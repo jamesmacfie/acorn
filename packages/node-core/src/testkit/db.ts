@@ -26,7 +26,7 @@ export function makeTestDb(): TestDb {
       try {
         rmSync(dir, { recursive: true, force: true })
       } catch {
-        // best effort. tmpdir is reaped by the OS anyway.
+        // Best effort. The OS reaps tmpdir anyway.
       }
     },
   }
@@ -42,13 +42,11 @@ export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRET
 // The 64-hex session key every test in the repo uses (docs/testing.md § Testkit).
 export const TEST_ENCRYPTION_KEY = '0'.repeat(64)
 
-// The `c.env` bindings a route test needs, in one place. Route tests used to hand-write
-// `{ DB: db, ...testSecretEnv('0'.repeat(64)) } as unknown as Env`, and twenty plugin test files
-// imported main/bindings.ts only to name the type of that cast.
+// The `c.env` bindings a route test needs, in one place.
 //
-// The cast is real and stays: `Env` is the full runtime binding set (devices, idempotency, pairing
-// codes, blobs, the capability resolver), and a test that exercises one route needs only the two or
-// three of them that route touches. Nothing here invents a binding; pass what the route reads.
+// The cast is real and stays. `Env` is the full runtime binding set: devices, idempotency, pairing
+// codes, blobs and the capability resolver. A test that exercises one route needs only the two or
+// three that route touches. Nothing here invents a binding, so pass what the route reads.
 export function testEnv(overrides: Partial<Env> = {}): Env {
   return { ...testSecretEnv(TEST_ENCRYPTION_KEY), ...overrides } as unknown as Env
 }
@@ -67,9 +65,9 @@ export function workspacePluginMigrations(plugin: string): string | null {
 
 export type TestPluginDb = { db: PluginDatabase; dataDir: string; cleanup: () => void }
 
-// A real per-plugin SQLite file in a temp data root (docs/testing.md § Testkit has how the migration
-// chain resolves). Keeping the schemas separate means a plugin's tests exercise the same ownership
-// boundary production does.
+// A real per-plugin SQLite file in a temp data root. See docs/testing.md § Testkit for how the
+// migration chain resolves. Separate schemas mean a plugin's tests exercise the ownership boundary
+// production has.
 export function makeTestPluginDb(plugin: string, migrationsFolder: string | null = workspacePluginMigrations(plugin)): TestPluginDb {
   if (!migrationsFolder) {
     throw new Error(`makeTestPluginDb('${plugin}') found no migration chain at plugins/${plugin}/migrations; pass the folder if it lives elsewhere.`)
@@ -88,7 +86,7 @@ export function makeTestPluginDb(plugin: string, migrationsFolder: string | null
       try {
         rmSync(dataDir, { recursive: true, force: true })
       } catch {
-        // best effort. tmpdir is reaped by the OS anyway.
+        // Best effort. The OS reaps tmpdir anyway.
       }
     },
   }

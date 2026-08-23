@@ -7,9 +7,8 @@ import { onScopeEvicted, openPane } from '@acorn/plugin-api/client'
 
 export type OpenFile = { path: string; ephemeral: boolean; dirty: boolean }
 
-// Open, or focus, a file. Ephemeral opens reuse the single preview slot (verne's model): the
-// previous ephemeral tab is replaced unless it is dirty, since an edit already promoted it in
-// spirit and should stay.
+// Open, or focus, a file. An ephemeral open reuses the single preview slot: it replaces the previous
+// ephemeral tab unless that tab is dirty, because an edit has already promoted it.
 export function openFileIn(list: OpenFile[], path: string, ephemeral: boolean): OpenFile[] {
   const existing = list.find((f) => f.path === path)
   if (existing) {
@@ -115,8 +114,8 @@ export function hydrateTaskEditorState(taskId: string, state: TaskEditorState): 
 export { byTask as editorStateByTask }
 
 // Every map here is keyed by a node-minted task id and must not survive a node switch
-// (docs/state.md § Scope rules): the persistence pass used to write each scope under the active
-// node's storage key, which let one node's state leak into another's namespace.
+// (docs/state.md § Scope rules). Writing each scope under the active node's storage key leaks one
+// node's state into another's namespace.
 export function clearEditorStates(): void {
   setByTask({})
 }

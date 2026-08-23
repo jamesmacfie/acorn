@@ -12,13 +12,12 @@ import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { agentDriverRegistry } from '@acorn/plugin-agents/main/drivers/registry.ts'
 import { assembleNodeGraph } from '../../src/server/composition'
 
-// The acceptance test for harness contributions (docs/managed-agents.md § Harnesses): the whole
-// opencode plugin from docs/plugin-authoring.md § Harnesses, on disk, through the real composition
-// root, appearing beside Claude and Codex.
+// The acceptance test for harness contributions (docs/managed-agents.md § Harnesses). The opencode
+// plugin from docs/plugin-authoring.md § Harnesses goes on disk, through the real composition root,
+// and lands beside Claude and Codex.
 //
-// It is the whole plugin. One manifest, one icon path, no node bundle, no client bundle, no build step
-// and no `exec` grant — which is what "a harness is data" has to mean if it means anything. If this
-// file needs a second file to pass, the seam is not finished.
+// This is the whole plugin: one manifest, one icon path, no node bundle, no client bundle, no build
+// step, no `exec` grant. If it needs a second file to pass, the seam is not finished.
 const OPENCODE = {
   id: 'opencode',
   name: 'OpenCode',
@@ -81,8 +80,8 @@ describe('a data-only harness plugin', () => {
     expect(graph.failures).toEqual([])
 
     const capabilities = new CapabilityRegistry()
-    // Provided before the plugins, matching both composition roots, and never started: agents registers
-    // its usage-refresh schedule during init and this suite asserts on registration, not on firing.
+    // Provided before the plugins and never started. Agents registers its usage-refresh schedule during
+    // init, and this suite asserts on registration, not on firing.
     capabilities.provide(SCHEDULER, new Scheduler(core.db))
     plugins = await initPlugins(graph.plugins, {
       capabilities,
@@ -92,8 +91,8 @@ describe('a data-only harness plugin', () => {
     })
     expect(plugins.failed).toEqual([])
 
-    // Beside the two built-ins, whose ids stay bare because both predate this seam and both are
-    // persisted; the contributed one is namespaced, and only the host ever mints that name.
+    // The two built-in ids stay bare because both are persisted. Only the host mints the namespaced
+    // name for a contributed one.
     expect(agentDriverRegistry.providers()).toEqual(['claude', 'codex', 'opencode:opencode'])
 
     const driver = agentDriverRegistry.create('opencode:opencode')!
@@ -105,13 +104,13 @@ describe('a data-only harness plugin', () => {
       // The same shared driver Claude runs on. Nothing downstream can tell which feeder answered.
       driverKind: 'acp',
     })
-    // Declared `manualCompaction`, so the pane may offer Compact; declared no session persistence, so
+    // Declared `manualCompaction`, so the pane may offer Compact. Declared no session persistence, so
     // resume is absent. Neither came from a list of ids inside acorn.
     expect(descriptor.capabilities).toContain('compact')
     expect(descriptor.capabilities).not.toContain('resume')
 
-    // A real plugin row, which is the whole reason a manifest-only package goes through the host rather
-    // than being delivered beside it: it is listed, and the owner can turn it off.
+    // A real plugin row is why a manifest-only package goes through the host: it is listed, and the
+    // owner can turn it off.
     expect(plugins.roster.find((row) => row.name === 'opencode')).toMatchObject({ state: 'active', required: false })
   })
 

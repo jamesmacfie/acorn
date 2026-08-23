@@ -12,9 +12,8 @@ import { createDatabaseFetch } from '../server/routes/database'
 //   ctx.routes.fetch()  the portable route carrier. A Hono instance cannot cross a process boundary and
 //                       a (Request) → Response function can.
 //
-// `ctx.capabilities.provide(DATABASE, …)` is gone. The route capability existed to cross the old
-// main/renderer boundary; the bridge is now a closure argument to the route factory
-// (server/routes/database.ts explains why). Nothing outside this plugin ever consumed it.
+// No route capability. The bridge is a closure argument to the route factory, so nothing outside this
+// plugin can reach it.
 export const databasePlugin = (): NodePlugin => ({
   name: 'database',
   init: (ctx) => {
@@ -23,7 +22,7 @@ export const databasePlugin = (): NodePlugin => ({
     const db = ctx.storage.open()
     ctx.routes.fetch(createDatabaseFetch(db, ctx.core, databaseBridge(ctx.core)), { prefix: '', note: '/tasks/:taskId/*' })
   },
-  // One resource left to release: the pg pools it opened per task. Its own WAL-mode SQLite file is the
-  // host's to close, and it does so right after this resolves, still before the data root's lock drops.
+  // One resource to release: the pg pools opened per task. The host closes this plugin's SQLite file
+  // itself, right after this resolves and before the data root's lock drops.
   dispose: () => endDbPools(),
 })

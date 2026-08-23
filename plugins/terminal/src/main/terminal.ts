@@ -96,12 +96,11 @@ export function sendToAgent(sessionId: string, text: string, submit: SendSubmit)
 
 // Spawn and enumerate, published by this plugin's init as the `terminal.sessions` capability
 // (contract/sessions.ts). A two-method object rather than a reach into the TerminalBridge, because
-// the bridge is the route layer's dependency: it exists to be nulled on dispose, and a capability
-// consumer resolving it would be reading this plugin's HTTP wiring.
+// the bridge is the route layer's dependency: it gets nulled on dispose, and a capability consumer
+// resolving it would be reading this plugin's HTTP wiring.
 //
 // Its one consumer is plugins/agents' terminal handoff, the only cross-plugin caller that needs to
-// start a PTY. It shares the bridge's list and create implementations; the other six methods stay
-// on the bridge alone.
+// start a PTY. It shares the bridge's list and create implementations, and not the other six.
 //
 // Named `sessionControl`, not `terminalSessions`, because that name is already the Drizzle table
 // this module imports, and shadowing it would silently rebind every query below.
@@ -538,10 +537,10 @@ export type TerminalIpcDeps = {
 // (node/index.ts), which runs before the data root's lock is dropped. Idempotent, so it's safe after
 // a partial boot that never started the idle watch.
 //
-// The session map is cleared. Without that, a second startServiceRuntime in one process inherits
-// the previous boot's sessions: `list()` would report PTYs owned by a torn-down engine, and the WS
-// hub's task-scope guard would resolve stream ids against them. The PTYs themselves are not killed:
-// a tmux session outliving the app is what the tmux backend is for.
+// Clearing the session map matters: without it, a second startServiceRuntime in one process inherits
+// the previous boot's sessions, so `list()` reports PTYs owned by a torn-down engine and the WS hub's
+// task-scope guard resolves stream ids against them. The PTYs themselves are not killed, because a
+// tmux session outliving the app is what the tmux backend is for.
 export function disposeTerminal(): void {
   if (idleWatch) {
     clearInterval(idleWatch)

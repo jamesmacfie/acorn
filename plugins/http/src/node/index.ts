@@ -11,10 +11,8 @@ import { createHttpFetch } from '../server/routes/http'
 //   ctx.routes.fetch()  the portable route carrier. A Hono instance cannot cross a process boundary
 //                       and a (Request) -> Response function can.
 //
-// No dispose at all. The one resource is this plugin's own WAL-mode SQLite file, and the host closes
-// what it opened through `ctx.storage`, before the data root's lock is dropped, as ever. There is no
-// bridge slot to clear either: the handler is a closure over the handle, and the plugin host drops a
-// re-registered plugin's previous route contributions itself.
+// No dispose. The host closes what it opened through `ctx.storage`, and drops a re-registered
+// plugin's previous route contributions itself.
 export const httpPlugin = (): NodePlugin => ({
   name: 'http',
   init: (ctx) => {

@@ -1,14 +1,10 @@
 // "Saved HTTP requests" in the agent composer, as the two routes the manifest's `agentContexts`
 // descriptor names (docs/http-client.md § Client).
 //
-// The rows here come straight out of this plugin's SQLite with the ciphertext already opened: real
-// bearer tokens, real bodies, real variable values. The redaction lives in its own module with its
-// own test rather than inline in a handler. The shape below is an allowlist: every field named is
-// one a reader decided an agent may see. Adding a field is an explicit act.
-//
-// What the host does not let this file decide: `source` (bound from the plugin id), the capture
-// time, and the byte measurement the 512 KiB composer ceiling is checked against. The only thing
-// that can go wrong here is disclosure.
+// These rows arrive with the ciphertext already opened: real bearer tokens, real bodies, real
+// variable values. The shape below is an allowlist, so adding a field is an explicit act. The host
+// binds `source`, the capture time, and the byte measurement, so the only thing that can go wrong
+// here is disclosure.
 import { MAX_PLUGIN_AGENT_CONTEXT_OPTIONS } from '@acorn/protocol/agentContext.ts'
 import type { AgentContextOption, PluginAgentContextSnapshotBody } from '@acorn/protocol/agentContext.ts'
 import type { HttpRequest } from '../shared/model'

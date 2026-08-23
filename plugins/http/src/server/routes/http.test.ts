@@ -26,21 +26,18 @@ const requestBody = {
 const principal = (login: string, kind: Principal['kind'] = 'device'): Principal => ({ kind, userId: login })
 
 describe('HTTP credential isolation', () => {
-  // The router is a factory over this plugin's own database, so the test hands it one instead of putting
-  // core's handle on `c.env`. Nothing about `c.env` is used any more except the one symbol the carrier
-  // puts there, which is what `call` below supplies.
-  // The host's own context for this plugin, on the loaded tier (the only tier http has). The
-  // permissions come from the plugin's own acorn-plugin.config.mjs, so `ctx.core` here holds exactly
-  // the facets the owner is told about: under-declare `tasks`, `projects:read` or `secrets` in the
-  // config and these routes stop working in this suite too.
+  // The router is a factory over this plugin's own database, so the test hands it one instead of
+  // putting core's handle on `c.env`. Permissions come from the plugin's own
+  // acorn-plugin.config.mjs, so under-declaring `tasks`, `projects:read`, or `secrets` there breaks
+  // these routes in this suite too.
   let ctx: TestNodeContext
   let pluginDb: PluginDatabase
 
   beforeEach(async () => {
     const config = await validatePluginConfig(PACKAGE_ROOT)
     if (!config.ok) throw new Error(config.reason)
-    // No `migrations`: the testkit resolves this checkout's plugins/http/migrations from the id, the same
-    // chain the builder stages inside the package for the real loader to find.
+    // No `migrations`: the testkit resolves plugins/http/migrations from the id, the same chain the
+    // builder stages inside the package for the real loader.
     ctx = makeTestNodeContext({
       plugin: { name: 'http' },
       permissions: config.manifest.permissions.node,
@@ -77,12 +74,11 @@ describe('HTTP credential isolation', () => {
     ctx.cleanup()
   })
 
-  // Straight through the portable carrier, which is the only door these routes have now: no host Hono
-  // stack, no middleware-set principal, and the identity arriving as the request context the host binds.
+  // Straight through the portable carrier, the only door these routes have: no host Hono stack, no
+  // middleware-set principal, and the identity arriving as the request context the host binds.
   const call = async (caller: Principal, path: string, init?: RequestInit) => {
-    // The real request context, over the real bindings. It used to be a literal with four throwing
-    // provider stubs; http registers no provider, so the host's own ownership check is what refuses
-    // them now, and nothing here has to remember to keep the shape up to date.
+    // The real request context over the real bindings, so nothing here has to keep a stub shape up to
+    // date.
     const context = await makeTestRequestContext({ plugin: 'http', principal: caller, env: ctx.env })
     return createHttpFetch(pluginDb, ctx.core)(new Request(`http://acorn.test${path}`, init), context)
   }
@@ -170,7 +166,7 @@ describe('HTTP credential isolation', () => {
     expect(await response.json()).toMatchObject({ error: { code: 'interactive_user_required' } })
   })
 
-  // ── The descriptor routes the move added: what the host reads, not what the frame reads ───────────
+  // ── Descriptor routes: what the host reads, not what the frame reads ───────────
 
   const save = (login: string, body: Record<string, unknown>) =>
     call(principal(login), '/projects/project-web/requests', {
@@ -211,8 +207,8 @@ describe('HTTP credential isolation', () => {
       body: JSON.stringify({ taskId: 'task-web', optionIds: [adhoc.id] }),
     })
     expect(captured.status).toBe(200)
-    // The assertion the whole node-side move rests on: the rows this route read had their ciphertext
-    // opened, and the snapshot still carries no credential.
+    // The rows this route read had their ciphertext opened, and the snapshot still carries no
+    // credential.
     const body = JSON.stringify(await captured.json())
     expect(body).toContain('Login')
     for (const secret of ['query-secret', 'header-secret', 'body-secret', 'auth-secret', 'override-secret']) {

@@ -1,5 +1,5 @@
 // Frame-safe components: props in and DOM out. See docs/plugins.md § The plugin API for the
-// barrel/tier boundary this is held to and the 2026-08-14 prune pass.
+// barrel and tier boundary this is held to.
 //
 // The diff toolkit sits on @acorn/plugin-api/ui/diff instead of here: it is a domain toolkit rather
 // than a primitive, and its `Row` type would collide with the `Row` layout component below.
@@ -28,14 +28,10 @@ export { createSplitDrag } from '@acorn/client-core/ui/split.ts'
 // The delegated tooltip protocol, as a typed helper. Attributes are the API; a wrapper component
 // would add an element around every trigger, which is exactly what the protocol avoids.
 export { tip } from '@acorn/client-core/ui/tips.tsx'
-// `mountFrameTips`, the frame-side tooltip listener, was here until `mountFrame` on ./ui/sdk started
-// calling it as part of the boot sequence every frame repeats. A frame gets tooltips by mounting; it
-// does not need the listener handed to it separately.
+// A frame gets tooltips by mounting: `mountFrame` on ./ui/sdk calls the frame-side listener itself.
 //
 // Behavior that isn't a component ships as a hook, following the dismissable.ts precedent.
-// Arm-to-confirm exists because a sandboxed frame's `window.confirm` silently returns false. The
-// anchored-popover hook came off this surface with it: five call sites inside client-core use it, no
-// plugin does.
+// Arm-to-confirm exists because a sandboxed frame's `window.confirm` silently returns false.
 export { createArmedConfirm } from '@acorn/client-core/ui/confirm.ts'
 export { default as CopyButton } from '@acorn/client-core/ui/CopyButton.tsx'
 export { default as MentionTextarea } from '@acorn/client-core/ui/MentionTextarea.tsx'
@@ -43,25 +39,21 @@ export { Modal } from '@acorn/client-core/ui/Modal.tsx'
 export { Tabs } from '@acorn/client-core/ui/Tabs.tsx'
 export type { TabDef } from '@acorn/client-core/ui/Tabs.tsx'
 export { UserAvatar } from '@acorn/client-core/ui/UserAvatar.tsx'
-// Provider markdown to sanitized HTML. Also on ./client, because the compiled shell reaches it
-// through that barrel. It is here too because a sandboxed frame rendering a ticket description needs
-// it without pulling in the router/query/apiClient half of ./client for one pure string function. It
-// qualifies for this barrel on its own terms: no imports, no DOM, text in and markup out.
+// Provider markdown to sanitized HTML. Also on ./client, which the compiled shell reaches it
+// through. It is here too so a sandboxed frame rendering a ticket description does not pull in the
+// router/query/apiClient half of ./client for one pure string function.
 export { renderMarkdown } from '@acorn/client-core/integrations/markdown.ts'
 
-// A density token as a number, on this barrel for the same reason as `renderMarkdown`: no imports, no
-// state. A virtualized list cannot get its row height from CSS at all; @tanstack/solid-virtual needs
-// a number and writes the result back as an inline style that beats any stylesheet rule. A frame gets
+// A density token as a number, on this barrel for the same reason as `renderMarkdown`: no imports,
+// no state. A virtualized list cannot read its row height from CSS. @tanstack/solid-virtual needs a
+// number and writes the result back as an inline style that beats any stylesheet rule. A frame gets
 // the same tokens the shell does, pushed onto `:root` by the SDK, so a plugin's grid can honor a
-// style pack's density instead of hardcoding 30. The generic `cssPx` reader went with the prune pass:
-// one grid needs one number, not a way to read any token as pixels.
+// style pack's density instead of hardcoding 30.
 export { rowHeightSm } from '@acorn/client-core/ui/metrics.ts'
 
 // Controlled connection and model dropdowns over `availableModelConnections`. On this barrel because
 // it is presentation only, a protocol type in and two selects out, and a plugin whose own route calls
-// `core.models.generateText` needs to offer the picker from a frame. This is now the only entrypoint
-// that carries it: a ./ui/host copy existed for compiled panes that were supposed to import it from
-// there, and no pane ever did.
+// `core.models.generateText` needs to offer the picker from a frame.
 export { default as ModelConnectionPicker, defaultModelIdFor } from '@acorn/client-core/modelProviders/ModelConnectionPicker.tsx'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────

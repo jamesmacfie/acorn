@@ -20,13 +20,12 @@ export const tmuxName = (id: string) => `${TMUX_PREFIX}${id}`
 // argv for the two tmux calls. new-session -A -d is create-or-noop, detached (a separate attach PTY
 // drives it). -c sets cwd; the trailing command runs only when the session is created.
 //
-// `-e KEY=VAL` sets the session environment explicitly (tmux >=3.2). This is load-bearing: the tmux
-// server is a singleton, and a session created against an already-running server does not inherit the
-// env handed to execFileSync. It takes the server's stale global env plus only the
-// `update-environment` allowlist, silently dropping ACORN_TASK_ID and ACORN_API_TOKEN. That made agent
-// panes (tmux backend) show "connected, no tools" while shell panes (node-pty, full env) worked.
-// Passing every var via -e replicates node-pty's behaviour regardless of server state. Session names
-// are unique per pane, so -A never attaches to an existing one where -e would not apply.
+// `-e KEY=VAL` sets the session environment explicitly (tmux >=3.2), and it is load-bearing. The tmux
+// server is a singleton, so a session created against an already-running one does not inherit the env
+// handed to execFileSync. It takes the server's stale global env plus the `update-environment`
+// allowlist, silently dropping ACORN_TASK_ID and ACORN_API_TOKEN. That made agent panes show
+// "connected, no tools" while shell panes worked. Session names are unique per pane, so -A never
+// attaches to an existing session where -e would not apply.
 export const tmuxNewSessionArgs = (name: string, cwd: string, command: string, env: Record<string, string> = {}) => [
   'new-session',
   '-A',
@@ -47,8 +46,8 @@ export const tmuxAttachArgs = (name: string) => ['-u', '-T', 'RGB', 'attach', '-
 
 // launchArgs reach node-pty as a real argv, but tmux and the -lc fallback take one shell line, so
 // quote each arg here (docs/notes-and-memory.md § Context integration). The args are const strings
-// from a profile definition, never user input; quoting handles spaces and apostrophes in the prompt
-// text, not a trust boundary.
+// from a profile definition, never user input, so the quoting handles spaces and apostrophes rather
+// than acting as a trust boundary.
 const shellQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
 export const launchCommandLine = (command: string, launchArgs: string[] = []): string =>
   launchArgs.length ? [command, ...launchArgs.map(shellQuote)].join(' ') : command
@@ -101,8 +100,8 @@ export function matchBlockedPrompt(ringTail: string): boolean {
 }
 
 // Wraps text as one bracketed-paste block (docs/terminal-and-agents.md § Sending text to an agent).
-// Strips stray paste markers first: a payload containing ESC[201~ would end the paste early, so it
-// has to go. Trailing whitespace is trimmed too, so the caller's '\r' is the only terminator.
+// Strips stray paste markers first, because a payload containing ESC[201~ would end the paste early,
+// and trims trailing whitespace so the caller's '\r' is the only terminator.
 export const PASTE_BEGIN = '\x1b[200~'
 export const PASTE_END = '\x1b[201~'
 // eslint-disable-next-line no-control-regex

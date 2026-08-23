@@ -1,8 +1,7 @@
-// Local-changes review backing: working-tree status, per-file patch and blob reads, plus
-// stage/commit/discard/push, all over the task's worktree. Used to be the `local:*` IPC channels
-// (preload group `terminal.local`); now the LocalGitBridge behind the HTTP routes in
+// Local-changes review backing: working-tree status, per-file patch and blob reads, plus stage,
+// commit, discard, and push over the task's worktree. The LocalGitBridge behind the HTTP routes in
 // server/routes/localGit.ts. The taskId is the capability, and relative paths are validated inside
-// localDiff.ts. Pure Node, so it works in dev:node too; wired in main/serverBridges.ts.
+// localDiff.ts. Pure Node, so it works in dev:node too. Wired in main/serverBridges.ts.
 import type { CoreServices } from '@acorn/plugin-api/node'
 import type { LocalGitBridge } from '../server/routes/localGit'
 import { commitStaged, discardAll, discardFile, localChanges, localDiff, localFileBlob, pushBranch, stageAll, stageFile, unstageAll, unstageFile } from './localDiff'

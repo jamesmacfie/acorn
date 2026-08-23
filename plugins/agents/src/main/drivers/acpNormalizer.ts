@@ -95,10 +95,9 @@ function toolStatus(status: string | null | undefined): 'pending' | 'running' | 
   return 'running'
 }
 
-// `harness` is the label of the agent whose events these are, and it is a parameter rather than a
-// constant because this file is the shared half of the generic driver (main/drivers/acpDriver.ts). It
-// used to write "Claude" into three user-visible strings, which would have named the wrong agent for
-// every harness the moment a second one arrived.
+// `harness` is the label of the agent whose events these are. A parameter, not a constant, because
+// this file is the shared half of the generic driver (main/drivers/acpDriver.ts) and it writes the
+// label into three user-visible strings.
 export function normalizeAcpUpdate(update: SessionUpdate, harness: string): AgentNormalizedEvent[] {
   switch (update.sessionUpdate) {
     case 'user_message_chunk':

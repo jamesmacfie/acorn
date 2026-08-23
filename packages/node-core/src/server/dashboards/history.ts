@@ -2,8 +2,8 @@ import { and, asc, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm'
 import type { DashboardHistoryResponse, DashboardMeasureSample } from '@acorn/protocol/api.ts'
 import { type AppDatabase, schema } from '../db'
 
-// The measure-history store, node-side with its own table and no write route; see docs/dashboards.md
-// § Sampling and retention for why the sampler is the only writer.
+// The measure-history store, node-side with its own table and no write route. See
+// docs/dashboards.md § Sampling and retention for why the sampler is the only writer.
 
 /** UTC hour start for an instant. One sample per bucket per panel, so the primary key makes finer
  *  granularity unrepresentable. */
@@ -12,12 +12,11 @@ export const DAY_MS = 24 * HOUR_MS
 export const hourBucket = (at: number): number => Math.floor(at / HOUR_MS) * HOUR_MS
 export const dayBucket = (at: number): number => Math.floor(at / DAY_MS) * DAY_MS
 
-/** Hourly retention window; see docs/dashboards.md § Sampling and retention for the full policy. */
+/** Hourly retention window. See docs/dashboards.md § Sampling and retention for the full policy. */
 export const HOURLY_RETENTION_MS = 14 * DAY_MS
-/** Daily retention window; see docs/dashboards.md § Sampling and retention for the full policy. */
+/** Daily retention window. See docs/dashboards.md § Sampling and retention for the full policy. */
 export const DAILY_RETENTION_MS = 400 * DAY_MS
-/** Hard cap per panel after compaction; see docs/dashboards.md § Sampling and retention for why it
- *  exists and how far under it the retention windows land. */
+/** Hard cap per panel after compaction. See docs/dashboards.md § Sampling and retention. */
 export const MAX_SAMPLES_PER_PANEL = 1000
 
 // Imported from the protocol rather than redeclared, so the client's sparkline and this store
@@ -27,9 +26,9 @@ export type MeasureSeries = DashboardHistoryResponse
 
 /** Record one sample, resetting the series first if the panel's meaning changed.
  *
- *  The signature check lives here rather than in the sampler because it is a property of the store's
+ *  The signature check lives here rather than in the sampler because it belongs to the store's
  *  contract: a row whose signature disagrees with the one being written describes a different
- *  measure, and keeping the two side by side would make every read ambiguous. */
+ *  measure, and keeping both makes every read ambiguous. */
 export async function appendSample(
   db: AppDatabase,
   input: { panelId: string; signature: string; bucket: number; value: number; recordedAt: number },
@@ -44,9 +43,8 @@ export async function appendSample(
   await db
     .insert(schema.dashboardMeasureSamples)
     .values(input)
-    // A bucket already written is overwritten rather than kept: within one hour the later look is
-    // the better answer, and "run now" from the settings page must not be a no-op for the rest of
-    // the hour.
+    // A bucket already written is overwritten. Within one hour the later look is the better answer,
+    // and "run now" from the settings page must not be a no-op for the rest of the hour.
     .onConflictDoUpdate({
       target: [schema.dashboardMeasureSamples.panelId, schema.dashboardMeasureSamples.bucket],
       set: { value: input.value, signature: input.signature, recordedAt: input.recordedAt },
@@ -54,7 +52,7 @@ export async function appendSample(
   return { reset }
 }
 
-/** The series for one panel, ascending. An empty series is `{ signature: '', samples: [] }`; see
+/** The series for one panel, ascending. An empty series is `{ signature: '', samples: [] }`. See
  *  docs/dashboards.md § Trends for why that renders as a cold state rather than an error. */
 export async function readSeries(db: AppDatabase, panelId: string, since?: number): Promise<MeasureSeries> {
   const rows = await db
@@ -84,8 +82,8 @@ export async function deleteSeries(db: AppDatabase, panelIds: readonly string[])
   return Number(result.changes ?? 0)
 }
 
-/** Every panel this store holds samples for; see docs/dashboards.md § Sampling and retention for the
- *  orphan sweep this feeds. */
+/** Every panel this store holds samples for. Feeds the orphan sweep in docs/dashboards.md § Sampling
+ *  and retention. */
 export async function sampledPanelIds(db: AppDatabase): Promise<string[]> {
   const rows = await db
     .selectDistinct({ panelId: schema.dashboardMeasureSamples.panelId })
@@ -95,7 +93,7 @@ export async function sampledPanelIds(db: AppDatabase): Promise<string[]> {
 
 export type CompactionResult = { collapsed: number; dropped: number; orphaned: number }
 
-/** Retention, as one daily pass (`core:compact-history`); see docs/dashboards.md § Sampling and
+/** Retention, as one daily pass (`core:compact-history`). See docs/dashboards.md § Sampling and
  *  retention for the policy and the orphan sweep. */
 export async function compactHistory(
   db: AppDatabase,
@@ -111,9 +109,9 @@ export async function compactHistory(
     orphaned = await deleteSeries(db, stale)
   }
 
-  // Older than the hourly window: keep the last bucket of each UTC day, delete the rest. One read
-  // and one delete per panel rather than a SQL window function, because a series is at most a few
-  // hundred rows and this job runs once a day.
+  // Older than the hourly window: keep the last bucket of each UTC day, delete the rest. One read and
+  // one delete per panel rather than a SQL window function, because a series is at most a few hundred
+  // rows and this job runs once a day.
   const hourlyFloor = hourBucket(now) - HOURLY_RETENTION_MS
   const oldRows = await db
     .select({ panelId: schema.dashboardMeasureSamples.panelId, bucket: schema.dashboardMeasureSamples.bucket })
@@ -146,7 +144,7 @@ export async function compactHistory(
     .where(lt(schema.dashboardMeasureSamples.bucket, dailyFloor))
   dropped += Number(expired.changes ?? 0)
 
-  // The cap, last, so it measures what compaction actually left behind.
+  // The cap runs last, so it measures what compaction left behind.
   for (const panelId of await sampledPanelIds(db)) {
     const rows = await db
       .select({ bucket: schema.dashboardMeasureSamples.bucket })

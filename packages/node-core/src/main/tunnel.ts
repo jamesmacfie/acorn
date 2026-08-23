@@ -6,8 +6,8 @@ import { claimUpgrade } from './upgradeClaim'
 import { authorizeWsUpgrade, type WsAuthDeps } from './wsHub'
 
 export type TunnelDeps = WsAuthDeps & {
-  // Ports this task legitimately serves on, resolved by the node (docs/api-reference.md § WebSocket).
-  // Empty, or a throw, means nothing is tunnellable for that task, which is the safe answer.
+  // Ports this task legitimately serves on (docs/api-reference.md § WebSocket). Empty, or a throw,
+  // means nothing is tunnellable for that task.
   declaredPorts(taskId: string): Promise<readonly number[]>
 }
 
@@ -22,7 +22,7 @@ const tunnelDisposers = new WeakMap<Server, () => void>()
 type Target = { taskId: string; port: number }
 
 // `?task=<uuid>&port=<n>`. A query rather than a path segment, so the path stays a constant the
-// upgrade handler can match with `===`, the same shape wsHub uses.
+// upgrade handler matches with `===`, the shape wsHub uses.
 function parseTarget(url: string | undefined, host: string): Target | null {
   let parsed: URL
   try {
@@ -39,26 +39,24 @@ function parseTarget(url: string | undefined, host: string): Target | null {
 
 // Refusing has to survive a peer that has already gone away.
 //
-// The window is real and not small: between `claimUpgrade` and the refusal the handler awaits a
-// device lookup and the port resolver, which reads the tasks table, the project config row and,
-// through the run bridge, possibly a `url_command`. A client that connects and immediately RSTs
-// leaves a destroyed socket, and `write` on one emits an `'error'` that the HTTP server is not
-// listening for any more, since it already handed the socket over. That turns into an
-// `uncaughtException` that takes the service down and spends part of its restart budget, so a loop of
-// half-open upgrades was a remote denial of service.
+// Between `claimUpgrade` and the refusal the handler awaits a device lookup and the port resolver,
+// which reads the tasks table, the project config row, and possibly a `url_command`. A client that
+// connects and immediately RSTs leaves a destroyed socket, and `write` on one emits an `'error'` the
+// HTTP server no longer listens for, having handed the socket over. That becomes an
+// `uncaughtException`, so a loop of half-open upgrades is a remote denial of service.
 const refuse = (socket: Duplex, status: number, reason: string): void => {
   socket.on('error', () => {})
   if (socket.writable) socket.write(`HTTP/1.1 ${status} ${reason}\r\n\r\n`)
   socket.destroy()
 }
 
-// Pipe a WebSocket and a TCP socket into each other. Binary both ways: a dev server's bytes are not
-// text, and without `binaryType` set `ws` would hand them over as string fragments and corrupt
+// Pipe a WebSocket and a TCP socket into each other. Binary both ways, because a dev server's bytes
+// are not text and without `binaryType` set `ws` hands them over as string fragments and corrupts
 // anything non-UTF8.
 //
-// Flow control runs in both directions, and it has to be real rather than the drop-on-overflow the
-// events hub uses: dropping a frame there costs a client a `seq` gap and a refetch, whereas dropping
-// bytes here corrupts a TCP stream with no way to notice.
+// Flow control runs in both directions, and it has to block rather than drop the way the events hub
+// does. A dropped frame there costs a client a `seq` gap and a refetch. Dropped bytes here corrupt a
+// TCP stream with no way to notice.
 function bridge(ws: WebSocket, tcp: Socket): void {
   ws.binaryType = 'nodebuffer'
   const closeBoth = (): void => {
@@ -66,16 +64,16 @@ function bridge(ws: WebSocket, tcp: Socket): void {
     if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close()
   }
 
-  // client to node. `write` returning false is TCP backpressure; pausing the WebSocket stops `ws`
-  // reading, which closes the kernel window back to the client.
+  // client to node. `write` returning false is TCP backpressure, and pausing the WebSocket stops
+  // `ws` reading, which closes the kernel window back to the client.
   ws.on('message', (data: Buffer) => {
     if (!tcp.write(data)) ws.pause()
   })
   tcp.on('drain', () => ws.resume())
 
-  // node to client. `ws.send`'s callback fires once the frame has been handed to the socket, so it is
-  // the drain signal. No polling on `bufferedAmount`, and no unbounded queue in this process if the
-  // LAN link is slower than the dev server.
+  // node to client. `ws.send`'s callback fires once the frame reaches the socket, so it is the drain
+  // signal. No polling on `bufferedAmount`, and no unbounded queue here when the LAN link is slower
+  // than the dev server.
   tcp.on('data', (chunk: Buffer) => {
     tcp.pause()
     ws.send(chunk, () => tcp.resume())
@@ -87,9 +85,8 @@ function bridge(ws: WebSocket, tcp: Socket): void {
   tcp.on('error', closeBoth)
 }
 
-// A live pipe, remembered so revocation can tear it down. Same reason `wsHub`'s `Conn` carries a
-// deviceId: a socket holds no bearer to re-present, so the connection has to remember which device it
-// belongs to.
+// A live pipe, remembered so revocation can tear it down. Like `wsHub`'s `Conn`, it carries a
+// deviceId, because a socket holds no bearer to re-present.
 type Pipe = { ws: WebSocket; tcp: Socket; deviceId: string | null }
 
 export function attachTunnel(server: Server, deps: TunnelDeps): void {
@@ -99,13 +96,13 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
   const closePipe = (pipe: Pipe): void => {
     pipes.delete(pipe)
     pipe.tcp.destroy()
-    pipe.ws.terminate() // terminate, not close: an invalidated credential must not survive a handshake
+    pipe.ws.terminate() // terminate, not close, so an invalidated credential cannot survive a handshake
   }
   const offRevoked = deps.devices.onRevoked((deviceId) => {
     for (const pipe of [...pipes]) if (pipe.deviceId === deviceId) closePipe(pipe)
   })
-  // The backstop, for a revoke this process never heard about. Same interval and same injection point
-  // as wsHub's.
+  // The backstop, for a revoke this process never heard about. Same interval and injection point as
+  // wsHub's.
   const sweep = setInterval(() => {
     void (async () => {
       for (const pipe of [...pipes]) {
@@ -119,10 +116,10 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
     // Parsing only; authorizeWsUpgrade below is what checks the Host against the allowlist.
     const host = req.headers.host ?? 'placeholder.invalid'
     const target = parseTarget(req.url, host)
-    // Only claim our own path, leaving `/v2/events` (and anything later) to its own handler, the same
-    // contract wsHub's handler observes.
+    // Claim only our own path, leaving `/v2/events` and anything later to its own handler, the same
+    // contract wsHub's handler keeps.
     if (!target) return
-    // Synchronously, for the reason main/upgradeClaim.ts gives: the sweeper cannot await our auth.
+    // Synchronously, because the sweeper in main/upgradeClaim.ts cannot await our auth.
     claimUpgrade(socket)
     void (async () => {
       const authorized = await authorizeWsUpgrade(req, deps)
@@ -130,14 +127,14 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
       const claims = authorized.internal
       if (claims?.scope === 'task' && claims.taskId !== target.taskId) return refuse(socket, 403, 'Forbidden')
 
-      // A throw is the same answer as an empty list: nothing is tunnellable, which is the safe direction.
+      // A throw means the same as an empty list: nothing is tunnellable.
       const ports: readonly number[] = await deps.declaredPorts(target.taskId).catch(() => [] as number[])
       if (!ports.includes(target.port)) return refuse(socket, 403, 'Forbidden')
 
       const tcp = connect({ host: LOOPBACK, port: target.port })
-      // The listener stays attached through the handshake. `removeAllListeners('error')` on connect
-      // used to leave a window with no error listener at all, so a dev server that reset between
-      // `connect` and the upgrade write produced an unhandled `'error'` that took the process down.
+      // The listener stays attached through the handshake. Clearing it on connect leaves a window
+      // with no error listener, so a dev server that resets between `connect` and the upgrade write
+      // emits an unhandled `'error'` that takes the process down.
       let handedOver = false
       tcp.on('error', () => {
         if (!handedOver) refuse(socket, 502, 'Bad Gateway')

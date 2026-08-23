@@ -27,9 +27,9 @@ const run = async <T>(fn: () => Promise<T>): Promise<T> => fn().catch(toBridgeEr
 
 const isActive = (c: DockerContainerSummary): boolean => c.state === 'running' || c.state === 'paused' || c.state === 'restarting'
 
-// `tasks` is a core table and this plugin owns no tables of its own, so its two task reads, one id
-// and the whole active set for the rail badge, come through the core service rather than a db
-// handle it should not hold (docs/data-layer.md § Plugin databases).
+// `tasks` is a core table and this plugin owns none, so its two task reads, one id and the whole
+// active set for the rail badge, come through the core service rather than a db handle
+// (docs/data-layer.md § Plugin databases).
 export type DockerCoreServices = Pick<CoreServices, 'tasks'>
 
 export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsServerFrame) => void): DockerBridge {
@@ -124,9 +124,8 @@ export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsSer
     taskContainers: (taskId) => run(() => linkedContainers(taskId)),
     taskTeardown: (taskId) => run(async () => {
       // Compose projects get `compose -p <project> down`: compose reconstructs the project from
-      // labels, so no compose file is needed and it works even after the worktree is gone. Loose
-      // linked containers are just stopped. Volumes are kept (no -v) to stop reclaiming RAM, not
-      // data.
+      // labels, so no compose file is needed and it works after the worktree is gone. Loose linked
+      // containers are stopped. Volumes are kept (no -v): this reclaims RAM, not data.
       const matched = await linkedContainers(taskId)
       const projects = [...new Set(matched.flatMap((c) => (c.composeProject ? [c.composeProject] : [])))]
       const loose = matched.filter((c) => !c.composeProject && isActive(c))

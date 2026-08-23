@@ -20,8 +20,8 @@ const installSource = z.union([
 const installBody = z.strictObject({ source: installSource, allowDowngrade: z.boolean().optional() })
 const updateBody = z.strictObject({ allowDowngrade: z.boolean().optional() })
 const uninstallBody = z.strictObject({ purgeData: z.boolean().optional() })
-// The owner's answer to one agent-raised request. `message` is written by the device, never by the
-// agent: the sentence the agent is told is the one piece of this exchange the human's side owns.
+// The owner's answer to one agent-raised request. The device writes `message`, never the agent: the
+// sentence the agent is told is the one piece of this exchange the human's side owns.
 const requestDecisionBody = z.strictObject({
   decision: z.enum(['approved', 'denied']),
   message: z.string().min(1).max(400).optional(),
@@ -36,7 +36,7 @@ const requireIdempotencyKey = (c: Context<AppEnv>): Response | null =>
     : respondError(c, 400, 'bad_request', ['This request must carry an Idempotency-Key header.'])
 
 // The installer's refusals are all operator-fixable: a bad manifest, an unreachable release, a
-// downgrade. So they surface as one 400 carrying the sentence rather than a 500. Same stance
+// downgrade. They surface as one 400 carrying the sentence rather than a 500, the stance
 // routes/backup.ts takes for tar failures.
 const asBadRequest = async <T>(work: () => Promise<T> | T): Promise<T> => {
   try {
@@ -48,13 +48,11 @@ const asBadRequest = async <T>(work: () => Promise<T> | T): Promise<T> => {
 
 export const plugins = new Hono<AppEnv>()
   .get('/', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => pluginState(bridge)))
-  // The client bundle itself (docs/plugins.md). Not viaBridge: that
-  // helper always JSONs, and this is the one response in the family that is bytes.
+  // The client bundle itself (docs/plugins.md). Not viaBridge, because that helper always JSONs and
+  // this is the one response in the family that is bytes.
   //
-  // Gated by mount, not by handler (docs/security.md § Transport and auth): server/index.ts puts
-  // requireDevice over `/v2/core/plugins/*` as well as the bare path, so a route added here later
-  // cannot arrive ungated. A task-scoped internal token gets 403: which code a device runs is an
-  // owner decision.
+  // Gated by mount, not by handler (docs/security.md § Transport and auth). A task-scoped internal
+  // token gets 403, because which code a device runs is an owner decision.
   .get('/:id/client.js', async (c) => {
     const bridge = routeCapabilityFor(c, PLUGIN_STATE)
     if (!bridge) return respondError(c, 503, 'bridge-unavailable')
@@ -68,8 +66,8 @@ export const plugins = new Hono<AppEnv>()
       'content-type': 'text/javascript; charset=utf-8',
       etag,
       'x-content-type-options': 'nosniff',
-      // The device's cache is content-addressed and does the real caching; an HTTP cache in front of
-      // a device-authenticated response would only add a second place for these bytes to live.
+      // The device's cache is content-addressed and does the real caching. An HTTP cache in front of
+      // a device-authenticated response only adds a second place for these bytes to live.
       'cache-control': 'private, no-store',
     })
   })
@@ -77,18 +75,16 @@ export const plugins = new Hono<AppEnv>()
     const parsed = body.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, PLUGIN_STATE, async (bridge) => {
-      // Roster union installed union what the loader refused: a client-only package has no roster row,
-      // a package whose manifest never parsed is in neither, and a toggle this route cannot accept is a
-      // checkbox that silently does not stick. Turning a broken package off is the owner's one way to
-      // stop it reporting, so it has to be a name this route recognises.
+      // Roster union installed union what the loader refused. A client-only package has no roster row
+      // and a package whose manifest never parsed is in neither. Turning a broken package off is the
+      // owner's one way to stop it reporting, so this route has to recognise its name.
       const known = new Map<string, { required: boolean }>([
         ...bridge.loadFailures().map((entry) => [entry.id, { required: false }] as const),
         ...bridge.installed().map((entry) => [entry.id, { required: false }] as const),
         ...bridge.roster().map((entry) => [entry.name, entry] as const),
       ])
-      // Both rejections are 400 rather than a silent filter. A typo'd name that vanished would leave the
-      // owner looking at a checkbox that would not stick and no explanation; a `required` name silently
-      // dropped would do the same, and the client already knows which rows are not togglable.
+      // Both rejections are 400 rather than a silent filter. A dropped name leaves the owner looking at
+      // a checkbox that will not stick, with no explanation.
       for (const name of parsed.data.disabled) {
         const entry = known.get(name)
         if (!entry) throw new BridgeError(400, 'bad_request', `Unknown plugin: ${name}`)
@@ -97,26 +93,24 @@ export const plugins = new Hono<AppEnv>()
       const before = [...bridge.disabled()].sort()
       bridge.setDisabled(parsed.data.disabled)
       const after = [...parsed.data.disabled].sort()
-      // Only on a real change. The client PUTs the whole list on every toggle, and a no-op PUT, a
-      // re-render, a second client re-saving what it already read, is not a decision anyone made.
+      // Only on a real change. The client PUTs the whole list on every toggle, and a no-op PUT is not a
+      // decision anyone made.
       if (before.join(' ') !== after.join(' ')) {
         auditRequest(c, {
           action: 'plugins.disabled.changed',
           // The list, not a diff: which plugins a node runs decides which routes exist and which
-          // databases open, so the state that was chosen is what an owner needs to see.
+          // databases open, so the owner needs to see the state that was chosen.
           details: { disabled: after.join(', ') || '(none)' },
         })
       }
       return pluginState(bridge)
     })
   })
-  // Install, update, uninstall (docs/plugins.md § Loaded plugins).
+  // Install, update, uninstall (docs/plugins.md § Loaded plugins). Owner surface, device-gated by
+  // mount, never reachable with a task-scoped internal token (docs/security.md § Credential handling).
   //
-  // Owner surface, like the rest of this router: device-gated by mount, never reachable with a
-  // task-scoped internal token (docs/security.md § Credential handling).
-  //
-  // Nothing here starts a plugin. Each answers "the disk now says this", and the roster above turns
-  // that into the pending state and the restart banner.
+  // Nothing here starts a plugin. Each answers "the disk says this", and the roster above turns that
+  // into the pending state and the restart banner.
   .post('/install', async (c) => {
     const missing = requireIdempotencyKey(c)
     if (missing) return missing
@@ -127,7 +121,7 @@ export const plugins = new Hono<AppEnv>()
       auditRequest(c, {
         action: 'plugins.installed',
         subject: result.id,
-        // The source as the owner gave it, not as it resolved: "which URL did I paste" is the question
+        // The source as the owner gave it, not as it resolved. "Which URL did I paste" is the question
         // an audit row gets read to answer, and the resolved asset URL is in the node's lockfile.
         details: { version: result.version, source: JSON.stringify(parsed.data.source) },
       })
@@ -151,7 +145,7 @@ export const plugins = new Hono<AppEnv>()
     })
   })
   // The one exception to "nothing here starts a plugin" (docs/plugins.md § The dev loop § Reloading
-  // one plugin without a restart). Loaded plugins only; a built-in is refused with the installer's own
+  // one plugin without a restart). Loaded plugins only. A built-in is refused with the installer's own
   // 400 shape.
   .post('/:id/reload', async (c) => {
     const missing = requireIdempotencyKey(c)
@@ -159,8 +153,8 @@ export const plugins = new Hono<AppEnv>()
     const id = c.req.param('id')
     return viaBridge(c, PLUGIN_STATE, async (bridge) => {
       const result = await asBadRequest(() => bridge.reload(id))
-      // Audited like install/update/uninstall: this replaces the code a node is running, which is the
-      // same class of decision even though no bytes arrived.
+      // Audited like install, update and uninstall: this replaces the code a node runs, the same class
+      // of decision even though no bytes arrived.
       auditRequest(c, { action: 'plugins.reloaded', subject: id, details: { state: result.state, version: result.version } })
       return result
     })
@@ -173,29 +167,27 @@ export const plugins = new Hono<AppEnv>()
     const id = c.req.param('id')
     return viaBridge(c, PLUGIN_STATE, async (bridge) => {
       const result = await asBadRequest(() => bridge.uninstall(id, { purgeData: parsed.data.purgeData }))
-      // Whether the data went with it is the part of this that cannot be undone, so it is the part the
-      // record has to carry.
+      // Whether the data went with it is the part that cannot be undone, so the record has to carry it.
       auditRequest(c, { action: 'plugins.uninstalled', subject: id, details: { dataPurged: result.dataPurged } })
       return result
     })
   })
   // The owner's answer to an agent-raised request (docs/plugins.md § Approval-mediated install).
-  // Device-gated by the same mount as everything above it: the agent that raised the request is an
-  // internal principal and cannot reach this route to answer its own question.
+  // Device-gated by the same mount as everything above it, so the agent that raised the request cannot
+  // reach this route to answer its own question.
   //
-  // It performs no install. The device has already done the install (or not) over the routes above, with
-  // its own principal; this only closes the record and decides what the agent is told. No
-  // Idempotency-Key requirement for the same reason: a replayed decision changes no code, and the store
-  // refuses a second answer with a 404 anyway.
+  // It performs no install. The device has already done that over the routes above, with its own
+  // principal. This closes the record and decides what the agent is told. No Idempotency-Key
+  // requirement, because a replayed decision changes no code and the store refuses a second answer.
   .post('/requests/:requestId', async (c) => {
     const parsed = requestDecisionBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const fallback = parsed.data.decision === 'approved' ? 'The owner approved this request.' : 'The owner declined this request.'
     const request = decidePluginRequest(c.req.param('requestId'), { decision: parsed.data.decision, message: parsed.data.message ?? fallback })
     if (!request) return respondError(c, 404, 'not_found')
-    // On the same trail as install/update/uninstall, because "an agent asked and a human said yes" is the
-    // decision the trail exists to hold. The agent's own sentence is not recorded: an audit
-    // row that quotes untrusted text becomes a second place that text gets read as fact.
+    // On the same trail as install, update and uninstall, because "an agent asked and a human said yes"
+    // is the decision the trail exists to hold. The agent's own sentence is not recorded: an audit row
+    // that quotes untrusted text becomes a second place that text gets read as fact.
     auditRequest(c, {
       action: 'plugins.request.decided',
       subject: request.pluginId ?? request.action,

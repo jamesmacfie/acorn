@@ -6,14 +6,14 @@ import { describeChannel, isFrameChannel } from './frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from './frames/scopes'
 
 // What a plugin's declared permissions read as in the trust prompt (PluginTrustDialog.tsx): a `node`
-// group (declared, unenforced) and an `api`/`events` group (enforced by plugins/frames/scopes.ts), kept
-// apart per docs/security.md § Design rules, rule 6.
+// group (declared, unenforced) and an `api`/`events` group (enforced by plugins/frames/scopes.ts),
+// kept apart per docs/security.md § Design rules, rule 6.
 //
-// A plain module rather than exports on the dialog, so a node-env suite can import it: client-core's
-// tests run under plain Node with no Solid plugin, and a .tsx does not parse there.
+// A plain module rather than exports on the dialog, so a node-env suite can import it. A .tsx does not
+// parse under plain Node with no Solid plugin.
 //
-// `key` versus `text`: see docs/security.md § Third-party plugin bundles ("What 'gained' means") for
-// why the update diff runs on the identifier and never the sentence.
+// For why the update diff runs on `key` and never on `text`, see docs/security.md § Third-party plugin
+// bundles, "What 'gained' means".
 export type PermissionLine = {
   // The stable grant identifier the update diff compares. Never shown.
   key: string
@@ -45,11 +45,9 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
 
 // One line for everything this acorn could not name.
 //
-// The count is part of the key, and that is the whole point of the line. An update that asks for three
-// unrecognised things where it previously asked for one has grown its reach; this shell just cannot
-// say into what. A constant key would let exactly that slide past the "what is new" mark unremarked.
-// Growth in the unnamed is still growth, and it is the growth an owner has least ability to reason
-// about, so it is the last thing that should diff as unchanged.
+// The count is part of the key, and that is the point of the line. One unrecognised request becoming
+// three is a widening this shell cannot describe, and a constant key would let it slide past the
+// update prompt unremarked.
 const ignoredLine = (key: string, count: number, kind = ''): PermissionLine => ({
   key: `${key}:${count}`,
   text: `${count} ${kind}${kind ? ' ' : ''}request${count === 1 ? '' : 's'} this version of acorn does not recognise (ignored)`,
@@ -76,9 +74,9 @@ export const nodePermissionLines = (permissions: NodePluginPermissions): Permiss
 }
 
 export const uiPermissionLines = (permissions: NodePluginPermissions): PermissionLine[] => {
-  // Classify instead of echoing: these strings came from an untrusted manifest, while every grant
-  // sentence under "Enforced" must be copy the host owns and can actually enforce. The key is the
-  // scope name, which is host-recognised by the time it gets here.
+  // Classify instead of echoing. These strings came from an untrusted manifest, and every sentence
+  // under "Enforced" has to be copy the host owns. The key is the scope name, which is host-recognised
+  // by this point.
   const scopes = permissions.api.flatMap((scope) => {
     if (!GRANTABLE_SCOPES.includes(scope)) return []
     const description = describeScope(scope)
@@ -112,13 +110,12 @@ export const webviewPermissionLines = (grants: readonly PluginWebviewGrant[]): P
 export const scheduleGrants = (contributions: PluginContributions): PluginScheduleGrant[] =>
   pluginScheduleGrants(contributions)
 
-// A `Declared` line, not an `Enforced` one, for the honest reason: this is the plugin's own node code
-// running, and nothing checks what it does once it starts. What the line adds over the rest of that
-// group is when, with no client open and nobody watching, which is the one thing about a plugin that a
-// person cannot discover by using it.
+// A `Declared` line rather than an `Enforced` one, because this is the plugin's own node code and
+// nothing checks what it does once it starts. What the line adds is when it runs, with no client open,
+// which a person cannot discover by using the plugin.
 //
-// The cadence is part of the key, like a webview's hosts and a key claim's chords: a package that moves
-// from daily to every five minutes has grown its reach, and the update prompt must say so.
+// The cadence is part of the key, so a package that moves from daily to every five minutes reads as
+// newly requested.
 export const schedulePermissionLines = (grants: readonly PluginScheduleGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -132,13 +129,12 @@ export const schedulePermissionLines = (grants: readonly PluginScheduleGrant[]):
 export const taskCheckGrants = (contributions: PluginContributions): PluginTaskCheckGrant[] =>
   pluginTaskCheckGrants(contributions)
 
-// `Declared`, like a schedule and for the same honest reason: what runs is the plugin's own node code
-// and nothing checks what it does once it starts. What the line adds is when: archiving a task now
-// asks this package, and, for a check that can clean up, that it will offer to change something.
+// `Declared`, like a schedule and for the same reason: the plugin's own node code runs and nothing
+// checks it. What the line adds is that archiving a task asks this package, and that a check which can
+// clean up will offer to change something.
 //
-// Two sentences rather than one with a clause, because they are two different facts about the package
-// and the second one is the one worth reading twice. `cleansUp` is in the key: a version that starts
-// offering a cleanup where it used to only warn has grown its reach.
+// Two sentences rather than one with a clause, because the second fact is worth reading twice.
+// `cleansUp` is in the key, so a version that starts offering a cleanup reads as newly requested.
 export const taskCheckPermissionLines = (grants: readonly PluginTaskCheckGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -154,16 +150,14 @@ export const taskCheckPermissionLines = (grants: readonly PluginTaskCheckGrant[]
 export const harnessGrants = (contributions: PluginContributions): PluginHarnessGrant[] =>
   pluginHarnessGrants(contributions)
 
-// `Enforced`, and the only line in that group that names a program. It earns the strong group because
-// the claim is exact and does not depend on the plugin behaving: the host spawns this command with these
-// arguments and nothing else, and the plugin never gets a process of its own
-// (docs/managed-agents.md § Harnesses).
+// `Enforced`, and the only line in that group that names a program. The claim does not depend on the
+// plugin behaving: the host spawns this command with these arguments and nothing else, and the plugin
+// never gets a process of its own (docs/managed-agents.md § Harnesses).
 //
-// `high`, because "acorn will run this binary" is the fact an owner most needs to actually read.
+// `high`, because "acorn will run this binary" is the fact an owner most needs to read.
 //
-// The environment is a second sentence rather than a clause, for the reason the task-check line gives:
-// they are two different facts about the package and the second one is worth reading twice. Both are in
-// the key, so a version that swaps the binary or widens the globs reads as newly requested.
+// The environment is a second sentence, and both it and the command are in the key, so a version that
+// swaps the binary or widens the globs reads as newly requested.
 export const harnessPermissionLines = (grants: readonly PluginHarnessGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -185,14 +179,12 @@ export const keyClaimGrants = (contributions: PluginContributions): PluginKeyCla
 export const extensionGrants = (pluginId: string, contributions: PluginContributions): PluginExtensionGrant[] =>
   pluginExtensionGrants(pluginId, contributions)
 
-// The cross-plugin lines, and they belong under `Enforced` rather than `Declared`. That is a claim about
-// what the host actually does, and it is true in both directions: the host delivers only to points a
+// The cross-plugin lines, under `Enforced` rather than `Declared`. The host delivers only to points a
 // manifest declared, draws only the descriptor shapes it knows, and never puts a replacement on screen
-// that the owner did not pick in settings. Nothing about any of it depends on the plugin behaving.
+// the owner did not pick in settings. None of it depends on the plugin behaving.
 //
-// The copy is the host's, not the plugin's. `label` is manifest text and reaches the sentence as an
-// interpolated string, exactly as a webview surface's label already does; what the sentence claims is
-// host vocabulary, so a plugin cannot phrase its own grant.
+// The copy is the host's. `label` is manifest text and reaches the sentence as an interpolated string,
+// as a webview surface's label does, so a plugin cannot phrase its own grant.
 const EXTENSION_KIND_ICON: Record<PluginExtensionGrant['kind'], string> = {
   hosts: 'door-open',
   extends: 'puzzle',
@@ -204,12 +196,12 @@ export const extensionPermissionLines = (grants: readonly PluginExtensionGrant[]
     const text = grant.kind === 'hosts'
       ? `Let other plugins add rows to its “${grant.label}” list`
       : grant.kind === 'extends'
-        // The owner half of the reference is the whole point of this line: it names the package this one
+        // The owner half of the reference is the point of this line. It names the package this one
         // reaches into, so "this plugin extends that plugin" is on screen before anything runs.
         ? `Add its own rows to ${grant.target.split(':')[0]}’s “${grant.label}” list`
         : `Offer to replace acorn’s own ${grant.target} — you choose in Settings`
-    // Kind and target together: a package that starts extending a different plugin's point has grown its
-    // reach, and a constant key would let that slide past the update prompt's "what is new" mark.
+    // Kind and target together, so a package that starts extending a different plugin's point reads as
+    // newly requested.
     return line(`extension:${grant.kind}:${grant.target}`, { text, icon: EXTENSION_KIND_ICON[grant.kind] })
   })
 

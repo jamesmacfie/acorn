@@ -5,39 +5,35 @@ use tauri::http::{Request, Response, Uri};
 
 use crate::plugin_scheme::PLUGIN_SCHEME;
 
-// The renderer's own origin and its Content-Security-Policy. Every directive below is recorded in
-// docs/shell.md § Renderer origin and protocol handler, along with the dev-only widening.
+// The renderer's own origin and its Content-Security-Policy. See docs/shell.md, "Renderer origin and
+// protocol handler", for every directive below and the dev-only widening.
 
 pub const APP_SCHEME: &str = "app";
 pub const APP_ORIGIN: &str = "app://acorn";
 
-/// Why this pattern matches only the highlighter's worker entry, and what a rename would cost:
-/// docs/shell.md § The syntax-highlighter worker's separate policy. The `worker-` prefix it keys on
-/// is set by the shared renderer Vite config, so it travels to both shells.
+/// See docs/shell.md, "The syntax-highlighter worker's separate policy", for why this matches only
+/// the highlighter's worker entry and what a rename would cost. The shared renderer Vite config sets
+/// the `worker-` prefix it keys on.
 fn is_highlight_worker(path: &str) -> bool {
     let Some(rest) = path.strip_prefix("/assets/worker-highlighter.worker-") else { return false };
     let Some(hash) = rest.strip_suffix(".js") else { return false };
     !hash.is_empty() && hash.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
-/// The highlighter worker's separate policy: docs/shell.md § The syntax-highlighter worker's
-/// separate policy.
+/// See docs/shell.md, "The syntax-highlighter worker's separate policy".
 const WORKER_CSP: &str = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'none'";
 
-/// The one CSP change against Electron: `connect-src` names the helper's exact loopback WebSocket
-/// origin as well as `'self'` (docs/shell.md § Renderer origin and protocol handler). No wildcard
-/// port — the handler knows the port because the helper reported it, so no other local service becomes
-/// reachable. Everything that directive protected still holds: the renderer still cannot reach a node
-/// directly, because a node needs the pinned agent and bearer only the helper has.
+/// `connect-src` names the helper's exact loopback WebSocket origin as well as `'self'`. No wildcard
+/// port: the handler knows the port because the helper reported it, so no other local service becomes
+/// reachable. The renderer still cannot reach a node directly, because a node needs the pinned agent
+/// and bearer only the helper has.
 ///
-/// `dev_server` widens it further, and only under `pnpm dev`: the renderer is proxied from Vite,
-/// so the page needs Vite's HMR socket and the inline preamble its plugins inject. A packaged build
-/// passes `None` and gets exactly Electron's policy plus the helper socket.
+/// `dev_server` widens it further, under `pnpm dev` only. The renderer is proxied from Vite, so the
+/// page needs Vite's HMR socket and the inline preamble its plugins inject.
 pub fn renderer_csp(helper_port: u16, dev_server: Option<&str>) -> String {
-    // `ipc:` and `http://ipc.localhost` are Tauri's own IPC channel, which is a custom protocol like
-    // this one. Without them every `invoke` silently falls back to a slower postMessage path — it still
-    // works, which is what makes the omission easy to ship. They reach only the commands in
-    // `commands.rs`, and the capability file is what says which those are.
+    // `ipc:` and `http://ipc.localhost` are Tauri's own IPC channel, a custom protocol like this one.
+    // Without them every `invoke` falls back to a slower postMessage path that still works, which is
+    // what makes the omission easy to ship. They reach only the commands the capability file names.
     let mut connect = format!("connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:{helper_port}");
     let mut script = "script-src 'self'".to_string();
     if let Some(origin) = dev_server {
@@ -54,8 +50,7 @@ pub fn renderer_csp(helper_port: u16, dev_server: Option<&str>) -> String {
         &connect,
         // Monaco's five ?worker chunks; blob: covers a bundler that inlines one.
         "worker-src 'self' blob:",
-        // frame-src names only the plugin scheme: docs/shell.md § Renderer origin and protocol
-        // handler. `plugin_scheme.rs` is what serves it.
+        // frame-src names only the plugin scheme, served by `plugin_scheme.rs`.
         &format!("frame-src {PLUGIN_SCHEME}:"),
         "object-src 'none'",
         "base-uri 'none'",
@@ -66,10 +61,10 @@ pub fn renderer_csp(helper_port: u16, dev_server: Option<&str>) -> String {
 
 /// Resolve a request path inside the client root, or refuse it.
 ///
-/// The traversal guard is checked after decoding, for the reason Electron's is: `..` arrives
-/// percent-encoded and intact until the decode runs, so normalising before that proves nothing. This
-/// rejects any `..` component outright rather than normalising, because a normaliser that agrees with
-/// the filesystem about symlinks is a much harder thing to be sure of than a refusal.
+/// The traversal guard runs after decoding, because `..` arrives percent-encoded and intact until
+/// then, so normalising first proves nothing. This rejects any `..` component outright rather than
+/// normalising, because a normaliser that agrees with the filesystem about symlinks is harder to be
+/// sure of than a refusal.
 pub fn resolve_in_root(root: &Path, pathname: &str) -> Option<PathBuf> {
     let decoded = percent_decode(pathname);
     let relative = decoded.trim_start_matches('/');
@@ -118,10 +113,9 @@ fn content_type(path: &Path) -> &'static str {
     }
 }
 
-/// Where the renderer comes from. Packaged builds read the staged client off disk; `pnpm dev`
-/// proxies the Vite dev server, so the page keeps this origin — and everything phase 0 verified about
-/// it — while it keeps HMR. Serving dev straight off `devUrl` would put developers on an origin the
-/// shipped app never uses, which is the one thing this migration cannot afford.
+/// Where the renderer comes from. Packaged builds read the staged client off disk. `pnpm dev`
+/// proxies the Vite dev server, so the page keeps this origin and its policy while it keeps HMR.
+/// Serving dev straight off `devUrl` would put developers on an origin the shipped app never uses.
 pub enum Source {
     Files(PathBuf),
     DevServer(String),
@@ -135,7 +129,7 @@ pub fn serve(source: &Source, helper_port: u16, request: &Request<Vec<u8>>) -> R
     };
     let csp = if is_highlight_worker(&pathname) { WORKER_CSP.to_string() } else { renderer_csp(helper_port, dev) };
 
-    // Checked ahead of the source, because it is true of both: Vite answers an unknown path with the
+    // Checked ahead of the source, because it is true of both. Vite answers an unknown path with the
     // shell's HTML exactly as the packaged read would.
     let (status, mime, body) = if is_node_route(&pathname) {
         refuse_node_route()
@@ -154,8 +148,8 @@ pub fn serve(source: &Source, helper_port: u16, request: &Request<Vec<u8>>) -> R
         .status(status)
         .header("content-type", mime)
         .header("content-security-policy", csp)
-        // The renderer is rebuilt on every launch and its filenames are content-hashed, so there is
-        // nothing a cache would save that the disk read does not already give.
+        // The renderer is rebuilt on every launch and its filenames are content-hashed, so a cache
+        // saves nothing the disk read does not already give.
         .header("cache-control", "no-store")
         .body(body)
         .unwrap_or_else(|_| refuse(500))
@@ -183,10 +177,10 @@ fn proxy(origin: &str, uri: &Uri) -> Option<(u16, String, Vec<u8>)> {
     Some((status, mime, body))
 }
 
-/// Nothing legitimate asks this origin for a node route: the API is the helper socket. But the
-/// renderer's HTTP client falls back to a same-origin fetch whenever it has no active node yet, and
-/// answering that with the shell's own HTML is a 200 full of markup that the caller then parses as
-/// JSON. A 404 in the wire's own envelope says what actually happened.
+/// Nothing legitimate asks this origin for a node route, because the API is the helper socket. The
+/// renderer's HTTP client falls back to a same-origin fetch whenever it has no active node, though,
+/// and answering that with the shell's HTML is a 200 full of markup the caller parses as JSON. A 404
+/// in the wire's own envelope says what happened.
 fn is_node_route(pathname: &str) -> bool {
     pathname.starts_with("/v2/") || pathname.starts_with("/api/")
 }

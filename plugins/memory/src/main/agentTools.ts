@@ -1,10 +1,8 @@
 // The memory plugin's agent tools, the `tools` contribution point (docs/plugins.md § Agent tools
 // and MCP).
 //
-// These four were defined in apps/node/src/wiring/agentToolsWiring.ts, which held this plugin's
-// MemoryIndex and MemoryProposalStore in an app-level dep bag to do it. They now close over the
-// same objects the plugin's own routes do, so there is one index and one proposal queue per node
-// no matter how the caller arrived.
+// These four close over the same MemoryIndex and MemoryProposalStore the plugin's own routes do, so
+// there is one index and one proposal queue per node no matter how the caller arrived.
 //
 // memory_write proposes and never writes directly (docs/notes-and-memory.md § Memory).
 // `ctx.sessionId` is transport metadata from the x-acorn-session-id header, stamped on the
@@ -23,8 +21,8 @@ type ToolCore = Pick<CoreServices, 'tasks'>
 const asMemoryType = (type: string | undefined): MemoryType | undefined =>
   MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined
 
-// The memory scope key is the task's project id. A missing task is `not_found` rather than a bare failure, matching
-// every other task-addressed tool on this surface.
+// The memory scope key is the task's project id. A missing task is `not_found` rather than a bare
+// failure, matching every other task-addressed tool on this surface.
 async function projectIdFor(core: ToolCore, taskId: string): Promise<string> {
   const task = await core.tasks.load(taskId)
   if (!task) throw new ToolError('not_found', 'no such task')
@@ -85,8 +83,8 @@ export function memoryAgentTools(index: MemoryIndex, proposals: MemoryProposalSt
             ok: true,
             proposal: await proposals.propose({
               taskId: ctx.taskId,
-              // An unresolvable task does not block the proposal: it lands unscoped and a reviewer sees
-              // it, which is better than losing what the agent learned.
+              // An unresolvable task does not block the proposal. It lands unscoped and a reviewer
+              // sees it, rather than losing what the agent learned.
               projectId: await projectIdFor(core, ctx.taskId).catch(() => null),
               name: p.name,
               type: p.type as MemoryType,

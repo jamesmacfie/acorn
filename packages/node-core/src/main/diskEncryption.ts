@@ -1,24 +1,22 @@
 import { runProcess } from './core/proc'
 
-// Is this machine's disk encrypted? Application encryption covers only secrets and backup
-// archives; a node's worktrees hold the owner's source, its blob cache holds every patch it has
-// fetched, and its plugin databases hold agent transcripts, none of it protected by anything but
-// the operating system. On a machine without FileVault, someone who steals the laptop reads all of
-// it.
+// Is this machine's disk encrypted? Application encryption covers secrets and backup archives only.
+// Worktrees, the blob cache, and plugin databases hold source, patches, and agent transcripts that
+// nothing but the operating system protects.
 //
-// `null` is a real answer, not a failure: on Linux the honest report is "we do not know" (LUKS,
-// dm-crypt, ZFS native encryption, and a dozen NAS arrangements all count), and probing for them
-// badly would produce a confident wrong answer, which is worse than none for a security warning.
+// `null` is a real answer, not a failure. On Linux the honest report is "we do not know", since
+// LUKS, dm-crypt, ZFS native encryption, and a dozen NAS arrangements all count, and a bad probe
+// would give a confident wrong answer.
 
 export type DiskEncryption = boolean | null
 
-// `fdesetup isactive` prints `true`/`false` and exits 0/1 accordingly. Not `fdesetup status`: that
-// prints prose whose wording has changed across macOS releases, and parsing it is how a check like
-// this quietly starts returning the wrong answer after an OS upgrade.
+// `fdesetup isactive` prints `true` or `false` and exits 0 or 1 to match. Not `fdesetup status`,
+// which prints prose whose wording has changed across macOS releases, so parsing it starts returning
+// the wrong answer after an OS upgrade.
 //
-// Runs through the process broker rather than a bare execFile (docs/security.md § Process, path,
-// and configuration controls), so it gets the allowlisted environment and a bounded capture instead
-// of inheriting this process's environment, tokens included.
+// It runs through the process broker rather than a bare execFile (docs/security.md § Process, path,
+// and configuration controls), for the allowlisted environment and a bounded capture instead of
+// inheriting this process's environment, tokens included.
 async function probe(): Promise<DiskEncryption> {
   if (process.platform !== 'darwin') return null
   try {
@@ -28,8 +26,8 @@ async function probe(): Promise<DiskEncryption> {
       cwd: '/',
       timeoutMs: 5_000,
     })
-    // A missing binary, a timeout, or anything unrecognised is `null`, not `false`. Reporting "your disk
-    // is not encrypted" because a probe failed would train the owner to dismiss a warning that matters.
+    // A missing binary, a timeout, or anything unrecognised is `null`, not `false`. Reporting "your
+    // disk is not encrypted" because a probe failed teaches the owner to dismiss a warning that matters.
     if (result.spawnError || result.timedOut) return null
     const answer = result.stdout.trim().toLowerCase()
     if (answer === 'true') return true
@@ -40,9 +38,9 @@ async function probe(): Promise<DiskEncryption> {
   }
 }
 
-// Cached for the life of the process. Turning FileVault on requires a reboot on macOS, so a node
-// that has been running since before the change will be restarted anyway, and a check on every
-// settings-page open would spawn a process for an answer that cannot have changed.
+// Cached for the life of the process. Turning FileVault on needs a reboot on macOS, so the answer
+// cannot change under a running node, and a probe per settings-page open spawns a process for
+// nothing.
 let cached: Promise<DiskEncryption> | null = null
 
 export function diskEncryption(): Promise<DiskEncryption> {
@@ -50,8 +48,8 @@ export function diskEncryption(): Promise<DiskEncryption> {
   return cached
 }
 
-// Test seam. The probe is a real subprocess, so a case that wants a known answer has to be able to say so
-// without one; a case that wants the real answer clears it.
+// Test seam. The probe is a real subprocess, so a case that wants a known answer sets one here, and
+// a case that wants the real answer clears it.
 export function _setDiskEncryption(value: Promise<DiskEncryption> | null): void {
   cached = value
 }

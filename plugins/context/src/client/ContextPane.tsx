@@ -17,9 +17,8 @@ export default function ContextPane(props: { task: Task }) {
   const api = taskBridge()
   const [msg, setMsg] = createSignal('')
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
-  // Pending-item counts reported up by section contributions, keyed by section id. This used to be
-  // a single `pendingMemory` signal, named after the one plugin that happened to have any, so a
-  // second contributor would have silently overwritten the first's count in the header.
+  // Pending-item counts reported up by section contributions, keyed by section id. Keyed, because a
+  // single signal lets a second contributor overwrite the first's count in the header.
   const [pending, setPending] = createSignal<Record<string, number>>({})
   const pendingFor = (sectionId: string) => pending()[sectionId] ?? 0
   const [previewOpen, setPreviewOpen] = createSignal(false)
@@ -76,11 +75,9 @@ export default function ContextPane(props: { task: Task }) {
 
   function followJump(item: ContextItem) {
     if (!item.jump?.itemId) return
-    // The same call notes' own `requestNoteOpen` makes. Inlined rather than imported, since
-    // `openPane` and the `notes:open` PaneIntent variant are both client-core's: borrowing notes'
-    // one-line wrapper would have been the only context-to-notes coupling for a function that
-    // reaches nothing of that plugin's own. Every other jump below already goes straight through
-    // openPane.
+    // The same call notes' own `requestNoteOpen` makes. Inlined rather than imported: `openPane` and
+    // the `notes:open` PaneIntent variant are both client-core's, so borrowing notes' wrapper would
+    // be the only context-to-notes coupling in the file.
     if (item.jump.pane === 'notes' && item.jump.noteScope) {
       openPane(props.task.id, 'notes', { kind: 'notes:open', slug: item.jump.itemId, scope: item.jump.noteScope })
       return
@@ -154,8 +151,7 @@ export default function ContextPane(props: { task: Task }) {
                       <span class="context-size">{formatSize(size())}</span>
                     </div>
                     <Show when={cap()}>
-                      {/* The 80% warn threshold this site invented is now Meter's `auto` tone,
-                          and the bar finally has an accessible name. */}
+                      {/* Meter's `auto` tone carries the 80% warn threshold. */}
                       <Meter class="context-bar" tone="auto" label={`${section.label} budget`} value={ratio()} />
                     </Show>
                     <Show when={section.absent}><div class="context-tray-detail muted">⚠ {section.absent!.detail}</div></Show>
@@ -188,9 +184,8 @@ export default function ContextPane(props: { task: Task }) {
                         )
                       }}
                     </For>
-                    {/* Extra controls a plugin renders under its own section — memory's add form and
-                        proposal queue today. Was a hardcoded `section.id === 'memory'` branch importing
-                        plugins/memory directly; the pane now asks the registry and does not know which
+                    {/* Extra controls a plugin renders under its own section, such as memory's add
+                        form and proposal queue. The pane asks the registry and does not know which
                         plugins answer. */}
                     <For each={contextSectionContributions(section.id)}>
                       {(contribution) => (

@@ -1,13 +1,12 @@
 // Resolves a built-in plugin's Drizzle migration chain across the three runtime layouts
-// (docs/data-layer.md § Migrations). The module URL passed in is always the plugin's own
-// (server/plugin/host.ts passes `migrationsModule: import.meta.url`), never this file's, which is what
-// stops a plugin from finding node-core's own chain by proximity.
+// (docs/data-layer.md § Migrations). The module URL passed in is always the plugin's own, never this
+// file's, which stops a plugin from finding node-core's chain by proximity.
 import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// resourcesPath is an Electron addition to `process`. node-core compiles against plain Node types,
-// so this reads it defensively rather than widening the package's type surface.
+// `resourcesPath` is a packaged-app addition to `process`. node-core compiles against plain Node
+// types, so read it defensively rather than widening the package's types.
 const electronResourcesPath = (process as { resourcesPath?: string }).resourcesPath
 
 // `meta/_journal.json` rather than the directory alone: a chain without a journal silently applies
@@ -26,9 +25,9 @@ export function pluginMigrationsChain(plugin: string, dir: string): string {
   return dir
 }
 
-// Source packages and loaded packages both have a `plugins/<id>/...` shape. The walk below stops here
-// rather than continuing past it, so a missing chain cannot adopt dataRoot/migrations, a checkout-level
-// core chain, or any other ancestor's DDL (docs/data-layer.md § Migrations).
+// Source packages and loaded packages both have a `plugins/<id>/...` shape. The walk below stops
+// here, so a missing chain cannot adopt dataRoot/migrations, a checkout-level core chain, or any
+// other ancestor's DDL (docs/data-layer.md § Migrations).
 const pluginPackageRoot = (plugin: string, start: string): string | null => {
   let dir = start
   for (;;) {

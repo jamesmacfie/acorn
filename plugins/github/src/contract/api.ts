@@ -5,10 +5,9 @@
 // diff rows against `PullFile`), and contract/ is the one sanctioned cross-plugin surface
 // (docs/plugins.md § Package shape).
 //
-// Moved verbatim out of @acorn/protocol/api.ts, which used to hold every plugin's route builders
-// (docs/architecture-overview.md § Package boundaries). Routes and keys are byte-identical: a
-// retyped route template compiles fine and 404s at runtime, and a changed query key silently orphans
-// a user's persisted IndexedDB cache, which has no buster.
+// Keep the route templates and query keys byte-identical when you move them. A retyped route
+// template compiles fine and 404s at runtime, and a changed query key orphans a user's persisted
+// IndexedDB cache, which has no buster.
 
 export type Repo = {
   id: number

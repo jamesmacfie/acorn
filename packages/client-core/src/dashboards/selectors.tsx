@@ -12,13 +12,12 @@ import { operatorLabel, operatorsForField, toggleParamValue } from './editor'
 import type { PanelFilterOp, PanelMappingColumnDef, PanelTone } from './model'
 
 // Typed, data-aware config inputs the generated editor is composed from (docs/dashboards.md §
-// The generated editor). Each one knows the schema it draws from, so the editor can only produce
-// a valid panel.
+// The generated editor). Each one knows the schema it draws from, so the editor can only produce a
+// valid panel.
 //
-// Native controls throughout: a select, a date input and a checkbox are keyboard-operable,
-// screen-reader-announced and locale-correct for free, which a hand-rolled combobox is not.
-// Everything below is one Select, Input or Checkbox plus the derivation that decided what to put
-// in it; the derivations live in editor.ts, where they can be tested.
+// Native controls throughout, because a select, a date input, and a checkbox are keyboard-operable,
+// announced, and locale-correct for free. The derivations that decide what goes in them live in
+// editor.ts, where they can be tested.
 
 /** Pick a field, filtered by whatever the caller can use: "a field of type enum", "a number field".
  *  The filtering is the caller's, because which fields are eligible is a question about the job
@@ -83,10 +82,9 @@ const fromDateInput = (raw: string): number => {
   return raw && Number.isFinite(year) ? new Date(year, (month ?? 1) - 1, day ?? 1).getTime() : 0
 }
 
-/** The value half of a filter row, drawn by the field's semantic type: the same vocabulary that
- *  decides how the cell renders (format.ts) decides how it is entered. A `datetime` gets a date
- *  picker, a `number` gets a spinner, a `boolean` gets a checkbox and an `enum` gets its own
- *  declared values, so "pick a value of that field" cannot be got wrong. */
+/** The value half of a filter row, drawn by the field's semantic type: the vocabulary that decides
+ *  how the cell renders (format.ts) also decides how it is entered. A `datetime` gets a date
+ *  picker, a `boolean` a checkbox, an `enum` its own declared values. */
 export function ValueInput(props: {
   field: PluginCollectionField
   value: PluginCollectionCell | undefined
@@ -138,12 +136,11 @@ export function ValueInput(props: {
   )
 }
 
-/** "Map these values onto those": the selector the design names for the mapping step
- *  (docs/dashboards.md § The generated editor), and the reason the whole matrix is one control
- *  repeated rather than a bespoke drag surface.
+/** "Map these values onto those", the mapping step's selector (docs/dashboards.md § The generated
+ *  editor), which is why the matrix is one control repeated rather than a drag surface.
  *
- *  The empty option is a real destination, not a null state: a value that lands in no column goes
- *  wherever the panel's unmapped rule says it goes, a catch-all column or hidden, never nowhere. */
+ *  The empty option is a real destination, not a null state: a value in no column goes wherever the
+ *  panel's unmapped rule says, never nowhere. */
 export function ColumnSelect(props: {
   columns: readonly PanelMappingColumnDef[]
   value: string | undefined
@@ -163,9 +160,8 @@ export function ColumnSelect(props: {
   )
 }
 
-/** A column's tone, from the host's own five (ui/primitives.tsx § StatusDot): the same vocabulary a
- *  plugin's declared value picks from, so a user-invented column colours the same way a provider's
- *  does under every appearance pack. */
+/** A column's tone, from the host's own five (ui/primitives.tsx § StatusDot). A plugin's declared
+ *  value picks from the same vocabulary, so an invented column colours like a provider's. */
 export function ToneSelect(props: {
   value: PanelTone | undefined
   onChange: (tone: PanelTone) => void
@@ -194,10 +190,8 @@ const TONE_LABELS: Record<PanelTone, string> = {
 
 /** The type of a field the user invented (model.ts § PanelFieldDef).
  *
- *  The wire's own seven, not a reduced set: an invented field renders, sorts, filters and groups
- *  through exactly the same machinery a declared one does, so narrowing the choice here would create
- *  a second class of field for no reason. It is the one place in the editor where a person picks a
- *  field type rather than a field, because there is no source to read it from. */
+ *  The wire's own seven rather than a reduced set, because an invented field renders, sorts,
+ *  filters, and groups through the same machinery a declared one does. */
 export function FieldTypeSelect(props: {
   value: PluginCollectionFieldType
   onChange: (type: PluginCollectionFieldType) => void
@@ -231,16 +225,14 @@ type ParamChoice = { id: string; label: string }
 /** Empty is a real answer: a param the person has not set is a param the plugin defaults. */
 const ANY_CHOICE: ParamChoice = { id: '', label: 'Any' }
 
-/** A collection's declared param. The host renders the input and hands the value back opaquely: the
- *  plugin owns what `repo` means, and the day it means something else this file does not change
- *  (Grafana's opaque-target lesson).
+/** A collection's declared param. The host renders the input and hands the value back opaquely, so
+ *  the plugin owns what `repo` means and this file does not change the day it means something else.
  *
- *  Three forms now, and which one appears is decided by the declaration plus whatever options the
- *  plugin resolved for this device (registries/collections.ts § paramOptions): checkboxes for a
- *  multiple-choice enum, the shared searchable picker where there is any closed list to choose one
- *  from, a text box otherwise. A multiple selection crosses back as one comma-joined string, because
- *  a param's value is a string on the wire, and a second encoding for the same field would give
- *  every plugin two to read. */
+ *  The declaration plus whatever options the plugin resolved for this device
+ *  (registries/collections.ts § paramOptions) picks the form: checkboxes for a multiple-choice
+ *  enum, the shared searchable picker for any other closed list, a text box otherwise. A multiple
+ *  selection crosses back as one comma-joined string, because a param's value is a string on the
+ *  wire. */
 export function ParamInput(props: {
   param: PluginCollectionParam
   value: string
@@ -271,8 +263,7 @@ export function ParamInput(props: {
     >
       <Match when={choices().length && props.param.multiple}>
         {/* Native checkboxes rather than `<select multiple>`, which needs a modifier key nobody
-            discovers and shows two rows of a scroller. Every choice is visible and each one is its own
-            announced control. */}
+            discovers and shows two rows of a scroller. */}
         <span class="dash-param-choices">
           <For each={choices()}>
             {(choice) => (
@@ -292,10 +283,9 @@ export function ParamInput(props: {
         </span>
       </Match>
       <Match when={choices().length}>
-        {/* The shared searchable picker, not a bare `<select>`. A declared enum is three values and
-            either would do; a RESOLVED one is however many repositories this person has, and scrolling
-            a native select past sixty of them is the thing that made this control feel broken. One
-            control for both cases rather than a threshold nobody can justify. */}
+        {/* The shared searchable picker rather than a bare `<select>`. A declared enum is three
+            values and either would do, but a resolved one is however many repositories this person
+            has, and a native select past sixty of them is unusable. */}
         <span class="dash-param-picker">
           <Picker<ParamChoice>
             label={choices().find((choice) => choice.id === props.value)?.label ?? ANY_CHOICE.label}

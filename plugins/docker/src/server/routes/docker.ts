@@ -54,18 +54,18 @@ const ref = (c: { req: { param(k: string): string } }): string | null => {
   return isDockerRef(value) ? value : null
 }
 
-// Every daemon-wide path in this router is device-only. Only the task-addressed routes at the bottom are
-// reachable by a task-scoped agent, and core confines those routes to the task in the caller's token.
-// Device-only access protects both destructive operations and container inspection, whose environment data
-// can contain credentials belonging to unrelated work.
+// Every daemon-wide path in this router is device-only. Only the task-addressed routes at the bottom
+// are reachable by a task-scoped agent, and core confines those to the task in the caller's token.
+// The gate covers destructive operations and container inspection, whose environment data can carry
+// credentials belonging to unrelated work.
 //
-// requireDevice, not requireProviderAccess: nothing on the node's own loopback path browses the daemon, so
-// there is no 'service'-scope caller to keep working. Docker browse is a renderer surface.
+// requireDevice, not requireProviderAccess: nothing on the node's own loopback path browses the
+// daemon, so there is no 'service'-scope caller to keep working.
 //
-// Subtrees are enumerated instead of using one path-string exemption for `/tasks/`: the router is mounted under
-// `/v2/p/docker`, so a guard based on the full request path would depend on the mount prefix. The route test
-// walks Hono's route table and fails if a new daemon-wide path is added without a device gate.
-// Measured: Hono's trailing `/*` matches zero segments, so `/containers/*` also covers bare `/containers`.
+// Subtrees are enumerated rather than exempting the `/tasks/` path string, because the router mounts
+// under `/v2/p/docker` and a full-path guard would depend on the mount prefix. The route test walks
+// Hono's route table and fails if a daemon-wide path arrives without a device gate. Hono's trailing
+// `/*` matches zero segments, so `/containers/*` also covers bare `/containers`.
 export const docker = new Hono<AppEnv>()
   .use('/info', requireDevice)
   .use('/containers/*', requireDevice)

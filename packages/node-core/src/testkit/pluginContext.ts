@@ -24,12 +24,11 @@ import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations } f
 const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [] }
 
 export type TestNodeContextOptions = {
-  // The plugin under test. A NodePlugin satisfies this, so `{ plugin: rollbarPlugin() }` reads well;
-  // only the name is used, because the name is what every owner-bound registration binds from.
+  // The plugin under test. A NodePlugin satisfies this, so `{ plugin: rollbarPlugin() }` reads well.
+  // Only the name is used, because every owner-bound registration binds from it.
   //
-  // init() is not called here. Running it is the test's job: the host's init/ready/containment
-  // lifecycle belongs to initPlugins, and a test usually wants to assert on what init did, or on it
-  // throwing.
+  // init() is not called here. Running it is the test's job: the init/ready/containment lifecycle
+  // belongs to initPlugins, and a test usually wants to assert on what init did, or on it throwing.
   plugin: Pick<NodePlugin, 'name'>
   // Pass this to get the loaded tier: scoped core and capabilities, no routes.register and no
   // events.channel/streams (docs/plugins.md § What is published, and what acorn promises about it).
@@ -37,15 +36,15 @@ export type TestNodeContextOptions = {
   // present in both tiers.
   permissions?: Partial<NodePermissions>
   // Where ctx.storage.open() migrates from. Defaults to this checkout's `plugins/<id>/migrations`, which
-  // is what every workspace plugin's suite wants; pass it for a chain that lives somewhere else.
+  // suits every workspace plugin's suite. Pass it for a chain that lives somewhere else.
   migrations?: string
   dataDir?: string
 }
 
 // The context, plus the handles a test needs to set the world up around it. Flat rather than
-// `{ ctx, db, … }` so `ctx.storage.open()` and `ctx.db` read the same way; if NodePluginContext ever
-// grows a member named `db`, `env` or `cleanup`, this intersection stops compiling and one of the two
-// names moves.
+// `{ ctx, db, ... }` so `ctx.storage.open()` and `ctx.db` read the same way. If NodePluginContext grows
+// a member named `db`, `env` or `cleanup`, this intersection stops compiling and one of the two names
+// has to move.
 export type TestNodeContext = NodePluginContext & {
   // Core's tables, migrated, in a temp directory. For seeding the workspaces/tasks/integrations rows a
   // route or a service reads back.
@@ -55,11 +54,10 @@ export type TestNodeContext = NodePluginContext & {
   env: Env
   dataDir: string
   encryptionKey: string
-  // Undoes everything the plugin registered, through the host's own rollback, the same undo a
-  // contained failure gets. Then closes core's database, the plugin's if it was opened, and removes
-  // the temp directories. Call it in a finally or an afterEach: the route, tool and provider
-  // registries are process-wide module singletons, so a registration left behind becomes the next
-  // test file's duplicate.
+  // Undoes everything the plugin registered, through the host's own rollback. Then closes core's
+  // database, the plugin's if it was opened, and removes the temp directories. Call it in a finally or
+  // an afterEach: the route, tool and provider registries are process-wide module singletons, so a
+  // registration left behind becomes the next test file's duplicate.
   cleanup(): void
 }
 
@@ -86,10 +84,9 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   }
 
   // What `clearRegistrations` cannot reach: the WS hub's two slots, which are module singletons with
-  // no duplicate guard, and any schedule the plugin declared, which lives in a scheduler the host
-  // owns (server/plugin/context.ts). The host keeps these separately and so must this, or a test
-  // whose plugin claims a channel prefix, or registers a schedule, leaves it claimed for the whole
-  // file.
+  // no duplicate guard, and any schedule the plugin declared, which lives in a scheduler the host owns
+  // (server/plugin/context.ts). Without this, a test whose plugin claims a channel prefix or registers
+  // a schedule leaves it claimed for the whole file.
   const undos: (() => void)[] = []
 
   const ctx = buildPluginContext({
@@ -97,17 +94,15 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     capabilities: new CapabilityRegistry(),
     core: services,
     onUndo: (undo) => void undos.push(undo),
-    // Both tiers get storage passed the same way, as in production: the caller derives the handle,
-    // and the binding carries the loader's raw one. The loaded tier also gets it on the binding,
-    // because that is what host.ts derives from (server/plugin/context.ts).
+    // Both tiers get storage passed the same way as in production: the caller derives the handle and
+    // the binding carries the loader's raw one (server/plugin/context.ts).
     ...(permissions ? { loaded: { permissions, storage } } : {}),
     storage,
   })
 
-  // A shallow copy of the host's context with the test handles alongside. The nested seams are the
-  // same objects the host built, so behaviour is identical; the price is that a plugin's init(),
-  // handed this, can also see `db`/`env`/`cleanup`. This is a test: the alternative, `{ ctx, db, … }`,
-  // would make every call site say `.ctx` to buy purity nothing is checking.
+  // A shallow copy of the host's context with the test handles alongside. The nested seams are the same
+  // objects the host built, so behaviour matches. The price is that a plugin's init(), handed this, can
+  // also see `db`, `env` and `cleanup`.
   return {
     ...ctx,
     db: core.db,
@@ -129,7 +124,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
         try {
           rmSync(dataDir, { recursive: true, force: true })
         } catch {
-          // best effort. tmpdir is reaped by the OS anyway.
+          // Best effort. The OS reaps tmpdir anyway.
         }
       }
     },
@@ -144,19 +139,18 @@ export type TestRequestContextOptions = {
   // `ctx.env` from makeTestNodeContext is the usual argument.
   env?: Env
   principal?: Principal
-  // Canned answers for the provider calls a test cannot make for real, such as a vendor API it has
-  // no token for. They sit on top of the real runtime: anything not stubbed still goes through the
-  // host's checks, and they are typed against PluginProviderRuntime, so a signature change breaks
-  // the test instead of being silently absorbed by an `as never`.
+  // Canned answers for the provider calls a test cannot make for real, such as a vendor API it has no
+  // token for. They sit on top of the real runtime, so anything not stubbed still goes through the
+  // host's checks. Typed against PluginProviderRuntime, so a signature change breaks the test rather
+  // than being absorbed by an `as never`.
   providers?: Partial<PluginProviderRuntime>
 }
 
 // A `PluginRequestContext` as the host builds it, for driving a loaded plugin's fetch handler
 // (docs/plugins.md § What is published, and what acorn promises about it).
 //
-// Async because it goes through a one-route Hono app: `pluginRequestContext()` takes a Hono
-// `Context`, and standing one up for real is cheaper, and truer, than casting an object literal into
-// the shape.
+// Async because it goes through a one-route Hono app. `pluginRequestContext()` takes a Hono `Context`,
+// and standing one up for real is cheaper, and truer, than casting an object literal into the shape.
 export async function makeTestRequestContext(options: TestRequestContextOptions): Promise<PluginRequestContext> {
   const principal: Principal = options.principal ?? { kind: 'device', userId: 'owner-1', deviceId: 'device-1' }
   const captured: { context?: PluginRequestContext } = {}
@@ -169,6 +163,6 @@ export async function makeTestRequestContext(options: TestRequestContextOptions)
   })
   await app.fetch(new Request('http://plugin.test/'), options.env ?? testEnv())
   const context = captured.context
-  if (!context) throw new Error('the test request context was never built — Hono did not reach the capture handler')
+  if (!context) throw new Error('the test request context was never built: Hono did not reach the capture handler')
   return options.providers ? { ...context, providers: { ...context.providers, ...options.providers } } : context
 }

@@ -136,8 +136,7 @@ type LinearProjectScope = Pick<CoreServices['projects'], 'byId' | 'externalProje
  * hang off the workspace rather than the project, and the descriptor only ever gives us the project
  * (docs/workspaces-and-tasks.md § Workspace and project).
  *
- * `null` and "mapped to an empty set" mean the same thing to the only caller, no rows, now that the
- * rail's fallback to the viewer's own issues is gone.
+ * `null` and an empty map mean the same thing to the only caller: no rows.
  */
 async function mappedProjects(
   c: Context<AppEnv>,
@@ -163,13 +162,13 @@ async function mappedProjects(
 // project/browse routes take an explicit ?integration=<id> since the caller already knows it.
 // Provider CRUD (connect/disconnect) lives in core's routes/integrations.ts.
 export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<AppEnv>()
-  // Active issues for the given project ids within one connection (?integration=<id>&ids=), with no
-  // caller left in the shell: the rail builds its mapped rows from this query directly. Kept because
-  // it is the single-connection form of a read the rail already performs, and it is the one place a
-  // test covers the active-only filter and the branch-suggestion passthrough.
+  // Active issues for the given project ids within one connection (?integration=<id>&ids=). No shell
+  // caller left: the rail builds its mapped rows from the same query. Kept as the single-connection
+  // form, and as the one place a test covers the active-only filter and the branch-suggestion
+  // passthrough.
   //
-  // `/projects` is gone: enumerating a connection's projects is now a provider contribution the host
-  // calls instead (docs/integrations.md § Project sources).
+  // Enumerating a connection's projects is a provider contribution the host calls, so there is no
+  // `/projects` route here (docs/integrations.md § Project sources).
   .get('/project-issues', async (c) => {
     const connections = await linearConnections(c)
     const connection = connections.find(({ row }) => row.id === c.req.query('integration'))
@@ -185,9 +184,8 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
   })
   // The declarative rail source's rows (docs/plugins.md § Descriptors). Degrades to an empty list at
   // every step rather than erroring: none of these conditions is the user doing something wrong.
-  //
-  // The no-mapping fallback to the viewer's own assigned issues is gone: docs/integrations.md § Linear
-  // records why, and why a source can now author its own `emptyState` instead.
+  // There is no fallback to the viewer's own assigned issues; the source authors an `emptyState`
+  // instead (docs/integrations.md § Linear).
   .get('/rail-items', async (c) => {
     const connections = await linearConnections(c)
     if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)
@@ -209,11 +207,10 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
     }
     return c.json({ items: sortLinearIssues(issues).map(linearRailItem) } satisfies LinearRailItemsResponse)
   })
-  // The declared collection's page (@acorn/protocol/collections.ts): the viewer's own active issues,
-  // across every connected workspace, as typed records the host renders itself. Same degrade-quietly
-  // posture as the rail above, and the same exemption from serve-then-revalidate (docs/caching.md §
-  // Provider mirrors). The plugin's own `refresh` on the descriptor is the client-side half of the same
-  // TTL `LINEAR_ISSUES_STALE_AFTER_MS` states for the item cache.
+  // The declared collection's page (@acorn/protocol/collections.ts): the viewer's own active issues
+  // across every connected workspace, as typed records the host renders. Same degrade-quietly posture
+  // as the rail above, and the same exemption from serve-then-revalidate (docs/caching.md § Provider
+  // mirrors). The descriptor's `refresh` is the client-side half of LINEAR_ISSUES_STALE_AFTER_MS.
   .get(`/collections/${LINEAR_ISSUES_COLLECTION_ID}`, async (c) => {
     const connections = await linearConnections(c)
     const issues: LinearProjectIssue[] = []
@@ -244,11 +241,10 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
       .slice(0, linearProvider.budgets.maxResolutionBatch)
     if (!identifiers.length) return c.json([] satisfies PluginRefResolutionBody[])
 
-    // Not scoped to one connection: a bare `ENG-42` has not been resolved to a workspace yet, so the
-    // cache read spans every connected Linear and the sort below picks the winner. `listByIdentifier`
-    // is the store's one read with that shape, and it absorbs the empty-list case `inArray` would turn
-    // into a SQL error. It is also the read that made the loaded tier need an item-store seam at all,
-    // since no per-connection `resource()` call can express a read across connections.
+    // Not scoped to one connection: a bare `ENG-42` has no workspace yet, so the cache read spans
+    // every connected Linear and the sort below picks the winner. `listByIdentifier` also absorbs the
+    // empty-list case that `inArray` turns into a SQL error. No per-connection `resource()` call can
+    // express a read across connections, which is why the loaded tier needs an item-store seam.
     const items = linearItems(c)
     const cached = await items.listByIdentifier(identifiers)
     const now = Date.now()
@@ -312,13 +308,12 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
       }
     }) satisfies PluginRefResolutionBody[])
   })
-  // Full detail for the panel. Always through the mirrored resource, which owns the cache read, the TTL,
-  // the secret scope and the write-back.
+  // Full detail for the panel, always through the mirrored resource, which owns the cache read, the
+  // TTL, the secret scope, and the write-back.
   //
   // Without ?integration this asks each connected workspace in turn and takes the first that answers,
-  // because which workspace owns a bare `ENG-42` is exactly what is unknown. That replaced a hand-rolled
-  // cache read plus a second fan-out doing the same resolution: the loop is the resolution, and the
-  // resource is the cache. refresh=1 (which opening the panel always sends) forces a live read.
+  // because which workspace owns a bare `ENG-42` is what is unknown. The loop is the resolution and
+  // the resource is the cache. `refresh=1`, which opening the panel always sends, forces a live read.
   .get('/issues/:identifier', async (c) => {
     const identifier = c.req.param('identifier')
     const requested = c.req.query('integration')
@@ -362,10 +357,9 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
     const resolved = await resolveIssues(connections, ISSUE_ID_QUERY, { filter })
     const issueId = resolved?.nodes[0]?.id
     if (!resolved || !issueId) return respondError(c, 404, 'provider_resource_not_found')
-    // The default registry argument is the host's when this is compiled in, and the bundle's own empty
-    // copy when it is loaded, so on the loaded tier this resolves from the stored capability map alone,
-    // which linear's `normalize` always writes. The row is the record of what the connection was
-    // granted; the descriptor is only its default.
+    // On the loaded tier the default registry argument is the bundle's own empty copy, so this
+    // resolves from the stored capability map that linear's `normalize` writes. The row records what
+    // the connection was granted; the descriptor is only its default.
     if (!connectionHasCapability(resolved.row, 'comments')) return respondError(c, 403, 'provider_missing_scope')
 
     const input: Record<string, unknown> = { issueId, body: body.trim() }
@@ -411,7 +405,6 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
 // The Hono routes over the portable carrier (docs/plugins.md § Loaded plugins), the only way in. Its
 // request context supplies the identity-bound provider runtime without exposing host database or
 // secret-service handles to the bundle. `projects` is optional for suites that drive these routes
-// without a project scope; `/rail-items` then falls back for every connection, which is what a test
-// asserting the fallback wants.
+// without a project scope; `/rail-items` then returns no rows.
 export const createLinearFetch = (projects?: LinearProjectScope): PluginFetchHandler =>
   portableFetch(createLinearRoutes(projects))

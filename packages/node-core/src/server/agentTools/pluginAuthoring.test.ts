@@ -20,8 +20,8 @@ import {
 } from './pluginAuthoring.ts'
 import type { CoreServices } from '../../main/core/index.ts'
 
-// The point of this file is drift: every test below re-derives an answer from the source of truth
-// and compares, rather than pinning a hand-written list (docs/agent-tools.md § plugin_authoring).
+// This file is about drift: every test below re-derives an answer from the source of truth and
+// compares, rather than pinning a hand-written list (docs/agent-tools.md § plugin_authoring).
 
 describe('the derived vocabulary tracks the manifest schema', () => {
   it('derives something at all', () => {
@@ -37,9 +37,9 @@ describe('the derived vocabulary tracks the manifest schema', () => {
 
   it('reads the two closed placement vocabularies off the things that enforce them', () => {
     // Both are short enums, and one has an independent declaration to compare against
-    // (`@acorn/protocol/contextMenus.ts`, which the client also reads); the slot enum does not, so
-    // it is checked the only way that proves anything: every listed name parses, and a plausible
-    // one does not.
+    // (`@acorn/protocol/contextMenus.ts`, which the client also reads). The slot enum does not, so it
+    // is checked the only way that proves anything: every listed name parses, and a plausible one
+    // does not.
     const v = pluginAuthoringVocabulary()
     expect(v.manifest.contextMenuLocations).toEqual([...CONTEXT_MENU_LOCATIONS])
     const withSlot = (slot: string) => pluginManifestShape.safeParse({
@@ -79,8 +79,8 @@ describe('the derived vocabulary tracks the manifest schema', () => {
       const parsed = pluginManifestShape.safeParse({
         id: 'p', name: 'P', version: '1', apiVersion: PLUGIN_API_MAJOR, contributions: { [key]: overflowing },
       })
-      // Specifically the cap, not the entries' shape: the placeholder above is not a valid
-      // descriptor for most of these keys, so "it failed" alone would prove nothing about the number.
+      // Specifically the cap, not the entries' shape. The placeholder above is not a valid descriptor
+      // for most of these keys, so "it failed" alone proves nothing about the number.
       const tooBig = parsed.success
         ? []
         : parsed.error.issues.filter((issue) => issue.code === 'too_big' && issue.path.join('.') === `contributions.${key}`)
@@ -93,7 +93,7 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     // object means a token added to the palette reaches the guide with no edit here.
     const v = pluginAuthoringVocabulary()
     expect(v.manifest.themeTokens).toEqual([...THEME_PALETTE_TOKENS])
-    // And the three the host writes from `dark` are not in it: they are not colours, and a manifest
+    // And the three the host writes from `dark` are not in it. They are not colours, and a manifest
     // that could spell them could tell the terminal it was dark while rendering a light palette.
     for (const name of ['--is-dark', '--color-scheme', '--syntax-fg']) {
       expect(v.manifest.themeTokens).not.toContain(name)
@@ -125,8 +125,8 @@ describe('the derived vocabulary tracks the manifest schema', () => {
 
 describe('the permission facets are the ones scopeCore honours', () => {
   // A facet in the guide that grants nothing is a lie the agent writes into a manifest and then
-  // debugs. `scopeCore` gates by omission, so "this token grants something" is exactly "the
-  // returned object is not empty", which is also why an unknown token has to come back empty.
+  // debugs. `scopeCore` gates by omission, so "this token grants something" is exactly "the returned
+  // object is not empty", which is also why an unknown token has to come back empty.
   const core = {
     fs: {}, git: {}, tasks: {}, context: {}, models: {}, identity: {}, prefs: { read: () => {}, write: () => {} },
     projects: { byId: 1, byGithub: 1, checkouts: 1, externalProjects: 1, config: 1, assertConfigTrusted: 1, setup: 1, create: 1, update: 1 },
@@ -154,8 +154,8 @@ describe('the two doors', () => {
   it('registers an opt-in context section that costs a normal task nothing', () => {
     const section = getContextSections().find((candidate) => candidate.id === PLUGIN_AUTHORING_SECTION)
     expect(section).toBeDefined()
-    // The whole affordability argument (docs/agent-tools.md § plugin_authoring): if this ever
-    // flips, every task starts paying for a guide it is not using.
+    // The affordability argument (docs/agent-tools.md § plugin_authoring). If this flips, every task
+    // starts paying for a guide it is not using.
     expect(section?.defaultIncluded).toBe(false)
     // Keeps wire order after memory (docs/agent-tools.md § Context sections).
     expect(section?.order).toBeGreaterThan(40)
@@ -176,23 +176,23 @@ describe('the two doors', () => {
   })
 
   it('is still the tool the Settings → Plugins starter prompt tells the agent to call', () => {
-    // A text read, not an import: node must not import the client, and this is the only way a rename here
-    // can go red over there. The seeded prompt is the entry point to the whole loop; if it names a tool
-    // that no longer exists, the first thing a new plugin author's agent does is fail.
+    // A text read, not an import: node must not import the client, and this is the only way a rename
+    // here can go red over there. The seeded prompt is the entry point to the loop, so a stale tool
+    // name fails the first thing a new plugin author's agent does.
     const settings = join(dirname(fileURLToPath(import.meta.url)), '../../../../client-core/src/settings/PluginsSettings.tsx')
     expect(readFileSync(settings, 'utf8')).toContain(`\`${PLUGIN_AUTHORING_TOOL}\``)
   })
 
   it('tells the agent the things about the loop it cannot derive', () => {
     const guide = renderPluginAuthoring()
-    // Each of these is a fact the agent gets wrong by default, and the one it would waste a session on.
+    // Each of these is a fact the agent gets wrong by default, and wastes a session on.
     expect(guide).toContain('plugin_request')
     expect(guide).toContain('identical arguments to collect the answer')
     expect(guide).toContain('Only the ENTRY module is re-evaluated')
     expect(guide).toContain('node:')
     expect(guide).toContain('acorn-plugin.json')
-    // Every derived list reaches the rendered text; a vocabulary computed and then not printed would
-    // pass every test above.
+    // Every derived list reaches the rendered text. A vocabulary computed and then not printed passes
+    // every test above.
     const v = pluginAuthoringVocabulary()
     for (const verb of v.actions.railOnSelect) expect(guide).toContain(`\`${verb}\``)
     for (const kind of Object.keys(v.bridge.kinds)) expect(guide).toContain(`\`${kind}\``)

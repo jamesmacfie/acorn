@@ -53,18 +53,13 @@ export const projectIssuesFilter = (projectIds: string[]): Record<string, unknow
   state: { type: { nin: ['completed', 'canceled'] } },
 })
 
-// The same query with a different filter: active issues assigned to whoever owns the credential, across
-// the whole workspace rather than the linked projects. A rail is scoped to the project someone is
-// looking at; a dashboard panel is scoped to the person, and "my issues" is only ever a question about
-// the second.
+// The same query with a different filter: active issues assigned to whoever owns the credential,
+// across the whole workspace rather than the linked projects. A rail is scoped to the project someone
+// is looking at; a dashboard panel is scoped to the person.
 export const myIssuesFilter = (): Record<string, unknown> => ({
   assignee: { isMe: { eq: true } },
   state: { type: { nin: ['completed', 'canceled'] } },
 })
-
-// The rail's fallback set, for a workspace with no Linear projects linked to it.
-//
-// It exists because of a gap the loaded tier has, not because anyone asked for a second rail mode.
 
 // A single issue-history event. Linear records each change with from/to fields; one event may
 // carry several changes (state + assignee at once). Labels arrive as IDs, resolved to names via

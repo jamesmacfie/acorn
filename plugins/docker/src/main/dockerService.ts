@@ -1,7 +1,7 @@
 // The stateful docker runtime: an in-memory list cache invalidated by a long-lived `docker events`
 // watcher, which also pushes a debounced `docker:changed` frame over the WS hub so every window
-// refreshes without polling the daemon. Pure Node, child processes only, constructed lazily on
-// first use, so it works under both the Electron root and dev:node; bootstrap disposes it on quit.
+// refreshes without polling the daemon. Pure Node, child processes only, constructed lazily on first
+// use. Bootstrap disposes it on quit.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { DockerContainerSummary, DockerImage, DockerInfo, DockerNetwork, DockerScope, DockerVolume } from '../shared/model'

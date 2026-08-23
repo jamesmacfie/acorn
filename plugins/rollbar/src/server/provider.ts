@@ -25,15 +25,14 @@ export type RollbarResourceInput = { kind: 'list' } | { kind: 'detail'; identifi
 export type RollbarListResult = { items: RollbarItemSummary[]; capped: boolean }
 export type RollbarResourceOutput = RollbarListResult | RollbarItemMetadata
 
-// See docs/integrations.md § Rollbar for why this always declares one project rather than none:
-// no fetch, and the secret goes unused, since `normalize` already wrote the project onto the
-// connection when the token was validated.
+// One project, always. `normalize` writes it onto the connection when the token is validated, so
+// there is no fetch and the secret goes unused. See docs/integrations.md § Rollbar.
 const rollbarProjectSource: ProviderProjectSource = {
   list({ connection }) {
     const config = parseJson(connection.config)
     const projectId = isRecord(config) && typeof config.projectId === 'string' ? config.projectId : null
-    // No project id means the row predates `normalize` writing one; offering a project whose id we
-    // would have to invent is worse than offering none, since that id becomes a database row.
+    // No project id means the row predates `normalize` writing one. An invented id would become a
+    // database row, so offer none.
     return Promise.resolve(projectId ? [{ id: projectId, label: connection.label }] : [])
   },
 }
@@ -118,8 +117,8 @@ function parseRollbar(raw: unknown, ref: ExternalRef): CodecResult<RollbarCached
       },
     }
   }
-  // v2 detail bundled latestOccurrence. Strip that child resource while retaining canonical item
-  // metadata; occurrence history now has independent cache rows and freshness.
+  // v2 detail bundled latestOccurrence. Strip that child resource and keep the item metadata.
+  // Occurrence history has its own cache rows and freshness.
   if (isRecord(raw) && raw.schemaVersion === 2 && isRecord(raw.summary)) {
     return {
       ok: true,
@@ -173,10 +172,9 @@ const resourceKey = (connectionId: string, input: RollbarResourceInput) =>
 
 type RefreshCtx = ProviderResourceRefreshContext
 
-// The read-modify-write below is why every persist path reads first: an item's cached envelope
-// carries both list membership and detail freshness, and each refresh owns only one of them. The
-// store exposes exactly that read/upsert pair over core's `issues` table, already scoped to this
-// owner (integrations/itemStore.ts explains why the table is core's, not rollbar's).
+// Every persist path reads first: an item's cached envelope carries both list membership and detail
+// freshness, and each refresh owns only one of them. The store exposes that read/upsert pair over
+// core's `issues` table, scoped to this owner (integrations/itemStore.ts).
 async function upsertIssue(context: RefreshCtx, summary: RollbarItemSummary, cached: RollbarCached): Promise<void> {
   const data = encodeCached(cached, context.limits.maxCachedItemBytes)
   await context.items.write({
@@ -235,8 +233,7 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
 
     const key = resourceKey(context.connection.id, input)
     // A list has no row of its own to carry its fetch time, so the marker and the membership are two
-    // reads that must agree; the store keeps them adjacent (`readMarker` hands back the timestamp
-    // rather than a row, because a marker is nothing but a timestamp).
+    // reads that must agree. The store keeps them adjacent.
     const [listAt, rows] = await Promise.all([
       context.items.readMarker(key),
       context.items.listForConnection(context.connection.id),

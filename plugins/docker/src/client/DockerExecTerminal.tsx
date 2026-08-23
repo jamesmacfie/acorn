@@ -1,6 +1,6 @@
 // A minimal in-panel exec terminal: xterm over the docker:exec WS channel. Independent of the
-// terminal plugin (frozen boundary): @xterm/xterm is a shared npm dependency, and this PTY is
-// throwaway (dies with the panel/connection; no ring, no tmux, no persistence).
+// terminal plugin, which is a frozen boundary. @xterm/xterm is a shared npm dependency, and this PTY
+// is throwaway: it dies with the panel or the connection, with no ring, no tmux, no persistence.
 import { onCleanup, onMount } from 'solid-js'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'

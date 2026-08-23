@@ -107,7 +107,7 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
         const parts = splitPath(file.path)
         return (
           <>
-            {/* Directory first and dimmed, filename emphasised — the finder's own emphasis, kept. */}
+            {/* Directory first and dimmed, filename emphasised. */}
             <span class="palette-hint muted">{parts.dir}</span>
             <span class="palette-label">{parts.name}</span>
           </>

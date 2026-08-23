@@ -7,11 +7,11 @@ import type { Capture, CaptureStore } from './driver'
 // The plugin's own capture table, as the driver's narrow store seam (./driver.ts).
 
 // How many captures one task keeps. A screenshot is a few hundred kilobytes and an agent in a loop
-// takes a lot of them, so the newest few are the evidence and the rest are noise on the owner's disk.
+// takes a lot of them.
 //
-// ponytail: newest-N per task, swept on write, because the write is the only moment the count can
-// change. If retention ever needs to be a policy — an age, a byte ceiling, an owner setting — it
-// belongs beside the other data-retention settings rather than here.
+// ponytail: newest-N per task, swept on write, because a write is the only moment the count changes.
+// If retention ever needs to be a policy, an age or a byte ceiling or an owner setting, it belongs
+// beside the other data-retention settings.
 const KEEP_PER_TASK = 20
 
 export function captureStore(db: PluginDatabase): CaptureStore & { read(id: string): Promise<Capture | null> } {

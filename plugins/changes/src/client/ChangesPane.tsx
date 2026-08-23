@@ -10,17 +10,16 @@ import { localGitApi } from './localGitClient'
 import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
 import './changes.css'
 
-// ChangesPane: a PR-style "Files changed" view over the task worktree's uncommitted changes, using
-// client-core's shared diff viewer (synth, gitdiff-parser, DiffRows) fed by local:changes/local:diff
-// instead of GitHub patches. Refreshes on the existing dirty-poll signal (taskStatus).
+// ChangesPane: a PR-style "Files changed" view over the task worktree's uncommitted changes. Uses
+// client-core's shared diff viewer (synth, gitdiff-parser, DiffRows) fed by local:changes and
+// local:diff instead of GitHub patches. Refreshes on the dirty-poll signal (taskStatus).
 export default function ChangesPane(props: { task: Task }) {
   const api = taskBridge()
   const projects = createQuery(() => projectsOptions(true))
   const project = () => projects.data?.find((candidate) => candidate.id === props.task.projectId)
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
   const [actionError, setActionError] = createSignal('')
-  // Arm-to-confirm for the two discard actions. The prompt used to be written into the error
-  // banner, which claimed a failure that had not happened.
+  // Arm-to-confirm for the two discard actions.
   const discardArmed = createArmedConfirm()
 
   const [changes, { refetch }] = createResource(
@@ -66,8 +65,8 @@ export default function ChangesPane(props: { task: Task }) {
     else setActionError('')
   }
 
-  // Review notes: inline annotations on the local diff. Created via the shared line composer,
-  // rendered under their anchor line, sent as one prompt via sendToAgent ('after-ready', queued
+  // Review notes: inline annotations on the local diff. Created through the shared line composer,
+  // rendered under their anchor line, sent as one prompt through sendToAgent ('after-ready', queued
   // until the agent idles), and stamped sentAt on delivery.
   const [notes, { refetch: refetchNotes }] = createResource(
     () => props.task.id,

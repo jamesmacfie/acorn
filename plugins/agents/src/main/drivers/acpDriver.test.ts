@@ -3,8 +3,8 @@ import { AcpDriver } from './acpDriver'
 import { harnessCapabilities } from './harness'
 
 // The generic driver's one branch worth pinning: resolving the two spawn forms into a descriptor
-// without spawning anything. A harness that cannot start has to appear as a row with a diagnostic, not
-// as a failed discovery, so `probe()` never throws.
+// without spawning anything. `probe()` never throws, so a harness that cannot start shows up as a row
+// with a diagnostic rather than as a failed discovery.
 
 describe('the generic ACP driver describes a harness before it starts one', () => {
   it('reports a command-form harness as uninstalled when its CLI is not on PATH', async () => {
@@ -65,7 +65,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     expect(harnessCapabilities(undefined)).not.toContain('compact')
     expect(harnessCapabilities({ sessionPersistence: true })).toContain('resume')
     expect(harnessCapabilities({ manualCompaction: true })).toContain('compact')
-    // The baseline is what the protocol defines and the shared normalizer maps, so it is true of every
+    // The baseline is what the protocol defines and the shared normalizer maps, so it holds for every
     // ACP harness whether or not that harness declares anything.
     expect(harnessCapabilities(undefined)).toContain('permissions')
   })

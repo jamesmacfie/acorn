@@ -92,9 +92,8 @@ describe('plugin host', () => {
     ...opts,
   })
 
-  // A fresh graph per call, mirroring how startServiceRuntime owns one per boot. `dataDir: ''` is
-  // deliberate: no plugin in this block declares `migrationsModule`, so nothing here opens a database and
-  // there is no root for the host to need. The one case that does opens its own temp directory.
+  // A fresh graph per call, mirroring how startServiceRuntime owns one per boot. `dataDir: ''` works
+  // because no plugin in this block declares `migrationsModule`, so nothing here opens a database.
   const host = (plugins: readonly NodePlugin[], disabled?: readonly string[]) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
@@ -165,8 +164,8 @@ describe('plugin host', () => {
       plugin('last', { dispose: () => void order.push('last') }),
     ])
     await result.dispose()
-    // Reverse order, because a later plugin may depend on an earlier one's resources; and 'first' still
-    // gets disposed despite 'bad' throwing, because teardown must not leave a WAL-mode database open.
+    // Reverse order, because a later plugin may depend on an earlier one's resources. 'first' still gets
+    // disposed despite 'bad' throwing, because teardown must not leave a WAL-mode database open.
     expect(order).toEqual(['last', 'first'])
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
@@ -196,9 +195,9 @@ describe('plugin host', () => {
   })
 
   it('disposes the plugins that DID initialize when a later init throws', async () => {
-    // The caller cannot do this itself: it only gets the dispose closure from a resolved result, so
-    // before this the composition root's catch released the data-root lock with every already-opened
-    // WAL-mode SQLite handle still open, plus live intervals and provider children.
+    // The caller cannot do this itself: it only gets the dispose closure from a resolved result. Without
+    // it, the composition root's catch releases the data-root lock while WAL-mode SQLite handles, live
+    // intervals and provider children are still open.
     const disposed: string[] = []
     await expect(
       host([
@@ -216,15 +215,13 @@ describe('plugin host', () => {
     expect(disposed).toEqual(['second', 'first'])
   })
 
-  // The compiled tier's half of ctx.storage (docs/data-layer.md § Migrations). Six built-ins used to
-  // open, migrate and close their own SQLite file, a five-line migrations module, a hand-wired
-  // openPluginDb call and an identical dispose block each. All the host needs now is the module the
-  // chain sits beside.
+  // The compiled tier's half of ctx.storage. See docs/data-layer.md § Migrations. All the host needs is
+  // the module the chain sits beside.
   it("opens, reuses and closes a built-in's database from its declared chain", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-builtin-storage-'))
     try {
-      // A chain with an empty journal: what is under test is the lifecycle, not anyone's schema. It sits
-      // where the plugin's own does, beside the module that declared it, found by the ancestor walk.
+      // A chain with an empty journal: this tests the lifecycle, not anyone's schema. It sits where the
+      // plugin's own does, beside the module that declared it, found by the ancestor walk.
       mkdirSync(join(dir, 'migrations/meta'), { recursive: true })
       writeFileSync(join(dir, 'migrations/meta/_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [] }))
       let opened: PluginDatabase | null = null
@@ -237,10 +234,8 @@ describe('plugin host', () => {
             opened = ctx.storage.open()
             again = ctx.storage.open()
           },
-          // The ordering the conversion had to preserve: agents flushes transcripts, workflows aborts
-          // steps and database drains pools through this handle on the way out, so it has to still be
-          // open here. The host closes it after this returns, at the same point in the drain the plugins'
-          // own `db.close()` used to sit.
+          // agents flushes transcripts, workflows aborts steps and database drains pools through this
+          // handle on the way out, so it has to still be open here. The host closes it after this returns.
           dispose: () => {
             opened!.$client.prepare('select 1').get()
             liveInDispose = true
@@ -253,10 +248,10 @@ describe('plugin host', () => {
         },
       )
       // Bound to the plugin id, under the one plugins directory: the same file and filename the plugin
-      // used to open for itself, so adopting the seam moves nobody's rows.
+      // opens for itself, so adopting the seam moves nobody's rows.
       expect(existsSync(join(dir, 'plugins/widgets.sqlite'))).toBe(true)
-      // One handle per boot however many times a plugin asks. Two openPluginDb calls used to mean two
-      // connections on one file, and nothing closed the second.
+      // One handle per boot however many times a plugin asks. Two openPluginDb calls would otherwise mean
+      // two connections on one file, with nothing closing the second.
       expect(again).toBe(opened)
       await result.dispose()
       expect(liveInDispose).toBe(true)
@@ -268,12 +263,9 @@ describe('plugin host', () => {
     }
   })
 
-  // The twin of the case above, and the one whose absence let the bug through: everything the built-in
-  // case proves has to hold for a plugin off disk too, because http and database deleted their own
-  // dispose-close on the strength of the host doing it. It did not: the context threw away the host's
-  // memoizing wrapper for this tier (server/plugin/context.ts), so the `opened` map never saw a loaded
-  // handle, closing was a no-op, and a WAL handle outlived the plugins drain, the sqlite drain and the
-  // data-root lock release. Same assertions, other tier.
+  // The twin of the case above, and the one whose absence let a bug through: the context dropped the
+  // host's memoizing wrapper for this tier (server/plugin/context.ts), so the `opened` map never saw a
+  // loaded handle, closing was a no-op, and a WAL handle outlived the data-root lock release.
   it("opens, reuses and closes a LOADED plugin's database from the manifest chain", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-loaded-storage-'))
     try {
@@ -297,9 +289,8 @@ describe('plugin host', () => {
           capabilities: new CapabilityRegistry(),
           core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
           dataDir: dir,
-          // The binding as the loader builds it: the chain already resolved from the manifest, which is why
-          // this tier never consults the plugin object's own `migrationsModule` (see the case at the
-          // bottom of this file).
+          // The binding as the loader builds it, with the chain already resolved from the manifest. That
+          // is why this tier never consults the plugin object's own `migrationsModule`.
           loaded: new Map([['ntfy', {
             permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
             storage: { open: () => openPluginDb(dir, 'ntfy', { migrationsFolder: join(dir, 'migrations') }) },
@@ -307,8 +298,8 @@ describe('plugin host', () => {
         },
       )
       expect(existsSync(join(dir, 'plugins/ntfy.sqlite'))).toBe(true)
-      // The binding's `open` is unmemoized above: it returns a fresh connection every call. So this
-      // passing is specifically the host's wrapper doing its job, not the binding's.
+      // The binding's `open` is unmemoized above and returns a fresh connection every call, so this
+      // passing is the host's wrapper doing its job, not the binding's.
       expect(again).toBe(opened)
       await result.dispose()
       expect(liveInDispose).toBe(true)
@@ -350,7 +341,7 @@ describe('plugin host', () => {
   it('clears a plugin contributions even when it is DISABLED on this boot', async () => {
     // The clear has to happen before the disabled check. Otherwise a plugin disabled on the second boot
     // of one process keeps the first boot's routes and tools, served through a handle its own dispose
-    // already closed. That is the exact trap the disable flag exists to avoid.
+    // already closed.
     const router = new Hono<AppEnv>()
     const tool = { name: 'probe_tool', title: 'Probe', risk: 'read', input: z.object({}), handler: async () => null } as never
     const contribute = plugin('docker', {
@@ -379,9 +370,9 @@ describe('plugin host', () => {
   })
 })
 
-// The other half of the two-tier rule. A built-in throwing is a broken build and still fails the
-// boot (the cases above). A plugin loaded from disk is third-party code, so its failure is contained:
-// its contributions are rolled back, it is reported, and the node keeps starting.
+// The other half of the two-tier rule. A built-in throwing is a broken build and fails the boot, as
+// the cases above show. A plugin loaded from disk is third-party code, so its failure is contained:
+// contributions roll back, the failure is reported, and the node keeps starting.
 describe('loaded plugins', () => {
   let shared: ReturnType<typeof makeTestDb> | null = null
   const coreDb = () => (shared ??= makeTestDb()).db
@@ -389,8 +380,8 @@ describe('loaded plugins', () => {
 
   const plugin = (name: string, opts: Partial<NodePlugin> = {}): NodePlugin => ({ name, init: () => {}, ...opts })
 
-  // Membership in `loaded` is the only thing that separates the two tiers, which is what these cases
-  // are really asserting: same plugin object, different treatment.
+  // Membership in `loaded` is the only thing that separates the two tiers: same plugin object,
+  // different treatment.
   const host = (plugins: readonly NodePlugin[], loaded: Record<string, Partial<NodePermissions>>) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
@@ -437,8 +428,8 @@ describe('loaded plugins', () => {
     // mounted, serving from a plugin that never finished starting.
     expect(pluginRouteContributions().some((c) => c.plugin === 'ntfy')).toBe(false)
     expect(disposed).toBe(true)
-    // The message travels with the row. It used to stop at this process's stderr, which a packaged app
-    // shows to nobody.
+    // The message travels with the row. Stopping at this process's stderr shows it to nobody in a
+    // packaged app.
     expect(result.roster.find((entry) => entry.name === 'ntfy'))
       .toMatchObject({ state: 'failed', failedAt: expect.any(Number), reason: 'boom', stage: 'init' })
     error.mockRestore()
@@ -487,9 +478,8 @@ describe('loaded plugins', () => {
   })
 
   it("ignores a loaded bundle's own migrationsModule, so the manifest chain always wins", async () => {
-    // The compiled tier declares its chain on the plugin object, and a loaded plugin's object comes out
-    // of a bundle the owner installed. If that declaration were honoured, a package could point the
-    // migrator at any directory it can name and the manifest's confinement would be advisory.
+    // A loaded plugin's object comes out of a bundle the owner installed. Honouring its declaration
+    // would let a package point the migrator at any directory it can name.
     let captured!: NodePluginContext
     await host(
       [plugin('ntfy', { migrationsModule: 'file:///tmp/not-my-chain/index.ts', init: (ctx) => void (captured = ctx) })],
@@ -564,7 +554,7 @@ describe('delivering a manifest-declared harness', () => {
   const plugin = (name: string, opts: Partial<NodePlugin> = {}): NodePlugin => ({ name, init: () => {}, ...opts })
 
   // Two plugins per boot, in the order the composition root uses them: the consumer publishes the
-  // capability from its own init, and the contributor's harnesses are delivered when its turn comes.
+  // capability from its own init, and the contributor's harnesses arrive when its turn comes.
   const boot = async (
     harnesses: readonly unknown[],
     dir: string,
@@ -605,8 +595,8 @@ describe('delivering a manifest-declared harness', () => {
     }], '')
 
     expect(registered).toHaveLength(1)
-    // `<pluginId>:<harnessId>`, minted here and nowhere else: this value is persisted onto every session
-    // row, so a manifest must not be able to choose it.
+    // `<pluginId>:<harnessId>`, minted here and nowhere else. It is persisted onto every session row,
+    // so a manifest must not be able to choose it.
     expect(registered[0]).toMatchObject({
       id: 'opencode:opencode',
       pluginId: 'opencode',
@@ -617,9 +607,8 @@ describe('delivering a manifest-declared harness', () => {
     expect(registered[0].probeUsage).toBeUndefined()
     expect(registered[0].probeAuth).toBeUndefined()
 
-    // Released when the plugin's registrations are rolled back, which is what a re-init and a contained
-    // failure both do. The plugin's own dispose does not: a harness lives in the consumer's registry, and
-    // the consumer's dispose takes the whole capability with it.
+    // Released when the plugin's registrations roll back, which a re-init and a contained failure both
+    // do. The plugin's own dispose does not, because the harness lives in the consumer's registry.
     clearRegistrations('opencode')
     expect(registered).toEqual([])
     await dispose()
@@ -637,8 +626,8 @@ describe('delivering a manifest-declared harness', () => {
           envPassthrough: [],
           quirks: { manualCompaction: false, sessionPersistence: false },
         },
-        // The schema already refuses `..` and a leading slash, so this is the belt to that brace: a path
-        // that only escapes once it is resolved must not reach the consumer either.
+        // The schema already refuses `..` and a leading slash. This covers a path that escapes only
+        // once it is resolved.
         {
           id: 'outside',
           label: 'Outside',
@@ -663,7 +652,7 @@ describe('delivering a manifest-declared harness', () => {
   })
 
   it('delivers nothing when no plugin owns agent sessions', async () => {
-    // The same silent nothing every unmatched contribution gets. A throw here would make "agents
+    // The same silent nothing every unmatched contribution gets. A throw here would turn "agents
     // disabled" into "this node does not boot".
     const result = await initPlugins([plugin('opencode')], {
       capabilities: new CapabilityRegistry(),

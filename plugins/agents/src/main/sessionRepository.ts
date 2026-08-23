@@ -39,9 +39,8 @@ export class AgentSessionRepository {
     protected readonly core: CoreServices,
   ) {}
 
-  // `null` means no workspace filter; an empty array means this workspace has no tasks, and the
-  // query must narrow to nothing rather than fall through to unfiltered (docs/managed-agents.md §
-  // Session model).
+  // `null` means no workspace filter. An empty array means the workspace has no tasks, so the query
+  // narrows to nothing rather than falling through to unfiltered.
   protected async workspaceTaskIds(workspaceId: string | undefined): Promise<string[] | null> {
     if (!workspaceId) return null
     return this.core.tasks.idsForWorkspace(workspaceId)

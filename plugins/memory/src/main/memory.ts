@@ -233,9 +233,8 @@ export async function memoryIndexSlice(db: PluginDatabase, projectId: string, ca
 }
 
 // Launch injection block, the push half (docs/notes-and-memory.md § Context integration): the
-// MEMORY.md index slice plus the project-scoped feedback/convention bodies, the rules an agent
-// must never miss. Caps keep it compact: injection covers the high-value slice, MCP search covers
-// the long tail.
+// MEMORY.md index slice plus the project-scoped feedback and convention bodies. Caps keep it
+// compact, and MCP search covers the long tail.
 export function formatMemoryInjection(
   slice: { name: string; description: string }[],
   keyMemories: { name: string; type: string; body: string }[],

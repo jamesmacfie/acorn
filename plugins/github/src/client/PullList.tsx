@@ -83,12 +83,12 @@ export default function PullList() {
   })
 
   // Promotes a PR into a task: origin github-pr, branch = headRef, pullNumber
-  // (docs/workspaces-and-tasks.md § Task creation and navigation). Linear ids are seeded from a
-  // warmed detail body when one is available; otherwise none.
+  // (docs/workspaces-and-tasks.md § Task creation and navigation). Linear ids come from a warmed
+  // detail body when there is one.
   //
-  // Creates inline rather than through PromoteToTaskModal, since a PR already carries its own title
-  // and branch, so this is the only place a create failure can be reported. Without it, a
-  // node-offline createTask threw an uncaught rejection and the click looked like it did nothing.
+  // Creates inline rather than through PromoteToTaskModal, because a PR already carries its title and
+  // branch. That makes this the only place a create failure can be reported, so keep the error path:
+  // a node-offline createTask otherwise throws an uncaught rejection and the click looks dead.
   const [taskError, setTaskError] = createSignal('')
   async function openAsTask(e: Event, pr: Pull) {
     e.preventDefault()
@@ -113,9 +113,9 @@ export default function PullList() {
     // Fetch the detail (cached if warm) so the body is present, then seed a task_link for every
     // Linear ticket the PR references. A PR can resolve several, and the task links them all.
     //
-    // The scan is provider-agnostic (the host reads every registered recogniser); the attribution is
-    // not, and cannot be: a task link needs a connection id, and the only one derivable here is the
-    // sole connected Linear. Widening this means asking each provider for its own sole connection,
+    // The scan is provider-agnostic, because the host reads every registered recogniser. The
+    // attribution is not: a task link needs a connection id, and the only one derivable here is the
+    // sole connected Linear. Widening it means asking each provider for its own sole connection,
     // which is a promotion-flow change rather than a scanner one.
     const detail = await queryClient.ensureQueryData(pullDetailOptions(owner(), repo(), String(pr.number), true)).catch(() => undefined)
     const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
@@ -155,8 +155,8 @@ export default function PullList() {
       return shown().length
     },
     getScrollElement: () => scrollEl() ?? null,
-    // --row-h-virt, read from the token: the virtualizer applies its result as an inline height,
-    // so a hardcoded 36 here silently pinned the PR list's density regardless of the style pack.
+    // --row-h-virt, read from the token. The virtualizer applies its result as an inline height, so a
+    // hardcoded 36 here pins the PR list's density whatever the style pack says.
     estimateSize: () => rowH(),
     overscan: 12,
   })
@@ -210,8 +210,8 @@ export default function PullList() {
         <Input class="pr-filter" kind="filter" placeholder="Filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
       </div>
       <Show when={taskError()}><Alert class="pr-task-error">{taskError()}</Alert></Show>
-      {/* Scroll element stays mounted from first render so the virtualizer always observes it —
-          publish the ref after layout so the first observed rect has the flexed pane height. */}
+      {/* Scroll element stays mounted from first render so the virtualizer always observes it.
+          Publish the ref after layout so the first observed rect has the flexed pane height. */}
       <div class="pr-list-scroll" ref={publishScrollEl}>
         <Show
           when={ready()}
@@ -241,9 +241,8 @@ export default function PullList() {
                   const checks = () => detail.data?.checks ?? []
                   return (
                     // Row, not a hand-built <A>: this list and every integration browse are the same
-                    // list, and they had two hover treatments, two selected treatments and two row
-                    // boxes between them. `href` keeps the real link (middle-click, copy address);
-                    // `onActivate` routes the plain click, exactly as <A> did.
+                    // list and share one hover, selected, and box treatment. `href` keeps the real
+                    // link for middle-click and copy address; `onActivate` routes the plain click.
                     <Row
                       class="pr-row"
                       href={`${githubBrowsePath(params.projectId ?? '')}/${pr.number}`}

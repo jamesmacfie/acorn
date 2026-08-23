@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest'
 // Primitive adoption ledger. See docs/ui-design.md § Primitive adoption ratchet for why this
 // exists and how the list grew.
 
-// Anchored on the workspace root rather than a fixed hop to a src/ dir: renderer code is spread
-// across packages/client-core and the plugin/app packages now, and a relative hop breaks on every
-// move. Ledger entries below are workspace-root-relative for the same reason.
+// Anchored on the workspace root rather than a fixed hop to a src/ dir, because renderer code is
+// spread across several packages and a relative hop breaks on every move. Ledger entries below are
+// workspace-root-relative for the same reason.
 const SRC = (() => {
   let dir = fileURLToPath(new URL('.', import.meta.url))
   for (;;) {
@@ -34,9 +34,8 @@ const rel = (p: string) => p.slice(SRC.length + 1)
 
 describe('primitive adoption', () => {
   it('no call site hand-writes a retired shared class', () => {
-    // `action-error` was the worst of the retired classes; see docs/ui-design.md
-    // § How the primitives are built for why. The Alert primitive owns it now and both github
-    // rules are gone.
+    // `action-error` was the worst of the retired classes; see docs/ui-design.md § How the
+    // primitives are built. Alert owns it.
     const retired = /class="[^"]*\b(overlay-btn|integration-key-input|ui-form-field|query-gate-\w+|action-error)\b/
     const offenders = tsx().filter((f) => retired.test(readFileSync(f, 'utf8'))).map(rel)
     expect(offenders).toEqual([])
@@ -166,8 +165,8 @@ describe('primitive adoption', () => {
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
-  // Files fully converted to the primitive components. Add a file here when you migrate it; the
-  // list may only grow. It is not "all files": migration is incremental.
+  // Files fully converted to the primitive components. Add a file when you migrate it; the list
+  // may only grow, and it is not every file.
   const CONVERTED = [
     'packages/client-core/src/settings/AppearanceSettings.tsx',
     'plugins/changes/src/client/agentToolRenderer.tsx',
@@ -273,11 +272,10 @@ describe('primitive adoption', () => {
   // See docs/ui-design.md § Migration tiers and their two invariant tests for why every primitive
   // must keep appending the caller's class rather than replacing it.
   //
-  // Matched as `.*Class` rather than the literal `.class` because a primitive that renders more
+  // Matched as `.*Class` rather than the literal `.class`, because a primitive that renders more
   // than one element needs more than one class prop: ListDetail draws a container and two columns,
-  // so its passthroughs are `class`, `listClass`, and `detailClass`. The receiver varies too; a
-  // primitive that splitProps() reads `own.class`. The invariant is that every cx() takes a
-  // caller-supplied class, not that they are all spelled the same.
+  // so its passthroughs are `class`, `listClass`, and `detailClass`. The invariant is that every
+  // cx() takes a caller-supplied class, not that they are all spelled the same.
   it('primitives append the caller class rather than replacing it', () => {
     const text = readFileSync(join(SRC, 'packages/client-core/src/ui/primitives.tsx'), 'utf8')
     const classAttrs = [...text.matchAll(/class=\{cx\(([^)]*)\)\}/g)].map((m) => m[1])

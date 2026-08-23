@@ -3,10 +3,8 @@ import { blob, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core
 // The browser plugin's one table (docs/data-layer.md § Plugin DBs). Lives in
 // <data-root>/plugins/browser.sqlite with its own Drizzle chain, migrated at plugin init.
 //
-// What a screenshot is for: an agent takes one, describes it, and moves on — but the bytes are the
-// evidence for whatever it concluded, and inline base64 in a transcript is evidence that evaporates.
-// A row keyed to the task is the smallest thing that survives, and a future audit trail at the
-// tool-registry seam reads it by id (docs/agent-tools.md § Browser tools).
+// Screenshot bytes are stored, not inlined into a transcript as base64, so they outlive the transcript
+// and stay addressable by id. See docs/agent-tools.md § Browser tools.
 //
 // `task_id` is a plain id into core's `tasks`, dereferenced through CoreServices.tasks, never joined.
 export const browserCaptures = sqliteTable(

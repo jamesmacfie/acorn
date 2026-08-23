@@ -3,13 +3,11 @@ import type { AgentPricingPreferences } from '../../shared/pricing'
 
 // Who can answer "how much of this harness's plan is left", keyed by harness id.
 //
-// A registry rather than the two-key record this replaced, because plan usage is per harness and the
-// set of harnesses is open (docs/managed-agents.md § Harnesses). Two feeders, indistinguishable
-// downstream: the built-in CLI probes, registered by the plugin's node entry, and a contributed
-// harness's `probes.usage` route, registered by the delivery seam.
-//
-// A harness with no collector simply shows no usage section. That is the honest answer, not a gap:
-// most agent CLIs have nothing to report.
+// A registry, because plan usage is per harness and the set of harnesses is open
+// (docs/managed-agents.md § Harnesses). Two feeders, indistinguishable downstream: the built-in CLI
+// probes, registered by the plugin's node entry, and a contributed harness's `probes.usage` route,
+// registered by the delivery seam. A harness with no collector shows no usage section, which is the
+// honest answer for most agent CLIs.
 
 export type AgentUsageCollector = (pricing: AgentPricingPreferences) => Promise<AgentProviderUsageReading>
 
@@ -22,8 +20,8 @@ export type AgentUsageCollectorEntry = {
 }
 
 export class AgentUsageCollectorRegistry {
-  // Insertion order, not sorted: the built-ins register first and stay first, which keeps the Agent
-  // pane's provider list stable as harnesses are installed and removed.
+  // Insertion order, not sorted, so the built-ins stay first and the Agent pane's provider list holds
+  // still as harnesses come and go.
   readonly #entries = new Map<string, AgentUsageCollectorEntry>()
 
   register(entry: AgentUsageCollectorEntry): () => void {

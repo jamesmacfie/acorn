@@ -1,15 +1,11 @@
 // The workflow control client, and the routes it drives.
 //
-// Lives in contract/ rather than client/ because two other plugins call it, plugins/agents' task
-// sidebar and this plugin's own palette rows, and contract/ is the one sanctioned cross-plugin
-// surface (docs/plugins.md § Package shape). It reads only client-core and protocol's workflow row
-// types, never this plugin's own client/, so transitive contract purity holds.
+// Lives in contract/ rather than client/ because plugins/agents' task sidebar calls it as well as
+// this plugin's own palette rows, and contract/ is the one sanctioned cross-plugin surface
+// (docs/plugins.md § Package shape). It reads only client-core and protocol's workflow row types,
+// never this plugin's own client/, so transitive contract purity holds.
 //
-// Moved here from @acorn/client-core/tasks/workflowClient.ts, along with its eight route builders
-// out of @acorn/protocol/api.ts (docs/architecture-overview.md: a plugin owns its own wire surface).
-// The route strings came over verbatim, not retyped, since a retyped template compiles fine and
-// only fails at runtime. Commands use HTTP; workflow notices and step events use the shared
-// WebSocket.
+// Commands use HTTP. Workflow notices and step events use the shared WebSocket.
 
 import { openRepoConfigTrust, readJson, writeJson } from '@acorn/plugin-api/client'
 import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'

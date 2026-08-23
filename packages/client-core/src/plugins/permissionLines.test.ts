@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { harnessGrants, harnessPermissionLines, keyClaimGrants, keyClaimPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
 
-// The permission diff the update prompt shows is a set-difference over the grant keys, so the wording
-// is free to change and the identifier is what has to stay stable. That makes this a contract test on
-// the keys, and a readability check on the sentences.
+// The update prompt diffs grant keys, not wording, so the key is what has to stay stable. This is a
+// contract test on the keys and a readability check on the sentences.
 
 const texts = (lines: readonly PermissionLine[]): string[] => lines.map((line) => line.text)
 
@@ -52,18 +51,16 @@ describe('the two permission groups', () => {
   })
 
   it('discloses a plugin\'s own live channel without echoing the verb it named', () => {
-    // The channel is admitted by shape, since core cannot enumerate a plugin's verbs
-    // (frames/channels.ts). The sentence stays the host's: a verb is manifest copy, and the whole point
-    // of this group is that everything in it is copy acorn owns and enforces.
+    // Core cannot enumerate a plugin's verbs, so the channel is admitted by shape
+    // (frames/channels.ts). The sentence stays the host's, because a verb is manifest copy.
     const lines = texts(uiPermissionLines(permissions({ events: ['plugin:machine-stats:sample'] })))
     expect(lines).toEqual(['Receive live updates from its own node half'])
     expect(lines.join(' ')).not.toContain('sample')
   })
 
   it('ignores a channel dressed up as another plugin\'s namespace, and a malformed one', () => {
-    // Ownership is not decided here — frameServices.ts refuses another plugin's channel at subscribe
-    // time — so a prompt line for one is honest about what was asked for. What must not happen is a
-    // malformed name reaching the prompt as a grant.
+    // frameServices.ts refuses another plugin's channel at subscribe time, so a prompt line for one is
+    // honest about what was asked for. A malformed name must not reach the prompt as a grant.
     expect(texts(uiPermissionLines(permissions({ events: ['plugin:Other:sample', 'plugin:a:b:c'] })))).toEqual([
       '2 requests this version of acorn does not recognise (ignored)',
     ])
@@ -108,10 +105,9 @@ describe('the update diff', () => {
     expect(added(same, same, uiPermissionLines)).toEqual([])
   })
 
-  it('marks nothing when only the WORDING moved', () => {
-    // The one this whole record shape exists for. Editing the trust prompt's copy used to re-prompt
-    // every owner of every installed plugin with the reworded line highlighted as newly requested,
-    // because the sentence was the diff key. Same grants, different sentence, nothing new.
+  it('marks nothing when only the wording moved', () => {
+    // The case this record shape exists for. With the sentence as the diff key, a copy edit re-prompted
+    // every owner of every installed plugin. Same grants, different sentence, nothing new.
     const same = permissions({
       api: ['core.tasks:read'],
       node: { core: ['fs'], capabilities: [], secrets: true, exec: false, net: ['ntfy.sh'] },
@@ -123,9 +119,8 @@ describe('the update diff', () => {
   })
 
   it('marks a growing set of unrecognised requests as new', () => {
-    // The count is in the key on purpose. An update asking for three things this shell cannot name
-    // where it previously asked for one has grown its reach, and it is the growth an owner can
-    // reason about least, so it is the last thing that should diff as unchanged.
+    // The count is in the key on purpose. One unrecognised request becoming three is a widening, and
+    // it is the widening an owner can reason about least, so it must not diff as unchanged.
     const before = permissions({ api: ['core.quantum:read'] })
     const after = permissions({ api: ['core.quantum:read', 'core.warp:write', 'core.flux:read'] })
     expect(added(before, after, uiPermissionLines)).toEqual([
@@ -136,8 +131,8 @@ describe('the update diff', () => {
   })
 
   it('carries severity with the grant instead of guessing it from the sentence', () => {
-    // The other half. A high-risk grant used to be recognised by prefix-matching its copy against a
-    // twenty-entry table, so a new one whose sentence matched nothing rendered as boring as a toast.
+    // The other half of the same idea. Prefix-matching copy against a table rendered any grant whose
+    // sentence missed the table as harmless.
     const risky = permissions({
       api: ['core.projects:read'],
       node: { core: ['fs', 'projects:write'], capabilities: [], secrets: true, exec: true, net: ['ntfy.sh'] },
@@ -149,8 +144,8 @@ describe('the update diff', () => {
     expect([...nodePermissionLines(risky), ...uiPermissionLines(risky)].every((line) => line.icon.length > 0)).toBe(true)
   })
 
-  // A permission the plugin gave UP is not marked, on purpose: the prompt asks "is this new reach
-  // acceptable", and a removal is never the thing to hesitate over.
+  // A permission the plugin gave up is not marked. The prompt asks whether the new reach is
+  // acceptable, and a removal is never the thing to hesitate over.
   it('does not mark a permission that was dropped', () => {
     const before = permissions({ node: { core: [], capabilities: [], secrets: true, exec: false, net: [] } })
     expect(added(before, permissions(), nodePermissionLines)).toEqual([])
@@ -234,8 +229,8 @@ describe('the harness grant', () => {
   })
 
   it('discloses nothing for a spawn the node already refused', () => {
-    // The node rejected this at parse, so it can never run, and a consent line about a grant that cannot
-    // exist is noise in the one list that must not have any.
+    // The node rejected this at parse, so it can never run. A consent line for it would be noise in the
+    // one list that must not have any.
     expect(harnessGrants(contributions([{ id: 'h', label: 'H', spawn: { args: [] }, envPassthrough: [] }]))).toEqual([])
   })
 })

@@ -1,5 +1,5 @@
-// Database pane backing: docs/data-layer.md § Database plugin: the Postgres pane. Was the `db:*` IPC
-// channels; now the DatabaseBridge behind the HTTP routes in server/routes/database.ts. Pure-Node (pg).
+// Database pane backing: docs/data-layer.md § Database plugin: the Postgres pane. The DatabaseBridge
+// behind the HTTP routes in server/routes/database.ts. Pure Node, on pg.
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -10,10 +10,8 @@ import type { QueryResult, QueryResultRow } from 'pg'
 import { type CoreServices, loadRepoConfig } from '@acorn/plugin-api/node'
 import type { DbCatalogResult, DbCatalogTable, DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
 
-// The Postgres surface this plugin's routes call. Declared beside the implementation rather than in
-// the route file that consumes it: a route capability provided at init and resolved per request used
-// to carry this across the old main/renderer boundary, and this plugin has had none since it became
-// loopback HTTP. A test that wants a fake passes one to the route factory.
+// The Postgres surface this plugin's routes call. Declared beside the implementation, not in the
+// route file that consumes it. A test that wants a fake passes one to the route factory.
 export type DatabaseBridge = {
   connect(taskId: string): Promise<DbConnectResult>
   disconnect(taskId: string): Promise<{ ok: true }>
@@ -72,10 +70,10 @@ export async function resolveDbUrl(core: DatabaseCoreServices, taskId: string): 
   const script = cfg.dbUrlScript?.trim()
   if (script && root) {
     // Executable content from the checkout, so it carries the same trust gate as other repo-authored
-    // run targets (docs/data-layer.md § Database plugin: the Postgres pane; core/main/repoConfigTrust.ts).
+    // run targets (docs/data-layer.md § Database plugin: the Postgres pane).
     //
-    // This check sits outside the try block below: a trust failure must propagate to the caller rather
-    // than fall through to the .env/env fallbacks as if the script had merely errored.
+    // The check sits outside the try block below: a trust failure must reach the caller rather than
+    // fall through to the .env and env fallbacks as if the script had merely errored.
     if (cfg.dbUrlFromRepo) await core.projects.assertConfigTrusted(taskId)
     try {
       const { stdout } = await exec('bash', ['-lc', script], { cwd: root, timeout: 15_000, maxBuffer: 1 << 20 })
@@ -115,13 +113,12 @@ async function readEnvUrl(envPath: string): Promise<string | null> {
 
 const getPool = (taskId: string): InstanceType<typeof Pool> | null => pools.get(taskId)?.pool ?? null
 
-// The introspected catalog behind table/column completions, cached per task. Monaco asks its provider
-// once per completion session and filters client-side as the reader types, so this is one lookup per
-// trigger rather than per keystroke, and a full introspection per trigger would still stall on a
-// remote node.
+// The introspected catalog behind table and column completions, cached per task. Monaco asks its
+// provider once per completion session and filters client-side as the reader types, so this is one
+// lookup per trigger. A full introspection per trigger would still stall on a remote node.
 //
-// Invalidated on connect/disconnect and after a non-read/write statement: docs/data-layer.md §
-// Database plugin: the Postgres pane.
+// Invalidated on connect, disconnect, and after a statement that is neither a read nor a write
+// (docs/data-layer.md § Database plugin: the Postgres pane).
 const catalogs = new Map<string, DbCatalogTable[]>()
 const DML_COMMANDS = new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
 
@@ -185,8 +182,8 @@ async function assertColumns(pool: InstanceType<typeof Pool>, schema: string, na
   return meta
 }
 
-// Shutdown disposal, composition-root owned: ends every open pg pool so quit doesn't leak connections.
-// Called by the composition root's reverse-order teardown. Idempotent, since an empty map is a no-op.
+// Shutdown disposal, called by the composition root's reverse-order teardown: ends every open pg pool
+// so quit does not leak connections. Idempotent, since an empty map is a no-op.
 export async function endDbPools(): Promise<void> {
   for (const [taskId, { pool }] of pools) {
     await pool.end().catch(() => {})
@@ -267,9 +264,9 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
         // A multi-statement string yields an array; report the last result set (psql-like).
         const last = Array.isArray(res) ? res[res.length - 1] : res
         const set = toResultSet(last as QueryResult<QueryResultRow>)
-        // Anything that was not a plain read or write may have changed the shape of the database, and
-        // the completion popup is the thing that would go on claiming otherwise. A multi-statement
-        // string is judged on its last command, which is the same simplification the row report makes.
+        // Anything that is neither a plain read nor a write may have changed the shape of the
+        // database, and the completion popup would go on claiming otherwise. A multi-statement string
+        // is judged on its last command, the same simplification the row report makes.
         if (!DML_COMMANDS.has(set.command.toUpperCase())) catalogs.delete(taskId)
         return { ...set, ms: Math.round(ms) }
       } catch (e) {

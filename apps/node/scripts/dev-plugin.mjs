@@ -4,17 +4,16 @@
 //   pnpm dev:plugin rollbar                                              # into the dev data root
 //   pnpm dev:plugin rollbar -- --package-root ../desktop/dist/bundled-plugins  # into desktop staging
 //
-// What this removes is the remembered sequence, not the restart: seeing a one-line change run used to
-// mean rebuilding the package by hand, restarting the node, reloading the renderer, and answering trust
-// dialogs. The dialogs are gone in a development build (main/helper/bundledPluginTrust.ts) and the rebuild is
-// this; the node restart is the one step that is real, because a loaded plugin's routes, tables and jobs
-// wire at init (node-core/server/routes/plugins.ts).
-// Under `pnpm dev:node` even that is automatic, because node's own `--watch` sees the rewritten bundle.
+// This removes the remembered sequence, not the restart. Trust dialogs are skipped in a development
+// build (main/helper/bundledPluginTrust.ts), and the rebuild is this. The node restart is the one real
+// step, because a loaded plugin's routes, tables and jobs wire at init
+// (node-core/server/routes/plugins.ts), and under `pnpm dev:node` even that is automatic, because
+// node's own `--watch` sees the rewritten bundle.
 //
 // A supervisor around the existing builder rather than a flag inside it: a fresh process per rebuild
 // re-reads the declaration and every workspace source with no module cache to invalidate, and one node
-// startup is noise next to a Vite build. Deliberately NOT a Vite watch build or a file-watching
-// library — `node:fs` already watches directories, and the builder already knows how to build.
+// startup is noise next to a Vite build. Not a Vite watch build and not a file-watching library:
+// `node:fs` already watches directories, and the builder already knows how to build.
 //
 // Ceiling: a rebuild is a full build of both bundles, ~1s, with no incremental graph. If that stops
 // being fast enough the upgrade path is Vite's own watch mode inside build-plugin.mjs, which keeps the
@@ -47,9 +46,9 @@ const dirs = [
   join(packageDir, 'src'),
   ...(declaredMigrations ? [declaredMigrations] : []),
 ].filter((target) => existsSync(target))
-// The watch list is resolved once, here, from one read of the declaration — so a chain that does not exist
-// yet is not watched into existence, and repointing `migrations` needs a restart of this watcher. Both are
-// silent stalls that read as "the builder is ignoring my file", so they get said out loud instead.
+// The watch list is resolved once, from one read of the declaration, so a chain that does not exist
+// yet is not watched into existence, and repointing `migrations` needs a restart of this watcher. Both
+// are silent stalls that read as "the builder is ignoring my file", so they get said out loud.
 if (declaredMigrations && !existsSync(declaredMigrations)) {
   console.warn(`[dev-plugin] ${relative(ROOT, declaredMigrations)} does not exist yet, so it is not being watched — restart dev:plugin once you create it`)
 }
@@ -62,7 +61,7 @@ const rebuild = () => {
     return
   }
   running = true
-  // A non-zero exit does NOT stop the watcher. Half-saved source is the normal state of a watched
+  // A non-zero exit does not stop the watcher. Half-saved source is the normal state of a watched
   // directory, and a watcher that dies on the first broken save is one you restart by hand instead of
   // reading.
   spawn(process.execPath, [BUILDER, ...args], { stdio: 'inherit', cwd: resolve(SCRIPTS, '..') }).on('exit', (code) => {
@@ -84,10 +83,10 @@ const trigger = () => {
 
 for (const dir of dirs) watch(dir, { recursive: true }, trigger)
 
-// The declaration is watched through its DIRECTORY, not by name. `watch()` on a single file follows the
-// inode, and the atomic save most editors do — write a temp file, rename it over the target — leaves the
-// watch pointing at an inode nothing will ever write to again. The symptom is the worst kind: the first
-// config edit is picked up if your editor writes in place, and silently ignored forever if it does not.
+// The declaration is watched through its directory, not by name. `watch()` on a single file follows
+// the inode, and the atomic save most editors do (write a temp file, rename it over the target) leaves
+// the watch pointing at an inode nothing will ever write to again. The symptom is the worst kind: the
+// first config edit is picked up if your editor writes in place, and silently ignored forever if not.
 watch(packageDir, { recursive: false }, (_event, filename) => {
   if (filename !== CONFIG_FILE) return
   console.log(`[dev-plugin] ${CONFIG_FILE} changed — rebuilding; restart dev:plugin if you changed 'migrations'`)

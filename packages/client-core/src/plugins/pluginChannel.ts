@@ -1,31 +1,15 @@
-// The live channel a loaded plugin owns, on the renderer's side.
+// The live channel a loaded plugin owns, on the renderer's side. See docs/plugins.md § The live
+// channel for the cadence rules and why a loaded plugin cannot claim a prefix of its own.
 //
-// A loaded plugin cannot claim a WS prefix: `ctx.events.channel` is withheld from it, because a prefix
-// is infrastructure exactly one owner may hold and it does not survive a message-passing boundary
-// (node-core/server/plugin/context.ts). But its node half still has data that changes, and before this
-// module the only push it had was `ctx.events.status()` — content-free, global, and it makes every
-// client re-pull everything it is showing. Sampling anything at 1 Hz through that is not a fast path,
-// it is a denial of service with good manners.
-//
-// So core claims the one prefix on every loaded plugin's behalf and routes by the plugin id inside the
-// channel name. `plugin:<id>:<verb>` is that plugin's namespace and no other's, which is the rule its
-// routes already follow. Two consumers, deliberately different:
-//
-//   - a **frame** that subscribed gets every frame, uncoalesced. It asked for the stream and it pays
-//     for it through the bridge's own message budget (plugins/frames/broker.ts).
-//   - **chrome** gets a coalesced nudge, at most one per plugin per COALESCE_MS. A rail row is a
-//     network read per node; a plugin sampling at 2 Hz must not turn that into a refetch storm.
-//
-// Core reads only the channel. What a plugin puts on the frame beside `channel` is the payload, handed
-// to its own frames unchanged — nothing here looks inside it.
+// Core claims the one `plugin` prefix and routes by the plugin id inside the channel name. A
+// subscribed frame gets every frame; chrome gets a coalesced nudge, because a rail row costs a
+// network read per node. Core reads the channel and nothing else in the payload.
 import { parsePluginChannel, PLUGIN_CHANNEL_PREFIX } from '@acorn/protocol/pluginState.ts'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import { registerWsChannel, type Disposable } from '../wsChannels'
 import { wsConnect } from '../wsClient'
 
-// Fast enough that a live number reads as live, slow enough that the descriptor reads behind it stay a
-// rounding error. A plugin sampling every 2s never touches the limit; one sampling in a loop is capped
-// at two chrome passes a second whatever it does.
+// Caps chrome at two passes a second per plugin. A plugin sampling every 2s never touches the limit.
 const COALESCE_MS = 500
 
 type FrameListener = (payload: unknown) => void
@@ -44,9 +28,8 @@ const announce = (pluginId: string): void => {
   for (const listener of [...pushListeners]) listener(pluginId)
 }
 
-// Leading and trailing edge both, because either alone is wrong here: leading-only drops the last
-// sample of a burst, which is the one a reader is looking at, and trailing-only makes the first update
-// after an idle period arrive half a second late.
+// Both edges. Leading alone drops the last sample of a burst, the one a reader is looking at, and
+// trailing alone delays the first update after an idle period by half a second.
 const nudge = (pluginId: string): void => {
   const since = Date.now() - (lastPushAt.get(pluginId) ?? 0)
   if (since >= COALESCE_MS) return announce(pluginId)
@@ -59,8 +42,7 @@ const nudge = (pluginId: string): void => {
 
 const route = (frame: WsServerFrame): void => {
   const parsed = parsePluginChannel(frame.channel)
-  // A frame on our prefix that is not a well-formed plugin channel is dropped, not guessed at: the node
-  // refuses to send one, so this is either a version skew or something forging frames.
+  // The node refuses to send a malformed plugin channel, so this is version skew or a forgery. Drop it.
   if (!parsed) return
   const listeners = frameListeners.get(frame.channel)
   if (listeners?.size) {
@@ -70,10 +52,10 @@ const route = (frame: WsServerFrame): void => {
   nudge(parsed.pluginId)
 }
 
-/** Claim the prefix. Idempotent, and called from the client composition root so the claim is made at
- *  boot like core's own three and can be pinned by the test that guards against a silent drop
- *  (apps/desktop/test/client/wsChannelPrefixes.test.ts). Claiming does not open the socket: that stays
- *  with the subscribers below, the same bargain wsClient.ts strikes. */
+/** Claim the prefix. Idempotent, and called from the client composition root so the claim lands at
+ *  boot beside core's own and the guard test can pin it
+ *  (apps/desktop/test/client/wsChannelPrefixes.test.ts). Claiming does not open the socket. The
+ *  subscribers below do, the same bargain wsClient.ts strikes. */
 export function ensurePluginChannel(): void {
   registration ??= registerWsChannel(PLUGIN_CHANNEL_PREFIX, route)
 }
@@ -87,9 +69,8 @@ export function onPluginPush(listener: (pluginId: string) => void): () => void {
   return () => void pushListeners.delete(listener)
 }
 
-/** One frame's subscription to one of its own plugin's channels. Throws for a channel belonging to
- *  another plugin, which is the same answer its routes give: another plugin's namespace is always
- *  denied, and the caller turns a throw into the bridge's own refusal. */
+/** One frame's subscription to one of its own plugin's channels. Another plugin's channel throws, the
+ *  same answer its routes give, and the caller turns the throw into the bridge's refusal. */
 export function onPluginFrame(pluginId: string, channel: string, listener: FrameListener): () => void {
   const parsed = parsePluginChannel(channel)
   if (!parsed) throw new Error(`${channel} is not a plugin channel`)

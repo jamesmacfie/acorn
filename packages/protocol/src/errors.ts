@@ -11,7 +11,7 @@ import { z } from 'zod'
 // no domain meaning.
 //
 // docs/api-reference.md calls this "a small closed set". It is the closed *floor*, not an exclusive
-// whitelist. 37 domain codes are already load-bearing on the client: `needs-trust` opens the
+// allowlist. 37 domain codes are already load-bearing on the client: `needs-trust` opens the
 // config-trust modal, `provider_needs_auth` rewrites the message, and collapsing them all into ten
 // would delete real behaviour. A closed set buys interop discipline across an API boundary, and there
 // isn't one here: client and Node ship from the same repo and are released together

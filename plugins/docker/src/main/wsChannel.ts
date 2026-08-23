@@ -16,9 +16,9 @@ const MAX_EXECS_PER_CONN = 8
 // Try bash, fall back to sh. Works across alpine/debian-ish images.
 const EXEC_SHELL = 'command -v bash >/dev/null && exec bash || exec sh'
 
-// `events` rather than a direct main/wsHub import: the hub is reached through the plugin context now
-// (server/plugin/types.ts § PluginBroadcast), which is also what makes the host able to take the
-// registration back on a re-init.
+// `events` rather than a direct main/wsHub import: the hub is reached through the plugin context
+// (server/plugin/types.ts § PluginBroadcast), which is what lets the host take the registration back
+// on a re-init.
 export function registerDockerWsChannel(events: PluginBroadcast): void {
   const service = getDockerService(events.send)
   const streamSubs = new Map<object, Map<StreamKey, { stop(): void }>>()
@@ -34,8 +34,8 @@ export function registerDockerWsChannel(events: PluginBroadcast): void {
   events.channel('docker', {
     onFrame(rawFrame, send, conn) {
       // The one cast, at the front door. Core hands over an open envelope and this plugin owns what
-      // is inside it (../shared/wsFrames.ts); every field read below is still guarded, because the
-      // sender is a peer over JSON and a type has never proved anything about that.
+      // is inside it (../shared/wsFrames.ts). Every field read below is still guarded, because the
+      // sender is a peer over JSON and a type proves nothing about that.
       const frame = rawFrame as DockerClientFrame
       switch (frame.channel) {
         case 'docker:logs:attach':

@@ -150,12 +150,10 @@ export class CodexAgentDriver implements AgentDriver {
       command: descriptor.executable,
       args: ['app-server', '--stdio'],
       cwd: options.cwd,
-      // brokerEnv, not `{ ...process.env }`. This is the same leak claudeDriver was fixed for, and
-      // initially missed here: the service inherits the parent's environment and reads
-      // SESSION_ENC_KEY from it, so spreading process.env would hand every Codex session the master
-      // encryption key. Combined with owner-level filesystem access to core.sqlite, that lets an
-      // agent decrypt every stored provider credential directly, bypassing
-      // canUseProviderCredential and SecretService entirely.
+      // brokerEnv, not `{ ...process.env }`. The service reads SESSION_ENC_KEY from its own
+      // environment, so spreading process.env hands every Codex session the master encryption key.
+      // With owner-level filesystem access to core.sqlite, that decrypts every stored provider
+      // credential, bypassing canUseProviderCredential and SecretService.
       env: brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
       onNotification: (notification) => {
         const events = normalizeCodexNotification(notification)

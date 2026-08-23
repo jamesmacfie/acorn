@@ -11,7 +11,7 @@ import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeRevea
 import SearchPanel from './search/SearchPanel'
 import './editor.css'
 
-// The extension-to-language map and the Monaco theme both moved to the host
+// The extension-to-language map and the Monaco theme live in the host
 // (docs/third-party/monaco.md § Status).
 
 // The Monaco editor pane: a lazy file tree on the left, a file tab bar and one reused Monaco
@@ -31,9 +31,9 @@ export default function EditorPane(props: { task: Task }) {
   let host: HTMLDivElement | undefined
   let editor: monaco.editor.IStandaloneCodeEditor | undefined
   let stopTheme: (() => void) | undefined
-  // One Monaco instance reused across tab switches, with the current path tracked explicitly
-  // rather than trusted from props or signals mid-swap (verne's documented gotcha: a stale model
-  // write lands in the wrong file without this). Models are kept per path and disposed on tab close.
+  // One Monaco instance reused across tab switches, with the current path tracked explicitly rather
+  // than read off props or signals mid-swap. Without that, a stale model write lands in the wrong
+  // file. Models are kept per path and disposed on tab close.
   let currentPath: string | null = null
   const models = new Map<string, monaco.editor.ITextModel>()
   const savedVersion = new Map<string, number>() // alternativeVersionId at last load/save
@@ -154,7 +154,7 @@ export default function EditorPane(props: { task: Task }) {
     maybeReveal(relPath)
   }
 
-  // Consumes a pending cross-pane reveal for the just-shown file: centers the target position and
+  // Consumes a pending cross-pane reveal for the file just shown: centers the target position and
   // places the cursor there. One-shot, cleared once applied so it does not re-fire on the next tab
   // switch.
   function maybeReveal(relPath: string) {
@@ -170,15 +170,15 @@ export default function EditorPane(props: { task: Task }) {
 
   const applyPaneIntent = (intent: PaneIntent | undefined) => {
     if (!intent) return
-    // ⌘⇧F and the "Find in files…" palette row, which used to open a pane of their own.
+    // ⌘⇧F and the "Find in files…" palette row.
     if (intent.kind === 'editor:search') {
       setSide('search')
       return
     }
     if (intent.kind !== 'editor:reveal') return
     setPendingReveal({ path: intent.path, line: intent.line, column: intent.column })
-    // Reveal implies open: cross-pane senders (find-in-files, stack frames) go through the core
-    // intent bus alone and can't call editorOpen themselves. No-op when the tab is already current.
+    // Reveal implies open: cross-pane senders such as find-in-files and stack frames reach this only
+    // through the core intent bus and cannot call editorOpen. No-op when the tab is already current.
     openPath(intent.path, true)
     if (currentPath === intent.path) maybeReveal(intent.path)
   }
@@ -232,9 +232,9 @@ export default function EditorPane(props: { task: Task }) {
     }
   }
 
-  // Single driver for the reused Monaco surface. Whenever the active file changes, from a task
-  // switch, a tree click, a tab close, or the quick-open palette (a separate component writing
-  // editorState), the model swaps here. Deferred so onMount owns the first paint.
+  // Single driver for the reused Monaco surface. The model swaps here whenever the active file
+  // changes, whether from a task switch, a tree click, a tab close, or the quick-open palette.
+  // Deferred so onMount owns the first paint.
   createEffect(
     on(active, (next) => {
       if (!editor) return

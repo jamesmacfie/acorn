@@ -133,8 +133,8 @@ export function assertValidWorkflow(def: WorkflowDef, catalog: WorkflowValidatio
   if (problems.length) throw new WorkflowValidationError(problems)
 }
 
-// Persisted runs may contain a join without `joins`. Infer it from the preceding fan-out at read time;
-// newly created definitions still require an explicit join target during validation.
+// Persisted runs can contain a join without `joins`. Infer it from the preceding fan-out at read time.
+// A newly created definition still needs an explicit join target to pass validation.
 export function normalizePersistedWorkflow(def: WorkflowDef): WorkflowDef {
   const steps = def.steps.map((step, index, all) => {
     if (step.kind !== 'join' || step.joins) return step

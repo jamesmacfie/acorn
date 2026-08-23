@@ -30,10 +30,9 @@ const USER = 'octocat'
 const ENC_KEY = '0'.repeat(64)
 const SECRETS = new SecretService(ENC_KEY)
 
-// Two databases, which is the shape of the split: `http_variables` lives in this plugin's own
-// file, and the task/checkout fixtures the command-variable tests need live in core's. The plugin reads
-// the second only through CoreServices, so the test builds the real thing over a real core DB rather
-// than stubbing the seam it is meant to exercise.
+// Two databases: `http_variables` lives in this plugin's own file, and the task and checkout fixtures
+// the command-variable tests need live in core's. The plugin reads the second only through
+// CoreServices, so the test builds the real thing rather than stubbing the seam it exercises.
 type Fixture = { core: SendCoreServices; db: ReturnType<typeof makeTestPluginDb>['db']; coreDb: ReturnType<typeof makeTestDb>['db']; cleanup: () => void }
 
 function fixture(): Fixture {
@@ -205,9 +204,9 @@ describe('resolveVars — command execution context', () => {
     root = null
   })
 
-  // Spawns a real subprocess via a bash login shell in a temp git worktree, so it is sensitive to
-  // machine load: on a saturated box the profile-sourcing shell can exceed send.ts's own 15s
-  // production command timeout. Retry rather than loosening a production timeout to suit CI.
+  // Spawns a real subprocess through a bash login shell in a temp git worktree, so it is sensitive to
+  // machine load: under load the profile-sourcing shell can exceed send.ts's 15s command timeout.
+  // Retry rather than loosening a production timeout to suit CI.
   it('runs a command in the explicit task worktree and uses its last non-empty output line', { timeout: 30_000, retry: 2 }, async () => {
     fx = fixture()
     root = mkdtempSync(join(tmpdir(), 'acorn-http-command-'))

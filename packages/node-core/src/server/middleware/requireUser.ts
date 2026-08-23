@@ -3,10 +3,9 @@ import { createMiddleware } from 'hono/factory'
 import { respondError } from '../respond'
 import type { AppEnv, Principal } from './auth'
 
-// The single authentication gate for /v2 routes (docs/security.md § Transport and auth). Mounted
-// once in createApp() over `/v2/*` (after authMiddleware), it replaces the per-route inline guards
-// and gates on the resolved principal: either credential kind passes, so internal-token callers work
-// exactly as device callers do.
+// The single authentication gate for /v2 routes (docs/security.md § Transport and auth). Mounted once
+// in createApp() over `/v2/*`, after authMiddleware. Either credential kind passes, so internal-token
+// callers work as device callers do.
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   if (!c.get('principal')) return respondError(c, 401, 'unauthenticated')
   await next()
@@ -35,9 +34,9 @@ export const canUseProviderCredential = (c: Context<AppEnv>): boolean =>
 // Is this principal entitled to act on `taskId`?
 //
 // A device may act on any task. An internal token may act only on the task it was minted for
-// (docs/security.md § Credential handling). Before scoped tokens that comparison was impossible, so
-// routes/agentTools.ts took the taskId from the URL and a credential handed to task A's agent could
-// drive task B's tools. The 'service' scope is unbound because the node's own loopback calls are not
+// (docs/security.md § Credential handling). Without that comparison, a credential handed to task A's
+// agent drives task B's tools. The 'service' scope is unbound, because the node's own loopback calls
+// are not task-specific.
 export const mayActOnTask = (c: Context<AppEnv>, taskId: string): boolean => {
   const principal = c.get('principal')
   if (!principal) return false
@@ -54,15 +53,12 @@ export const mayActOnTask = (c: Context<AppEnv>, taskId: string): boolean => {
 //     workflow run) must look the owning task up before they can check it, and an unconfined caller
 //     should skip that lookup rather than pay for it.
 //
-// This is a boolean and not "the task this principal is bound to", because the id-returning form has
-// to use `null` for "unconfined", which collides with a `task`-scoped principal that somehow carries
-// no taskId. Those two must produce opposite answers (allow everything vs allow nothing). Today
-// verifyInternalToken rejects that token outright (server/auth/internalTokens.ts), so the collision is
-// unreachable, but a guard whose correctness rests on an invariant two files away is still the wrong
-// shape. Pair this with mayActOnTask per item and the malformed case denies rather than admits.
-//
-// Both call sites were first written as `mayActOnTask(c, '')`, true for a device, false for a
-// task-scoped token, correct by accident and unreadable. Say the thing instead.
+// A boolean rather than "the task this principal is bound to", because the id-returning form has to
+// use `null` for "unconfined", which collides with a `task`-scoped principal carrying no taskId. Those
+// two must answer opposite ways, allow everything against allow nothing. verifyInternalToken rejects
+// that token outright (server/auth/internalTokens.ts), so the collision is unreachable, but a guard
+// resting on an invariant two files away is the wrong shape. Pair this with mayActOnTask per item and
+// the malformed case denies rather than admits.
 export const isTaskConfined = (c: Context<AppEnv>): boolean => {
   const principal = c.get('principal')
   return !!principal && principal.kind !== 'device' && principal.scope !== 'service'
@@ -78,8 +74,8 @@ export const requireTaskScope = createMiddleware<AppEnv>(async (c, next) => {
 })
 
 // Gate for routes that administer or spend the owner's provider connections (docs/security.md §
-// Credential handling). requireDevice would be too strict: the node's own loopback calls ('service'
-// scope) legitimately reach provider-backed reads to warm a mirror.
+// Credential handling). requireDevice is too strict, because the node's own loopback calls, on the
+// 'service' scope, reach provider-backed reads to warm a mirror.
 export const requireProviderAccess = createMiddleware<AppEnv>(async (c, next) => {
   if (!canUseProviderCredential(c)) return respondError(c, 403, 'interactive_user_required')
   await next()

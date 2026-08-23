@@ -10,14 +10,13 @@ import { pullDetailOptions } from './queries'
 import './styles/ref-panel.css'
 
 // GitHub's reference panel: one pull request, glance-sized, over whatever the reader was looking at
-// (docs/github-integration.md § Content links). It shows less than the full pane, a pull request is
-// a whole review with diff, threads, checks, and commits, and offers the pane as the next step
-// rather than being a smaller copy of it.
+// (docs/github-integration.md § Content links). It shows less than the full pane and offers the pane
+// as the next step, rather than being a smaller copy of a whole review.
 
 export default function PullRefPanel(props: RefPanelProps) {
   const navigate = useNavigate()
-  // `owner/repo#number`, parsed by the one module that also spells it (../contract/pullRef.ts), so this
-  // panel cannot disagree with the collection row or the URL recogniser about what it is looking at.
+  // `owner/repo#number`, parsed by the module that also spells it (../contract/pullRef.ts), so this
+  // panel, the collection row, and the URL recogniser name the same thing.
   const parts = createMemo(() => parsePullRef(props.target.displayId))
 
   const detail = createQuery(() => {
@@ -27,11 +26,10 @@ export default function PullRefPanel(props: RefPanelProps) {
   const pull = () => detail.data?.pull
   const checks = () => detail.data?.checks ?? []
 
-  // Through the host's own ladder rather than a path built here, so the panel reaches the pull
-  // request exactly the way a dashboard row does, including selecting the rail source, which
-  // navigating alone does not do. `prefer: 'route'` because this is the "take me there" affordance:
-  // if the repo is not one acorn tracks there is no route, the URL opens in the browser, and either
-  // way the panel is done.
+  // Through the host's ladder rather than a path built here, so the panel reaches the pull request
+  // the way a dashboard row does, including selecting the rail source, which navigating alone does
+  // not do. `prefer: 'route'` because this is the "take me there" affordance. An untracked repo has
+  // no route, so the URL opens in the browser and the panel is done either way.
   const openFull = (): void => {
     const at = parts()
     if (at) openInAppUrl(`https://github.com/${at.owner}/${at.repo}/pull/${at.number}`, { prefer: 'route', navigate })
@@ -52,8 +50,8 @@ export default function PullRefPanel(props: RefPanelProps) {
             when={pull()}
             fallback={(
               <EmptyState align="start" size="sm" busy={detail.isLoading}>
-                {/* A displayId this panel cannot parse is a recogniser and a panel disagreeing, which is a
-                    bug rather than a missing pull request — so it says so instead of spinning forever. */}
+                {/* A displayId this panel cannot parse means the recogniser and the panel disagree,
+                    which is a bug, not a missing pull request. Say so instead of spinning. */}
                 {!parts() ? 'Not a pull request reference.' : detail.isLoading ? 'Loading…' : 'Could not load this pull request.'}
               </EmptyState>
             )}
@@ -72,8 +70,7 @@ export default function PullRefPanel(props: RefPanelProps) {
                 <Show when={loaded().headRef}>
                   {(head) => <div class="gh-ref-branch muted">{head()} → {loaded().baseRef ?? ''}</div>}
                 </Show>
-                {/* Checks as one word, not a list. The list is the pane's job, and a reader glancing wants
-                    to know whether to care. */}
+                {/* Checks as one word, not a list. The list is the pane's job. */}
                 <Show when={checks().length}>
                   <div class="gh-ref-meta">
                     <StatusDot tone={CHECK_TONE[checksState(checks())]} />
@@ -83,8 +80,8 @@ export default function PullRefPanel(props: RefPanelProps) {
                 <Toolbar>
                   <Button onClick={openFull}>Open pull request</Button>
                 </Toolbar>
-                {/* Host-drawn and provider-agnostic: whether a task already tracks this PR, and the means
-                    to start one if not. github never touches core's task routes to offer it. */}
+                {/* Host-drawn and provider-agnostic: whether a task tracks this PR, and how to start
+                    one. github never touches core's task routes to offer it. */}
                 <RefPanelTaskLink target={props.target} />
               </>
             )}

@@ -1,13 +1,13 @@
-// Agent-surfaces model (docs/terminal-and-agents.md): pure mappers from headless stream-json events
-// to the single AgentState enum (05, never redeclared), activity-feed items, and task-sidebar roster
-// composition (PTY sessions and workflow steps merged into one list).
+// Agent-surfaces model (docs/terminal-and-agents.md): pure mappers from headless stream-json events to
+// the AgentState enum, activity-feed items, and task-sidebar roster composition, which merges PTY
+// sessions and workflow steps into one list.
 import type { AgentState, TerminalSession } from '@acorn/protocol/terminal.ts'
 import type { WorkflowRunRow, WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 
 export type StreamEvent = Record<string, unknown> & { type?: string }
 
-// The 15 §status table: system/init → starting; assistant/tool activity → working; permission
-// request → blocked; result → done.
+// system/init to starting, assistant and tool activity to working, permission request to blocked,
+// result to done.
 export function streamJsonToAgentState(event: StreamEvent): AgentState {
   switch (event.type) {
     case 'system':
@@ -78,8 +78,8 @@ export function stepFeed(step: WorkflowStepRow): { items: FeedItem[]; costUsd: n
   }
 }
 
-// Open-in-terminal (15 P2): the resume command for a step's captured session id, per profile, the
-// same seam the headless argv templates use. Runs through the drawer's $SHELL -lc path.
+// Open-in-terminal: the resume command for a step's captured session id, per profile, the same seam
+// the headless argv templates use. Runs through the drawer's $SHELL -lc path.
 export function resumeCommandFor(step: { profileId: string | null; sessionId: string | null; resumeCommand?: string | null }): string | null {
   if (!step.sessionId) return null
   if (/[^A-Za-z0-9_-]/.test(step.sessionId)) return null // session ids are opaque tokens; never shell metachars

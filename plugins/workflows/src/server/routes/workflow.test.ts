@@ -98,8 +98,7 @@ describe('workflow routes', () => {
 
 // A workflow step executes an agent CLI in a worktree, so approving another task's gate or killing
 // its step acts on that task. The run-scoped paths carry no taskId, so core's mounted
-// requireTaskScope cannot see them. The /tasks/:id half of this router is covered there; this file
-// does not retest it.
+// requireTaskScope cannot see them. The /tasks/:id half is covered there, not here.
 describe('a task-scoped credential is confined to its own runs', () => {
   afterEach(() => setWorkflowBridge(null))
 

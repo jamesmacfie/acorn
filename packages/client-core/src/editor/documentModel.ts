@@ -1,15 +1,13 @@
 // The parts of a host-owned document surface that are not a component (docs/third-party/monaco.md).
 //
-// Everything here is pure or a plain module-level map, because the surface itself is a .tsx and
-// this repo's vitest runs in node with no Solid plugin (docs/testing.md): a green suite proves
-// nothing about a component, so the logic worth pinning lives on this side of the file boundary.
+// Everything here is pure or a plain module-level map, because vitest runs in node with no Solid
+// plugin (docs/testing.md), so the logic worth pinning has to live outside the .tsx.
 import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/pluginBridge.ts'
 import { onScopeEvicted } from '../registries/scopeEviction'
 
-// The shapes both ends read: the body a document route serves, and the completion request/response
-// pair, live on the wire (`@acorn/protocol/documentSurface.ts`), not here. A plugin's node half
-// serves them, and it cannot import client-core. Re-exported so the editor half still has one
-// place to read them from.
+// The shapes both ends read live on the wire (`@acorn/protocol/documentSurface.ts`), because a
+// plugin's node half serves them and cannot import client-core. Re-exported so the editor half has
+// one place to read them from.
 export type {
   PluginCompletionItem,
   PluginCompletionKind,
@@ -19,11 +17,9 @@ export type {
 } from '@acorn/protocol/documentSurface.ts'
 export { COMPLETION_KINDS, MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
 
-/** Read bodies are bytes from a node. A document big enough to wedge the renderer is refused
- * rather than truncated: half a file in an editor that will happily save it back is data loss.
- * Declared on the wire (`@acorn/protocol/pluginBridge.ts`) because the frame's `document.write` is
- * held to the same ceiling; re-exported here so this module stays the one place the editor half
- * reads it from. */
+/** A document big enough to wedge the renderer is refused rather than truncated: half a file in an
+ * editor that will happily save it back is data loss. Declared on the wire
+ * (`@acorn/protocol/pluginBridge.ts`), because the frame's `document.write` has the same ceiling. */
 export { MAX_DOCUMENT_BYTES }
 
 /** The scope a pane was mounted in. Both are optional because a project-scoped pane has no task and a
@@ -39,9 +35,8 @@ export type DocumentHandle = {
 }
 
 
-// The only two parameters the host substitutes, and the reason the list is closed: these are the two
-// values the host holds about the pane it is drawing. Anything else in a path is the plugin naming
-// something the host has no business inventing, so it is left alone and the route 404s honestly.
+// The only two parameters the host substitutes, because they are the two values it holds about the
+// pane it is drawing. Anything else in a path is left alone and the route 404s honestly.
 const SUBSTITUTIONS = ['taskId', 'projectId'] as const
 
 /**
@@ -73,11 +68,10 @@ export const documentUri = (pluginId: string, surfaceId: string): string => `plu
 
 // ── View state ────────────────────────────────────────────────────────────────────────────────────
 //
-// View state (docs/third-party/monaco.md § View state is the one type that must go opaque):
-// scroll and cursor, held as host state keyed by (node, scope, uri) rather than the plugin's own
-// Monaco blob.
+// Scroll and cursor, held as host state keyed by (node, scope, uri) rather than the plugin's own
+// Monaco blob. See docs/third-party/monaco.md § View state is the one type that must go opaque.
 //
-// `unknown` rather than the Monaco type: this module is storage, not the editor, and the one
+// `unknown` rather than the Monaco type, because this module is storage, not the editor. The one
 // caller that knows what the blob is casts at the boundary.
 const viewStates = new Map<string, unknown>()
 
@@ -101,9 +95,8 @@ export function clearDocumentViewStates(): void {
   viewStates.clear()
 }
 
-// Registered beside the signal it clears, which is the rule scopeEviction.ts states at length. View
-// state does not clear on a node switch: it is keyed by node, so switching back restores where the
-// reader was, the same treatment editor scroll already gets.
+// Registered beside the signal it clears (registries/scopeEviction.ts). View state does not clear
+// on a node switch, because it is keyed by node, so switching back restores where the reader was.
 onScopeEvicted((eviction) => {
   if (eviction.scope === 'task') evictDocumentViewStates(eviction.taskId)
   else if (eviction.scope === 'workspace') evictDocumentViewStates(eviction.workspaceId)

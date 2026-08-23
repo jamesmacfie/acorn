@@ -44,7 +44,7 @@ export async function confirmAdvertiseHost(root: Pick<DataRoot, 'advertiseHost' 
     candidates.forEach((candidate, index) => {
       process.stdout.write(`  ${index + 1}) ${candidate.address.padEnd(18)}${candidate.iface}\n`)
     })
-    process.stdout.write('  n) none — keep this node private to this machine\n\n')
+    process.stdout.write('  n) none, keep this node private to this machine\n\n')
 
     // Enter means "none" (docs/node-distribution.md § Reaching a node from another machine).
     const answer = (await rl.question('Choice [n]: ')).trim()

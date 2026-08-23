@@ -1,4 +1,4 @@
-// Runs a provider's declared project source for core's own workspace-project picker; see
+// Runs a provider's declared project source for core's own workspace-project picker. See
 // docs/integrations.md § Project sources and § Provider boundaries for the credential handling and
 // caching rules this follows.
 import type { ProviderErrorCode } from '@acorn/protocol/integrations.ts'
@@ -18,13 +18,12 @@ const failure = (error: ProviderErrorCode, status: RouteFailure['status']): Rout
 })
 
 // Bounds a provider's claimed project list before any of it becomes a `workspace_external_projects`
-// row; see docs/integrations.md § Project sources for the limits and why they match the
+// row. See docs/integrations.md § Project sources for the limits and why they match the
 // workspace-mapping write's own Zod bounds.
 export const PROVIDER_PROJECT_LIMITS = { maxProjects: 500, maxIdBytes: 200, maxLabelBytes: 200 } as const
 
 /**
-/**
- * A provider's claimed project list, bounded to what core will store and show; see
+ * A provider's claimed project list, bounded to what core will store and show. See
  * docs/integrations.md § Project sources for why an over-long or empty id is dropped rather than
  * truncated.
  *
@@ -52,8 +51,7 @@ export function boundProviderProjects(raw: unknown): ProviderProject[] {
 }
 
 /**
-/**
- * The projects one connection offers, or a typed failure for that connection; see
+ * The projects one connection offers, or a typed failure for that connection. See
  * docs/integrations.md § Project sources for why this runs per connection rather than per provider.
  */
 export async function listConnectionProjects(args: {
@@ -68,12 +66,12 @@ export async function listConnectionProjects(args: {
   const provider = connectionProviderRegistry.get(connection.provider)
   const source = provider?.projects
   // Reaching here without a source means the client asked about a connection whose provider never
-  // offered projects. The descriptor it filtered on said otherwise, so the roster moved under it (a
-  // plugin disabled mid-session), a misconfiguration rather than something the owner did.
+  // offered projects. The descriptor it filtered on said otherwise, so the roster moved under it, most
+  // likely a plugin disabled mid-session.
   if (!provider || !source) return failure('provider_bad_config', 502)
 
   // Same rule as the mirrored-resource path: a connection awaiting re-auth or turned off must not
-  // generate outbound work. Unlike that path there is no cache to fall back to, so this is the answer.
+  // generate outbound work. There is no cache to fall back to here, so this is the answer.
   if (connection.status === 'needs-auth') return failure('provider_needs_auth', 401)
   if (connection.status === 'disabled') return failure('provider_not_connected', 403)
 
@@ -87,15 +85,15 @@ export async function listConnectionProjects(args: {
     return { ok: true, value: boundProviderProjects(claimed) }
   } catch (error) {
     if (error instanceof SecretUnavailableError) {
-      // The credential is gone or unreadable, which is the definition of needs-auth. Recorded so
-      // Settings → Integrations says so too, rather than only this picker knowing.
+      // The credential is gone or unreadable, which is what needs-auth means. Recorded so Settings →
+      // Integrations says so too, rather than only this picker knowing.
       await args.db
         .update(schema.integrations)
         .set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: Date.now() })
         .where(eq(schema.integrations.id, connection.id))
       return failure('provider_secret_unreadable', 401)
     }
-    // 400 does not survive as a client status: a provider rejecting its own request is this node's
+    // 400 does not survive as a client status. A provider rejecting its own request is this node's
     // configuration problem, and the owner did not send a bad request by opening a picker.
     if (error instanceof ProviderOperationError) {
       return failure(error.code, error.status === 400 ? 502 : error.status)

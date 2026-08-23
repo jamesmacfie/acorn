@@ -1,9 +1,9 @@
-// Renderer broadcasts shared by the main-process surfaces. They use the authenticated WebSocket hub
-// rather than per-window IPC and are no-ops when no socket is connected.
+// Renderer broadcasts shared by the main-process surfaces. They go over the authenticated WebSocket
+// hub and do nothing when no socket is connected.
 import { wsBroadcast } from './wsHub'
 
-// Per-tab status (idle/exited) is shown for sessions the renderer isn't attached to, so changes
-// are broadcast as a content-free ping; the panel re-pulls the session list to get fresh meta.
+// Per-tab status is shown for sessions the renderer is not attached to, so a change broadcasts as a
+// content-free ping and the panel re-pulls the session list.
 export function broadcastStatus(): void {
   wsBroadcast({ channel: 'term:status' })
 }
@@ -23,10 +23,10 @@ export function broadcastRepoConfigTrustNotice(taskId: string): void {
   broadcastStatus()
 }
 
-// An agent asked for a plugin to be installed, updated or removed and the owner has not answered
-// (docs/plugins.md § Approval-mediated install). Content-free apart from the verb: the request
-// itself, including the agent's own sentence about why, is read from the device-only roster route,
-// so nothing an agent wrote reaches the notification bell over the wire.
+// An agent asked for a plugin install, update, or removal and the owner has not answered
+// (docs/plugins.md § Approval-mediated install). Content-free apart from the verb: the request, and
+// the agent's own sentence about why, come from the device-only roster route, so nothing an agent
+// wrote reaches the bell over the wire.
 export function broadcastPluginApprovalNotice(taskId: string, action: 'install' | 'update' | 'uninstall'): void {
   wsBroadcast({
     channel: 'workflow:notice',
@@ -39,10 +39,10 @@ export function broadcastWorkflowStepEvent(runId: string, stepId: string, event:
   wsBroadcast({ channel: 'workflow:step:event', runId, stepId, event })
 }
 
-// This node's plugin set moved under a running client: a reload swapped a plugin's node half, so its
-// roster row, its routes and the bundle hash behind its UI may all be different (docs/plugins.md §
-// The dev loop). Content-free, like `term:status`: the roster is already a fetchable route, and
-// duplicating it on the wire would mean two projections of the same state to keep in step.
+// This node's plugin set moved under a running client. A reload swapped a plugin's node half, so its
+// roster row, its routes, and the bundle hash behind its UI may all differ (docs/plugins.md § The
+// dev loop). Content-free, like `term:status`: the roster is a fetchable route, and putting it on
+// the wire too would mean two projections of the same state to keep in step.
 export function broadcastPluginsChanged(): void {
   wsBroadcast({ channel: 'plugins:changed' })
 }

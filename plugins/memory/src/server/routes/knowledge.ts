@@ -36,14 +36,12 @@ const titleBody = z.object({ title: z.string().trim().min(1) })
 const workspaceLocation = (id: string): NoteLocation => (id === 'global' ? { scope: 'global' } : { scope: 'workspace', workspaceId: id })
 const taskLocation = (id: string): NoteLocation => ({ scope: 'task', taskId: id })
 
-// Pin the proposal list to a confined caller's own task, the way plugins/agents' `confineFilter`
-// pins its session roster. `GET /memory/proposals` with no `?task=` used to return every pending
-// proposal on the node with bodies included, and with a `?task=` it honoured whatever was asked
-// for, so an agent could read the pending memory writes of every other task by asking nicely.
+// Pin the proposal list to a confined caller's own task, the way plugins/agents' `confineFilter` pins
+// its session roster. Without this, an agent can read the pending memory writes of every other task
+// by asking for them.
 //
-// null means refuse: the caller named a task that is not its own, or is confined and carries no
-// task at all. Silently rewriting the filter would answer a question nobody asked, which is the
-// same reasoning managed.ts records.
+// null means refuse: the caller named a task that is not its own, or is confined and carries no task
+// at all. Rewriting the filter instead would answer a question nobody asked.
 const confineTaskQuery = (c: Context<AppEnv>): { taskId?: string } | null => {
   const asked = c.req.query('task') ?? undefined
   if (!isTaskConfined(c)) return { taskId: asked }
@@ -64,8 +62,8 @@ export const knowledge = new Hono<AppEnv>()
   })
   .get('/memory/proposals', (c) => {
     const filter = confineTaskQuery(c)
-    // 404 rather than 403, matching every other confinement denial in this codebase: the answer must not
-    // reveal whether the task the caller named exists.
+    // 404 rather than 403, matching every other confinement denial here: the answer must not reveal
+    // whether the task the caller named exists.
     if (!filter) return respondError(c, 404, 'not_found')
     return viaBridge(c, KNOWLEDGE, (b) => b.memoryProposals(filter.taskId))
   })

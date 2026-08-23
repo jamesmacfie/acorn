@@ -1,8 +1,8 @@
-// Local diff source for uncommitted changes. Parses `git status --porcelain=v2` into unified
-// patches per file and scope, plus blob reads, all against a task's worktree. Patches carry only
-// hunks, like GitHub's per-file patch, so the renderer's existing diff.ts synth and gitdiff-parser
-// path handles them unchanged. Every git call uses execFile with an argument array, and
-// repo-relative paths are validated at this boundary: no `..` segments, no absolute paths.
+// Local diff source for uncommitted changes. Parses `git status --porcelain=v2` into unified patches
+// per file and scope, plus blob reads, all against a task's worktree. Patches carry only hunks, like
+// GitHub's per-file patch, so the renderer's diff.ts synth and gitdiff-parser path handle them
+// unchanged. Every git call uses execFile with an argument array, and repo-relative paths are
+// validated at this boundary: no `..` segments, no absolute paths.
 
 import { git, gitOrThrow, gitText } from '@acorn/plugin-api/node'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'

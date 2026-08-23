@@ -24,9 +24,8 @@ export type AgentUsageServiceOptions = {
   ttlMs?: number
   now?: () => number
   pricingForUser?: PricingReader
-  // Read per refresh, never captured: harnesses arrive and leave with the plugins that contribute them
-  // (main/usage/collectors.ts), so a list resolved once at construction would freeze the set that
-  // happened to exist at boot.
+  // Read per refresh, never captured. Harnesses arrive and leave with the plugins that contribute them
+  // (main/usage/collectors.ts), so resolving the list at construction would freeze the boot-time set.
   collectors?: AgentUsageCollectorRegistry
 }
 
@@ -52,8 +51,8 @@ function failedProvider(
   return emptyProviderUsage(entry.provider, entry.label, normalized.code === 'cli_missing' ? 'missing' : 'error', normalized)
 }
 
-// The collector answers about usage; how the harness is named is the registration's business. Stamped
-// here so a collector never has to repeat its own id and label, and so the two can never disagree.
+// The collector answers about usage, the registration owns the naming. Stamped here so a collector
+// never repeats its own id and label, and the two cannot disagree.
 const named = (entry: AgentUsageCollectorEntry, usage: AgentProviderUsageReading): AgentProviderUsage => ({
   ...usage,
   provider: entry.provider,

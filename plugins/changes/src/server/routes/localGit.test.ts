@@ -15,9 +15,8 @@ import { localGit, setLocalGitBridge } from './localGit'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
-// Wiring test over a real git worktree (the git parsing itself is covered by
-// main/localDiff.test.ts): working-tree status, a stage mutation, plus auth, body validation, and
-// bridge-unavailable.
+// Wiring test over a real git worktree: working-tree status, a stage mutation, auth, body validation,
+// and bridge-unavailable. main/localDiff.test.ts covers the git parsing.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

@@ -8,53 +8,51 @@ import { startHelperServer, type HelperServer } from './helperServer'
 import { HELPER_PROTOCOL } from './wire'
 
 // The desktop helper process: the whole custody stack, running under the bundled Node runtime with
-// Rust as its supervisor (docs/shell.md § The shell process).
+// Rust as its supervisor. See docs/shell.md, "The shell process".
 //
-// Rust is the only thing that talks to this process directly, and it does so over stdin and stdout in
-// lines: one handshake line in, one ready line out, then commands. Never env or argv — the data key is
-// in that handshake, and argv is world-readable on every platform this ships to.
+// Rust is the only thing that talks to this process directly, over stdin and stdout in lines: one
+// handshake line in, one ready line out, then commands. Never env or argv, because the data key is in
+// that handshake and argv is world-readable on every platform this ships to.
 //
-// The handshake goes in before anything is started, and the command reader is installed before the
-// handshake is even read, because Rust can send `stop` while the node is still booting. A helper that
-// installed its reader after `service.start` resolved dropped that line and was killed for not
-// quitting (docs/shell.md § Node child).
+// The command reader is installed before the handshake is read, because Rust can send `stop` while
+// the node is still booting. A helper that installed its reader after `service.start` resolved
+// dropped that line and was killed for not quitting.
 
-// Every line Rust is meant to read carries this key; everything else on stdout is a log.
+// Every line Rust is meant to read carries this key. Everything else on stdout is a log.
 const TAG = 'acorn-helper'
 
 const handshakeSchema = z.strictObject({
   protocol: z.literal(HELPER_PROTOCOL),
-  // 32 bytes of hex. Rust holds it in the OS keychain and it never touches disk on this side; it is
-  // what device tokens are encrypted under (docs/shell.md § Keys and custody).
+  // 32 bytes of hex, and what device tokens are encrypted under. Rust holds it in the OS keychain and
+  // it never touches disk on this side. See docs/shell.md, "Keys and custody".
   dataKey: z.string().regex(/^[0-9a-f]{64}$/),
-  // The node's data root, and the helper's own custody root. Two different directories on purpose:
-  // fleet.json and the encrypted tokens are this app's, not the node's.
+  // The node's data root, and the helper's own custody root. Separate on purpose, because fleet.json
+  // and the encrypted tokens belong to this app rather than the node.
   dataDir: z.string().min(1),
   userDataDir: z.string().min(1),
   serviceEntry: z.string().min(1),
   mcpEntry: z.string().min(1),
   bundledPluginsDir: z.string().min(1).optional(),
-  // Where secrets come from, in order, least specific first. The shell decides the list because only
-  // it knows whether this is a bundle or a checkout; the helper is the process that has to have them
-  // loaded, because it is the one that spawns the node.
+  // Where secrets come from, in order, least specific first. The shell decides the list, because only
+  // it knows whether this is a bundle or a checkout. The helper has to load them, because it spawns
+  // the node.
   envFiles: z.array(z.string().min(1)),
   version: z.string().min(1),
   isPackaged: z.boolean(),
   // The renderer's origin, checked on the WebSocket upgrade.
   appOrigin: z.string().min(1),
   // An Electron build's custody root and the safeStorage password its device tokens are under, when
-  // the shell found both. Adopted once, on a first launch that has no fleet of its own
-  // (@acorn/desktop-helper/main/legacyCustody.ts).
+  // the shell found both. Adopted once, on a first launch that has no fleet of its own. See
+  // @acorn/desktop-helper/main/legacyCustody.ts.
   legacy: z.strictObject({ userDataDir: z.string().min(1), safeStorageKey: z.string().min(1) }).optional(),
 })
 type Handshake = z.infer<typeof handshakeSchema>
 
 const commandSchema = z.strictObject({ command: z.enum(['stop', 'retry']) })
 
-// AES-256-GCM under the key Rust holds, in the shape deviceTokenStore.ts asks for. The blob is
-// nonce ‖ tag ‖ ciphertext, self-describing enough that a future key rotation can tell one from
-// nothing at all. This is the Tauri answer to Electron's `safeStorage`, and the reason the store
-// takes a cipher rather than importing one.
+// AES-256-GCM under the key Rust holds, in the shape deviceTokenStore.ts asks for. The blob is nonce,
+// then tag, then ciphertext, which is self-describing enough for a future key rotation to tell one
+// from nothing. This is why the store takes a cipher rather than importing one.
 const dataKeyCipher = (dataKey: string): TokenCipher => {
   const key = Buffer.from(dataKey, 'hex')
   return {
@@ -74,26 +72,25 @@ const dataKeyCipher = (dataKey: string): TokenCipher => {
 }
 
 // Anything the shell has to react to. Rust reads these off stdout the same way it reads the ready
-// line: `node-replaced` reaches the renderer over the helper socket, but the recovery screen is a
-// native dialog, so the crash budget has to reach Rust — and so does each preview tunnel's secret,
-// which the shell seeds into the pane's cookie store because wry cannot inject a request header
-// (docs/shell.md § Host-owned webviews). This pipe reaches Rust and nothing else,
-// which is why a secret may travel on it.
+// line. The recovery screen is a native dialog, so the crash budget has to reach Rust, and so does
+// each preview tunnel's secret, which the shell seeds into the pane's cookie store because wry cannot
+// inject a request header. This pipe reaches Rust and nothing else, which is why a secret may travel
+// on it. See docs/shell.md, "Host-owned webviews".
 const emit = (event: 'crash-budget-exhausted' | 'tunnel-opened' | 'tunnel-closed', detail?: object): void =>
   console.log(JSON.stringify({ [TAG]: event, ...detail }))
 
 async function boot(handshake: Handshake): Promise<{ helper: Helper; server: HelperServer }> {
   const tokenCipher = dataKeyCipher(handshake.dataKey)
-  // Before anything reads the fleet, because everything below it assumes the custody root is whatever
-  // it is going to be for this launch.
+  // Before anything reads the fleet, because everything below assumes the custody root is settled for
+  // this launch.
   if (handshake.legacy) adoptLegacyCustody(handshake.userDataDir, tokenCipher, handshake.legacy)
 
   for (const file of handshake.envFiles) {
     try {
       process.loadEnvFile(file)
     } catch {
-      // Fine if this one is missing: secrets can still come from the other file, the environment, or
-      // the keychain.
+      // A missing file is fine. Secrets can still come from the other file, the environment, or the
+      // keychain.
     }
   }
 
@@ -105,22 +102,21 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
       version: handshake.version,
       isPackaged: handshake.isPackaged,
       // The bundled Node binary Rust launched this process with. `serviceHost.ts` spawns the service
-      // with it, and so do agents and MCP registration, which is the whole point of shipping a real
-      // runtime (docs/shell.md § Build and packaging).
+      // with it, and so do agents and MCP registration. See docs/shell.md, "Build and packaging".
       hostRuntimePath: process.execPath,
       mcpEntry: handshake.mcpEntry,
       ...(handshake.bundledPluginsDir ? { bundledPluginsDir: handshake.bundledPluginsDir } : {}),
     },
     userDataDir: handshake.userDataDir,
     tokenCipher,
-    // Held as a lookup rather than captured, because the listener does not exist yet and there may be
-    // no renderer attached when a frame arrives.
+    // Looked up rather than captured, because the listener does not exist yet and there may be no
+    // renderer attached when a frame arrives.
     push: {
       frame: (nodeId, frame) => server?.push({ push: 'node-frame', nodeId, frame }),
       status: (status) => server?.push({ push: 'node-status', status }),
     },
-    // Electron reloads the window from main; here the renderer is told and reloads itself. Same
-    // meaning either way: the node it was talking to has a new endpoint, certificate and token.
+    // The renderer is told and reloads itself. The node it was talking to has a new endpoint,
+    // certificate, and token.
     onNodeReplaced: () => server?.push({ push: 'node-replaced' }),
     onCrashBudgetExhausted: (reason) => emit('crash-budget-exhausted', reason ? { reason } : undefined),
     tunnelEvents: {
@@ -151,9 +147,9 @@ const stop = async (code: number): Promise<never> => {
   process.exit(code)
 }
 
-// One reader for both the handshake and the commands after it, installed before either can arrive.
-// Lines queue behind whatever the previous one is still doing, so a `stop` that lands mid-boot waits
-// for the boot rather than racing it.
+// One reader for the handshake and the commands after it, installed before either can arrive. Lines
+// queue behind whatever the previous one is still doing, so a `stop` that lands mid-boot waits for
+// the boot rather than racing it.
 let queue: Promise<unknown> = Promise.resolve()
 createInterface({ input: process.stdin }).on('line', (line) => {
   const trimmed = line.trim()
@@ -163,14 +159,14 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       const handshake = handshakeSchema.parse(JSON.parse(trimmed))
       booted = boot(handshake)
       const { server } = await booted
-      // The ready line. `nodeVersion` is here so Rust can assert the runtime pin it thinks it shipped
-      // is the runtime that actually booted (docs/shell.md § Node child).
+      // The ready line. `nodeVersion` lets Rust check that the runtime pin it shipped is the runtime
+      // that booted.
       console.log(JSON.stringify({ [TAG]: 'ready', protocol: HELPER_PROTOCOL, port: server.port, secret: server.secret, nodeVersion: process.version }))
       return
     }
     const { command } = commandSchema.parse(JSON.parse(trimmed))
     if (command === 'stop') return stop(0)
-    // The owner's answer to the recovery screen: forgive the spent budget and try once more.
+    // The owner's answer to the recovery screen. Forgive the spent budget and try once more.
     await (await booted).helper.retry()
   }).catch((error: unknown) => {
     console.error('[helper] failed:', error)
@@ -179,14 +175,14 @@ createInterface({ input: process.stdin }).on('line', (line) => {
 })
 
 // A shell that died takes its end of these pipes with it, and the next `console.log` in the drain
-// would then throw EPIPE as an unhandled 'error' event and kill this process mid-shutdown — with the
-// node still holding the data root's lock, which is the exact failure the process group is there to
-// prevent. Nobody is listening is not a fault; the drain below is what matters.
+// would throw EPIPE as an unhandled 'error' event, killing this process mid-shutdown with the node
+// still holding the data root's lock. Nobody listening is not a fault. The drain below is what
+// matters.
 for (const stream of [process.stdout, process.stderr]) stream.on('error', () => {})
 
-// Rust kills the process group, so this is the polite half of that: drain before the escalation lands.
+// Rust kills the process group. This is the polite half: drain before the escalation lands.
 process.once('SIGTERM', () => void stop(0))
 process.once('SIGINT', () => void stop(0))
-// Rust closing the pipe means the shell is gone. Nothing else can reach this process, so there is no
-// reason to keep the node alive holding the data root's lock.
+// Rust closing the pipe means the shell is gone. Nothing else can reach this process, so keeping the
+// node alive would only hold the data root's lock.
 process.stdin.once('end', () => void stop(0))

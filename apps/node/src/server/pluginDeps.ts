@@ -6,9 +6,7 @@ import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/contract/knowledge.ts'
 import type { NodePluginDeps } from './plugins'
 
 // The plugin dependency bag, built once for both composition roots (docs/plugins.md § Adding a
-// plugin contribution). Nothing here differs between the two hosts any more: the one thing that did
-// was the preview browser, and agent browser automation is a plugin now, with a browser of its own on
-// whichever node runs it (docs/agent-tools.md § Browser tools).
+// plugin contribution). Nothing in it differs between the two hosts.
 export type PluginDepsInput = {
   capabilities: CapabilityRegistry
   core: CoreServices
@@ -19,11 +17,10 @@ export type PluginDepsInput = {
 }
 
 export function buildPluginDeps({ capabilities, core, internalEnv, reconciled }: PluginDepsInput): NodePluginDeps {
-  // Resolved at call time, never here: memory's init runs inside initPlugins and has not happened yet
+  // Resolved at call time, never here. Memory's init runs inside initPlugins and has not happened yet
   // when this object is built, and plugins/terminal cannot import memory directly because
   // plugins/memory already imports terminal's TERMINAL_SEND_TO_AGENT. Importing back would close a
-  // package cycle turbo refuses to build (docs/plugins.md § Collaboration rules describes the same
-  // pattern for agents/workflows).
+  // package cycle turbo refuses to build. See docs/plugins.md § Collaboration rules.
   //
   // The clean fix inverts one half, the way plugins/agents and plugins/workflows were
   // (plugins/agents/src/contract/workflowControl.ts). Until then the root injects these thunks.

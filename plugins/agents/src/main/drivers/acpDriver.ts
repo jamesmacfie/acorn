@@ -1,10 +1,5 @@
-// The generic ACP driver: one driver for every harness that speaks the Agent Client Protocol, built
-// from a launch spec instead of subclassed per provider. See docs/managed-agents.md § Harnesses.
-//
-// This is tier 1, and it is the only tier a loaded plugin can reach. Everything downstream of the
-// events it emits — the normalizer, the durable ledger, the transcript, permission plumbing — is
-// shared, which is what lets a harness be data. Tier 2 is a native driver for a vendor protocol that
-// carries product value ACP cannot express (main/drivers/codexDriver.ts is the worked example).
+// One driver for every harness that speaks the Agent Client Protocol, built from a launch spec
+// rather than subclassed per provider. See docs/managed-agents.md § Harnesses.
 import {
   ClientSideConnection,
   ndJsonStream,
@@ -33,13 +28,12 @@ type PendingPermission = {
   resolve(response: RequestPermissionResponse): void
 }
 
-// What `probe()` learned about the child before it is spawned, kept so `start()` does not re-derive it.
 type Launch = {
   // The argv the child runs. For the `entry` form this is the node binary plus the resolved adapter.
   file: string
   args: string[]
-  // The harness's own CLI, when there is one: the `command` itself, or the CLI an adapter drives. This
-  // is what the auth probe is asked about and what the descriptor reports as its executable.
+  // The harness's own CLI, if it has one: the `command` itself, or the CLI an adapter drives. The auth
+  // probe asks about this, and the descriptor reports it.
   executable: string | null
   env: Record<string, string>
   diagnostics: string[]
@@ -110,9 +104,8 @@ export class AcpDriver implements AgentDriver {
     return this.spec.profileId
   }
 
-  // Resolves the child's argv and env, and collects the reasons it could not be resolved rather than
-  // throwing: an unavailable harness has to show up in the Agent Center as a row with a diagnostic, not
-  // as a failed discovery.
+  // Collects the reasons a launch cannot resolve instead of throwing, so an unavailable harness shows
+  // up in the Agent Center as a row with a diagnostic rather than as a failed discovery.
   private launch(): Launch {
     const processEnv = usageProcessEnv()
     const diagnostics: string[] = []
@@ -169,8 +162,8 @@ export class AcpDriver implements AgentDriver {
   }
 
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
-    // Read off the spec here rather than through `this` inside the session object below: the returned
-    // literal's methods rebind `this` to the literal.
+    // Read the spec here, not through `this` below. The returned literal's methods rebind `this` to
+    // the literal.
     const { id, label, quirks } = this.spec
     const launch = this.launch()
     if (launch.diagnostics.length > 0) throw new Error(launch.diagnostics[0])
@@ -181,15 +174,10 @@ export class AcpDriver implements AgentDriver {
 
     const child: ChildProcessWithoutNullStreams = spawnChild(launch.file, launch.args, {
       cwd: options.cwd,
-      // brokerEnv, not `{ ...process.env }`. Spreading the parent environment would hand the session
-      // the node's own bindings too, SESSION_ENC_KEY, INTERNAL_TOKEN, GITHUB_CLIENT_*, on top of the
-      // task env it already has (docs/security.md § Credential handling). Config directories pass
-      // through by name instead.
-      //
-      // That is the rule for every harness, not a Claude detail: a passthrough glob is for tool
-      // configuration and never for credentials. `ANTHROPIC_*` and `OPENAI_*` are absent from the base
-      // allowlist for exactly this reason (main/drivers/toolEnv.ts) — those globs would carry API keys,
-      // and an agent CLI authenticates through its own stored login under XDG_CONFIG_HOME.
+      // brokerEnv, not `{ ...process.env }`: spreading the parent environment would hand the session
+      // SESSION_ENC_KEY, INTERNAL_TOKEN, and GITHUB_CLIENT_*. See docs/security.md § Credential
+      // handling. A passthrough glob is for tool configuration, never for credentials, which is why
+      // `ANTHROPIC_*` and `OPENAI_*` are absent from the base allowlist in main/drivers/toolEnv.ts.
       env: {
         ...brokerEnv({
           env: options.env,
@@ -229,9 +217,8 @@ export class AcpDriver implements AgentDriver {
     const initialized = await agent.initialize({
       protocolVersion: 1,
       clientInfo: { name: 'acorn', version: '0.1.0' },
-      // Everything ACP offers the client side is declined for now. Each of the three is worth adopting
-      // on its own merits and none blocks a harness contribution: docs/managed-agents.md § Harnesses
-      // records why they are parked and what each buys.
+      // acorn declines everything ACP offers the client side. See docs/managed-agents.md § Harnesses
+      // for what each one buys and why it is parked.
       clientCapabilities: {
         fs: { readTextFile: false, writeTextFile: false },
         terminal: false,
@@ -270,9 +257,8 @@ export class AcpDriver implements AgentDriver {
     let active = false
     let stopped = false
     let currentConfig = normalizeAcpConfig(configOptions)
-    // ACP has one door for everything the client sends the agent, so both a turn and a compaction request
-    // go through here. What differs is what the caller does with the answer, which is why this does not
-    // emit anything itself: only one of the two is a turn.
+    // ACP has one call for everything the client sends the agent, so a turn and a compaction request
+    // both go through here. It emits nothing itself, because only one of the two is a turn.
     const prompt = async (blocks: ContentBlock[]): Promise<string | undefined> => {
       if (!providerSessionRef) throw new Error(`${label} has no initialized ACP session.`)
       if (active) throw new Error(`${label} already has an active turn.`)
@@ -305,13 +291,10 @@ export class AcpDriver implements AgentDriver {
           throw error
         }
       },
-      // Only when the harness declared `manualCompaction`, because ACP has no compaction call: what the
-      // quirk says is that this agent implements a `/compact` command, so compaction is that command sent
-      // down the same door a turn uses. A harness that has not declared it leaves this undefined and the
-      // runtime refuses the request rather than sending a prompt the agent would answer as prose.
-      //
-      // No `turn_completed`: this is not a turn, and one here would end whatever the transcript thinks is
-      // in flight. The agent's own output still streams in through `sessionUpdate` either way.
+      // ACP has no compaction call, so the `manualCompaction` quirk means the agent implements a
+      // `/compact` command. Without the quirk this stays undefined and the runtime refuses the request
+      // rather than sending a prompt the agent answers as prose. No `turn_completed` here: this is not
+      // a turn, and one would end whatever the transcript thinks is in flight.
       ...(quirks?.manualCompaction
         ? {
           compact: async () => {

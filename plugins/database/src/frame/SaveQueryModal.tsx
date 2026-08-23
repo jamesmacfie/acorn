@@ -4,16 +4,12 @@ import type { DbSavedQuery } from '../shared/database'
 import { saveQuery } from './databaseClient'
 
 // Save the editor's SQL under a name for this project. Saving under a name that already exists
-// overwrites it, which is the edit/rename path, so the button says "Overwrite" when it will. The notes
-// travel with the query into the AI prompt when it is picked as an example, so they are worth writing
-// even for a query loaded only by hand.
+// overwrites it, so the button says "Overwrite" when it will. The notes travel with the query into the
+// AI prompt when it is picked as an example.
 //
-// The shared `Modal` on @acorn/plugin-api/ui replaces the hand-rolled backdrop and `createDismissable`
-// call this had as a compiled component: same job, frame-safe (props in, DOM out). One small cost of
-// the move: a frame confined to the bottom region of a composed pane can only overlay that region, so
-// this now covers the grid rather than the whole pane. The `overlay` frame target is the escape hatch
-// if that ever grates, at the cost of being heavier (docs/third-party/monaco.md § Composed panes:
-// decided).
+// A frame confined to the bottom region of a composed pane can only overlay that region, so this
+// covers the grid rather than the whole pane. The `overlay` frame target is the escape hatch, at the
+// cost of being heavier (docs/third-party/monaco.md § Composed panes: decided).
 export default function SaveQueryModal(props: {
   taskId: string
   sql: string

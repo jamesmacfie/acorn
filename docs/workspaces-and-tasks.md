@@ -10,48 +10,48 @@ has a stable opaque ID, display name, optional folder path, and optional Git/Git
 may be a plain folder or a Git checkout. Facets are cached observations and may be refreshed; the
 project ID is the application identity.
 
-`path` is nullable and the model still tolerates a path-null project, but nothing creates one any
-more — the GitHub importer's "defer" action, which was the only producer, is gone. Existing rows stay
-readable and are repaired by giving them a folder in Settings → Projects.
+`path` is nullable and the model tolerates a path-null project, but nothing creates one. The GitHub
+importer's "defer" action was the only producer, and it is gone. Rows that predate that stay readable
+and are repaired by giving them a folder in Settings → Projects.
 
 The `Default` workspace is created lazily by the first project, not at boot: both `createProject` and
 `createProjectRef` fall back to it when no workspace is named. The owner adds folders from Settings →
 Projects or imports repositories explicitly through the GitHub plugin. Moving or hiding a project
 changes only its core row; deleting a project never deletes its folder.
 
-Settings → Projects lists projects **grouped under their workspace** rather than giving every row a
-workspace dropdown in isolation: the grouping is what is being edited, so it is the layout. The card
-owns the column tracks and its header and rows subgrid into them, so names, selects and buttons share
-one set of columns. Workspace and project names are edited in place; a row's workspace menu moves it,
-and its last option creates the workspace being moved to; a workspace can be deleted from its own
-header (except the default, which is where an orphaned workspace's projects land); and a project whose
-workspace has vanished appears under `Unassigned` so it can always be rescued.
+Settings → Projects lists projects grouped under their workspace rather than giving every row a
+workspace dropdown in isolation. The grouping is what is being edited, so it is the layout. The card
+owns the column tracks, and its header and rows subgrid into them, so names, selects, and buttons
+share one set of columns. Workspace and project names are edited in place. A row's workspace menu
+moves it, and the menu's last option creates the workspace being moved to. A workspace can be deleted
+from its own header, except the default, which is where an orphaned workspace's projects land. A
+project whose workspace has vanished appears under `Unassigned` so it can always be rescued.
 
-Deleting a project takes its tasks and task links with it — `tasks.project_id` has no foreign key, so
-rows left behind are invisible in every rail and impossible to remove. The confirmation names the task
-count before it happens. Nothing on disk is touched: the folder and any task worktrees remain.
+Deleting a project takes its tasks and task links with it, because `tasks.project_id` has no foreign
+key and rows left behind are invisible in every rail and impossible to remove. The confirmation names
+the task count first. Nothing on disk is touched: the folder and any task worktrees remain.
 
 A node with zero projects opens the first-run wizard (`plugins/onboarding`) instead: welcome, add
-projects by folder or GitHub, name them and their workspace, done. Its gate is `shouldShowOnboarding` —
-zero projects and no `onboarded` preference — and both finishing and skipping write that preference, so
-it never opens twice. Everything it offers is also in Settings → Projects.
+projects by folder or GitHub, name them and their workspace, done. Its gate is `shouldShowOnboarding`,
+meaning zero projects and no `onboarded` preference, and both finishing and skipping write that
+preference, so it never opens twice. Everything it offers is also in Settings → Projects.
 
 Opening is a one-way door (`onboardingVisible`). "No projects yet" is the right trigger and the wrong
 latch, because the wizard's own first step creates a project: re-evaluating the trigger every render
 unmounted the wizard mid-flow and dropped the owner into the app on the project they had just added.
 Once open it stays open until it closes itself.
 
-The GitHub step is a batch, not a single choice: an account has many repositories and taking several is
-the normal case, so importing does not leave the screen. The list stays put with a running tally of what
-has been added, and the owner presses Done adding when finished. The naming step then covers the whole
-batch: a name field per project, and a workspace picker per project whose last option creates a new
-workspace — so one run can spread its projects across several new workspaces, each one appearing in the
-next row's list as soon as it exists.
+The GitHub step is a batch, not a single choice. An account has many repositories and taking several
+is the normal case, so importing does not leave the screen. The list stays put with a running tally
+of what has been added, and the owner presses **Done adding** when finished. The naming step covers
+the whole batch: a name field per project, and a workspace picker per project whose last option
+creates a new workspace. One run can spread its projects across several new workspaces, each
+appearing in the next row's list as soon as it exists.
 
-The batch is whatever the adding reported, never inferred. `ProjectImporterProps.onImported` carries the
-project ids it produced, because an import may REPAIR an existing path-less project rather than create
-one; an earlier version diffed the project list against a snapshot taken on entry and silently dropped
-exactly those, showing only the last repository of several.
+The batch is whatever the adding reported, never inferred. `ProjectImporterProps.onImported` carries
+the project ids it produced, because an import may repair a path-less project rather than create one.
+Diffing the project list against a snapshot taken on entry drops exactly those, and shows only the
+last repository of several.
 
 Provider projects from Linear and Rollbar are separate external references in
 `workspace_external_projects`, keyed by the exact integration connection. They do not become local
@@ -65,10 +65,10 @@ permanently unmappable on the frame bridge, and `CoreServices.projects` exposes 
 with no write. When the only writer lived inside the Linear plugin's browse pane, deleting that pane
 made the mapping unwritable and left every integration silently unscoped.
 
-Which providers appear is decided by the providers, not by the picker: a provider declares a `projects`
-source on its contribution, and one that declares none is absent rather than present and empty
-([integrations.md](./integrations.md)). Selection is edited one project at a time against the current
-set, so a provider whose list fails to load — or one that is simply not on screen — keeps its rows.
+The providers decide which of them appear, not the picker. A provider declares a `projects` source
+on its contribution, and one that declares none is absent rather than present and empty
+([integrations.md](./integrations.md)). Selection is edited one project at a time against the loaded
+set, so a provider whose list fails to load, or one that is not on screen, keeps its rows.
 
 A rail scoped to nothing mapped is not always empty: Rollbar, which has no linked-project concept,
 reads every connection unscoped. Linear, which does have one, declares its own `emptyState` for "no
@@ -78,15 +78,15 @@ linked projects" instead of falling back to any issues ([integrations.md § Line
 
 A task contains:
 
-- one required `projectId`;
-- an optional branch and optional worktree path;
-- origin: `github-pr`, `linear`, `rollbar`, or `local`;
-- optional pull-request number, title/icon, rail sort, status, archive timestamp, and parent task;
-- task links to external items and feature-owned terminal/agent/pane state.
+- One required `projectId`.
+- An optional branch and optional worktree path.
+- An origin: `github-pr`, `linear`, `rollbar`, or `local`.
+- Optional pull-request number, title and icon, rail sort, status, archive timestamp, and parent task.
+- Task links to external items, and feature-owned terminal, agent, and pane state.
 
-Tasks are intentionally branchless-capable: a null branch runs in the project root. A branch creates
-an isolated Git worktree lazily when the first filesystem-dependent surface needs one. The project
-row, not a copied owner/name pair, is the source of task identity.
+A task can be branchless: a null branch runs in the project root. A branch creates an isolated Git
+worktree lazily, when the first filesystem-dependent surface needs one. The project row, not a copied
+owner and name pair, is the source of task identity.
 
 Tasks created from external items retain a `task_links` record tied to the exact provider connection.
 This avoids collisions when two Linear or Rollbar connections expose the same visible identifier.
@@ -97,12 +97,12 @@ Worktrees are created lazily for editor, changes, terminal, preview, or agent ex
 derives and revalidates the path; clients cannot choose an arbitrary worktree path. A task with no
 branch uses the mapped project folder directly.
 
-The directory is keyed by owner/repo/branch, so revalidation checks the branch as well as the path:
-before a resolved worktree is handed out — persisted or freshly reused — its on-disk HEAD must still
-be the task's branch. A directory that was pruned, moved, or checked out onto something else is
-refused with a `worktree-stale` 409, and a worktree that cannot be created is refused with
-`worktree-unavailable` rather than silently falling back to the main checkout. Both used to hand the
-task another branch's files, which is the tree its agent then read and edited.
+The directory is keyed by owner, repo, and branch, so revalidation checks the branch as well as the
+path. Before a resolved worktree is handed out, persisted or reused, its on-disk HEAD must still be
+the task's branch. A directory that was pruned, moved, or checked out onto something else is refused
+with a `worktree-stale` 409, and a worktree that cannot be created is refused with
+`worktree-unavailable` rather than falling back to the main checkout. Either fallback hands the task
+another branch's files, which is the tree its agent then reads and edits.
 
 A new branch is created from a base ref chosen in order: the project's preferred ref, an
 identity-scoped preference read from prefs key `base_ref:<projectId>`, then `origin/main`, then
@@ -117,19 +117,19 @@ are never overwritten, and a repo's list wins over a personal one outright rathe
 it.
 
 Archive runs the configured teardown flow where the desktop runtime is available and reports partial
-failures instead of pretending removal succeeded. Its order is guard → repo teardown script → stop
-sessions → plugin cleanups → remove worktree → mark archived; the two teardown steps sit before
-removal so anything that needs the worktree still has it.
+failures instead of pretending removal succeeded. Its order is guard, repo teardown script, stop
+sessions, plugin cleanups, remove worktree, mark archived. The two teardown steps sit before removal
+so anything that needs the worktree still has it.
 
-Before any of that, the confirmation dialog asks every plugin what it has to say about this task —
-running containers, uncommitted files, live sessions — and offers whatever cleanup each one declared.
-That is a plugin contribution called a task check, and it is the only way anything reaches that
-dialog: [plugins.md § Task checks](./plugins.md). A cleanup that fails names its plugin; the task is
-still archived, because it is.
+Before any of that, the confirmation dialog asks every plugin what it has to say about this task,
+such as running containers, uncommitted files, or live sessions, and offers whatever cleanup each one
+declared. That is a plugin contribution called a task check, and it is the only way anything reaches
+that dialog ([plugins.md § Task checks](./plugins.md)). A cleanup that fails names its plugin, and
+the task is archived anyway.
 
 The teardown takes seconds, so while it runs the task's close button and its rail row both spin,
 whichever of the two started the archive. One shared flag in `client-core/tasks/archiveLifecycle.ts`
-holds it, cleared when the archive finishes or fails; on the rail row the teardown marker replaces
+holds it, cleared when the archive finishes or fails. On the rail row the teardown marker replaces
 the live status markers instead of stacking on them, because it shares the working spinner's slot.
 
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,

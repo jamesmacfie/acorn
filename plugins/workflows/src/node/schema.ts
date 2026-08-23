@@ -1,16 +1,13 @@
 // The workflows plugin's own tables (docs/data-layer.md § Plugin databases). They live in
 // <data-root>/plugins/workflows.sqlite with their own Drizzle chain, migrated at plugin init.
 //
-// Moved out of @acorn/node-core's schema.ts: a run and its steps are the workflow engine's durable
-// checkpoint, and nothing outside this plugin ever read them. The two ids that point elsewhere,
-// `task_id` into core's `tasks` and `agent_session_id` into plugins/agents' session table, were
-// already plain IDs rather than foreign keys, dereferenced through CoreServices.tasks and the
-// agents capability respectively, so no join had to be unpicked to move these.
+// The two ids that point elsewhere, `task_id` into core's `tasks` and `agent_session_id` into
+// plugins/agents' session table, are plain IDs rather than foreign keys, dereferenced through
+// CoreServices.tasks and the agents capability.
 //
-// The row set is unchanged, column for column, including the three indexes: the generated `0000`
-// migration for this chain has to produce byte-identical tables to what an existing data root
-// already holds, or a user who upgrades gets a schema mismatch on first run instead of a fresh
-// empty file.
+// The generated `0000` migration for this chain has to produce tables byte-identical to what a
+// populated data root already holds, or an upgrade hits a schema mismatch on first run instead of
+// finding a fresh empty file.
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // Workflow runs (docs/workflows.md): the durable checkpoint for the state machine. Machine-scoped

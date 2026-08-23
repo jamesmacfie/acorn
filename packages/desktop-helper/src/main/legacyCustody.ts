@@ -3,25 +3,25 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync 
 import { join } from 'node:path'
 import { deviceTokens, type TokenCipher } from './deviceTokenStore'
 
-// One-time adoption of the custody root an Electron build left behind
-// (docs/shell.md § Keys and custody).
+// One-time adoption of the custody root an Electron build left behind. See docs/shell.md, "Keys and
+// custody".
 //
-// The two shells cannot share a root: Electron's userData is named after the app, Tauri's after the
-// bundle identifier. So this is a copy, not a handover — and it copies the whole root rather than only
-// the tokens, because a device token without the `fleet.json` row that names its node is a secret for
-// a machine nobody remembers.
+// The two shells cannot share a root, because Electron's userData is named after the app and Tauri's
+// after the bundle identifier. So this is a copy. It takes the whole root rather than only the
+// tokens, because a device token without the `fleet.json` row that names its node is a secret for a
+// machine nobody remembers.
 //
-// Everything here is best-effort by design. If any of it fails, the owner loses remembered pairings
+// Everything here is best-effort by design. If any of it fails the owner loses remembered pairings
 // and nothing else: the local node mints a fresh device row, remote nodes ask to be paired again, and
-// the fleet UI says so honestly. That is a supported product state, which is what lets this be one
-// pass with no retry, no marker file, and no migration ledger.
+// the fleet UI says so. That supported state is what lets this be one pass with no retry, no marker
+// file, and no migration ledger.
 
 /// What the shell found: the old root, and the safeStorage password from the keychain item beside it.
 export type LegacyCustody = { userDataDir: string; safeStorageKey: string }
 
 // Chromium's os_crypt, which is what `safeStorage` is. On macOS the keychain holds a password and the
-// AES key is derived from it with these exact constants; they are Chromium's and are not ours to
-// choose. The `v10` prefix is os_crypt's version tag, and an IV of sixteen spaces is likewise theirs.
+// AES key is derived from it with these constants. They are Chromium's, not ours to choose: `v10` is
+// os_crypt's version tag, and the IV of sixteen spaces is theirs too.
 const OS_CRYPT = { salt: 'saltysalt', iterations: 1003, keyLength: 16, prefix: 'v10' } as const
 
 // The files that make a custody root. Copied verbatim except the tokens, which have to change hands
@@ -39,7 +39,7 @@ function legacyDecrypt(blob: Buffer, password: string): string | null {
     return Buffer.concat([decipher.update(blob.subarray(OS_CRYPT.prefix.length)), decipher.final()]).toString('utf8')
   } catch {
     // A password that no longer opens these blobs, which is what a rebuilt or re-signed Electron app
-    // leaves behind. Nothing to salvage and nothing to warn twice about; the caller reports the count.
+    // leaves behind. Nothing to salvage, and the caller reports the count.
     return null
   }
 }
@@ -50,8 +50,8 @@ function legacyDecrypt(blob: Buffer, password: string): string | null {
  * so it is safe to call on every boot and only ever runs once in practice.
  */
 export function adoptLegacyCustody(userDataDir: string, cipher: TokenCipher, legacy: LegacyCustody): void {
-  // An owner who has already used this build has a fleet of their own, and it wins. This is the whole
-  // guard: no marker file, because the presence of a fleet is the marker.
+  // An owner who has already used this build has a fleet of their own, and it wins. No marker file,
+  // because the presence of a fleet is the marker.
   if (existsSync(join(userDataDir, FLEET)) || !existsSync(join(legacy.userDataDir, FLEET))) return
 
   mkdirSync(userDataDir, { recursive: true, mode: 0o700 })
@@ -59,7 +59,7 @@ export function adoptLegacyCustody(userDataDir: string, cipher: TokenCipher, leg
     const from = join(legacy.userDataDir, name)
     if (existsSync(from)) copyFileSync(from, join(userDataDir, name))
   }
-  // The plugin cache is content-addressed, so copying it is free of decisions: the same bytes hash to
+  // The plugin cache is content-addressed, so copying it takes no decisions. The same bytes hash to
   // the same names, and the trust records that came with it still point at them.
   const cacheFrom = join(legacy.userDataDir, CACHE)
   if (existsSync(cacheFrom)) cpSync(cacheFrom, join(userDataDir, CACHE), { recursive: true })

@@ -32,14 +32,14 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
 
 type WireOptions = {
   installed?: InstalledPluginInfo[]
-  // What the process actually loaded, defaulting to "on disk, at that version". A case overrides
-  // this only when it is testing the gap between what is on disk and what is running.
+  // What the process loaded, defaulting to "on disk, at that version". A case overrides this only
+  // when it tests the gap between what is on disk and what is running.
   booted?: { id: string; version: string }[]
   bundles?: Record<string, string>
   roster?: PluginRosterEntry[]
   // Why a package on disk produced no plugin at this boot. Defaults to none, which is every test here
   // except the one about a package that would not load.
-  // Unstamped; the helper adds the clock, as in pluginState.test.ts.
+  // Unstamped. The helper adds the clock, as in pluginState.test.ts.
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
 }
 
@@ -80,8 +80,8 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
       calls.reload.push({ id })
       // The bridge's refusal for a name this node did not load from disk, which the route turns into a 400.
       if (id === 'terminal') throw new Error(`'terminal' is not a plugin this node loaded from disk.`)
-      // 'broken' stands for a candidate whose init threw: a 200 that reports the previous instance is
-      // still the one serving.
+      // 'broken' stands for a candidate whose init threw: a 200 reporting that the previous instance is
+      // still serving.
       if (id === 'broken') return { id, version: '1.0.0', state: 'failed', reason: 'init exploded' }
       return { id, version: '1.1.0', state: 'reloaded' }
     },
@@ -130,9 +130,9 @@ describe('GET /v2/core/plugins', () => {
   })
 
   it('reports the running set and the pending set separately', async () => {
-    // rollbar is disabled and not running (the file said so at boot); docker was just turned off and is
-    // still running until the restart. Both rows are needed: the page renders one checkbox and one
-    // "restart to apply" banner, and collapsing them would either lie about the checkbox or the banner.
+    // rollbar is disabled and not running, because the file said so at boot. docker was turned off and
+    // keeps running until the restart. Both rows are needed: the page renders one checkbox and one
+    // "restart to apply" banner, and collapsing them lies about one or the other.
     wire(['rollbar', 'docker'])
     const res = await asDevice().fetch(request('GET'))
     expect(res.status).toBe(200)
@@ -148,9 +148,8 @@ describe('GET /v2/core/plugins', () => {
 
   it('passes a failed plugin through without demanding a restart a restart cannot deliver', async () => {
     // A loaded plugin whose init threw. It is not disabled and its contributions are gone, but the
-    // A loaded plugin whose init threw. It is not disabled and its contributions are gone, but the
-    // owner's list and the running set still agree, so the restart banner must stay down, and the
-    // client learns about the failure from `state` and the attention inbox instead.
+    // owner's list and the running set still agree, so the restart banner stays down and the client
+    // learns about the failure from `state` and the attention inbox instead.
     wire([], { roster: [{ name: 'ntfy', required: false, disabled: false, state: 'failed', failedAt: 1_700_000_000_000 }] })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins).toEqual([
@@ -160,9 +159,9 @@ describe('GET /v2/core/plugins', () => {
   })
 
   it('serves a load failure as failed with its reason, not as pending-restart', async () => {
-    // The package is on disk with a parseable manifest, so it is in `installed()`; its bundle would not
-    // import, so it never booted. That pair used to read as "waiting for a restart", with a banner that
-    // restarting could never clear.
+    // The package is on disk with a parseable manifest, so it is in `installed()`, but its bundle would
+    // not import, so it never booted. That pair must not read as "waiting for a restart", which raises
+    // a banner restarting can never clear.
     wire([], {
       roster: [],
       installed: [installedEntry('ntfy')],
@@ -193,9 +192,9 @@ describe('GET /v2/core/plugins', () => {
 
   it('never reports a required plugin as disabled, even if the file names it', async () => {
     // A stale file from a build where the plugin was optional, or a hand-edit. The host ignores the flag
-    // for a required plugin, so the API has to as well or the checkbox would show off while it runs.
-    // `rollbar` stays in the list so the fixture is self-consistent. The roster says it was disabled at
-    // boot, and a file that no longer named it would legitimately mean "restart to bring it back".
+    // for a required plugin, so the API has to as well, or the checkbox shows off while it runs.
+    // `rollbar` stays in the list to keep the fixture self-consistent: the roster says it was disabled
+    // at boot, and a file that no longer named it would mean "restart to bring it back".
     wire(['terminal', 'rollbar'])
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins.filter((row) => row.disabled).map((row) => row.name)).toEqual(['rollbar'])
@@ -203,7 +202,7 @@ describe('GET /v2/core/plugins', () => {
   })
 
   it('reports restartRequired for a plugin turned back ON but not yet loaded', async () => {
-    // The other direction, which a "did anything get disabled?" check would miss: rollbar is off in the
+    // The other direction, which a "did anything get disabled?" check misses: rollbar is off in the
     // running process and no longer in the file, so it comes back at the next start.
     wire([])
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
@@ -221,8 +220,8 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
       version: '2.1.0',
       apiVersion: '1',
       permissions: NO_PERMISSIONS,
-      // Passed through untouched for the device to register surfaces from
-      // (docs/plugins.md); the node neither reads nor renders it.
+      // Passed through untouched for the device to register surfaces from (docs/plugins.md). The node
+      // neither reads nor renders it.
       contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], collections: [], schedules: [], taskChecks: [], harnesses: [] },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
@@ -233,8 +232,10 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
 
   it('gives a client-only package a row the plugin host never produced', async () => {
     // No node entrypoint, so it never entered initPlugins and has no roster entry, but its bundle is
-    // exactly what this phase distributes, so the device has to be told about it.
-    // ['rollbar'] so the shared roster fixture is itself quiet: it was disabled at boot, so naming it
+    // what this phase distributes, so the device has to be told about it.
+    // ['rollbar'] so the shared roster fixture is quiet: it was disabled at boot, so naming it keeps
+    // the file and the process in agreement and leaves restartRequired to speak about the row under
+    // test.
     wire(['rollbar'], { installed: [installedEntry('sparkline')] })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins.at(-1)).toEqual({
@@ -256,7 +257,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
 
   it('never asks for a restart to apply a client-only toggle', async () => {
     // Its contributions are all client-side and the client re-initialises its plugin host on a roster
-    // change, so `running` tracks `disabled` and the banner stays down. A restart would change nothing.
+    // change, so `running` tracks `disabled` and the banner stays down. A restart changes nothing.
     const saved = wire(['rollbar'], { installed: [installedEntry('sparkline')] })
     const res = await asDevice().fetch(request('PUT', { disabled: ['rollbar', 'sparkline'] }))
     expect(res.status).toBe(200)
@@ -315,8 +316,8 @@ describe('PUT /v2/core/plugins', () => {
   })
 
   it('accepts turning off a package the loader refused, which is the owner’s only escape hatch', async () => {
-    // Such a package is in neither the roster nor `installed()`: nothing about it parsed. Without the
-    // third clause in the route's `known` map, the row's own checkbox 400s.
+    // Such a package is in neither the roster nor `installed()`, because nothing about it parsed.
+    // Without the third clause in the route's `known` map, the row's own checkbox 400s.
     const saved = wire([], {
       roster: [],
       loadFailures: [{ id: 'ntfy', dir: '/data/plugins/ntfy', reason: 'acorn-plugin.json is not valid JSON' }],
@@ -352,10 +353,9 @@ describe('PUT /v2/core/plugins', () => {
 })
 
 describe('the device gate over /v2/core/plugins', () => {
-  // The gate itself is mounted in server/index.ts (`.use('/v2/core/plugins', requireDevice)`), so this
-  // asserts the middleware's verdict on this path rather than re-mounting the router: an agent-spawned
-  // child must not be able to enumerate the node's surface, nor disable the plugin whose gate it stands
-  // behind and get a different node on the next restart.
+  // The gate is mounted in server/index.ts (`.use('/v2/core/plugins', requireDevice)`), so this asserts
+  // the middleware's verdict on this path rather than re-mounting the router. An agent-spawned child
+  // must not enumerate the node's surface, nor disable the plugin whose gate it stands behind.
   const gated = (principal: AppEnv['Variables']['principal']) => {
     const hono = new Hono<AppEnv>()
     hono.use('/v2/*', async (c, next) => {
@@ -363,8 +363,8 @@ describe('the device gate over /v2/core/plugins', () => {
       await next()
     })
     hono.use('/v2/core/plugins', requireDevice)
-    // The second form, exactly as server/index.ts mounts it. It is what keeps a route added under the
-    // prefix, the bundle route below, from arriving ungated.
+    // The second form, as server/index.ts mounts it. It keeps a route added under the prefix, such as
+    // the bundle route below, from arriving ungated.
     hono.use('/v2/core/plugins/*', requireDevice)
     return hono.route('/v2/core/plugins', plugins)
   }
@@ -396,8 +396,8 @@ describe('the device gate over /v2/core/plugins', () => {
   })
 
   it('403s a task-scoped agent answering its own approval request', async () => {
-    // The whole point of the request/decision split. An agent raises a request precisely because it
-    // cannot install; if it could also POST the approval, the split would be theatre.
+    // The point of the request and decision split. An agent raises a request because it cannot install.
+    // If it could also POST the approval, the split would be theatre.
     wire([])
     _resetPluginRequests()
     const raised = raisePluginRequest({ taskId: 't1', action: 'install', dev: true, source: { path: '/src/board' } })
@@ -409,16 +409,16 @@ describe('the device gate over /v2/core/plugins', () => {
   })
 
   it('403s a task-scoped agent on install, update, uninstall and reload', async () => {
-    // The sharpest case in this file. A prompt-injected agent that could POST here would make the node
-    // fetch and run arbitrary code with the node's own access (docs/security.md).
+    // The sharpest case in this file. A prompt-injected agent that could POST here makes the node fetch
+    // and run arbitrary code with the node's own access (docs/security.md).
     wire([], { installed: [installedEntry('sparkline')] })
     const agent = gated({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
     const attempts = [
       at('/install', 'POST', { source: { url: 'https://example.test/p.tgz' } }, KEY),
       at('/sparkline/update', 'POST', {}, KEY),
       at('/sparkline', 'DELETE', {}, KEY),
-      // Reload is the sharpest of the four: it is how a prompt-injected agent would make code already on
-      // the node run again on its own timing, with no bytes arriving to notice.
+      // Reload is the sharpest of the four: it is how a prompt-injected agent makes code already on the
+      // node run again on its own timing, with no bytes arriving to notice.
       at('/sparkline/reload', 'POST', undefined, KEY),
     ]
     for (const attempt of attempts) expect((await agent.fetch(attempt.clone())).status, attempt.url).toBe(403)
@@ -431,8 +431,8 @@ describe('the pending-restart state', () => {
   const installedNtfy = (version: string) => installedEntry('ntfy', { version })
 
   it('reports a freshly installed plugin as pending, not running', async () => {
-    // On disk, never loaded: the whole point of the install route is that it cannot make this true in
-    // the running process, so the roster has to say so rather than claim the plugin is live.
+    // On disk, never loaded. The install route cannot make it true in the running process, so the
+    // roster has to say so rather than claim the plugin is live.
     wire([], { installed: [installedNtfy('1.0.0')], booted: [] })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins.find((row) => row.name === 'ntfy')).toMatchObject({ running: false, state: 'pending-restart' })
@@ -459,10 +459,10 @@ describe('the pending-restart state', () => {
   })
 
   it('leaves a client-only package alone, because no restart would change anything', async () => {
-    // Its contributions are all client-side and the client re-registers on a roster change. Raising a
-    // restart banner it can never clear would train the owner to ignore the banner.
-    // `rollbar` is disabled in the default roster, so the file has to name it for the toggle half of
-    // restartRequired to be quiet and this assertion to be about the install half.
+    // Its contributions are all client-side and the client re-registers on a roster change. A restart
+    // banner it can never clear trains the owner to ignore the banner. `rollbar` is disabled in the
+    // default roster, so the file has to name it for the toggle half of restartRequired to stay quiet
+    // and this assertion to be about the install half.
     wire(['rollbar'], { installed: [installedEntry('sparkline', { hasNode: false })], booted: [] })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins.find((row) => row.name === 'sparkline')).toMatchObject({ running: true, state: 'active' })
@@ -471,7 +471,7 @@ describe('the pending-restart state', () => {
 
   it('does not turn a failed plugin into a pending one', async () => {
     // A restart cannot fix an init that throws, so 'failed' outranks 'pending-restart' even though the
-    // package is on disk and unloaded. That is the shape a broken install leaves behind.
+    // package is on disk and unloaded.
     wire([], {
       roster: [{ name: 'ntfy', required: false, disabled: false, state: 'failed', failedAt: 1 }],
       installed: [installedNtfy('1.0.0')],
@@ -501,8 +501,8 @@ describe('the install, update and uninstall routes', () => {
   })
 
   it('demands an Idempotency-Key on every mutation', async () => {
-    // A retried install is the case this exists for: the first attempt may have finished on the node and
-    // died on the wire, and a second unkeyed POST would fetch and place the package all over again.
+    // A retried install is the case this exists for. The first attempt may have finished on the node
+    // and died on the wire, and a second unkeyed POST fetches and places the package again.
     wire([], { installed: [installedEntry('ntfy')] })
     for (const attempt of [
       at('/install', 'POST', { source: { url: 'https://example.test/p.tgz' } }),
@@ -521,7 +521,7 @@ describe('the install, update and uninstall routes', () => {
 
   it('turns an installer refusal into a 400 carrying its sentence', async () => {
     // Everything the installer refuses is operator-fixable: a bad manifest, an unreachable release, a
-    // downgrade. So the owner needs the wording, not a 500.
+    // downgrade. The owner needs the wording, not a 500.
     wire([])
     const res = await asDevice().fetch(at('/install', 'POST', { source: { url: 'bad' } }, KEY))
     expect(res.status).toBe(400)
@@ -558,8 +558,8 @@ describe('the install, update and uninstall routes', () => {
   })
 
   it('answers 200 with state failed when the new code did not start', async () => {
-    // Candidate-then-commit means a failed reload changed nothing: the previous instance is still
-    // serving, so this is a report and not a request error. A 500 would say the opposite.
+    // Candidate-then-commit means a failed reload changed nothing. The previous instance is still
+    // serving, so this is a report and not a request error. A 500 says the opposite.
     wire([], { installed: [installedEntry('broken')] })
     const res = await asDevice().fetch(at('/broken/reload', 'POST', undefined, KEY))
     expect(res.status).toBe(200)
@@ -582,7 +582,7 @@ describe('the install, update and uninstall routes', () => {
 
   it('answers the agent-raised approval queue on the roster route', async () => {
     // The queue rides the roster rather than getting a GET of its own: same device-only mount, same
-    // reconcile. A request the owner has not answered is the only thing an agent can put here.
+    // reconcile. An unanswered request is the only thing an agent can put here.
     wire([])
     _resetPluginRequests()
     raisePluginRequest({ taskId: 't1', action: 'install', dev: true, source: { path: '/src/board' }, reason: 'so I can iterate' })

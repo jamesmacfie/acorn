@@ -24,16 +24,14 @@ import SaveQueryModal from './SaveQueryModal'
 // The Database pane's plugin half: a searchable table list, the button bar, a virtualized results grid,
 // and a row-detail panel that doubles as the edit/insert/delete surface.
 //
-// The SQL editor lives in the host now, in the region above this frame (docs/third-party/monaco.md §
+// The SQL editor lives in the host, in the region above this frame (docs/third-party/monaco.md §
 // Composed panes: decided). This file reaches it through three bridge methods: `document.read()`
 // behind Execute, `document.write()` when the picker or Generate loads a query in, and
 // `document.flush()`, which the host has already called by the time a surface action arrives.
 //
-// ⌘Enter still runs the query, and that is the acceptance test for the whole design: the chord is
-// pressed with focus in the host's editor, where this frame has no keyboard at all. The host resolves
-// it against the manifest's surface-scoped keybinding, flushes the document, and posts `execute` here,
-// handled below exactly as the Execute button's click is, since the frame does not care which one it
-// was.
+// ⌘Enter runs the query even though it is pressed with focus in the host's editor, where this frame
+// has no keyboard. The host resolves it against the manifest's surface-scoped keybinding, flushes the
+// document, and posts `execute` here, handled below exactly as the Execute button's click is.
 
 type Selected = { schema: string; name: string } | null
 
@@ -51,24 +49,23 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   const [activeRow, setActiveRow] = createSignal<number | null>(null)
   const [inserting, setInserting] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
-  // The armed button is the prompt; this used to be written into the error banner.
   const deleteArmed = createArmedConfirm()
   const [generating, setGenerating] = createSignal(false)
   const [saving, setSaving] = createSignal<string | null>(null) // the SQL being saved (null = modal closed)
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
 
-  // AI SQL generation is offered only when a model-provider key is connected. Read from this plugin's own
-  // route, because a frame cannot see core's integrations. See databaseClient.ts.
+  // AI SQL generation is offered only when a model-provider key is connected. Read from this plugin's
+  // own route, because a frame cannot see core's integrations. See databaseClient.ts.
   const [modelConnections] = createResource(
     () => props.taskId,
     (taskId) => listModelConnections(taskId).catch(() => []),
   )
   const connections = () => modelConnections() ?? []
 
-  // Saved queries are project-scoped, so they outlive this task; the route resolves the project from the
-  // task id. Failures surface in the pane's error line rather than rejecting, since a resource in an
-  // error state re-throws on read, which would take the whole panel down over a missing list of snippets.
+  // Saved queries are project-scoped, so they outlive this task, and the route resolves the project
+  // from the task id. Failures land in the pane's error line rather than rejecting: a resource in an
+  // error state re-throws on read, taking the whole panel down over a missing list of snippets.
   const [saved, { refetch: refetchSaved }] = createResource(
     () => props.taskId,
     (taskId) => listSavedQueries(taskId).catch((e: unknown) => (fail(e), [] as DbSavedQuery[])),
@@ -93,7 +90,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     return q ? list.filter((t) => `${t.schema}.${t.name}`.toLowerCase().includes(q)) : list
   }
 
-  // The shared document, written through the host. Every one of these used to be `editor.setValue(…)`.
+  // The shared document, written through the host.
   const writeSql = (sql: string) => void props.bridge.document.write(sql).catch(fail)
 
   async function connect() {
@@ -138,9 +135,8 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
 
   async function execute() {
     if (busy()) return
-    // The document as the reader currently sees it, including keystrokes the host's autosave has not
-    // written yet. When this ran from ⌘Enter the host has already flushed, so the plugin's own scratch
-    // route agrees with what comes back here.
+    // The document as the reader sees it, including keystrokes the host's autosave has not written.
+    // On the ⌘Enter path the host has already flushed, so the plugin's scratch route agrees with this.
     const sql = (await props.bridge.document.read().catch(() => '')).trim()
     if (!sql) return
     setBusy(true)

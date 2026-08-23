@@ -112,10 +112,10 @@ describe('agent usage routes', () => {
     expect((await response.json()).providers[0].error.code).toBe('authentication_required')
   })
 
-  // The pricing pane's round trip, now through the bridge rather than `getDb(c.env)`. The bridge is filled
-  // the way the plugin's init fills it, over a real CoreServices whose `prefs` reads and writes core's
-  // `prefs` table, so this still asserts against actual persistence rather than a stub's memory. `env` is
-  // empty here: a passing test with no DB on `c.env` proves the route no longer touches core's handle.
+  // The pricing pane's round trip, through the bridge. The bridge is filled the way the plugin's init
+  // fills it, over a real CoreServices whose `prefs` reads and writes core's `prefs` table, so this
+  // asserts against real persistence. `env` is empty, so a pass proves the route never touches core's
+  // handle.
   it('reads, validates, and persists plugin-owned pricing preferences', async () => {
     const testDb = makeTestDb()
     try {
@@ -153,9 +153,9 @@ describe('agent usage routes', () => {
   })
 })
 
-// `ownerId(c)` resolves to the same login for a device and for an agent-spawned child, so nothing here
-// distinguished them. A task-scoped agent could overwrite the cost table every usage figure in the app
-// is computed against, for every task.
+// `ownerId(c)` resolves to the same login for a device and for an agent-spawned child, so nothing else
+// tells them apart. Without this check, a task-scoped agent could overwrite the cost table every usage
+// figure in the app is computed against.
 describe('writing pricing preferences needs a human', () => {
   afterEach(() => setAgentUsageBridge(null))
 

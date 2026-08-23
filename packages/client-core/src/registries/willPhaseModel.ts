@@ -3,8 +3,8 @@ export type Concern = {
   feature: string
   message: string
   severity: 'warn' | 'danger'
-  // Up to five lines under the message, capped at `DETAILS_MAX` (docs/plugins.md § Task checks): the
-  // host draws `detailsMore` as "+N more", so no producer has to invent that string.
+  // Up to five lines under the message, capped at `DETAILS_MAX` (docs/plugins.md § Task checks). The
+  // host draws `detailsMore` as "+N more", so no producer invents that string.
   details?: string[]
   detailsMore?: number
   // Optional opt-in side action shown as a checkbox under the concern, such as docker's "also stop
@@ -27,12 +27,11 @@ type WillEventKind = keyof WillEventMap
 type WillHandler<K extends WillEventKind> = (payload: WillEventMap[K]) => Concern | Concern[] | null | Promise<Concern | Concern[] | null>
 type RegisteredHandler = { feature: string; run: (payload: never) => Concern | Concern[] | null | Promise<Concern | Concern[] | null> }
 
-// How long each kind's handlers get, per kind rather than one number: the budget is a property of
-// what is being asked, not of the dialog. `app:quit` and `workspace:remove` are answered from state
-// the client already holds, so 250ms is generous for reading a signal. `task:archive` waits on the
-// node, whose own check budget is docs/plugins.md § Task checks' two seconds plus the slowest check,
-// so it gets room for that round trip and no more. It lives here rather than at the call sites: a
-// caller opening a confirmation should not have to know what the handlers behind it cost.
+// How long each kind's handlers get. Per kind, because the budget is a property of what is being
+// asked. `app:quit` and `workspace:remove` are answered from state the client holds, so 250ms is
+// generous for reading a signal. `task:archive` waits on the node, whose own check budget is two
+// seconds plus the slowest check (docs/plugins.md § Task checks), so it gets room for that round trip.
+// It lives here so a caller opening a confirmation need not know what the handlers cost.
 const BUDGET_MS: Record<WillEventKind, number> = {
   'task:archive': 2_500,
   'workspace:remove': 250,
@@ -45,10 +44,10 @@ const handlers = new Map<WillEventKind, RegisteredHandler[]>()
 /**
  * A client-side concern producer.
  *
- * Not the plugin seam any more (docs/plugins.md § Task checks, the `registerWillHandler` paragraph):
- * a plugin declares what it has to say about archiving a task on the node, through `ctx.taskChecks`
- * or a manifest `taskChecks` entry. What is left here is core's own use for the two events that have
- * no node meaning: the app quitting, or a workspace being removed.
+ * Not the plugin seam (docs/plugins.md § Task checks, the `registerWillHandler` paragraph). A plugin
+ * says what it has to about archiving a task on the node, through `ctx.taskChecks` or a manifest
+ * `taskChecks` entry. What is left here is core's use for the two events with no node meaning: the app
+ * quitting, and a workspace being removed.
  */
 export function registerWillHandler<K extends WillEventKind>(kind: K, feature: string, handler: WillHandler<K>): () => void {
   const entry: RegisteredHandler = { feature, run: handler as RegisteredHandler['run'] }
@@ -70,10 +69,8 @@ export async function collectConcerns<K extends WillEventKind>(kind: K, payload:
       console.warn(`[will:${kind}] dropped slow concern handler: ${entry.feature}`)
       resolve([])
     }, timeoutMs)
-    // `Promise.try`-shaped: `Promise.resolve(entry.run(...))` would evaluate the call first, so a
-    // handler that threw synchronously would throw out of this executor and reject the whole fan-out,
-    // one bad handler taking the dialog with it, which is the opposite of what the catch below is
-    // for.
+    // `Promise.try`-shaped. `Promise.resolve(entry.run(...))` evaluates the call first, so a handler
+    // that throws synchronously throws out of this executor and rejects the whole fan-out.
     new Promise<Concern | Concern[] | null>((ok) => ok(entry.run(payload as never))).then((result) => {
       if (settled) return
       settled = true
@@ -94,9 +91,8 @@ export async function collectConcerns<K extends WillEventKind>(kind: K, payload:
 /**
  * One row per (feature, id) (docs/plugins.md § Task checks, the `registerWillHandler` paragraph).
  *
- * Belt to the disposal braces, not a substitute for them: two identical rows is how a handler
- * registered twice presented for real, sharing a checkbox because the state map is keyed on `id` and
- * confirming ran the teardown twice.
+ * Belt to the disposal braces, not a substitute. A handler registered twice showed two identical rows
+ * sharing one checkbox, because the state map is keyed on `id`, and confirming ran the teardown twice.
  */
 const dedupe = (concerns: readonly Concern[]): Concern[] => {
   const seen = new Set<string>()

@@ -1,9 +1,8 @@
-// Typed wrapper over the /v2/p/http routes, now over the frame bridge rather than core's fetch helpers.
+// Typed wrapper over the /v2/p/http routes, over the frame bridge rather than core's fetch helpers.
 //
-// A frame has no network at all (`connect-src 'none'`), so there is no `readJson` to reach for and
-// no CSRF envelope to share: every call is a message on the one MessagePort, and the host checks the
-// path against this plugin's own namespace before forwarding it
-// (client-core/plugins/frames/scopes.ts).
+// A frame has no network (`connect-src 'none'`), so there is no `readJson` and no CSRF envelope.
+// Every call is a message on the one MessagePort, and the host checks the path against this plugin's
+// own namespace before forwarding it (client-core/plugins/frames/scopes.ts).
 import { connect } from '@acorn/plugin-api/ui/sdk'
 import {
   httpRequestRoute,

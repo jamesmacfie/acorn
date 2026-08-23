@@ -75,9 +75,8 @@ describe('the provider stamp on a parsed target', () => {
 })
 
 describe('scanning text for every provider at once', () => {
-  // Two providers registered together, because the whole point of the scanner is that a surface asks
-  // one question and gets everyone's answer, the thing github's `scanLinearRefs` import could never
-  // do.
+  // Two providers registered together, because a surface asks the scanner one question and gets
+  // everyone's answer.
   let board: Disposable
   let tickets: Disposable
   beforeEach(() => {
@@ -177,8 +176,8 @@ describe('bare tokens licensed by a prefix witnessed in the same surface', () =>
   })
 
   it('learns nothing from a ref with no provider or the wrong shape', () => {
-    // A recogniser with no panel of its own (github's) licenses nothing, because there is no provider to
-    // attribute a bare token to; and a captured item that is not `PREFIX-NUMBER` is not a prefix at all.
+    // A recogniser with no panel of its own licenses nothing, because there is no provider to
+    // attribute a bare token to. A captured item that is not `PREFIX-NUMBER` is not a prefix.
     expect(learnRefPrefixes([ref(undefined, 'ENG-1'), ref('board', 'some-slug'), ref('board', 'eng-1')])).toEqual(new Map())
   })
 })
@@ -199,7 +198,7 @@ describe('the host ladder', () => {
   })
 
   it('falls to the reference panel when there is no task to open a pane in', () => {
-    // Classic browse and a rail source have no task. Before the panel rung this was the end of the ladder.
+    // Classic browse and a rail source have no task.
     expect(openContentTarget(target, { taskId: null })).toBe('refPanel')
     expect(activeRefPanel()).toEqual({ providerId: 'board', displayId: 'ENG-42' })
   })
@@ -228,10 +227,9 @@ describe('the host ladder', () => {
   })
 
   it('falls through to the browser when the target’s plugin is stopped on this node', () => {
-    // Both rungs exist on paper and neither can render: the pane's `when` is a plugin's per-node
-    // presence gate, and a ref panel carries the same predicate. Before these gates the click was
-    // claimed by whichever rung was asked first, `preventDefault` ran, and the reader watched nothing
-    // happen.
+    // Both rungs exist on paper and neither can render. The pane's `when` is a plugin's per-node
+    // presence gate and a ref panel carries the same predicate, so a click claimed by an ungated rung
+    // calls `preventDefault` and then does nothing.
     let running = false
     const stopped = paneRegistry.register({
       id: 'stopped', label: 'Stopped', glyph: 'kanban', order: 500,
@@ -258,9 +256,9 @@ describe('the host ladder', () => {
     stopped.dispose()
   })
 
-  // The third destination (docs/plugins.md § "Loaded plugins: the client half"): a target whose
-  // plugin has a project-scoped route rather than a pane or a panel. The null case has to keep
-  // working, since an untracked repo must still leave for the browser.
+  // The third destination (docs/plugins.md § "Loaded plugins: the client half"): a target whose plugin
+  // has a project-scoped route rather than a pane or a panel. The null case has to keep working, so an
+  // untracked repo still leaves for the browser.
   it('resolves a route for a target whose plugin declares one, and null for one it cannot place', () => {
     const tracked = contentLinkRegistry.register({
       id: 'test.pull-request',
@@ -279,15 +277,12 @@ describe('the host ladder', () => {
     tracked.dispose()
   })
 
-  // The regression this suite exists for. `openInAppUrl` first asked only about `path`, one
-  // provider's rung, so a provider that had shipped a reference panel instead still lost every click
-  // to the browser. Each case below is a provider declaring a different one of the three
-  // destinations, and none of them knows about the others.
+  // The regression this suite exists for. Asking only about `path` sent every click from a
+  // panel-shipping provider to the browser. Each case below declares a different destination.
   describe('openInAppUrl', () => {
-    // The ranking: a provider that declared all three destinations, clicked from two surfaces that
-    // want different things, which is the whole argument for `prefer` existing. The route used to be
-    // tried first unconditionally, so a reader mid-review clicking a link got pulled out from under
-    // them, and a dashboard row asking to go somewhere got a glance panel instead.
+    // The ranking. One provider declares all three destinations and two surfaces want different
+    // things, which is the argument for `prefer`. Trying the route first pulls a reader mid-review out
+    // from under themselves.
     it('honours the surface’s preference over every other rung', () => {
       const panel = refPanelRegistry.register({ id: 'triple-ref', providerId: 'triple', component: () => null })
       const source = sourceRegistry.register({
@@ -326,8 +321,8 @@ describe('the host ladder', () => {
       setSelectedSource(null)
     })
 
-    // A preference is a preference, not a demand. Every rung can be unavailable, and the fallback order
-    // is what stops a surface having to know which of the three a provider actually installed.
+    // A preference, not a demand. Every rung can be unavailable, and the fallback order is what stops a
+    // surface having to know which of the three a provider installed.
     it('falls to the next rung when the preferred one is unavailable', () => {
       const claimed = contentLinkRegistry.register({
         id: 'test.route-only',
@@ -340,8 +335,8 @@ describe('the host ladder', () => {
       expect(openInAppUrl('https://example.com/r-only', { prefer: 'refPanel', navigate: (to) => void navigated.push(to) })).toBe(true)
       expect(navigated).toEqual(['/p/project-1/pulls/9'])
 
-      // Asked for the route with no navigator in scope: that rung is unreachable, and with nothing else
-      // declared the caller is told to open the browser.
+      // The route was asked for with no navigator in scope, so that rung is unreachable and nothing
+      // else is declared.
       expect(openInAppUrl('https://example.com/r-only', { prefer: 'route' })).toBe(false)
 
       claimed.dispose()
@@ -366,9 +361,8 @@ describe('the host ladder', () => {
     })
 
     // Navigating is only half of arriving (docs/dashboards.md § "Taking a route also selects the rail
-    // source that owns it"): the shell draws from the rail selection, not the location, so a route
-    // taken while another source is selected moves the URL and leaves the previous surface on screen.
-    // That is exactly how this shipped once, as a click that did nothing at all.
+    // source that owns it"). The shell draws from the rail selection, not the location, so a route
+    // taken while another source is selected moves the URL and leaves the old surface on screen.
     it('selects the rail source that owns the route before navigating', () => {
       setSelectedSource('home')
       const source = sourceRegistry.register({
@@ -394,8 +388,7 @@ describe('the host ladder', () => {
       const routed = contentLinkRegistry.register({
         id: 'test.routed-core',
         parse: (href) => (href === 'https://example.com/c' ? { kind: 'routed' } : null),
-        // A core route. Core's own paths are not rail sources, and hijacking the rail for one would be
-        // a worse bug than the one this branch fixes.
+        // A core route. Core's own paths are not rail sources, so the rail stays put.
         path: () => '/settings/projects',
       })
 
@@ -414,8 +407,8 @@ describe('the host ladder', () => {
         parse: (href) => (href === 'https://example.com/i/ENG-1' ? { kind: 'issue', item: 'ENG-1' } : null),
       })
 
-      // A navigator is present and irrelevant: there is no route to take, and the panel needs neither
-      // it nor a task. This is the case a dashboard row for a Linear ticket hits.
+      // A navigator is present and irrelevant. There is no route to take, and the panel needs neither
+      // it nor a task. A dashboard row for a Linear ticket hits this.
       expect(openInAppUrl('https://example.com/i/ENG-1', { prefer: 'refPanel', navigate: () => {} })).toBe(true)
       expect(activeRefPanel()).toEqual({ providerId: 'panelled', displayId: 'ENG-1' })
 
@@ -441,9 +434,9 @@ describe('the host ladder', () => {
   })
 
   it('reports external when neither rung can take the target', () => {
-    // The deliberate browser fall-through: a named outcome rather than a boolean
-    // (registries/contentLinks.ts § ContentLinkOutcome), because the boolean it replaced is how
-    // `preventDefault` reached branches that had not handled anything.
+    // The deliberate browser fall-through, as a named outcome rather than a boolean
+    // (registries/contentLinks.ts § ContentLinkOutcome). A boolean lets `preventDefault` reach branches
+    // that handled nothing.
     expect(openContentTarget({ kind: 'github.pull-request', owner: 'runn', repo: 'acorn' }, { taskId: 'task-1' })).toBe('external')
     expect(activeRefPanel()).toBeNull()
   })

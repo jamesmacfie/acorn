@@ -4,16 +4,15 @@ import type { LinearComment, LinearIssueDetail, LinearRelatedIssue } from '../sh
 import { priorityMeta } from '../shared/triage'
 import { formatDate, relativeTime } from './model'
 
-// One Linear ticket, rendered inside the frame's own document. The same three tabs the compiled panel
-// had, Overview, Activity, and Comments, all fed by the one detail request, drawn with the shell's own
-// primitives so a loaded Linear looks like a first-party one under every appearance pack.
+// One Linear ticket, rendered inside the frame's own document. Three tabs, Overview, Activity, and
+// Comments, all fed by one detail request and drawn with the shell's primitives so a loaded Linear
+// looks first-party under every appearance pack.
 //
-// Three things the compiled panel owned moved elsewhere rather than being lost. The right-anchored
-// drawer chrome belongs to whoever opened the panel, because a frame cannot Portal past its iframe
-// (client-core/plugins/frames/register.ts). The ticket switcher for a task linking several tickets is
-// the app shell's business, so it sits in app.tsx beside the task read. Where a link in rendered content
-// goes is a policy question with two answers, re-point this view or hand the URL to the host, so it
-// arrives as `onContentClick` from app.tsx, which holds both.
+// Three things live outside this file. The right-anchored drawer chrome belongs to whoever opened the
+// panel, because a frame cannot Portal past its iframe (client-core/plugins/frames/register.ts). The
+// ticket switcher for a task linking several tickets sits in app.tsx beside the task read. Where a
+// link in rendered content goes has two answers, re-point this view or hand the URL to the host, so
+// it arrives as `onContentClick` from app.tsx, which holds both.
 
 // Glyph per activity kind (Linear-style compact feed). State changes are tinted by the new state.
 const ACTIVITY_GLYPH: Record<string, string> = { created: '✦', state: '◐', assignee: '○', label: '▣', title: '✎' }
@@ -36,16 +35,14 @@ export type LinearIssueViewProps = {
   onCopy(text: string): void
   /**
    * A click anywhere in rendered markdown. Where a link goes is not this view's decision: a Linear
-   * ticket re-points the view, anything else is handed to the host, and both halves need things this
-   * file does not have (the current target, the bridge). It arrives as one handler for the same reason
-   * the ref-panel contract passes `onContentClick` down instead of resolving it in the panel.
+   * ticket re-points the view, anything else goes to the host, and both halves need the current target
+   * and the bridge, which this file does not have.
    */
   onContentClick(event: MouseEvent): void
   /**
-   * Markdown to sanitised HTML. `renderMarkdown` alone would do, and this is a prop for the same reason
-   * `onContentClick` is: a Linear body can point at a private upload, resolving one needs the bridge,
-   * and the resolved set is app state that has to be able to tick this render. So the view asks for
-   * HTML and stays ignorant of where the pictures came from.
+   * Markdown to sanitised HTML. A prop rather than a direct `renderMarkdown` call because a Linear
+   * body can point at a private upload, resolving one needs the bridge, and the resolved set is app
+   * state that has to tick this render.
    */
   renderBody(markdown: string): string
 }
@@ -90,10 +87,9 @@ export function LinearIssueView(props: LinearIssueViewProps) {
           }}>Reply</Button>
         </Show>
       </div>
-      {/* innerHTML over host-sanitised markup. `renderMarkdown` behind `renderBody` escapes the source,
-          allows only http(s)/mailto hrefs and `data:image/` sources, and drops every attribute it did
-          not write — which is exactly why it was moved onto the frame-safe barrel rather than
-          reimplemented here. */}
+      {/* innerHTML over host-sanitised markup. `renderMarkdown` behind `renderBody` escapes the
+          source, allows only http(s) and mailto hrefs and `data:image/` sources, and drops every
+          attribute it did not write. */}
       <div class="ui-markdown" innerHTML={props.renderBody(entry.body)} onClick={props.onContentClick} />
       <Show when={repliesOf(entry.id).length}>
         <ul class="ln-comment-children"><For each={repliesOf(entry.id)}>{(child) => comment(child, true)}</For></ul>
@@ -129,13 +125,10 @@ export function LinearIssueView(props: LinearIssueViewProps) {
             <Button size="sm" variant="bare" onClick={props.onBack}>← back</Button>
           </Show>
           <Button size="sm" busy={props.refreshing} onClick={props.onRefresh}>Refresh</Button>
-          {/* Still the clipboard, and NOT the "Open in Linear ↗" anchor it replaced, even though
-              `ui.openUrl` now exists. The reason changed rather than went away: the host resolves a URL
-              through its content-link ladder, linear's own recogniser claims `linear.app/…/issue/…`, and
-              the item it resolves to is the ticket already on screen. So the button would re-open where
-              the reader already is. A frame cannot ask for "the browser specifically" — that is the
-              host's call by design — so the clipboard stays the honest affordance for this one URL.
-              docs/integrations.md § Linear records it. */}
+          {/* The clipboard, not `ui.openUrl`. The host resolves a URL through its content-link
+              ladder, linear's recogniser claims `linear.app/…/issue/…`, and it resolves to the ticket
+              already on screen, so the button would re-open where the reader is. A frame cannot ask
+              for the browser specifically. See docs/integrations.md § Linear. */}
           <Button size="sm" onClick={() => props.onCopy(issue().url)}>Copy link</Button>
         </div>
       </header>
@@ -165,7 +158,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
       />
 
       <section id="linear-panel-overview" class="ln-panel" role="tabpanel" aria-labelledby="linear-tab-overview" hidden={props.activeTab !== 'overview'}>
-        {/* This grid IS where DescriptionList's `facts` layout came from. */}
+        {/* DescriptionList's `facts` layout started as this grid. */}
         <DescriptionList class="ln-facts" layout="facts">
           <Show when={issue().assignee}>{(name) => <DescriptionList.Item label="Assignee">{name()}</DescriptionList.Item>}</Show>
           <Show when={issue().creator}>{(name) => <DescriptionList.Item label="Opened by">{name()} {relativeTime(issue().createdAt)}</DescriptionList.Item>}</Show>
@@ -192,11 +185,10 @@ export function LinearIssueView(props: LinearIssueViewProps) {
 
         <Show when={(issue().attachments ?? []).length}>
           <h2 class="ln-section-head">Links</h2>
-          {/* Real anchors, on the same delegated handler the markdown uses. A ticket's attachments are
-              the one section that is nothing BUT links — a PR, a Figma file, a Sentry issue — and until
-              the host had a verb for opening one they were titles beside a copy button. `Copy link`
-              stays alongside, because an attachment is also the thing a reader most often wants to paste
-              somewhere, and unlike the header URL it is not a link back to where they already are. */}
+          {/* Real anchors, on the same delegated handler the markdown uses. Attachments are the one
+              section that is nothing but links: a PR, a Figma file, a Sentry issue. `Copy link` stays
+              alongside, because an attachment is what a reader most often pastes somewhere, and
+              unlike the header URL it does not point back to this view. */}
           <ul class="ln-links" onClick={props.onContentClick}>
             <For each={issue().attachments}>
               {(attachment) => (

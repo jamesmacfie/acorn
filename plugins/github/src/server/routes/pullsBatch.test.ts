@@ -38,10 +38,9 @@ const jsonRequest = (body: unknown) =>
     body: JSON.stringify(body),
   })
 
-// The plugin handle the router is a factory over. It answers exactly one query, the per-PR
-// `sync_state` freshness read, because every mirror read/write around it is mocked above; both
-// resources come back fresh so nothing reaches GitHub. It is handed to the factory directly now
-// instead of through a getDb mock, which is why that mock is gone.
+// The plugin handle the router is a factory over. It answers one query, the per-PR `sync_state`
+// freshness read, because every mirror read and write around it is mocked above. Both resources come
+// back fresh, so nothing reaches GitHub.
 const makeDb = () =>
   ({
     select: vi.fn(() => ({
@@ -59,10 +58,9 @@ const makeDb = () =>
 // here because the batch is fully fresh.
 const noIntegrations = { select: () => ({ from: () => ({ where: async () => [] }) }) } as unknown as Env['DB']
 
-// `BLOBS` is here because the route hands `readFiles` a blob store rather than the whole binding set:
-// `readFiles(env: Env, …)` named SECRETS/ACTIVE_IDENTITY/INTERNAL_TOKEN to reach two methods, so it now
-// takes the two methods (prMirror.ts § PatchBlobStore). A fixture that omitted them passed only because
-// `Env` was an object and `expect.anything()` does not look inside one.
+// `BLOBS` is here because the route hands `readFiles` a blob store rather than the whole binding set
+// (prMirror.ts § PatchBlobStore). A fixture that omits it still passes, because `Env` is an object
+// and `expect.anything()` does not look inside one.
 const blobs = { get: vi.fn(async () => null), put: vi.fn(async () => undefined) }
 const env = () => ({ DB: noIntegrations, BLOBS: blobs, ...testSecretEnv('0'.repeat(64)) }) as unknown as Env
 

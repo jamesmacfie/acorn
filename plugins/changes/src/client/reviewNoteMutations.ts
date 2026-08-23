@@ -1,6 +1,5 @@
-// The review-note writes, moved out of @acorn/client-core/tasks/mutations.ts with the routes they
-// drive (../shared/api.ts). That file mixed core's task writes with this plugin's note writes over one
-// import block; the task half stays in core.
+// The review-note writes, beside the routes they drive (../shared/api.ts). Core's task writes stay in
+// @acorn/client-core/tasks/mutations.ts.
 import { postJson, writeJson } from '@acorn/plugin-api/client'
 import { reviewNoteRoute, reviewNotesRoute, reviewNotesSentRoute, type ReviewNote, type ReviewNoteSeed } from '../shared/api'
 

@@ -14,15 +14,13 @@ import { readDevicePrefs } from '../persistence/devicePrefs'
 import { PrefKeys } from '../persistence/prefKeys'
 import { savePref } from '../settings/savePref'
 
-// Settings → Security's reads, addressed at a named node (docs/security.md § Audit,
-// § Filesystem and backup). Node-addressed for the same reason Settings → Plugins is: the audit
-// trail and the disk-encryption answer are facts about one machine, and a fleet-wide roll-up would be
-// actively misleading.
+// Settings → Security's reads, addressed at a named node (docs/security.md § Audit, § Filesystem and
+// backup). The audit trail and the disk-encryption answer are facts about one machine, so a fleet-wide
+// roll-up would mislead.
 //
-// Plain functions over a `createResource`, not query-options factories, because neither answer is
-// cached anywhere else and both belong to a page that is open or not. Adding them to the shared
-// QueryClient would put a per-node value under a key the fan-out rules govern
-// (docs/caching.md § Fan-out cache safety), for no reader.
+// Plain functions rather than query-options factories, because neither answer is cached anywhere else.
+// Adding them to the shared QueryClient would put a per-node value under a key the fan-out rules
+// govern (docs/caching.md § Fan-out cache safety), for no reader.
 
 export function nodeSecurityPosture(nodeId?: string): Promise<NodeSecurityPosture> {
   return readJson<NodeSecurityPosture>(coreSecurityRoute, nodeId ? { nodeId } : {})
@@ -38,16 +36,15 @@ export function nodeAuditPage(options: { nodeId?: string; before?: number; limit
 
 // --- Backup (docs/data-layer.md § Backup and import) ---
 
-// Where the node suggests writing the archive. Asked rather than composed on this side, because the
-// path is on the node's filesystem and a client cannot know its home directory. That is also why
-// there is no native save dialog: it would pick a path on the wrong machine for any node but the
-// local one.
+// Where the node suggests writing the archive. Asked rather than composed here, because the path is on
+// the node's filesystem and a client cannot know its home directory. A native save dialog would pick a
+// path on the wrong machine for any node but the local one.
 export function suggestedBackupPath(nodeId?: string): Promise<BackupSuggestion> {
   return readJson<BackupSuggestion>(coreBackupRoute, nodeId ? { nodeId } : {})
 }
 
 // Errors propagate. This is an action with a button behind it, so a failure has to be shown, the same
-// rule `saveDisabledNodePlugins` follows and `refreshNodePlugins` does not.
+// rule `saveDisabledNodePlugins` follows.
 export function createNodeBackup(destPath: string, nodeId?: string): Promise<BackupResult> {
   return writeJson<BackupResult>(
     coreBackupRoute,
@@ -72,21 +69,21 @@ const ackedNodes = (): string[] => {
   }
 }
 
-// Pure, and exported for its own test: the decision is a three-valued input to a boolean, and getting
-// it backwards means either nagging forever or never warning at all.
+// Pure, and exported for its own test. The decision maps three values onto a boolean, and getting it
+// backwards means nagging forever or never warning.
 export function shouldWarnAboutDisk(posture: NodeSecurityPosture, nodeId: string, acked: readonly string[]): boolean {
-  // `null`, "this node cannot tell", must not warn. Off macOS that is the honest answer for a
-  // perfectly well encrypted LUKS volume, and a warning nobody can act on is one they learn to dismiss.
+  // `null` means "this node cannot tell" and must not warn. Off macOS that is the honest answer for a
+  // well encrypted LUKS volume, and a warning nobody can act on is one they learn to dismiss.
   if (posture.diskEncrypted !== false) return false
   return !acked.includes(nodeId)
 }
 
-// Warn once per (device, node). Pushed as a notice rather than a modal because it is information, not
-// a decision: nothing is blocked by an unencrypted disk, and docs/ui-design.md § Interaction rules
-// reserves modal chrome for destructive confirmations, secret entry and agent approvals.
+// Warn once per device and node. A notice rather than a modal, because nothing is blocked by an
+// unencrypted disk and docs/ui-design.md § Interaction rules reserves modal chrome for destructive
+// confirmations, secret entry and agent approvals.
 //
-// Best-effort throughout. A node that cannot answer, or a device with no localStorage, simply does
-// not warn. This must never be the thing that fails a settings page or a boot.
+// Best-effort throughout. A node that cannot answer, or a device with no localStorage, does not warn.
+// This must never fail a settings page or a boot.
 export async function warnOnceAboutDisk(qc: QueryClient, nodeId: string, label: string): Promise<boolean> {
   let posture: NodeSecurityPosture
   try {

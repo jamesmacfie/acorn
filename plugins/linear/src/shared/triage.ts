@@ -1,13 +1,9 @@
-// What survives of the browse's list model, now that the browse is a host-drawn descriptor rail.
+// Ordering and the priority projection for the browse list. A rail row is data the host renders, with
+// no filter inputs, facet selects, or state columns, so the filter, group, and facet halves are gone
+// (docs/integrations.md § Linear). Ordering stays, because the rail is still a list.
 //
-// `client/model.ts` filtered, sorted, grouped and faceted the loaded issue set client-side. A rail row
-// is data the host renders, with no filter inputs, facet selects, or state columns, so the filter,
-// group and facet halves lost their only caller and are gone (docs/integrations.md § Linear). Ordering
-// and the priority projection did not: the rail is still a list, so something has to decide row order,
-// and it moved to the node because that is where the rows are now built.
-//
-// Both halves are used from both runtimes, the node sorts and labels rows, the frame labels the open
-// ticket, so this sits in shared/ rather than in either.
+// Both runtimes use both halves: the node sorts and labels rows, the frame labels the open ticket. So
+// this sits in shared/.
 
 export type LinearPriorityFields = { priority: number | null; updatedAt: number | null }
 

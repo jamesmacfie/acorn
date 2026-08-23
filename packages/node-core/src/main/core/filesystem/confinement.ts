@@ -7,10 +7,10 @@ import { dirname, isAbsolute, resolve, sep } from 'node:path'
 
 export { isContainedPath, isValidRepoIdent } from '../../pathGuards'
 
-// Confine a caller-supplied relative path to within `root`; null on any escape. Two gates: a
-// lexical one that rejects `..` and absolute paths, and a symlink one that resolves the real path of
-// the nearest existing ancestor (the target itself may not exist yet on a new-file write) and
-// requires it to stay within root's real path.
+// Confine a caller-supplied relative path to within `root`, returning null on any escape. Two gates:
+// a lexical one that rejects `..` and absolute paths, and a symlink one that resolves the real path
+// of the nearest existing ancestor and requires it to stay within root's real path. It checks the
+// ancestor because the target may not exist yet on a new-file write.
 export function resolveInRoot(root: string, relPath: string): string | null {
   const abs = resolve(root, relPath)
   if (abs !== root && !abs.startsWith(root + sep)) return null
@@ -42,10 +42,10 @@ export async function confineExistingFile(root: string, relPath: string): Promis
     const realRoot = realpathSync(root)
     if (real !== realRoot && !real.startsWith(realRoot + sep)) return { ok: false, reason: 'escapes' }
     if (!(await stat(real)).isFile()) return { ok: false, reason: 'not-file' }
-    // Returns `abs`, not `real`. On macOS the temp/worktree root often sits under a symlink
-    // (/var -> /private/var), so the realpath is correct but differently rooted: returning it would
-    // hand the caller a string that no longer starts with the root it passed in, and would differ
-    // from resolveInRoot's answer for the same input. Both open the same file.
+    // Return `abs`, not `real`. On macOS the worktree root often sits under a symlink such as /var
+    // to /private/var, so `real` is correct but differently rooted: it would no longer start with
+    // the root the caller passed in, and would disagree with resolveInRoot on the same input. Both
+    // open the same file.
     return { ok: true, path: abs }
   } catch {
     return { ok: false, reason: 'missing' }

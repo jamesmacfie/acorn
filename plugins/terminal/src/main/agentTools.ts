@@ -1,10 +1,8 @@
 // The terminal plugin's agent tools: the five run_* tools, as the `tools` contribution point
 // (docs/plugins.md § Tool projection).
 //
-// They were defined in apps/node/src/wiring/agentToolsWiring.ts, which resolved the RuntimeService
-// out of the capability registry purely so it could declare them. The service is built by this
-// plugin's init (it closes over the live session map and this plugin's database), so the tools
-// belong beside it.
+// They live here, beside the RuntimeService this plugin's init builds, because that service closes
+// over the live session map and this plugin's database.
 //
 // A run target is a terminal session in the task worktree: start/stop/restart go through the same
 // PTY engine the run pane drives, so an agent and a human cannot end up with two copies of `pnpm dev`.
@@ -16,9 +14,9 @@ export function runAgentTools(runTargets: TerminalRunTargets, repoConfigTrustNot
   const empty = z.object({})
 
   // Starting a run target executes the repo's committed `.acorn/config.toml`, so it sits behind the
-  // hash-gated trust acknowledgement (docs/workflows.md § Configuration trust). The notice
-  // broadcasts so the human sees the review prompt, and the agent gets a distinct 'needs-trust' kind
-  // rather than an opaque failure it might retry.
+  // hash-gated trust acknowledgement (docs/workflows.md § Configuration trust). The notice broadcasts
+  // so the human sees the review prompt, and the agent gets a 'needs-trust' kind rather than an opaque
+  // failure it might retry.
   const executeRun = async <T>(taskId: string, execute: () => Promise<T>): Promise<T> => {
     try {
       return await execute()

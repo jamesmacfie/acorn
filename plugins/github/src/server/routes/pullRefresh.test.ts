@@ -40,11 +40,10 @@ const gqlPull: GqlPull = {
 const json = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json', ...init?.headers } })
 
-// Two handles, because this operation now spans two SQLite files and cannot pretend otherwise. The
-// PR mirror is github's own (`plugin.db`); `tasks` is core's, reached through CoreServices.tasks. The
-// mirror replace is still one all-or-nothing `db.batch` within github's file. What changed is that
-// the task adoption is no longer inside it, so it is asserted as an effect that follows the batch
-// rather than as part of it.
+// Two handles, because this operation spans two SQLite files. The PR mirror is github's own
+// (`plugin.db`); `tasks` is core's, reached through CoreServices.tasks. The mirror replace is one
+// all-or-nothing `db.batch` within github's file, and the task adoption sits outside it, so the
+// tests assert adoption as an effect that follows the batch.
 describe('shared pull refresh operations', () => {
   let core: TestDb
   let plugin: TestPluginDb
@@ -124,17 +123,14 @@ describe('shared pull refresh operations', () => {
     expect(await plugin.db.select().from(prFiles)).toEqual([])
     expect(await plugin.db.select().from(comments)).toEqual([])
     expect(await plugin.db.select().from(checks)).toEqual([])
-    // Flow B, in core's file now. Same observable outcome as when this write rode in the mirror's
-    // batch; what it no longer proves is that the two were one transaction, because two SQLite files
-    // cannot share one. See the ordering test below for the guarantee that replaced it.
+    // Flow B, in core's file. This proves the outcome, not that the two writes share a transaction:
+    // two SQLite files cannot. The ordering test below covers what replaced that guarantee.
     expect((await core.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1')))[0].pullNumber).toBe(5)
     expect((await plugin.db.select().from(syncState).where(eq(syncState.resource, pullsResource(REPO_ID, 'open'))))[0].etag).toBe('"open-v2"')
   })
 
-  // The guarantee that took over from "it was all one transaction": the adoption runs only after the
-  // mirror batch commits, so a refresh that never reaches the batch cannot adopt a PR into a task.
-  // Without this, moving the write out of the batch could regress into adopting on a failed refresh
-  // unnoticed.
+  // The guarantee that replaced "it was all one transaction": adoption runs only after the mirror
+  // batch commits, so a refresh that never reaches the batch cannot adopt a PR into a task.
   it('does not adopt a PR into a task when the open-PR fetch fails', async () => {
     await core.db.insert(schema.tasks).values({
       id: 'task-1',
@@ -157,9 +153,9 @@ describe('shared pull refresh operations', () => {
     expect(await plugin.db.select().from(pullRequests)).toEqual([])
   })
 
-  // Idempotence is what makes "after the batch" safe: a crash between the mirror commit and the adoption
-  // self-heals on the next refresh, and re-running never steals a PR number from a task that already has
-  // one or from a branch nobody is on.
+  // Idempotence is what makes "after the batch" safe. A crash between the mirror commit and the
+  // adoption self-heals on the next refresh, and re-running never steals a PR number from a task that
+  // has one, or from a branch nobody is on.
   it('re-adopting is idempotent and never overwrites a task that already has a PR', async () => {
     await core.db.insert(schema.tasks).values([
       { id: 'task-adopt', title: 'Adopt me', origin: 'local', projectId: 'project-web', branch: 'feature', status: 'active', createdAt: 1, updatedAt: 1 },

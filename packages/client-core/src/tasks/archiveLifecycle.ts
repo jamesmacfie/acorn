@@ -1,10 +1,9 @@
 import { createSignal } from 'solid-js'
 import { clientEvents } from '../registries/clientEvents'
 
-// Which tasks are mid-teardown. The guarded archive takes seconds (stop sessions, teardown script,
-// worktree removal) and either surface can start it: the task pane's close button or the rail row's
-// own menu. The flag lives here, not in whichever component started it, so both the button and the
-// rail row show the same spinner whichever door was used.
+// Which tasks are mid-teardown. The guarded archive takes seconds and either the task pane's close
+// button or the rail row's menu can start it, so the flag lives here and both surfaces show the
+// same spinner whichever door was used.
 const [archivingIds, setArchivingIds] = createSignal<readonly string[]>([])
 
 export const isArchiving = (taskId: string): boolean => archivingIds().includes(taskId)

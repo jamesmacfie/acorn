@@ -94,7 +94,7 @@ const readException = (raw: unknown): Exception => {
 }
 
 // Normalize one occurrence body into the allowlisted detail. `truncated` is set when any cap fired,
-// so the UI can say "omitted by Acorn" rather than implying upstream absence.
+// so the UI can say "omitted by Acorn" rather than imply the field was missing upstream.
 export function normalizeOccurrence(instance: RollbarApiInstance): RollbarOccurrenceDetail {
   const occurrence = isRecord(instance.data) ? instance.data : isRecord(instance.occurrence) ? instance.occurrence : {}
   const body = isRecord(occurrence.body) ? occurrence.body : {}
@@ -213,8 +213,8 @@ export function normalizeItemMetadata(
   }
 }
 
-// The public API retains its original composite response. Desktop reads use the independently
-// cached metadata and occurrence resources instead.
+// The public API keeps its composite response. Desktop reads use the separately cached metadata and
+// occurrence resources.
 export function composeItemDetail(
   metadata: RollbarItemMetadata,
   occurrence: RollbarOccurrenceDetail | null,

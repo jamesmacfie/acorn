@@ -9,12 +9,10 @@ import type { Draft } from './draft'
 type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'vars'
 
 /**
-/**
  * The shared editor, adapted to this plugin's `KeyValue` shape (`name` where KVRow says `key`).
  *
- * The grid itself moved to client-core's KeyValueEditor, which was lifted from this implementation,
- * including the trailing blank row and the `<Index>`-not-`<For>` rule that keeps an input from losing
- * focus on every keystroke.
+ * The grid lives in client-core's KeyValueEditor, including the trailing blank row and the
+ * `<Index>`-not-`<For>` rule that keeps an input from losing focus on every keystroke.
  */
 function KeyValueTable(props: { rows: KeyValue[]; onChange: (rows: KeyValue[]) => void; nameLabel?: string; valueLabel?: string }) {
   return (
@@ -118,8 +116,8 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
   )
 }
 
-// Switching auth mode has to build a whole new config object, since each mode carries different
-// fields. Defaults are empty rather than carried over: a token is not a password.
+// Each auth mode carries different fields, so switching builds a new config object. Defaults are
+// empty rather than carried over: a token is not a password.
 const emptyAuth = (mode: AuthConfig['mode']): AuthConfig => {
   switch (mode) {
     case 'basic':

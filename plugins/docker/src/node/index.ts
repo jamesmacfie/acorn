@@ -13,26 +13,24 @@ export const dockerPlugin = (): NodePlugin => {
     const bridge = dockerBridge(ctx.core, ctx.events.send)
     capability = ctx.capabilities.provide(DOCKER, bridge)
     // Archiving a task leaves its containers running unless somebody stops them, so docker says so
-    // and offers. Through ctx, like every other contribution here, so the host owns the disposal,
-    // which is exactly what the client-side version of this check did not have.
+    // and offers to. Registered through ctx, like every other contribution here, so the host owns the
+    // disposal.
     ctx.taskChecks.register({
       id: 'containers',
       check: (task) => dockerArchiveConcern(bridge, task),
-      // `compose down` reconstructs the project from labels, so it works whether or not the
-      // worktree is still there. The archive runs this before removal anyway, which is the one
-      // ordering the fire-and-forget client version could not promise.
+      // `compose down` reconstructs the project from labels, so it works whether or not the worktree
+      // is still there. The archive runs it before removal.
       apply: async (task) => void await bridge.taskTeardown(task.id),
     })
     ctx.routes.register(docker, { prefix: '', note: 'local docker daemon' })
-    // The log/stats streams and interactive `docker exec` PTYs ride the one authenticated WebSocket
-    // (@acorn/protocol/ws.ts), so the channel handler is part of this plugin's surface too. Losing
-    // it would leave the routes working and every live pane silent.
+    // The log and stats streams and the interactive `docker exec` PTYs ride the one authenticated
+    // WebSocket (@acorn/protocol/ws.ts), so the channel handler is part of this plugin's surface.
+    // Drop it and the routes keep working while every live pane goes silent.
     registerDockerWsChannel(ctx.events)
   },
-  // Kills the log/stats children and the cached daemon polls this plugin started. The channel
-  // handler no longer needs dropping here: it was registered through ctx.events, so the host takes
-  // it back on re-init, the same guarantee this dispose used to provide by hand, moved somewhere a
-  // new plugin cannot forget it.
+  // Kills the log and stats children and the cached daemon polls this plugin started. The channel
+  // handler needs no dropping here: it registered through ctx.events, so the host takes it back on
+  // re-init.
   dispose: () => {
       capability?.dispose()
     disposeDocker()

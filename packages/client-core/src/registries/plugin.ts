@@ -18,14 +18,12 @@ import { commandRegistry, type CommandContribution } from './commands'
 import { keybindingRegistry, type KeybindingContribution } from './keybindings'
 import { integrationFlowRegistry, type IntegrationFlowContribution } from './integrationFlows'
 import { projectImporterRegistry, type ProjectImporterContribution } from './projectImporters'
-// From ./slots, not ./uiSlots: the slot hosts contain JSX, and reaching one from here would make this
-// file (and the whole host) unimportable in a bare-Node vitest run (docs/frontend.md § Registries and
-// plugins).
+// From ./slots, not ./uiSlots. The slot hosts contain JSX, which makes this file unimportable in a
+// bare-Node vitest run (docs/frontend.md § Registries and plugins).
 import { taskSlotRegistry, uiSlotRegistry, type TaskSlotContribution, type UiSlotContribution } from './slots'
 
-// One contribution point. `register` returns nothing: the host owns the disposable (docs/plugins.md
-// § Activation), which is what makes a re-init replace a plugin's contributions instead of appending
-// a second copy.
+// One contribution point. `register` returns nothing, because the host owns the disposable
+// (docs/plugins.md § Activation), so a re-init replaces a plugin's contributions instead of appending.
 export type ClientContributionPoint<T> = {
   register(entry: T): void
 }
@@ -33,9 +31,8 @@ export type ClientContributionPoint<T> = {
 export type ClientPluginContext = {
   readonly name: string
   panes: ClientContributionPoint<PaneContribution>
-  // Generic per call: a source's promotion is typed on the item it promotes, but the underlying
-  // registry erases that (it holds a heterogeneous list), so a plugin still declares its own item
-  // type here.
+  // Generic per call. A source's promotion is typed on the item it promotes, and the registry holds a
+  // heterogeneous list, so a plugin declares its own item type here.
   sources: { register<Item>(entry: SourceContribution<Item>): void }
   commands: ClientContributionPoint<CommandContribution>
   keybindings: ClientContributionPoint<KeybindingContribution>
@@ -58,31 +55,27 @@ export type ClientPluginContext = {
   // (docs/frontend.md § Shell state; registries/attention.ts).
   attention: ClientContributionPoint<AttentionSourceContribution>
   // A typed set of records a user can compose a panel over (docs/dashboards.md § Collections). The
-  // compiled feeder; a loaded plugin declares `collections` in its manifest and the descriptor pass
+  // compiled feeder. A loaded plugin declares `collections` in its manifest and the descriptor pass
   // builds the same contribution. `pluginId` and the registry id are bound here, not declared.
   collections: ClientContributionPoint<CollectionRegistration>
   contribute<T extends { id: string }>(registry: Registry<T>, entry: T): void
   // Publish a typed capability for another plugin to resolve at call time, mirroring the node's
-  // ctx.capabilities.provide. Disposal is the host's, like every contribution above: a second
-  // activation in one process must not hit "already provided".
+  // ctx.capabilities.provide. Disposal is the host's, so a second activation in one process does not
+  // hit "already provided".
   capability<T>(id: ClientCapabilityId<T>, impl: T): void
 }
 
 export type ClientPlugin = {
   name: string
-  // Required plugins and why (docs/plugins.md § Activation): the shell assumes their contributions
-  // exist, so they cannot be disabled. GitHub is optional; its PR rail and importer are
-  // gated/removed as one plugin contribution.
+  // The shell assumes a required plugin's contributions exist, so it cannot be disabled
+  // (docs/plugins.md § Activation).
   required?: boolean
-  // Registration only, and synchronous (docs/plugins.md § "Frame authoring and the UI kit"): nothing
-  // here awaits or performs I/O, so making it async would put a promise between `render()` and the
-  // first paint for no gain.
+  // Registration only, and synchronous. Nothing here does I/O, so async would put a promise between
+  // `render()` and the first paint for no gain.
   init(ctx: ClientPluginContext): void
-  // The side-effect phase, run after every plugin's `init` (docs/plugins.md § "Frame authoring and
-  // the UI kit"). It exists because plugins/http and plugins/agents were doing I/O inside a
-  // synchronous `init` while half the registries were still empty. A plugin disabled in this pass
-  // never reaches it, and this stays synchronous too: a plugin wanting a network read fires it and
-  // handles its own rejection.
+  // The side-effect phase, run after every plugin's `init`, so no plugin does I/O while half the
+  // registries are empty. A disabled plugin never reaches it. Synchronous as well, so a plugin wanting
+  // a network read fires it and handles its own rejection.
   activate?(ctx: ClientPluginContext): void
 }
 
@@ -95,15 +88,13 @@ export type ClientPluginHostResult = {
   skipped: readonly string[]
 }
 
-// Everything a plugin has registered, so a second activation can take it back out again.
-// Module-level because the registries are module-level: there is exactly one renderer per window, and
-// a per-host map would let two hosts fight over one registry without either noticing.
+// Everything a plugin registered, so a second activation can take it back out. Module-level because
+// the registries are, and a per-host map would let two hosts fight over one registry unnoticed.
 const contributed = new Map<string, Disposable[]>()
 
-// A contribution that names a provider must name its own plugin (docs/plugins.md § "Frame authoring
-// and the UI kit"). Contribution ids are not namespaced (same section): `pr`, `changes`, `notes`,
-// `palette.files` and `docker-footer-badge` are persisted layout keys and chord targets, so
-// prefixing them would be a storage break dressed up as hygiene.
+// A contribution that names a provider must name its own plugin. Contribution ids stay un-namespaced,
+// because `pr`, `changes` and `palette.files` are persisted layout keys and chord targets, so
+// prefixing them breaks stored state.
 const declaredProvider = (entry: object): string | undefined =>
   'providerId' in entry && typeof (entry as { providerId?: unknown }).providerId === 'string'
     ? (entry as { providerId: string }).providerId
@@ -128,9 +119,8 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
       record(integrationFlowRegistry.register(entry))
     },
   }
-  // Not `own`: the entry arrives without the two fields the host binds, so there is nothing for the
-  // provider check to look at until they are stamped. Same shape as `ownIntegrationFlow`, for the
-  // same reason: the id is the host's to mint.
+  // Not `own`. The entry arrives without the two fields the host binds, so the provider check has
+  // nothing to look at until they are stamped. The id is the host's to mint.
   const ownCollection: ClientContributionPoint<CollectionRegistration> = {
     register: (entry) => {
       record(collectionRegistry.register({ ...entry, id: collectionKey(name, entry.collectionId), pluginId: name }))
@@ -139,8 +129,8 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
   return {
     name,
     panes: own(paneRegistry),
-    // The registry is heterogeneous by construction, so widening the item type here is the erasure,
-    // not a hole: nothing downstream reads a promotion without first selecting the source by id.
+    // The registry is heterogeneous by construction, so widening the item type here is the erasure
+    // rather than a hole. Nothing downstream reads a promotion without selecting the source by id.
     sources: { register: <Item>(entry: SourceContribution<Item>) => sources.register(entry) },
     commands,
     keybindings,
@@ -159,9 +149,8 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     nodeStats: own(nodeStatRegistry),
     attention: own(attentionRegistry),
     collections: ownCollection,
-    // Straight through `own`, so a plugin-published registry gets identical treatment: ownership
-    // checked, disposable recorded. The only difference from the members above is that the registry
-    // arrives as an argument instead of being named here.
+    // Straight through `own`, so a plugin-published registry gets the same ownership check and the
+    // same recorded disposable. Only the registry arrives as an argument.
     contribute: (registry, entry) => own(registry).register(entry),
     capability: (id, impl) => record(provideClientCapability(id, impl)),
   }
@@ -179,16 +168,14 @@ export function initClientPlugins(
   const disabled = new Set(options.disabled ?? [])
   const enabled: string[] = []
   const skipped: string[] = []
-  // Kept so the activate pass runs in declaration order over exactly the plugins that initialized,
-  // paired with the context each one already owns: a second `makeContext` would hand the plugin a
-  // recorder writing into a disposable list nobody holds.
+  // Kept so the activate pass runs in declaration order over the plugins that initialized, paired with
+  // the context each one owns. A second `makeContext` would write disposables into a list nobody holds.
   const activations: { plugin: ClientPlugin; ctx: ClientPluginContext }[] = []
 
   for (const plugin of plugins) {
     // Take back whatever this plugin registered on a previous activation, before it registers again.
-    // Registry.register throws on a duplicate id, so without this a second activate() in one process
-    // (a test, or a dev-server module reload) would not append a stale copy; it would take the whole
-    // shell down on the first pane. The node host takes the same precaution for the same reason.
+    // Registry.register throws on a duplicate id, so a second activate() in one process, from a test
+    // or a dev-server reload, takes the shell down on the first pane without this.
     for (const disposable of [...(contributed.get(plugin.name) ?? [])].reverse()) disposable.dispose()
     const disposables: Disposable[] = []
     contributed.set(plugin.name, disposables)
@@ -197,16 +184,16 @@ export function initClientPlugins(
       skipped.push(plugin.name)
       continue
     }
-    // Not caught, matching the node host: every plugin here is first-party code shipped in the same
-    // bundle, and a shell that half-registered is a worse outcome than one that fails loudly at boot.
+    // Not caught, matching the node host. Every plugin here ships in the same bundle, and a
+    // half-registered shell is worse than one that fails loudly at boot.
     const ctx = makeContext(plugin.name, (disposable) => disposables.push(disposable))
     plugin.init(ctx)
     enabled.push(plugin.name)
     if (plugin.activate) activations.push({ plugin, ctx })
   }
 
-  // Second pass, mirroring the node host's `ready`: by here every registry holds every enabled
-  // plugin's contributions, so a plugin priming a store can look up a sibling's descriptor.
+  // Second pass, mirroring the node host's `ready`. Every registry now holds every enabled plugin's
+  // contributions, so a plugin priming a store can look up a sibling's descriptor.
   for (const { plugin, ctx } of activations) plugin.activate?.(ctx)
 
   return { enabled, skipped }

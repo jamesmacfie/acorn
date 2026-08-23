@@ -12,8 +12,8 @@ export const editorViewState = (taskId: string, path: string): editor.ICodeEdito
   viewStates.get(viewKey(taskId, path))
 
 export function evictEditorViewStates(taskId: string): void {
-  // Every node's entries for this task id, not just the active node's: archival is final, and a key left
-  // behind under another node's prefix would never be reached again.
+  // Every node's entries for this task id, not just the active node's. Archival is final, and a key
+  // left behind under another node's prefix is never reached again.
   const suffix = `/${taskId}:`
   for (const key of viewStates.keys()) if (key.includes(suffix)) viewStates.delete(key)
 }

@@ -3,8 +3,9 @@ import { join, resolve } from 'node:path'
 import { z } from 'zod'
 import { PLUGIN_DB_DIR } from './pluginStorage'
 
-// Visible rather than dot-prefixed: dot names in this directory are reserved for installer staging
-// and debris sweeps. The manifest id grammar forbids dots, so this cannot collide with a package.
+// Visible rather than dot-prefixed, because dot names in this directory are reserved for installer
+// staging and debris sweeps. The manifest id grammar forbids dots, so this cannot collide with a
+// package.
 const STATE_FILE = 'bundled-state.json'
 
 const entrySchema = z.discriminatedUnion('status', [
@@ -60,12 +61,11 @@ const setEntry = (dataRoot: string, id: string, entry: BundledPluginStateEntry):
 export const readBundledPluginState = (dataRoot: string, id: string): BundledPluginStateEntry | undefined =>
   readState(dataRoot).plugins[id]
 
-/** Every id whose ownership row says an owner installed it, so reconciliation will never replace it.
+/** Every id whose ownership row says an owner installed it, so reconciliation never replaces it.
  *
- * Read on its own, rather than only as reconciliation's `preserved` list, because the row is what makes
- * a frozen copy frozen and a node with no bundled root to reconcile from never produces that list,
- * which is exactly the `dev:node` case where a `build:plugin` output outlived every later build and
- * nothing said so. */
+ * Read on its own, not only as reconciliation's `preserved` list, because the row is what freezes a
+ * copy, and a node with no bundled root to reconcile from never produces that list. That is the
+ * `dev:node` case where a `build:plugin` output outlives every later build and nothing says so. */
 export const userManagedPluginIds = (dataRoot: string): string[] =>
   Object.entries(readState(dataRoot).plugins)
     .filter(([, entry]) => entry.status === 'user')
@@ -80,8 +80,8 @@ export const markBundledPluginInstalled = (
   installedAt = Date.now(),
 ): void => setEntry(dataRoot, id, { status: 'installed', version, fingerprint, installedAt })
 
-/** A package installed through the owner-facing installer is an override. Keeping this row even when
- * the package later disappears prevents a future app release from silently claiming the id. */
+/** A package installed through the owner-facing installer is an override. Keeping this row after the
+ * package disappears stops a later app release from claiming the id. */
 export const markPluginUserManaged = (dataRoot: string, id: string): void =>
   setEntry(dataRoot, id, { status: 'user', installedAt: Date.now() })
 

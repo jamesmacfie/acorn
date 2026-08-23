@@ -65,15 +65,14 @@ export default function PullDetail(props: { task?: Task } = {}) {
   })
   const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
   const linearConnected = () => (integrations.data?.integrations ?? []).some((i) => i.providerId === 'linear' && i.status === 'connected')
-  // Enrichment through the host, addressed by provider (docs/first-party-plugins.md § github, "First-
-  // party for one specific reason"). The resolver route is Linear's; the connection check stays
-  // because a 403 with no connection wastes a round trip when the "connect Linear" fallback below is
-  // what should render anyway.
+  // Enrichment through the host, addressed by provider (docs/first-party-plugins.md § github). The
+  // resolver route is Linear's. The connection check stays because a 403 with no connection wastes a
+  // round trip when the "connect Linear" fallback below is what should render.
   const linearIssues = createQuery(() => refResolutionsOptions('linear', linearRefs().map((rf) => rf.item), linearConnected()))
   const linearSummary = createMemo(() => new Map((linearIssues.data ?? []).map((i) => [i.identifier, i])))
-  // Show a linked ticket without leaving the PR: the linked-ticket list below, and the bare `CRA-404` ids
-  // in the title. `openRefPanel` refuses when Linear is not installed on this device, which is the right
-  // degradation for a detail overlay and is why nothing here checks first.
+  // Show a linked ticket without leaving the PR: the list below, and the bare `CRA-404` ids in the
+  // title. `openRefPanel` refuses when Linear is not installed on this device, which is why nothing
+  // here checks first.
   const showLinearIssue = (identifier: string): void => void openRefPanel({ providerId: 'linear', displayId: identifier })
 
   // The Navigator pane itself is the scroll container, outside this fragment-owned component.
@@ -135,7 +134,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
   }
 
   const [mergeMethod, setMergeMethod] = createSignal('squash')
-  // Destructive PR-side actions arm before they fire. github had NO confirmation on these at all.
+  // Destructive PR-side actions arm before they fire.
   const armed = createArmedConfirm()
   const [draftText, setDraftText] = createSignal('')
   const [reviewBody, setReviewBody] = createSignal('')
@@ -268,8 +267,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                                   <>
                                     <span class="integration-row-title">{s().label}</span>
                                     <Show when={s().state}>
-                                      {/* The same visual the linear frame draws — two
-                                          implementations of one pill until Chip existed. */}
+                                      {/* The same visual the linear frame draws. */}
                                       {(st) => <Chip size="xs" color={st().color}>{st().name}</Chip>}
                                     </Show>
                                   </>
@@ -467,12 +465,8 @@ export default function PullDetail(props: { task?: Task } = {}) {
             <Show when={openCheck()}>
               {(c) => <ChecksPanel owner={o()} repo={r()} runId={c().runId} jobName={c().name} onClose={() => setOpenCheck(null)} />}
             </Show>
-            {/* No reference panel here any more, and the deletion is the point. This was
-                `<Show when={openIssue() ? refPanelFor('linear') : undefined}>` — a local signal plus one
-                provider named in the markup, which made this the ONLY surface in the app that could show a
-                referenced item, and Linear the only provider it could show. The registry was always
-                general; the invocation was not. Both now belong to the shell
-                (client-core/registries/refPanels.ts + refPanelHost.tsx), and this pane just asks. */}
+            {/* No reference panel here. The shell owns both the registry and the invocation
+                (client-core/registries/refPanels.ts and refPanelHost.tsx), so this pane only asks. */}
           </>
         )}
       </Show>

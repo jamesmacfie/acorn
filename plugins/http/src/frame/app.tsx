@@ -11,10 +11,9 @@ import HttpVariables from './HttpVariables'
 //
 //   pane (task)     `context.taskId` + `context.projectId`.
 //   pane (project)  `context.projectId` and no task, mounted beside the rail list at /p/:projectId.
-//                   This is the surface the compiled rail Source used to be, and it is the reason a
-//                   rail row click still opens something outside a task instead of being refused.
+//                   Lets a rail row click open something outside a task.
 //   settings        neither. The settings modal only knows a workspace, so this surface picks a
-//                   project first, same as the compiled settings page did.
+//                   project first.
 //
 // A selection into an already-mounted project pane arrives as `onSelect`, because `context` is a
 // snapshot by contract and remounting per click would throw away the draft the panel is holding.
@@ -31,8 +30,8 @@ export function HttpFrameApp(props: { bridge: AcornBridge }) {
     return context.taskId ? 'task' : 'project'
   }
 
-  // The project is read from core rather than carried in `context`, which holds an id and not a name. One
-  // read, no refetch: a frame is recreated when its subject changes.
+  // The project is read from core rather than carried in `context`, which holds an id and not a name.
+  // One read, no refetch: a frame is recreated when its subject changes.
   const [project] = createResource(
     () => (kind() === 'task' || kind() === 'project' ? context.projectId : undefined),
     (id) => props.bridge.api.get<Project>(projectRoute(id)),
@@ -75,9 +74,8 @@ export function HttpFrameApp(props: { bridge: AcornBridge }) {
   )
 }
 
-// The variables settings surface. Still a picker rather than an inferred project: variables belong
-// to a project, the settings modal is workspace-shaped, and guessing which project someone meant
-// would be worse than asking.
+// The variables settings surface. A picker rather than an inferred project: variables belong to a
+// project and the settings modal is workspace-shaped.
 function SettingsSurface(props: { bridge: AcornBridge }) {
   const [projects] = createResource(() => props.bridge.api.get<ProjectsResponse>(projectsRoute))
   const [selected, setSelected] = createSignal('')

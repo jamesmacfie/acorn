@@ -216,9 +216,9 @@ describe('architecture boundaries', () => {
   })
 
   it('spawning a child process is an enumerated exception to the broker', () => {
-    // Every entry below is a considered exception to the broker, with its reason inline
-    // (docs/architecture-overview.md § Package boundaries, docs/security.md § Process, path, and
-    // configuration controls).
+    // Every entry below is a considered exception to the broker, with its reason inline. See
+    // docs/architecture-overview.md § Package boundaries and docs/security.md § Process, path, and
+    // configuration controls.
     const CHILD_PROCESS_OK = new Set([
       // Core, and the broker itself.
       'packages/node-core/src/main/core/exec/proc.ts', // IS the broker
@@ -385,9 +385,9 @@ describe('architecture boundaries', () => {
       'managedAgents.ts',
     ]
     // Not in the baseline, because a baseline means "still to fix" and these aren't. All three are
-    // name collisions rather than dependencies: the first two with core vocabulary, and
-    // `browserRules.ts` with the `browser` plugin, which arrived long after it. Those rules are the
-    // preview pane's page-fill rules and belong to `preview`; nothing in `plugins/browser` reads them.
+    // name collisions rather than dependencies: two with core vocabulary, and `browserRules.ts` with
+    // the `browser` plugin. Those rules are the preview pane's page-fill rules and belong to
+    // `preview`. Nothing in `plugins/browser` reads them.
     const NAME_COLLISIONS = ['agentContext.ts', 'browserRules.ts', 'contextMenus.ts']
     const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
     const proto = byName.get('@acorn/protocol')!
@@ -431,19 +431,16 @@ describe('architecture boundaries', () => {
   })
 
   it('nothing in the tree imports electron', () => {
-    // The end state of the migration: there is one shell, it is Tauri, and the Electron dependency is
-    // gone from every manifest (docs/shell.md). This used to be an
-    // enumerated baseline of the files allowed to name electron; it shrank to zero at cutover and the
-    // rule flipped to a flat ban, which is why there is nothing to exempt and nothing to shrink.
+    // One shell, Tauri, and no Electron dependency in any manifest (docs/shell.md). A flat ban, so
+    // there is nothing to exempt and nothing to shrink.
     //
-    // A source scan as well as an edge scan, because both lazy adapters that survived to the end
-    // reached for it through `createRequire` rather than an import, and an edge scan alone would not
-    // have seen either.
+    // A source scan as well as an edge scan, because a lazy adapter can reach for electron through
+    // `createRequire` rather than an import, which an edge scan alone would miss.
     const naming = [...new Set(EDGES.filter((e) => e.target.external === 'electron').map((e) => e.fromFile))]
     expect(naming.map(rel).sort()).toEqual([])
-    // Any call whose sole argument is the string, which is the `createRequire(import.meta.url)('electron')`
-    // form both surviving adapters used. Comments are stripped so prose about the deleted shell is not
-    // a failure.
+    // Any call whose sole argument is the string, which covers
+    // `createRequire(import.meta.url)('electron')`. Comments are stripped so prose about the deleted
+    // shell is not a failure.
     const LAZY_REQUIRE = /\(\s*['"]electron['"]\s*\)/
     const withoutComments = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     const files = PACKAGES.flatMap((p) => walk(p.src))
@@ -465,9 +462,9 @@ describe('architecture boundaries', () => {
 
   it('the Tauri surface stays inside the shell', () => {
     // The renderer's one door to a host is the platform seam, and the bridge that fills it is the only
-    // file in the tree that may name a Tauri binding (docs/testing.md § Test
-    // layers). `src/app/client` is the renderer and shares this package with the shell, so the rule is
-    // written against the shell folder rather than the package.
+    // file that may name a Tauri binding (docs/testing.md § Test layers). `src/app/client` is the
+    // renderer and shares this package with the shell, so the rule names the shell folder rather than
+    // the package.
     const SHELL = join(ROOT, 'apps', 'desktop', 'src', 'shell') + '/'
     const naming = [...new Set(EDGES.filter((e) => e.target.external === '@tauri-apps/api').map((e) => e.fromFile))]
     expect(naming.filter((f) => !f.startsWith(SHELL)).map(rel).sort()).toEqual([])

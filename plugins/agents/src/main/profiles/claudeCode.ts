@@ -9,9 +9,9 @@ export const claudeCodeProfile: AgentProfileContribution = {
   transport: 'pty',
   mcpRegistration: (name, launcher) => registerAcornMcp('claude', name, launcher),
   // Pull, not push (docs/notes-and-memory.md): a system-prompt instruction to fetch the task's own
-  // context via the projected MCP tools. The pushed block it replaces was queued 'after-ready', so
-  // it landed after the user's first ask whenever the CLI was still busy; a system prompt can't race.
-  // Tools are named bare. The acorn server's name is build-flavoured (acorn / acorn-dev).
+  // context through the projected MCP tools. A pushed block queues 'after-ready', so it lands after the
+  // user's first ask whenever the CLI is busy. A system prompt cannot race.
+  // Tools are named bare, because the acorn server's name is build-flavoured (acorn or acorn-dev).
   launchArgs: [
     '--append-system-prompt',
     'This session runs inside acorn, which projects the current task as MCP tools. Before starting work, call task_context to read the task: its pull request, linked issues, workspace notes and the repo memory index. Follow up with notes_read for any note it lists, and memory_search / memory_get for relevant repo memory — conventions and past feedback live there. Re-read them when the task shifts; the user edits notes while you work. Never ask the user for context you can pull yourself.',

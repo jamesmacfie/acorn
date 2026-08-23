@@ -11,10 +11,9 @@ describe('the codex profile', () => {
     expect(codexProfile).toMatchObject({ id: 'codex', label: 'Codex', kind: 'agent', command: 'codex', transport: 'pty' })
   })
 
-  // Asserts the whole array, not a prefix slice plus a last-element check: together those left the middle
-  // of the argv unasserted, so anything inserted between `--json` and the prompt, such as a sandbox opt-out
-  // or an extra `--config`, would pass. Same reasoning as the claude suite: these arrays are the command
-  // line.
+  // Asserts the whole array. A prefix slice plus a last-element check leaves the middle of the argv
+  // unasserted, so a sandbox opt-out or an extra `--config` slipped between `--json` and the prompt
+  // would pass.
   it('builds a headless turn as `exec --json`, with the prompt last', () => {
     const { file, args } = codexProfile.headlessArgv!('codex', { prompt: 'do the thing' })
     expect(file).toBe('codex')
@@ -22,9 +21,8 @@ describe('the codex profile', () => {
   })
 
   it('materializes a schema to a FILE, because codex takes a path where claude takes JSON', () => {
-    // The divergence worth a test: `--output-schema` wants a path, so the profile writes a temp
-    // file. A change that passed the JSON inline would produce an invocation codex rejects, or
-    // worse, treats as a filename.
+    // `--output-schema` wants a path, so the profile writes a temp file. Passing the JSON inline
+    // produces an invocation codex rejects, or treats as a filename.
     const { args } = codexProfile.headlessArgv!('codex', { prompt: 'p', schema: { type: 'object' } })
     const path = args[args.indexOf('--output-schema') + 1]
     expect(path).toMatch(/schema\.json$/)

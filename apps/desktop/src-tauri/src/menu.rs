@@ -5,18 +5,17 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use crate::commands::Shell;
 
-// The application menu, and the two accelerators that are really product behaviour rather than
-// decoration (docs/shell.md § Startup: data directory, environment, and the singleton lock).
+// The application menu, and the two accelerators that are product behaviour rather than decoration.
 //
 // Quit is a custom item, never `PredefinedMenuItem::quit`, which routes through `[NSApp terminate:]`
-// and bypasses the event loop — the quit negotiation would never run.
+// and bypasses the event loop, so the quit negotiation would never run.
 //
-// Cmd/Ctrl+W closes the focused pane, never the window. Electron intercepts the key with
-// `before-input-event`; there is no Tauri equivalent, so it is a menu item whose accelerator wins over
-// the page and whose click becomes the same event the seam already listens for.
+// Cmd/Ctrl+W closes the focused pane, never the window. Tauri has no key interception hook, so it is
+// a menu item whose accelerator wins over the page and whose click becomes the event the seam
+// listens for.
 //
-// The rest of the menu is the standard macOS set, spelled out rather than inherited: a window with no
-// Edit menu has no working Cmd+C, and the default menu is not available once a custom one is set.
+// The rest is the standard macOS set, spelled out rather than inherited. A window with no Edit menu
+// has no working Cmd+C, and the default menu is gone once a custom one is set.
 
 pub const CLOSE_PANE: &str = "acorn:close-pane";
 pub const QUIT: &str = "acorn:quit";
@@ -70,8 +69,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 /// Menu clicks that are product behaviour. Everything else is a predefined item the platform handles.
 pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match id {
-        // The pane that owns focus decides what closes. If none does, nothing closes: this is a
-        // single-window app and Cmd-Q is what quits it.
+        // The pane that owns focus decides what closes. If none does, nothing closes. This is a
+        // single-window app, and Cmd-Q is what quits it.
         CLOSE_PANE => {
             let _ = app.emit("acorn:close-pane", ());
         }
@@ -80,8 +79,8 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     }
 }
 
-/// Ask the renderer before quitting, once. It collects concerns — a running agent, an unsaved buffer —
-/// and answers through the `quit_approved` command, which is what actually exits.
+/// Ask the renderer before quitting, once. It collects concerns, such as a running agent or an
+/// unsaved buffer, and answers through the `quit_approved` command, which is what exits.
 pub fn request_quit<R: Runtime>(app: &AppHandle<R>) {
     let Some(shell) = app.try_state::<Shell>() else { return };
     if shell.quit_approved.load(Ordering::SeqCst) {

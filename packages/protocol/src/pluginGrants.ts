@@ -65,11 +65,11 @@ export const pluginTaskCheckGrants = (contributions: PluginContributions): Plugi
     .sort((a, b) => a.id.localeCompare(b.id))
 
 /** What this package asks acorn to run as a managed agent, and what it carries into it. See
- *  docs/managed-agents.md § Harnesses. Unlike a schedule or a task check, the route is not the
- *  interesting part and there is none: the whole grant is the program and its environment.
+ *  docs/managed-agents.md § Harnesses. There is no route here: the whole grant is the program and its
+ *  environment.
  *
- *  A descriptor declaring neither a command nor an entry is dropped rather than disclosed, exactly as an
- *  unparseable extension reference is: the node refused it at parse, so it can never run, and a consent
+ *  A descriptor declaring neither a command nor an entry is dropped rather than disclosed, like an
+ *  unparseable extension reference. The node refused it at parse, so it can never run, and a consent
  *  line about a grant that cannot exist is noise in the one list that must not have any. */
 export const pluginHarnessGrants = (contributions: PluginContributions): PluginHarnessGrant[] =>
   (contributions.harnesses ?? [])

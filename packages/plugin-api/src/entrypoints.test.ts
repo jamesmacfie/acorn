@@ -8,11 +8,9 @@ import { describe, expect, it } from 'vitest'
 //
 // This file loads every entrypoint in process, under vitest's node environment with no jsdom and no
 // Solid transform, rather than spawning a child the way
-// apps/node/test/integration/mainBarrelLoad.test.ts does: the hazard is what a vitest worker can
+// apps/node/test/integration/mainBarrelLoad.test.ts does. The hazard is what a vitest worker can
 // load, so a vitest worker is the honest place to ask. It doubles as enforcement of
-// "sideEffects": false in package.json, since a barrel doing real work at module scope (opening a
-// database, reading a data root, registering into a live registry) would do it here too, in a test
-// that passes nothing in and asserts only that names came back.
+// "sideEffects": false, since a barrel doing real work at module scope would do it here too.
 const PKG = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json'), 'utf8')) as {
   exports: Record<string, string>
 }

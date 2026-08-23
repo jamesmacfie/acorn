@@ -20,9 +20,9 @@ export type KnowledgeDeps = {
 
 export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity'>
 
-// Reads over the derived index, bound to this plugin's own database (docs/data-layer.md §
-// Plugin databases). Keeps the app-layer agent-tool and context-section wiring working without a
-// handle to the underlying files (docs/notes-and-memory.md § Memory).
+// Reads over the derived index, bound to this plugin's own database (docs/data-layer.md § Plugin
+// databases). Agent tools and context sections read memory through this rather than the files
+// (docs/notes-and-memory.md § Memory).
 export type MemoryIndex = {
   // Exposed as well as used internally: a caller that then reads through a different path (core's
   // context assembler) still needs the index fresh.
@@ -44,9 +44,9 @@ export type MemoryKnowledge = MemoryIndex & {
   memoryReviewTrigger(taskId: string, transcriptTail: string): Promise<void>
 }
 
-// The capability id moved to ../contract/knowledge.ts, narrowed to the two methods that are
-// actually driven from outside this plugin. This type stays here because it is the full runtime,
-// including the proposal-store handle, which a contract file may not name.
+// The capability id lives in ../contract/knowledge.ts, narrowed to the two methods driven from
+// outside this plugin. This type stays here because it is the full runtime, including the
+// proposal-store handle, which a contract file may not name.
 
 // The headless profile the memory-review pass runs on (docs/notes-and-memory.md § Lifecycle
 // hooks).
@@ -67,9 +67,8 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
     }
   }
 
-  // Memory (docs/notes-and-memory.md § Memory): files are truth, and the SQLite index reconciles
-  // from every active worktree, primary checkout, and the private home dir before each read
-  // (cheap at this scale).
+  // Memory (docs/notes-and-memory.md § Memory): files are truth, and the SQLite index reconciles from
+  // every active worktree, primary checkout, and the private home dir before each read.
   const buildMemorySources = async () => {
     const active = (await core.tasks.active())
       .filter((t) => t.worktreePath && isDir(t.worktreePath))
@@ -161,10 +160,9 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
     }
   }
 
-  // The renderer's notes + memory surface, exposed as the KnowledgeBridge behind the HTTP routes
-  // (server/routes/knowledge.ts). Distinct from the harness memory/notes bridges (the MCP agent
-  // surface); this is the human-facing pane. guard() keeps the `| { error }` contract the clients
-  // union on. Backed by the same stores, so it 503s under dev:node.
+  // The renderer's notes and memory surface, exposed as the KnowledgeBridge behind the HTTP routes
+  // (server/routes/knowledge.ts). This is the human-facing pane, distinct from the harness memory and
+  // notes bridges that serve MCP. guard() keeps the `| { error }` contract the clients union on.
   const route: KnowledgeBridge = {
     memoryList: (projectId) =>
       guard(async () => {
@@ -227,10 +225,9 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
     },
     // --- notes ---
     //
-    // Delegated to plugins/notes' `notes.store` capability, resolved per call (docs/notes-and-memory.md
-    // § Notes: this is the one-release compatibility alias for older clients). Moving the mount to
-    // /v2/p/notes/* remains outstanding: it needs route builder, client, and mount-table changes
-    // this batch didn't make.
+    // Delegated to plugins/notes' `notes.store` capability, resolved per call. This is the
+    // compatibility alias for older clients (docs/notes-and-memory.md § Notes). Moving the mount to
+    // /v2/p/notes/* is outstanding: it needs route builder, client, and mount-table changes.
     notesList: (location) => guard(() => deps.notes().list(location)),
     notesRead: (location, slug) => guard(() => deps.notes().read(location, slug)),
     notesCreate: (location, title, kind) => guard(() => deps.notes().create(location, title, { kind: kind as NoteKind | undefined })),

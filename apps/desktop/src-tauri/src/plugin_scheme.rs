@@ -2,42 +2,35 @@ use std::path::{Path, PathBuf};
 
 use tauri::http::{Request, Response};
 
-// `app-plugin://<sha256>/...` is the origin a plugin's UI runs on. Why the hash is the host, what it
-// buys (isolation, immutability, custody), and why index.html is generated here rather than shipped
-// by the plugin: docs/shell.md § The plugin frame origin, docs/plugins.md.
+// `app-plugin://<sha256>/...` is the origin a plugin's UI runs on. See docs/shell.md, "The plugin
+// frame origin", and docs/plugins.md for why the hash is the host and why index.html is generated
+// here rather than shipped by the plugin. Each hash is a real origin with its own storage.
 //
-// Phase 0 measured this exact arrangement in WKWebView: each hash is a real origin with its own
-// storage, `'self'` resolves against it, and the per-response CSP below is honoured
-// (docs/shell.md § The plugin frame origin).
-//
-// Two things are shaped by Rust serving this rather than a Node process:
+// Two things are shaped by Rust serving this rather than a Node process.
 //
 // The cache is read by path, not through `PluginCache`. That class lives in the helper process and
 // its `path()` is `<userDataDir>/plugin-cache/<hash>.js`, so the handler resolves the same file
-// itself. It is a content-addressed store: a file whose name is a 64-hex hash IS a bundle this
-// device holds, and nothing else can be named.
+// itself. The store is content-addressed: a file named with a 64-hex hash is a bundle this device
+// holds, and nothing else can be named.
 //
 // The frame stylesheet is a staged file rather than a `?raw` import, read once at boot.
 // `scripts/stage.mjs` holds the ordered list of client-core modules that make it up, and
-// `cssHygiene.test.ts` reads that same list to check a frame is dressed in what it needs.
+// `cssHygiene.test.ts` reads the same list to check a frame is dressed in what it needs.
 
 pub const PLUGIN_SCHEME: &str = "app-plugin";
 
 const CACHE_DIR: &str = "plugin-cache";
 
-/// The plugin frame's CSP, one header on every response, and the reasoning behind each directive:
-/// docs/shell.md § The plugin frame origin. `connect-src 'none'` is the load-bearing one, and
-/// phase 0 confirmed a frame served this policy is network-dead in WKWebView: fetch, XHR, WebSocket
-/// and sendBeacon all fail.
+/// The plugin frame's CSP, one header on every response. See docs/shell.md, "The plugin frame
+/// origin", for each directive. `connect-src 'none'` is the load-bearing one: fetch, XHR, WebSocket,
+/// and sendBeacon all fail in a frame served this policy.
 const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
-/// The generated document. Deliberately tiny: the
-/// host's shared stylesheet and the plugin's module script. No inline script, no favicon, no title a
-/// plugin could use to impersonate the shell in a devtools list.
+/// The generated document: the host's shared stylesheet and the plugin's module script. No inline
+/// script, no favicon, and no title a plugin could use to impersonate the shell in a devtools list.
 ///
-/// The inline block sits before the stylesheet link, and that order matters: a later `html, body`
-/// rule beat `base.css` on source order alone and rendered every frame in the browser's default
-/// serif.
+/// The inline block sits before the stylesheet link. Put it after and its `html, body` rule beats
+/// `base.css` on source order, rendering every frame in the browser's default serif.
 const DOCUMENT: &str = r#"<!doctype html>
 <html>
 <head>
@@ -60,8 +53,8 @@ pub struct Frames {
 }
 
 impl Frames {
-    /// Read the staged stylesheet once. A missing one is not fatal: frames still run, they just
-    /// render undressed, which is a far more legible failure than a scheme that refuses to serve.
+    /// Read the staged stylesheet once. A missing one is not fatal. Frames still run, undressed,
+    /// which reads better than a scheme that refuses to serve.
     pub fn new(user_data_dir: &Path, styles_path: &Path) -> Self {
         let styles = std::fs::read(styles_path).unwrap_or_else(|error| {
             eprintln!("[plugin-scheme] no frame stylesheet at {}: {error}", styles_path.display());
@@ -76,8 +69,8 @@ fn is_hash(value: &str) -> bool {
 }
 
 pub fn serve(frames: &Frames, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
-    // The host part IS the bundle hash. Anything that is not a hash is not a bundle this device
-    // holds, so it never reaches the cache lookup.
+    // The host part is the bundle hash. Anything else is not a bundle this device holds, so it never
+    // reaches the cache lookup.
     let hash = request.uri().host().unwrap_or_default().to_string();
     if !is_hash(&hash) {
         return respond(404, "text/plain", Vec::new());
@@ -88,15 +81,13 @@ pub fn serve(frames: &Frames, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
         // One host-owned stylesheet, identical at every plugin origin. The plugin cannot replace it.
         "/ui.css" => respond(200, "text/css; charset=utf-8", frames.styles.clone()),
         // One bundle per plugin, one file per bundle. There is no plugin-controlled asset tree: a
-        // plugin that wants an image or font inlines it, keeping its hash claim exactly as auditable
-        // as one file.
+        // plugin that wants an image or font inlines it, which keeps the hash claim auditable.
         //
-        // The hash is checked above and a hash cannot contain a separator, so this join cannot climb
-        // out of the cache directory.
+        // The hash is checked above and cannot contain a separator, so this join cannot climb out of
+        // the cache directory.
         "/client.js" => match std::fs::read(frames.cache_dir.join(format!("{hash}.js"))) {
-            // A hash the cache does not hold. The normal case is a bundle the owner rejected or one
-            // that was swept; either way the answer is nothing, not a fetch from the node that
-            // offered it.
+            // A hash the cache does not hold, usually a bundle the owner rejected or one that was
+            // swept. The answer is nothing, not a fetch from the node that offered it.
             Err(_) => respond(404, "text/plain", Vec::new()),
             Ok(bytes) => respond(200, "text/javascript; charset=utf-8", bytes),
         },
@@ -109,14 +100,12 @@ fn respond(status: u16, mime: &str, body: Vec<u8>) -> Response<Vec<u8>> {
         .status(status)
         .header("content-type", mime)
         .header("content-security-policy", CSP)
-        // The bundle is served as a module script; a sniffed type is a type an attacker chose.
+        // The bundle is served as a module script. A sniffed type is a type an attacker chose.
         .header("x-content-type-options", "nosniff")
-        // Frames are hash-addressed, so the only correct cache lifetime is forever, but this is a
-        // local scheme with a content-addressed store behind it: nothing to gain, and one more place
-        // for stale bytes to live.
+        // Frames are hash-addressed, so caching forever would be correct, but this is a local scheme
+        // over a content-addressed store. Nothing to gain, one more place for stale bytes to live.
         .header("cache-control", "no-store")
-        // No `x-frame-options` or `frame-ancestors`, and why: docs/shell.md § The plugin frame
-        // origin.
+        // No `x-frame-options` or `frame-ancestors`. See docs/shell.md, "The plugin frame origin".
         .body(body)
         .unwrap_or_else(|_| Response::builder().status(500).body(Vec::new()).expect("a bodyless response always builds"))
 }

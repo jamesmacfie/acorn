@@ -8,10 +8,10 @@ data.
 The GitHub plugin stores repository and pull-request projections in `plugins/github.sqlite`. Linear
 and Rollbar use the core external-item projection. Reads use serve-then-revalidate:
 
-1. resolve the resource and freshness marker;
-2. serve a usable local projection immediately when one exists;
-3. refresh in the request or in a bounded background operation when the policy says it is stale;
-4. replace or update the projection and freshness marker.
+1. Resolve the resource and its freshness marker.
+2. Serve a usable local projection when one exists.
+3. Refresh in the request, or in a bounded background operation, when the policy says it is stale.
+4. Replace or update the projection and freshness marker.
 
 Mirror collections are disposable. A full list refresh can delete and rebuild rows so repositories
 or issues no longer visible to the provider do not remain in the UI. Provider errors preserve a
@@ -22,24 +22,22 @@ GitHub list and PR detail policies are defined in `plugins/github/src/server/` a
 to each resource. Repositories and open PR lists use ETags where the provider supplies them. A `304`
 only advances the local freshness timestamp. Explicit `force` requests block for a fresh response.
 
-The sync engine itself (`server/sync/policy.ts`, `engine.ts`) used to hold the staleness TTL for every
-provider resource: GitHub's pulls and repos, Rollbar's items, Linear's issues. Each now sits with the
-plugin whose API it describes, since how fast a provider's data moves is a fact about that provider,
-not about core. What stays in the engine's own policy is the rate-limit backoff: how long a
-rate-limited key waits before another background refresh runs. That one is the engine's, not a
-provider's, because a provider that could set its own backoff could make the node keep hammering an
-API that already said no. `read()` still takes a per-call `backoffMs` override for a provider that
-publishes a `Retry-After`.
+Each staleness TTL sits with the plugin whose API it describes, because how fast a provider's data
+moves is a fact about that provider, not about core. The engine's own policy
+(`server/sync/policy.ts`, `engine.ts`) keeps one value: the rate-limit backoff, or how long a
+rate-limited key waits before another background refresh runs. A provider that could set its own
+backoff could make the node keep hammering an API that already said no. `read()` takes a per-call
+`backoffMs` override for a provider that publishes a `Retry-After`.
 
 Provider item resources have independent freshness markers. A Rollbar item list, item detail, and
 occurrence history can therefore be stale independently.
 
 Linear's rail, its `issues-mine` collection, and its batch reference-resolution route are the
-exception to serve-then-revalidate: they read across every connected workspace with partial results,
-and a bare identifier has not yet been attributed to a connection, so there is no single freshness
-marker to revalidate against. These routes resolve directly against each connection and write what
-they find into the external-item store themselves. Linear's single-resource issue detail route still
-goes through the mirrored resource and gets serve-then-revalidate as normal.
+exception to serve-then-revalidate. They read across every connected workspace with partial results,
+and a bare identifier is not attributed to one connection, so there is no single freshness marker to
+revalidate against. These routes resolve directly against each connection and write what they find
+into the external-item store themselves. Linear's single-resource issue detail route goes through
+the mirrored resource and gets serve-then-revalidate as normal.
 
 ## Immutable blob cache
 
@@ -63,9 +61,9 @@ not mutation confirmation. When a Node is reconnecting or offline, cached respon
 with freshness badges. A WebSocket reconnect or sequence gap marks affected data stale and triggers
 normal refetching; there is no history cursor or offline mutation queue.
 
-The persisted cache has no version buster. A stale entry from before a response type gained a
-required field survives a relaunch as-is, so a query key must change whenever the shape it caches
-gains a required field; there is no other point at which an old entry gets invalidated.
+The persisted cache has no version buster. An entry written before a response type gained a required
+field survives a relaunch as-is, so change the query key whenever the shape it caches gains a
+required field. Nothing else invalidates an old entry.
 
 ## Fan-out cache safety
 

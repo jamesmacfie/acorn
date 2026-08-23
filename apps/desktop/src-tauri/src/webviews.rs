@@ -5,41 +5,31 @@ use serde::{Deserialize, Serialize};
 use tauri::webview::{Cookie, NewWindowResponse, PageLoadEvent, WebviewBuilder};
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview, WebviewUrl};
 
-// Host-owned child webviews: the browser preview pane and loaded-plugin webview surfaces. One module
-// rather than three, because the difference between the two products is a policy function and a key
-// prefix (docs/shell.md § Host-owned webviews).
+// Host-owned child webviews: the browser preview pane and loaded-plugin webview surfaces. See
+// docs/shell.md, "Host-owned webviews", for why one module covers both.
 //
-// wry has no `WebContentsView` and no `webRequest`, so two things are shaped by what it does have,
-// and both were measured in phase 0:
-//
-// A child webview under `Window::add_child` composites over the main one, takes logical bounds the
-// renderer's pane geometry drives directly, and hides under overlays. `incognito(true)` gives it its
-// own ephemeral data store, which is what `partition:`-without-`persist:` buys under Electron.
-//
-// Tunnel auth moves from a request header to a cookie. There is no `onBeforeSendHeaders` to inject
-// `x-acorn-tunnel` per request, so the pane's cookie store is seeded before its first real navigation
-// instead. The helper pushes each listener's secret to the shell as it opens one, keyed by port, and
-// `previewTunnel.ts` accepts either spelling of the credential. The secret never reaches the renderer,
-// which is the property that mattered.
+// wry has no `webRequest`, so there is no `onBeforeSendHeaders` to inject `x-acorn-tunnel` per
+// request. The pane's cookie store is seeded before its first real navigation instead, from secrets
+// the helper pushes to the shell per port. The secret never reaches the renderer.
 
 /// Preview keys are `preview:<taskId>`; plugin surfaces are `plugin:<pluginId>:<nodeId>[:<surface>]`.
-/// The prefix is what selects the policy below, so it is validated rather than assumed.
+/// The prefix selects the policy below, so it is validated rather than assumed.
 const PREVIEW_PREFIX: &str = "preview:";
 const PLUGIN_PREFIX: &str = "plugin:";
 
-/// The cookie the preview tunnel accepts in place of the `x-acorn-tunnel` header. One name, spelled
-/// once here and once in `previewTunnel.ts`.
+/// The cookie the preview tunnel accepts in place of the `x-acorn-tunnel` header. Spelled here and
+/// in `previewTunnel.ts`.
 const TUNNEL_COOKIE: &str = "acorn_tunnel";
 
-/// Matches Electron's per-renderer ceiling on preview tunnels, for the same reason: a renderer bug
-/// that ensures in a loop should cost a refused call, not every webview the OS will give us.
+/// A renderer bug that ensures in a loop should cost a refused call, not every webview the OS will
+/// give us.
 const MAX_WEBVIEWS: usize = 32;
 
 #[derive(Clone, Debug, PartialEq)]
 enum Policy {
     Preview,
-    /// The manifest host allowlist, checked here as well as in the renderer broker. Two independent
-    /// checks is the point: widening the grant in one layer must not silently widen the other.
+    /// The manifest host allowlist, checked here and in the renderer broker. Widening the grant in
+    /// one layer must not silently widen the other.
     Plugin(Vec<String>),
 }
 
@@ -53,9 +43,9 @@ impl Policy {
 }
 
 /// Where a webview has been, so back and forward can be offered honestly. wry exposes no navigation
-/// history, so the shell keeps its own: `on_navigation` fires for every navigation including the ones
-/// page script drives, and `traversing` marks the ones this module asked for so they move the cursor
-/// instead of truncating the future.
+/// history. `on_navigation` fires for every navigation, including the ones page script drives, and
+/// `traversing` marks the ones this module asked for so they move the cursor instead of truncating
+/// the future.
 #[derive(Default)]
 struct Nav {
     entries: Vec<String>,
@@ -100,14 +90,13 @@ struct Record<R: Runtime> {
 }
 
 /// The shell's webview state. `tunnels` is written from the helper's stdout signals, never from the
-/// renderer: a renderer that could name a secret would not need one.
+/// renderer.
 pub struct Webviews<R: Runtime> {
     records: Mutex<HashMap<String, Record<R>>>,
     tunnels: Mutex<HashMap<u16, String>>,
 }
 
-// Hand-written rather than derived: `derive(Default)` would ask the runtime parameter to be Default
-// too, and a runtime is not a value this owns.
+// Hand-written because `derive(Default)` would ask the runtime parameter to be Default too.
 impl<R: Runtime> Default for Webviews<R> {
     fn default() -> Self {
         Self { records: Mutex::new(HashMap::new()), tunnels: Mutex::new(HashMap::new()) }
@@ -124,8 +113,7 @@ impl<R: Runtime> Webviews<R> {
         self.tunnels.lock().unwrap().remove(&port);
     }
 
-    /// Close every webview. Called on the way out so a child webview cannot outlive the window it is
-    /// composited over.
+    /// Close every webview, so none outlives the window it is composited over.
     pub fn dispose(&self) {
         for (_, record) in self.records.lock().unwrap().drain() {
             let _ = record.webview.close();
@@ -135,8 +123,8 @@ impl<R: Runtime> Webviews<R> {
 
 // ── URL policy ────────────────────────────────────────────────────────────────────────────────────
 // Ports of `isAllowedPreviewUrl` (plugins/preview/src/main/browserAuto.ts) and `isAllowedWebviewUrl`
-// (@acorn/protocol/webview.ts). Ported rather than called, because this is the second of the two
-// independent checks and a second implementation is what makes it independent.
+// (@acorn/protocol/webview.ts). Ported rather than called: a second implementation is what makes the
+// second check independent.
 
 fn parsed(url: &str) -> Option<Url> {
     let parsed = Url::parse(url).ok()?;
@@ -156,8 +144,8 @@ fn host_matches(hostname: &str, pattern: &str) -> bool {
     let pattern = pattern.to_lowercase();
     let hostname = hostname.to_lowercase();
     match pattern.strip_prefix("*.") {
-        // A wildcard covers the registrable host and its subdomains, and nothing else — never a
-        // suffix match, which would make `evil-example.com` match `*.example.com`.
+        // A wildcard covers the host and its subdomains, and nothing else. A suffix match would let
+        // `evil-example.com` match `*.example.com`.
         Some(suffix) => !suffix.is_empty() && (hostname == suffix || hostname.ends_with(&format!(".{suffix}"))),
         None => hostname == pattern,
     }
@@ -166,8 +154,8 @@ fn host_matches(hostname: &str, pattern: &str) -> bool {
 pub fn is_allowed_webview_url(url: &str, hosts: &[String]) -> bool {
     let Some(parsed) = parsed(url) else { return false };
     let Some(host) = parsed.host_str() else { return false };
-    // https everywhere, http only for loopback: a plugin surface that reaches a dev server on this
-    // machine is the one case where plaintext is not a downgrade.
+    // https everywhere, http only for loopback, where a dev server on this machine is the one case
+    // plaintext is not a downgrade.
     if parsed.scheme() != "https" && !(parsed.scheme() == "http" && is_loopback(host)) {
         return false;
     }
@@ -234,10 +222,9 @@ fn policy_for(key: &str, hosts: Option<Vec<String>>) -> Option<Policy> {
     Some(Policy::Plugin(hosts))
 }
 
-/// Create the surface if it is not there, or re-point an existing one at a new home URL. Returns
-/// false for a key this shell does not recognise, a URL the policy refuses, or a window that is gone —
-/// the same three refusals `WebviewService.ensure` makes, collapsed into one boolean because the
-/// caller's only move is to hide the affordance either way.
+/// Create the surface if it is not there, or re-point one at a new home URL. Returns false for an
+/// unrecognised key, a URL the policy refuses, or a window that is gone. One boolean covers all
+/// three, because the caller hides the affordance either way.
 #[tauri::command]
 pub fn webview_ensure<R: Runtime>(app: AppHandle<R>, key: String, url: String, hosts: Option<Vec<String>>) -> bool {
     let state = app.state::<Webviews<R>>();
@@ -249,8 +236,8 @@ pub fn webview_ensure<R: Runtime>(app: AppHandle<R>, key: String, url: String, h
     {
         let mut records = state.records.lock().unwrap();
         if let Some(record) = records.get_mut(&key) {
-            // Keep the policy current across renderer remounts: it carries no authority of its own,
-            // since every operation still resolves the record by key and re-checks the URL.
+            // Refresh the policy across renderer remounts. It carries no authority of its own,
+            // because every operation resolves the record by key and re-checks the URL.
             record.policy = policy;
             let current = record.nav.lock().unwrap().url();
             if current != url {
@@ -280,21 +267,18 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
     let load_key = key.to_string();
 
     let builder = WebviewBuilder::<R>::new(webview_label(key), WebviewUrl::External(Url::parse("about:blank").ok()?))
-        // Ephemeral and per surface. Phase 0 confirmed a second incognito webview on the same origin
-        // sees neither the localStorage nor the cookies the first one held, which is the isolation
-        // Electron's non-`persist:` partition gives.
+        // Ephemeral and per surface: a second incognito webview on the same origin sees neither the
+        // localStorage nor the cookies the first one held.
         .incognito(true)
-        // Nothing composited over the shell may open a window. Electron denies through
-        // `setWindowOpenHandler`; phase 0 confirmed `Deny` here makes `window.open` return null in the
-        // page with no window appearing.
+        // Nothing composited over the shell may open a window. `Deny` makes `window.open` return null
+        // in the page with no window appearing.
         .on_new_window(|url, _features| {
             eprintln!("[webview] denied window.open: {url}");
             NewWindowResponse::Deny
         })
         .on_navigation(move |url| {
             let url = url.as_str();
-            // The blank page the surface is created on, so its cookie store exists before the first
-            // real navigation. It is never recorded as history.
+            // The blank page the surface is created on. Never recorded as history.
             if url == "about:blank" {
                 return true;
             }
@@ -330,14 +314,13 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
         .add_child(builder, LogicalPosition::new(0.0, 0.0), LogicalSize::new(1.0, 1.0))
         .inspect_err(|error| eprintln!("[webview] could not create {key}: {error}"))
         .ok()?;
-    // Created hidden, because the renderer's order is ensure → setBounds → show and a 1×1 view in the
+    // Created hidden. The renderer's order is ensure, setBounds, show, and a 1x1 view in the
     // top-left corner for those two frames is a visible artefact.
     let _ = webview.hide();
 
-    // The tunnel credential, before the first real navigation. Two constraints from phase 0 shape
-    // this: the webview has to exist before its cookie store can be written, and `cookies_for_url`
-    // returns nothing for an incognito webview — so from here the store is write-only, and the check
-    // that the cookie arrived lives on the helper's side of the tunnel, which is where the auth is.
+    // The tunnel credential, before the first real navigation. The webview has to exist before its
+    // cookie store can be written, and `cookies_for_url` returns nothing for an incognito webview, so
+    // the store is write-only from here. The helper checks that the cookie arrived.
     seed_tunnel_cookie(app, &webview, home);
 
     if let Ok(parsed) = Url::parse(home) {
@@ -347,8 +330,8 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
     Some(())
 }
 
-/// Tauri labels have their own grammar and must be unique per app; the seam's keys carry colons. One
-/// deterministic rewrite, so a label can always be traced back to the surface that owns it.
+/// Tauri labels have their own grammar and must be unique per app, and the seam's keys carry colons.
+/// The rewrite is deterministic, so a label traces back to the surface that owns it.
 fn webview_label(key: &str) -> String {
     let mut label = String::with_capacity(key.len() + 8);
     label.push_str("acorn-");
@@ -379,8 +362,8 @@ pub fn webview_bounds<R: Runtime>(app: AppHandle<R>, key: String, rect: Rect) {
     });
 }
 
-/// `exclusive` is the preview pane's rule: one visible preview at a time, so showing one hides every
-/// other surface in the same family. Plugin surfaces are independent and pass false.
+/// `exclusive` is the preview pane's rule of one visible preview at a time, so showing one hides
+/// every other surface in the same family. Plugin surfaces are independent and pass false.
 #[tauri::command]
 pub fn webview_show<R: Runtime>(app: AppHandle<R>, key: String, exclusive: bool) {
     let state = app.state::<Webviews<R>>();
@@ -406,8 +389,8 @@ pub fn webview_hide<R: Runtime>(app: AppHandle<R>, key: String) {
     });
 }
 
-/// The preview seam's `hide()`, which takes no key: every surface in one family goes away, because
-/// what the caller means is "no preview is on screen right now".
+/// The preview seam's `hide()` takes no key, so every surface in the family goes away. The caller
+/// means "no preview is on screen".
 #[tauri::command]
 pub fn webview_hide_family<R: Runtime>(app: AppHandle<R>, prefix: String) {
     let Some(prefix) = family(&prefix) else { return };
@@ -437,8 +420,8 @@ pub fn webview_command<R: Runtime>(app: AppHandle<R>, key: String, action: Strin
     let Some(record) = records.get(&key) else { return false };
     let webview = &record.webview;
     match action.as_str() {
-        // wry has no history API, so traversal is asked of the page and the shell's own cursor is
-        // moved to match. `traversing` stops the resulting `on_navigation` from truncating the future.
+        // wry has no history API, so traversal is asked of the page and the shell moves its own
+        // cursor to match. `traversing` stops the resulting `on_navigation` truncating the future.
         "back" | "forward" => {
             let mut nav = record.nav.lock().unwrap();
             let forward = action == "forward";
@@ -453,8 +436,8 @@ pub fn webview_command<R: Runtime>(app: AppHandle<R>, key: String, action: Strin
         }
         "reload" => webview.reload().is_ok(),
         "stop" => webview.eval("window.stop()").is_ok(),
-        // Only in a build that has them. A packaged release has no devtools to open, and the pane
-        // hides the button rather than offering one that does nothing.
+        // A packaged release has no devtools, and the pane hides the button rather than offering one
+        // that does nothing.
         #[cfg(any(debug_assertions, feature = "devtools"))]
         "devtools" => {
             if webview.is_devtools_open() {
@@ -548,7 +531,7 @@ mod tests {
         assert!(nav.can_go_back() && !nav.can_go_forward());
         assert_eq!(nav.url(), "https://b.test/");
 
-        // Going back is the shell's move: the cursor is set first, and the navigation it causes is
+        // Going back is the shell's move. The cursor is set first, and the navigation it causes is
         // marked so it does not read as a new entry.
         nav.traversing = true;
         nav.index -= 1;

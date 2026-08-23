@@ -3,10 +3,10 @@
 The renderer is a SolidJS application bundled into the desktop app. It loads from
 `app://acorn`; it does not run from a Node origin and cannot make direct network requests.
 
-The framework choice is settled and is now a private implementation detail: third-party plugin UI
-runs in its own frame with its own bundle, so a plugin author's framework is their own. The shell's
-workload — a dense, always-on surface with live panes and streams — is what fine-grained reactivity
-is for. See [extensibility.md](./extensibility.md) § Some decisions that look like gaps.
+The framework choice is a private implementation detail: third-party plugin UI runs in its own frame
+with its own bundle, so a plugin author's framework is their own. The shell's workload is a dense,
+always-on surface with live panes and streams, which is what fine-grained reactivity is for. For more
+information, see [extensibility.md](./extensibility.md) § Some decisions that look like gaps.
 
 ## Composition
 
@@ -31,19 +31,18 @@ The shell consumes that accessor for initial selection, persistence, workspace r
 fallbacks; provider-specific navigation commands belong to the owning plugin.
 
 Every registry's `order` is a required field, not inferred from where its plugin activates. Plugin
-activation order is otherwise invisible in the code and only lightly covered by end-to-end tests, so
-leaving order optional and falling back to activation order let a reorder land with nothing to catch
-it. Panes, rail sources, settings pages, shell slots, and palette rows all sort on this same explicit
-field for that reason.
+activation order is invisible in the code, so leaving order optional and falling back to activation
+order let a reorder land with nothing to catch it. Panes, rail sources, settings pages, shell slots,
+and palette rows all sort on this explicit field.
 
 A rail source may also gate itself with a `when` predicate, for relevance that is not an integration
 question. Core's own Fleet home is the one user of it: the predicate is true only once more than one
 Node is registered, so a single-Node install never sees a rail entry for a concept it has not met.
 
-A Fleet home node card can also carry a plugin's own number alongside core's task count
-(`registries/nodeStats.ts`). The card lives in client-core, which cannot import the agents or workflows
-plugins to ask them directly, so a plugin registers its own labelled count instead. A stat is fetched
-per Node the same way the attention inbox is, but is not merged with it: an attention item is a
+A Fleet home node card can also carry a plugin's own number beside core's task count
+(`registries/nodeStats.ts`). The card lives in client-core, which cannot import the agents or
+workflows plugins to ask them directly, so a plugin registers its own labelled count instead. A stat
+is fetched per Node the way the attention inbox is, but is not merged with it: an attention item is a
 navigable row with a severity and a target, and a stat is one integer with a label.
 
 Several client registries (`slots.ts`, `contextMenus.ts`, `extensionPoints.ts`, and
@@ -62,17 +61,18 @@ The router is registry-driven. A source contributes path shapes with an explicit
 shell composes them before rendering, so a static route stays ahead of a parameter route without embedding a
 provider's URL scheme in `index.tsx`.
 
-Core owns its own URLs as constants in `registries/corePaths.ts` — `/p/:projectId`, `/p/:projectId/new`,
-`/t/:taskId` — and never resolves them through the registry. A contributed route ADDRESSES something inside a
-surface; it does not decide whether the surface renders. Every browse source scopes itself to the routed
-project and renders at `/p/:projectId`; GitHub's `/pulls/:number` and Linear's `/issues/:identifier` select an
-item within that surface. A source that gates its render on its own route match becomes unreachable, because
-selecting a source in the rail sets a signal rather than navigating.
+Core owns its own URLs as constants in `registries/corePaths.ts` (`/p/:projectId`,
+`/p/:projectId/new`, `/t/:taskId`) and never resolves them through the registry. A contributed route
+addresses something inside a surface; it does not decide whether the surface renders. Every browse
+source scopes itself to the routed project and renders at `/p/:projectId`. GitHub's `/pulls/:number`
+and Linear's `/issues/:identifier` select an item within that surface. A source that gates its render
+on its own route match becomes unreachable, because selecting a source in the rail sets a signal
+rather than navigating.
 
-The one thing core asks a plugin for is where a task lives: `SourceContribution.taskPath` lets a source claim
-a task's URL (GitHub puts a PR-backed task at its PR URL), and `pathForTask` falls back to `/t/:taskId`. This
-replaced a lookup that asked the registry for whichever source happened to own a route `kind` — a global
-first-match that worked only while GitHub was the sole plugin with routes.
+The one thing core asks a plugin for is where a task lives. `SourceContribution.taskPath` lets a
+source claim a task's URL, so GitHub puts a PR-backed task at its PR URL, and `pathForTask` falls
+back to `/t/:taskId`. The alternative, asking the registry for whichever source owned a route `kind`,
+is a global first-match that only works while one plugin has routes.
 
 Task panes are addressed with query params rather than path segments: `/t/:taskId?pane=…&item=…` is consumed
 once into a `PaneIntent` and then stripped (`tasks/taskDeepLink.ts`). The pane layout is a row with focus and
@@ -109,15 +109,15 @@ task. Task panes are an ordered/resizable row with persisted widths, pinning, an
 The terminal drawer is a task surface and is available when the desktop terminal capability exists.
 
 Overlays are shell-owned: command palette, settings, onboarding, notices, confirmations, and secret
-entry are not rendered by arbitrary pane content. Native preview views are positioned by the main
-process over a renderer pane host and hidden while overlays cover them.
+entry are not rendered by arbitrary pane content. The shell positions native preview views over a
+renderer pane host and hides them while overlays cover them.
 
-The top bar's bell renders two different kinds of item, and the difference matters to whatever
-produces one. A notice is an event that already happened, such as a run finishing or a build
-failing: it is client-local, dismissible, and gone once the ring rolls over it. An attention item
-(`registries/attention.ts`) is a state that persists until something changes on the Node: a pending
+The top bar's bell renders two kinds of item, and the difference matters to whatever produces one. A
+notice is an event that already happened, such as a run finishing or a build failing. It is
+client-local, dismissible, and gone once the ring rolls over it. An attention item
+(`registries/attention.ts`) is a state that lasts until something changes on the Node: a pending
 approval is still pending after a person dismisses it, so it returns on the next fetch. That is why
-attention items are fetched per Node rather than pushed, and why they carry no `read` flag; a notice
+attention items are fetched per Node rather than pushed, and why they carry no `read` flag. A notice
 is fired once and forgotten.
 
 ## Restore and persistence

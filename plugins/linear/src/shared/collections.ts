@@ -39,7 +39,7 @@ const PRIORITIES = [
 
 /** The workspace's own name for each state type, where these issues showed one. First name wins: two
  *  connected workspaces that disagree about what `started` is called cannot both be right on one
- *  column header, and the grouping, which is what the column is, is the type either way. */
+ *  column header, and the grouping is by type either way. */
 const stateValues = (issues: readonly LinearProjectIssue[]): PluginCollectionEnumValue[] => {
   const named = new Map<string, string>()
   for (const issue of issues) {
@@ -67,19 +67,17 @@ const rowFor = (issue: LinearProjectIssue): PluginCollectionRowBody => ({
   values: {
     title: issue.title,
     identifier: issue.identifier,
-    // The type, not the name: the name is the label on the column and lives on the field, the type is
-    // what the row belongs to. Writing the name here would make every workspace its own set of groups.
+    // The type, not the name. The name is the column label and lives on the field. Writing it here
+    // would give every workspace its own set of groups.
     status: issue.state?.type ?? null,
     priority: priorityMeta(issue.priority, issue.priorityLabel).level,
     assignee: issue.assignee,
     updated: issue.updatedAt,
     url: issue.url,
   },
-  // Linear's detail pane needs a routed project and this row has none, which is why the verb is
-  // `openUrl`: it is in the context-free set precisely because it needs nothing from its click site.
-  //
-  // That does not mean the click leaves the app: the host resolves the URL against the recognisers
-  // before opening a browser (docs/dashboards.md § Provenance, and what a row may not claim).
+  // Linear's detail pane needs a routed project and this row has none, so the verb is `openUrl`,
+  // which is in the context-free set because it needs nothing from its click site. The click still
+  // stays in the app when a recogniser claims the URL (docs/dashboards.md § Provenance).
   action: { verb: 'openUrl', url: issue.url },
 })
 

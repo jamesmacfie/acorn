@@ -4,28 +4,28 @@ import { z } from 'zod'
 import { nodeRecordSchema, type NodeRecord } from '@acorn/protocol/broker.ts'
 import { LOCAL_TOKEN_SCOPE, type DeviceTokens } from './deviceTokenStore'
 
-// Fleet membership, its storage split, and the local-node singleton invariant: docs/shell.md
-// § Fleet membership.
+// Fleet membership, its storage split, and the local-node singleton invariant. See docs/shell.md,
+// "Fleet membership".
 //
-// File discipline: 0700 dir, 0600 files, chmod after write so a looser
-// umask on an existing file cannot survive.
+// File discipline: 0700 dir, 0600 files, chmod after write so a looser umask on an existing file
+// cannot survive.
 
 const FLEET_FILE = 'fleet.json'
 
 // The stored record: a NodeRecord plus the two fields the renderer must never need.
 export const fleetNodeSchema = nodeRecordSchema.extend({
-  // The node's self-signed certificate, used as the CA for the pinned agent. Public material, but the
-  // renderer has no use for it: main is what performs the TLS.
+  // The node's self-signed certificate, used as the CA for the pinned agent. Public material, but
+  // main performs the TLS, so the renderer has no use for it.
   certPem: z.string().optional(),
-  // Our own row in the node's `devices` table, so "Revoke" can name it. Absent for the local node,
-  // which is adopted from the service start handoff rather than paired and cannot be revoked anyway.
+  // This device's row in the node's `devices` table, so "Revoke" can name it. Absent for the local
+  // node, which is adopted from the service start handoff rather than paired.
   deviceId: z.string().optional(),
 })
 export type FleetNode = z.infer<typeof fleetNodeSchema>
 
 const fleetFileSchema = z.strictObject({ version: z.literal(1), nodes: z.array(fleetNodeSchema) })
 
-// The renderer's projection: docs/shell.md § Fleet membership.
+// The renderer's projection. See docs/shell.md, "Fleet membership".
 export const toNodeRecord = (node: FleetNode): NodeRecord => ({
   nodeId: node.nodeId,
   label: node.label,
@@ -34,7 +34,7 @@ export const toNodeRecord = (node: FleetNode): NodeRecord => ({
   ...(node.fingerprint ? { fingerprint: node.fingerprint } : {}),
 })
 
-// The bundled local node's token predates its nodeId: docs/shell.md § Fleet membership.
+// The bundled local node's token predates its nodeId. See docs/shell.md, "Fleet membership".
 const scopeOf = (node: Pick<FleetNode, 'nodeId' | 'local'>): string => (node.local ? LOCAL_TOKEN_SCOPE : node.nodeId)
 
 export class FleetStore {
@@ -59,11 +59,11 @@ export class FleetStore {
     return node ? this.tokens.read(scopeOf(node)) : undefined
   }
 
-  // Add or replace a node and its token. Called on every local-node start (the endpoint changes
-  // across restarts now that the port is ephemeral) and once per successful pairing.
+  // Add or replace a node and its token. Called on every local-node start, because the ephemeral port
+  // changes the endpoint across restarts, and once per successful pairing.
   //
-  // Why a local node replaces any other local row as well as its own, and the bug this fixed:
-  // docs/shell.md § Fleet membership.
+  // See docs/shell.md, "Fleet membership", for why a local node replaces any other local row as well
+  // as its own.
   remember(node: FleetNode, token: string): FleetNode {
     const nodes = this.list().filter((existing) => existing.nodeId !== node.nodeId && !(node.local && existing.local))
     nodes.push(node)
@@ -81,7 +81,7 @@ export class FleetStore {
     return renamed
   }
 
-  // Forget locally. Dropping the token as well as the row is the point: a row without a token would
+  // Forget locally. Dropping the token as well as the row is the point. A row without a token would
   // reconnect as an unauthenticated stranger, and a token without a row is an orphaned credential.
   forget(nodeId: string): void {
     const node = this.get(nodeId)
@@ -94,11 +94,11 @@ export class FleetStore {
     try {
       const parsed = fleetFileSchema.safeParse(JSON.parse(readFileSync(join(this.userDataDir, FLEET_FILE), 'utf8')))
       if (parsed.success) return parsed.data.nodes
-      // A file we cannot parse is not a file we may guess at. Starting from an empty fleet costs the
-      // owner a re-pair; half-reading it could point a pinned connection at the wrong fingerprint.
+      // An unparseable file is not one to guess at. Starting from an empty fleet costs the owner a
+      // re-pair, where half-reading it could point a pinned connection at the wrong fingerprint.
       console.warn('[fleet] fleet.json is unreadable; starting from an empty fleet')
     } catch {
-      // No file yet: first launch.
+      // No file yet, so this is a first launch.
     }
     return []
   }

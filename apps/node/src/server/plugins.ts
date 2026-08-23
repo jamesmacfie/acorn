@@ -26,10 +26,10 @@ export type NodePluginDeps = {
 }
 
 // `dataDir` is threaded in for the three plugins that write files of their own under the data root:
-// agents' attachments and artifacts, memory's index sources, notes' markdown. It is no longer needed
-// so a plugin can open its database, since the host does that behind `ctx.storage`, from each
-// plugin's declared `migrationsModule`. Cross-plugin dependencies resolve through the
-// capability/provider registries at call time; array order is not a feature contract.
+// agents' attachments and artifacts, memory's index sources, notes' markdown. A plugin does not need
+// it to open a database, because the host does that behind `ctx.storage` from the plugin's declared
+// `migrationsModule`. Cross-plugin dependencies resolve through the capability and provider
+// registries at call time, and array order is not a feature contract.
 export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[] => [
   agentsPlugin(dataDir, deps.agents),
   browserPlugin(),

@@ -5,9 +5,8 @@ import type { DbCatalogTable } from '../shared/database'
 // Pure, and takes the catalog as an argument, because this is the part worth testing and a live
 // Postgres is not.
 
-// Enough to be useful in an editor whose author knows SQL, deliberately not a dialect reference. The
-// long tail is what the reader types anyway, and a completion list that offers three hundred keywords
-// is one people learn to dismiss.
+// Enough to be useful in an editor whose author knows SQL, not a dialect reference. A completion list
+// that offers three hundred keywords is one people learn to dismiss.
 const KEYWORDS = [
   'SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT JOIN', 'INNER JOIN', 'ON', 'GROUP BY', 'ORDER BY', 'HAVING',
   'LIMIT', 'OFFSET', 'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM', 'RETURNING', 'DISTINCT',
@@ -25,8 +24,8 @@ const QUALIFIER = /([a-z_][\w$]*)\.\s*$/i
 /** The text on this line up to (and excluding) the cursor. Column is 1-based, as it is on the wire. */
 export function textBeforeCursor(text: string, position: { line: number; column: number }): string {
   const lines = text.split('\n')
-  // A position past the end of the document is not an error worth failing a popup over. It is what a race
-  // between a keystroke and a fetch looks like. Clamp and answer.
+  // A position past the end of the document is a race between a keystroke and a fetch, not an error
+  // worth failing a popup over. Clamp and answer.
   const index = Math.min(Math.max(position.line, 1), lines.length) - 1
   const line = lines[index] ?? ''
   return line.slice(0, Math.max(position.column - 1, 0))
@@ -63,9 +62,8 @@ const tableLabel = (table: DbCatalogTable): string => (table.schema === 'public'
  *   after FROM/JOIN/…    → tables, because a name in that slot is a relation.
  *   anything else        → columns of the tables this statement mentions, then tables, then keywords.
  *
- * The third case is the one that earns its keep: in `SELECT ` with `FROM orders` further along the
- * line, the useful list is orders' columns, and offering the whole database's is what makes a
- * completion popup something people switch off.
+ * The third case earns its keep: in `SELECT ` with `FROM orders` further along the line, the useful
+ * list is orders' columns. Offering the whole database's is what makes people switch a popup off.
  */
 export function completeSql(
   text: string,

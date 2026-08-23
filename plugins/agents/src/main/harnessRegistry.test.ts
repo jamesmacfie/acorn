@@ -5,9 +5,8 @@ import { AgentDriverRegistry } from './drivers/registry'
 import { AgentUsageCollectorRegistry } from './usage/collectors'
 import { emptyAgentPricingPreferences } from '../shared/pricing'
 
-// The consuming end of the harness seam. What is worth pinning is that a contributed harness is
-// indistinguishable from a built-in one downstream, and that the three effects a registration can have
-// are each conditional on what the descriptor declared.
+// The consuming end of the harness seam. Pins two things: a contributed harness looks the same as a
+// built-in one downstream, and each of a registration's three effects is conditional on the descriptor.
 
 const harness = (over: Partial<ManifestHarness> = {}): ManifestHarness => ({
   id: 'opencode:opencode',
@@ -42,8 +41,8 @@ describe('a contributed harness becomes a driver like any other', () => {
     const handle = registry.register(harness())
 
     expect(drivers.providers()).toEqual(['opencode:opencode'])
-    // No usage probe and no terminal block, so neither exists. A harness with no plan usage simply shows
-    // no usage section, which is the right answer for most agent CLIs.
+    // No usage probe and no terminal block, so neither exists. Most agent CLIs have no plan usage and
+    // show no usage section.
     expect(collectors.entries()).toEqual([])
     expect(profiles).toEqual([])
 
@@ -57,8 +56,8 @@ describe('a contributed harness becomes a driver like any other', () => {
 
     const driver = drivers.create('opencode:opencode')!
     expect(driver.providerId).toBe('opencode:opencode')
-    // The profile id is the harness id. Only `claude`/`claude-code` differ, because both predate this
-    // seam and both are persisted.
+    // The profile id is the harness id. Only `claude`/`claude-code` differ, because both names predate
+    // this seam and both are persisted.
     expect(driver.profileId).toBe('opencode:opencode')
 
     const descriptor = await driver.probe()
@@ -84,11 +83,10 @@ describe('a contributed harness becomes a driver like any other', () => {
     expect(entry).toMatchObject({ provider: 'opencode:opencode', label: 'OpenCode' })
     const usage = await entry.collect(emptyAgentPricingPreferences())
     expect(usage.plan).toBe('Pro')
-    // 12% remaining is critical, and acorn decides that, so one harness cannot call it healthy while
-    // another calls it critical.
+    // acorn decides that 12% remaining is critical, so one harness cannot call it healthy.
     expect(usage.quotas[0].health).toBe('critical')
     expect(usage.health).toBe('critical')
-    // Neither is something a harness can answer about itself.
+    // Neither is a harness's to answer.
     expect(usage.cost).toBeNull()
     expect(usage.daily).toBeNull()
   })
@@ -102,9 +100,8 @@ describe('a contributed harness becomes a driver like any other', () => {
   it('reads an unusable auth answer as “cannot tell”, never as signed out', async () => {
     const { drivers, registry } = registries()
     registry.register(harness({ probeAuth: async () => ({ authenticated: 'yes' }) }))
-    // `null`, not `false`: claiming a signed-in account is signed out would send the owner to
-    // re-authenticate something that was fine. The command is missing here anyway, so the probe is not
-    // reached — what this pins is that the driver was built with one at all.
+    // `null`, not `false`, which would send the owner to re-authenticate an account that was fine. The
+    // command is missing here, so the probe never runs; this pins that the driver was built with one.
     expect(await drivers.create('opencode:opencode')!.probe()).toMatchObject({ authenticated: null })
   })
 
@@ -124,7 +121,7 @@ describe('a contributed harness becomes a driver like any other', () => {
       launchArgs: ['--acorn'],
     }])
     // No headless argv and no stream-JSON adapter, so a workflow step cannot name this harness. That is
-    // the line the design draws, not an oversight.
+    // the design, not an oversight.
     expect(profiles[0].headlessArgv).toBeUndefined()
     expect(profiles[0].streamJson).toBeUndefined()
 

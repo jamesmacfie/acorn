@@ -18,11 +18,10 @@ export function prefillFromCompare(commits: CompareCommit[], headRef: string): {
   return { title: humanizeBranch(headRef), body: '' }
 }
 
-// An in-progress new-PR form, kept in localStorage per repo so navigating away doesn't lose it, the
-// same rationale (and per-device scope) as the comment drafts in
-// @acorn/client-core/lib/draftState.ts. base/head are stored too: they live in the URL while the
-// form is mounted, but a fresh visit to /:owner/:repo/new carries no query params, so the URL alone
-// cannot restore them.
+// An in-progress new-PR form, kept in localStorage per repo so navigating away does not lose it, the
+// same per-device scope as the comment drafts in @acorn/client-core/lib/draftState.ts. base and head
+// are stored too: they live in the URL while the form is mounted, but a fresh visit to
+// /:owner/:repo/new carries no query params.
 export type PullDraft = { base: string; head: string; title: string; body: string; draft: boolean; touched: boolean }
 
 const draftKey = (owner: string, repo: string) => `new-pr:${owner}/${repo}`

@@ -57,8 +57,8 @@ const hrefAnchor = (href: string) => ({ getAttribute: (name: string) => (name ==
 const project = (id: string, owner: string, name: string) => ({ id, github: { owner, name } }) as unknown as Project
 
 // These tests go through `allProjects`, like the code does, instead of a stub resolver. A stub that
-// echoed back the same owner/repo the test wrote would agree with itself regardless of casing, which
-// is why the case-insensitivity bug below survived earlier versions of this suite.
+// echoed back the same owner/repo the test wrote would agree with itself whatever the casing, which
+// is how the case-insensitivity bug below survived earlier versions of this suite.
 describe('project-keyed content navigation', () => {
   afterEach(() => setProjectsLookup(() => []))
 
@@ -88,9 +88,8 @@ describe('project-keyed content navigation', () => {
 
 describe('bare ref anchors reaching the panel through github’s handler', () => {
   // The host mints these anchors (client-core § linkifyRefs) and covers prefix learning and
-  // attribution in its own suite. What this pins is that github's handler wraps
-  // `handlePluginContentLinkClick` rather than reimplementing it, so reordering its two branches
-  // would break this test too.
+  // attribution in its own suite. This pins that github's handler wraps
+  // `handlePluginContentLinkClick` rather than reimplementing it.
   afterEach(() => closeRefPanel())
 
   it('opens the provider reference panel when that provider has one registered', () => {
@@ -116,9 +115,9 @@ describe('bare ref anchors reaching the panel through github’s handler', () =>
   })
 })
 
-// The dashboard-row path, end to end through github's own registered contribution rather than a
-// stand-in. The host asks `openInAppUrl` before it opens a browser; everything github contributes to
-// that answer is the `path` resolver: a project lookup, and the route minted from the pattern.
+// The dashboard-row path, end to end through github's registered contribution rather than a stand-in.
+// The host asks `openInAppUrl` before it opens a browser, and github's whole contribution to that
+// answer is the `path` resolver: a project lookup, and the route minted from the pattern.
 describe('openInAppUrl over github rows', () => {
   afterEach(() => setProjectsLookup(() => []))
 
@@ -139,7 +138,7 @@ describe('openInAppUrl over github rows', () => {
   })
 
   // A dashboard row asks to go there and gets github's surface; a reader inside something else asks
-  // to glance and gets github's panel. Same URL, same recogniser, different caller: this is why
+  // to glance and gets github's panel. Same URL, same recogniser, different caller, which is why
   // `prefer` is the caller's choice rather than the target's.
   it('gives a dashboard the pull request surface and a reader the panel', () => {
     setProjectsLookup(() => [project('proj-1', 'runn', 'acorn')])

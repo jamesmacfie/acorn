@@ -9,12 +9,11 @@ import { nodeState } from './node/fleet'
 // certificate, and the device token, so nothing here knows an origin and nothing here holds a
 // credential.
 //
-// readJson / writeJson / postJson keep the exact signatures their 213 call sites already use; only
-// the innards changed.
+// readJson, writeJson and postJson keep the signatures their call sites use.
 
-// Typed error for non-OK API responses: carries the HTTP status so consumers branch structurally
-// (e.g. the node-state machine's 401 handling) instead of pattern-matching message text. `requestId`
-// is what makes a user-reported failure findable in the node's log.
+// Typed error for non-OK API responses. It carries the HTTP status so consumers branch structurally,
+// such as the node-state machine's 401 handling, instead of pattern-matching message text.
+// `requestId` is what makes a user-reported failure findable in the node's log.
 export class ApiError extends Error {
   readonly status: number
   readonly code?: string
@@ -30,8 +29,8 @@ export class ApiError extends Error {
   }
 }
 
-// What a call site sees. Deliberately not a web Response: a broker reply is already fully buffered,
-// and pretending otherwise would invite streaming code that cannot work over IPC.
+// What a call site sees. Not a web Response, because a broker reply is fully buffered and pretending
+// otherwise invites streaming code that cannot work over IPC.
 export type ApiResponse = { ok: boolean; status: number; headers: Record<string, string>; body: Uint8Array }
 
 let requestSeq = 0
@@ -53,15 +52,15 @@ type SendOptions = {
   nodeId?: string
 }
 
-// GET and HEAD are the reads; everything else changes something on the node. Defaulted to GET, matching
-// `send`'s own default.
+// GET and HEAD are the reads, everything else changes something on the node. Defaults to GET, matching
+// `send`.
 const isMutation = (method: string | undefined): boolean => {
   const verb = (method ?? 'GET').toUpperCase()
   return verb !== 'GET' && verb !== 'HEAD'
 }
 
-// A node whose connection state means a write cannot land. Read from the broker's projection
-// rather than attempted and timed out: main already knows.
+// A node whose connection state means a write cannot land. Read from the broker's projection rather
+// than attempted and timed out, because main already knows.
 const isWritable = (nodeId: string): boolean => {
   const state = nodeState(nodeId)
   return state !== 'offline' && state !== 'revoked'
@@ -73,9 +72,9 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
   const nodeId = options.nodeId ?? activeNodeId()
 
   if (!transport || !nodeId) {
-    // No broker: the renderer is running in a plain browser served directly by a node (`dev:node`),
-    // or in a unit test that stubs global fetch. Same-origin, so whatever auth that origin accepts
-    // applies. There is no device token on this path by definition.
+    // No broker, so the renderer is in a plain browser served by a node (`dev:node`) or in a unit test
+    // that stubs global fetch. Same-origin, so whatever auth that origin accepts applies. There is no
+    // device token on this path.
     const res = await fetch(path, {
       method: options.method ?? 'GET',
       headers: options.headers,
@@ -85,16 +84,15 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
     return { ok: res.ok, status: res.status, headers: headersToObject(res.headers), body: new Uint8Array(await res.arrayBuffer()) }
   }
 
-  // docs/architecture-overview.md § Client state and fleet behavior: mutations fail fast and keep
-  // the user's input as a draft, with no automatic replay queue.
+  // Mutations fail fast and keep the user's input as a draft, with no replay queue
+  // (docs/architecture-overview.md § Client state and fleet behavior).
   //
-  // Fail fast here rather than wait for a TCP timeout: main already knows the node is unreachable,
-  // and without this check a submit sat spinning for the broker's 30s request timeout before
-  // producing a message about connect ECONNREFUSED. A read against an offline node is still worth
-  // attempting, since the broker may reconnect between the status update and the request, and a
-  // failed read costs nothing but a stale badge.
+  // Fail fast rather than wait for a TCP timeout, because main already knows the node is unreachable.
+  // Without the check a submit spins for the broker's 30s request timeout and then reports
+  // ECONNREFUSED. A read is still worth attempting: the broker may reconnect between the status update
+  // and the request, and a failed read costs a stale badge.
   //
-  // `offline` and `revoked` only: `degraded` is WS-down/HTTP-up, where writes still work, and
+  // `offline` and `revoked` only. `degraded` is WS down and HTTP up, where writes still work, and
   // `incompatible` gets its own message from the route it fails on.
   if (isMutation(options.method) && !isWritable(nodeId)) {
     throw new ApiError('This node is offline, so nothing was sent. Try again once it is back.', 0, 'node_offline', {
@@ -103,8 +101,8 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
   }
 
   const requestId = nextRequestId()
-  // Abort has to be forwarded explicitly: the AbortSignal itself cannot cross contextBridge, so main
-  // holds the controller and the renderer names the request to cancel.
+  // Abort is forwarded explicitly, because an AbortSignal cannot cross contextBridge. Main holds the
+  // controller and the renderer names the request to cancel.
   const onAbort = () => transport.abort(requestId)
   options.signal?.addEventListener('abort', onAbort, { once: true })
   try {
@@ -163,8 +161,8 @@ function errorBody(res: ApiResponse): ApiErrorBody['error'] | undefined {
   }
 }
 
-// Prefer the human/upstream prose in `message` (e.g. GitHub's verbatim 422 reason) over the machine
-// code. The code is for branching, the message is for people.
+// Prefer the upstream prose in `message`, such as GitHub's verbatim 422 reason, over the machine code.
+// The code is for branching, the message is for people.
 const errorText = (error: ApiErrorBody['error'] | undefined, fallback: string): string => error?.message || error?.code || fallback
 
 const raise = (res: ApiResponse, fallback: string): never => {
@@ -177,17 +175,17 @@ const raise = (res: ApiResponse, fallback: string): never => {
 
 type ReadOptions = { signal?: AbortSignal; nodeId?: string }
 
-// A cast, not a parse: within a protocol major every change is additive, so a read tolerates
-// fields it does not know about (docs/api-reference.md § Versioning).
+// A cast, not a parse. Within a protocol major every change is additive, so a read tolerates fields it
+// does not know about (docs/api-reference.md § Versioning).
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
   const res = await send(url, { signal: options.signal, nodeId: options.nodeId })
   if (!res.ok) raise(res, `${url} ${res.status}`)
   return parseJson<T>(res)
 }
 
-// The one non-JSON read: a download. A route builder's URL can no longer be handed to the browser
-// as an `href` or `src`, since under app:// it resolves against the protocol handler, not a node,
-// so a download has to come back as bytes and become a blob URL on this side.
+// The one non-JSON read: a download. Under app:// a route builder's URL resolves against the protocol
+// handler rather than a node, so it cannot be an `href` or `src`. A download comes back as bytes and
+// becomes a blob URL on this side.
 export async function readBytes(url: string, fallback = 'download failed'): Promise<{ bytes: Uint8Array; type: string; filename: string | null }> {
   const res = await send(url)
   if (!res.ok) raise(res, fallback)
@@ -198,9 +196,8 @@ export async function readBytes(url: string, fallback = 'download failed'): Prom
   }
 }
 
-// Only the quoted `filename="…"` form, which is the only form our own routes emit. Anything else
-// is a null and the caller names the file itself: guessing at RFC 5987 for a header we control
-// would be speculative.
+// Only the quoted `filename="…"` form, which is the only form acorn's routes emit. Anything else
+// returns null and the caller names the file.
 const filenameFromDisposition = (header: string | undefined): string | null =>
   /filename="([^"]+)"/.exec(header ?? '')?.[1] ?? null
 
@@ -244,7 +241,7 @@ export type WriteInit = {
   nodeId?: string
 }
 
-// JSON POST. Throws the structured error code on failure so callers can branch (e.g. merge_failed).
+// JSON POST. Throws the structured error code on failure, such as `merge_failed`, so callers branch.
 export const postJson = async <T>(url: string, body?: unknown, options?: { idempotencyKey?: string }): Promise<T> =>
   writeJson<T>(url, {
     method: 'POST',
@@ -262,8 +259,8 @@ export async function sendJson<T = void>(url: string, init: WriteInit, fallback:
   return parseJson<T>(res)
 }
 
-// Multipart upload. The parts are described, not encoded: main builds the real body, so the renderer
-// never has to hand-roll a boundary.
+// Multipart upload. The parts are described, not encoded, so main builds the real body and the
+// renderer never hand-rolls a boundary.
 export async function sendForm<T>(url: string, parts: Extract<NodeFetchBody, { kind: 'form' }>['parts'], fallback = 'upload failed'): Promise<T> {
   const res = await send(url, { method: 'POST', body: { kind: 'form', parts } })
   if (!res.ok) raise(res, fallback)

@@ -12,13 +12,13 @@ const DockerSettings = lazy(() => import('./DockerSettings'))
 export const dockerClientPlugin: ClientPlugin = {
   name: 'docker',
   init: (ctx) => {
-    // The other feeder (docs/ui-design.md § Icons): a loaded plugin declares its mark in the
-    // manifest and the host registers it, so every `brand:docker` glyph string below reads the
-    // same either way.
+    // The other feeder (docs/ui-design.md § Icons): a loaded plugin declares its mark in the manifest
+    // and the host registers it, so every `brand:docker` glyph string below reads the same either
+    // way.
     //
     // Through `ctx.contribute` rather than `brandMarkRegistry.register`, so the host records the
-    // disposable the way it does for the panes and slots below. A bare register would survive a
-    // disable/enable cycle and throw on the duplicate id at the next activation.
+    // disposable. A bare register survives a disable and enable cycle, then throws on the duplicate
+    // id at the next activation.
     //
     // Artwork from simple-icons (CC0). The trademark remains Docker's.
     ctx.contribute(brandMarkRegistry, {

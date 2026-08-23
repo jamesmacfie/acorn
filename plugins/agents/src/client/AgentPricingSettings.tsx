@@ -114,10 +114,9 @@ export default function AgentPricingSettings() {
   }
 
   const unpricedModels = createMemo(() => {
-    // The one `'claude'` left on the client, and it is not a branch on a closed harness set: the whole
-    // pricing table is Anthropic's model catalogue (shared/pricing.ts § claudePriceCatalog) and the
-    // preferences it edits are keyed `claude`. This asks which of those models were observed with no
-    // price, so the id names the pricing namespace rather than the harness.
+    // The one `'claude'` left on the client, and it is not a branch on a closed harness set. The whole
+    // pricing table is Anthropic's model catalogue (shared/pricing.ts) and the preferences it edits are
+    // keyed `claude`, so the id names the pricing namespace rather than the harness.
     const claude = agentUsageStore.snapshot()?.providers.find((provider) => provider.provider === 'claude')
     const observed = [
       ...(claude?.daily?.today.unpricedModels ?? []),

@@ -9,29 +9,28 @@ import { fleetBridge, nodeTransport } from '../platform'
 // cache per node (docs/architecture-overview.md § Client state and fleet behavior,
 // docs/data-layer.md § Preferences and client persistence).
 //
-// Membership itself is not owned here. Main owns it, because main owns the device tokens and the
-// pinned certificates (docs/architecture-overview.md § Process ownership); this is a projection of
-// `fleetList()` plus the `onNodeStatus` push stream, and every mutation is a request to main.
+// Membership is main's, because main owns the device tokens and the pinned certificates
+// (docs/architecture-overview.md § Process ownership). This is a projection of `fleetList()` plus the
+// `onNodeStatus` push stream, and every mutation is a request to main.
 //
 // ## Why a QueryClient per node rather than a nodeId in every query key
 //
-// Partitioning at the client gives each node its own persister and cache without a nodeId in the key,
-// and it is the cheaper half of the trade by a wide margin:
+// Partitioning at the client gives each node its own persister and cache without a nodeId in the key:
 //
-//   - Prefixing keys means touching all 34 `*Options()` factories, the 44 cache-mutation call sites,
-//     the 3 inline key literals, and `shouldPersistQueryKey`, which reads `key[0]`/`key[4]`
-//     positionally. A client per node touches this file and index.tsx.
-//   - "Two nodes may coincidentally hold the same UUID" cannot collide by construction, rather than by
-//     every future call site remembering the convention.
-//   - IndexedDB partitions for free: one persister key per node.
+//   - Prefixing keys means touching every `*Options()` factory, every cache-mutation call site, and
+//     `shouldPersistQueryKey`, which reads `key[0]` and `key[4]` positionally. A client per node
+//     touches this file and index.tsx.
+//   - Two nodes holding the same UUID cannot collide by construction, rather than by every call site
+//     remembering the convention.
+//   - IndexedDB partitions for free, one persister key per node.
 //
-// The invariant that makes it safe is stated in activeNode.ts: only the active node's provider is
-// mounted, and `setActiveNode` runs before the swap.
+// The invariant that makes it safe is in activeNode.ts: only the active node's provider is mounted,
+// and `setActiveNode` runs before the swap.
 const CACHE_KEY_PREFIX = 'acorn-cache:'
 
-// The partition used when there is no broker at all: the renderer served directly by a node
-// (`dev:node` in a browser), where the origin is the node and no nodeId is ever known. A named
-// constant rather than `''` so the IndexedDB key stays readable.
+// The partition used when there is no broker: a renderer served by a node (`dev:node` in a browser),
+// where the origin is the node and no nodeId is known. A named constant rather than `''` so the
+// IndexedDB key stays readable.
 export const ORIGIN_NODE_ID = 'origin'
 
 const [nodes, setNodes] = createSignal<readonly NodeRecord[]>([])
@@ -41,13 +40,13 @@ export { nodes }
 
 export const nodeStatus = (nodeId: string): NodeStatus | undefined => statuses()[nodeId]
 
-// Unknown nodes read as `offline` rather than a sixth "unknown" state: the UI's question is always
-// "may I trust what I have?", and the answer for a node the broker has not reported on is no.
+// Unknown nodes read as `offline` rather than a sixth "unknown" state. The UI asks whether it can
+// trust what it has, and for a node the broker has not reported on the answer is no.
 export const nodeState = (nodeId: string): NodeConnectionState => statuses()[nodeId]?.state ?? 'offline'
 
-// The node this window opens on when nothing else is selected, and the one a notification with no
-// node of its own is attributed to. Not a prefs home: preferences follow the resource they describe
-// (docs/state.md § Scope rules), so this pick no longer decides where anything is stored.
+// The node this window opens on when nothing else is selected, and the one a notification with no node
+// of its own is attributed to. Not a prefs home: preferences follow the resource they describe
+// (docs/state.md § Scope rules).
 export const homeNode = (): NodeRecord | undefined => nodes().find((node) => node.local) ?? nodes()[0]
 export const homeNodeId = (): string | null => homeNode()?.nodeId ?? null
 
@@ -72,8 +71,7 @@ export async function refreshFleet(): Promise<void> {
   setStatuses(Object.fromEntries(fleet.statuses.map((status) => [status.nodeId, status])))
 }
 
-// The persister type is inferred rather than imported: the package exports only the factory, and a
-// hand-written structural copy of its return type would be a second thing to keep in step.
+// The persister type is inferred rather than imported, because the package exports only the factory.
 export type NodeCache = { client: QueryClient; persister: ReturnType<typeof createAsyncStoragePersister> }
 
 const caches = new Map<string, NodeCache>()
@@ -87,11 +85,9 @@ export function clientFor(nodeId: string): NodeCache {
   if (existing) return existing
   const cache: NodeCache = {
     client: new QueryClient({
-      // Keep focus refreshes useful without turning every quick app switch into a fan-out across
-      // every active query. Domain queries that genuinely need fresher data override this (running
-      // checks, integration detail, the one-minute PR-list poll).
-      // gcTime must outlive a session so persisted entries survive reload (docs/caching.md § Renderer
-      // query cache).
+      // Keeps focus refreshes useful without turning a quick app switch into a fan-out across every
+      // active query. Queries that need fresher data override this. gcTime has to outlive a session so
+      // persisted entries survive a reload (docs/caching.md § Renderer query cache).
       defaultOptions: {
         queries: {
           refetchOnWindowFocus: true,
@@ -100,14 +96,13 @@ export function clientFor(nodeId: string): NodeCache {
         },
       },
     }),
-    // Persist to IndexedDB for an instant render from last-known data and offline browsing of
-    // recently-seen PRs. One key per node: a shared key would let node A's snapshot rehydrate into
-    // node B.
+    // Persist to IndexedDB so a reload renders from last-known data. One key per node, or node A's
+    // snapshot rehydrates into node B.
     persister: createAsyncStoragePersister({
       storage: { getItem: get, setItem: set, removeItem: del },
       key: cacheKeyFor(nodeId),
-      // Persistence serializes the whole dehydrated cache. A slightly wider coalescing window keeps a
-      // burst of PR-prefetch/query updates from repeatedly stringifying the same growing snapshot.
+      // Persistence serializes the whole dehydrated cache, so a wider coalescing window stops a burst
+      // of query updates stringifying the same growing snapshot over and over.
       throttleTime: 5_000,
     }),
   }
@@ -117,12 +112,12 @@ export function clientFor(nodeId: string): NodeCache {
 
 export const homeClient = (): QueryClient => clientFor(homeNodeId() ?? ORIGIN_NODE_ID).client
 
-// Forget everything this client cached for a node. The whole point of the per-node partition: there
-// is exactly one place a node's data lives, so eviction is this function and nothing else, in
-// contrast to `runtime:task-archived`, which has to fan out to ten state owners.
+// Forget everything this client cached for a node. The payoff of the per-node partition: one place a
+// node's data lives, so eviction is this function alone, unlike `runtime:task-archived`, which fans
+// out to ten state owners.
 //
-// Clearing the in-memory client as well as the IndexedDB key matters because the two are independent
-// tiers: dropping only the key would leave a live cache that re-persists itself on the next write.
+// The in-memory client and the IndexedDB key are independent tiers, so dropping only the key leaves a
+// live cache that re-persists itself on the next write.
 export function dropNode(nodeId: string): void {
   const cache = caches.get(nodeId)
   caches.delete(nodeId)
@@ -134,8 +129,8 @@ export function dropNode(nodeId: string): void {
     return next
   })
   void del(cacheKeyFor(nodeId)).catch((error: unknown) => {
-    // A persisted snapshot we could not delete is a correctness problem only if the same nodeId comes
-    // back, which needs a re-pair; say so rather than failing the removal the owner asked for.
+    // A snapshot that could not be deleted only matters if the same nodeId comes back, which needs a
+    // re-pair. Say so rather than failing the removal the owner asked for.
     console.warn(`[fleet] could not delete the persisted cache for ${nodeId}:`, error)
   })
 }

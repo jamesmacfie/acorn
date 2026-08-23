@@ -56,10 +56,10 @@ Every first-party package is consumed as TypeScript source through its exports m
 imports include the real `.ts` extension. `apps/desktop` embeds the built Node artifact; it never
 imports Node source.
 
-First-party plugins ship in two tiers. Most are compiled into the composition roots. A growing set
-(Rollbar, Linear, model-providers, HTTP, database) ships as loaded packages: bundled with the app,
-installed like third-party plugins, importing the host only through `@acorn/plugin-api`. The record
-of those migrations is [docs/third-party/README.md](./docs/third-party/README.md).
+First-party plugins ship in two tiers. Most are compiled into the composition roots. Rollbar,
+Linear, model-providers, HTTP, and database ship as loaded packages: bundled with the app, installed
+like third-party plugins, importing the host only through `@acorn/plugin-api`. The record of those
+migrations is [docs/third-party/README.md](./docs/third-party/README.md).
 
 ## Development
 
@@ -81,28 +81,31 @@ pnpm --filter @acorn/desktop dist          # build, package, and verify the macO
 pnpm pack:node                             # build the standalone Node tarball
 ```
 
-`SESSION_ENC_KEY` (64 hexadecimal characters) is optional in development — a Node with none generates
-its own; setting it in `.env` pins a stable key across throwaway data roots. The GitHub plugin reads
-`GITHUB_CLIENT_ID` when GitHub connection or import features are enabled; it does not use a client
-secret. `node-pty` is the only native module, since SQLite is the runtime's own `node:sqlite`, and
-there is one ABI to match because the desktop runs the node under the same pinned runtime the tests
-use: `pnpm rebuild:node`, as documented in [local-development.md](./docs/local-development.md).
+`SESSION_ENC_KEY` (64 hexadecimal characters) is optional in development. A Node without one
+generates its own. Setting it in `.env` pins a stable key across throwaway data roots. The GitHub
+plugin reads `GITHUB_CLIENT_ID` when GitHub connection or import features are enabled; it does not
+use a client secret.
+
+`node-pty` is the only native module, because SQLite is the runtime's own `node:sqlite`. There is
+one ABI to match: the desktop runs the Node under the same pinned runtime the tests use, so
+`pnpm rebuild:node` covers both. For more information, see
+[local-development.md](./docs/local-development.md).
 
 ## Documentation
 
 Start with [architecture-overview.md](./docs/architecture-overview.md), then use the topic docs:
 
-- [features.md](./docs/features.md) — shipped product surfaces.
-- [frontend.md](./docs/frontend.md) and [state.md](./docs/state.md) — renderer composition and state ownership.
-- [authentication.md](./docs/authentication.md) and [security.md](./docs/security.md) — device auth and boundaries.
-- [shell.md](./docs/shell.md) — the Tauri shell: schemes, custody, webviews, and packaging.
-- [api-reference.md](./docs/api-reference.md) and [data-layer.md](./docs/data-layer.md) — Node API and storage.
+- [features.md](./docs/features.md): shipped product surfaces.
+- [frontend.md](./docs/frontend.md) and [state.md](./docs/state.md): renderer composition and state ownership.
+- [authentication.md](./docs/authentication.md) and [security.md](./docs/security.md): device auth and boundaries.
+- [shell.md](./docs/shell.md): the Tauri shell, its schemes, custody, webviews, and packaging.
+- [api-reference.md](./docs/api-reference.md) and [data-layer.md](./docs/data-layer.md): Node API and storage.
 - [plugins.md](./docs/plugins.md), [first-party-plugins.md](./docs/first-party-plugins.md), and
-  [extensibility.md](./docs/extensibility.md) — the two plugin tiers, and why they're shaped that way.
-- [agent-tools.md](./docs/agent-tools.md) — agent tool contributions and MCP projection.
+  [extensibility.md](./docs/extensibility.md): the two plugin tiers, and why they're shaped that way.
+- [agent-tools.md](./docs/agent-tools.md): agent tool contributions and MCP projection.
 - [local-development.md](./docs/local-development.md), [testing.md](./docs/testing.md), and
-  [node-distribution.md](./docs/node-distribution.md) — build, test, and distribution workflows.
+  [node-distribution.md](./docs/node-distribution.md): build, test, and distribution workflows.
 
 Design and migration material lives under [docs/third-party/](./docs/third-party/README.md) (the
-loaded-plugin record), `docs/future/`, and `docs/smolforge/`. Current runtime contracts live in the
-topic docs above and the code.
+loaded-plugin record), `docs/future/`, and `docs/smolforge/`. Runtime contracts live in the topic
+docs above and the code.

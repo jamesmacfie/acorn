@@ -17,10 +17,10 @@ const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$
 // already won't match GH_REPO_RE, but these two-ish reserved roots could look like an owner).
 const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'marketplace', 'explore', 'topics', 'about'])
 
-// Registered from client/index.ts through ctx.contribute, like every other contribution.
+// Registered from client/index.ts through ctx.contribute.
 //
 // The PR recogniser declares `providerId: 'github'` so a click can open the reference panel
-// (./PullRefPanel.tsx); the repo recogniser declares none, because a repository is a list rather than
+// (./PullRefPanel.tsx). The repo recogniser declares none, because a repository is a list rather than
 // a card (docs/github-integration.md § Content links).
 export const githubContentLinkContributions: ContentLinkContribution[] = [
   {
@@ -30,7 +30,7 @@ export const githubContentLinkContributions: ContentLinkContribution[] = [
       const match = GH_PR_RE.exec(href)
       // `item` is what makes the panel reachable (docs/plugins.md § Frame authoring and the UI kit).
       // Spelled `owner/repo#number`, the same identity the pulls collection gives its rows, so a row,
-      // a URL, and the panel cannot disagree about what they name.
+      // a URL, and the panel name the same thing.
       return match ? { kind: 'pr', owner: match[1], repo: match[2], number: match[3], item: formatPullRef(match[1], match[2], match[3]) } : null
     },
     path: (target) => {
@@ -53,11 +53,10 @@ export const githubContentLinkContributions: ContentLinkContribution[] = [
 
 const str = (value: unknown): string => (typeof value === 'string' ? value : '')
 
-// owner/name → the project acorn tracks it as. Null means an untracked repo, and it is a normal
-// answer, not an error: `makeContentLinkHandler` below falls through to the browser for exactly that
-// case.
+// owner/name to the project acorn tracks it as. Null means an untracked repo, which is a normal
+// answer: `makeContentLinkHandler` below falls through to the browser for that case.
 //
-// Compared case-insensitively (docs/github-integration.md § Content links): GitHub treats owner and
+// Compared case-insensitively (docs/github-integration.md § Content links). GitHub treats owner and
 // repo names as case-insensitive, and the URL's casing does not match `projects.github_owner`.
 const eq = (a: unknown, b: unknown): boolean => str(a).toLowerCase() === str(b).toLowerCase()
 
@@ -65,13 +64,12 @@ const projectIdFor = (target: InAppTarget): string | null =>
   allProjects().find((project) => eq(project.github?.owner, target.owner) && eq(project.github?.name, target.repo))?.id ?? null
 
 // A delegated click handler for a PR content container, wrapping the host's
-// `handlePluginContentLinkClick` (docs/plugins.md § Frame authoring and the UI kit). `projectIdFor`
-// returning null is the normal answer for an untracked repo: the URL then opens the real github.com
-// page instead of an in-app route.
+// `handlePluginContentLinkClick` (docs/plugins.md § Frame authoring and the UI kit). A null from
+// `projectIdFor` means an untracked repo, and the URL opens the real github.com page.
 //
 // `prefer: 'refPanel'` is the one local choice: a reader half-way through a diff who clicks a link
-// wants to glance at it, not have the surface under them replaced. It is only a preference, so a
-// provider with no panel installed still gets its pane or route.
+// wants a glance, not a replaced surface. It is a preference, so a provider with no panel installed
+// still gets its pane or route.
 export function makeContentLinkHandler(navigate: (to: string) => void) {
   return (e: MouseEvent) => {
     handlePluginContentLinkClick(e, { taskId: activeTaskId(), prefer: 'refPanel', navigate })

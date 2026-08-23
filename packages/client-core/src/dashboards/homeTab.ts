@@ -3,15 +3,12 @@ import { PrefKeys } from '../persistence/prefKeys'
 import { appStateBinding, type PersistedStateSlice } from '../persistence/persistedState'
 import { MAX_TABS, type DashboardTab } from './persist'
 
-// The tab bar's own state and arithmetic. Everything a tab IS lives in `persist.ts`: a tab is the
-// placement scope `home/<tabId>` and a name in the `tabs` list.
+// The tab bar's own state and arithmetic. What a tab is lives in `persist.ts`: the placement scope
+// `home/<tabId>` and a name in the `tabs` list.
 //
-// Which tab is active is device view state (docs/dashboards.md § Placements): it never enters the
-// node blob, unlike the composition it points into.
-//
-// Create, rename and reorder are all one write (`setHomeTabs`), so each verb only has to decide
-// what list to hand over. That keeps the interesting part testable without a DOM; this suite
-// renders no components.
+// Which tab is active is device view state and never enters the node blob (docs/dashboards.md
+// § Placements). Create, rename, and reorder are all one write (`setHomeTabs`), so each verb only
+// decides what list to hand over.
 
 const [activeHomeTab, setActiveHomeTab] = createSignal('')
 export { activeHomeTab, setActiveHomeTab }

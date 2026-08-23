@@ -8,10 +8,11 @@ import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapabilit
 // The routes need the main-process WorkflowRunner, so they return 503 under dev:node.
 
 export type WorkflowBridge = {
-  // Which task a run belongs to, for the ownership guard below. `/workflows/runs/:runId/*` names
-  // no task, so the mount over /v2/p/:plugin/tasks/:id never sees it. A workflow step executes an
-  // agent CLI in a worktree, so approving another task's gate or killing its step acts on that task.
-  // `null` means no such run, which the guard treats as "not yours" so run ids cannot be enumerated.
+  // Which task a run belongs to, for the ownership guard below. `/workflows/runs/:runId/*` names no
+  // task, so the mount over /v2/p/:plugin/tasks/:id never sees it. A workflow step executes an agent
+  // CLI in a worktree, so approving another task's gate or killing its step acts on that task.
+  // `null` means no such run, and the guard treats that as "not yours" so run ids cannot be
+  // enumerated.
   taskIdForRun(runId: string): Promise<string | null>
   defs(taskId: string): Promise<unknown> // { workflows, errors }
   start(taskId: string, def: unknown): Promise<{ runId?: string; error?: string }>
@@ -34,9 +35,9 @@ const startBody = z.object({ def: z.object({ name: z.string().min(1), steps: z.a
 const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })
 const killBody = z.object({ stepId: z.string().min(1) })
 
-// The task-scoped half of this router (/tasks/:id/...) inherits core's mounted requireTaskScope; the
-// run-scoped half does not, because the task is not in the path. Same shape as terminal's and agents':
-// resolve the owner, deny on unknown as well as foreign, and never shadow viaBridge's 503.
+// The task-scoped half of this router (/tasks/:id/...) inherits core's mounted requireTaskScope. The
+// run-scoped half does not, because the task is not in the path. Same shape as terminal's and
+// agents': resolve the owner, deny on unknown as well as foreign, and never shadow viaBridge's 503.
 const ownsRun = createMiddleware<AppEnv>(async (c, next) => {
   const runId = c.req.param('runId')
   if (!runId || !isTaskConfined(c)) return next()
@@ -71,7 +72,7 @@ export const workflow = new Hono<AppEnv>()
     return viaBridge(c, WORKFLOW_ROUTE, (b) => b.kill(c.req.param('runId'), parsed.data.stepId))
   })
 // Node-wide, not task-scoped: a poll evaluates every task's triggers and starts runs. There is no
-// taskId to confine it to, so a confined caller is refused outright rather than given a partial
-// sweep. An agent has no business firing other tasks' workflows. The renderer's poller is a device.
+// taskId to confine it to, so a confined caller is refused rather than given a partial sweep. An
+// agent has no business firing other tasks' workflows. The renderer's poller is a device.
   .post('/workflows/triggers/poll', (c) =>
     isTaskConfined(c) ? respondError(c, 403, 'interactive_user_required') : viaBridge(c, WORKFLOW_ROUTE, (b) => b.pollTriggers()))

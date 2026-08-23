@@ -47,9 +47,7 @@ export { projectPath } from '@acorn/client-core/registries/corePaths.ts'
 export type { TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/registries/slots.ts'
 export type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
 export type { PollerContribution } from '@acorn/client-core/registries/pollers.ts'
-// See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does. `refPanelFor`,
-// "does a panel exist?", came off this surface: the answer already arrives with the attempt, so
-// nothing was asking it in advance.
+// See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does.
 export { closeRefPanel, openRefPanel } from '@acorn/client-core/registries/refPanels.ts'
 // The props a first-party reference panel receives. The registry value itself stays off this
 // surface; a plugin registers through `ctx.refPanels`, which binds the provider to the plugin's own
@@ -76,13 +74,12 @@ export {
 } from '@acorn/client-core/registries/contentLinks.ts'
 export type { ContentLinkContribution, InAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
 // The project list from module-level code, for a content-link `path` resolver: the one caller with
-// no component scope that still has to ask which repos acorn tracks. Reader only. `setProjectsLookup`
-// belongs to the composition root and stays off this surface.
+// no component scope that still has to ask which repos acorn tracks. Reader only.
+// `setProjectsLookup` belongs to the composition root and stays off this surface.
 export { allProjects } from '@acorn/client-core/projects/projectLookup.ts'
 // See docs/plugins.md § Loaded plugins: the client half for what a `refResolvers` entry answers.
-// The query options only: a plugin consumes resolutions here but never contributes a resolver from
-// client code (that's a manifest row), so neither the registry lookup nor the contribution type
-// belongs on this surface.
+// The query options only: a plugin consumes resolutions here but contributes a resolver from a
+// manifest row, never from client code.
 export { refResolutionsOptions } from '@acorn/client-core/registries/refResolvers.ts'
 export type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
 export { contextSectionContributions } from '@acorn/client-core/registries/contextSections.ts'
@@ -140,10 +137,9 @@ export { contextSnapshot } from '@acorn/client-core/agent/contextSnapshot.ts'
 export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHandler } from '@acorn/client-core/agent/reference.ts'
 
 // ── The platform seam ─────────────────────────────────────────────────────────────────────────
-// What the host provides, as opposed to what the node provides (git history:
-// docs/future/node-first/platform-seam.md). A plugin gets the two groups it has a legitimate use for:
-// the native folder dialog and the host-owned preview view. Nothing else, since transport, fleet and
-// plugin custody are core's business.
+// What the host provides, as opposed to what the node provides. A plugin gets the two groups it has
+// a legitimate use for: the native folder dialog and the host-owned preview view. Transport, fleet
+// and plugin custody stay core's business.
 export { canPickFolder, pickFolder, previewViews } from '@acorn/client-core/platform/index.ts'
 export type { PreviewState, PreviewViews } from '@acorn/client-core/platform/index.ts'
 
@@ -162,8 +158,8 @@ export { openRepoConfigTrust } from '@acorn/client-core/configTrust/configTrust.
 export { createDeviceFlow } from '@acorn/client-core/integrations/deviceFlow.ts'
 export { renderMarkdown } from '@acorn/client-core/integrations/markdown.ts'
 export { pushManagedAgentNotice, registerNoticeTargetHandler } from '@acorn/client-core/notifications/notifications.ts'
-// Transient feedback. Notices persist in the bell; a toast says "that worked" and gets out of the way.
-// Three plugins had invented text-channel toasts before this existed.
+// Transient feedback. Notices persist in the bell, and a toast says "that worked" then gets out of
+// the way.
 export { toast } from '@acorn/client-core/notifications/toast.ts'
 export { fuzzyScore } from '@acorn/client-core/palette/model.ts'
 export type { PaletteItem } from '@acorn/client-core/palette/model.ts'
@@ -171,10 +167,10 @@ export { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
 
 // ── Design-system helpers ─────────────────────────────────────────────────────────────────────
 // Plain functions, no component in sight, which is why they sit here rather than on ./ui. Tokens,
-// metrics and the status/display vocabulary the shell renders by. `cx` was here too and no plugin
-// ever called it: seventeen of them write `class={...}` by hand.
+// metrics, and the status/display vocabulary the shell renders by.
 export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/client-core/ui/appearance.ts'
-// `rowHeightSm` is on ./ui instead: the one thing that needs a density number is a frame's virtualized grid.
+// `rowHeightSm` is on ./ui instead: the one thing that needs a density number is a frame's
+// virtualized grid.
 export { rowHeight, termFontSize } from '@acorn/client-core/ui/metrics.ts'
 export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
 

@@ -3,10 +3,9 @@ import { z } from 'zod'
 import type { SearchResult } from '../../shared/search'
 import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
-// Find-in-files: project-wide text search over the task's worktree via ripgrep. Replaced the
-// `search:findInFiles` IPC channel. The taskId in the path is the capability: the renderer never
-// hands us a worktree path, and the bridge re-derives it from the DB and runs rg with cwd:root.
-// Server-backed and pure Node, so it also works in dev:node.
+// Find-in-files: project-wide text search over the task's worktree through ripgrep. The taskId in the
+// path is the capability: the renderer never hands over a worktree path, and the bridge re-derives it
+// from the DB and runs rg with cwd:root. Pure Node, so it works in dev:node.
 
 // The main-process backing (main/search.ts): resolve the task worktree and run ripgrep.
 export type SearchBridge = {

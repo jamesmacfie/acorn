@@ -1,8 +1,8 @@
-// Rung 1 of the containment ladder (docs/security.md § Rung 1, permission-shaped context): a loaded
-// plugin's NodePluginContext is built from its manifest's `permissions.node` block instead of being
-// handed the full context a built-in gets. It is least privilege for cooperative code, not a security
-// boundary: a loaded bundle shares the Node's process and can `import('node:fs')` or open core.sqlite
-// and ignore `ctx` entirely.
+// Rung 1 of the containment ladder (docs/security.md § Rung 1, permission-shaped context). A loaded
+// plugin's NodePluginContext comes from its manifest's `permissions.node` block rather than the full
+// context a built-in gets. This is least privilege for cooperative code, not a security boundary: a
+// loaded bundle shares the Node process, so it can `import('node:fs')`, open core.sqlite, and ignore
+// `ctx` entirely.
 import type { CoreServices } from './core'
 import type { PrefService } from './core/identity/preferences'
 import type { ProjectService } from './core/projects'
@@ -14,20 +14,20 @@ import { connectionProviderRegistry } from '../server/integrations/connectionReg
 // What `projects:read` grants (docs/security.md § Rung 1, on why `checkouts()` needs its own
 // disclosure line in the trust prompt).
 const PROJECT_READS = ['byId', 'byGithub', 'checkouts', 'externalProjects'] as const
-// Kept behind its own token because config() and setup() return the shell commands acorn executes.
-// The trust assertion belongs to the same surface: code with no reason to inspect project config has
-// no reason to assert that config's trust either.
+// Behind its own token because config() and setup() return the shell commands acorn executes. The
+// trust assertion sits on the same surface: code with no reason to read project config has no reason
+// to assert its trust.
 const PROJECT_CONFIG = ['config', 'assertConfigTrusted', 'setup'] as const
 const PROJECT_WRITES = ['create', 'update'] as const
 
-// Facet token → CoreServices key, for the facets that map one to one. `secrets` and `proc` are
-// deliberately absent: they come from their own manifest booleans (`secrets`, `exec`) rather than
-// from this list, because they are the two asks a reviewer should have to see spelled out.
+// Facet token to CoreServices key, for the facets that map one to one. `secrets` and `proc` are
+// absent on purpose: they come from their own manifest booleans, `secrets` and `exec`, because they
+// are the two asks a reviewer should see spelled out.
 //
-// `git` is granted independently of `exec`, and that split is cosmetic rather than real: core/vcs/git
-// is a thin wrapper over the same runProcess the broker exposes, so `git` without `exec` still means
-// "can run a git subprocess". It stays separate because "reads this repo's history" and "runs
-// arbitrary commands" are different things to disclose, not because one contains the other.
+// `git` is granted independently of `exec`, and that split is cosmetic. core/vcs/git wraps the same
+// runProcess the broker exposes, so `git` without `exec` still means "can run a git subprocess". It
+// stays separate because "reads this repo's history" and "runs arbitrary commands" are different
+// things to disclose.
 const SIMPLE_FACETS = {
   fs: 'fs',
   git: 'git',
@@ -37,11 +37,10 @@ const SIMPLE_FACETS = {
   identity: 'identity',
 } as const satisfies Record<string, keyof CoreServices>
 
-// The whole `permissions.node.core` vocabulary, in one exported list because the agent-facing
-// authoring projection (server/agentTools/pluginAuthoring.ts) has to be able to answer "what may I
-// declare" from the running node rather than from a list someone copied. Derived from SIMPLE_FACETS so
-// a facet added above is in it for free; the four spelled out here are the ones scopeCore handles
-// itself, and pluginAuthoring.test.ts asserts each of them still grants something.
+// The whole `permissions.node.core` vocabulary, exported as one list so the agent-facing authoring
+// projection answers "what may I declare" from the running node rather than a copied list. Derived
+// from SIMPLE_FACETS, so a facet added above lands here for free. The four spelled out are the ones
+// scopeCore handles itself, and pluginAuthoring.test.ts asserts each still grants something.
 export const NODE_CORE_FACETS = [
   ...Object.keys(SIMPLE_FACETS),
   'prefs',
@@ -55,10 +54,9 @@ const pick = <T extends object, K extends keyof T>(source: T, keys: readonly K[]
 
 const utf8Bytes = (text: string): number => new TextEncoder().encode(text).byteLength
 
-// Loaded plugins share the same `plugin:<id>:*` preference namespace as their sandboxed frames
-// (docs/security.md § Rung 1). Built-ins never pass through scopeCore and retain the raw service
-// because several core-owned preference keys predate loaded plugins and are intentionally shared
-// with client surfaces.
+// Loaded plugins share the `plugin:<id>:*` preference namespace with their sandboxed frames
+// (docs/security.md § Rung 1). Built-ins never pass through scopeCore and keep the raw service,
+// because several core-owned preference keys are shared with client surfaces on purpose.
 const prefsFor = (prefs: PrefService, pluginId: string): PrefService => ({
   read: (userId, key) => prefs.read(userId, pluginStateKey(pluginId, key)),
   write: async (userId, key, value) => {
@@ -78,19 +76,18 @@ const projectsFor = (
   providers: ProviderOwnership,
 ): Partial<ProjectService> => ({
   ...pick(projects, keys),
-  // `externalProjects` is the exceptional project read: unlike byId/checkouts, each row belongs to
-  // an integration provider. Resolve ownership lazily because providers are registered during the
-  // plugin's init, after this scoped context has been constructed.
+  // `externalProjects` is the odd project read: each row belongs to an integration provider. Resolve
+  // ownership lazily, because providers register during the plugin's init, after this scoped context
+  // is built.
   ...(keys.includes('externalProjects')
     ? { externalProjects: (workspaceId: string) => projects.externalProjects(workspaceId, providers.idsForOwner(pluginId)) }
     : {}),
 })
 
 // The returned object is typed as a full CoreServices and is not one. Widening
-// NodePluginContext['core'] to a partial would make every facet optional for the fifteen built-in
-// plugins that legitimately have all of them, to describe a shape only loaded plugins see. The lie is
-// contained to this one cast, and the failure mode it produces, a TypeError on the first call to an
-// undeclared facet, is the one this module is trying to produce.
+// NodePluginContext['core'] to a partial would make every facet optional for the built-ins that have
+// all of them, to describe a shape only loaded plugins see. The lie stops at this one cast, and its
+// failure mode, a TypeError on the first call to an undeclared facet, is the point.
 export function scopeCore(
   core: CoreServices,
   permissions: NodePermissions,
@@ -105,13 +102,12 @@ export function scopeCore(
     }
     const simple = SIMPLE_FACETS[token as keyof typeof SIMPLE_FACETS]
     if (simple) {
-      // Assigning through the union of facet types needs the widening; each key takes its own value.
+      // Assigning through the union of facet types needs the widening. Each key takes its own value.
       Object.assign(granted, { [simple]: core[simple] })
       continue
     }
-    // Both wider project grants imply identity reads. A caller that may create/update a project or
-    // inspect its config but cannot resolve one by id cannot do anything useful, and pretending
-    // otherwise would just make every importer declare two tokens.
+    // Both wider project grants imply the reads. A caller that may create or update a project, or
+    // read its config, but cannot resolve one by id can do nothing useful.
     if (token === 'projects:read' || token === 'projects:config' || token === 'projects:write') {
       const keys: readonly (keyof ProjectService)[] = token === 'projects:config'
         ? [...PROJECT_READS, ...PROJECT_CONFIG]
@@ -120,23 +116,22 @@ export function scopeCore(
           : PROJECT_READS
       granted.projects = { ...granted.projects, ...projectsFor(core.projects, keys, pluginId, providers) } as ProjectService
     }
-    // Anything else is a facet this acorn does not have. Ignored rather than rejected: a manifest
-    // naming a facet from a newer build should lose that one grant, not fail to load.
+    // Anything else is a facet this acorn does not have. Ignored rather than rejected, so a manifest
+    // naming a facet from a later build loses that one grant instead of failing to load.
   }
-  // Use-scoped credential access. There is deliberately no "read this secret" call anywhere on the
-  // public surface, so this grant cannot widen into one later.
+  // Use-scoped credential access. No "read this secret" call exists on the public surface, so this
+  // grant cannot widen into one later.
   if (permissions.secrets) granted.secrets = core.secrets
   if (permissions.exec) granted.proc = core.proc
   return granted as CoreServices
 }
 
-// Undeclared capability ids read as absent, which is indistinguishable from the providing plugin
-// being disabled, a state every consumer already has to degrade around (docs/plugins.md). `require`
-// keeps throwing, because a loaded plugin calling `require` on something it never declared is a bug
-// in the plugin, and a loud one is better than a silent undefined.
+// An undeclared capability id reads as absent, the same as the providing plugin being disabled,
+// which every consumer already degrades around (docs/plugins.md). `require` still throws, because a
+// loaded plugin calling `require` on something it never declared is a bug worth being loud about.
 //
-// `provide` is not filtered: exporting a capability is a contribution, not an access grant, and the
-// host binds nothing to the plugin's name through it that the plugin could not already publish.
+// `provide` is not filtered. Exporting a capability is a contribution, not an access grant, and the
+// host binds nothing to the plugin's name that the plugin could not already publish.
 export function scopeCapabilities(
   registry: CapabilityRegistry,
   declared: readonly string[],

@@ -1,9 +1,6 @@
-// Docker's half of the WebSocket, moved out of @acorn/client-core/wsClient.ts.
-//
-// It was thirteen lines of a flat if/else in core plus four module-level subscriber maps plus a
-// reconnect loop that knew how to spell `docker:${kind}:attach`. Core now owns the envelope and
-// routes on the `docker` prefix (@acorn/client-core/wsChannels.ts). Everything below, the maps,
-// the payload narrowing, and the reattach set, belongs to this plugin.
+// Docker's half of the WebSocket. Core owns the envelope and routes on the `docker` prefix
+// (@acorn/client-core/wsChannels.ts). The maps, the payload narrowing, and the reattach set below
+// belong to this plugin.
 import { registerWsChannel, wsConnect, wsSend } from '@acorn/plugin-api/client'
 import type { DockerServerFrame, DockerStatsSample } from '../shared/wsFrames'
 
@@ -99,7 +96,7 @@ registerWsChannel(
   }),
 )
 
-// Test seam: these maps are module singletons, and core's _resetWsClient no longer knows about them.
+// Test seam: these maps are module singletons, and core's _resetWsClient does not know about them.
 export const _resetDockerWsChannel = (): void => {
   dockerChangedSubs.clear()
   dockerStreamSubs.clear()

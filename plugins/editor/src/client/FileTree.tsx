@@ -11,8 +11,8 @@ export default function FileTree(props: {
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
 }) {
-  // The tree's container semantics live here, which is what TreeRow's contract requires: a row
-  // cannot know its tree. There were none of these before.
+  // The tree's container semantics live here, as TreeRow's contract requires: a row cannot know its
+  // tree.
   return (
     <div role="tree" aria-label="Worktree files">
       <Tree

@@ -4,27 +4,27 @@ import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { normalizeFingerprint, pinnedTlsOptions } from './nodeBroker'
 import { nodeRequest } from './nodeRequest'
 
-// The two requests that turn a URL into a fleet member (docs/api-reference.md § Pairing).
+// The two requests that turn a URL into a fleet member. See docs/api-reference.md, "Pairing".
 //
-// They cannot go through the broker: the broker's whole job is to attach a device token to a pinned
-// connection, and pairing exists precisely because there is no token and no pin yet. So this is the one
-// place in the app that talks to a node outside the broker, and it is deliberately two functions long.
+// They cannot go through the broker. The broker's job is to attach a device token to a pinned
+// connection, and pairing exists because there is no token and no pin yet. So this is the one place
+// in the app that talks to a node outside the broker, and it is two functions long on purpose.
 //
-// Electron-free, like nodeBroker.ts, so it can be exercised against a real TLS server.
+// Shell-free, like nodeBroker.ts, so it can be exercised against a real TLS server.
 
 const PROBE_TIMEOUT_MS = 8_000
 
-// Step 1-2: reach the node and learn the certificate it presents.
+// Steps 1 and 2: reach the node and learn the certificate it presents.
 //
-// This connection is unverified by construction: there is no CA in this architecture, and nothing yet
-// knows what to trust. What makes pairing safe is not this request; it is the owner comparing the
-// returned fingerprint against the one the node itself displays, out of band (nodePairRequestSchema).
-// Everything here does is get an honest value in front of them:
+// This connection is unverified by construction. There is no CA in this architecture and nothing yet
+// knows what to trust. What makes pairing safe is the owner comparing the returned fingerprint
+// against the one the node displays, out of band. All this does is get an honest value in front of
+// them:
 //
-//   - the fingerprint reported is the one the socket presented, not the one the body claims;
-//   - the body's self-reported fingerprint must agree with it, which is what catches a middlebox
-//     re-terminating TLS and forwarding the real node's response;
-//   - a protocol major this client cannot speak is reported as incompatible instead of paired and
+//   - The fingerprint reported is the one the socket presented, not the one the body claims.
+//   - The body's self-reported fingerprint has to agree with it, which catches a middlebox
+//     re-terminating TLS and forwarding the real node's response.
+//   - A protocol major this client cannot speak is reported as incompatible rather than paired and
 //     then broken.
 //
 // No token is sent and nothing is remembered, so an unverified request here grants nothing.
@@ -36,13 +36,13 @@ export async function probeNode(endpoint: string): Promise<NodeProbeResult & { c
   const payload: unknown = JSON.parse(body)
   const parsedInfo = nodeInfoSchema.safeParse(payload)
   if (!parsedInfo.success) {
-    // Two very different failures wore one message here. `nodeInfoSchema` is additive-forever now, so
-    // a newer node still parses, but a future major that reshaped this response would not, and telling
+    // Two very different failures wore one message here. `nodeInfoSchema` is additive-forever, so a
+    // newer node still parses, but a future major that reshaped this response would not, and telling
     // its owner "this is not an acorn node" sends them to check the URL instead of the version.
     //
-    // So: if the body announces a protocol at all, it is an acorn node and the answer is the version.
-    // Read straight off the payload rather than through a second schema, since the whole point is that
-    // this is the case where the schema does not fit what came back.
+    // So a body that announces a protocol at all is an acorn node, and the answer is the version.
+    // Read straight off the payload rather than through a second schema, because this is the case
+    // where the schema does not fit what came back.
     const claimed = (payload as { protocolVersion?: unknown } | null)?.protocolVersion
     if (typeof claimed === 'number') {
       throw new Error(`${endpoint} speaks acorn protocol ${claimed}; this app speaks ${NODE_PROTOCOL_VERSION}. Upgrade whichever is older.`)
@@ -51,7 +51,7 @@ export async function probeNode(endpoint: string): Promise<NodeProbeResult & { c
   }
   const info = parsedInfo.data
   if (normalizeFingerprint(info.fingerprint) !== fingerprint) {
-    // The node reports its own fingerprint; a peer that re-terminates TLS cannot make the two agree
+    // The node reports its own fingerprint. A peer that re-terminates TLS cannot make the two agree
     // without also owning the node's private key.
     throw new Error('The certificate presented does not match the fingerprint the node reports. Something is intercepting this connection.')
   }
@@ -82,8 +82,7 @@ export async function pairWithNode(
     })
     const text = new TextDecoder().decode(response.body)
     if (response.status !== 200) {
-      // The node answers every pairing failure identically on purpose (pairing.ts), so there is nothing
-      // to distinguish here either.
+      // The node answers every pairing failure identically on purpose. See pairing.ts.
       throw new Error(response.status === 429 ? 'Too many pairing attempts. Try again shortly.' : 'Pairing failed. Check the code and try again.')
     }
     const result = pairResultSchema.safeParse(JSON.parse(text))
@@ -96,7 +95,7 @@ export async function pairWithNode(
 
 // A single GET with the certificate captured off the socket. Written out rather than routed through
 // nodeRequest because it needs the peer certificate, which only the raw request exposes, and because
-// `rejectUnauthorized: false` must appear exactly once in this codebase, here, next to the reason.
+// `rejectUnauthorized: false` appears once in this codebase, here, next to the reason.
 function unverifiedGet(url: URL): Promise<{ body: string; certPem: string; fingerprint: string }> {
   return new Promise((resolve, reject) => {
     const req = httpsRequest(url, { method: 'GET', rejectUnauthorized: false, timeout: PROBE_TIMEOUT_MS }, (res) => {

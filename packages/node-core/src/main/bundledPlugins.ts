@@ -41,9 +41,9 @@ const packageFingerprint = (root: string): string => {
 }
 
 const packageManifest = (dir: string, expectedId: string): PluginManifest => {
-  // The result form, so a bundled package that fails reconciliation says which field broke rather than
-  // "invalid". Same reason the loader uses it (docs/plugins.md § Failures are contained): this sentence
-  // is printed at boot and is the only account anyone gets.
+  // The result form, so a bundled package that fails reconciliation names the field that broke
+  // rather than saying "invalid". This sentence prints at boot and is the only account anyone gets
+  // (docs/plugins.md § Failures are contained).
   const read = readPluginManifestResult(dir)
   if (!read.ok) throw new Error(read.reason)
   const manifest = read.manifest
@@ -51,8 +51,8 @@ const packageManifest = (dir: string, expectedId: string): PluginManifest => {
   if (manifest.apiVersion !== PLUGIN_API_MAJOR) {
     throw new Error(`built for plugin API ${manifest.apiVersion}; this app speaks ${PLUGIN_API_MAJOR}`)
   }
-  // Including a harness's adapter entry, which is a package-relative path acorn will run
-  // (docs/managed-agents.md § Harnesses) and so belongs under the same check as the code entrypoints.
+  // A harness's adapter entry is a package-relative path acorn runs (docs/managed-agents.md §
+  // Harnesses), so it belongs under the same check as the code entrypoints.
   const declaredPaths = [
     manifest.node,
     manifest.client,
@@ -85,10 +85,10 @@ const place = (dataRoot: string, id: string, source: string): void => {
 }
 
 /** Written by `apps/node/scripts/build-plugin.mjs` into a package it builds straight into the data
- * root, never into `--package-root` staging (docs/plugins.md § Loaded plugins, on why reconciliation
- * needs this marker to tell a developer's own build from an owner-installed package). Re-spelled here
- * rather than imported: the script is plain ESM run by node with no build step, and one filename in
- * two places beats a build dependency between a script and this package. */
+ * root, never into `--package-root` staging. Reconciliation needs the marker to tell a developer's
+ * own build from an owner-installed package (docs/plugins.md § Loaded plugins). Spelled again here
+ * rather than imported, because the script is plain ESM with no build step, and one filename in two
+ * places beats a build dependency between a script and this package. */
 export const DEV_BUILD_MARKER = '.acorn-dev-build'
 
 const bundledDirectories = (root: string): string[] => {
@@ -103,8 +103,8 @@ const bundledDirectories = (root: string): string[] => {
 }
 
 /** Reconcile trusted app resources into the node-owned plugin directory before the loader scans it.
- * Existing unknown and owner-installed packages win; bytes previously recorded as bundled, and a
- * developer's own `build:plugin` output, are updated. */
+ * Unknown and owner-installed packages win. Bytes recorded as bundled, and a developer's own
+ * `build:plugin` output, get updated. */
 export function reconcileBundledPlugins(dataRoot: string, bundledRoot: string): BundledPluginReconcileResult {
   const result: BundledPluginReconcileResult = {
     installed: [], updated: [], preserved: [], removed: [], failures: [],
@@ -139,23 +139,22 @@ export function reconcileBundledPlugins(dataRoot: string, bundledRoot: string): 
         }
 
         // Covers the crash window after placement but before the state file write, and an owner who
-        // happened to install the byte-identical package. Either way these are the app's exact bytes.
+        // installed the byte-identical package. Either way these are the app's exact bytes.
         if (targetFingerprint === fingerprint) {
           markBundledPluginInstalled(dataRoot, id, manifest.version, fingerprint, state?.installedAt)
           continue
         }
 
         // A developer's own `build:plugin` output, treated as app-owned so a newer bundled version
-        // wins (docs/plugins.md § Loaded plugins). Checked before the state test rather than only in
-        // the no-row case, because the second dev build over an already-reconciled package leaves an
-        // 'installed' row whose fingerprint has drifted, which is the same trap one step later.
-        // `place` replaces the directory, so the marker goes with it and the package is an ordinary
-        // bundled one again until the next build.
+        // wins (docs/plugins.md § Loaded plugins). Checked before the state test, not only in the
+        // no-row case, because a second dev build over an already-reconciled package leaves an
+        // 'installed' row whose fingerprint has drifted. `place` replaces the directory, so the
+        // marker goes with it and the package is an ordinary bundled one until the next build.
         if (existsSync(join(target, DEV_BUILD_MARKER))) {
           place(dataRoot, id, source)
           markBundledPluginInstalled(dataRoot, id, manifest.version, fingerprint, state?.installedAt)
-          // Loud, like the loader's built-in-shadowing line, and for the same reason: "the version
-          // running is not the one you built" is the single most confusing thing to work out later.
+          // Loud, like the loader's built-in-shadowing line. "The version running is not the one
+          // you built" is the hardest thing to work out later.
           console.warn(`[plugins] ${id}: replaced a dev build in ${target} with the bundled package from ${source}`)
           result.updated.push(id)
           continue
@@ -173,7 +172,7 @@ export function reconcileBundledPlugins(dataRoot: string, bundledRoot: string): 
       }
 
       // Removed and user-managed rows returned above. An 'installed' row with no target is an
-      // interrupted placement and is safe to retry; no row is a fresh profile.
+      // interrupted placement and is safe to retry. No row means a fresh profile.
       place(dataRoot, id, source)
       markBundledPluginInstalled(dataRoot, id, manifest.version, fingerprint, state?.installedAt)
       result.installed.push(id)

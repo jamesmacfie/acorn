@@ -3,14 +3,13 @@ import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { makeTestNodeContext } from '@acorn/plugin-api/testkit'
 import { captureStore } from './captures'
 
-// The store, against the real chain the host migrates at boot. The retention sweep is the part worth
-// a test: it runs on every write, and a wrong `notInArray` would either keep everything (an agent in a
-// loop fills the owner's disk) or delete everything (the evidence a screenshot exists to be).
+// The store, against the real chain the host migrates at boot. The retention sweep is the part worth a
+// test: it runs on every write, and a wrong `notInArray` either keeps everything or deletes everything.
 
 let db: PluginDatabase
 
-// No manifest to validate: this is a compiled plugin, so its storage is the `migrationsModule` chain
-// the testkit resolves from the package name rather than a declared one.
+// No manifest to validate: this is a compiled plugin, so the testkit resolves its `migrationsModule`
+// chain from the package name.
 beforeEach(() => {
   db = makeTestNodeContext({ plugin: { name: 'browser' } }).storage.open()
 })
@@ -32,8 +31,8 @@ describe('the capture store', () => {
     const store = captureStore(db)
     const ids: string[] = []
     for (let i = 0; i < 25; i += 1) {
-      // Distinct timestamps, since the sweep orders by them and a 25-write loop finishes inside one
-      // millisecond on any machine that would run this.
+      // Distinct timestamps, because the sweep orders by them and a 25-write loop finishes inside one
+      // millisecond.
       await new Promise((resolve) => setTimeout(resolve, 2))
       ids.push((await store.put({ taskId: 'task-1', mime: 'image/png', bytes: png(i) })).id)
     }

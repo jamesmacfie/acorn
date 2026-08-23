@@ -45,9 +45,8 @@ describe('plugin route registry', () => {
 // table below, this file verifies the current mount shape: core answers under /v2/core and plugins under
 // /v2/p/<plugin>.
 const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
-    // The two pre-auth pairing routes, outside /v2/core because that namespace is the gated one:
-    // they're how an unpaired client gets a credential at all (docs/api-reference.md § Request
-    // processing).
+  // The two pre-auth pairing routes, outside /v2/core because that namespace is the gated one. They
+  // are how an unpaired client gets a credential at all (docs/api-reference.md § Request processing).
   ['GET', '/v2/node'],
   ['POST', '/v2/pair'],
   ['POST', '/v2/core/pair/start'],
@@ -185,8 +184,8 @@ describe('assembled routes', () => {
     const expected = ['github']
     expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
     // The integration registry holds only providers with mirrored resources (docs/integrations.md §
-    // Connection and integration contributions). github happens to have them, so the two lists
-    // coincide today, but they're asserted separately since that won't always be true.
+    // Connection and integration contributions). github has them, so the two lists coincide. They are
+    // asserted separately because a connection provider need not be an integration one.
     expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
     expect(modelProviderRegistry.list().map((a) => a.providerId).sort()).toEqual([])
   })

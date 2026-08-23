@@ -3,11 +3,10 @@ import { activeTaskId, capabilities } from '@acorn/plugin-api/client'
 import { workflowApi } from '../contract/workflowClient'
 import { Alert, Button } from '@acorn/plugin-api/ui'
 
-// Settings → Workflows (docs/workflows.md): a read-only inspector over the committed/user workflow
-// definitions the active task's worktree would load (`.acorn/workflows/*.toml` + ~/.acorn), plus any
-// parse errors, so a malformed file surfaces instead of silently vanishing. Mirrors McpSettings:
-// task-scoped via activeTaskId, reuses the existing workflow:defs IPC as-is. Launch a workflow from
-// the command palette (⌘K); this is the viewer, not a launcher.
+// Settings → Workflows (docs/workflows.md): a read-only inspector over the workflow definitions the
+// active task's worktree loads, from `.acorn/workflows/*.toml` and ~/.acorn, plus any parse errors,
+// so a malformed file surfaces instead of vanishing. Task-scoped through activeTaskId, like
+// McpSettings. Launching a workflow happens in the command palette (⌘K).
 export default function WorkflowsSettings() {
   const taskId = () => activeTaskId()
 

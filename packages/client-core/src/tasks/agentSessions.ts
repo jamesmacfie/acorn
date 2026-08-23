@@ -1,13 +1,10 @@
-// "Which agents are running in this task": platform state, not terminal-drawer internals. The
-// rail spinner, the topbar badge, the notification edge tracker, the archive/quit concerns and the
-// send-to-agent target pickers in the changes and context panes all read it, so it lives in core,
-// in the codebase's signals-only style (cf. ./tasks.ts). One status subscription, one session
+// "Which agents are running in this task": platform state, not terminal-drawer internals. The rail
+// spinner, the topbar badge, the notification edge tracker, the archive and quit concerns, and the
+// send-to-agent pickers all read it, so it lives in core. One status subscription, one session
 // list.
 //
-// It reads the session route and the status stream directly because both are core's own
-// transports, so no feature accessor is needed. `capabilities().terminal` is the same probe
-// taskBridge() and terminalApi() use (pinned by ./taskBridge.test.ts), so off-desktop behaviour is
-// unchanged: an empty list and no subscription.
+// `capabilities().terminal` is the same probe taskBridge() and terminalApi() use (pinned by
+// ./taskBridge.test.ts), so off-desktop this is an empty list and no subscription.
 import { createSignal } from 'solid-js'
 import { capabilities } from '../capabilities'
 import { readJson } from '../apiClient'
@@ -15,15 +12,9 @@ import { wsOnStatus } from '../wsClient'
 import { trackSessionEdges } from '../notifications/notifications'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 
-// plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are
-// duplicated here as literals because client-core is a shared library and may not import a
-// plugin; the arch suite enforces that, and it is the rule that keeps the shell from depending on
-// features.
-//
-// This file is core: it holds platform state (which agent sessions exist on this node), not
-// terminal-drawer internals, and its own header says so. Two duplicated strings is the cheaper
-// side of that trade against inventing a capability seam for a GET. Collected as debt against
-// finding 10 (de-GitHub the shell), which reworks how the shell reaches feature routes.
+// plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are duplicated
+// here as literals because client-core is a shared library and may not import a plugin, which the
+// arch suite enforces. Two duplicated strings beat inventing a capability seam for a GET.
 const terminalSessionsRoute = '/v2/p/terminal/sessions'
 import { requestTerminalFocusIntent } from '../registries/clientEvents'
 import { latestOnly } from '../lib/latestOnly'
@@ -66,12 +57,10 @@ export const evictActiveTerminal = (taskId: string): void => {
   activeByTask.delete(taskId)
 }
 
-// Drop everything on a node switch. Terminal sessions are keyed by an opaque node-minted id and
-// the rail, the topbar badge and both archive/quit concerns read this list, so node A's running
-// sessions were being counted against node B's tasks, up to and including blocking an archive with
-// "2 active sessions" that belong to another machine. `initSessions` refetches immediately for the
-// new node, which is why clearing is right here where keying by node would be right for a durable
-// preference.
+// Drop everything on a node switch. Sessions are keyed by an opaque node-minted id, so node A's
+// running sessions were counted against node B's tasks, once blocking an archive with "2 active
+// sessions" that belonged to another machine. `initSessions` refetches for the new node, which is
+// why clearing beats keying by node here.
 export function clearSessions(): void {
   setSessions([])
   activeByTask.clear()
@@ -97,8 +86,8 @@ export function workingCountFor(taskId: string | null): number {
   ).length
 }
 
-// Registered here rather than listed in the shell's evictor file, so this signal and the thing that
-// clears it are one edit apart (registries/scopeEviction.ts states the full argument).
+// Registered here rather than in the shell's evictor file, so this signal and the thing that clears
+// it are one edit apart (registries/scopeEviction.ts).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictActiveTerminal(e.taskId)
   else if (e.scope === 'node-switched') clearSessions()
