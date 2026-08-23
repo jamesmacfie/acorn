@@ -370,6 +370,7 @@ export default function AgentPane(props: { task: Task }) {
         <Picker<AgentProviderDescriptor>
           label={<><Icon name="plus" /> New</>}
           ariaLabel="New"
+          placement="bottom-end"
           placeholder="Filter providers…"
           emptyText="No managed providers available."
           results={(query) => (providers() ?? []).filter((item) =>
