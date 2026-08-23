@@ -1,6 +1,6 @@
 # Shell architecture
 
-Status: proposal, 2026-08-22; phase 2 built it, 2026-08-23. The organizing principle: the renderer seam
+Status: proposal, 2026-08-22; phases 2 and 3 built it, 2026-08-23. The organizing principle: the renderer seam
 (`packages/client-core/src/platform/index.ts`) and the service protocol
 (`packages/protocol/src/serviceProtocol.ts`) are the two contracts that must not change; everything
 between them is replaceable.
@@ -153,11 +153,23 @@ fail-quiet stance `deviceTokenStore.ts` has today, and the same blast radius as 
 `sessionKeyStore.ts` is deleted: the desktop-supervised node uses the generated
 `session.key`-in-data-root the standalone node already uses. One custody mechanism fewer.
 
-Migration: Electron's `safeStorage` is Chromium os_crypt — on macOS a keychain item named "acorn
-Safe Storage" derives an AES-128-CBC key. The helper performs a one-time migration that reads the
-legacy item, decrypts the `device-token-*` blobs, re-encrypts under the new key, and deletes the
-legacy items. If the item is unreadable, forget the tokens: the local node mints a fresh device row
-(supported today), paired remote nodes need re-pairing, and the fleet UI says so honestly.
+Migration, built in phase 3 as `packages/desktop-helper/src/main/legacyCustody.ts`: Electron's
+`safeStorage` is Chromium os_crypt, and on macOS a keychain item named "acorn Safe Storage" derives an
+AES-128-CBC key. Rust reads that item and passes it in the handshake; the helper decrypts each
+`device-token-*` blob and re-encrypts it under the data key.
+
+It copies the whole custody root rather than only the tokens, which the design did not say and should
+have. The two shells cannot share a root — Electron's is named after the app and Tauri's after the
+bundle identifier — so a device token arriving without the `fleet.json` row that names its node is a
+secret for a machine nobody remembers. `fleet.json`, `plugin-trust.json` and the content-addressed
+plugin cache come across with it. Nothing is deleted from the Electron root: it is still a shipping
+app until cutover.
+
+The guard is the whole lifecycle. A `fleet.json` in the new root means the owner has used this build,
+and their fleet wins, so the adoption runs at most once with no marker file and no ledger. If the key
+no longer opens the blobs, which is what a rebuilt or re-signed Electron app leaves behind, the fleet
+still comes across and the tokens do not: the local node mints a fresh device row, paired remote nodes
+need re-pairing, and the fleet UI says so honestly.
 
 A caveat to document loudly: keychain item ACLs bind to the code signature, so while acorn ships
 ad-hoc signed, every rebuild re-prompts or loses access, and the file fallback is the common path
@@ -187,9 +199,13 @@ keychain items (a prompt per node and ACL churn), tokens inside `fleet.json` (re
 - **External URLs**: one Rust command `open_external(url)` enforces the scheme allowlist that
   `setWindowOpenHandler` plus `shell.openExternal` enforce today; the opener plugin capability is
   granted only to that command, never to the renderer directly.
-- **Navigation**: `on_navigation` pins the main frame to the app origin. No OAuth exception is
-  needed — GitHub connects by device flow against the node, unchanged. The subframe guard is a
-  spike item in [webviews-and-frames.md](./webviews-and-frames.md).
+- **Navigation**: `on_navigation` pins the window to the app origin plus `app-plugin:`, which is the
+  main-frame policy and the subframe guard in one callback, since it fires for both. No OAuth
+  exception is needed: GitHub connects by device flow against the node, unchanged.
+- **Capabilities are scoped by webview label, never by window.** A capability that names a window
+  grants every webview inside it, and since phase 3 the main window hosts the preview pane and plugin
+  webview surfaces. Those get no capability at all, so `invoke` reaches nothing from them. A Rust test
+  reads `capabilities/default.json` back and fails if `windows` returns.
 
 ## The resulting Rust surface
 
@@ -200,9 +216,10 @@ keychain items (a prompt per node and ACL churn), tokens inside `fleet.json` (re
 | `keychain.rs` | Data key get-or-create, `keyring` plus the 0600-file fallback. |
 | `app_scheme.rs` | Shell protocol: traversal guard, SPA fallback, per-response CSP. |
 | `plugin_scheme.rs` | Per-hash static serving from the helper-written cache, frame CSP, no-store. |
+| `keychain.rs` | Also reads the legacy `safeStorage` item, for the one-time custody adoption below. |
 | `menu.rs` | The application menu, quit negotiation, Cmd+W and Cmd+Q accelerators. |
 | `commands.rs` | `helper_endpoint`, `pick_folder`, `reveal_data_folder`, `force_quit`, `quit_approved`, and the shell state they read. |
-| `preview_webviews.rs` | Phase 3: child-webview lifecycle, bounds, nav guards, cookie seeding. |
+| `webviews.rs` | Child-webview lifecycle, bounds, nav guards, URL policy, tunnel-cookie seeding. Preview panes and plugin surfaces both, keyed by prefix. |
 | `updater_owned.rs` | Post-signing: staged, verified updates. |
 
 Quit negotiation lives in `menu.rs` beside the accelerator that triggers it rather than in its own

@@ -21,7 +21,7 @@ must validate input again at execution time and use CoreServices for files, Git,
 and task lookup.
 
 Current tool groups include task/context inspection, Git and changes, notes, memory, terminal
-handoff, workflow controls, database operations, Docker, and preview/browser operations.
+handoff, workflow controls, database operations, Docker, and browser operations.
 
 ## Projections
 

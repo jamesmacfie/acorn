@@ -1,6 +1,6 @@
 # Sequencing
 
-Status: proposal, 2026-08-22; phases 0, 1 and 2 executed 2026-08-23. Coexistence, the phases, the cutover trigger, and the deletion list.
+Status: proposal, 2026-08-22; phases 0 to 4 executed 2026-08-23. Coexistence, the phases, the cutover trigger, and the deletion list.
 
 ## Coexistence: a second app package
 
@@ -18,8 +18,8 @@ extracted once and imported by both build systems so it cannot drift.
 | 0 | De-risk spikes ✅ | M | yes (throwaway) |
 | 1 | Groundwork that lands in Electron ✅ | M | yes (on trunk) |
 | 2 | Rust shell skeleton + helper ✅ | L | yes (parallel app) |
-| 3 | Feature parity | L | yes (parallel app) |
-| 4 | Packaging and CI | M | yes (parallel artifact) |
+| 3 | Feature parity ✅ | L | yes (parallel app) |
+| 4 | Packaging and CI ✅ | M | yes (parallel artifact) |
 | 5 | Cutover and deletion | M | — (the flip) |
 
 ### Phase 0 — de-risk spikes
@@ -123,19 +123,116 @@ Four things came out differently from the design:
 Not in this phase, by design: preview panes, plugin webviews, plugin frames and the plugin scheme,
 the `safeStorage` token migration, and the Playwright browser plugin. Those are phase 3.
 
-### Phase 3 — feature parity
+### Phase 3 — feature parity ✅
 
-Every capability in [docs/electron.md](../../electron.md) has a Tauri implementation or an argued
-waiver recorded here: multi-webview preview and plugin webviews with the cookie-auth tunnel, plugin
-frames and the trust store, key custody with the safeStorage migration, dialogs, quit negotiation,
-recovery UI, navigation policy, and the Playwright browser plugin. Exit: the smoke checklist passes
-on a dev build; no unrecorded gaps.
+Done 2026-08-23. Every capability in [docs/electron.md](../../electron.md) now has a Tauri
+implementation or a waiver argued below. The platform seam has no null groups left: `bridge.test.ts`
+drives the whole of `SEAM_GROUPS` against the real bridge and exempts nothing.
 
-### Phase 4 — packaging and CI
+What landed, and where it sits:
 
-The staging script, `tauri build`, inventory verification, ad-hoc DMG, updater artifacts with no
-endpoint ([packaging-and-release.md](./packaging-and-release.md)). Exit: a fresh machine installs
-the DMG and passes the smoke checklist.
+- **`src-tauri/src/webviews.rs`.** One module for both the preview pane and plugin webview surfaces,
+  because the difference between them is a policy function and a key prefix. Child webviews under
+  `Window::add_child`, `incognito(true)` for the ephemeral store, logical bounds the renderer's pane
+  geometry drives, `on_new_window` denying `window.open`, and `on_navigation` enforcing the URL policy
+  before the load. The keys are the ones Electron's `WebviewService` already uses, `preview:<taskId>`
+  and `plugin:<pluginId>:<nodeId>[:<surface>]`, so the renderer needed no change.
+- **The tunnel credential is a cookie.** wry cannot inject `x-acorn-tunnel` per request, so
+  `previewTunnel.ts` accepts the same per-listener secret in a `Cookie` header, and the shell seeds it
+  into the pane's store before the first real navigation. The helper reports each listener's port and
+  secret to Rust on the stdout pipe it already owns, so the secret reaches the shell and stops there —
+  the renderer never sees it, which is the property the secret exists for.
+- **`src-tauri/src/plugin_scheme.rs`.** `app-plugin://<hash>` serves the generated document, the shared
+  frame stylesheet, and `client.js` out of `<userDataDir>/plugin-cache/<hash>.js`, with the frame CSP on
+  every response. The window's navigation guard admits that scheme and no other, which is the subframe
+  guard `will-frame-navigate` gives Electron.
+- **`packages/desktop-helper/src/main/legacyCustody.ts`.** A first launch with no fleet of its own
+  adopts the Electron build's custody root: `fleet.json`, the trust store, and the content-addressed
+  plugin cache are copied, and the device tokens are decrypted under Chromium's os_crypt and
+  re-encrypted under the data key. Rust reads the legacy keychain item and passes it in the handshake.
+- **`plugins/browser`.** The six `browser_*` agent tools, driven by Playwright against an installed
+  Chrome. They left `plugins/preview` with their pure accessibility-tree layer, which moved unchanged.
+  Screenshots are rows in the plugin's own table, served back by `/v2/p/browser/captures/:id`, so a
+  tool result is a handle that outlives the transcript.
+
+Five things came out differently from the design:
+
+- **The capability file was granting the whole window.** `"windows": ["main"]` gives `core:default` to
+  every webview in that window, which from this phase on includes the preview pane and plugin webview
+  surfaces — pages this app does not write. It is `"webviews": ["main"]` now, and a Rust test reads the
+  JSON back and fails if `windows` reappears. This was a live hole for exactly as long as the phase
+  that opened it.
+- **The browser plugin is compiled, not loaded.** A loaded package is one inlined bundle with no
+  `node_modules` of its own, and `playwright-core` brings native bits with it. It sits in the compiled
+  roster beside `terminal`, which carries `node-pty` for the same reason. The browser itself is still
+  not in any bundle: the plugin drives an installed Chrome and reports why when there is not one.
+- **`desktop.browser-*` is deleted rather than reimplemented.** Its only consumer was the preview
+  plugin's agent tools, which now have a browser of their own. `desktop.preview-*` stays in the
+  protocol and stays registered by Electron, and the Tauri shell registers no handler for it. That is
+  the phase's one waiver, and it costs nothing today: nothing reachable from
+  `apps/node/src/service/runtime.ts` calls it. A node-side caller that wanted it would need a
+  request-reply channel on the helper's stdio pipe, which is a day's work and has no requester.
+- **Navigation history is the shell's own.** wry exposes none, so `webviews.rs` records what
+  `on_navigation` reports and marks the traversals it asked for, which is what lets the pane offer back
+  and forward honestly rather than always-enabled.
+- **`stage.mjs` was bricking the bundled Node.** It overwrote `binaries/node-<triple>` in place, and
+  macOS caches a code signature against the inode, so every re-stage produced a runtime the kernel
+  SIGKILLed with no message. It removes the file before writing it now. The boot test caught it.
+
+Exit met: `pnpm lint` clean across 29 packages, the Rust suite at 23 tests, the boot test green
+against the staged helper, and the browser plugin's snapshot-act-verify loop verified against a real
+Chrome (`pnpm --filter @acorn/plugin-browser test:smoke`).
+
+### Phase 4 — packaging and CI ✅
+
+Done 2026-08-23. `pnpm --filter @acorn/desktop-tauri run build` produces an ad-hoc signed
+`acorn_0.1.0_aarch64.dmg` with signed updater artifacts beside it, and verifies its own output before
+it finishes. `.github/workflows/build-tauri.yml` runs the same command on a push to main, alongside
+`build-dmg.yml` rather than instead of it.
+
+What landed, and where it sits:
+
+- **`scripts/nodeRuntime.mjs`.** The pinned runtime, fetched from nodejs.org and verified against that
+  release's `SHASUMS256.txt` rather than copied from whatever Node happens to be running the build.
+  It caches the extracted binary with its digest beside it, so the second stage costs 0.3 seconds and
+  no network. This is the piece phase 2 marked as owed.
+- **`scripts/verify-bundle.mjs`.** The inventory check, run as the last step of the build. It compares
+  every file staging produced against the same path inside the `.app`, by digest, and checks the code
+  signature, the bundled runtime's reported version, the updater artifact and its signature, and the
+  DMG. The expected inventory is whatever staging wrote, so nothing here drifts when a resource is
+  added.
+- **The build's own checks.** The renderer is built by the package rather than by `beforeBuildCommand`,
+  so `check-renderer-budget.mjs` runs against the bytes that get bundled and the bundler does not
+  repeat a build that already happened. Both that script and `check-runtime-syntax.mjs` take a
+  directory argument now and keep their Electron defaults, so one copy of each serves both shells.
+- **`.github/workflows/build-tauri.yml`.** Rust toolchain with a cargo cache, a cache for the pinned
+  runtime keyed on `node-runtime.json`, staging, the boot test and the Rust suite, then the build and
+  its verification. The boot test runs in CI for the first time here; nothing in this repo ran tests in
+  CI before.
+
+Four things came out differently from the design:
+
+- **`bundle.macOS.signingIdentity` had to be set to `"-"`.** With no identity Tauri runs no `codesign`
+  pass at all, so the `.app` carried the linker's ad-hoc mark on one binary and sealed no resources,
+  which `codesign --verify` rejects. Gate 0 is stated as parity with Electron's `identity: null`, and
+  that does real ad-hoc bundle signing, so this was the difference between parity and something
+  weaker. A Rust test now reads the config back and fails if the identity, `createUpdaterArtifacts`,
+  or the updater public key goes missing.
+- **The shell resolved the bundled Node under the wrong directory.** `externalBin` stages it beside the
+  executable, `Contents/MacOS`, and `lib.rs` looked under `resource_dir()`, `Contents/Resources`. The
+  path exists only in a packaged build and no packaged build had been made, so nothing before this
+  phase could have caught it. The inventory check found it on the first run.
+- **The DMG's Finder-cosmetics AppleScript cannot run unattended.** It needs an Automation permission
+  no build machine grants, and the call times out and fails the bundle. Tauri skips the step when `CI`
+  is set, so the build script sets it for that one invocation and a local DMG matches the shipped one.
+- **The packaged runtime is checked by what it reports, not by digest.** Signing rewrites every Mach-O
+  in the bundle, so the bundled Node is deliberately not the staged bytes. Its provenance comes from
+  the checksum staging verified before the copy.
+
+Exit met, with one half owed to a person: the DMG builds, mounts, and passes inventory verification,
+and `spctl` rejects it exactly as it rejects the Electron DMG. The smoke checklist on a machine that
+never had the Electron build is the remaining item, and it is item 2 of the cutover trigger rather than
+something a script can close.
 
 ### Phase 5 — cutover and deletion
 
@@ -146,7 +243,8 @@ The flip, then the cleanup, executed as one phase so nothing half-dead lingers.
 All four, not any:
 
 1. The phase-3 parity list has no open waivers.
-2. The packaged DMG passes the smoke checklist on a machine that never had the Electron build.
+2. The packaged DMG passes the smoke checklist on a machine that never had the Electron build. This
+   is the only one of the four still open.
 3. Developers have run `dev:tauri` as their default for an agreed soak window.
 4. No invariant in the [README](./README.md) is regressed.
 
@@ -162,8 +260,10 @@ parity.
 - The Electron-ABI branch of `scripts/rebuild-node-abi.mjs`; the plain-Node path stays for the
   standalone tarball.
 - `apps/desktop/e2e` and `playwright.e2e.config.ts`, or whatever remains after the extraction.
-- `.github/workflows/build-dmg.yml`.
-- The lazy Electron adapters in `plugins/preview` and `plugins/terminal`, replaced in phase 3.
+- `.github/workflows/build-dmg.yml`. `build-tauri.yml` is the one that stays.
+- `plugins/terminal/src/main/folderPickerIpc.ts`, the last lazy Electron adapter. Preview's went in
+  phase 3 with the CDP driver; this one survives only because Electron still calls it, and the Tauri
+  shell has answered the same seam through `pick_folder` since phase 2.
 - Arch tests: the Electron-consumer baseline reaches zero and the rule flips to "nothing imports
   electron". Stale `better-sqlite3` and `sharp` entries in `pnpm-workspace.yaml` go with it.
 - [docs/electron.md](../../electron.md) is replaced by a shipped-behavior shell doc, and this

@@ -2,10 +2,11 @@ import { readdir } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { extname, join, resolve } from 'node:path'
 
-const roots = [
-  resolve(import.meta.dirname, '../out/main'),
-  resolve(import.meta.dirname, '../out/preload'),
-]
+// The generated host-side bundles, parsed by the runtime that will load them. Electron's main and
+// preload by default; the Tauri package passes its helper and bridge output instead.
+const roots = process.argv.length > 2
+  ? process.argv.slice(2).map((root) => resolve(process.cwd(), root))
+  : [resolve(import.meta.dirname, '../out/main'), resolve(import.meta.dirname, '../out/preload')]
 
 async function javascriptFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -21,7 +22,7 @@ const files = (await Promise.all(roots.map(javascriptFiles)))
   .filter((path) => ['.cjs', '.js', '.mjs'].includes(extname(path)))
   .sort()
 
-if (files.length === 0) throw new Error('No Electron runtime bundles were found to validate')
+if (files.length === 0) throw new Error(`No generated bundles were found to validate in ${roots.join(', ')}`)
 
 for (const file of files) {
   const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' })

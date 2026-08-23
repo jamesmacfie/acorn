@@ -94,12 +94,6 @@ export const serviceRpcMethods = [
   'desktop.preview-nav-state',
   'desktop.preview-navigate',
   'desktop.preview-evict',
-  'desktop.browser-navigate',
-  'desktop.browser-snapshot',
-  'desktop.browser-click',
-  'desktop.browser-fill',
-  'desktop.browser-screenshot',
-  'desktop.browser-console',
 ] as const
 export const serviceRpcMethodSchema = z.enum(serviceRpcMethods)
 export type ServiceRpcMethod = z.infer<typeof serviceRpcMethodSchema>

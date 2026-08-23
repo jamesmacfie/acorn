@@ -2,7 +2,6 @@ import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { DesktopCapabilities } from '@acorn/protocol/desktopCapabilities.ts'
 import { pluginRouteContributions } from '@acorn/node-core/server/routeRegistry.ts'
 import { agentToolContributions } from '@acorn/node-core/server/agentTools/registry.ts'
 import { getContextSections } from '@acorn/node-core/server/agentTools/contextSections.ts'
@@ -17,24 +16,6 @@ import { SecretService } from '@acorn/node-core/main/core/index.ts'
 import { nodePlugins } from '../../src/server/plugins'
 import { readGolden, writeGolden } from './golden'
 
-const desktop: DesktopCapabilities = {
-  preview: {
-    currentUrl: async () => null,
-    loadUrl: async () => false,
-    navState: async () => null,
-    navigate: async () => false,
-    evict: async () => false,
-  },
-  browser: {
-    navigate: async () => ({ ok: false }),
-    snapshot: async () => ({ error: 'not available' }),
-    click: async () => ({ ok: false }),
-    fill: async () => ({ ok: false }),
-    screenshot: async () => ({ error: 'not available' }),
-    console: async () => ({ lines: [] }),
-  },
-}
-
 // The deps the composition root supplies. These are stubs, not fakes, because nothing here runs
 // during init. The test is which contributions land, and each plugin's init that does I/O does it
 // against its own database.
@@ -44,7 +25,6 @@ const buildPlugins = (dataDir: string) =>
       internalEnv: () => ({}),
       memoryReviewTrigger: async () => undefined,
     },
-    preview: { browser: desktop.browser },
     notes: { internalEnv: () => ({}) },
     terminal: {
       internalEnv: () => ({}),
@@ -73,9 +53,10 @@ type Snapshot = {
   integrationProviders: string[]
   providerRoutes: string[]
   modelProviders: string[]
+  capabilities: string[]
   databases: string[]
 }
-const SNAPSHOT_KEYS = ['routes', 'tools', 'sections', 'connectionProviders', 'integrationProviders', 'providerRoutes', 'modelProviders', 'databases'] as const
+const SNAPSHOT_KEYS = ['routes', 'tools', 'sections', 'connectionProviders', 'integrationProviders', 'providerRoutes', 'modelProviders', 'capabilities', 'databases'] as const
 
 // The full boot's contribution set, and what each optional plugin owns within it: every entry that
 // must vanish when it's disabled, and by omission every entry that must not. Recorded as a golden
@@ -176,6 +157,11 @@ describe('disabling a node plugin', () => {
         integrationProviders: integrationProviderRegistry.list().map((p) => p.id).sort(),
         providerRoutes: integrationProviderRegistry.routes().map((r) => `${r.providerId}${r.prefix}`).sort(),
         modelProviders: modelProviderRegistry.list().map((a) => a.providerId).sort(),
+        // The typed capability registry, which for some plugins is the whole contribution: `preview`
+        // provides its page rules here and registers nothing else at all now that the browser tools
+        // have left for `plugins/browser`. Without this key, disabling it would lose nothing this
+        // snapshot could see, and the anti-vacuity check below would rightly call that meaningless.
+        capabilities: [...capabilities.ids()].sort(),
         // Proof the plugin actually opened its own file, which a stubbed init could not fake.
         databases: readdirSync(join(dataDir, 'plugins'), { withFileTypes: true })
           .filter((e) => e.isFile() && e.name.endsWith('.sqlite'))

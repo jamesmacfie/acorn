@@ -20,9 +20,10 @@ import {
 // the folder dialog, the close-pane key, quit negotiation, the recovery screen's two buttons — is a
 // Tauri command or event, because those are the shell's, not the helper's.
 //
-// The phase-2 shell implements every seam group except `preview` and `webviews`, which stay absent
-// rather than half-built: a consumer probes the group and then calls its members, so half a group is
-// worse than none (docs/future/tauri/sequencing.md § Phase 2).
+// The preview pane and plugin webview surfaces are the third transport: they are Tauri commands, not
+// helper calls, because a webview composited over the window is the shell's to own. One command set
+// serves both, keyed by the same opaque strings Electron's `WebviewService` uses, and the key prefix is
+// what picks the policy on the Rust side (src-tauri/src/webviews.rs).
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void }
 
@@ -99,10 +100,31 @@ const subscribe = <T>(set: Set<T>, cb: T): (() => void) => {
 // A Tauri event, in the shape the seam wants: a subscribe that hands back its own unsubscribe. The
 // `listen` promise resolves after the handler is registered, so unsubscribing before that resolves has
 // to wait for it rather than silently doing nothing.
-const onEvent = (name: string, handler: () => void): (() => void) => {
-  const unlisten = listen(name, handler)
+const onEvent = <T>(name: string, handler: (payload: T) => void): (() => void) => {
+  const unlisten = listen<T>(name, (event) => handler(event.payload))
   return () => void unlisten.then((off) => off())
 }
+
+// ── Host-owned webviews ───────────────────────────────────────────────────────────────────────────
+// Both seam groups project onto one Rust command set. Preview keys are `preview:<taskId>`; plugin
+// surfaces already arrive as `plugin:...` keys and pass through unchanged.
+
+type WebviewState = { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
+type WebviewBlocked = { key: string; url: string; host: string }
+
+const previewKey = (taskId: string): string => `preview:${taskId}`
+
+// Rect fields cross as-is: the renderer measures its pane in CSS pixels and Rust positions the child
+// webview in logical ones, which are the same unit on both sides of the boundary.
+const setBounds = (key: string, rect: { x: number; y: number; width: number; height: number }): void =>
+  void invoke('webview_bounds', { key, rect })
+
+// One listener per group rather than one per surface: a Tauri event listener is a round trip to
+// register, and the renderer already fans these out by key.
+const onWebviewState = (cb: (state: WebviewState) => void, matches: (key: string) => boolean): (() => void) =>
+  onEvent<WebviewState>('acorn:webview-state', (state) => {
+    if (matches(state.key)) cb(state)
+  })
 
 const toWireBody = (body: unknown): WireFetchBody | undefined => {
   const value = body as { kind: 'bytes'; bytes: Uint8Array } | { kind: 'form'; parts: Record<string, unknown>[] } | undefined
@@ -175,6 +197,35 @@ const acorn = {
   },
 
   folderPath: { pick: () => invoke<string | null>('pick_folder') },
+
+  // The browser preview pane. `show` is exclusive because one task's preview is on screen at a time,
+  // and `hide` names no task because what the caller means is "no preview right now".
+  preview: {
+    ensure: (taskId: string, url: string) => invoke<boolean>('webview_ensure', { key: previewKey(taskId), url }),
+    setBounds: (taskId: string, rect: { x: number; y: number; width: number; height: number }) => setBounds(previewKey(taskId), rect),
+    show: (taskId: string) => void invoke('webview_show', { key: previewKey(taskId), exclusive: true }),
+    hide: () => void invoke('webview_hide_family', { prefix: 'preview:' }),
+    load: (taskId: string, url: string) => void invoke('webview_load', { key: previewKey(taskId), url }),
+    command: (taskId: string, action: string) => void invoke('webview_command', { key: previewKey(taskId), action }),
+    evict: (taskId: string) => void invoke('webview_evict', { key: previewKey(taskId) }),
+    onEvent: (cb: (state: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void) =>
+      onWebviewState(({ key, ...rest }) => cb({ taskId: key.slice('preview:'.length), ...rest }), (key) => key.startsWith('preview:')),
+  },
+
+  // Host-owned page surfaces for accepted loaded plugins. The manifest host allowlist rides on
+  // `ensure` and is checked again in Rust, which is the second of the two independent checks
+  // docs/electron.md § Host-owned webviews asks for.
+  webview: {
+    ensure: (key: string, url: string, hosts: readonly string[]) => invoke<boolean>('webview_ensure', { key, url, hosts: [...hosts] }),
+    setBounds,
+    show: (key: string) => void invoke('webview_show', { key, exclusive: false }),
+    hide: (key: string) => void invoke('webview_hide', { key }),
+    load: (key: string, url: string) => invoke<boolean>('webview_load', { key, url }),
+    command: (key: string, action: string) => invoke<boolean>('webview_command', { key, action }),
+    evict: (key: string) => void invoke('webview_evict', { key }),
+    onEvent: (cb: (state: WebviewState) => void) => onWebviewState(cb, (key) => key.startsWith('plugin:')),
+    onBlocked: (cb: (state: WebviewBlocked) => void) => onEvent<WebviewBlocked>('acorn:webview-blocked', cb),
+  },
 }
 
 // Written, not read. The seam is the only module allowed to read this global, and it reads it off

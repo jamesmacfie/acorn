@@ -1,0 +1,9 @@
+{
+  // Node-only, like model-providers: no frame, so no DOM lib and no vite/client types.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

@@ -57,14 +57,6 @@ const desktop: DesktopCapabilities = {
     navigate: async () => false,
     evict: async () => false,
   },
-  browser: {
-    navigate: async () => ({ ok: false }),
-    snapshot: async () => ({ error: 'not available' }),
-    click: async () => ({ ok: false }),
-    fill: async () => ({ ok: false }),
-    screenshot: async () => ({ error: 'not available' }),
-    console: async () => ({ lines: [] }),
-  },
 }
 
 describe('Electron-free service runtime', () => {

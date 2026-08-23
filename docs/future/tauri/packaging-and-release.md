@@ -1,6 +1,6 @@
 # Packaging and release
 
-Status: proposal, 2026-08-22.
+Status: proposal, 2026-08-22; phase 4 built it, 2026-08-23.
 
 ## The problem
 
@@ -29,13 +29,66 @@ present with matching checksums, the pattern in
 `references/proliferate/.github/workflows/release-desktop.yml`. A tag-triggered release job adds
 GitHub Release creation and updater-manifest generation, gated off until signing exists.
 
+## What landed
+
+Built 2026-08-23. `pnpm --filter @acorn/desktop-tauri run build` stages, builds the renderer, runs both
+budget checks, bundles, and then verifies the bundle it produced. `.github/workflows/build-tauri.yml`
+runs the same thing on a push to main, alongside `build-dmg.yml` rather than instead of it.
+
+- **The runtime is fetched, not copied.** `scripts/nodeRuntime.mjs` downloads the pinned build from
+  nodejs.org, verifies it against that release's `SHASUMS256.txt`, and caches the extracted binary
+  under `~/.cache/acorn/node-runtime` with its own digest beside it, so a second stage re-verifies
+  without the network. Phase 2's script copied whichever Node was running it and refused when that was
+  not the pin. There is one path now and it is the release path: every machine and every CI run bundles
+  the same verified bytes, and a developer no longer has to switch runtimes to stage a build. The cost
+  is one 50 MB download per pin per machine.
+- **`scripts/verify-bundle.mjs` compares the bundle against what staging produced,** file by file, by
+  digest, for the renderer, the bridge, the helper and node service, and the bundled plugins. The
+  expected inventory is whatever staging wrote rather than a list somebody maintains, so a resource
+  added later is covered the day it is added. Named files on top of that stop an empty `dist/` from
+  passing by comparing nothing, and the run also checks the code signature, the updater artifact and
+  its signature, and the DMG. The bundled runtime is the exception: signing rewrites every Mach-O in
+  the bundle, so it is checked by the version it reports and its own signature, and its provenance
+  comes from the checksum staging already verified.
+- **The updater keypair exists.** The public half is in `tauri.conf.json`. The private half was
+  generated on 2026-08-23 with `tauri signer generate`, has no passphrase, and sits at
+  `~/.acorn/tauri-updater/acorn-updater.key` on the machine that made it. That is not durable storage:
+  it belongs in a password manager and in the `TAURI_SIGNING_PRIVATE_KEY` repo secret, and losing it
+  means every install carrying this public key can never be updated, because the only fix is a new
+  keypair and a manual reinstall. The workflow refuses to start without the secret, because
+  `createUpdaterArtifacts` with no key produces nothing signed and an unsigned updater payload is worse
+  than none.
+
+Four things came out differently from the design:
+
+- **The `.app` was not signed at all.** With no `signingIdentity`, Tauri runs no `codesign` pass, so
+  the bundle carried only the linker's own ad-hoc mark on one binary and sealed no resources —
+  `codesign --verify` rejects that outright. Electron's `identity: null` does real ad-hoc bundle
+  signing, so gate 0 needed `"signingIdentity": "-"` to be parity rather than something weaker. A Rust
+  test reads the config back and fails if it, `createUpdaterArtifacts`, or the updater public key goes
+  missing.
+- **The shell was looking for the bundled Node in the wrong place.** `externalBin` stages the binary
+  beside the executable, which on macOS is `Contents/MacOS`, and the shell resolved it under
+  `resource_dir()`, which is `Contents/Resources`. Nothing before this phase could have caught it:
+  the path only exists in a packaged build, and no packaged build had been made. The inventory check
+  is what found it.
+- **The DMG's Finder cosmetics do not run.** `bundle_dmg.sh` drives Finder over AppleScript to lay the
+  window out, and that needs an Automation permission no build machine grants; the call times out and
+  fails the bundle. Tauri already skips the step when `CI` is set, so the build script sets it for that
+  one invocation and a local DMG comes out the same shape as the shipped one.
+- **The workflow carries no GitHub OAuth secrets.** `build-dmg.yml` still bakes `MAIN_VITE_GITHUB_*`
+  into the Electron main bundle, but nothing has read them since the GitHub-optional projects model
+  landed. The client id is a node-side plugin read now, from the environment or the data root's `.env`.
+
 ## Signing gates, staged
 
 The macOS constraint is recorded elsewhere and does not change with the shell: there is no Apple
 Developer ID today, and the hosting decision for updates (R2 versus GitHub Releases) is open.
 
-- **Gate 0 — ad-hoc.** Today's parity: `identity: null` equivalent, Gatekeeper friction identical
-  to the current DMG. This is where the migration ships and cuts over.
+- **Gate 0 — ad-hoc.** Met. `bundle.macOS.signingIdentity` is `"-"`, the `identity: null` equivalent:
+  `codesign --verify --deep --strict` passes on the built `.app` and on the DMG-mounted copy, and
+  `spctl` rejects both, which is the same Gatekeeper friction the current DMG has. This is where the
+  migration ships and cuts over.
 - **Gate 1 — Developer ID.** One purchase unblocks three things at once: notarized desktop builds,
   the macOS half of [bundle.md](../bundle.md)'s tarball matrix, and any updater. Sign and
   notarize in the same `tauri build` pass so the `.app`, DMG, and updater payload are one
@@ -57,8 +110,10 @@ why: the plugin buffers whole downloads in memory, cannot abort or resume, and `
 performs no signature verification. The owned path streams to a staged file with resume, enforces
 one live download, and verifies sha256 plus minisign against the baked pubkey before install.
 
-Do now, because it is cheap: generate the minisign keypair, set `createUpdaterArtifacts`, and write
-the release-workflow stance (refuse to publish ad-hoc-signed releases once gate 1 exists).
+Done, because it was cheap: the minisign keypair exists, `createUpdaterArtifacts` is on, and the
+workflow's release job refuses to publish. A tag builds and keeps its artifacts on the run; the publish
+step fails with the gate-1 reason rather than putting a Gatekeeper-blocked download and an
+uninstallable updater payload behind a public link.
 
 Rejected: the plugin end-to-end (unverified install path), building the owned updater before
 signing exists (dead code against a blocked constraint).
@@ -67,3 +122,7 @@ signing exists (dead code against a blocked constraint).
 
 CI produces an installable DMG whose inventory verification passes, and a machine that never had
 the Electron build installs it and passes the smoke checklist in [testing.md](./testing.md).
+
+The first half is met: the build produces `acorn_0.1.0_aarch64.dmg`, the inventory verification passes
+against it, and the DMG mounts with a valid signature. The second half is a person on a second machine,
+and it is the last thing standing between here and the cutover trigger.

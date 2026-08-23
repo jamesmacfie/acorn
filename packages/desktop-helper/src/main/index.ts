@@ -6,7 +6,7 @@ import { FleetStore, toNodeRecord } from './fleetStore'
 import { NodeBroker } from './nodeBroker'
 import { PluginCache } from './pluginCache'
 import { PluginTrustStore } from './pluginTrustStore'
-import { PreviewTunnels } from './previewTunnel'
+import { PreviewTunnels, type TunnelEvents } from './previewTunnel'
 import { ServiceHost } from './serviceHost'
 
 // The custody stack, composed in one place: the broker and its fleet, the device tokens, the plugin
@@ -39,6 +39,10 @@ export type HelperOptions = {
   // Shell-only capabilities the service can call back into (main/desktopCapabilities.ts). Omitted by a
   // shell with no webviews.
   desktopCapabilities?(peer: ServiceRpcPeer): () => void
+  // A preview tunnel opened or closed. Only a shell that cannot inject a request header needs these:
+  // the Tauri shell seeds the listener's secret into the preview webview's cookie store instead
+  // (previewTunnel.ts). Electron leaves it out and keeps using `headersFor`.
+  tunnelEvents?: TunnelEvents
   // The node the renderer was talking to has been replaced, by a restart or by crash recovery. Its
   // endpoint, certificate and token are all new, so whatever is rendering has to start over.
   onNodeReplaced?(): void
@@ -95,17 +99,20 @@ export function createHelper(options: HelperOptions): Helper {
   // Preview tunnels re-resolve their node from the same fleet store the broker reads on every connection,
   // so updated endpoint, token, and certificate records are applied to new connections. Established
   // pipes are torn down explicitly by restart, adoption, and forget operations.
-  const tunnels = new PreviewTunnels((nodeId) => {
-    const node = fleet.get(nodeId)
-    const token = node && fleet.tokenFor(nodeId)
-    if (!node || !token) return null
-    return {
-      endpoint: node.endpoint,
-      token,
-      ...(node.certPem ? { certPem: node.certPem } : {}),
-      ...(node.fingerprint ? { fingerprint: node.fingerprint } : {}),
-    }
-  })
+  const tunnels = new PreviewTunnels(
+    (nodeId) => {
+      const node = fleet.get(nodeId)
+      const token = node && fleet.tokenFor(nodeId)
+      if (!node || !token) return null
+      return {
+        endpoint: node.endpoint,
+        token,
+        ...(node.certPem ? { certPem: node.certPem } : {}),
+        ...(node.fingerprint ? { fingerprint: node.fingerprint } : {}),
+      }
+    },
+    options.tunnelEvents,
+  )
 
   // Third-party plugin bundles a node has served us, and this device's decisions about running them
   // (docs/plugins.md). Both stores are the host's: the bytes never pass through the renderer, and the

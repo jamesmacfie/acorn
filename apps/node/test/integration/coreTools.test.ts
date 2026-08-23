@@ -9,7 +9,7 @@ import { runAgentTools } from '@acorn/plugin-terminal/main/agentTools.ts'
 import { buildAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
 import { notesAgentTools } from '@acorn/plugin-notes/main/agentTools.ts'
 import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
-import { browserAgentTools } from '@acorn/plugin-preview/server/agentTools.ts'
+import { browserAgentTools } from '@acorn/plugin-browser/server/agentTools.ts'
 
 // The notes_* tools are contributed by the notes plugin. This suite pins their task-scoped default and
 // agent provenance at the composition root.
@@ -66,7 +66,7 @@ describe('the full agent-tool manifest', () => {
     'plugin_request',
   ]
   // Preview tools remain an Electron capability exposed through the same assembled tool manifest.
-  const PREVIEW_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']
+  const BROWSER_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']
   const CHANGES_TOOLS = ['local_changes', 'local_diff', 'git_log']
   const NOTES_TOOLS = ['notes_list', 'notes_read', 'notes_write', 'notes_append']
   const MEMORY_TOOLS = ['memory_search', 'memory_list', 'memory_get', 'memory_write']
@@ -86,7 +86,7 @@ describe('the full agent-tool manifest', () => {
       ]
       // No duplicates: the registry throws on one, so a collision would break the boot, not a call.
       expect(new Set(names).size).toBe(names.length)
-      expect([...names].sort()).toEqual([...CORE_TOOLS, ...CHANGES_TOOLS, ...MEMORY_TOOLS, ...NOTES_TOOLS, ...PREVIEW_TOOLS, ...TERMINAL_TOOLS].sort())
+      expect([...names].sort()).toEqual([...CORE_TOOLS, ...CHANGES_TOOLS, ...MEMORY_TOOLS, ...NOTES_TOOLS, ...BROWSER_TOOLS, ...TERMINAL_TOOLS].sort())
     } finally {
       testDb.cleanup()
     }
@@ -97,6 +97,6 @@ describe('the full agent-tool manifest', () => {
     expect(memoryAgentTools({} as never, {} as never, {} as never).map((tool) => tool.name)).toEqual(MEMORY_TOOLS)
     expect(notesAgentTools({} as never, {} as never).map((tool) => tool.name)).toEqual(NOTES_TOOLS)
     expect(runAgentTools({} as never).map((tool) => tool.name)).toEqual(TERMINAL_TOOLS)
-    expect(browserAgentTools({} as never).map((tool) => tool.name)).toEqual(PREVIEW_TOOLS)
+    expect(browserAgentTools({} as never).map((tool) => tool.name)).toEqual(BROWSER_TOOLS)
   })
 })

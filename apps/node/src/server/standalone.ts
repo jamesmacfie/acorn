@@ -20,7 +20,6 @@ import { buildPluginDeps } from './pluginDeps'
 import { buildPluginStateBridge, effectiveDisabled } from './pluginState'
 import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from './composition'
 import { setWorktreesRoot } from '@acorn/node-core/main/taskWorktree.ts'
-import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 
 // ACORN_DATA_DIR names the data root (docs/data-layer.md § Data root); service/runtime.ts's
 // internalApiEnv hands this node's own child processes the same variable, so one spelling of "which
@@ -68,23 +67,11 @@ let finishReconcile!: () => void
 const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY, capabilities })
 
-// Every method rejects identically. There is no window on a standalone node, so nothing to drive,
-// and a rejection beats a silent empty result: an agent that asked for a snapshot and got nothing
-// back cannot tell "the page is blank" from "there is no browser".
-const browserUnavailable = () => Promise.reject(new Error('The preview browser needs a desktop window; this node is running headless.'))
-const unavailableBrowser: BrowserDesktopCapability = {
-  navigate: browserUnavailable,
-  snapshot: browserUnavailable,
-  click: browserUnavailable,
-  fill: browserUnavailable,
-  screenshot: browserUnavailable,
-  console: browserUnavailable,
-}
-
-// Same plugin list, through the same builder, as the Electron-supervised root
-// (docs/node-distribution.md § Runtime). They differ only where the runtime bridge does, here the
-// preview browser.
-const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: unavailableBrowser }))
+// Same plugin list, through the same builder, as the desktop-supervised root
+// (docs/node-distribution.md § Runtime). Nothing in the bag differs between them any more: the preview
+// browser was the last entry that did, and agent browser automation is a plugin now, with a browser of
+// its own on whichever node runs it.
+const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled }))
 // The node's one scheduler (docs/schedules.md § Why the node, and only the node).
 const scheduler = createScheduler(runtime.DB, { env: runtime })
 const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)

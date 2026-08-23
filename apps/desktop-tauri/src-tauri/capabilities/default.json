@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the renderer may call. `core:default` covers invoke and event listening, which is how the bridge reaches the commands in src/commands.rs. The dialog and opener plugins are deliberately absent: their capabilities belong to our own commands, which enforce the scheme allowlist and the data root, never to the process that renders third-party content.",
-  "windows": ["main"],
+  "description": "What the renderer may call. `core:default` covers invoke and event listening, which is how the bridge reaches the commands in src/commands.rs. The dialog and opener plugins are deliberately absent: their capabilities belong to our own commands, which enforce the scheme allowlist and the data root, never to the process that renders third-party content. Scoped by webview label rather than by window, and that is load-bearing: naming a window grants every webview inside it, which since phase 3 includes the preview pane and plugin webview surfaces — pages this app does not write. Those get no capability at all, so `invoke` reaches nothing from them.",
+  "webviews": ["main"],
   "permissions": ["core:default"]
 }

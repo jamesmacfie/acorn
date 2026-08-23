@@ -12,11 +12,19 @@ publish = false
 name = "acorn_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# The preview pane's devtools item, and the only thing it gates. Tauri exposes `open_devtools` in a
+# debug build for free; a release build has to ask, and a shipped release deliberately does not
+# (src/webviews.rs).
+devtools = ["tauri/devtools"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# `unstable` is what exposes `Window::add_child`, the child-webview API the preview pane and plugin
+# webview surfaces are built on (src/webviews.rs). Phase 0 measured it before the design committed.
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"

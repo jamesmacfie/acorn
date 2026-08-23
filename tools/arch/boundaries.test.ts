@@ -384,9 +384,11 @@ describe('architecture boundaries', () => {
       // until the shell stops naming agents.
       'managedAgents.ts',
     ]
-    // Not in the baseline, because a baseline means "still to fix" and these aren't. Both are name
-    // collisions with core vocabulary, not dependencies.
-    const NAME_COLLISIONS = ['agentContext.ts', 'contextMenus.ts']
+    // Not in the baseline, because a baseline means "still to fix" and these aren't. All three are
+    // name collisions rather than dependencies: the first two with core vocabulary, and
+    // `browserRules.ts` with the `browser` plugin, which arrived long after it. Those rules are the
+    // preview pane's page-fill rules and belong to `preview`; nothing in `plugins/browser` reads them.
+    const NAME_COLLISIONS = ['agentContext.ts', 'browserRules.ts', 'contextMenus.ts']
     const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
     const proto = byName.get('@acorn/protocol')!
     const named = walk(proto.src)

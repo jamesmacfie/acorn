@@ -120,9 +120,6 @@ describe('assembled routes', () => {
         // below: the deps are inert because this suite asserts the mount table and nothing it
         // exercises starts a provider child.
         agents: { internalEnv: () => ({}) },
-        // Inert: this suite asserts the mount table, and preview contributes agent tools, not
-        // routes.
-        preview: { browser: {} as never },
         notes: { internalEnv: () => ({}) },
         // terminal is `required`, so it initializes here whatever this test asks for. Its four
         // composition-root deps are inert stubs: this suite asserts the mount table, and nothing it

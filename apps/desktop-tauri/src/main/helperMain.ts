@@ -3,6 +3,7 @@ import { createInterface } from 'node:readline'
 import { z } from 'zod'
 import { createHelper, type Helper } from '@acorn/desktop-helper/main/index.ts'
 import type { TokenCipher } from '@acorn/desktop-helper/main/deviceTokenStore.ts'
+import { adoptLegacyCustody } from '@acorn/desktop-helper/main/legacyCustody.ts'
 import { startHelperServer, type HelperServer } from './helperServer'
 import { HELPER_PROTOCOL } from '../shared/wire'
 
@@ -42,6 +43,10 @@ const handshakeSchema = z.strictObject({
   isPackaged: z.boolean(),
   // The renderer's origin, checked on the WebSocket upgrade.
   appOrigin: z.string().min(1),
+  // An Electron build's custody root and the safeStorage password its device tokens are under, when
+  // the shell found both. Adopted once, on a first launch that has no fleet of its own
+  // (@acorn/desktop-helper/main/legacyCustody.ts).
+  legacy: z.strictObject({ userDataDir: z.string().min(1), safeStorageKey: z.string().min(1) }).optional(),
 })
 type Handshake = z.infer<typeof handshakeSchema>
 
@@ -71,10 +76,19 @@ const dataKeyCipher = (dataKey: string): TokenCipher => {
 
 // Anything the shell has to react to. Rust reads these off stdout the same way it reads the ready
 // line: `node-replaced` reaches the renderer over the helper socket, but the recovery screen is a
-// native dialog, so the crash budget has to reach Rust.
-const emit = (event: 'crash-budget-exhausted'): void => console.log(JSON.stringify({ [TAG]: event }))
+// native dialog, so the crash budget has to reach Rust — and so does each preview tunnel's secret,
+// which the shell seeds into the pane's cookie store because wry cannot inject a request header
+// (docs/future/tauri/webviews-and-frames.md § Preview pane). This pipe reaches Rust and nothing else,
+// which is why a secret may travel on it.
+const emit = (event: 'crash-budget-exhausted' | 'tunnel-opened' | 'tunnel-closed', detail?: object): void =>
+  console.log(JSON.stringify({ [TAG]: event, ...detail }))
 
 async function boot(handshake: Handshake): Promise<{ helper: Helper; server: HelperServer }> {
+  const tokenCipher = dataKeyCipher(handshake.dataKey)
+  // Before anything reads the fleet, because everything below it assumes the custody root is whatever
+  // it is going to be for this launch.
+  if (handshake.legacy) adoptLegacyCustody(handshake.userDataDir, tokenCipher, handshake.legacy)
+
   for (const file of handshake.envFiles) {
     try {
       process.loadEnvFile(file)
@@ -99,7 +113,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
       ...(handshake.bundledPluginsDir ? { bundledPluginsDir: handshake.bundledPluginsDir } : {}),
     },
     userDataDir: handshake.userDataDir,
-    tokenCipher: dataKeyCipher(handshake.dataKey),
+    tokenCipher,
     // Held as a lookup rather than captured, because the listener does not exist yet and there may be
     // no renderer attached when a frame arrives.
     push: {
@@ -110,8 +124,15 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
     // meaning either way: the node it was talking to has a new endpoint, certificate and token.
     onNodeReplaced: () => server?.push({ push: 'node-replaced' }),
     onCrashBudgetExhausted: () => emit('crash-budget-exhausted'),
-    // No desktopCapabilities: the phase-2 shell has no webviews, so the service's calls into them
-    // answer "unavailable" by themselves (docs/future/tauri/sequencing.md § Phase 2).
+    tunnelEvents: {
+      opened: (port, secret) => emit('tunnel-opened', { port, secret }),
+      closed: (port) => emit('tunnel-closed', { port }),
+    },
+    // No desktopCapabilities. `DesktopCapabilities.preview` has no caller in the node — nothing
+    // reachable from `apps/node/src/service/runtime.ts` reads it — and `DesktopCapabilities.browser`
+    // is the CDP driver that leaves the shell entirely for a Playwright plugin
+    // (docs/future/tauri/webviews-and-frames.md § Agent browser automation). A shell that registered
+    // neither answers "unavailable" by itself, which is what both callers already handle.
   })
 
   await helper.start()

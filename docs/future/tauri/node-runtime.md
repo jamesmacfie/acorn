@@ -1,6 +1,6 @@
 # Node runtime
 
-Status: proposal, 2026-08-22; phase 2 built it, 2026-08-23.
+Status: proposal, 2026-08-22; phase 2 built it and phase 4 finished it, 2026-08-23.
 
 ## The problem
 
@@ -19,10 +19,12 @@ what sets the floor, [docs/node-distribution.md](../../node-distribution.md)), a
 `process.version` in its ready line so the boot test can assert the runtime that booted is the one
 the pin names.
 
-The staging script copies the running Node rather than downloading one, and refuses to run when that
-Node is not the pinned version. That is enough for a developer build and nothing else: a release has
-to fetch the pinned build for its target and verify it against nodejs.org's `SHASUMS`, which is phase
-4's work ([packaging-and-release.md](./packaging-and-release.md)).
+The staging script fetches the pinned build for its target from nodejs.org and verifies it against
+that release's `SHASUMS256.txt` before it goes anywhere near the bundle
+(`apps/desktop-tauri/scripts/nodeRuntime.mjs`). It caches the extracted binary with its digest beside
+it, so a re-stage re-verifies without the network. Phase 2 copied whichever Node was running the
+script and refused when that was not the pin; phase 4 replaced that with one path, so a developer
+build and a release bundle the same verified bytes and nobody has to switch runtimes to stage.
 
 The helper from [architecture.md](./architecture.md) is launched as `node-<triple> helper.js`.
 Because the helper is a real Node process:
