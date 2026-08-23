@@ -7,14 +7,27 @@ import type {
   AgentNormalizedEvent,
   AgentRequest,
   AgentSession,
+  AgentSubagent,
   AgentTurn,
 } from '@acorn/protocol/managedAgents.ts'
 import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '@acorn/protocol/managedAgents.ts'
 import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import type { RemovedArtifactObject } from './artifactStore'
-import { projectAgentEvent } from './stateMachine'
+import { foldSubagentRoster, projectAgentEvent } from './stateMachine'
 
 const now = (): number => Date.now()
+
+// Tolerant on purpose: a roster that cannot be decoded starts over rather than failing the event
+// insert. Losing the roster costs a sidebar row; failing the insert loses the transcript.
+const parseSubagents = (value: string | null): AgentSubagent[] => {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return Array.isArray(parsed) ? parsed as AgentSubagent[] : []
+  } catch {
+    return []
+  }
+}
 
 type SessionSearchFilter = {
   taskId?: string
@@ -67,6 +80,7 @@ export class AgentSessionRepository {
         .select({
           lastEventSeq: schema.agentSessions.lastEventSeq,
           configJson: schema.agentSessions.configJson,
+          subagentsJson: schema.agentSessions.subagentsJson,
         })
         .from(schema.agentSessions)
         .where(eq(schema.agentSessions.id, sessionId))
@@ -81,6 +95,19 @@ export class AgentSessionRepository {
             ...(event.skills ? { skills: event.skills } : {}),
           })
         : projection.configJson
+      // The subagent roster projected onto the row in the same transaction as the event insert, so a
+      // reader can never see a roster that disagrees with the ledger it was folded from. It is on the
+      // row rather than in a table of its own because runtimeEngine.record() already broadcasts the
+      // row after every event, which is what makes the sidebar's sub-rows live for a session nobody
+      // has opened (docs/managed-agents.md § Subagents).
+      const subagentsJson = event.type === 'subagent'
+        ? JSON.stringify(foldSubagentRoster(
+            parseSubagents(current.subagentsJson),
+            event.subagent,
+            turnId,
+            timestamp,
+          ))
+        : undefined
       tx.update(schema.agentSessions)
         .set({
           lastEventSeq: seq,
@@ -89,6 +116,7 @@ export class AgentSessionRepository {
           ...(projection.attention ? { attention: projection.attention } : {}),
           ...(projection.providerSessionRef ? { providerSessionRef: projection.providerSessionRef } : {}),
           ...(configJson ? { configJson } : {}),
+          ...(subagentsJson ? { subagentsJson } : {}),
         })
         .where(eq(schema.agentSessions.id, sessionId))
         .run()

@@ -24,7 +24,7 @@ export async function buildCompletedTurnTranscript(store: AgentStore, sessionId:
     turn ? `User:\n${agentTurnInputText(turn)}` : '',
     ...events.flatMap((record) => {
       if (record.event.type === 'assistant_message') return [`Assistant:\n${record.event.text}`]
-      if (record.event.type === 'tool') return [`Tool: ${record.event.tool.title} (${record.event.tool.status})`]
+      if (record.event.type === 'tool') return [`Tool: ${record.event.tool.title} (${record.event.tool.status ?? 'running'})`]
       if (record.event.type === 'file_change') return [`File change: ${record.event.path ?? record.event.summary ?? 'unknown'}`]
       return []
     }),

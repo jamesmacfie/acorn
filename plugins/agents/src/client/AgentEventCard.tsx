@@ -1,11 +1,13 @@
-import { For, Show } from 'solid-js'
+import { createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
 import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
 import { managedAgentApi } from './managedClient'
 import { AgentToolCallCard } from './toolRendererRegistry'
-import { Button } from '@acorn/plugin-api/ui'
+import { Button, StatusDot } from '@acorn/plugin-api/ui'
+import { subagentTone } from './stateTone'
+import { subagentSummary } from './subagentDisplay'
 
 const copy = (text: string): void => {
   void navigator.clipboard.writeText(text)
@@ -20,6 +22,7 @@ async function downloadArtifact(artifactId: string, title: string): Promise<void
   anchor.click()
   URL.revokeObjectURL(url)
 }
+
 
 export default function AgentEventCard(props: { item: AgentConversationItem; taskId: string; turn?: AgentTurn }) {
   const event = () => props.item.event
@@ -89,6 +92,37 @@ export default function AgentEventCard(props: { item: AgentConversationItem; tas
         {(() => {
           const tool = (event() as Extract<ReturnType<typeof event>, { type: 'tool' }>).tool
           return <AgentToolCallCard tool={tool} taskId={props.taskId} />
+        })()}
+      </Show>
+      <Show when={event().type === 'subagent'}>
+        {(() => {
+          const subagent = () => (event() as Extract<ReturnType<typeof event>, { type: 'subagent' }>).subagent
+          // Seeded open, then the reader's own. A reactive `open` would slam the card shut the moment
+          // the subagent finished, which is the one moment somebody is most likely to be reading it.
+          const [open, setOpen] = createSignal(true)
+          return (
+            <details
+              class="agent-subagent"
+              data-subagent={subagent().id}
+              data-status={subagent().status ?? 'running'}
+              open={open()}
+              onToggle={(toggle) => setOpen(toggle.currentTarget.open)}
+            >
+              <summary>
+                <StatusDot tone={subagentTone(subagent().status)} />
+                <span class="agent-subagent-title">{subagent().title ?? 'Subagent'}</span>
+                <span class="muted">{subagentSummary(subagent())}</span>
+              </summary>
+              {/* `Index`, not `For`, for the reason AgentTranscript states: buildConversationItems
+                  rebuilds every item object on every snapshot, so reference keying would replace this
+                  DOM, and any selection in it, on each streamed event. */}
+              <div class="agent-subagent-stream">
+                <Index each={props.item.children ?? []}>
+                  {(child) => <AgentEventCard item={child()} taskId={props.taskId} turn={props.turn} />}
+                </Index>
+              </div>
+            </details>
+          )
         })()}
       </Show>
       <Show when={event().type === 'plan'}>

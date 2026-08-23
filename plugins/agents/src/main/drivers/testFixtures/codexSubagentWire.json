@@ -1,0 +1,1649 @@
+{
+ "capturedWith": {
+  "cli": "codex-cli 0.146.1",
+  "model": "gpt-5.6-luna"
+ },
+ "prompt": "two subagents, alpha and beta, each returning one word",
+ "notes": [
+  "Every notification, in order. Children get NO thread/started on this version: the only",
+  "registration signal is the parent-side subAgentActivity item. The first child notification",
+  "precedes that item, so registration must tolerate child-first arrival."
+ ],
+ "rootThreadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+ "childThreadIds": [
+  "01a02e00-48ab-7ae1-9541-6568fca7c147",
+  "01a02e00-5bd3-7a52-987c-2d181b82bcbd"
+ ],
+ "notifications": [
+  {
+   "method": "remoteControl/status/changed",
+   "params": {
+    "status": "disabled",
+    "serverName": "Zoidberg.local",
+    "installationId": "a5066580-76d0-49a6-ae01-1b40c02fefd3",
+    "environmentId": null
+   }
+  },
+  {
+   "method": "thread/started",
+   "params": {
+    "thread": {
+     "id": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+     "extra": null,
+     "sessionId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+     "forkedFromId": null,
+     "parentThreadId": null,
+     "preview": "",
+     "ephemeral": false,
+     "isPinned": false,
+     "historyMode": "legacy",
+     "modelProvider": "openai",
+     "createdAt": 1787478158,
+     "updatedAt": 1787478158,
+     "recencyAt": 1787478158,
+     "status": {
+      "type": "idle"
+     },
+     "path": "/Users/jamesmacfie/.codex/sessions/2026/08/23/rollout-2026-08-23T21-42-38-01a02e00-2b7c-74a0-a913-5ddeafbc6387.jsonl",
+     "cwd": "/tmp/acorn-subagent-probe/work",
+     "cliVersion": "0.146.1",
+     "source": "vscode",
+     "canAcceptDirectInput": true,
+     "threadSource": "appServer",
+     "agentNickname": null,
+     "agentRole": null,
+     "gitInfo": null,
+     "name": null,
+     "turns": []
+    }
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "node_repl",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "codex_apps",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "acorn",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "playwright",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "acorn-dev",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "thread/status/changed",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "status": {
+     "type": "active",
+     "activeFlags": []
+    }
+   }
+  },
+  {
+   "method": "turn/started",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turn": {
+     "id": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+     "items": [],
+     "itemsView": "notLoaded",
+     "status": "inProgress",
+     "error": null,
+     "startedAt": 1787478158,
+     "completedAt": null,
+     "durationMs": null
+    }
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "acorn-dev",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "acorn",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "node_repl",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "codex_apps",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "playwright",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "node_repl",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "playwright",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "node_repl",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "codex_apps",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "playwright",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "codex_apps",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "acorn-dev",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "name": "acorn",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "hook/started",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "session-start:2:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "eventName": "sessionStart",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "thread",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 2,
+     "status": "running",
+     "statusMessage": null,
+     "startedAt": 1787478161,
+     "completedAt": null,
+     "durationMs": null,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "hook/completed",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "session-start:2:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "eventName": "sessionStart",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "thread",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 2,
+     "status": "completed",
+     "statusMessage": null,
+     "startedAt": 1787478161,
+     "completedAt": 1787478161,
+     "durationMs": 69,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "hook/started",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "user-prompt-submit:3:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "eventName": "userPromptSubmit",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 3,
+     "status": "running",
+     "statusMessage": null,
+     "startedAt": 1787478161,
+     "completedAt": null,
+     "durationMs": null,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "hook/completed",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "user-prompt-submit:3:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "eventName": "userPromptSubmit",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 3,
+     "status": "completed",
+     "statusMessage": null,
+     "startedAt": 1787478161,
+     "completedAt": 1787478161,
+     "durationMs": 74,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "userMessage",
+     "id": "01a02e00-375f-7061-90b5-b267dd13c1f1",
+     "clientId": "probe-turn-1",
+     "content": [
+      {
+       "type": "text",
+       "text": "Spawn two subagents, one named alpha and one named beta. Ask alpha for a one-word colour and beta for a one-word animal. Wait for both, then reply with just those two words. Do not run any shell commands and do not write any files.",
+       "text_elements": []
+      }
+     ]
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "startedAtMs": 1787478161247
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "userMessage",
+     "id": "01a02e00-375f-7061-90b5-b267dd13c1f1",
+     "clientId": "probe-turn-1",
+     "content": [
+      {
+       "type": "text",
+       "text": "Spawn two subagents, one named alpha and one named beta. Ask alpha for a one-word colour and beta for a one-word animal. Wait for both, then reply with just those two words. Do not run any shell commands and do not write any files.",
+       "text_elements": []
+      }
+     ]
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "completedAtMs": 1787478161247
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "reasoning",
+     "id": "rs_0cde330dfa88e3d2016a8ac093a29c87d0b2201ca76ef0541f",
+     "summary": [],
+     "content": []
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "startedAtMs": 1787478163645
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "reasoning",
+     "id": "rs_0cde330dfa88e3d2016a8ac093a29c87d0b2201ca76ef0541f",
+     "summary": [],
+     "content": []
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "completedAtMs": 1787478165152
+   }
+  },
+  {
+   "method": "thread/status/changed",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "status": {
+     "type": "idle"
+    }
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "subAgentActivity",
+     "id": "call_xMGSI8fj9FUOhuXmMifE6VqY",
+     "kind": "started",
+     "agentThreadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+     "agentPath": "/root/alpha"
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "startedAtMs": 1787478165812
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "subAgentActivity",
+     "id": "call_xMGSI8fj9FUOhuXmMifE6VqY",
+     "kind": "started",
+     "agentThreadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+     "agentPath": "/root/alpha"
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "completedAtMs": 1787478165812
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "acorn-dev",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "node_repl",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "acorn",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "codex_apps",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "playwright",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "hook/started",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "post-tool-use:1:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json:call_xMGSI8fj9FUOhuXmMifE6VqY",
+     "eventName": "postToolUse",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 1,
+     "status": "running",
+     "statusMessage": null,
+     "startedAt": 1787478165,
+     "completedAt": null,
+     "durationMs": null,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "thread/status/changed",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "status": {
+     "type": "active",
+     "activeFlags": []
+    }
+   }
+  },
+  {
+   "method": "turn/started",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "turn": {
+     "id": "01a02e00-4934-70f2-837d-f5c1807610c7",
+     "items": [],
+     "itemsView": "notLoaded",
+     "status": "inProgress",
+     "error": null,
+     "startedAt": 1787478165,
+     "completedAt": null,
+     "durationMs": null
+    }
+   }
+  },
+  {
+   "method": "hook/completed",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "post-tool-use:1:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json:call_xMGSI8fj9FUOhuXmMifE6VqY",
+     "eventName": "postToolUse",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 1,
+     "status": "completed",
+     "statusMessage": null,
+     "startedAt": 1787478165,
+     "completedAt": 1787478165,
+     "durationMs": 64,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "thread/tokenUsage/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "tokenUsage": {
+     "total": {
+      "totalTokens": 20853,
+      "inputTokens": 20739,
+      "cachedInputTokens": 11008,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 114,
+      "reasoningOutputTokens": 74
+     },
+     "last": {
+      "totalTokens": 20853,
+      "inputTokens": 20739,
+      "cachedInputTokens": 11008,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 114,
+      "reasoningOutputTokens": 74
+     },
+     "modelContextWindow": 258400
+    }
+   }
+  },
+  {
+   "method": "account/rateLimits/updated",
+   "params": {
+    "rateLimits": {
+     "limitId": "codex",
+     "limitName": null,
+     "primary": {
+      "usedPercent": 0,
+      "windowDurationMins": 10080,
+      "resetsAt": 1788082961
+     },
+     "secondary": null,
+     "credits": {
+      "hasCredits": false,
+      "unlimited": false,
+      "balance": null
+     },
+     "individualLimit": null,
+     "spendControlReached": null,
+     "planType": "team",
+     "rateLimitReachedType": null
+    }
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "acorn-dev",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "node_repl",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "acorn",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "playwright",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "name": "codex_apps",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "thread/status/changed",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "status": {
+     "type": "idle"
+    }
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "subAgentActivity",
+     "id": "call_ePUpIexYPZKXbmSgcZAXLJJZ",
+     "kind": "started",
+     "agentThreadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+     "agentPath": "/root/beta"
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "startedAtMs": 1787478170659
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "subAgentActivity",
+     "id": "call_ePUpIexYPZKXbmSgcZAXLJJZ",
+     "kind": "started",
+     "agentThreadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+     "agentPath": "/root/beta"
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "completedAtMs": 1787478170659
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "acorn-dev",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "playwright",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "acorn",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "codex_apps",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "node_repl",
+    "status": "starting",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "hook/started",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "post-tool-use:1:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json:call_ePUpIexYPZKXbmSgcZAXLJJZ",
+     "eventName": "postToolUse",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 1,
+     "status": "running",
+     "statusMessage": null,
+     "startedAt": 1787478170,
+     "completedAt": null,
+     "durationMs": null,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "thread/status/changed",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "status": {
+     "type": "active",
+     "activeFlags": []
+    }
+   }
+  },
+  {
+   "method": "turn/started",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "turn": {
+     "id": "01a02e00-5c22-78d0-99a8-d95c818dcc03",
+     "items": [],
+     "itemsView": "notLoaded",
+     "status": "inProgress",
+     "error": null,
+     "startedAt": 1787478170,
+     "completedAt": null,
+     "durationMs": null
+    }
+   }
+  },
+  {
+   "method": "hook/completed",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "post-tool-use:1:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json:call_ePUpIexYPZKXbmSgcZAXLJJZ",
+     "eventName": "postToolUse",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 1,
+     "status": "completed",
+     "statusMessage": null,
+     "startedAt": 1787478170,
+     "completedAt": 1787478170,
+     "durationMs": 17,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "thread/tokenUsage/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "tokenUsage": {
+     "total": {
+      "totalTokens": 41765,
+      "inputTokens": 41613,
+      "cachedInputTokens": 31232,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 152,
+      "reasoningOutputTokens": 74
+     },
+     "last": {
+      "totalTokens": 20912,
+      "inputTokens": 20874,
+      "cachedInputTokens": 20224,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 38,
+      "reasoningOutputTokens": 0
+     },
+     "modelContextWindow": 258400
+    }
+   }
+  },
+  {
+   "method": "account/rateLimits/updated",
+   "params": {
+    "rateLimits": {
+     "limitId": "codex",
+     "limitName": null,
+     "primary": {
+      "usedPercent": 0,
+      "windowDurationMins": 10080,
+      "resetsAt": 1788082966
+     },
+     "secondary": null,
+     "credits": {
+      "hasCredits": false,
+      "unlimited": false,
+      "balance": null
+     },
+     "individualLimit": null,
+     "spendControlReached": null,
+     "planType": "team",
+     "rateLimitReachedType": null
+    }
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "acorn-dev",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "node_repl",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "acorn",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "reasoning",
+     "id": "rs_060e74f2ea02ac69016a8ac09b142887d0879af004159a5896",
+     "summary": [],
+     "content": []
+    },
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "turnId": "01a02e00-4934-70f2-837d-f5c1807610c7",
+    "startedAtMs": 1787478171079
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "reasoning",
+     "id": "rs_060e74f2ea02ac69016a8ac09b142887d0879af004159a5896",
+     "summary": [],
+     "content": []
+    },
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "turnId": "01a02e00-4934-70f2-837d-f5c1807610c7",
+    "completedAtMs": 1787478171208
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "agentMessage",
+     "id": "msg_060e74f2ea02ac69016a8ac09b2fbc87d0bee455a7d3f38a92",
+     "text": "",
+     "phase": "final_answer",
+     "memoryCitation": null
+    },
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "turnId": "01a02e00-4934-70f2-837d-f5c1807610c7",
+    "startedAtMs": 1787478171209
+   }
+  },
+  {
+   "method": "item/agentMessage/delta",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "turnId": "01a02e00-4934-70f2-837d-f5c1807610c7",
+    "itemId": "msg_060e74f2ea02ac69016a8ac09b2fbc87d0bee455a7d3f38a92",
+    "delta": "Te"
+   }
+  },
+  {
+   "method": "item/agentMessage/delta",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "turnId": "01a02e00-4934-70f2-837d-f5c1807610c7",
+    "itemId": "msg_060e74f2ea02ac69016a8ac09b2fbc87d0bee455a7d3f38a92",
+    "delta": "al"
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "agentMessage",
+     "id": "msg_060e74f2ea02ac69016a8ac09b2fbc87d0bee455a7d3f38a92",
+     "text": "Teal",
+     "phase": "final_answer",
+     "memoryCitation": null
+    },
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "turnId": "01a02e00-4934-70f2-837d-f5c1807610c7",
+    "completedAtMs": 1787478171348
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "codex_apps",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "thread/tokenUsage/updated",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "turnId": "01a02e00-4934-70f2-837d-f5c1807610c7",
+    "tokenUsage": {
+     "total": {
+      "totalTokens": 20740,
+      "inputTokens": 20721,
+      "cachedInputTokens": 11008,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 19,
+      "reasoningOutputTokens": 11
+     },
+     "last": {
+      "totalTokens": 20740,
+      "inputTokens": 20721,
+      "cachedInputTokens": 11008,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 19,
+      "reasoningOutputTokens": 11
+     },
+     "modelContextWindow": 258400
+    }
+   }
+  },
+  {
+   "method": "account/rateLimits/updated",
+   "params": {
+    "rateLimits": {
+     "limitId": "codex",
+     "limitName": null,
+     "primary": {
+      "usedPercent": 0,
+      "windowDurationMins": 10080,
+      "resetsAt": 1788082966
+     },
+     "secondary": null,
+     "credits": {
+      "hasCredits": false,
+      "unlimited": false,
+      "balance": null
+     },
+     "individualLimit": null,
+     "spendControlReached": null,
+     "planType": "team",
+     "rateLimitReachedType": null
+    }
+   }
+  },
+  {
+   "method": "mcpServer/startupStatus/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "name": "playwright",
+    "status": "ready",
+    "error": null,
+    "failureReason": null
+   }
+  },
+  {
+   "method": "thread/status/changed",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "status": {
+     "type": "idle"
+    }
+   }
+  },
+  {
+   "method": "turn/completed",
+   "params": {
+    "threadId": "01a02e00-48ab-7ae1-9541-6568fca7c147",
+    "turn": {
+     "id": "01a02e00-4934-70f2-837d-f5c1807610c7",
+     "items": [
+      {
+       "type": "agentMessage",
+       "id": "msg_060e74f2ea02ac69016a8ac09b2fbc87d0bee455a7d3f38a92",
+       "text": "Teal",
+       "phase": "final_answer",
+       "memoryCitation": null
+      }
+     ],
+     "itemsView": "summary",
+     "status": "completed",
+     "error": null,
+     "startedAt": 1787478165,
+     "completedAt": 1787478171,
+     "durationMs": 5771
+    }
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "reasoning",
+     "id": "rs_0cde330dfa88e3d2016a8ac09c00bc87d089663b066de08713",
+     "summary": [],
+     "content": []
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "startedAtMs": 1787478172005
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "reasoning",
+     "id": "rs_0cde330dfa88e3d2016a8ac09c00bc87d089663b066de08713",
+     "summary": [],
+     "content": []
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "completedAtMs": 1787478172328
+   }
+  },
+  {
+   "method": "thread/tokenUsage/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "tokenUsage": {
+     "total": {
+      "totalTokens": 41765,
+      "inputTokens": 41613,
+      "cachedInputTokens": 31232,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 152,
+      "reasoningOutputTokens": 74
+     },
+     "last": {
+      "totalTokens": 20912,
+      "inputTokens": 20874,
+      "cachedInputTokens": 20224,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 38,
+      "reasoningOutputTokens": 0
+     },
+     "modelContextWindow": 258400
+    }
+   }
+  },
+  {
+   "method": "account/rateLimits/updated",
+   "params": {
+    "rateLimits": {
+     "limitId": "codex",
+     "limitName": null,
+     "primary": {
+      "usedPercent": 0,
+      "windowDurationMins": 10080,
+      "resetsAt": 1788082966
+     },
+     "secondary": null,
+     "credits": {
+      "hasCredits": false,
+      "unlimited": false,
+      "balance": null
+     },
+     "individualLimit": null,
+     "spendControlReached": null,
+     "planType": "team",
+     "rateLimitReachedType": null
+    }
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "collabAgentToolCall",
+     "id": "call_5cSN6cqMz0g2wXmgYYyUjYMc",
+     "tool": "wait",
+     "status": "inProgress",
+     "senderThreadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+     "receiverThreadIds": [],
+     "prompt": null,
+     "model": null,
+     "reasoningEffort": null,
+     "agentsStates": {}
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "startedAtMs": 1787478175319
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "agentMessage",
+     "id": "msg_0c82b77d571637d3016a8ac09ff50c87d0bb30c96598b4377f",
+     "text": "",
+     "phase": "final_answer",
+     "memoryCitation": null
+    },
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "turnId": "01a02e00-5c22-78d0-99a8-d95c818dcc03",
+    "startedAtMs": 1787478175951
+   }
+  },
+  {
+   "method": "item/agentMessage/delta",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "turnId": "01a02e00-5c22-78d0-99a8-d95c818dcc03",
+    "itemId": "msg_0c82b77d571637d3016a8ac09ff50c87d0bb30c96598b4377f",
+    "delta": "Ot"
+   }
+  },
+  {
+   "method": "item/agentMessage/delta",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "turnId": "01a02e00-5c22-78d0-99a8-d95c818dcc03",
+    "itemId": "msg_0c82b77d571637d3016a8ac09ff50c87d0bb30c96598b4377f",
+    "delta": "ter"
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "agentMessage",
+     "id": "msg_0c82b77d571637d3016a8ac09ff50c87d0bb30c96598b4377f",
+     "text": "Otter",
+     "phase": "final_answer",
+     "memoryCitation": null
+    },
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "turnId": "01a02e00-5c22-78d0-99a8-d95c818dcc03",
+    "completedAtMs": 1787478176459
+   }
+  },
+  {
+   "method": "thread/tokenUsage/updated",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "turnId": "01a02e00-5c22-78d0-99a8-d95c818dcc03",
+    "tokenUsage": {
+     "total": {
+      "totalTokens": 20727,
+      "inputTokens": 20721,
+      "cachedInputTokens": 20224,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 6,
+      "reasoningOutputTokens": 0
+     },
+     "last": {
+      "totalTokens": 20727,
+      "inputTokens": 20721,
+      "cachedInputTokens": 20224,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 6,
+      "reasoningOutputTokens": 0
+     },
+     "modelContextWindow": 258400
+    }
+   }
+  },
+  {
+   "method": "account/rateLimits/updated",
+   "params": {
+    "rateLimits": {
+     "limitId": "codex",
+     "limitName": null,
+     "primary": {
+      "usedPercent": 0,
+      "windowDurationMins": 10080,
+      "resetsAt": 1788082966
+     },
+     "secondary": null,
+     "credits": {
+      "hasCredits": false,
+      "unlimited": false,
+      "balance": null
+     },
+     "individualLimit": null,
+     "spendControlReached": null,
+     "planType": "team",
+     "rateLimitReachedType": null
+    }
+   }
+  },
+  {
+   "method": "thread/status/changed",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "status": {
+     "type": "idle"
+    }
+   }
+  },
+  {
+   "method": "turn/completed",
+   "params": {
+    "threadId": "01a02e00-5bd3-7a52-987c-2d181b82bcbd",
+    "turn": {
+     "id": "01a02e00-5c22-78d0-99a8-d95c818dcc03",
+     "items": [
+      {
+       "type": "agentMessage",
+       "id": "msg_0c82b77d571637d3016a8ac09ff50c87d0bb30c96598b4377f",
+       "text": "Otter",
+       "phase": "final_answer",
+       "memoryCitation": null
+      }
+     ],
+     "itemsView": "summary",
+     "status": "completed",
+     "error": null,
+     "startedAt": 1787478170,
+     "completedAt": 1787478176,
+     "durationMs": 5823
+    }
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "collabAgentToolCall",
+     "id": "call_5cSN6cqMz0g2wXmgYYyUjYMc",
+     "tool": "wait",
+     "status": "completed",
+     "senderThreadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+     "receiverThreadIds": [],
+     "prompt": null,
+     "model": null,
+     "reasoningEffort": null,
+     "agentsStates": {}
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "completedAtMs": 1787478176476
+   }
+  },
+  {
+   "method": "hook/started",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "post-tool-use:1:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json:call_5cSN6cqMz0g2wXmgYYyUjYMc",
+     "eventName": "postToolUse",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 1,
+     "status": "running",
+     "statusMessage": null,
+     "startedAt": 1787478176,
+     "completedAt": null,
+     "durationMs": null,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "hook/completed",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "post-tool-use:1:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json:call_5cSN6cqMz0g2wXmgYYyUjYMc",
+     "eventName": "postToolUse",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 1,
+     "status": "completed",
+     "statusMessage": null,
+     "startedAt": 1787478176,
+     "completedAt": 1787478176,
+     "durationMs": 13,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "thread/tokenUsage/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "tokenUsage": {
+     "total": {
+      "totalTokens": 62767,
+      "inputTokens": 62593,
+      "cachedInputTokens": 51456,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 174,
+      "reasoningOutputTokens": 74
+     },
+     "last": {
+      "totalTokens": 21002,
+      "inputTokens": 20980,
+      "cachedInputTokens": 20224,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 22,
+      "reasoningOutputTokens": 0
+     },
+     "modelContextWindow": 258400
+    }
+   }
+  },
+  {
+   "method": "account/rateLimits/updated",
+   "params": {
+    "rateLimits": {
+     "limitId": "codex",
+     "limitName": null,
+     "primary": {
+      "usedPercent": 0,
+      "windowDurationMins": 10080,
+      "resetsAt": 1788082966
+     },
+     "secondary": null,
+     "credits": {
+      "hasCredits": false,
+      "unlimited": false,
+      "balance": null
+     },
+     "individualLimit": null,
+     "spendControlReached": null,
+     "planType": "team",
+     "rateLimitReachedType": null
+    }
+   }
+  },
+  {
+   "method": "item/started",
+   "params": {
+    "item": {
+     "type": "agentMessage",
+     "id": "msg_0cde330dfa88e3d2016a8ac0a32d2887d0b16b6997e41cb147",
+     "text": "",
+     "phase": "final_answer",
+     "memoryCitation": null
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "startedAtMs": 1787478179158
+   }
+  },
+  {
+   "method": "item/agentMessage/delta",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "itemId": "msg_0cde330dfa88e3d2016a8ac0a32d2887d0b16b6997e41cb147",
+    "delta": "Te"
+   }
+  },
+  {
+   "method": "item/agentMessage/delta",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "itemId": "msg_0cde330dfa88e3d2016a8ac0a32d2887d0b16b6997e41cb147",
+    "delta": "al"
+   }
+  },
+  {
+   "method": "item/agentMessage/delta",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "itemId": "msg_0cde330dfa88e3d2016a8ac0a32d2887d0b16b6997e41cb147",
+    "delta": " Ot"
+   }
+  },
+  {
+   "method": "item/agentMessage/delta",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "itemId": "msg_0cde330dfa88e3d2016a8ac0a32d2887d0b16b6997e41cb147",
+    "delta": "ter"
+   }
+  },
+  {
+   "method": "item/completed",
+   "params": {
+    "item": {
+     "type": "agentMessage",
+     "id": "msg_0cde330dfa88e3d2016a8ac0a32d2887d0b16b6997e41cb147",
+     "text": "Teal Otter",
+     "phase": "final_answer",
+     "memoryCitation": null
+    },
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "completedAtMs": 1787478179265
+   }
+  },
+  {
+   "method": "thread/tokenUsage/updated",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "tokenUsage": {
+     "total": {
+      "totalTokens": 83838,
+      "inputTokens": 83656,
+      "cachedInputTokens": 71680,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 182,
+      "reasoningOutputTokens": 74
+     },
+     "last": {
+      "totalTokens": 21071,
+      "inputTokens": 21063,
+      "cachedInputTokens": 20224,
+      "cacheWriteInputTokens": 0,
+      "outputTokens": 8,
+      "reasoningOutputTokens": 0
+     },
+     "modelContextWindow": 258400
+    }
+   }
+  },
+  {
+   "method": "account/rateLimits/updated",
+   "params": {
+    "rateLimits": {
+     "limitId": "codex",
+     "limitName": null,
+     "primary": {
+      "usedPercent": 0,
+      "windowDurationMins": 10080,
+      "resetsAt": 1788082966
+     },
+     "secondary": null,
+     "credits": {
+      "hasCredits": false,
+      "unlimited": false,
+      "balance": null
+     },
+     "individualLimit": null,
+     "spendControlReached": null,
+     "planType": "team",
+     "rateLimitReachedType": null
+    }
+   }
+  },
+  {
+   "method": "hook/started",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "stop:4:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "eventName": "stop",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 4,
+     "status": "running",
+     "statusMessage": null,
+     "startedAt": 1787478179,
+     "completedAt": null,
+     "durationMs": null,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "hook/completed",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turnId": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+    "run": {
+     "id": "stop:4:/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "eventName": "stop",
+     "handlerType": "command",
+     "executionMode": "sync",
+     "scope": "turn",
+     "sourcePath": "/Users/jamesmacfie/.codex/plugins/cache/codex-warp/warp/0.4.0/hooks/hooks.json",
+     "source": "plugin",
+     "displayOrder": 4,
+     "status": "completed",
+     "statusMessage": null,
+     "startedAt": 1787478179,
+     "completedAt": 1787478179,
+     "durationMs": 70,
+     "entries": []
+    }
+   }
+  },
+  {
+   "method": "thread/status/changed",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "status": {
+     "type": "idle"
+    }
+   }
+  },
+  {
+   "method": "turn/completed",
+   "params": {
+    "threadId": "01a02e00-2b7c-74a0-a913-5ddeafbc6387",
+    "turn": {
+     "id": "01a02e00-2c44-7d81-8357-83d3e9646fad",
+     "items": [
+      {
+       "type": "agentMessage",
+       "id": "msg_0cde330dfa88e3d2016a8ac0a32d2887d0b16b6997e41cb147",
+       "text": "Teal Otter",
+       "phase": "final_answer",
+       "memoryCitation": null
+      }
+     ],
+     "itemsView": "summary",
+     "status": "completed",
+     "error": null,
+     "startedAt": 1787478158,
+     "completedAt": 1787478179,
+     "durationMs": 21012
+    }
+   }
+  }
+ ]
+}

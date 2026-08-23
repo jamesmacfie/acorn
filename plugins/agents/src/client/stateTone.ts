@@ -4,6 +4,8 @@
 // knowing what "reconnecting" means, so the plugin decides once, here. See docs/ui-design.md §
 // Primitive adoption ratchet for why StatusDot replaced each plugin's own colour vocabulary.
 
+import type { AgentSubagentStatus } from '@acorn/protocol/managedAgents.ts'
+
 type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'accent'
 
 /** A managed session's runtime state, as shown in the pane header, task sidebar and Agent Center. */
@@ -17,6 +19,16 @@ export const runtimeTone = (state: string): Tone => {
 
 /* A tool call's dot lives elsewhere: its status is a protocol type the changes plugin also renders,
    so `agentToolTone` sits beside the renderer contract in client-core instead. */
+
+/** A subagent's status, in its transcript card and its sidebar row. `idle` is settled rather than
+ *  in flight: a Codex child rests resumable when it is done, and an accent dot on a resting subagent
+ *  reads as stuck. The word for each status lives in subagentDisplay.ts. */
+export const subagentTone = (status: AgentSubagentStatus | undefined): Tone => {
+  if (status === 'running' || status === 'pending') return 'accent'
+  if (status === 'completed') return 'ok'
+  if (status === 'failed') return 'bad'
+  return 'muted'
+}
 
 /** A provider's install/auth health in the Agent Center header. */
 export const providerTone = (health: 'ok' | 'error' | 'missing'): Tone => {

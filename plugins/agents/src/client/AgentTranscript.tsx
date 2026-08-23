@@ -11,6 +11,7 @@ const VISIBLE_EVENT_TYPES = new Set([
   'assistant_message',
   'reasoning',
   'tool',
+  'subagent',
   'plan',
   'usage',
   'file_change',
@@ -42,6 +43,7 @@ export default function AgentTranscript(props: {
   taskId: string
   snapshot: AgentSessionSnapshot
   focusRequestId?: string
+  focusSubagentId?: string
   onRequestResolved: () => void
 }) {
   const [scrollElement, setScrollElement] = createSignal<HTMLDivElement>()
@@ -93,11 +95,37 @@ export default function AgentTranscript(props: {
   // The list grows for two reasons and the response differs: while restoring we chase the saved offset,
   // otherwise we sit on the bottom. The scroll element is observed too, because the pending-request strip
   // above it appearing shortens the viewport without touching the list.
+  // Where a sidebar sub-row sends the reader. The card may not be in the DOM on the first attempt,
+  // because selecting a sub-row under another session loads that session's snapshot first, so the id is
+  // held and retried on the list's own resizes alongside the restore.
+  let pendingSubagentId: string | null = null
+  const focusPendingSubagent = () => {
+    const element = scrollElement()
+    if (!element || !pendingSubagentId) return
+    const card = element.querySelector(`[data-subagent="${CSS.escape(pendingSubagentId)}"]`)
+    if (!card) return
+    pendingSubagentId = null
+    // Jumping to a card is a decision to stop following the tail, the same as scrolling up by hand.
+    target = null
+    following = false
+    card.scrollIntoView({ block: 'start' })
+    scrollTopBySession.set(sessionId(), element.scrollTop)
+  }
   const growth = new ResizeObserver(() => {
-    if (target !== null) applyTarget()
+    if (pendingSubagentId) focusPendingSubagent()
+    else if (target !== null) applyTarget()
     else if (following) pin()
   })
   onCleanup(() => growth.disconnect())
+  // A memo, not an inline getter: `on()` runs its callback on every notification without comparing the
+  // input, and the signal behind this prop is one record covering every session's subagent selection,
+  // so an inline getter would jump the transcript when a different session's row was clicked.
+  const focusSubagentId = createMemo(() => props.focusSubagentId)
+  createEffect(on(focusSubagentId, (id) => {
+    if (!id) return
+    pendingSubagentId = id
+    focusPendingSubagent()
+  }, { defer: true }))
   // Switching sessions in the sidebar swaps the snapshot without remounting, so this covers both mount
   // and session change.
   createEffect(on(sessionId, (id) => {

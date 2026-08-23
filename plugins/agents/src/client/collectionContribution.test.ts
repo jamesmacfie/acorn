@@ -30,6 +30,7 @@ const session: AgentSession = {
   },
   parentSessionId: null,
   parentTurnId: null,
+  subagents: [],
   lastEventSeq: 0,
   lastReadSeq: 0,
   archivedAt: null,
