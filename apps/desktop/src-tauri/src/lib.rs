@@ -43,7 +43,7 @@ fn dev_server() -> Option<String> {
 
 pub fn run() {
     // Read once, at the top, because the window and the scheme handler both need it and neither should
-    // be deciding what "dev" means. A runtime variable rather than a compile-time one: `pnpm dev:tauri`
+    // be deciding what "dev" means. A runtime variable rather than a compile-time one: `pnpm dev`
     // sets it, and a stale cargo cache must not be able to bake the wrong answer into a binary.
     let dev_server = dev_server();
     // The helper's port, shared with the scheme handler. The handler has to be registered before the

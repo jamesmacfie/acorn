@@ -30,7 +30,7 @@ const WORKER_CSP: &str = "default-src 'none'; script-src 'self' 'wasm-unsafe-eva
 /// reachable. Everything that directive protected still holds: the renderer still cannot reach a node
 /// directly, because a node needs the pinned agent and bearer only the helper has.
 ///
-/// `dev_server` widens it further, and only under `pnpm dev:tauri`: the renderer is proxied from Vite,
+/// `dev_server` widens it further, and only under `pnpm dev`: the renderer is proxied from Vite,
 /// so the page needs Vite's HMR socket and the inline preamble its plugins inject. A packaged build
 /// passes `None` and gets exactly Electron's policy plus the helper socket.
 pub fn renderer_csp(helper_port: u16, dev_server: Option<&str>) -> String {
@@ -118,7 +118,7 @@ fn content_type(path: &Path) -> &'static str {
     }
 }
 
-/// Where the renderer comes from. Packaged builds read the staged client off disk; `pnpm dev:tauri`
+/// Where the renderer comes from. Packaged builds read the staged client off disk; `pnpm dev`
 /// proxies the Vite dev server, so the page keeps this origin — and everything phase 0 verified about
 /// it — while it keeps HMR. Serving dev straight off `devUrl` would put developers on an origin the
 /// shipped app never uses, which is the one thing this migration cannot afford.

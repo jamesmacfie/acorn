@@ -1,7 +1,6 @@
-// vitest runs under system Node, but the app runs under Electron. A native module compiled with
-// node-gyp matches one ABI at a time, so the test runner and the app can't always share a build.
-// `pnpm rebuild` is shadowed by the root "rebuild" script (which produces the Electron ABI via
-// electron-rebuild), so this rebuilds for the CURRENT Node ABI directly.
+// There is one ABI now: the desktop runs the node under the same pinned runtime that runs the tests
+// (node-runtime.json), so nothing here mediates between two builds. This stays because node-pty must
+// be loadable by whatever Node is about to run the suites, and rebuilds it for that ABI when it isn't.
 //
 // node-pty is the only native module left — SQLite is now the runtime's own `node:sqlite`
 // (packages/node-core/src/main/sqlite.ts), which has no ABI to get wrong. node-pty builds against
@@ -22,8 +21,7 @@ const require = createRequire(import.meta.url)
 // node-pty 1.1.0 publishes prebuilds/<platform>-<arch>/spawn-helper as mode 644 and never chmods it
 // in its own install/postinstall, so node-pty's posix_spawnp of the helper dies with EACCES and
 // reports "posix_spawnp failed". The probe below can't catch it — pty.node is N-API and loads fine.
-// The packaged app is unaffected (electron-builder's node-gyp rebuild writes build/Release at 755,
-// which node-pty prefers), so this only ever bites tests. Re-run after every install: the file is
+// Re-run after every install: the file is
 // hard-linked from the pnpm store, so a fresh install restores the broken mode.
 if (process.platform !== 'win32') {
   const ptyDir = dirname(require.resolve('node-pty/package.json'))

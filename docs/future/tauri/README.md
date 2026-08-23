@@ -72,7 +72,7 @@ automation left the shell for `plugins/browser`, so `desktop.browser-*` is delet
 Five details changed on contact, including a capability scoped to the window that would have handed
 `invoke` to every preview page; [sequencing.md](./sequencing.md) has them.
 
-**Coexist, then cut over.** The Tauri shell was a second package, `apps/desktop`, consuming the
+**Coexist, then cut over.** The Tauri shell was a second package, `apps/desktop-tauri`, consuming the
 same renderer source, node artifact, bundled-plugins build, and protocol, with CI building both from
 the same commit. Phase 5 merged it into `apps/desktop` and deleted Electron. In-place conversion was
 rejected up front: no fallback artifact, and every failure ambiguous between "Tauri cannot do it" and
@@ -174,7 +174,7 @@ Read these before building anything in this folder.
 ## Drift warning
 
 Paths and behaviour claims in this folder were verified against the tree on 2026-08-22, before any of
-it was built. Several are now wrong: `apps/desktop` is `apps/desktop`, `src/client/bridge.ts`
+it was built. Several are now wrong: `apps/desktop-tauri` is `apps/desktop`, `src/client/bridge.ts`
 and `src/main/helperMain.ts` are under `src/shell/`, and the Electron files these documents compare
 against are gone. [docs/shell.md](../../shell.md),
 [docs/architecture-overview.md](../../architecture-overview.md), and

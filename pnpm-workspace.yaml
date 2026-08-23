@@ -4,7 +4,6 @@ packages:
   - "plugins/*"
   - "tools/*"
 allowBuilds:
-  electron: set this to true or false
   esbuild: true
   node-pty: true
   workerd: true
