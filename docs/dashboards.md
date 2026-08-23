@@ -137,6 +137,19 @@ cannot be filed under a stranger's name. Both feeders land in one registry
 the point: a third-party plugin's panels ship no client bundle, trigger no trust prompt, and are
 pixel-identical to a first-party one's under every appearance pack.
 
+**Core registers one of its own, `core:tasks`, "Workspace tasks"** — this node's active tasks, one row
+each, with the project and the workspace as id-valued enums so a board can be grouped by either, and a
+`workspace` param whose options are the node's own workspaces. It reads the three routes the rail
+already reads and adds no endpoint. It is filed under `core` from the shell's activation, beside the
+plugin-failure attention source, for the same reason that one is: there is no plugin whose data this is.
+It is also the replacement for the task list Home used to draw above its panels — see § Placements.
+
+Two honest limits on it. The `changes` cell is the worktree status poller's answer, which polls the
+active node and only on desktop, so a panel pointed anywhere else gets `null`, which reads as "no value
+here" rather than "clean". And a node with more than 32 projects or workspaces declares the first 32 by
+name, the wire cap on enum values; the surplus renders as its raw id, which is what any undeclared enum
+value does.
+
 `params` are up to eight declared inputs, each `text` or `enum`. The host renders one control per
 param in the panel editor and hands the value back opaquely. The plugin owns what `repo` means, and
 the day it means something else the host does not change. Deliberately not the field vocabulary
@@ -205,7 +218,7 @@ than a generic placeholder.
 Row identity is required and has no fallback: `id` must be stable across refreshes, because that is
 what a mixed board dedupes and keys its rendering by.
 
-A row's optional `action` takes the manifest's **context-free** verb set — `openPane`,
+A row's optional `action` takes the manifest's **context-free** verb set — `openPane`, `openTask`,
 `runNodeAction`, `openUrl`, `openOverlay`, `surfaceAction` — and runs through the host's ordinary
 chrome dispatcher, so a click can do exactly what a command can do and nothing more. Not the full
 chrome-action union: a panel row has no rail row to promote and no routed project to substitute, so
@@ -219,6 +232,11 @@ selection intent; a task this node does not have is refused at the click rather 
 somewhere else. The agents plugin's session rows are the proving case: clicking one lands in that
 session's own task with that session selected, and the pane learns *which* session from the same
 `plugin:select` intent a rail row's click carries.
+
+`openTask` is the same trip without the pane, and `taskId` is the whole of what it needs. Core's own
+task rows are why it exists: a row whose thing *is* a task has nowhere else to send a click, and naming
+a pane would be choosing one on the reader's behalf. A row that declares it and names no task is
+refused out loud, the same as one naming a task this node does not have.
 
 Naming a task is not the same as naming a source. Provenance is stamped by the host precisely so a row
 cannot wear a stranger's badge; a task is a core object the host resolves itself, and
@@ -594,9 +612,9 @@ writes them back.
 
 **Placements reference panel definitions by id; they never embed them.** Embedding panel config
 inside a "home dashboard" blob works right up until panels need to live in a second place, and then
-it is a migration. A placement scope key is `(surface, ownerId?, projectId?)` with segments encoded,
+it is a migration. A placement scope key is `(surface, ownerId?, workspaceId?)` with segments encoded,
 so an owner id that itself contains a separator can never be read as two. Two surfaces are drawn:
-`home` (a tab per `ownerId`) and `plugin-region` (a rail source's side panel or a pane's
+`home` (a tab per `ownerId`, per workspace) and `plugin-region` (a rail source's side panel or a pane's
 aside, `<pluginId>:<somethingId>`). `pane` stays in the key grammar although its one owner, the
 per-task dashboard pane, is retired: stored `pane/dashboard` entries keep parsing, they just have no
 container to render in. The split did its job — every surface arrived as a container
@@ -617,16 +635,19 @@ and in a plugin region has two of them. **A placed panel with no rect is auto-pl
 is one rule serving three cases at once: the migration for every existing blob, the recovery from an
 old client's write, and the default for a newly added panel.
 
-**Home tabs are a fourth top-level key, `tabs`** — a list of `{ id, name }` in display order, and
-nothing else. A tab *is* the placement scope `{ surface: 'home', ownerId: tabId }`, so its panels are
-ordinary placements and its geometry an ordinary `layouts` entry; only names and order are new. The
-default tab's id is `''`, which the key encoder collapses back to the bare `home` key — so every blob
-written before tabs existed is already a valid one-tab state, with no migration and no bar. Parsed
-tolerantly like everything else: duplicates dropped keeping the first, **at most 8 tabs**, names
+**Home tabs are a fourth top-level key, `tabs`** — a list of `{ id, name, workspaceId? }` in display
+order, and nothing else. A tab *is* the placement scope `{ surface: 'home', ownerId: tabId,
+workspaceId }`, so its panels are ordinary placements and its geometry an ordinary `layouts` entry;
+only names, order and which workspace owns each are new. The default tab's id is `''` in every
+workspace, so **identity is the pair**, and the cap is per workspace too: one workspace at eight
+dashboards costs another nothing. With no workspace known the key encoder drops both trailing
+segments and the key is the bare `home` — so every blob written before tabs or workspaces existed is
+already a valid one-tab state, and § Placements says which workspace adopts it. Parsed tolerantly
+like everything else: duplicates dropped keeping the first, **at most 8 tabs per workspace**, names
 trimmed to 60 characters rather than dropped.
 
-The renderer derives its tab list as `tabs` **plus any `home/*` scope that has placements and no
-name**, shown as "Untitled". That one rule does three jobs: it is the recovery from an old client
+The renderer derives its tab list as the current workspace's entries in `tabs` **plus any of its
+`home/*` scopes that has placements and no name**, shown as "Untitled". That one rule does three jobs: it is the recovery from an old client
 that wrote the slice and dropped `tabs`, the defence against a partially written blob, and the reason
 losing a name can never be what loses a composition. The ceiling matches `layouts`' — an old client
 writing the slice loses names and order, keeps every panel; an old client *rendering* sees only the
@@ -656,17 +677,49 @@ shape the codec quietly deletes is not reserved.
 
 ## Placements
 
-**Home** is the default, and the dashboard there is **additive**. The active-task list is what people
-open that screen for, so panels go below it, and a person who has placed none sees no heading, no
-empty grid and no invitation — one ghost button, and not even that when no plugin provides a
-collection, because an "Add panel" that opens an empty picker is worse than no button. Panels already
-placed still render when a plugin goes away.
+**Home** is the default, and it is a dashboard and nothing else. A person who has placed no panel sees
+no heading, no empty grid and no invitation, just one ghost button. Panels already placed still render
+when a plugin goes away.
+
+It used to open with the workspace's active tasks above the panels. That list was on the screen whether
+or not it was being read, and it was the one thing a person could not take off their own home page. The
+same rows are a collection now (§ Declaring one, `core:tasks`), so anyone who wants them places them,
+sorts them, filters them and sizes them, and a row still opens its task — that is the `openTask` verb,
+which exists because a row whose thing *is* a task has nowhere else to send a click.
+
+**A Home board belongs to one workspace, and switching workspace switches the board.** The panels,
+their arrangement and the whole tab bar are the current workspace's; another workspace's are not
+merged in, not greyed out, and not reachable from here.
+
+The reason is what a row does when you click it. A panel's rows are work — a pull request, an issue,
+a task — and a row's in-app action resolves against the workspace you are in. On one shared board the
+same panel could offer you a row whose project lives somewhere else entirely, and following it meant
+a workspace switch the board never mentioned, or nothing at all. Scoping the board is what makes "the
+rows here are about the work here" true by construction rather than by whoever composed it being
+careful.
+
+The workspace is the scope key's third segment, so nothing about a panel changed: definitions stay in
+one library and the same panel can be placed on a board in every workspace, each with its own rect.
+Which workspace that is comes from the routed project, the same derivation the rail and the topbar
+already make (`workspaces/activeWorkspace.ts`); before the mapping loads there is no workspace, and
+Home draws the board that has none.
+
+**A board written before this is adopted by the first workspace to open Home**, once, keys and names
+together (`adoptLegacyHome`). The old board named no workspace, so there is no better guess available
+than the one the person is looking at, and every other choice leaves the panels invisible until they
+go hunting. Adoption never overwrites: a workspace that already has a board of its own keeps it, and
+the old one stays where it is. The ceiling is the one every key here has — a client that does not
+know about workspaces sees the bare `home` scope, which after adoption is empty, and writes back a
+`tabs` list with the workspace stamps stripped.
+
+**Plugin regions are not scoped this way.** A region hangs off a surface that is already pinned to a
+project or a plugin pane, so a second scope on it would be a key with no question behind it.
 
 **Home can hold several dashboards, as tabs**, and the bar exists only past one of them. With a
 single dashboard Home is what it always was — no bar, no "1 of 1" chrome — and the feature costs
 nothing until it is used. Past one, the bar takes the "Panels" section-header seat, because tabs *are*
 the heading when there are several; the Add-panel button keeps its right-aligned place on the same
-row, and the active-task list above is untouched. It is a standard ARIA tablist: arrows move
+row. It is a standard ARIA tablist: arrows move
 selection with activation on focus, Home/End jump, roving tabindex, and the grid below is the
 `tabpanel` the active tab labels.
 
@@ -693,14 +746,16 @@ destination.
 in the device-pref list. The composition belongs to the node and is shared by every client paired with
 it; which of its dashboards this screen happens to be showing is a property of this screen, and syncing
 it would move somebody else's view under them. A remembered tab that has since been deleted falls back
-to the default rather than drawing an empty grid.
+to the default rather than drawing an empty grid, and a tab another workspace owns is the same case:
+switching workspace lands on that workspace's default board, and switching back returns to the tab
+you left, because the remembered id was never overwritten.
 
 **The task pane placement is retired.** It was keyed by *pane*, not by task, so the same board
 rendered beside every task — which turned out to be noise beside the work rather than context for
 it, and the pane was removed from the switcher. The `pane` surface stays in the scope-key grammar so
 stored `pane/dashboard` placements parse instead of corrupting the slice; nothing draws them. If a
-per-task or per-project board is ever wanted, the answer is still the scope's `projectId` segment,
-which the key format already carries, not a task segment.
+per-task or per-project board is ever wanted, the answer is a narrower id in the scope's third
+segment, which is where the workspace already goes, not a fourth segment and not a task one.
 
 **Plugin regions** are the remaining placements, and they are the same `PanelGrid` again — a rectangle a
 plugin reserved in one of *its own* surfaces for panels the user composes. Two surfaces reserve one
