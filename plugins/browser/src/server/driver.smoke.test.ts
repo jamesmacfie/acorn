@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { BrowserPool } from './driver'
 
-// The snapshot-act-verify loop, against a real browser (docs/future/tauri/webviews-and-frames.md
-// § Exit criteria). This is the check the Electron-era `scripts/smoke-browser.cjs` used to be, moved
+// The snapshot-act-verify loop, against a real browser (docs/testing.md
+// § The browser smoke test). This is the check the Electron-era `scripts/smoke-browser.cjs` used to be, moved
 // here with its subject and turned from a script into a test, because the driver is plain TypeScript
 // now rather than something only an Electron main process could load.
 //

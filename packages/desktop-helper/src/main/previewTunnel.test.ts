@@ -131,7 +131,7 @@ describe('the tunnel listener demands its secret', () => {
   })
 
   // The Tauri shell cannot inject a request header, so the same secret arrives as a cookie it seeded
-  // into the preview webview's store (docs/future/tauri/webviews-and-frames.md § Preview pane).
+  // into the preview webview's store (docs/shell.md § Host-owned webviews).
   it('accepts the same secret as a cookie, beside cookies it knows nothing about', async () => {
     const port = await tunnels.open(TARGET)
     const { alive } = await speak(port, request(`Cookie: theme=dark; acorn_tunnel=${secretValue(port)}; other=1\r\n`))

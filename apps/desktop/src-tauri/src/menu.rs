@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use crate::commands::Shell;
 
 // The application menu, and the two accelerators that are really product behaviour rather than
-// decoration (docs/future/tauri/architecture.md § Window, lifecycle, and platform bits).
+// decoration (docs/shell.md § Startup: data directory, environment, and the singleton lock).
 //
 // Quit is a custom item, never `PredefinedMenuItem::quit`, which routes through `[NSApp terminate:]`
 // and bypasses the event loop — the quit negotiation would never run.

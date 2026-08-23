@@ -1,5 +1,5 @@
 // The helper wire: what the renderer and the desktop helper say to each other over one loopback
-// WebSocket (docs/future/tauri/architecture.md § The renderer ↔ helper contract).
+// WebSocket (docs/shell.md § The shell process).
 //
 // This replaces Electron's preload + ipcMain pair, and it carries exactly the same vocabulary: every
 // method below is one of the channels Electron's `nodeBrokerIpc.ts` and `pluginIpc.ts` handled, and

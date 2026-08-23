@@ -3,7 +3,7 @@
 // Playwright ARIA-snapshot model: agents reference refs, never CSS selectors.
 //
 // Moved here from `plugins/preview/src/main/browserAuto.ts` when browser automation left the shell for
-// this plugin (docs/future/tauri/webviews-and-frames.md § Agent browser automation). Nothing in it
+// this plugin (docs/agent-tools.md § Browser tools). Nothing in it
 // changed: it was already pure, already tested under plain Node, and the CDP payloads it reads are the
 // same whether the session is attached by Electron's debugger or by Playwright. What did change is the
 // process it runs in — the node's, on any machine, rather than a desktop shell's.

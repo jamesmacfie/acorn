@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 
 // Supervision of the desktop helper: spawn it under the bundled Node, hand it the handshake on stdin,
 // read its ready line off stdout, and kill its whole process group on the way out
-// (docs/future/tauri/architecture.md § Boot order).
+// (docs/shell.md § The shell process).
 //
 // Two things here are not optional, both from the phase-0 spike
-// (docs/future/tauri/node-runtime.md § Spike findings):
+// (docs/shell.md § Node child):
 //
 // The helper gets its own process group and we kill the GROUP. Killing the helper alone orphans the
 // node service, which keeps holding the data root's exclusive lock, and the replacement helper's node

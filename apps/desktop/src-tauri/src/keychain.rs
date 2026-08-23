@@ -3,7 +3,7 @@ use std::io;
 use std::path::Path;
 
 // The one secret Rust holds: a 32-byte data key that device tokens are encrypted under, in the OS
-// keychain via the `keyring` crate (docs/future/tauri/architecture.md § Keys and custody). The helper
+// keychain via the `keyring` crate (docs/shell.md § Keys and custody). The helper
 // receives it over the stdin handshake and never writes it anywhere.
 //
 // One key, not one per token. Per-token keychain items would mean a prompt per node and ACL churn on
@@ -50,7 +50,7 @@ fn to_file(path: &Path, key: &str) -> io::Result<()> {
 /// `use_keychain` is false for a dev build, and that is not a shortcut. An unsigned binary's keychain
 /// ACL does not survive a rebuild, so every `cargo build` would put a modal password prompt in front of
 /// the app — and the answer to it grants nothing durable, because the next rebuild asks again. The
-/// 0600 file beside the tokens is what the caveat in docs/future/tauri/architecture.md § Keys and
+/// 0600 file beside the tokens is what the caveat in docs/shell.md § Keys and
 /// custody says will be the common path on macOS until Developer ID signing exists; a dev build simply
 /// takes it directly.
 pub fn data_key(user_data_dir: &Path, use_keychain: bool) -> String {
@@ -82,7 +82,7 @@ pub fn data_key(user_data_dir: &Path, use_keychain: bool) -> String {
 }
 
 /// Electron's `safeStorage` key, for the one-time adoption of a custody root the Electron build left
-/// behind (docs/future/tauri/architecture.md § Keys and custody).
+/// behind (docs/shell.md § Keys and custody).
 ///
 /// safeStorage is Chromium's os_crypt: on macOS the password lives in a keychain item named
 /// "<app> Safe Storage" and the AES key is derived from it. The derivation and the decryption are the

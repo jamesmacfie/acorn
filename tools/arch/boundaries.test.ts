@@ -432,7 +432,7 @@ describe('architecture boundaries', () => {
 
   it('nothing in the tree imports electron', () => {
     // The end state of the migration: there is one shell, it is Tauri, and the Electron dependency is
-    // gone from every manifest (docs/future/tauri/sequencing.md § Phase 5). This used to be an
+    // gone from every manifest (docs/shell.md). This used to be an
     // enumerated baseline of the files allowed to name electron; it shrank to zero at cutover and the
     // rule flipped to a flat ban, which is why there is nothing to exempt and nothing to shrink.
     //
@@ -465,8 +465,8 @@ describe('architecture boundaries', () => {
 
   it('the Tauri surface stays inside the shell', () => {
     // The renderer's one door to a host is the platform seam, and the bridge that fills it is the only
-    // file in the tree that may name a Tauri binding (docs/future/tauri/testing.md § Seam contract
-    // tests). `src/app/client` is the renderer and shares this package with the shell, so the rule is
+    // file in the tree that may name a Tauri binding (docs/testing.md § Test
+    // layers). `src/app/client` is the renderer and shares this package with the shell, so the rule is
     // written against the shell folder rather than the package.
     const SHELL = join(ROOT, 'apps', 'desktop', 'src', 'shell') + '/'
     const naming = [...new Set(EDGES.filter((e) => e.target.external === '@tauri-apps/api').map((e) => e.fromFile))]

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { deviceTokens, type TokenCipher } from './deviceTokenStore'
 
 // One-time adoption of the custody root an Electron build left behind
-// (docs/future/tauri/architecture.md § Keys and custody).
+// (docs/shell.md § Keys and custody).
 //
 // The two shells cannot share a root: Electron's userData is named after the app, Tauri's after the
 // bundle identifier. So this is a copy, not a handover — and it copies the whole root rather than only

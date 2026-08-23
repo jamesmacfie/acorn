@@ -5,7 +5,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sha256, targetTriple } from './nodeRuntime.mjs'
 
-// What a built `.app` has to contain before anybody installs it (docs/future/tauri/packaging-and-release.md).
+// What a built `.app` has to contain before anybody installs it (docs/shell.md § Build and packaging).
 //
 // The shell resolves the node runtime, the helper, the renderer, the frame assets and the bundled
 // plugins from fixed places inside the bundle, and every one of them is copied there by the bundler
@@ -110,7 +110,7 @@ try {
 }
 
 // Generated from the first release even with no updater endpoint, so turning updates on later is
-// configuration rather than a re-release (docs/future/tauri/packaging-and-release.md).
+// configuration rather than a re-release (docs/shell.md § Build and packaging).
 const updater = readdirSync(join(bundle, 'macos')).filter((name) => name.endsWith('.app.tar.gz'))
 if (updater.length === 0) fail('no updater artifact was produced; `bundle.createUpdaterArtifacts` should be on.')
 else if (!existsSync(join(bundle, 'macos', `${updater[0]}.sig`))) fail(`${updater[0]} has no minisign signature beside it.`)

@@ -8,7 +8,7 @@ import type { NodePluginDeps } from './plugins'
 // The plugin dependency bag, built once for both composition roots (docs/plugins.md § Adding a
 // plugin contribution). Nothing here differs between the two hosts any more: the one thing that did
 // was the preview browser, and agent browser automation is a plugin now, with a browser of its own on
-// whichever node runs it (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
+// whichever node runs it (docs/agent-tools.md § Browser tools).
 export type PluginDepsInput = {
   capabilities: CapabilityRegistry
   core: CoreServices

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 //
 // The encryption itself is the shell's, injected as a `TokenCipher`, because it is the one part of
 // custody that is not portable: Electron has safeStorage against the OS keychain, and the Tauri
-// helper has a data key Rust holds in the keychain instead (docs/future/tauri/architecture.md § Keys
+// helper has a data key Rust holds in the keychain instead (docs/shell.md § Keys
 // and custody). Everything else here — the scope rules, the file discipline, the forget-quietly
 // failure mode — is the same on both.
 //

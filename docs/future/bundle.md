@@ -79,7 +79,7 @@ Shape: GitHub Actions across macOS arm64/x64, Linux x64/arm64 and Windows; five 
 release. Linux and Windows first — see Gatekeeper below. The eventual front door is a release page
 plus a `curl | sh` installer that picks the right tarball, and a container image on ghcr with a
 compose example; service-manager units stay documentation, not an installer product
-(docs/future/tauri/distribution.md already settled that).
+(settled during the Tauri migration).
 
 ## Docker (2026-08-22)
 

@@ -28,7 +28,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // One runtime pin, two consumers: this tarball's engines floor and the Node binary the Tauri bundle
-// ships as an external binary (docs/future/tauri/node-runtime.md). Keeping them in one file is what
+// ships as an external binary (docs/shell.md § Build and packaging). Keeping them in one file is what
 // stops a desktop build from shipping a runtime the standalone artifact would refuse.
 const RUNTIME_PIN = JSON.parse(readFileSync(new URL('../node-runtime.json', import.meta.url), 'utf8'))
 

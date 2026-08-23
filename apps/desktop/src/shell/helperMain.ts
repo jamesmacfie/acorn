@@ -17,7 +17,7 @@ import { HELPER_PROTOCOL } from './wire'
 // The handshake goes in before anything is started, and the command reader is installed before the
 // handshake is even read, because Rust can send `stop` while the node is still booting. A helper that
 // installed its reader after `service.start` resolved dropped that line and was killed for not
-// quitting (docs/future/tauri/node-runtime.md § Spike findings).
+// quitting (docs/shell.md § Node child).
 
 // Every line Rust is meant to read carries this key; everything else on stdout is a log.
 const TAG = 'acorn-helper'
@@ -25,7 +25,7 @@ const TAG = 'acorn-helper'
 const handshakeSchema = z.strictObject({
   protocol: z.literal(HELPER_PROTOCOL),
   // 32 bytes of hex. Rust holds it in the OS keychain and it never touches disk on this side; it is
-  // what device tokens are encrypted under (docs/future/tauri/architecture.md § Keys and custody).
+  // what device tokens are encrypted under (docs/shell.md § Keys and custody).
   dataKey: z.string().regex(/^[0-9a-f]{64}$/),
   // The node's data root, and the helper's own custody root. Two different directories on purpose:
   // fleet.json and the encrypted tokens are this app's, not the node's.
@@ -77,7 +77,7 @@ const dataKeyCipher = (dataKey: string): TokenCipher => {
 // line: `node-replaced` reaches the renderer over the helper socket, but the recovery screen is a
 // native dialog, so the crash budget has to reach Rust — and so does each preview tunnel's secret,
 // which the shell seeds into the pane's cookie store because wry cannot inject a request header
-// (docs/future/tauri/webviews-and-frames.md § Preview pane). This pipe reaches Rust and nothing else,
+// (docs/shell.md § Host-owned webviews). This pipe reaches Rust and nothing else,
 // which is why a secret may travel on it.
 const emit = (event: 'crash-budget-exhausted' | 'tunnel-opened' | 'tunnel-closed', detail?: object): void =>
   console.log(JSON.stringify({ [TAG]: event, ...detail }))
@@ -106,7 +106,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
       isPackaged: handshake.isPackaged,
       // The bundled Node binary Rust launched this process with. `serviceHost.ts` spawns the service
       // with it, and so do agents and MCP registration, which is the whole point of shipping a real
-      // runtime (docs/future/tauri/node-runtime.md).
+      // runtime (docs/shell.md § Build and packaging).
       hostRuntimePath: process.execPath,
       mcpEntry: handshake.mcpEntry,
       ...(handshake.bundledPluginsDir ? { bundledPluginsDir: handshake.bundledPluginsDir } : {}),
@@ -164,7 +164,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       booted = boot(handshake)
       const { server } = await booted
       // The ready line. `nodeVersion` is here so Rust can assert the runtime pin it thinks it shipped
-      // is the runtime that actually booted (docs/future/tauri/node-runtime.md § Design).
+      // is the runtime that actually booted (docs/shell.md § Node child).
       console.log(JSON.stringify({ [TAG]: 'ready', protocol: HELPER_PROTOCOL, port: server.port, secret: server.secret, nodeVersion: process.version }))
       return
     }
