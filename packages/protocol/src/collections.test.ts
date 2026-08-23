@@ -81,6 +81,9 @@ describe('rows', () => {
   it('takes the context-free verbs and refuses the two that need a click site', () => {
     expect(page({ rows: [{ id: 'x', values: {}, action: { verb: 'openUrl', url: 'https://github.test/p/1' } }] }).success).toBe(true)
     expect(page({ rows: [{ id: 'x', values: {}, action: { verb: 'openPane', pane: 'pr' } }] }).success).toBe(true)
+    // The pane-less half of `openPane`, for a row whose thing is the task itself. Its only carrier is
+    // the row's `taskId`, so it declares nothing of its own.
+    expect(page({ rows: [{ id: 'x', values: {}, action: { verb: 'openTask' } }] }).success).toBe(true)
     // `createTask` needs a selected rail row and `navigate` a routed project; a panel row has neither.
     expect(page({ rows: [{ id: 'x', values: {}, action: { verb: 'createTask' } }] }).success).toBe(false)
     expect(page({ rows: [{ id: 'x', values: {}, action: { verb: 'navigate', surface: 'linear-issue' } }] }).success).toBe(false)

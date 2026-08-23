@@ -28,13 +28,13 @@ import PanelPreview from './PanelPreview'
 import { addTab, setActiveHomeTab } from './homeTab'
 import {
   dashboards,
-  HOME_PLACEMENT,
   homeTabs,
   homeTabScope,
   setHomeTabs,
   type PlacementScope,
   type PlacementSurface,
 } from './persist'
+import { useActiveWorkspaceId } from '../workspaces/useActiveWorkspaceId'
 import './dashboards.css'
 
 // The panel wizard: panel creation, staged, with the panel visible while it is being composed. See
@@ -130,6 +130,7 @@ export default function PanelWizard(props: {
   onClose: () => void
 }) {
   const draft = createPanelDraft(props)
+  const activeWorkspaceId = useActiveWorkspaceId()
 
   const [stepIndex, setStepIndex] = createSignal(0)
   const [filter, setFilter] = createSignal('')
@@ -177,7 +178,11 @@ export default function PanelWizard(props: {
 
   // ── Step 4: destination and footprint ───────────────────────────────────────────────────────
 
-  const tabs = createMemo(() => homeTabs(dashboards()))
+  // Which workspace's dashboards the Home destination offers. The launching scope's when it has one;
+  // otherwise the one the shell is showing, because a plugin region carries no workspace and "Home"
+  // from there means the Home you would get by clicking Home.
+  const homeWorkspaceId = () => props.scope.workspaceId ?? activeWorkspaceId()
+  const tabs = createMemo(() => homeTabs(dashboards(), homeWorkspaceId()))
 
   /** The Home destinations: the dashboards that exist, plus a new one.
    *
@@ -197,14 +202,14 @@ export default function PanelWizard(props: {
    *  promise that nothing is written until the last step commits. */
   const resolveTarget = (): PlacementScope => {
     if (surface() !== 'home') return props.scope
-    if (tabId() !== NEW_TAB) return tabs().length > 1 ? homeTabScope(tabId()) : HOME_PLACEMENT
+    if (tabId() !== NEW_TAB) return homeTabScope(tabId(), homeWorkspaceId())
     // Empty falls back to `addTab`'s own unique default, so naming one is an option rather than a step.
     const created = addTab(tabs(), newTabName().trim())
-    setHomeTabs(created.tabs)
+    setHomeTabs(created.tabs, homeWorkspaceId())
     // Land on the dashboard the panel went to. Placing it somewhere invisible is the one outcome nobody
     // asked for.
     setActiveHomeTab(created.id)
-    return homeTabScope(created.id)
+    return homeTabScope(created.id, homeWorkspaceId())
   }
 
   const rect = (): Rect => sizePresets(draft.definition().view.kind)[preset()]

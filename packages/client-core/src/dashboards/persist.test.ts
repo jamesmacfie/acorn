@@ -4,8 +4,8 @@ import {
   dashboards,
   dashboardsSlice,
   emptyDashboards,
+  adoptLegacyHome,
   hydrateDashboards,
-  HOME_PLACEMENT,
   homeTabIdOf,
   homeTabs,
   homeTabScope,
@@ -24,6 +24,10 @@ import {
   unplacePanel,
 } from './persist'
 
+// The pre-workspace Home scope: the key every blob written before boards were per workspace uses,
+// and still what a device with no workspace mapping yet draws.
+const HOME_PLACEMENT = homeTabScope('')
+
 const panel = (id: string, over: Partial<PanelDefinition> = {}): PanelDefinition => ({
   id,
   title: `Panel ${id}`,
@@ -38,9 +42,9 @@ describe('placement scope keys', () => {
     expect(placementScopeKey(HOME_PLACEMENT)).toBe('home')
     expect(placementScopeKey({ surface: 'pane', ownerId: 'pr' })).toBe('pane/pr')
     // `pluginId:regionId` is the owner id placements.md names, and it survives the round trip.
-    expect(placementScopeKey({ surface: 'plugin-region', ownerId: 'github:sidebar', projectId: 'p1' }))
-      .toBe('plugin-region/github%3Asidebar/p1')
-    expect(placementScopeKey({ surface: 'pane', ownerId: 'a/b' })).not.toBe(placementScopeKey({ surface: 'pane', ownerId: 'a', projectId: 'b' }))
+    expect(placementScopeKey({ surface: 'plugin-region', ownerId: 'github:sidebar', workspaceId: 'w1' }))
+      .toBe('plugin-region/github%3Asidebar/w1')
+    expect(placementScopeKey({ surface: 'pane', ownerId: 'a/b' })).not.toBe(placementScopeKey({ surface: 'pane', ownerId: 'a', workspaceId: 'b' }))
   })
 })
 
@@ -392,9 +396,57 @@ describe('home tabs', () => {
     expect(placementScopeKey(homeTabScope('t1'))).toBe('home/t1')
     expect(homeTabIdOf('home')).toBe('')
     expect(homeTabIdOf('home/t1')).toBe('t1')
-    // Not a tab: another surface, and the projectId variant, which no tab carries.
+    // Not a tab: another surface, and another workspace's home, which this workspace never draws.
     expect(homeTabIdOf('pane/pr')).toBeUndefined()
-    expect(homeTabIdOf('home/t1/p1')).toBeUndefined()
+    expect(homeTabIdOf('home/t1/w1')).toBeUndefined()
+  })
+
+  it('keys a board by workspace, and the pre-workspace board is nobody\'s', () => {
+    expect(placementScopeKey(homeTabScope('', 'w1'))).toBe('home//w1')
+    expect(placementScopeKey(homeTabScope('t1', 'w1'))).toBe('home/t1/w1')
+    expect(homeTabIdOf('home//w1', 'w1')).toBe('')
+    expect(homeTabIdOf('home/t1/w1', 'w1')).toBe('t1')
+    // One workspace never reads another's, in either direction.
+    expect(homeTabIdOf('home/t1/w2', 'w1')).toBeUndefined()
+    expect(homeTabIdOf('home/t1', 'w1')).toBeUndefined()
+  })
+
+  it('lists only the workspace\'s own tabs, default tab and all', () => {
+    const state = parseDashboards({
+      placements: { 'home//w1': ['a'], 'home/t2/w1': ['b'], 'home//w2': ['c'] },
+      tabs: [{ id: '', name: 'Home', workspaceId: 'w1' }, { id: '', name: 'Elsewhere', workspaceId: 'w2' }],
+    })
+    // Every workspace's default tab is `''`, so identity is the pair and both survive the codec.
+    expect(state.tabs).toHaveLength(2)
+    expect(homeTabs(state, 'w1')).toEqual([
+      { id: '', name: 'Home', workspaceId: 'w1' },
+      { id: 't2', name: 'Untitled', workspaceId: 'w1' },
+    ])
+    expect(homeTabs(state, 'w2')).toEqual([{ id: '', name: 'Elsewhere', workspaceId: 'w2' }])
+  })
+
+  it('caps tabs per workspace, so one at the limit costs another nothing', () => {
+    const fill = (workspaceId: string) =>
+      Array.from({ length: 10 }, (_, index) => ({ id: `${workspaceId}-${index}`, name: `Fill ${index}`, workspaceId }))
+    const state = parseDashboards({ tabs: [...fill('w1'), ...fill('w2')] })
+    expect(state.tabs?.filter((tab) => tab.workspaceId === 'w1')).toHaveLength(8)
+    expect(state.tabs?.filter((tab) => tab.workspaceId === 'w2')).toHaveLength(8)
+  })
+
+  it('writing one workspace\'s tabs leaves every other workspace\'s alone', () => {
+    hydrateDashboards(parseDashboards({ tabs: [{ id: 't1', name: 'Theirs', workspaceId: 'w2' }] }))
+    setHomeTabs([{ id: '', name: 'Home' }, { id: 't1', name: 'Mine' }], 'w1')
+    expect(dashboards().tabs).toEqual([
+      { id: 't1', name: 'Theirs', workspaceId: 'w2' },
+      { id: '', name: 'Home', workspaceId: 'w1' },
+      { id: 't1', name: 'Mine', workspaceId: 'w1' },
+    ])
+
+    removeHomeTab('t1', 'w1')
+    expect(dashboards().tabs).toEqual([
+      { id: 't1', name: 'Theirs', workspaceId: 'w2' },
+      { id: '', name: 'Home', workspaceId: 'w1' },
+    ])
   })
 
   it('parses tolerantly: keeps the empty id, drops duplicates, caps the count and the name', () => {
@@ -478,5 +530,40 @@ describe('home tabs', () => {
     setHomeTabs([{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }])
     removePanel('a')
     expect(dashboards().tabs).toHaveLength(2)
+  })
+})
+
+describe('adopting the pre-workspace board', () => {
+  const legacy = () => parseDashboards({
+    panels: { a: panel('a'), b: panel('b') },
+    placements: { home: ['a'], 'home/t1': ['b'], 'plugin-region/github%3Asidebar': ['a'] },
+    layouts: { home: { a: { x: 0, y: 0, w: 4, h: 4 } } },
+    tabs: [{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }],
+  })
+
+  it('re-keys the old home scopes into the workspace that opens them first', () => {
+    const state = adoptLegacyHome(legacy(), 'w1')
+    expect(Object.keys(state.placements).sort()).toEqual(['home//w1', 'home/t1/w1', 'plugin-region/github%3Asidebar'])
+    expect(state.layouts['home//w1']).toEqual({ a: { x: 0, y: 0, w: 4, h: 4 } })
+    expect(state.tabs).toEqual([{ id: '', name: 'Home', workspaceId: 'w1' }, { id: 't1', name: 'Reviews', workspaceId: 'w1' }])
+    // The panels the boards point at are untouched: this moves keys, never definitions.
+    expect(Object.keys(state.panels).sort()).toEqual(['a', 'b'])
+    expect(homeTabs(state, 'w1').map((tab) => tab.name)).toEqual(['Home', 'Reviews'])
+  })
+
+  it('is a no-op the second time, and returns the same state so nothing is written', () => {
+    const once = adoptLegacyHome(legacy(), 'w1')
+    expect(adoptLegacyHome(once, 'w2')).toBe(once)
+    const empty = emptyDashboards()
+    expect(adoptLegacyHome(empty, 'w1')).toBe(empty)
+  })
+
+  it('never overwrites a board the workspace already composed', () => {
+    const state = adoptLegacyHome(parseDashboards({
+      panels: { a: panel('a'), b: panel('b') },
+      placements: { home: ['a'], 'home//w1': ['b'] },
+    }), 'w1')
+    expect(state.placements['home//w1']).toEqual(['b'])
+    expect(state.placements.home).toEqual(['a'])
   })
 })

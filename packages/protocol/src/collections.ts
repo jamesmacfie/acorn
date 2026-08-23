@@ -128,6 +128,10 @@ const withRisk = <T extends z.ZodRawShape>(shape: T) => z.object({ ...shape, ris
 
 const collectionRowAction = z.discriminatedUnion('verb', [
   withRisk({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
+  // `openPane` minus the pane: go to the task this row belongs to and stop there. The verb a row whose
+  // thing IS a task needs, since naming a pane would be picking one on the reader's behalf. Its carrier
+  // is the same `taskId` below, and a row without one is refused at the click.
+  withRisk({ verb: z.literal('openTask') }),
   withRisk({ verb: z.literal('runNodeAction'), path: z.string().min(1).max(256) }),
   withRisk({ verb: z.literal('openUrl'), url: z.string().url() }),
   withRisk({ verb: z.literal('openOverlay'), overlay: z.string().min(1).max(64) }),

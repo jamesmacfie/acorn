@@ -349,13 +349,15 @@ export default function PanelGrid(props: {
 
   const moveTargets = () => props.scope.surface !== 'home'
     ? []
-    : homeTabs(dashboards()).filter((tab) => tab.id !== (props.scope.ownerId ?? ''))
+    : homeTabs(dashboards(), props.scope.workspaceId).filter((tab) => tab.id !== (props.scope.ownerId ?? ''))
 
   /** Keeps the definition and takes a fresh rect at the destination. A rect is per (scope, panel), so
-   *  there is nothing to carry across. */
+   *  there is nothing to carry across. The destination is in this workspace: the targets are its own
+   *  dashboards, and moving a board's panel into a workspace you are not looking at is the same
+   *  "somewhere nobody is looking" the wizard's Where control already refuses. */
   const moveToTab = (id: PanelId, tabId: string) => {
     unplacePanel(props.scope, id)
-    placePanelAt(homeTabScope(tabId), id, sizePresets(panelDefinition(id)?.view.kind ?? 'list').m)
+    placePanelAt(homeTabScope(tabId, props.scope.workspaceId), id, sizePresets(panelDefinition(id)?.view.kind ?? 'list').m)
   }
 
   // ── Chrome ──────────────────────────────────────────────────────────────────────────────────
