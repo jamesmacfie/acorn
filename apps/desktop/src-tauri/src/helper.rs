@@ -120,7 +120,7 @@ fn spawn(launch: &Launch) -> std::io::Result<Child> {
         .stderr(Stdio::inherit());
 
     // Its own process group, so the kill below reaches the node service too. `setsid` would also
-    // detach it from the controlling terminal, which is exactly wrong for `pnpm dev:tauri`: the
+    // detach it from the controlling terminal, which is exactly wrong for `pnpm dev`: the
     // helper's logs are meant to land in the developer's terminal.
     #[cfg(unix)]
     unsafe {

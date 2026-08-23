@@ -6,7 +6,7 @@ the cutover trigger, and the deletion list. [docs/shell.md](../../shell.md) owns
 ## Coexistence: a second app package
 
 `apps/desktop` (Electron) remains untouched and shipped. The Tauri shell is a new package, working
-name `apps/desktop`, holding `src-tauri/` plus the extracted renderer Vite config, consuming
+name `apps/desktop-tauri`, holding `src-tauri/` plus the extracted renderer Vite config, consuming
 the same renderer source, node artifact, bundled-plugins build, and protocol. CI builds both from
 the same commit. This works because the Electron surface is 12 files behind an arch-tested seam:
 the two shells are two consumers of one seam, not two forks. The shared renderer config is
@@ -85,12 +85,12 @@ What landed, and where it sits:
 
 - **`packages/desktop-helper`.** The custody stack moved out of `apps/desktop/src/app/main/helper/`
   into its own workspace package, one phase earlier than the deletion list assumed. The arch rule
-  "apps never import each other" forced it: `apps/desktop` cannot reach into `apps/desktop`,
+  "apps never import each other" forced it: `apps/desktop-tauri` cannot reach into `apps/desktop`,
   so the code both shells run has to live in a package. Electron's `bootstrap.ts` imports it exactly
   as it imported the folder. The plugin request schemas came with it, as
   `main/pluginRequests.ts`, because both shells parse them and a schema that drifted would mean one
   host recording an acknowledgement the other cannot read.
-- **`apps/desktop`.** `src-tauri/` (six Rust modules), `src/main/` (the helper process),
+- **`apps/desktop-tauri`.** `src-tauri/` (six Rust modules), `src/main/` (the helper process),
   `src/client/bridge.ts` (the renderer bridge), `src/shared/wire.ts` (the vocabulary between them),
   and the Vite configs. It consumes `apps/desktop`'s renderer source through
   `vite.renderer.config.ts`, the import direction phase 1 set up.
@@ -238,9 +238,9 @@ something a script can close.
 ### Phase 5 — cutover and deletion ✅
 
 Done 2026-08-23. The flip and the cleanup in one phase, so nothing half-dead lingers. `apps/desktop`
-is the Tauri app; `apps/desktop` and every Electron file are gone.
+is the Tauri app; `apps/desktop-tauri` and every Electron file are gone.
 
-The two packages merged into `apps/desktop` rather than the renderer moving into `apps/desktop`
+The two packages merged into `apps/desktop` rather than the renderer moving into `apps/desktop-tauri`
 as the phase-2 note assumed. One desktop app should be called `desktop`, and keeping the name meant
 every `apps/desktop/src/app/client/...` path in packages, plugins, and tests stayed valid, including
 the three that are functional rather than prose (`adoption.test.ts`, `readStyleSheets.ts`, and the

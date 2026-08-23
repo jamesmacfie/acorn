@@ -119,4 +119,4 @@ of the run.
   budget and the dialog are both wired; item 7 of the smoke checklist in [testing.md](./testing.md)
   is what confirms it.
 - The desktop build contains no `electron-rebuild` step and no Electron-ABI native module. True of
-  `apps/desktop`; the Electron package keeps its rebuild step until cutover.
+  `apps/desktop-tauri`; the Electron package keeps its rebuild step until cutover.

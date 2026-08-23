@@ -7,7 +7,7 @@ import { LOCAL_TOKEN_SCOPE, type DeviceTokens } from './deviceTokenStore'
 // Fleet membership, its storage split, and the local-node singleton invariant: docs/shell.md
 // § Fleet membership.
 //
-// Follows sessionKeyStore.ts's file discipline: 0700 dir, 0600 files, chmod after write so a looser
+// File discipline: 0700 dir, 0600 files, chmod after write so a looser
 // umask on an existing file cannot survive.
 
 const FLEET_FILE = 'fleet.json'
