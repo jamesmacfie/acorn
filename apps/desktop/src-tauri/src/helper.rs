@@ -72,7 +72,10 @@ pub struct Ready {
 #[derive(Debug)]
 pub enum Signal {
     Ready(Ready),
-    CrashBudgetExhausted,
+    /// `reason` is what the service said about the last attempt, when it said anything. The recovery
+    /// dialog is the only place an owner reads it, and a locked data root or a taken port is worth
+    /// naming there.
+    CrashBudgetExhausted { reason: Option<String> },
     /// A preview tunnel is listening on this loopback port under this secret. The shell needs it
     /// because wry cannot inject a per-request header, so the credential is seeded into the preview
     /// webview's cookie store instead (src/webviews.rs). It travels on this pipe rather than through
@@ -86,7 +89,9 @@ fn parse_signal(line: &str) -> Option<Signal> {
     let port = || u16::try_from(value.get("port")?.as_u64()?).ok();
     match value.get("acorn-helper")?.as_str()? {
         "ready" => serde_json::from_value(value.clone()).ok().map(Signal::Ready),
-        "crash-budget-exhausted" => Some(Signal::CrashBudgetExhausted),
+        "crash-budget-exhausted" => Some(Signal::CrashBudgetExhausted {
+            reason: value.get("reason").and_then(|r| r.as_str()).map(str::to_string),
+        }),
         "tunnel-opened" => Some(Signal::TunnelOpened { port: port()?, secret: value.get("secret")?.as_str()?.to_string() }),
         "tunnel-closed" => Some(Signal::TunnelClosed { port: port()? }),
         _ => None,
@@ -244,8 +249,11 @@ mod tests {
         assert!(parse_signal("{\"hello\":1}").is_none());
         assert!(matches!(
             parse_signal("{\"acorn-helper\":\"crash-budget-exhausted\"}"),
-            Some(Signal::CrashBudgetExhausted)
+            Some(Signal::CrashBudgetExhausted { reason: None })
         ));
+        let exhausted = parse_signal("{\"acorn-helper\":\"crash-budget-exhausted\",\"reason\":\"another node holds this root\"}");
+        let Some(Signal::CrashBudgetExhausted { reason: Some(reason) }) = exhausted else { panic!("expected a reason") };
+        assert_eq!(reason, "another node holds this root");
         let ready = parse_signal("{\"acorn-helper\":\"ready\",\"protocol\":1,\"port\":51234,\"secret\":\"ab\",\"nodeVersion\":\"v24.11.0\"}");
         let Some(Signal::Ready(ready)) = ready else { panic!("expected a ready line") };
         assert_eq!(ready.port, 51234);
