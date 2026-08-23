@@ -1,6 +1,6 @@
 # Testing
 
-Status: proposal, 2026-08-22; the seam contract suite landed in phase 1 and the boot test in phase 2, both 2026-08-23.
+Status: proposal, 2026-08-22; the seam contract suite landed in phase 1, the boot test in phase 2, the phase-3 unit tests below, and CI to run them in phase 4, all 2026-08-23.
 
 ## The problem
 
@@ -40,7 +40,9 @@ shrinking one that reaches zero at cutover; its first step landed in phase 1 and
 
 The `mainBarrelLoad` analogue, and the single highest-value test in this series. It catches "the shell
 cannot load its world" the way `apps/node/test/integration/mainBarrelLoad.test.ts` catches barrel
-poisoning, and it runs in CI from phase 2 on.
+poisoning. Phase 4's `.github/workflows/build-tauri.yml` is what runs it in CI, before the bundler pass
+so a broken boot path fails in seconds rather than minutes. Nothing in this repo ran tests in CI before
+that workflow.
 
 It came out as two halves rather than one headless shell run, because a Tauri app needs a display
 server and a test that needs one does not run in CI.
@@ -53,11 +55,27 @@ up and the device token authenticated, so one assertion covers the custody stack
 check the gate: a socket without the secret is refused, and a plain HTTP request gets 426. The whole
 thing takes about three seconds.
 
-The eleven Rust unit tests in `apps/desktop-tauri/src-tauri/src/` cover what is left: the CSP the
-scheme handler sends and the dev-only widening it must not send in a packaged build, the traversal
-guard, the highlighter worker's separate policy, the refusal to answer a node route with the shell's
-own HTML, the handshake's field names, the ready-line parser, and the data key's shape and file
-fallback. Between the two halves, nothing in the boot path is unexercised.
+The Rust unit tests in `apps/desktop-tauri/src-tauri/src/` cover what is left, twenty-four of them
+after phase 4: the CSP the scheme handler sends and the dev-only widening it must not send in a
+packaged build, the traversal guard, the highlighter worker's separate policy, the refusal to answer a
+node route with the shell's own HTML, the handshake's field names, the ready-line parser including the
+tunnel signals, the data key's shape and file fallback, the plugin scheme's hash grammar and frame CSP,
+the two URL policies, the key grammar that picks between them, the navigation-history bookkeeping,
+the capability file's webview scoping, and the three packaging properties that only surface when
+somebody installs the artifact — the ad-hoc signing identity, `createUpdaterArtifacts`, and the updater
+public key. Between the two halves, nothing in the boot path is unexercised.
+
+What no headless run reaches is compositing: a child webview positioned over a window needs a window.
+That is what items 4 and 5 of the smoke checklist are for.
+
+## The browser smoke test
+
+`plugins/browser/src/server/driver.smoke.test.ts` runs an agent's loop against a real Chrome — load a
+loopback page, snapshot it, fill a field by its ref, click a button by its ref, and read back the
+console line the page logged with the value it saw. Opt-in through
+`pnpm --filter @acorn/plugin-browser test:smoke`, because launching a browser is not something every
+`pnpm test` should pay for. On a machine with no Chrome it takes the other branch and asserts the tools
+reported why, which is the second half of what phase 3 promised.
 
 ## Parity tests
 
@@ -74,12 +92,25 @@ release during coexistence and at cutover, on a machine that never had the Elect
 1. Install and launch; the window appears and the local node reaches online.
 2. Pair a second node by code; fingerprint words match.
 3. Open a terminal; a TUI renders and survives resize.
-4. Open a preview pane against a task dev server through the tunnel.
+4. Open a preview pane against a task dev server through the tunnel. Navigate, go back, and cover it
+   with an overlay; the child webview hides rather than floating above it.
 5. Open a loaded plugin pane; it renders, and a network call from its frame fails.
-6. Trigger the quit flow with an active agent; the concern prompt appears; quit drains cleanly.
-7. Kill the node process five times; the recovery screen appears on the sixth.
+6. Open a loaded plugin's webview surface; a link to a host its manifest does not name is refused.
+7. Trigger the quit flow with an active agent; the concern prompt appears; quit drains cleanly.
+8. Kill the node process five times; the recovery screen appears on the sixth.
+
+## The bundle inventory check
+
+`apps/desktop-tauri/scripts/verify-bundle.mjs`, the last step of the build. It is the packaging
+analogue of the boot test: the boot test proves the shell can load its world in a checkout, and this
+proves the world is actually inside the artifact. It compares every file staging produced against the
+same path in the `.app`, by digest, and checks the code signature, the bundled runtime, the updater
+artifact and its signature, and the DMG. Its first run found a bug nothing else could have: the shell
+resolved the bundled Node under `Contents/Resources` and `externalBin` stages it into `Contents/MacOS`,
+a path that exists only in a packaged build.
 
 ## Exit criteria
 
 The boot test is green in CI for the Tauri shell, and the checklist has passed once against a
-packaged build.
+packaged build. The first is met by `.github/workflows/build-tauri.yml`. The second is open, and it is
+the last thing between here and the cutover trigger.

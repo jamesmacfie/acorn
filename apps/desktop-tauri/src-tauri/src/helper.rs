@@ -40,10 +40,22 @@ pub struct Handshake {
     pub mcp_entry: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bundled_plugins_dir: Option<String>,
+    /// The Electron build's custody root and the safeStorage key its device tokens are encrypted
+    /// under, when both were found. Absent means there is nothing to adopt, or nothing readable —
+    /// either way the helper starts from an empty fleet (src/keychain.rs).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub legacy: Option<Legacy>,
     pub env_files: Vec<String>,
     pub version: String,
     pub is_packaged: bool,
     pub app_origin: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Legacy {
+    pub user_data_dir: String,
+    pub safe_storage_key: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -61,13 +73,22 @@ pub struct Ready {
 pub enum Signal {
     Ready(Ready),
     CrashBudgetExhausted,
+    /// A preview tunnel is listening on this loopback port under this secret. The shell needs it
+    /// because wry cannot inject a per-request header, so the credential is seeded into the preview
+    /// webview's cookie store instead (src/webviews.rs). It travels on this pipe rather than through
+    /// the renderer for the reason the secret exists at all.
+    TunnelOpened { port: u16, secret: String },
+    TunnelClosed { port: u16 },
 }
 
 fn parse_signal(line: &str) -> Option<Signal> {
     let value: serde_json::Value = serde_json::from_str(line).ok()?;
+    let port = || u16::try_from(value.get("port")?.as_u64()?).ok();
     match value.get("acorn-helper")?.as_str()? {
-        "ready" => serde_json::from_value(value).ok().map(Signal::Ready),
+        "ready" => serde_json::from_value(value.clone()).ok().map(Signal::Ready),
         "crash-budget-exhausted" => Some(Signal::CrashBudgetExhausted),
+        "tunnel-opened" => Some(Signal::TunnelOpened { port: port()?, secret: value.get("secret")?.as_str()?.to_string() }),
+        "tunnel-closed" => Some(Signal::TunnelClosed { port: port()? }),
         _ => None,
     }
 }
@@ -241,6 +262,7 @@ mod tests {
             service_entry: "/s".into(),
             mcp_entry: "/m".into(),
             bundled_plugins_dir: None,
+            legacy: None,
             env_files: vec!["/a/.env".into()],
             version: "0.1.0".into(),
             is_packaged: false,
@@ -251,5 +273,17 @@ mod tests {
         assert!(line.contains("\"isPackaged\":false"), "{line}");
         assert!(line.contains("\"envFiles\":[\"/a/.env\"]"), "{line}");
         assert!(!line.contains("bundledPluginsDir"), "{line}");
+        assert!(!line.contains("legacy"), "{line}");
+    }
+
+    #[test]
+    fn a_tunnel_signal_carries_a_port_and_a_secret() {
+        let opened = parse_signal("{\"acorn-helper\":\"tunnel-opened\",\"port\":51999,\"secret\":\"s3cr3t\"}");
+        let Some(Signal::TunnelOpened { port, secret }) = opened else { panic!("expected a tunnel-opened signal") };
+        assert_eq!((port, secret.as_str()), (51999, "s3cr3t"));
+        assert!(matches!(parse_signal("{\"acorn-helper\":\"tunnel-closed\",\"port\":51999}"), Some(Signal::TunnelClosed { port: 51999 })));
+        // A port that cannot be one is not a signal, rather than a signal about port 0.
+        assert!(parse_signal("{\"acorn-helper\":\"tunnel-closed\",\"port\":70000}").is_none());
+        assert!(parse_signal("{\"acorn-helper\":\"tunnel-opened\",\"port\":1}").is_none());
     }
 }

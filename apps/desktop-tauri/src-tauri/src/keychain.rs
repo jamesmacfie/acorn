@@ -81,6 +81,26 @@ pub fn data_key(user_data_dir: &Path, use_keychain: bool) -> String {
     key
 }
 
+/// Electron's `safeStorage` key, for the one-time adoption of a custody root the Electron build left
+/// behind (docs/future/tauri/architecture.md § Keys and custody).
+///
+/// safeStorage is Chromium's os_crypt: on macOS the password lives in a keychain item named
+/// "<app> Safe Storage" and the AES key is derived from it. The derivation and the decryption are the
+/// helper's, in TypeScript beside the token store that has to re-encrypt the results; all Rust owns is
+/// the one thing only it can reach.
+///
+/// Returns None whenever there is nothing to adopt or nothing readable, and that is a supported
+/// outcome rather than an error: the local node mints a fresh device row, remote nodes need
+/// re-pairing, and the fleet UI says so.
+pub fn legacy_safe_storage_key(app_name: &str) -> Option<String> {
+    keyring::Entry::new(&format!("{app_name} Safe Storage"), app_name)
+        .ok()?
+        .get_password()
+        .inspect_err(|error| eprintln!("[keychain] no legacy safeStorage key to adopt: {error}"))
+        .ok()
+        .filter(|password| !password.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

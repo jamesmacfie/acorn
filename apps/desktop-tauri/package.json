@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm run stage && ACORN_DEV_SERVER=http://localhost:4319 tauri dev --config src-tauri/tauri.dev.json",
-    "build": "pnpm run stage && tauri build",
+    "build": "pnpm run stage && pnpm run build:renderer && pnpm run check:renderer-budget && pnpm run check:runtime-syntax && CI=true tauri build --config '{\"build\":{\"beforeBuildCommand\":\"\"}}' && pnpm run verify:bundle",
     "stage": "pnpm run build:service && pnpm run build:bundled-plugins && pnpm run build:helper && pnpm run build:bridge && node scripts/stage.mjs",
     "build:service": "pnpm --filter @acorn/node build",
     "build:bundled-plugins": "node ../desktop/scripts/build-bundled-plugins.mjs dist/bundled-plugins",
@@ -13,8 +13,13 @@
     "lint": "tsc --noEmit",
     "test": "pnpm run stage && vitest run && cargo test --manifest-path src-tauri/Cargo.toml",
     "tauri": "tauri",
-    "build:bridge": "vite build --config vite.bridge.config.ts"
+    "build:bridge": "vite build --config vite.bridge.config.ts",
+    "build:renderer": "vite build",
+    "check:renderer-budget": "node ../desktop/scripts/check-renderer-budget.mjs dist/client",
+    "check:runtime-syntax": "node ../desktop/scripts/check-runtime-syntax.mjs dist/bridge dist/helper",
+    "verify:bundle": "node scripts/verify-bundle.mjs"
   },
+  "//build": "The renderer is built here rather than by `beforeBuildCommand` so the startup-budget check runs against the bytes that get bundled and the bundler pass does not repeat a build that already happened; the inline config empties the hook for that one invocation. CI=true is what makes the DMG's Finder-cosmetics AppleScript get skipped — it needs Automation permission a build machine does not have, so the runner skips it either way and this keeps a local DMG the same shape as the shipped one.",
   "//dependencies": "The node's runtime dependencies. The staged service.js and the helper both resolve their externals from this package's node_modules, so this mirrors apps/desktop for the same reason it exists there.",
   "dependencies": {
     "@agentclientprotocol/claude-agent-acp": "^0.54.1",
@@ -27,6 +32,7 @@
     "@tanstack/solid-query": "^5.101.0",
     "@tanstack/solid-query-persist-client": "^5.101.0",
     "@tanstack/solid-virtual": "^3.13.29",
+    "@tauri-apps/api": "^2.9.0",
     "@vscode/ripgrep": "^1.15.9",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-serialize": "0.13.0",
@@ -44,12 +50,12 @@
     "node-pty": "^1.0.0",
     "openai": "^6.48.0",
     "pg": "^8.22.0",
+    "playwright-core": "^1.61.1",
     "shiki": "^4.2.0",
     "smol-toml": "^1.7.0",
     "solid-js": "catalog:",
     "ws": "^8.21.0",
-    "zod": "catalog:",
-    "@tauri-apps/api": "^2.9.0"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@acorn/client-core": "workspace:*",

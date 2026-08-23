@@ -9,6 +9,12 @@
     "beforeDevCommand": "vite",
     "beforeBuildCommand": "vite build"
   },
+  "plugins": {
+    "//updater": "There is no updater plugin compiled in and no endpoint configured. The public key is here so `createUpdaterArtifacts` signs every release from the first one, which makes turning updates on later a configuration change rather than a re-release (docs/future/tauri/packaging-and-release.md). Its private half is a build secret; CI reads it from TAURI_SIGNING_PRIVATE_KEY.",
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERERkVDRjVGNDNDMzM1MzQKUldRME5jTkRYOC8rM1FOUEtqMVhWOEgvRDhBVjZuMllWQnZ1MTdsYmZyMk8rVTNmTUcyUmJpc0IK"
+    }
+  },
   "app": {
     "withGlobalTauri": false,
     "windows": [],
@@ -37,7 +43,8 @@
       "../dist/bundled-plugins": "plugins"
     },
     "macOS": {
-      "minimumSystemVersion": "12.0"
+      "minimumSystemVersion": "12.0",
+      "signingIdentity": "-"
     }
   }
 }

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { WebSocketServer } from 'ws'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { ensureCert } from '@acorn/node-core/main/tls.ts'
-import { PreviewTunnels } from './previewTunnel'
+import { PreviewTunnels, type TunnelEvents } from './previewTunnel'
 
 let certDir: string
 let certPem: string
@@ -81,6 +81,12 @@ const secretHeader = (port: number): string => {
   return `${name}: ${value}\r\n`
 }
 
+const secretValue = (port: number): string => {
+  const headers = tunnels.headersFor(`http://127.0.0.1:${port}/`)
+  if (!headers) throw new Error('no headers for our own tunnel')
+  return Object.values(headers)[0]
+}
+
 describe('the tunnel listener demands its secret', () => {
   it('pipes a connection that presents it, head bytes and all', async () => {
     const port = await tunnels.open(TARGET)
@@ -124,6 +130,23 @@ describe('the tunnel listener demands its secret', () => {
     expect(upgrades).toEqual([])
   })
 
+  // The Tauri shell cannot inject a request header, so the same secret arrives as a cookie it seeded
+  // into the preview webview's store (docs/future/tauri/webviews-and-frames.md § Preview pane).
+  it('accepts the same secret as a cookie, beside cookies it knows nothing about', async () => {
+    const port = await tunnels.open(TARGET)
+    const { alive } = await speak(port, request(`Cookie: theme=dark; acorn_tunnel=${secretValue(port)}; other=1\r\n`))
+
+    expect(alive).toBe(true)
+    expect(upgrades).toHaveLength(1)
+  })
+
+  it('refuses a cookie carrying the wrong secret, and one carrying a differently named value', async () => {
+    const port = await tunnels.open(TARGET)
+    expect((await speak(port, request(`Cookie: acorn_tunnel=${'x'.repeat(43)}\r\n`))).alive).toBe(false)
+    expect((await speak(port, request(`Cookie: acorn=${secretValue(port)}\r\n`))).alive).toBe(false)
+    expect(upgrades).toHaveLength(0)
+  })
+
   it('destroys a connection that says nothing, so a silent peer cannot hold the socket', async () => {
     const port = await tunnels.open(TARGET)
     const socket = createConnection({ port, host: '127.0.0.1' })
@@ -152,6 +175,20 @@ describe('headersFor', () => {
     expect(tunnels.headersFor(`http://localhost:${port}/`)).toBeNull()
     expect(tunnels.headersFor('https://example.com/')).toBeNull()
     expect(tunnels.headersFor('not a url')).toBeNull()
+  })
+
+  it('tells the shell about every listener it opens and closes, so the cookie can be seeded', async () => {
+    const opened: [number, string][] = []
+    const closed: number[] = []
+    const events: TunnelEvents = { opened: (port, secret) => opened.push([port, secret]), closed: (port) => closed.push(port) }
+    const watched = new PreviewTunnels(() => ({ endpoint, token: 'token', certPem, fingerprint }), events)
+    const port = await watched.open(TARGET)
+
+    expect(opened).toEqual([[port, expect.any(String)]])
+    // The secret the shell is told is the one the listener actually checks.
+    expect(opened[0][1]).toBe(Object.values(watched.headersFor(`http://127.0.0.1:${port}/`) ?? {})[0])
+    watched.dispose()
+    expect(closed).toEqual([port])
   })
 
   it('stops answering once the tunnel is closed', async () => {

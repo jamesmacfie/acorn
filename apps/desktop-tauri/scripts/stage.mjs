@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process'
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { stageNodeRuntime, targetTriple } from './nodeRuntime.mjs'
 
 // Everything the Rust shell needs on disk before `tauri dev` or `tauri build` runs: the bundled Node
 // runtime, the node service beside the helper, and the migration chains where the node's own walk-up
@@ -44,21 +44,35 @@ for (const chain of chains) {
 
 // The bundled Node runtime, as a Tauri external binary: `binaries/node-<target triple>` is the name
 // `bundle.externalBin` resolves, and the triple comes from rustc rather than a guess about how
-// process.arch spells itself.
+// process.arch spells itself. The runtime is fetched from nodejs.org and checksum-verified, so the
+// developer's own Node no longer has to be the pinned one — see scripts/nodeRuntime.mjs.
 const pin = JSON.parse(readFileSync(resolve(ROOT, 'node-runtime.json'), 'utf8')).version
-const triple = /host: (\S+)/.exec(execFileSync('rustc', ['-vV'], { encoding: 'utf8' }))?.[1]
-if (!triple) throw new Error('Could not read the host target triple from `rustc -vV`.')
-const binary = resolve(PKG, 'src-tauri/binaries', `node-${triple}`)
+const triple = targetTriple()
+const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple })
 
-// ponytail: the pinned runtime is the one already running this script, so there is no download and no
-// checksum here. That holds for a developer build and nothing else — a release must fetch the pinned
-// build for its target and verify it against nodejs.org's SHASUMS, which is phase 4's packaging work
-// (docs/future/tauri/packaging-and-release.md).
-if (process.version !== `v${pin}`) {
-  throw new Error(`node-runtime.json pins Node ${pin} and this is ${process.version}. Switch runtimes, or update the pin if that is the intent.`)
-}
-mkdirSync(dirname(binary), { recursive: true })
-copyFileSync(process.execPath, binary)
-chmodSync(binary, 0o755)
+// The plugin frame's stylesheet, as one file the `app-plugin://` handler serves at `/ui.css`
+// (src-tauri/src/plugin_scheme.rs). Electron compiles the same modules into main through `?raw`
+// imports; Rust cannot, so they are concatenated here instead.
+//
+// The list is read out of Electron's `pluginFrameStyles.ts` rather than copied, because two lists that
+// have to agree eventually do not. That file is the one place the order is decided, and when it goes
+// at cutover this reader goes with it — the modules move here and the parsing disappears.
+const stylesSource = readFileSync(resolve(ROOT, 'apps/desktop/src/app/main/pluginFrameStyles.ts'), 'utf8')
+const specifiers = new Map([...stylesSource.matchAll(/^import (\w+) from '@acorn\/client-core\/(\S+?)\?raw'/gm)].map((m) => [m[1], m[2]]))
+const order = /export const pluginFrameStyles = \[([^\]]*)\]/.exec(stylesSource)?.[1]
+if (!order) throw new Error('pluginFrameStyles.ts no longer declares its module list as an array literal.')
+const frameStyles = order
+  .split(',')
+  .map((name) => name.trim())
+  .filter(Boolean)
+  .map((name) => {
+    const specifier = specifiers.get(name)
+    if (!specifier) throw new Error(`pluginFrameStyles.ts lists ${name} but does not import it from @acorn/client-core.`)
+    return readFileSync(resolve(ROOT, 'packages/client-core/src', specifier), 'utf8')
+  })
+mkdirSync(resolve(PKG, 'dist/bridge'), { recursive: true })
+writeFileSync(resolve(PKG, 'dist/bridge/plugin-frame.css'), frameStyles.join('\n'))
 
-console.log(`[stage] node ${pin} -> ${triple}; service + ${chains.length} migration chain(s) -> dist/helper`)
+console.log(
+  `[stage] node ${pin} (${source}) -> binaries/node-${triple}; service + ${chains.length} migration chain(s) -> dist/helper; ${frameStyles.length} frame stylesheet(s) -> dist/bridge`,
+)

@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import type { ServiceRpcPeer } from '@acorn/protocol/serviceProtocol.ts'
 import {
-  driverFor,
   previewCurrentUrl,
   previewEvictTask,
   previewLoadUrl,
@@ -14,9 +13,14 @@ const previewLoadPayload = taskPayload.extend({ url: z.string() })
 const previewNavigatePayload = taskPayload.extend({
   action: z.enum(['back', 'forward', 'reload', 'stop']),
 })
-const browserClickPayload = taskPayload.extend({ ref: z.string() })
-const browserFillPayload = browserClickPayload.extend({ text: z.string() })
 
+// The shell-only capabilities the node service can call back into. Only the preview half is left:
+// agent browser automation moved to `plugins/browser`, where the browser belongs to the node
+// (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
+//
+// Nothing in the node calls these today. They are registered anyway, because the cost is five lines
+// and the alternative — deleting the seam and rebuilding it the first time something node-side wants
+// to drive the pane — is the worse trade.
 export function registerDesktopCapabilityHandlers(peer: ServiceRpcPeer): () => void {
   const disposers = [
     peer.register('desktop.preview-current-url', (payload) => previewCurrentUrl(taskPayload.parse(payload).taskId)),
@@ -30,29 +34,6 @@ export function registerDesktopCapabilityHandlers(peer: ServiceRpcPeer): () => v
       return previewNavigate(taskId, action)
     }),
     peer.register('desktop.preview-evict', (payload) => previewEvictTask(taskPayload.parse(payload).taskId)),
-    peer.register('desktop.browser-navigate', async (payload) => {
-      const { taskId, url } = previewLoadPayload.parse(payload)
-      return driverFor(taskId)?.navigate(url) ?? { ok: false, reason: 'No preview webview for this task — open the browser pane first.' }
-    }),
-    peer.register('desktop.browser-snapshot', async (payload) => {
-      const driver = driverFor(taskPayload.parse(payload).taskId)
-      return driver ? driver.takeSnapshot() : { error: 'No preview webview for this task — open the browser pane first.' }
-    }),
-    peer.register('desktop.browser-click', async (payload) => {
-      const { taskId, ref } = browserClickPayload.parse(payload)
-      return driverFor(taskId)?.click(ref) ?? { ok: false, reason: 'No preview webview for this task.' }
-    }),
-    peer.register('desktop.browser-fill', async (payload) => {
-      const { taskId, ref, text } = browserFillPayload.parse(payload)
-      return driverFor(taskId)?.fill(ref, text) ?? { ok: false, reason: 'No preview webview for this task.' }
-    }),
-    peer.register('desktop.browser-screenshot', async (payload) => {
-      const driver = driverFor(taskPayload.parse(payload).taskId)
-      return driver ? driver.screenshot() : { error: 'No preview webview for this task.' }
-    }),
-    peer.register('desktop.browser-console', (payload) => (
-      driverFor(taskPayload.parse(payload).taskId)?.console() ?? { lines: [] }
-    )),
   ]
   return () => {
     for (const dispose of disposers.reverse()) dispose()

@@ -1,9 +1,27 @@
 # Webviews and frames
 
-Status: proposal, 2026-08-22. Three embedded-content surfaces and one automation surface. All three
-renderer-side capability groups (`PreviewViews`, `PluginWebviews`, and the plugin frame machinery)
-are already shaped so absence is a supported product state, which is what lets phase 2 ship without
-them.
+Status: proposal, 2026-08-22; built in phase 3, 2026-08-23. Three embedded-content surfaces and one
+automation surface. All three renderer-side capability groups (`PreviewViews`, `PluginWebviews`, and
+the plugin frame machinery) were shaped so absence is a supported product state, which is what let
+phase 2 ship without them.
+
+## What phase 3 built
+
+`src-tauri/src/webviews.rs` is one module for the preview pane and plugin webview surfaces both,
+because the difference between the two products is a policy function and a key prefix.
+`src-tauri/src/plugin_scheme.rs` serves `app-plugin://<hash>`. `plugins/browser` is the automation
+surface. The design below is what they were built from; where the build disagreed with it,
+[sequencing.md](./sequencing.md) § Phase 3 says so. Four things are worth knowing before reading the
+rest:
+
+- The manifest host allowlist is ported into Rust rather than called across the boundary. Two
+  independent checks is the point, and a second implementation is what makes it independent.
+- Every surface is created on `about:blank`, so its cookie store exists before the first real
+  navigation, then navigated once. That is what makes the tunnel cookie seedable.
+- wry exposes no navigation history, so the shell keeps its own from `on_navigation` and marks the
+  traversals it asked for. Back and forward are offered honestly rather than always enabled.
+- A capability that names a window grants every webview inside it. The default capability is scoped
+  by webview label instead, and a Rust test fails if `windows` comes back.
 
 ## The problem
 
@@ -92,7 +110,7 @@ pane asks of it:
 
 ## Preview pane
 
-Adopt child webviews, in phase 3. Create on `ensure`, drive bounds and visibility from the same
+Child webviews. Create on `ensure`, drive bounds and visibility from the same
 renderer geometry that positions the pane today, one non-persistent data store per task,
 HTTP(S)-only plus the caller's rules in `on_navigation`, page-fill rules via `evaluate_script`.
 
@@ -119,13 +137,13 @@ isolation — rejected in the Electron design already), an authless tunnel.
 
 ## Plugin webview panes
 
-Same child-webview mechanism, same phase. The manifest host allowlist stays checked twice — in the
+Same child-webview mechanism, same module. The manifest host allowlist stays checked twice — in the
 renderer broker and again in the Rust command layer, replacing `pluginWebviewIpc.ts`'s double
 check. Ephemeral store per surface; no devtools, no tunnel cookie, no page bridge.
 
 ## Agent browser automation
 
-Move it out of the shell and into a plugin: a browser plugin whose node half ships
+Moved out of the shell and into `plugins/browser`, whose node half ships
 `playwright-core` and contributes browser tools (navigate, snapshot, act, screenshot) through the
 agent-tool contribution registry, which already projects every contributed tool to MCP, the
 harness, and the renderer generically. No new machinery: the plugin registers tools the way every
@@ -146,7 +164,13 @@ plugin. What this plugin must do is keep its rich results audit-ready: screensho
 console captures are returned as blobs the node stores keyed to the task and agent event, not as
 inline base64 that evaporates with the transcript. Nothing else is designed here.
 
-The user's preview pane and the agent's browser become two surfaces on purpose: the Tauri child
+One thing the build settled that the design left open: the plugin is compiled rather than loaded. A
+loaded package is one inlined bundle with no `node_modules` of its own, and `playwright-core` brings
+native bits with it, so it sits in the compiled roster beside `terminal` and its `node-pty`. Nothing
+about the browser changes: it is still not in any bundle, and the plugin still drives an installed
+Chrome or reports why it cannot.
+
+The user's preview pane and the agent's browser are two surfaces on purpose: the Tauri child
 webview is view-only for the person, the Playwright browser is the agent's. When the agent needs
 to see what the user sees, it points its own browser at the same tunnel URL. The `desktop.preview-*`
 capabilities stay desktop-routed over the service protocol and terminate in the Rust webview
@@ -163,8 +187,15 @@ say no).
 
 - Preview pane: load, navigate, tunnel-authed dev server, page-fill rules, hide under overlays.
 - Plugin frame: renders, is network-dead (`fetch`, XHR, WebSocket, beacon all fail), storage
-  isolated per hash or per fallback origin.
+  isolated per hash.
 - Plugin webview pane: allowlist enforced on navigate and redirect.
 - Browser tools: an agent completes a snapshot-act-verify loop through the plugin's contributed
   tools on a machine with a browser, captures a screenshot persisted as a blob, and reports
   unavailable cleanly on a machine without one.
+
+The browser-tools criterion is met and checked:
+`plugins/browser/src/server/driver.smoke.test.ts` runs the loop against a real Chrome under
+`pnpm --filter @acorn/plugin-browser test:smoke`, and takes the no-browser branch, asserting the
+reported reason, on a machine without one. The three webview criteria are pinned by the Rust unit
+tests in `webviews.rs` and `plugin_scheme.rs` as far as a headless run can reach them; the rest is on
+the phase-4 smoke checklist, because a composited webview needs a window.

@@ -1,7 +1,9 @@
 import { readFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-const clientDir = resolve(import.meta.dirname, '../dist/client')
+// The startup budget for a built renderer. Both shells build the same client source from the same
+// shared Vite config, so both run this against their own output directory; the argument is where.
+const clientDir = resolve(process.cwd(), process.argv[2] ?? resolve(import.meta.dirname, '../dist/client'))
 const html = await readFile(resolve(clientDir, 'index.html'), 'utf8')
 
 const assetPaths = (pattern) => [...html.matchAll(pattern)].map((match) => match[1])

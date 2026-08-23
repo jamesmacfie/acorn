@@ -682,13 +682,20 @@ here as the checklist reviewers should hold PRs against:
 
 The desktop view service owns every `WebContentsView`, with an ephemeral session, no preload,
 navigation checks, denied permission requests, and browser chrome outside the guest page. Loaded
-plugin surfaces add a manifest host allowlist enforced on redirects and deliberately omit CDP
-attachment. Preview supplies its task binding and is the only caller that opts into the CDP driver.
-The remote preview tunnel accepts only declared task ports and authenticates its local loopback
-request with a per-tunnel secret before forwarding it to the Node.
+plugin surfaces add a manifest host allowlist enforced on redirects. The remote preview tunnel accepts
+only declared task ports and authenticates its local loopback request with a per-tunnel secret before
+forwarding it to the Node.
 
-Agent browser tools use a CDP method allowlist. They do not expose arbitrary JavaScript evaluation.
-Secret fields are filled through DOM primitives and are not injected into page scripts.
+Agent browser tools drive a separate browser of the node's own, through `plugins/browser`, rather than
+the person's preview pane. That separation is deliberate: the pane a person is looking at is not a
+surface an agent steers. Each task gets its own browsing context, so cookies, storage, and any login
+one task's work established never reach another's. Fills go through the resolved accessibility node
+rather than a selector, so a page cannot substitute a different element between the snapshot an agent
+read and the value it writes. The tools expose no arbitrary JavaScript evaluation.
+
+Screenshots are rows in the plugin's own database, keyed to the task, served back only through
+`/v2/p/browser/captures/:id` behind the same auth as every other node route. The newest twenty per
+task are kept.
 
 ## Untrusted provider data
 

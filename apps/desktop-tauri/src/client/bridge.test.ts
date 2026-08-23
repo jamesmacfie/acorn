@@ -6,8 +6,8 @@ import { SEAM_GROUPS, seamProblems, type SeamGroup } from '@acorn/client-core/pl
 // The bridge writes the global and the seam reads it, and nothing between them is type-checked, so
 // this is the side that catches a renamed member or a dropped key.
 //
-// It also pins what this shell does NOT implement. A group that resolves anyway is a failure, not a
-// bonus: consumers probe the group and then call its members, so half a group is worse than none.
+// Every group is implemented as of phase 3. A group that stops resolving is a failure here rather
+// than an affordance that quietly disappears in the product.
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: async () => undefined }))
 vi.mock('@tauri-apps/api/event', () => ({ listen: async () => () => {} }))
@@ -16,18 +16,18 @@ vi.mock('@tauri-apps/api/event', () => ({ listen: async () => () => {} }))
 vi.stubGlobal('WebSocket', class {})
 await import('./bridge')
 
-const IMPLEMENTED: SeamGroup[] = ['desktop', 'transport', 'fleet', 'pairing', 'plugins', 'desktopExtras', 'folderPicker', 'recovery']
+const IMPLEMENTED: SeamGroup[] = SEAM_GROUPS
 
 describe('the Tauri bridge satisfies the platform seam', () => {
   it('installs the host under the name the seam reads', () => {
     expect((globalThis as { acorn?: unknown }).acorn).toBeTypeOf('object')
   })
 
-  it('implements every group except the two phase 3 owns', () => {
+  it('implements every group in the seam', () => {
     vi.stubGlobal('window', { acorn: (globalThis as { acorn?: unknown }).acorn })
     expect(seamProblems(IMPLEMENTED)).toEqual([])
-    // Named rather than derived, so adding preview or webviews to the bridge without adding them here
-    // fails instead of silently widening what this shell claims.
-    expect(SEAM_GROUPS.filter((group) => !IMPLEMENTED.includes(group))).toEqual(['preview', 'webviews'])
+    // Phase 3 closed the last two, so there is nothing left to exempt. A group added to the seam and
+    // not to this shell fails here rather than in the product.
+    expect(IMPLEMENTED).toHaveLength(SEAM_GROUPS.length)
   })
 })

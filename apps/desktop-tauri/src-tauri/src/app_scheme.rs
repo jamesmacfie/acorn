@@ -3,6 +3,8 @@ use std::path::{Component, Path, PathBuf};
 
 use tauri::http::{Request, Response, Uri};
 
+use crate::plugin_scheme::PLUGIN_SCHEME;
+
 // The renderer's own origin and its Content-Security-Policy, the Tauri half of
 // `apps/desktop/src/app/main/appScheme.ts`. Every directive below is the one Electron sends today
 // (docs/electron.md § Renderer origin and protocol handler), with one deliberate change and one
@@ -10,7 +12,6 @@ use tauri::http::{Request, Response, Uri};
 
 pub const APP_SCHEME: &str = "app";
 pub const APP_ORIGIN: &str = "app://acorn";
-pub const PLUGIN_SCHEME: &str = "app-plugin";
 
 /// Why this pattern matches only the highlighter's worker entry, and what a rename would cost:
 /// docs/electron.md § The syntax-highlighter worker's separate policy. The `worker-` prefix it keys on
@@ -56,7 +57,7 @@ pub fn renderer_csp(helper_port: u16, dev_server: Option<&str>) -> String {
         // Monaco's five ?worker chunks; blob: covers a bundler that inlines one.
         "worker-src 'self' blob:",
         // frame-src names only the plugin scheme: docs/electron.md § Renderer origin and protocol
-        // handler. Nothing serves that scheme yet in this phase; the directive is the floor either way.
+        // handler. `plugin_scheme.rs` is what serves it.
         &format!("frame-src {PLUGIN_SCHEME}:"),
         "object-src 'none'",
         "base-uri 'none'",

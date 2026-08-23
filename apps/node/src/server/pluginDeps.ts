@@ -1,4 +1,3 @@
-import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 import type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 import type { CoreServices } from '@acorn/node-core/main/core/index.ts'
 import type { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
@@ -7,9 +6,9 @@ import { MEMORY_KNOWLEDGE } from '@acorn/plugin-memory/contract/knowledge.ts'
 import type { NodePluginDeps } from './plugins'
 
 // The plugin dependency bag, built once for both composition roots (docs/plugins.md § Adding a
-// plugin contribution). The only real difference between the two hosts is the preview browser: the
-// Electron root has a real DesktopCapabilities peer, the headless one a stub that rejects with a
-// reason.
+// plugin contribution). Nothing here differs between the two hosts any more: the one thing that did
+// was the preview browser, and agent browser automation is a plugin now, with a browser of its own on
+// whichever node runs it (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
 export type PluginDepsInput = {
   capabilities: CapabilityRegistry
   core: CoreServices
@@ -17,11 +16,9 @@ export type PluginDepsInput = {
   // Resolves when the root's post-window reconcile pass is done (always resolves, even on failure).
   // terminal and workflows both await it before starting anything a sweep would clobber.
   reconciled: Promise<void>
-  // The one real difference between the roots.
-  browser: BrowserDesktopCapability
 }
 
-export function buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser }: PluginDepsInput): NodePluginDeps {
+export function buildPluginDeps({ capabilities, core, internalEnv, reconciled }: PluginDepsInput): NodePluginDeps {
   // Resolved at call time, never here: memory's init runs inside initPlugins and has not happened yet
   // when this object is built, and plugins/terminal cannot import memory directly because
   // plugins/memory already imports terminal's TERMINAL_SEND_TO_AGENT. Importing back would close a
@@ -36,9 +33,6 @@ export function buildPluginDeps({ capabilities, core, internalEnv, reconciled, b
       internalEnv,
       memoryReviewTrigger: (taskId, transcriptTail) => knowledgeAt().memoryReviewTrigger(taskId, transcriptTail),
     },
-    // The browser driver behind the six `browser_*` tools preview owns. A native adapter, so it comes
-    // from the root: a plugin may not import electron to build one.
-    preview: { browser },
     notes: { internalEnv },
     terminal: {
       internalEnv,

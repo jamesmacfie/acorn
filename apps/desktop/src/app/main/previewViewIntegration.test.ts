@@ -101,7 +101,6 @@ nodeRequire.cache[electronModulePath] = {
 } as NodeModule
 
 const { registerPreviewIpc } = await import('@acorn/plugin-preview/main/previewService.ts')
-const { driverFor } = await import('@acorn/plugin-preview/main/browserService.ts')
 const { WebviewService } = await import('./webviewService')
 
 let dispose: () => void
@@ -123,7 +122,7 @@ beforeEach(() => {
 afterEach(() => dispose())
 
 describe('preview over the generic view service', () => {
-  it('retains preview partition names and opts only preview into CDP', () => {
+  it('retains preview partition names, one ephemeral session per task', () => {
     const owner = new electron.FakeBrowserWindow()
     expect(ensure(owner, 'task-1', 'http://localhost:3000')).toBe(true)
     expect(ensure(owner, 'task-2', 'http://localhost:3001')).toBe(true)
@@ -131,9 +130,10 @@ describe('preview over the generic view service', () => {
       'acorn-preview-task-1',
       'acorn-preview-task-2',
     ])
-    expect(driverFor('task-1')).not.toBeNull()
+    // Closing the window takes its views with it, which is what makes the sessions ephemeral in
+    // practice as well as in name.
     owner.close()
-    expect(driverFor('task-1')).toBeNull()
+    expect(electron.FakeWebContentsView.instances.every((view) => view.webContents.isDestroyed())).toBe(true)
   })
 
   it('preserves browse state until the configured home changes', () => {

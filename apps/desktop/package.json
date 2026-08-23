@@ -45,6 +45,7 @@
     "node-pty": "^1.0.0",
     "openai": "^6.48.0",
     "pg": "^8.22.0",
+    "playwright-core": "^1.61.1",
     "shiki": "^4.2.0",
     "smol-toml": "^1.7.0",
     "solid-js": "catalog:",

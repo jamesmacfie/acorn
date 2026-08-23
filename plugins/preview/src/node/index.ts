@@ -9,32 +9,19 @@
 //
 // That read needs core's tasks and projects tables, so it takes CoreServices rather than the
 // database handle the composition root used to pass to a loose previewRulesForTask function in
-// service/runtime.ts. It also owns the six browser_* agent tools (server/agentTools.ts), moved here
-// from apps/node/src/wiring/agentToolsWiring.ts now that the plugin has a node-side owner to declare
-// them against; the driver itself still runs in Electron main.
+// service/runtime.ts. It briefly owned the six browser_* agent tools too; those left for
+// `plugins/browser`, whose driver is Playwright on the node rather than CDP in a desktop shell
+// (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
 //
-// No database, no routes, no dispose: there is nothing to release. It is not `required`: a node
-// with preview disabled reports no page rules and contributes no browser tools, which is already
-// how the browser automation treats an empty rule set.
+// No database, no routes, no dispose: there is nothing to release. It is not `required`: a node with
+// preview disabled reports no page rules, which the pane already treats as an empty rule set.
 import type { NodePlugin } from '@acorn/plugin-api/node'
-import type { BrowserDesktopCapability } from '@acorn/protocol/desktopCapabilities.ts'
 import { PREVIEW_RULES } from '../contract/rules'
-import { browserAgentTools } from '../server/agentTools'
 import { previewRulesForTask } from '../server/previewRules'
 
-export type PreviewPluginDeps = {
-  // The Electron-main browser driver, task-addressed and serialisable
-  // (@acorn/protocol/desktopCapabilities.ts). It stays an app-supplied dep for the same reason
-  // terminal's `internalEnv` does: it is a native adapter the composition root owns, and a plugin
-  // may not import electron to build one. A node with no window (dev:node) supplies a driver whose
-  // calls fail cleanly.
-  browser: BrowserDesktopCapability
-}
-
-export const previewPlugin = (deps: PreviewPluginDeps): NodePlugin => ({
+export const previewPlugin = (): NodePlugin => ({
   name: 'preview',
   init: (ctx) => {
     ctx.capabilities.provide(PREVIEW_RULES, { forTask: (taskId) => previewRulesForTask(ctx.core, taskId) })
-    for (const tool of browserAgentTools(deps.browser)) ctx.tools.register(tool)
   },
 })

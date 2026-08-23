@@ -25,6 +25,21 @@ const MAX_TUNNELS = 16
 // Header name and case handling: docs/electron.md § Host-owned webviews.
 const TUNNEL_HEADER = 'x-acorn-tunnel'
 
+// The same credential as a cookie, for a shell that cannot inject a header. Electron adds
+// `x-acorn-tunnel` per request through `webRequest`; wry has no equivalent, so the Tauri shell seeds
+// this into the preview webview's ephemeral cookie store before its first navigation instead
+// (docs/future/tauri/webviews-and-frames.md § Preview pane). Same secret, same constant-time compare,
+// same per-listener scope — only the envelope differs, so both shells are one code path from here on.
+const TUNNEL_COOKIE = 'acorn_tunnel'
+
+// Told the shell as each listener opens and closes, so it can seed that cookie. The secret goes to the
+// shell process and no further; nothing about this reaches the renderer, which is the whole reason
+// the secret exists (docs/electron.md § Host-owned webviews).
+export type TunnelEvents = {
+  opened(port: number, secret: string): void
+  closed(port: number): void
+}
+
 // Request-head deadline and size bound: docs/electron.md § Host-owned webviews.
 const HEAD_TIMEOUT_MS = 2_000
 const MAX_HEAD_BYTES = 8 * 1024
@@ -38,15 +53,28 @@ type Entry = {
   secret: string
 }
 
-// Secret check: docs/electron.md § Host-owned webviews.
-function headCarriesSecret(head: string, secret: string): boolean {
+// Byte-level comparison and why: docs/electron.md § Host-owned webviews.
+function matches(presented: string, secret: string): boolean {
+  const a = Buffer.from(presented, 'latin1')
+  const b = Buffer.from(secret, 'latin1')
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+// Secret check: docs/electron.md § Host-owned webviews. Either envelope satisfies it — the header
+// Electron injects, or the cookie the Tauri shell seeds — because they carry the same per-listener
+// secret and a dev server behind the tunnel sees both regardless.
+export function headCarriesSecret(head: string, secret: string): boolean {
   for (const line of head.split('\r\n')) {
     const colon = line.indexOf(':')
     if (colon === -1) continue
-    if (line.slice(0, colon).trim().toLowerCase() !== TUNNEL_HEADER) continue
-    const presented = Buffer.from(line.slice(colon + 1).trim())
-    const expected = Buffer.from(secret)
-    if (presented.length === expected.length && timingSafeEqual(presented, expected)) return true
+    const name = line.slice(0, colon).trim().toLowerCase()
+    const value = line.slice(colon + 1).trim()
+    if (name === TUNNEL_HEADER && matches(value, secret)) return true
+    if (name !== 'cookie') continue
+    for (const pair of value.split(';')) {
+      const eq = pair.indexOf('=')
+      if (eq !== -1 && pair.slice(0, eq).trim() === TUNNEL_COOKIE && matches(pair.slice(eq + 1).trim(), secret)) return true
+    }
   }
   return false
 }
@@ -64,7 +92,10 @@ export class PreviewTunnels {
   // Dedupes overlapping opens for the same key: docs/electron.md § Host-owned webviews.
   private readonly opening = new Map<string, Promise<number>>()
 
-  constructor(private readonly resolve: (nodeId: string) => TunnelNode | null) {}
+  constructor(
+    private readonly resolve: (nodeId: string) => TunnelNode | null,
+    private readonly events?: TunnelEvents,
+  ) {}
 
   async open(target: TunnelKey): Promise<number> {
     const id = key(target)
@@ -125,6 +156,7 @@ export class PreviewTunnels {
       this.closeEntry(id)
     })
     this.entries.set(id, { server, port, sockets, idle: null, secret })
+    this.events?.opened(port, secret)
     this.armIdle(id)
     return port
   }
@@ -200,6 +232,7 @@ export class PreviewTunnels {
     const entry = this.entries.get(id)
     if (!entry) return
     this.entries.delete(id)
+    this.events?.closed(entry.port)
     if (entry.idle) clearTimeout(entry.idle)
     for (const socket of entry.sockets) socket.destroy()
     entry.server.close()

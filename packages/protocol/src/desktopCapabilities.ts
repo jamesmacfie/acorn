@@ -8,22 +8,21 @@ export type PreviewDesktopCapability = {
   evict(taskId: string): Promise<boolean>
 }
 
-export type BrowserDesktopCapability = {
-  navigate(taskId: string, url: string): Promise<unknown>
-  snapshot(taskId: string): Promise<unknown>
-  click(taskId: string, ref: string): Promise<unknown>
-  fill(taskId: string, ref: string, text: string): Promise<unknown>
-  screenshot(taskId: string): Promise<unknown>
-  console(taskId: string): Promise<unknown>
-}
-
 export type DesktopCapabilities = {
   preview: PreviewDesktopCapability
-  browser: BrowserDesktopCapability
 }
 
-// Service-side projection of the small native surface it exposes. The utility service never
-// receives a BrowserWindow/WebContents handle; it can only issue task-addressed commands.
+// Service-side projection of the small native surface a shell exposes. The utility service never
+// receives a window or webview handle; it can only issue task-addressed commands.
+//
+// The `browser` half of this seam is gone: agent browser automation is a plugin now, driving a real
+// browser on the node rather than the desktop's preview pane over CDP
+// (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
+//
+// What is left has no caller in the node today — nothing reachable from `service/runtime.ts` reads
+// `desktop.preview` — and it is kept because it is the seam a node-side caller would use to drive the
+// pane, which is a reasonable thing to want. The Tauri shell registers no handler for it and records
+// the waiver in docs/future/tauri/sequencing.md § Phase 3.
 export function desktopCapabilitiesOverRpc(peer: ServiceRpcPeer): DesktopCapabilities {
   return {
     preview: {
@@ -32,14 +31,6 @@ export function desktopCapabilitiesOverRpc(peer: ServiceRpcPeer): DesktopCapabil
       navState: (taskId) => peer.request('desktop.preview-nav-state', { taskId }),
       navigate: (taskId, action) => peer.request('desktop.preview-navigate', { taskId, action }),
       evict: (taskId) => peer.request('desktop.preview-evict', { taskId }),
-    },
-    browser: {
-      navigate: (taskId, url) => peer.request('desktop.browser-navigate', { taskId, url }),
-      snapshot: (taskId) => peer.request('desktop.browser-snapshot', { taskId }),
-      click: (taskId, ref) => peer.request('desktop.browser-click', { taskId, ref }),
-      fill: (taskId, ref, text) => peer.request('desktop.browser-fill', { taskId, ref, text }),
-      screenshot: (taskId) => peer.request('desktop.browser-screenshot', { taskId }),
-      console: (taskId) => peer.request('desktop.browser-console', { taskId }),
     },
   }
 }

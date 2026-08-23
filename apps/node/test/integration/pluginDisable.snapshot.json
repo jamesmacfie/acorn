@@ -3,6 +3,7 @@
     "routes": [
       "agents",
       "agents",
+      "browser/captures",
       "changes/tasks",
       "changes/tasks",
       "docker",
@@ -67,8 +68,36 @@
     ],
     "providerRoutes": [],
     "modelProviders": [],
+    "capabilities": [
+      "agents.managedRoute",
+      "agents.runtime",
+      "agents.sessionExecute",
+      "agents.usageRoute",
+      "changes.localGit",
+      "core.scheduler",
+      "core.taskWorktreeCreated",
+      "docker.route",
+      "editor.route",
+      "editor.searchRoute",
+      "github.mirror",
+      "memory.knowledge",
+      "memory.knowledgeRoute",
+      "notes.seedTask",
+      "notes.store",
+      "preview.rules",
+      "terminal.route",
+      "terminal.runRoute",
+      "terminal.runTargets",
+      "terminal.sendToAgent",
+      "terminal.sessions",
+      "terminal.taskCreatedHook",
+      "terminal.taskSessionsRoute",
+      "workflows.route",
+      "workflows.runner"
+    ],
     "databases": [
       "agents.sqlite",
+      "browser.sqlite",
       "changes.sqlite",
       "github.sqlite",
       "memory.sqlite",
@@ -77,6 +106,22 @@
     ]
   },
   "owned": {
+    "browser": {
+      "routes": [
+        "browser/captures"
+      ],
+      "tools": [
+        "browser_click",
+        "browser_console",
+        "browser_fill",
+        "browser_navigate",
+        "browser_screenshot",
+        "browser_snapshot"
+      ],
+      "databases": [
+        "browser.sqlite"
+      ]
+    },
     "changes": {
       "routes": [
         "changes/tasks",
@@ -87,6 +132,9 @@
         "local_changes",
         "local_diff"
       ],
+      "capabilities": [
+        "changes.localGit"
+      ],
       "databases": [
         "changes.sqlite"
       ]
@@ -94,12 +142,19 @@
     "docker": {
       "routes": [
         "docker"
+      ],
+      "capabilities": [
+        "docker.route"
       ]
     },
     "editor": {
       "routes": [
         "editor/tasks",
         "editor/tasks"
+      ],
+      "capabilities": [
+        "editor.route",
+        "editor.searchRoute"
       ]
     },
     "github": {
@@ -130,23 +185,25 @@
       "integrationProviders": [
         "github"
       ],
+      "capabilities": [
+        "github.mirror"
+      ],
       "databases": [
         "github.sqlite"
       ]
     },
     "preview": {
-      "tools": [
-        "browser_click",
-        "browser_console",
-        "browser_fill",
-        "browser_navigate",
-        "browser_screenshot",
-        "browser_snapshot"
+      "capabilities": [
+        "preview.rules"
       ]
     },
     "workflows": {
       "routes": [
         "workflows"
+      ],
+      "capabilities": [
+        "workflows.route",
+        "workflows.runner"
       ],
       "databases": [
         "workflows.sqlite"

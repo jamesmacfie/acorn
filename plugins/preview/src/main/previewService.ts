@@ -1,10 +1,13 @@
-// Preview's thin Electron adapter over the host-owned view service. Preview still owns its page
-// rules, tunnel headers and CDP binding; native view lifecycle and session isolation are shared.
+// Preview's thin Electron adapter over the host-owned view service. Preview still owns its page rules
+// and tunnel headers; native view lifecycle and session isolation are shared.
+//
+// It used to bind a CDP driver to each view as well, which is how an agent got a browser. That left for
+// `plugins/browser`, where the browser is the node's and every node has one
+// (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
 import { createRequire } from 'node:module'
 import type { BrowserWindow, IpcMainEvent, IpcMainInvokeEvent, WebContents } from 'electron'
 import { matchesUrlPattern } from '@acorn/protocol/browserRules.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
-import { bindBrowserContents, unbindBrowserContents } from './browserService'
 import { buildFillScript, isAllowedPreviewUrl } from './browserAuto'
 
 type Rect = { x: number; y: number; width: number; height: number }
@@ -115,8 +118,6 @@ export function registerPreviewIpc(deps: {
       partitionKey: `acorn-preview-${encodeURIComponent(taskId)}`,
       headersFor: tunnelHeadersFor,
       allowsNavigation: isAllowedPreviewUrl,
-      onAttach: (contents) => bindBrowserContents(taskId, contents),
-      onDetach: (contents) => unbindBrowserContents(taskId, contents),
       onState: (state) => emit(owner, taskId, state),
       onDomReady: (contents) => applyLoadRules(taskId, contents, rulesForTask),
     })

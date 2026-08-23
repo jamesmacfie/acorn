@@ -21,8 +21,8 @@ privileges are under [The plugin frame origin](#the-plugin-frame-origin) below.
 
 Boot is split in two. `bootstrap.ts` is the Electron half: it supplies `safeStorage` as the cipher
 device tokens are encrypted with, the target broker pushes go to, the recovery dialog, and the IPC
-projections the renderer talks to, then wires window creation, native folder dialogs, preview and
-browser capabilities, and quit-time shutdown.
+projections the renderer talks to, then wires window creation, native folder dialogs, the preview
+capability, and quit-time shutdown.
 
 `@acorn/desktop-helper` is the other half, composed by its `main/index.ts`: service supervision and
 the restart policy, the connection broker and its fleet, device-token custody, the plugin cache and
@@ -289,7 +289,12 @@ over the renderer's pane host and hides it while overlays cover the pane.
 
 A loaded plugin may also declare a `webview` pane. Its manifest hosts are checked by the renderer
 broker and again in main, including `will-navigate` and `will-redirect`. Each surface gets an
-ephemeral isolated partition and no CDP attachment, devtools, tunnel header, preload, or page bridge.
+ephemeral isolated partition and no devtools, tunnel header, preload, or page bridge.
+
+No view is attached to a debugger. Agent browser automation used to drive the preview pane's
+`webContents` over CDP; it is `plugins/browser` now, which runs Playwright against a browser of the
+node's own, so an agent on a headless node has one too. The preview pane is the person's surface and
+nothing steers it but them.
 
 For a task whose dev server is served by another Node process,
 `@acorn/desktop-helper/main/previewTunnel.ts` opens an authenticated loopback listener that forwards
@@ -335,9 +340,13 @@ requests do not use this RPC; they use `/v2` over the broker.
 ## Native capability boundary
 
 The service may request only the native operations represented by
-`@acorn/protocol/desktopCapabilities.ts`. Preview/browser calls are validated in Electron main and
-remain scoped to a task and binding. The service never receives a `BrowserWindow`, `WebContentsView`,
-or Electron object.
+`@acorn/protocol/desktopCapabilities.ts`. Preview calls are validated in Electron main and remain
+scoped to a task and binding. The service never receives a `BrowserWindow`, `WebContentsView`, or
+Electron object.
+
+Nothing in the node calls them. The browser half of the seam went with the CDP driver, and the preview
+half is registered against the day something node-side wants to drive the pane rather than because
+something does.
 
 ## Build and packaging
 

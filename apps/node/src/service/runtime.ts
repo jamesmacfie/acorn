@@ -33,6 +33,15 @@ export type ServiceRuntime = {
 
 type RuntimeOptions = {
   config: ServiceStartConfig
+  // The shell's native surface, and nothing in this runtime reads it today. It used to carry the
+  // browser driver behind the six `browser_*` agent tools; those moved to `plugins/browser`, whose
+  // browser belongs to the node and therefore works on a headless one too
+  // (docs/future/tauri/webviews-and-frames.md § Agent browser automation).
+  //
+  // What is left is `desktop.preview`, which is how a node-side caller would drive the preview pane —
+  // a reasonable thing to want, and kept threaded here so that caller has a seam to reach for rather
+  // than a protocol change. Electron registers the handlers; the Tauri shell does not, and records the
+  // waiver in docs/future/tauri/sequencing.md § Phase 3.
   desktop: DesktopCapabilities
   stateChanged(state: ServiceState, detail?: string): void
 }
@@ -58,10 +67,10 @@ async function inheritLoginShellPath(isPackaged: boolean): Promise<void> {
   }
 }
 
-// Electron-free composition root (docs/architecture-overview.md § Process ownership). Importing
-// this module in a plain Node test never loads Electron: native UI operations arrive through
-// DesktopCapabilities.
-export async function startServiceRuntime({ config, desktop, stateChanged }: RuntimeOptions): Promise<ServiceRuntime> {
+// Shell-free composition root (docs/architecture-overview.md § Process ownership). Importing this
+// module in a plain Node test loads no shell: native UI operations arrive through DesktopCapabilities,
+// which is why `desktop` is in the options above and not destructured here.
+export async function startServiceRuntime({ config, stateChanged }: RuntimeOptions): Promise<ServiceRuntime> {
   const mark = bootTimer()
   await inheritLoginShellPath(config.isPackaged)
   configureTerminalMcp(
@@ -187,7 +196,7 @@ export async function startServiceRuntime({ config, desktop, stateChanged }: Run
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY, capabilities })
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
-    const graph = await assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled, browser: desktop.browser }))
+    const graph = await assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled }))
     // The node's one scheduler (docs/schedules.md § Why the node, and only the node): built and
     // provided before the plugins so a declared schedule has somewhere to land, started after the
     // listener binds because a catch-up run may call this node's own routes.

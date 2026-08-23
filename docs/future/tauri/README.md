@@ -1,6 +1,6 @@
 # Tauri migration
 
-Status: proposal, 2026-08-22; phases 0, 1 and 2 executed 2026-08-23. Phases 3 to 5 are not scheduled. This
+Status: proposal, 2026-08-22; phases 0 to 4 executed 2026-08-23. Phase 5 is not scheduled. This
 folder plans the replacement of the Electron host with a Tauri v2 shell, written for the agents and
 developers who will implement the phases. The reference implementation we steal mechanics from is
 `references/proliferate`, a shipped Tauri v2 app in this repo's references directory.
@@ -64,6 +64,14 @@ wire is one WebSocket rather than a socket plus loopback HTTP, `connect-src` als
 IPC protocol, dev proxies Vite through `app://` instead of loading `devUrl`, and a dev build skips
 the keychain.
 
+**Phase 3 landed on trunk, 2026-08-23.** The seam has no null groups left. The preview pane and plugin
+webview surfaces are child webviews driven from `src-tauri/src/webviews.rs`, the tunnel credential
+travels as a cookie the shell seeds and the renderer never sees, `app-plugin://<hash>` serves plugin
+frames out of the cache, and a first launch adopts an Electron build's custody root. Agent browser
+automation left the shell for `plugins/browser`, so `desktop.browser-*` is deleted rather than ported.
+Five details changed on contact, including a capability scoped to the window that would have handed
+`invoke` to every preview page; [sequencing.md](./sequencing.md) has them.
+
 **Coexist, then cut over.** The Tauri shell is a new package (`apps/desktop-tauri`)
 consuming the same renderer source, node artifact, bundled-plugins build, and protocol. CI builds
 both from the same commit; Electron ships until the cutover checklist in
@@ -80,12 +88,21 @@ carries the full argument.
 the same version pin feeds `scripts/pack-node.mjs`. One runtime pin, two consumers.
 [node-runtime.md](./node-runtime.md).
 
-**Preview and plugin webviews arrive after the skeleton.** The seam groups are nullable, so a shell
-without them is a supported product state, not a hack. Agent browser automation leaves the shell
-entirely: a browser plugin ships `playwright-core`, contributes its tools through the agent-tool
-registry (so they project to MCP for free), and drives an installed or managed browser — rich
-results land as blobs so a future audit trail at the registry seam captures them.
-[webviews-and-frames.md](./webviews-and-frames.md).
+**Preview and plugin webviews arrived after the skeleton, in phase 3.** The seam groups are nullable,
+so a shell without them was a supported product state rather than a hack. Agent browser automation left
+the shell entirely: `plugins/browser` ships `playwright-core`, contributes its tools through the
+agent-tool registry (so they project to MCP for free), and drives an installed Chrome. Screenshots are
+rows in the plugin's own table rather than inline base64, so a future audit trail at the registry seam
+has something to read. [webviews-and-frames.md](./webviews-and-frames.md).
+
+**Phase 4 landed on trunk, 2026-08-23.** `pnpm --filter @acorn/desktop-tauri run build` produces an
+ad-hoc signed DMG with signed updater artifacts, and checks its own output against what staging wrote
+before it finishes. `.github/workflows/build-tauri.yml` runs it on a push to main, alongside
+`build-dmg.yml`. The pinned Node is fetched from nodejs.org and checksum-verified rather than copied
+from the developer's runtime. The inventory check earned its place on the first run by catching a
+packaged-only bug: the shell looked for the bundled Node under `Contents/Resources` and `externalBin`
+stages it into `Contents/MacOS`. Three more details changed on contact;
+[sequencing.md](./sequencing.md) has them.
 
 **No updater in v1.** It is hard-blocked on Apple Developer ID signing regardless of shell. The
 minisign keypair and updater artifacts exist from the first release.
@@ -118,13 +135,14 @@ path. [distribution.md](./distribution.md) records the convergence points with
 | 0 | De-risk spikes | ✅ Done, go (2026-08-23) | M |
 | 1 | Groundwork that lands in Electron | ✅ Done (2026-08-23) | M |
 | 2 | Rust shell skeleton + helper | ✅ Done (2026-08-23) | L |
-| 3 | Feature parity | ⬜ Not started | L |
-| 4 | Packaging and CI | ⬜ Not started | M |
+| 3 | Feature parity | ✅ Done (2026-08-23) | L |
+| 4 | Packaging and CI | ✅ Done (2026-08-23) | M |
 | 5 | Cutover and deletion | ⬜ Not started | M |
 
 Ordering and exit criteria live in [sequencing.md](./sequencing.md), which records what each finished
-phase actually landed. Phase 3 is clear to start: the shell boots, the seam has two hosts running one
-contract suite, and the two groups phase 3 fills are the two the bridge currently resolves null.
+phase actually landed. The artifact exists. What gates phase 5 is a person running the smoke checklist
+in [testing.md](./testing.md) against the DMG on a machine that never had the Electron build, and the
+soak window in the cutover trigger.
 
 ## Invariants
 
