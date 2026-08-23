@@ -49,28 +49,33 @@ export default function AgentTranscript(props: {
     buildConversationItems(props.snapshot.events).filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type)))
   const pending = createMemo(() => props.snapshot.requests.filter((request) =>
     request.status === 'pending' || request.status === 'resolving'))
-  // Appending an event and growing the last event's text are both worth following down; nothing else
-  // about a snapshot should move the scroll position.
-  const tail = createMemo(() => {
-    const last = items().at(-1)
-    return `${items().length}:${last?.lastSeq ?? 0}`
-  })
-
   const sessionId = createMemo(() => props.snapshot.session.id)
 
-  let wasNearBottom = true
-  let frame = 0
+  // Follow the bottom until the reader scrolls away from it, and pick it up again when they scroll back.
+  // Everything below is driven by the list resizing rather than by the snapshot changing: a streamed
+  // message keeps growing after the event that carried it, and code highlighting settles a frame or two
+  // later again, so any write timed off the data lands short of a bottom that has since moved.
+  let following = true
   let target: number | null = null
   let applied = -1
   const nearBottom = (element: HTMLDivElement) =>
     element.scrollHeight - element.scrollTop - element.clientHeight < 96
+  const pin = () => {
+    const element = scrollElement()
+    if (!element) return
+    element.scrollTop = element.scrollHeight
+    applied = element.scrollTop
+    scrollTopBySession.set(sessionId(), applied)
+  }
   const noteScroll = () => {
     const element = scrollElement()
     if (!element) return
-    // Our own restore write echoes back as a scroll event; a real scroll ends the restore.
+    // Our own writes echo back as scroll events. Reading near-bottom off one is a trap: the list has
+    // usually grown again by the time it arrives, so the write we just made now measures as "scrolled up"
+    // and following would switch itself off. Only a scroll we did not make counts.
     if (element.scrollTop === applied) return
     target = null
-    wasNearBottom = nearBottom(element)
+    following = nearBottom(element)
     scrollTopBySession.set(sessionId(), element.scrollTop)
   }
   // Leaving the task unmounts this pane, so the reader must land back where they were. Code highlighting
@@ -83,28 +88,24 @@ export default function AgentTranscript(props: {
     applied = element.scrollTop
     if (element.scrollTop < target - 1) return
     target = null
-    wasNearBottom = nearBottom(element)
+    following = nearBottom(element)
   }
-  const growth = new ResizeObserver(applyTarget)
+  // The list grows for two reasons and the response differs: while restoring we chase the saved offset,
+  // otherwise we sit on the bottom. The scroll element is observed too, because the pending-request strip
+  // above it appearing shortens the viewport without touching the list.
+  const growth = new ResizeObserver(() => {
+    if (target !== null) applyTarget()
+    else if (following) pin()
+  })
   onCleanup(() => growth.disconnect())
   // Switching sessions in the sidebar swaps the snapshot without remounting, so this covers both mount
   // and session change.
   createEffect(on(sessionId, (id) => {
     target = scrollTopBySession.get(id) ?? null
-    wasNearBottom = target === null
-    applyTarget()
+    following = target === null
+    if (target === null) pin()
+    else applyTarget()
   }))
-  // Follow the tail only while the reader is already at the tail. Scrolling up to read, or to select, is
-  // a decision to stop following, so the next event must not yank the viewport back down.
-  createEffect(on(tail, () => {
-    if (!wasNearBottom) return
-    cancelAnimationFrame(frame)
-    frame = requestAnimationFrame(() => {
-      const element = scrollElement()
-      if (element) element.scrollTop = element.scrollHeight
-    })
-  }, { defer: true }))
-  onCleanup(() => cancelAnimationFrame(frame))
 
   return (
     <div class="agent-transcript-wrap">
@@ -121,7 +122,14 @@ export default function AgentTranscript(props: {
           </For>
         </div>
       </Show>
-      <div class="agent-transcript" ref={setScrollElement} onScroll={noteScroll}>
+      <div
+        class="agent-transcript"
+        ref={(element) => {
+          setScrollElement(element)
+          growth.observe(element)
+        }}
+        onScroll={noteScroll}
+      >
         <Show
           when={items().length}
           fallback={
