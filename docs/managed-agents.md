@@ -206,7 +206,13 @@ are revalidated against the owning task.
 
 ## Operations and failure
 
-Only one turn dispatches per session. Workspace and provider ceilings bound concurrency.
+Only one turn dispatches per session. Workspace and provider ceilings bound concurrency, and the owner
+sets both under Settings > Agent concurrency. The provider ceiling is counted against one agent CLI
+across the whole node, which is what holds a single provider account to a few turns at once. The
+workspace ceiling is counted across all providers in one workspace. Both live in one `prefs` row
+(`agents:concurrency:v1`), read per scan rather than captured, so a raise applies to the scan the write
+triggers. Absent or unreadable, the built-in 2 and 3 stand.
+
 The dispatcher is edge-triggered: it scans the queue when a turn is enqueued, when a provider starts,
 and when a turn settles. A scan that starts nothing rescans when a call arrived while it was running,
 because that call's turn cannot be in the snapshot the scan is working from, and the reconcile pass

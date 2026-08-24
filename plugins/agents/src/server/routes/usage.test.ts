@@ -8,21 +8,29 @@ import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
 import { makeTestDb } from '@acorn/node-core/testkit/db.ts'
 import type { AgentUsageSnapshot } from '../../shared/usage'
 import { emptyAgentPricingPreferences, type AgentPricingPreferences } from '../../shared/pricing'
+import { defaultAgentConcurrency, type AgentConcurrencyLimits } from '../../shared/concurrency'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../../main/pricingStore'
+import { readAgentConcurrency, writeAgentConcurrency } from '../../main/concurrencyStore'
 import { agentUsage, setAgentUsageBridge } from './usage'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 const snapshot: AgentUsageSnapshot = { providers: [], refreshedAt: 123 }
 
 // The three usage cases only exercise `read`, but the bridge type is complete, so each stub fills the
-// pricing halves too. Kept as one helper rather than repeated: a stub that silently answered the built-in
-// pricing table would make the persistence case below pass vacuously.
-const unusedPricing = {
+// pricing and concurrency halves too. Kept as one helper rather than repeated: a stub that silently
+// answered the built-in table would make the persistence cases below pass vacuously.
+const unusedSettings = {
   pricing: async (): Promise<AgentPricingPreferences> => {
     throw new Error('pricing is not part of this case')
   },
   setPricing: async (): Promise<void> => {
     throw new Error('setPricing is not part of this case')
+  },
+  concurrency: async (): Promise<AgentConcurrencyLimits> => {
+    throw new Error('concurrency is not part of this case')
+  },
+  setConcurrency: async (): Promise<void> => {
+    throw new Error('setConcurrency is not part of this case')
   },
 }
 const request = (path: string, method = 'GET', body?: unknown) => new Request(
@@ -61,7 +69,7 @@ describe('agent usage routes', () => {
   it('reads cached usage and forces refresh through the typed bridge', async () => {
     const calls: Array<{ userId: string; force?: boolean }> = []
     setAgentUsageBridge({
-      ...unusedPricing,
+      ...unusedSettings,
       read: async (options) => {
         calls.push(options)
         return snapshot
@@ -74,7 +82,7 @@ describe('agent usage routes', () => {
   })
 
   it('401s without a principal', async () => {
-    setAgentUsageBridge({ ...unusedPricing, read: async () => snapshot })
+    setAgentUsageBridge({ ...unusedSettings, read: async () => snapshot })
     expect((await gated().fetch(request('/api/agents/usage'), {} as Env)).status).toBe(401)
   })
 
@@ -86,7 +94,7 @@ describe('agent usage routes', () => {
 
   it('returns provider-local error rows as a successful response', async () => {
     setAgentUsageBridge({
-      ...unusedPricing,
+      ...unusedSettings,
       read: async () => ({
         refreshedAt: 1,
         providers: [
@@ -121,6 +129,7 @@ describe('agent usage routes', () => {
     try {
       const core = createCoreServices({ secrets: new SecretService('33'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
       setAgentUsageBridge({
+        ...unusedSettings,
         read: async () => snapshot,
         pricing: (userId) => readAgentPricingPreferences(core.prefs, userId),
         setPricing: (userId, preferences) => writeAgentPricingPreferences(core.prefs, userId, preferences),
@@ -151,6 +160,38 @@ describe('agent usage routes', () => {
       testDb.cleanup()
     }
   })
+
+  it('reads, validates, and persists the dispatch concurrency limits', async () => {
+    const testDb = makeTestDb()
+    try {
+      const core = createCoreServices({ secrets: new SecretService('44'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      setAgentUsageBridge({
+        ...unusedSettings,
+        read: async () => snapshot,
+        concurrency: (userId) => readAgentConcurrency(core.prefs, userId),
+        setConcurrency: (userId, limits) => writeAgentConcurrency(core.prefs, userId, limits),
+      })
+      const app = authed()
+      const env = {} as Env
+      expect(await (await app.fetch(request('/api/agents/concurrency'), env)).json())
+        .toEqual(defaultAgentConcurrency())
+
+      const limits: AgentConcurrencyLimits = { provider: 6, workspace: 8 }
+      const saved = await app.fetch(request('/api/agents/concurrency', 'PUT', limits), env)
+      expect(saved.status).toBe(200)
+      expect(await (await app.fetch(request('/api/agents/concurrency'), env)).json()).toEqual(limits)
+
+      // Zero and a number past the ceiling are both refused, and neither disturbs what is stored.
+      for (const body of [{ provider: 0, workspace: 8 }, { provider: 6, workspace: 500 }]) {
+        const refused = await app.fetch(request('/api/agents/concurrency', 'PUT', body), env)
+        expect(refused.status).toBe(400)
+        expect((await refused.json()).error.code).toBe('bad_request')
+      }
+      expect(await (await app.fetch(request('/api/agents/concurrency'), env)).json()).toEqual(limits)
+    } finally {
+      testDb.cleanup()
+    }
+  })
 })
 
 // `ownerId(c)` resolves to the same login for a device and for an agent-spawned child, so nothing else
@@ -162,6 +203,7 @@ describe('writing pricing preferences needs a human', () => {
   it('403s a PUT from a task-scoped credential, without reaching the bridge or parsing the body', async () => {
     let wrote = 0
     setAgentUsageBridge({
+      ...unusedSettings,
       read: async () => snapshot,
       pricing: async () => emptyAgentPricingPreferences(),
       setPricing: async () => void (wrote += 1),
@@ -177,7 +219,12 @@ describe('writing pricing preferences needs a human', () => {
   })
 
   it('leaves the READS open to an agent — a turn asking what it cost is reasonable', async () => {
-    setAgentUsageBridge({ read: async () => snapshot, pricing: async () => emptyAgentPricingPreferences(), setPricing: async () => {} })
+    setAgentUsageBridge({
+      ...unusedSettings,
+      read: async () => snapshot,
+      pricing: async () => emptyAgentPricingPreferences(),
+      setPricing: async () => {},
+    })
     const app = asTask1()
     expect((await app.fetch(request('/api/agents/pricing'), {} as Env)).status).toBe(200)
     expect((await app.fetch(request('/api/agents/usage'), {} as Env)).status).toBe(200)

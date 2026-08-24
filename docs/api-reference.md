@@ -265,6 +265,7 @@ bodies use the shared immutable blob cache. GitHub writes update or invalidate t
 /v2/p/agents/providers
 /v2/p/agents/usage
 /v2/p/agents/pricing
+/v2/p/agents/concurrency
 /v2/p/agents/sessions
 /v2/p/agents/sessions/:id
 /v2/p/agents/sessions/:id/events

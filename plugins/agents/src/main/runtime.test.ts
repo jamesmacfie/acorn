@@ -18,6 +18,7 @@ import type {
 import { AgentDriverRegistry } from './drivers/registry'
 import { FakeAgentDriver } from './drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
+import { writeAgentConcurrency } from './concurrencyStore'
 
 const ENCRYPTION_KEY = '11'.repeat(32)
 const SECRETS = new SecretService(ENCRYPTION_KEY)
@@ -613,6 +614,54 @@ describe('managed agent runtime conformance', () => {
 
     const snapshot = await runtime.wait(live.id, 0, 'turn_completed', 2_000)
     expect(snapshot.turns.find((candidate) => candidate.id === turn.id)?.status).toBe('completed')
+  })
+
+  it('gates dispatch on the stored concurrency limits and drains when they are raised', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const owner = 'owner-1'
+    const registry = new AgentDriverRegistry()
+    const driver = new RequestDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    await writeAgentConcurrency(core.prefs, owner, { provider: 1, workspace: 3 })
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => owner,
+      registry,
+    })
+    const open = async () => runtime!.createSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+    const first = await open()
+    const second = await open()
+    const prompt = (sessionId: string) => runtime!.enqueueTurn(sessionId, {
+      input: [{ type: 'text', text: 'Take the slot.' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+
+    // The first turn holds the one provider slot: this driver waits on a permission and does not finish.
+    await prompt(first.id)
+    await runtime.wait(first.id, 0, 'attention', 2_000)
+
+    const queued = await prompt(second.id)
+    // Resolves on the timeout with whatever the session has, which is the point: nothing happened.
+    const blocked = await runtime.wait(second.id, 0, 'attention', 150)
+    expect(blocked.turns.find((turn) => turn.id === queued.id)?.status).toBe('queued')
+
+    await writeAgentConcurrency(core.prefs, owner, { provider: 2, workspace: 3 })
+    runtime.drainQueue()
+
+    const dispatched = await runtime.wait(second.id, 0, 'attention', 2_000)
+    expect(dispatched.turns.find((turn) => turn.id === queued.id)?.status).toBe('active')
   })
 
   it('writes a transcript row when the model or reasoning level changes', async () => {

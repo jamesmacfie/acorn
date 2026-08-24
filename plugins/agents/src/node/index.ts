@@ -11,6 +11,7 @@ import { ManagedAgentRuntime } from '../main/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { createSessionExecute } from '../main/sessionExecute'
 import { agentUsageCollectors } from '../main/usage/collectors'
+import { readAgentConcurrency, writeAgentConcurrency } from '../main/concurrencyStore'
 import { collectClaudeUsage } from '../main/usage/claudeUsage'
 import { collectCodexUsage } from '../main/usage/codexUsage'
 import { createAgentUsageService } from '../main/usage/service'
@@ -144,6 +145,13 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         }),
         pricing: (userId) => readAgentPricingPreferences(core.prefs, userId),
         setPricing: (userId, preferences) => writeAgentPricingPreferences(core.prefs, userId, preferences),
+        concurrency: (userId) => readAgentConcurrency(core.prefs, userId),
+        // Drained straight after the write: raising a ceiling has to start the turns it just admitted,
+        // and the dispatcher runs on events, not on a timer (docs/managed-agents.md § Operations).
+        setConcurrency: async (userId, limits) => {
+          await writeAgentConcurrency(core.prefs, userId, limits)
+          runtime?.drainQueue()
+        },
       })
 
       // agents.harnessRegistry (docs/managed-agents.md § Harnesses). The plugin host resolves this per
@@ -151,7 +159,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       harnessRoute = ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, createHarnessRegistry())
 
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
-      ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing — account-scoped provider usage' })
+      ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency — account-scoped provider usage and dispatch limits' })
 
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).
       ctx.schedules.register({
