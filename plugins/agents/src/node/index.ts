@@ -12,6 +12,7 @@ import { AGENTS_RUNTIME } from '../contract/runtime'
 import { createSessionExecute } from '../main/sessionExecute'
 import { agentUsageCollectors } from '../main/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../main/concurrencyStore'
+import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../main/sessionDefaultsStore'
 import { collectClaudeUsage } from '../main/usage/claudeUsage'
 import { collectCodexUsage } from '../main/usage/codexUsage'
 import { createAgentUsageService } from '../main/usage/service'
@@ -152,6 +153,14 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           await writeAgentConcurrency(core.prefs, userId, limits)
           runtime?.drainQueue()
         },
+        sessionDefaults: (userId) => readAgentSessionDefaults(core.prefs, userId),
+        // Read, merge, write. Settings sends the checkbox and the pinned values; the runtime writes
+        // `last` as sessions change, and neither should flatten the other.
+        setSessionDefaults: async (userId, patch) => {
+          const merged = { ...await readAgentSessionDefaults(core.prefs, userId), ...patch }
+          await writeAgentSessionDefaults(core.prefs, userId, merged)
+          return merged
+        },
       })
 
       // agents.harnessRegistry (docs/managed-agents.md § Harnesses). The plugin host resolves this per
@@ -159,7 +168,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       harnessRoute = ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, createHarnessRegistry())
 
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
-      ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency — account-scoped provider usage and dispatch limits' })
+      ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults — account-scoped provider usage, dispatch limits, and new-session defaults' })
 
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).
       ctx.schedules.register({

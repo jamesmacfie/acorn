@@ -226,7 +226,10 @@ contributions.
 A harness is a managed agent: acorn starts it, drives the session, and draws the transcript, the
 permission prompts, the plans and the config options you see in the Agent pane. Every agent that
 speaks the [Agent Client Protocol](https://agentclientprotocol.com) is one manifest away, because
-acorn already owns everything downstream of the wire.
+acorn already owns everything downstream of the wire. That includes new-session defaults: whatever
+config options your harness advertises are remembered and re-applied to the owner's next session with
+no work on your side. For more information, see
+[New-session defaults](./managed-agents.md#new-session-defaults).
 
 This is the whole plugin that adds OpenCode:
 

@@ -11,14 +11,19 @@ import { emptyAgentPricingPreferences, type AgentPricingPreferences } from '../.
 import { defaultAgentConcurrency, type AgentConcurrencyLimits } from '../../shared/concurrency'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../../main/pricingStore'
 import { readAgentConcurrency, writeAgentConcurrency } from '../../main/concurrencyStore'
+import {
+  defaultAgentSessionDefaults,
+  type AgentSessionDefaults,
+} from '../../shared/sessionDefaults'
+import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../../main/sessionDefaultsStore'
 import { agentUsage, setAgentUsageBridge } from './usage'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 const snapshot: AgentUsageSnapshot = { providers: [], refreshedAt: 123 }
 
 // The three usage cases only exercise `read`, but the bridge type is complete, so each stub fills the
-// pricing and concurrency halves too. Kept as one helper rather than repeated: a stub that silently
-// answered the built-in table would make the persistence cases below pass vacuously.
+// pricing, concurrency, and session-defaults halves too. Kept as one helper rather than repeated: a
+// stub that silently answered the built-in table would make the persistence cases below pass vacuously.
 const unusedSettings = {
   pricing: async (): Promise<AgentPricingPreferences> => {
     throw new Error('pricing is not part of this case')
@@ -31,6 +36,12 @@ const unusedSettings = {
   },
   setConcurrency: async (): Promise<void> => {
     throw new Error('setConcurrency is not part of this case')
+  },
+  sessionDefaults: async (): Promise<AgentSessionDefaults> => {
+    throw new Error('sessionDefaults is not part of this case')
+  },
+  setSessionDefaults: async (): Promise<AgentSessionDefaults> => {
+    throw new Error('setSessionDefaults is not part of this case')
   },
 }
 const request = (path: string, method = 'GET', body?: unknown) => new Request(
@@ -188,6 +199,61 @@ describe('agent usage routes', () => {
         expect((await refused.json()).error.code).toBe('bad_request')
       }
       expect(await (await app.fetch(request('/api/agents/concurrency'), env)).json()).toEqual(limits)
+    } finally {
+      testDb.cleanup()
+    }
+  })
+
+  it('merges a new-session defaults write onto the values the runtime maintains', async () => {
+    const testDb = makeTestDb()
+    try {
+      const core = createCoreServices({ secrets: new SecretService('44'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      setAgentUsageBridge({
+        ...unusedSettings,
+        read: async () => snapshot,
+        sessionDefaults: (userId) => readAgentSessionDefaults(core.prefs, userId),
+        setSessionDefaults: async (userId, patch) => {
+          const merged = { ...await readAgentSessionDefaults(core.prefs, userId), ...patch }
+          await writeAgentSessionDefaults(core.prefs, userId, merged)
+          return merged
+        },
+      })
+      const app = authed()
+      const env = {} as Env
+      expect(await (await app.fetch(request('/api/agents/session-defaults'), env)).json())
+        .toEqual(defaultAgentSessionDefaults())
+
+      // What the runtime writes as sessions change.
+      const tracked = await app.fetch(
+        request('/api/agents/session-defaults', 'PUT', { last: { codex: { reasoning: 'high' } } }),
+        env,
+      )
+      expect(tracked.status).toBe(200)
+
+      // Settings sends the checkbox and the pinned values, and must not flatten `last`.
+      const pinned = await app.fetch(
+        request('/api/agents/session-defaults', 'PUT', {
+          followLastSession: false,
+          pinned: { codex: { model: 'gpt-5.1-codex-max' } },
+        }),
+        env,
+      )
+      expect(pinned.status).toBe(200)
+      expect(await (await app.fetch(request('/api/agents/session-defaults'), env)).json()).toEqual({
+        followLastSession: false,
+        pinned: { codex: { model: 'gpt-5.1-codex-max' } },
+        last: { codex: { reasoning: 'high' } },
+      })
+
+      // A value that is not a string is refused, and nothing stored moves.
+      const refused = await app.fetch(
+        request('/api/agents/session-defaults', 'PUT', { pinned: { codex: { model: 7 } } }),
+        env,
+      )
+      expect(refused.status).toBe(400)
+      expect((await refused.json()).error.code).toBe('bad_request')
+      expect((await (await app.fetch(request('/api/agents/session-defaults'), env)).json() as AgentSessionDefaults).pinned)
+        .toEqual({ codex: { model: 'gpt-5.1-codex-max' } })
     } finally {
       testDb.cleanup()
     }
