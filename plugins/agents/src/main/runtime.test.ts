@@ -177,6 +177,33 @@ class SafeRetryDriver implements AgentDriver {
   }
 }
 
+/** Blocks inside start() until the test releases it, so a pump scan can be held mid-pass. */
+class GatedStartDriver implements AgentDriver {
+  readonly providerId = 'gated-start'
+  readonly profileId = 'gated-start'
+  #entered!: () => void
+  #release!: (error: Error) => void
+  readonly entered = new Promise<void>((resolve) => {
+    this.#entered = resolve
+  })
+  readonly #gate = new Promise<never>((_, reject) => {
+    this.#release = reject
+  })
+
+  async probe(): Promise<AgentProviderDescriptor> {
+    return descriptor(this.providerId)
+  }
+
+  release(): void {
+    this.#release(new Error('provider never came up'))
+  }
+
+  async start(): Promise<AgentDriverSession> {
+    this.#entered()
+    return this.#gate
+  }
+}
+
 class FailingStartDriver implements AgentDriver {
   readonly providerId = 'failing-start'
   readonly profileId = 'failing-start'
@@ -532,6 +559,60 @@ describe('managed agent runtime conformance', () => {
     expect(snapshot.turns.find((candidate) => candidate.id === turn.id)?.attempt).toBe(2)
     expect(snapshot.events.some((record) =>
       record.event.type === 'diagnostic' && record.event.message.includes('retrying'))).toBe(true)
+  })
+
+  it('dispatches a turn that arrives while a fruitless pump scan is in flight', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const gated = new GatedStartDriver()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    registry.registerNative(gated.providerId, () => gated)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+    const live = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
+    // Queued through the store, so the only thing that can dispatch it is the scan reconcile starts.
+    const stuck = await runtime.store.createSession({
+      taskId: seed.taskId,
+      providerId: gated.providerId,
+      profileId: gated.profileId,
+      kind: 'interactive',
+      config: {},
+    }, descriptor(gated.providerId))
+    await runtime.store.enqueueTurn(stuck.id, {
+      input: [{ type: 'text', text: 'Never starts.' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+
+    await runtime.reconcile()
+    await gated.entered
+
+    // The scan is parked inside the gated provider's start, holding a queue snapshot that predates
+    // this turn. Its own pump call finds the scan already running and cannot start a second one.
+    const turn = await runtime.enqueueTurn(live.id, {
+      input: [{ type: 'text', text: 'Arrives mid-scan.' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+    gated.release()
+
+    const snapshot = await runtime.wait(live.id, 0, 'turn_completed', 2_000)
+    expect(snapshot.turns.find((candidate) => candidate.id === turn.id)?.status).toBe('completed')
   })
 
   it('writes a transcript row when the model or reasoning level changes', async () => {
