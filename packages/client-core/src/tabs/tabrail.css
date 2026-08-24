@@ -47,7 +47,9 @@
   position: absolute;
   bottom: 4px;
   right: 5px;
-  font-size: var(--fs-lg);
+  /* Same as .tabrail-needs. These markers are em-sized svgs now; --fs-lg was sized for the
+     Unicode character this used to be, and left the pencil dwarfing its neighbours. */
+  font-size: var(--fs-xs);
   line-height: 1;
   color: var(--warn);
   pointer-events: none;
