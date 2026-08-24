@@ -83,6 +83,14 @@ and one column is 1ch) rather than from `max-content`: rows are absolutely posit
 ones inside the virtual window have boxes, and a layout-derived width would change as you scrolled
 vertically and drag the horizontal scroll position with it.
 
+File headers stay visible while the wide canvas scrolls sideways, the same way the gutters do:
+each head is `position: sticky; left: 0` inside its canvas-wide row, sized to the visible
+scrollport with `100cqw` (`.diff` is an inline-size container). That is also why the sticky
+current-file header renders inside the row canvas rather than as a direct child of the scroller —
+a sticky element can only travel within its containing block, and the scroller's content box is
+only one scrollport wide. Hunk headers and expand bands scroll away with the code, as they do on
+GitHub.
+
 In split the pair always fits the pane, so half the pane stays half the pane however long a line
 gets, and each column scrolls horizontally inside itself. The scroller is each row's own code box, so
 there is one per row and `splitScrollSync.ts` keeps a column's rows in step. Their scrollbars are
