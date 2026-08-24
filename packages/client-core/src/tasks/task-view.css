@@ -41,6 +41,10 @@
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }
+/* Slot badges bring their own markup: an em-sized inline svg aligns its bottom edge to the text
+   baseline and rides high (same fix as svg.glyph in base.css). Scoped to the footer so every
+   contribution is covered without each plugin re-learning the rule. */
+.workspace-footer svg { vertical-align: -0.125em; }
 .workspace-footer-worktree {
   display: inline-flex;
   align-items: center;
