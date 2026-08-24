@@ -42,7 +42,12 @@ export { UserAvatar } from '@acorn/client-core/ui/UserAvatar.tsx'
 // Provider markdown to sanitized HTML. Also on ./client, which the compiled shell reaches it
 // through. It is here too so a sandboxed frame rendering a ticket description does not pull in the
 // router/query/apiClient half of ./client for one pure string function.
-export { renderMarkdown } from '@acorn/client-core/integrations/markdown.ts'
+export { renderMarkdown } from '@acorn/client-core/ui/markdown.ts'
+export type { MarkdownOptions } from '@acorn/client-core/ui/markdown.ts'
+// The component around it: the same sanitizing pass, plus a Shiki grammar per fence and a copy button
+// on each. A call site that already holds HTML, or that needs a `ref` on the element, uses the
+// `.ui-markdown` class and `renderMarkdown` instead.
+export { default as Markdown } from '@acorn/client-core/ui/Markdown.tsx'
 
 // A density token as a number, on this barrel for the same reason as `renderMarkdown`: no imports,
 // no state. A virtualized list cannot read its row height from CSS. @tanstack/solid-virtual needs a

@@ -849,9 +849,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    note preview, an agent turn. See docs/ui-design.md § How the primitives are built for why this
    owns .ui-markdown now.
 
-   A class rather than a component because two call sites need a `ref` on the element, and a props
-   member named `ref` is a Solid DOM setter rather than data (docs/plugins.md § Loaded plugins:
-   the client half). Consumers keep their own element and add the class.
+   A class as well as a component. `ui/Markdown.tsx` wraps it for a caller that holds Markdown source,
+   adding the highlight pass and the per-fence copy button. The bare class is for the rest: GitHub
+   renders its own HTML, and two call sites need a `ref` on the element, which a component cannot
+   offer, because a props member named `ref` is a Solid DOM setter rather than data (docs/plugins.md
+   § Loaded plugins: the client half).
 
    Frames get this free: primitives.css is served to a plugin origin whole as /ui.css. */
 .ui-markdown { font-size: var(--fs-sm); line-height: var(--lh); overflow-wrap: anywhere; }
@@ -869,6 +871,12 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   border-left: var(--surface-bw) solid var(--border);
   color: var(--text-muted);
 }
+/* A table comes out as `.ui-table` inside `.ui-table-scroll`, so it picks up the same tokens and the
+   same overflow behaviour as a hand-built one. All this adds is the block spacing. */
+.ui-markdown .ui-table-scroll { margin: var(--space-3) 0; }
+/* The stand-in for an image the renderer refuses to fetch (ui/markdown.ts, `placeholder`).
+   In primitives.css rather than the agents plugin's sheet because the renderer that emits it is core's. */
+.ui-md-omitted { color: var(--text-faint); font-style: italic; }
 
 /* ── FindBar ────────────────────────────────────────────────────────────────────────────────
    Toolbar geometry plus the search semantics. */

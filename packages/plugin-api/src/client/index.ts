@@ -156,7 +156,7 @@ export { openRepoConfigTrust } from '@acorn/client-core/configTrust/configTrust.
 
 // ── Integrations, notifications, palette ──────────────────────────────────────────────────────
 export { createDeviceFlow } from '@acorn/client-core/integrations/deviceFlow.ts'
-export { renderMarkdown } from '@acorn/client-core/integrations/markdown.ts'
+export { renderMarkdown } from '@acorn/client-core/ui/markdown.ts'
 export { pushManagedAgentNotice, registerNoticeTargetHandler } from '@acorn/client-core/notifications/notifications.ts'
 // Transient feedback. Notices persist in the bell, and a toast says "that worked" then gets out of
 // the way.

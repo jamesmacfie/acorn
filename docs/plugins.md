@@ -89,7 +89,7 @@ Eight entrypoints:
 | --- | --- |
 | `@acorn/plugin-api/node` | `NodePlugin`, the route toolkit (`AppEnv`, `requireUser` and friends, `respondError`, the bridge, `portableCarrier`), the `PluginDatabase` handle type, `CoreServices` with its `ProjectRef`/`TaskRef` projections, `capabilityId`, provider and integration contracts |
 | `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task/workspace/fleet state, and the design system's plain functions (`token`, the metrics, the status/display vocabulary) |
-| `@acorn/plugin-api/ui` | Frame-safe presentation components: primitives (including the `ListDetail` two-column pane layout), `Icon`, `Picker`, `Modal`, `Tabs`, and the diff rows |
+| `@acorn/plugin-api/ui` | Frame-safe presentation components: primitives (including the `ListDetail` two-column pane layout), `Icon`, `Picker`, `Modal`, `Tabs`, `Markdown`, and the diff rows |
 | `@acorn/plugin-api/ui/diff` | The diff model, virtualizer, hydration and find pass |
 | `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components and registration seams; never import this from an isolated frame |
 | `@acorn/plugin-api/ui/editor` | The host-owned Monaco surface: the theme and the language map. Compiled panes only, and browser-realm only — it pulls in `monaco-editor`, which reads `window` at module scope |
