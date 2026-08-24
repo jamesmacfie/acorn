@@ -96,11 +96,21 @@ export const agentSessionsCollection = {
   collectionId: SESSIONS_COLLECTION_ID,
   name: 'Agent sessions',
   schema: sessionsSchema,
+  // A session runs in a task, a task belongs to a workspace, and a board belongs to one workspace, so
+  // the fleet on it is that workspace's. The host fills the `workspace` param from the board rather
+  // than the panel naming one, because one definition is placed on a board in every workspace
+  // (client-core/dashboards/data.ts, `scopedQuery`).
+  workspaceScoped: true,
   // Sessions move on the WebSocket, but a panel is a glance surface and nothing here subscribes; half a
   // minute is the same order as the Fleet stat's own freshness.
   refresh: 30,
-  fetch: async (nodeId: string, _params: Record<string, string>, signal: AbortSignal): Promise<PluginCollectionPage> => {
-    const page = await managedAgentApi.sessions({ archived: false }, { nodeId, signal })
+  // `workspace` is the host's, filled from the board (`workspaceScoped` above). Absent is every session
+  // on the node, which is what a surface with no workspace behind it means.
+  fetch: async (nodeId: string, params: Record<string, string>, signal: AbortSignal): Promise<PluginCollectionPage> => {
+    const page = await managedAgentApi.sessions(
+      { archived: false, ...(params.workspace ? { workspaceId: params.workspace } : {}) },
+      { nodeId, signal },
+    )
     return { schema: sessionsSchema, rows: page.sessions.map(sessionRow) }
   },
 }

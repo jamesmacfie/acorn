@@ -24,6 +24,14 @@ export type CollectionContribution = {
   name: string
   // Declared inputs, passed back to `fetch` opaquely. The plugin owns their meaning.
   params?: PluginCollectionParam[]
+  // Whether these rows belong to one workspace. Set, the host fills a `workspace` param with the
+  // workspace of the board the panel is placed on, so the collection reads it out of `params` like any
+  // other input and nothing here learns what a workspace is (dashboards/data.ts, `scopedQuery`).
+  //
+  // The one input the plugin cannot name itself: a definition lives in one library and the same panel
+  // is placed on a board in every workspace, so a workspace written into the definition would pin
+  // every board to one (docs/dashboards.md § Placements).
+  workspaceScoped?: boolean
   // A param whose choices only exist on the device. github's `repo` is the repositories this user has,
   // which no static declaration can name. Absent, or answering empty, leaves the param in its declared
   // form.

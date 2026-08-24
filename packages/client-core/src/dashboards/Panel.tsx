@@ -4,6 +4,7 @@ import type { PluginCollectionRow, PluginCollectionRowAction } from '@acorn/prot
 import { activeNodeId } from '../node/activeNode'
 import { FRESHNESS_LABELS } from '../node/freshness'
 import { runChromeAction } from '../plugins/chrome/actions'
+import { useActiveWorkspaceId } from '../workspaces/useActiveWorkspaceId'
 import { Alert, Button, Card, EmptyState } from '../ui/primitives'
 import Icon from '../ui/Icon'
 import { createPanelData } from './data'
@@ -48,7 +49,11 @@ const RISK_PROMPT: Record<string, string> = {
 }
 
 export default function Panel(props: PanelProps) {
-  const data = createPanelData(() => props.definition)
+  // The workspace a panel is about is ambient, not part of its definition: one definition is placed on
+  // a board in every workspace, and the board on screen is the one the shell is showing
+  // (docs/dashboards.md § Placements). A workspace-scoped collection reads it as a param (data.ts,
+  // `scopedQuery`); every other collection never sees it.
+  const data = createPanelData(() => props.definition, useActiveWorkspaceId())
   const nodeId = activeNodeId() ?? ''
   const navigate = useNavigate()
   const [pending, setPending] = createSignal<PluginCollectionRow | undefined>()
