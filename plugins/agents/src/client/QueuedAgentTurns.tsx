@@ -1,6 +1,9 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import type { AgentTurn } from '@acorn/protocol/managedAgents.ts'
+import { createQuery } from '@tanstack/solid-query'
+import type { AgentRuntimeState, AgentTurn } from '@acorn/protocol/managedAgents.ts'
 import { Button, Icon, Textarea } from '@acorn/plugin-api/ui'
+import { clientEvents } from '@acorn/plugin-api/client'
+import { agentConcurrencyOptions } from './concurrencyClient'
 import { managedAgentApi } from './managedClient'
 
 const promptText = (turn: AgentTurn): string =>
@@ -8,6 +11,7 @@ const promptText = (turn: AgentTurn): string =>
 
 export default function QueuedAgentTurns(props: {
   sessionId: string
+  runtimeState: AgentRuntimeState
   turns: AgentTurn[]
   onChanged(): void | Promise<unknown>
   onError(message: string): void
@@ -17,6 +21,10 @@ export default function QueuedAgentTurns(props: {
   const [editing, setEditing] = createSignal<string | null>(null)
   const [text, setText] = createSignal('')
   const [pending, setPending] = createSignal<string | null>(null)
+  // A ready session with a queued turn is the dispatcher's concurrency ceilings holding it, which is
+  // the one wait with no other sign of itself: the transcript is empty and the session reads as idle.
+  const blockedByLimits = createMemo(() => props.runtimeState === 'ready')
+  const limits = createQuery(() => ({ ...agentConcurrencyOptions(), enabled: blockedByLimits() }))
 
   const run = async (actionId: string, operation: () => Promise<unknown>): Promise<boolean> => {
     if (pending()) return false
@@ -48,6 +56,26 @@ export default function QueuedAgentTurns(props: {
     <Show when={queued().length}>
       <section class="agent-queued-turns" aria-label="Queued follow-ups">
         <header><strong>Queued follow-ups</strong><span>{queued().length}</span></header>
+        <p class="agent-queued-reason">
+          <Show
+            when={blockedByLimits()}
+            fallback={props.runtimeState === 'working' || props.runtimeState === 'waiting'
+              ? 'Sends when the current turn finishes.'
+              : 'Sends when the provider is ready.'}
+          >
+            <span>
+              Waiting for a free slot. This Node runs {limits.data?.provider ?? 2} turns at once per
+              provider and {limits.data?.workspace ?? 3} per workspace.
+            </span>
+            <Button
+              variant="bare"
+              size="sm"
+              onClick={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-concurrency' })}
+            >
+              Change
+            </Button>
+          </Show>
+        </p>
         <For each={queued()}>
           {(turn, index) => (
             <div class="agent-queued-turn">
