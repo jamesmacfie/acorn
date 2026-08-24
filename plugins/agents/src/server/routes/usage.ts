@@ -4,12 +4,18 @@ import {
   validateAgentPricingPreferences,
   type AgentPricingPreferences,
 } from '../../shared/pricing'
+import {
+  validateAgentConcurrency,
+  type AgentConcurrencyLimits,
+} from '../../shared/concurrency'
 import { type AppEnv, ownerId, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 export type AgentUsageBridge = {
   read(options: { userId: string; force?: boolean }): Promise<AgentUsageSnapshot>
   pricing(userId: string): Promise<AgentPricingPreferences>
   setPricing(userId: string, preferences: AgentPricingPreferences): Promise<void>
+  concurrency(userId: string): Promise<AgentConcurrencyLimits>
+  setConcurrency(userId: string, limits: AgentConcurrencyLimits): Promise<void>
 }
 
 export const AGENT_USAGE = routeCapability<AgentUsageBridge>('agents.usageRoute')
@@ -37,6 +43,22 @@ export const agentUsage = new Hono<AppEnv>()
     return viaBridge(c, AGENT_USAGE, async (bridge) => {
       await bridge.setPricing(userId, result.value)
       return result.value satisfies AgentPricingPreferences
+    })
+  })
+  .get('/concurrency', (c) => {
+    const userId = ownerId(c)
+    return viaBridge(c, AGENT_USAGE, (bridge) => bridge.concurrency(userId))
+  })
+  // Device only, for the reason the pricing write is: `ownerId(c)` cannot tell a device from a
+  // task-scoped agent, and this decides how many provider children the node will run at once.
+  .put('/concurrency', requireDevice, async (c) => {
+    const body = await c.req.json().catch(() => null) as unknown
+    const result = validateAgentConcurrency(body)
+    if (!result.ok) return respondError(c, 400, 'bad_request', result.errors)
+    const userId = ownerId(c)
+    return viaBridge(c, AGENT_USAGE, async (bridge) => {
+      await bridge.setConcurrency(userId, result.value)
+      return result.value satisfies AgentConcurrencyLimits
     })
   })
   .get('/usage', (c) => {

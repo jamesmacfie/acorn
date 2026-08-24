@@ -192,6 +192,13 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     return turn
   }
 
+  // For a change outside a turn that widens what the dispatcher may start, the concurrency ceilings
+  // being the one so far. Without it a raise waits for the next enqueue or completion to take effect,
+  // which is the same stall raising the ceiling was meant to clear.
+  drainQueue(): void {
+    void this.pump()
+  }
+
   async cancelTurn(sessionId: string, turnId?: string): Promise<void> {
     const live = this.live.get(sessionId)
     const active = await this.store.activeTurn(sessionId)

@@ -14,11 +14,13 @@ import { safeProviderMessage } from './drivers/diagnostics'
 import { AgentAttachmentStore } from './attachmentStore'
 import { AgentArtifactStore } from './artifactStore'
 import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventBuffer'
+import { readAgentConcurrency } from './concurrencyStore'
 import { AgentStore } from './store'
 import { decideAgentCommand } from './stateMachine'
 import { AgentWebhookService } from './webhookService'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildCompletedTurnTranscript, buildForkContext } from './runtimeContext'
+import { defaultAgentConcurrency } from '../shared/concurrency'
 
 export { agentTurnInputText } from './runtimeContext'
 
@@ -56,8 +58,6 @@ export type AgentRuntimeOptions = {
 export type WaitCondition = 'ready' | 'attention' | 'turn_completed' | 'stopped'
 type RuntimeListener = (frame: AgentWsFrame) => void
 
-const WORKSPACE_ACTIVE_LIMIT = 3
-const PROVIDER_ACTIVE_LIMIT = 2
 const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000]
 
 const secretEnvironmentValues = (env: Record<string, string>): string[] =>
@@ -326,6 +326,12 @@ export class ManagedAgentEngine {
       for (;;) {
         this.pumpRequested = false
         const heads = await this.store.queuedHeads()
+        // Read per pass, not captured: the owner can change the ceilings while turns are queued, and a
+        // raise has to apply to the scan the write triggers. One indexed row read per pass.
+        const userId = this.currentUserId()
+        const limits = userId
+          ? await readAgentConcurrency(this.core.prefs, userId)
+          : defaultAgentConcurrency()
         const workspaceActive = new Map<string, number>()
         const providerActive = new Map<string, number>()
         for (const live of this.live.values()) {
@@ -352,8 +358,8 @@ export class ManagedAgentEngine {
             pendingRequestIds: [],
           }, { type: 'dispatch_turn', turnId: item.turn.id })
           if (!decision.ok) continue
-          if ((workspaceActive.get(live.workspaceId) ?? 0) >= WORKSPACE_ACTIVE_LIMIT) continue
-          if ((providerActive.get(live.providerId) ?? 0) >= PROVIDER_ACTIVE_LIMIT) continue
+          if ((workspaceActive.get(live.workspaceId) ?? 0) >= limits.workspace) continue
+          if ((providerActive.get(live.providerId) ?? 0) >= limits.provider) continue
           live.activeTurnId = item.turn.id
           live.acceptedResponse = false
           workspaceActive.set(live.workspaceId, (workspaceActive.get(live.workspaceId) ?? 0) + 1)

@@ -14,6 +14,7 @@ import { agentPaneContribution } from './paneContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
 import { agentCenterSourceContribution } from './sourceContribution'
 
+const AgentConcurrencySettings = lazy(() => import('./AgentConcurrencySettings'))
 const AgentPricingSettings = lazy(() => import('./AgentPricingSettings'))
 
 export const agentsClientPlugin: ClientPlugin = {
@@ -25,6 +26,10 @@ export const agentsClientPlugin: ClientPlugin = {
     // The same roster the stat counts and the inbox filters, with a schema on it, so a dashboard panel
     // can be composed over running agents (collectionContribution.ts).
     ctx.collections.register(agentSessionsCollection)
+    ctx.settingsPages.register({
+      id: 'agent-concurrency', label: 'Agent concurrency', group: 'general', order: 44, requires: 'desktop',
+      component: AgentConcurrencySettings,
+    })
     ctx.settingsPages.register({
       id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop',
       component: AgentPricingSettings,
