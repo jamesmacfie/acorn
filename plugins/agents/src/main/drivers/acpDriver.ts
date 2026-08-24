@@ -256,11 +256,6 @@ export class AcpDriver implements AgentDriver {
         // never dispatches, and the session is stuck reporting provider_start_failed.
         if (!(error instanceof RequestError) || error.code !== ACP_RESOURCE_NOT_FOUND) throw error
         await createSession()
-        await options.onEvent({
-          type: 'diagnostic',
-          level: 'warning',
-          message: `${label} no longer has the earlier conversation, so this session starts fresh. The transcript above is Acorn's copy; the agent cannot see it.`,
-        })
       }
     } else {
       await createSession()
