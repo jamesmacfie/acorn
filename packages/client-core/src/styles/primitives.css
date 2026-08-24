@@ -872,8 +872,17 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   color: var(--text-muted);
 }
 /* A table comes out as `.ui-table` inside `.ui-table-scroll`, so it picks up the same tokens and the
-   same overflow behaviour as a hand-built one. All this adds is the block spacing. */
+   same overflow behaviour as a hand-built one. What it adds is the block spacing and the two rules a
+   prose table needs that a data grid does not.
+
+   `padding-block` only, so the horizontal padding still comes from the pack's `--pad-cell`: a row of
+   wrapped identifiers reads as a wall without a little air above and below it, and a data grid's rows
+   are one line each, where the same spacing is just wasted height.
+
+   Top, not the `middle` a cell defaults to. Prose cells wrap at different lengths, so a one-line cell
+   beside a two-line one floated half a line down and nothing in the row lined up. */
 .ui-markdown .ui-table-scroll { margin: var(--space-3) 0; }
+.ui-markdown .ui-table :is(th, td) { padding-block: var(--space-3); vertical-align: top; }
 /* The stand-in for an image the renderer refuses to fetch (ui/markdown.ts, `placeholder`).
    In primitives.css rather than the agents plugin's sheet because the renderer that emits it is core's. */
 .ui-md-omitted { color: var(--text-faint); font-style: italic; }
