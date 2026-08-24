@@ -16,6 +16,7 @@ import { agentCenterSourceContribution } from './sourceContribution'
 
 const AgentConcurrencySettings = lazy(() => import('./AgentConcurrencySettings'))
 const AgentPricingSettings = lazy(() => import('./AgentPricingSettings'))
+const AgentSessionDefaultsSettings = lazy(() => import('./AgentSessionDefaultsSettings'))
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
@@ -33,6 +34,10 @@ export const agentsClientPlugin: ClientPlugin = {
     ctx.settingsPages.register({
       id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop',
       component: AgentPricingSettings,
+    })
+    ctx.settingsPages.register({
+      id: 'agent-defaults', label: 'Agent defaults', group: 'general', order: 43, requires: 'desktop',
+      component: AgentSessionDefaultsSettings,
     })
     // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one,
     // because the card exists to show several nodes at once.

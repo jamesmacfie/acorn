@@ -183,7 +183,8 @@ be tested against what the harness actually sent.
   is held per session outside the component, so stepping in and back does not lose typed text.
 - Changing a provider config option — the model, the reasoning level, the permission profile — writes
   a row into the transcript, so reading back a session shows where the switch happened rather than
-  leaving every later turn to be read under whatever the setting is now.
+  leaving every later turn to be read under whatever the setting is now. The switch also becomes the
+  default the next session starts on, described under New-session defaults below.
 - Terminal handoff transfers an exclusive input-controller lease to a raw provider TUI. A managed
   session and a raw terminal cannot write the same provider session simultaneously.
 - Notifications and the attention inbox represent requests that need the owner. Dismissing purely
@@ -196,6 +197,41 @@ dashboard collection) and appear in the archived list instead. This is resolved 
 rather than cascaded onto the session's own `archivedAt`, because removing a project deletes its
 tasks outright and no cascade would visit those rows. A read that names a task id is exempt, because
 the task pane is looking at that task.
+
+## New-session defaults
+
+A new session starts on the settings the owner last used, not on the provider's own choice. Switch
+Codex to a higher reasoning effort in one session and the next Codex session starts there.
+
+Nothing in this is per-provider. A provider already advertises its options as `AgentConfigOption[]`
+when a session starts, so a default is a value keyed by the provider id and the option id it came
+from. A harness added later is defaultable the moment it advertises anything, and a new kind of
+option, a fast mode say, needs no change on the acorn side to be remembered.
+
+One `prefs` row (`agents:session-defaults:v1`) holds three fields. `followLastSession`, on by
+default, decides which of the other two applies. `last` is written by the runtime whenever a session's
+option changes, and `pinned` is written by the owner under Settings > Agent defaults. Neither writer
+sends the other's field, and the write merges server-side, so the Settings page cannot flatten a
+switch made while it was open.
+
+Both halves hang off `ManagedAgentRuntime`, which is where every path that opens a session and every
+path that changes one already meets:
+
+- Applied in `createSession`, after the driver has reported `session_metadata`. That is the first
+  moment there is an advertised option list to validate a stored value against. A value the provider
+  no longer offers is dropped rather than sent, so a model retired between two sessions cannot wedge
+  every later start, and a provider that refuses the switch gets a warning row in the transcript
+  rather than failing the session the owner just opened.
+- Remembered in `patchSession`, which is the one method a config change goes through whether the
+  composer sent it or an automation did. Only the options that actually changed are stored, so a
+  provider default the owner never touched stays a provider default.
+
+Interactive sessions only, and not a fork. A workflow step names the model it wants in its own policy,
+and a fork continues the session it came from at the settings that session was running.
+
+Settings reads the option list to draw pickers off the newest session that advertised one, because a
+provider reports its models and reasoning levels only once a session is running. A provider you have
+not run inside the 50 most recent sessions shows no pickers until you run it again.
 
 ## Context, files, and attachments
 

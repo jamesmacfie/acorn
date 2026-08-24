@@ -19,6 +19,7 @@ import { AgentDriverRegistry } from './drivers/registry'
 import { FakeAgentDriver } from './drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 import { writeAgentConcurrency } from './concurrencyStore'
+import { readAgentSessionDefaults, writeAgentSessionDefaults } from './sessionDefaultsStore'
 
 const ENCRYPTION_KEY = '11'.repeat(32)
 const SECRETS = new SecretService(ENCRYPTION_KEY)
@@ -727,5 +728,112 @@ describe('managed agent runtime conformance', () => {
     })
     const after = await runtime.store.snapshot(session.id, 0)
     expect(after.events.filter((record) => record.event.type === 'diagnostic')).toHaveLength(2)
+  })
+
+  // Two advertised options, matching what a provider reports when a session starts. Seeded through
+  // `config` because FakeAgentDriver advertises none of its own, and its `session_metadata` carries no
+  // `configOptions`, so what is seeded here is what the session runs with.
+  const advertised = () => [
+    {
+      id: 'model',
+      label: 'Model',
+      category: 'model' as const,
+      currentValue: 'sonnet',
+      values: [{ value: 'sonnet', label: 'Sonnet 5' }, { value: 'opus', label: 'Opus 5' }],
+    },
+    {
+      id: 'reasoning',
+      label: 'Reasoning effort',
+      category: 'reasoning' as const,
+      currentValue: 'medium',
+      values: [{ value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }],
+    },
+  ]
+
+  const defaultsRuntime = (owner: string) => new ManagedAgentRuntime({
+    db: pluginDb.db,
+    dataDir,
+    core,
+    internalEnv: () => ({}),
+    secrets: SECRETS,
+    currentUserId: () => owner,
+    registry: (() => {
+      const registry = new AgentDriverRegistry()
+      registry.registerNative('fake', () => new FakeAgentDriver())
+      return registry
+    })(),
+  })
+
+  it('starts a new session on the pinned defaults, and does not treat that as a change to carry forward', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const owner = 'owner-defaults'
+    await writeAgentSessionDefaults(core.prefs, owner, {
+      followLastSession: false,
+      pinned: { fake: { model: 'opus', reasoning: 'nonsense' } },
+      last: {},
+    })
+    runtime = defaultsRuntime(owner)
+
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { configOptions: advertised() },
+    })
+
+    const options = session.config.configOptions as Array<{ id: string; currentValue: string }>
+    expect(options.find((option) => option.id === 'model')?.currentValue).toBe('opus')
+    // 'nonsense' is not one of the values the provider advertised, so the provider's own choice stands.
+    expect(options.find((option) => option.id === 'reasoning')?.currentValue).toBe('medium')
+    expect((await runtime.store.snapshot(session.id, 0)).events.flatMap((record) =>
+      record.event.type === 'diagnostic' ? [record.event.message] : [])).toContain('Model changed to Opus 5')
+    // Applying a stored default is not the owner switching anything.
+    expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
+  })
+
+  it('carries an in-session switch onto the next session of that provider while following is on', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const owner = 'owner-following'
+    runtime = defaultsRuntime(owner)
+
+    const first = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { configOptions: advertised() },
+    })
+    await runtime.patchSession(first.id, {
+      config: { configOptions: advertised().map((option) => option.id === 'reasoning' ? { ...option, currentValue: 'high' } : option) },
+    })
+    expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({ fake: { reasoning: 'high' } })
+
+    const second = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { configOptions: advertised() },
+    })
+    expect((second.config.configOptions as Array<{ id: string; currentValue: string }>)
+      .find((option) => option.id === 'reasoning')?.currentValue).toBe('high')
+
+    // A workflow step names the model it wants in its own policy, and a fork continues the session it
+    // came from, so neither takes the owner's interactive picks.
+    for (const input of [
+      { kind: 'workflow' as const },
+      { kind: 'interactive' as const, parentSessionId: first.id },
+    ]) {
+      const session = await runtime.createSession({
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        config: { configOptions: advertised() },
+        ...input,
+      })
+      expect((session.config.configOptions as Array<{ id: string; currentValue: string }>)
+        .find((option) => option.id === 'reasoning')?.currentValue).toBe('medium')
+    }
   })
 })

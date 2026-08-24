@@ -8,6 +8,10 @@ import {
   validateAgentConcurrency,
   type AgentConcurrencyLimits,
 } from '../../shared/concurrency'
+import {
+  validateAgentSessionDefaults,
+  type AgentSessionDefaults,
+} from '../../shared/sessionDefaults'
 import { type AppEnv, ownerId, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 export type AgentUsageBridge = {
@@ -16,6 +20,8 @@ export type AgentUsageBridge = {
   setPricing(userId: string, preferences: AgentPricingPreferences): Promise<void>
   concurrency(userId: string): Promise<AgentConcurrencyLimits>
   setConcurrency(userId: string, limits: AgentConcurrencyLimits): Promise<void>
+  sessionDefaults(userId: string): Promise<AgentSessionDefaults>
+  setSessionDefaults(userId: string, patch: Partial<AgentSessionDefaults>): Promise<AgentSessionDefaults>
 }
 
 export const AGENT_USAGE = routeCapability<AgentUsageBridge>('agents.usageRoute')
@@ -60,6 +66,21 @@ export const agentUsage = new Hono<AppEnv>()
       await bridge.setConcurrency(userId, result.value)
       return result.value satisfies AgentConcurrencyLimits
     })
+  })
+  .get('/session-defaults', (c) => {
+    const userId = ownerId(c)
+    return viaBridge(c, AGENT_USAGE, (bridge) => bridge.sessionDefaults(userId))
+  })
+  // Device only, for the reason the pricing and concurrency writes are: `ownerId(c)` cannot tell a
+  // device from a task-scoped agent, and this decides which model and permission profile every later
+  // session of a provider starts on.
+  .put('/session-defaults', requireDevice, async (c) => {
+    const body = await c.req.json().catch(() => null) as unknown
+    const result = validateAgentSessionDefaults(body)
+    if (!result.ok) return respondError(c, 400, 'bad_request', result.errors)
+    const userId = ownerId(c)
+    // The merged record, not the patch: the caller sends only the fields it owns.
+    return viaBridge(c, AGENT_USAGE, (bridge) => bridge.setSessionDefaults(userId, result.value))
   })
   .get('/usage', (c) => {
     const userId = ownerId(c)

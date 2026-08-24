@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type {
+  AgentConfigOption,
   AgentDeleteResult,
   AgentRequest,
   AgentSession,
@@ -15,6 +16,12 @@ import {
   validateAgentInputFiles,
 } from './inputValidation'
 import { parseAgentTranscript } from './transcriptImport'
+import { readAgentSessionDefaults, writeAgentSessionDefaults } from './sessionDefaultsStore'
+import {
+  effectiveAgentDefaults,
+  optionsWithDefaults,
+  rememberAgentDefaults,
+} from '../shared/sessionDefaults'
 import {
   agentTurnInputText,
   ManagedAgentEngine,
@@ -51,7 +58,60 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const session = await this.store.createSession(input, provider)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     await this.ensureSession(session)
+    // Interactive sessions only, and not a fork. A workflow step names the model it wants in its own
+    // policy, and a fork continues the session it came from, so neither is the owner opening something
+    // new for the defaults to answer for.
+    if (session.kind === 'interactive' && !input.parentSessionId) {
+      await this.applySessionDefaults(session.id, provider.id)
+    }
     return this.store.requireSession(session.id)
+  }
+
+  /**
+   * Fold the owner's stored defaults onto what the provider advertised while starting. It runs after
+   * the driver's `session_metadata` rather than at insert, because the advertised option list is
+   * where the values are validated and there is nothing to validate against until the provider has
+   * reported it. A refusal is recorded and dropped: a default that cannot be applied is not a reason
+   * to fail the session the owner just opened.
+   */
+  private async applySessionDefaults(sessionId: string, providerId: string): Promise<void> {
+    const userId = this.currentUserId()
+    if (!userId) return
+    const stored = await readAgentSessionDefaults(this.core.prefs, userId)
+    const wanted = effectiveAgentDefaults(stored, providerId)
+    if (!Object.keys(wanted).length) return
+    const session = await this.store.requireSession(sessionId)
+    const advertised = Array.isArray(session.config.configOptions)
+      ? session.config.configOptions as AgentConfigOption[]
+      : []
+    const configOptions = optionsWithDefaults(advertised, wanted)
+    if (configOptions === advertised) return
+    // `remember: false`, or applying the stored value would write it straight back.
+    await this.patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
+      .catch(async (error) => {
+        await this.record(sessionId, null, {
+          type: 'diagnostic',
+          level: 'warning',
+          message: `Your saved defaults could not be applied to this session: ${error instanceof Error ? error.message : 'unknown error'}`,
+        })
+      })
+  }
+
+  /** Carry an in-session switch forward, so the next session of this provider starts where this one is. */
+  private async rememberSessionDefaults(
+    providerId: string,
+    changed: ReadonlyArray<{ id: string; value: string }>,
+  ): Promise<void> {
+    const userId = this.currentUserId()
+    if (!userId) return
+    const stored = await readAgentSessionDefaults(this.core.prefs, userId)
+    if (!stored.followLastSession) return
+    const chosen = Object.fromEntries(changed.map((option) => [option.id, option.value]))
+    await writeAgentSessionDefaults(
+      this.core.prefs,
+      userId,
+      rememberAgentDefaults(stored, providerId, chosen),
+    )
   }
 
   async importTranscript(input: {
@@ -282,6 +342,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   async patchSession(
     sessionId: string,
     patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
+    options: { remember?: boolean } = {},
   ): Promise<AgentSession> {
     const before = await this.store.requireSession(sessionId)
     if (patch.config) {
@@ -327,6 +388,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
             message: `${option.label} changed to ${option.valueLabel}`,
           })
         }
+        // Every config change goes through this one method, whether the composer sent it or an
+        // automation did, so it is the only place that has to notice one to carry it forward.
+        if (options.remember !== false) await this.rememberSessionDefaults(before.providerId, changed)
       }
     }
     if (patch.archived != null) {
