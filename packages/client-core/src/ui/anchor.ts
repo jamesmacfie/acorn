@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount } from 'solid-js'
+import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 
 // Element-anchored floating surfaces: portal-aware dismissal plus position-to-rect. See
 // docs/ui-design.md § Menus and right-click for why this exists, what it leaves to focus.ts and the
@@ -104,6 +104,13 @@ export function createAnchoredPopover(opts: {
   }
 
   const toggle = () => (open() ? close() : show())
+
+  // A controlled owner can flip `open` without calling show() (the task rail opens its row menu
+  // from onRowClick), and only show() measures. Measure on every open, whichever door it came
+  // through. Runs after render, so the mounted surface is already registered.
+  createEffect(() => {
+    if (open()) reposition()
+  })
 
   const onDocPointer = (event: PointerEvent) => {
     if (!open()) return
