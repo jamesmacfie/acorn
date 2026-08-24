@@ -14,6 +14,9 @@
   --diff-marker-w: 14px;
   --diff-btn-w: calc(16px + var(--space-2));
   --diff-chrome-w: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w) + var(--diff-btn-w) + var(--pane-pad));
+  /* Size container so file heads can be exactly one scrollport wide (100cqw) while the canvas
+     underneath is --diff-cols wide. */
+  container-type: inline-size;
 }
 /* docs/diff-rendering.md § Row geometry covers why the canvas width comes from --diff-cols rather
    than max-content. 1ch is exact for the mono font and wrong for anything it falls back on (CJK,
@@ -101,16 +104,23 @@
 }
 .diff-load-error { color: var(--del-marker); }
 /* Per-file header that opens each file's section in the stacked all-files diff. Kept in-flow so
-   virtual row measurement cannot overlap it with the following hunk. */
+   virtual row measurement cannot overlap it with the following hunk. `clip` rather than `hidden`:
+   hidden makes the row a scroll container, which would capture the head's sticky-left below. */
 .diff-file-row {
   display: block;
   width: 100%;
   min-width: 100%;
   height: 36px;
-  overflow: hidden;
+  overflow: clip;
   white-space: normal;
 }
+/* Sticky-left like the gutters: the row is as wide as the diff canvas, so on a horizontal scroll
+   the head (path, copy, stats) would ride off-screen. 100cqw is the scrollport (.diff is the
+   inline-size container), which also keeps the stats pinned to the visible right edge. */
 .diff-file-head {
+  position: sticky;
+  left: 0;
+  width: 100cqw;
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -142,7 +152,9 @@
 }
 .diff-file-head .file-stat { flex: none; }
 /* Sticky current-file header pinned to the top of the scrolling diff (GitHub-style). Zero-height
-   sticky shell so it never shifts the virtualizer's row offsets; the head inside paints over rows. */
+   sticky shell so it never shifts the virtualizer's row offsets; the head inside paints over rows.
+   Lives inside the row canvas (not the scroller) so it is canvas-wide and the head's sticky-left
+   above has room to travel on a horizontal scroll. */
 .diff-sticky-file { position: sticky; top: 0; z-index: var(--z-sticky); height: 0; }
 .diff-sticky-file .diff-file-head { border-top: none; }
 .diff-nodiff { display: block; padding: 4px var(--pane-pad); }

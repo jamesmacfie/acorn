@@ -58,8 +58,10 @@ export function DiffCanvas(props: {
   return (
     <Show when={props.viewMode() === 'split'} fallback={
       <div class="diff" ref={(el) => props.publishScrollEl(el, 'unified')} onScroll={(e) => props.onScroll(e.currentTarget)}>
-        {props.stickyHead()}
+        {/* Inside the canvas, not the scroller: the sticky head needs a canvas-wide containing
+            block to stay put when the wide unified canvas scrolls sideways. */}
         <div class="diff-rows" style={{ height: `${props.virt.getTotalSize()}px`, '--diff-cols': props.maxCols() }}>
+          {props.stickyHead()}
           <For each={virtualRows()}>
             {({ vi, row }) => {
               let rowEl: HTMLDivElement | undefined
@@ -124,12 +126,12 @@ export function DiffCanvas(props: {
       </div>
     }>
       <div class="diff diff-split" ref={(el) => props.publishScrollEl(el, 'split')} onScroll={(e) => props.onScroll(e.currentTarget)}>
-        {props.stickyHead()}
         <div
           class="diff-split-rows"
           style={{ height: `${props.splitVirt.getTotalSize()}px` }}
           ref={(el) => splitScroll.attach(el)}
         >
+          {props.stickyHead()}
           <For each={virtualBands()}>
             {({ vi, band }) => {
               let bandEl: HTMLDivElement | undefined
