@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { collectionQueryKey, isCollectionCacheKey } from './data'
+import { collectionQueryKey, isCollectionCacheKey, scopedQuery } from './data'
 
-// Only the two pure things in the panel's read path. The read itself needs a QueryClient and a
+// Only the pure things in the panel's read path. The read itself needs a QueryClient and a
 // fan-out, and vitest here runs in node with no Solid plugin, so a test of it would be a test of the
 // mocks.
 
@@ -14,6 +14,30 @@ describe('collectionQueryKey', () => {
   it('separates different params, which are different answers', () => {
     expect(collectionQueryKey({ pluginId: 'github', collectionId: 'pulls', params: { a: '1' } }))
       .not.toEqual(collectionQueryKey({ pluginId: 'github', collectionId: 'pulls', params: { a: '2' } }))
+  })
+})
+
+describe('scopedQuery', () => {
+  const query = { pluginId: 'agents', collectionId: 'sessions' }
+
+  it('fills the board’s workspace for a collection whose rows belong to one', () => {
+    expect(scopedQuery(query, { workspaceScoped: true }, 'ws-1').params).toEqual({ workspace: 'ws-1' })
+  })
+
+  it('moves the cache key with the workspace, so one board never serves another’s rows', () => {
+    expect(collectionQueryKey(scopedQuery(query, { workspaceScoped: true }, 'ws-1')))
+      .not.toEqual(collectionQueryKey(scopedQuery(query, { workspaceScoped: true }, 'ws-2')))
+  })
+
+  it('leaves every other collection alone, so its answer is still cached once', () => {
+    expect(scopedQuery(query, { workspaceScoped: false }, 'ws-1')).toBe(query)
+    expect(scopedQuery(query, undefined, 'ws-1')).toBe(query)
+  })
+
+  it('keeps a workspace the panel chose, and asks for everything when there is none', () => {
+    const pinned = { ...query, params: { workspace: 'ws-9' } }
+    expect(scopedQuery(pinned, { workspaceScoped: true }, 'ws-1')).toBe(pinned)
+    expect(scopedQuery(query, { workspaceScoped: true }, undefined)).toBe(query)
   })
 })
 

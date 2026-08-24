@@ -23,6 +23,29 @@ import { shapeRows, visibleFields } from './shaping'
 // availability: one source failing is data, not an error, so the panel says which source is missing and
 // renders the rest, which is the fleet machinery's rule one tier down (node/fanout.ts).
 
+/** The board's own workspace, merged into the params of a source that asked for one.
+ *
+ *  Which workspace a panel is about is the host's answer, not the definition's: definitions live in one
+ *  library and the same panel is placed on a board in every workspace (docs/dashboards.md §
+ *  Placements), so a workspace written into a query would pin every board to one. Filling it here is
+ *  what makes "the rows here are about the work here" true by construction rather than by whoever
+ *  composed the panel being careful.
+ *
+ *  It goes into `params` rather than being handed to `fetch` beside them, because `params` is what the
+ *  query key is built from. An input the key cannot see is one workspace's rows served from another
+ *  workspace's cache entry.
+ *
+ *  An explicitly chosen value wins: a collection that declares a `workspace` param of its own is
+ *  offering a deliberate pin, and that one was asked for. */
+export const scopedQuery = (
+  query: PanelQuery,
+  entry: Pick<CollectionContribution, 'workspaceScoped'> | undefined,
+  workspaceId: string | undefined,
+): PanelQuery => {
+  if (!entry?.workspaceScoped || !workspaceId || query.params?.workspace) return query
+  return { ...query, params: { ...query.params, workspace: workspaceId } }
+}
+
 /** Private to panels. The fan-out writes through the node's QueryClient, so sharing a key means sharing
  *  the value's shape (node/fanout.ts). A collection page is an aggregate nothing else in the app holds,
  *  so it gets a key of its own. Two panels over the same collection with the same params legitimately
@@ -151,9 +174,14 @@ function createSourceState(
   nodeId: string,
   panelRefresh: Accessor<number | undefined>,
   panelRevision: Accessor<number>,
+  workspaceId: Accessor<string | undefined>,
 ): PanelSourceState {
   const contribution = createMemo(() => collectionContribution(query.pluginId, query.collectionId))
   const refreshSeconds = createMemo(() => panelRefreshSeconds(panelRefresh(), contribution()?.refresh))
+  // What this source actually reads: the definition's query with the board's workspace filled in. Every
+  // key and every fetch below goes through it, so the workspace is part of this source's identity rather
+  // than an ambient value read at fetch time.
+  const scoped = createMemo(() => scopedQuery(query, contribution(), workspaceId()))
 
   const [revision, setRevision] = createSignal(0)
   createEffect(() => {
@@ -169,17 +197,19 @@ function createSourceState(
   })
 
   const [result] = createFleetQuery(
-    (_dep: { revision: number; panel: number; registered: boolean }) => collectionQueryKey(query),
-    async (node, _dep, signal) => {
+    (dep: { revision: number; panel: number; registered: boolean; query: PanelQuery }) =>
+      collectionQueryKey(dep.query),
+    async (node, dep, signal) => {
       const entry = collectionContribution(query.pluginId, query.collectionId)
       // Same answer for "no such collection" as for one that answered with nothing: an empty page. The
       // panel's inert chrome comes from `contribution()`, not from the shape of the data.
       if (!entry) return emptyCollectionPage()
-      return entry.fetch(node, query.params ?? {}, signal)
+      return entry.fetch(node, dep.query.params ?? {}, signal)
     },
     // `registered` is in the dep so a plugin that activates after this panel mounted causes a refetch
-    // rather than leaving it inert until something else moves.
-    () => ({ revision: revision(), panel: panelRevision(), registered: !!contribution() }),
+    // rather than leaving it inert until something else moves. The query is in it for the same reason:
+    // a workspace switch is a different read, and it has to move the key rather than the answer.
+    () => ({ revision: revision(), panel: panelRevision(), registered: !!contribution(), query: scoped() }),
     { nodeIds: [nodeId] },
   )
 
@@ -195,7 +225,7 @@ function createSourceState(
   const cacheRevision = createCollectionCacheRevision(nodeId)
   const cached = createMemo(() => {
     cacheRevision()
-    return cachedCollectionPage(query, nodeId)
+    return cachedCollectionPage(scoped(), nodeId)
   })
   const page = createMemo((): PluginCollectionPage => row()?.data ?? cached() ?? emptyCollectionPage())
   const schema = createMemo(() => {
@@ -217,7 +247,14 @@ function createSourceState(
   }
 }
 
-export function createPanelData(definition: Accessor<PanelDefinition>): PanelData {
+/** `workspaceId` is the board's workspace, passed in rather than read here: it comes from the router
+ *  (`workspaces/useActiveWorkspaceId.ts`), and importing that reaches `@solidjs/router`, which throws in
+ *  the node tests that cover this file. Absent, or unresolved, is every workspace, which is what a
+ *  surface with no workspace behind it means and what a board draws before the mapping loads. */
+export function createPanelData(
+  definition: Accessor<PanelDefinition>,
+  workspaceId: Accessor<string | undefined> = () => undefined,
+): PanelData {
   // Captured at creation rather than read per render: a node switch swaps the QueryClient provider this
   // tree sits under, which remounts it (plugins/chrome/ChromeSourcePanel.tsx says the same).
   const nodeId = activeNodeId() ?? ''
@@ -228,7 +265,7 @@ export function createPanelData(definition: Accessor<PanelDefinition>): PanelDat
   const queries = createMemo(() => definition().queries)
   const panelRefresh = () => definition().refresh
   const sources = createMemo(
-    mapArray(queries, (query) => createSourceState(query, nodeId, panelRefresh, revision)),
+    mapArray(queries, (query) => createSourceState(query, nodeId, panelRefresh, revision, workspaceId)),
   )
 
   const pages = createMemo((): PanelSourcePage[] =>

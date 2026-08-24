@@ -157,6 +157,21 @@ param in the panel editor and hands the value back opaquely. The plugin owns wha
 the day it means something else the host does not change. Params deliberately do not use the field
 vocabulary above, because a param is an input rather than a rendered cell.
 
+**One param the host fills rather than a person: `workspace`, on a collection that sets
+`workspaceScoped`.** `agents:sessions` sets it, because a session runs in a task and a task belongs to
+a workspace. The value is the workspace of the board the panel is placed on, so a board shows the work
+of the workspace it belongs to without whoever composed the panel having to be careful — the same
+argument § Placements makes for scoping the board itself. It is the one input a plugin cannot name
+itself: definitions live in one library and the same panel is placed on a board in every workspace, so
+a workspace written into a query would pin every board to one.
+
+It arrives as an ordinary param, which is what keeps it honest. Params are what the cache key is built
+from (`dashboards/data.ts`, `scopedQuery` and `collectionQueryKey`), so a workspace switch is a
+different key rather than the same entry answering differently, and a collection that ignores the flag
+never sees the value. A panel that names a workspace itself keeps it; unset with no workspace resolved,
+such as a plugin region or a board drawn before the mapping loads, means every workspace. Compiled
+plugins only, like `paramOptions` and for the same reason.
+
 Opaque is load-bearing rather than fastidious, and github's second param is the demonstration. Unset,
 `involves` serves a select over the PR mirror. Set, the same route answers the same columns from a
 GitHub search, because "assigned to me" has no answer in the mirror at all. See

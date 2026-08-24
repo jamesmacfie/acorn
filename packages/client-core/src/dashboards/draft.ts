@@ -1,10 +1,10 @@
-import { createMemo, createSignal } from 'solid-js'
+import { createMemo, createSignal, type Accessor } from 'solid-js'
 import type { PluginCollectionField } from '@acorn/protocol/collections.ts'
 import { activeNodeId } from '../node/activeNode'
 import type { CollectionContribution } from '../registries/collections'
 import { chartSeriesFields, chartShapesFor, defaultChartAxis, type ChartShape } from './chart'
 import { collectionsForPicker, defaultPanelTitle } from './compose'
-import { cachedCollectionAnsweredAt, cachedCollectionPage, createCollectionCacheRevision } from './data'
+import { cachedCollectionAnsweredAt, cachedCollectionPage, createCollectionCacheRevision, scopedQuery } from './data'
 import {
   defaultGroupBy,
   normalizePanel,
@@ -61,6 +61,10 @@ export function createPanelDraft(props: {
   collections: readonly CollectionContribution[]
   /** Absent for the add flow. */
   panel?: PanelDefinition
+  /** The workspace whose board this panel is for, read the same way a placed panel reads it (data.ts,
+   *  `scopedQuery`). Without it, a preview of a workspace-scoped collection would look for a cache entry
+   *  no panel ever writes and draw "not read on this device yet" over rows the board is showing. */
+  workspaceId?: Accessor<string | undefined>
 }) {
   const existing = props.panel
   // Captured once: a node switch closes this window's surface anyway, and re-reading it per render would
@@ -101,7 +105,11 @@ export function createPanelDraft(props: {
   const cacheRevision = createCollectionCacheRevision(nodeId)
   const pages = createMemo((): PanelSourcePage[] => {
     cacheRevision()
-    return queries().map((query) => {
+    return queries().map((raw) => {
+      // The placed panel's own query, workspace and all, because that is the key its answer is under.
+      // The draft keeps `queries()` unscoped, so what a commit writes is still the definition as
+      // composed rather than one pinned to whichever workspace it was composed in.
+      const query = scopedQuery(raw, entryFor(raw), props.workspaceId?.())
       const cached = cachedCollectionPage(query, nodeId)
       return { query, schema: schemaOf(entryFor(query), cached?.schema), rows: cached?.rows ?? [] }
     })

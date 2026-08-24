@@ -459,7 +459,7 @@
   gap: var(--space-2);
   margin: var(--space-1) 0 0;
   font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  color: var(--text-muted);
 }
 .agent-queued-turn { justify-content: space-between; padding-top: var(--space-2); }
 .agent-queued-turn p {

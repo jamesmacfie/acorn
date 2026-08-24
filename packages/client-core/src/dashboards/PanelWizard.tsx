@@ -6,7 +6,7 @@ import { Button, Card, Chip, Field, Input, SectionHeader, SegmentedControl } fro
 import { brandMarkRegistry } from '../ui/brandMarks'
 import Icon from '../ui/Icon'
 import { Modal } from '../ui/Modal'
-import { cachedCollectionAnsweredAt, cachedCollectionPage } from './data'
+import { cachedCollectionAnsweredAt, cachedCollectionPage, scopedQuery } from './data'
 import { createPanelDraft } from './draft'
 import { collectionCardMeta, viewAvailability, type ViewReasonCode } from './editor'
 import { COLS, sizePresets, type Rect } from './layout'
@@ -129,8 +129,13 @@ export default function PanelWizard(props: {
   onOpenEditor: (panel: PanelDefinition) => void
   onClose: () => void
 }) {
-  const draft = createPanelDraft(props)
   const activeWorkspaceId = useActiveWorkspaceId()
+  // Which workspace this panel is headed for: the launching scope's when it has one, otherwise the one
+  // the shell is showing, because a plugin region carries no workspace and "Home" from there means the
+  // Home you would get by clicking Home. It picks the Home destinations below, and it is what a
+  // workspace-scoped collection's cards and preview read (draft.ts, `workspaceId`).
+  const homeWorkspaceId = () => props.scope.workspaceId ?? activeWorkspaceId()
+  const draft = createPanelDraft({ ...props, workspaceId: homeWorkspaceId })
 
   const [stepIndex, setStepIndex] = createSignal(0)
   const [filter, setFilter] = createSignal('')
@@ -156,7 +161,7 @@ export default function PanelWizard(props: {
    *  landing mid-wizard turns "not read on this device yet" into a row count in place. */
   const metaFor = (entry: CollectionContribution) => {
     draft.cacheRevision()
-    const query = { pluginId: entry.pluginId, collectionId: entry.collectionId }
+    const query = scopedQuery({ pluginId: entry.pluginId, collectionId: entry.collectionId }, entry, homeWorkspaceId())
     const page = cachedCollectionPage(query, draft.nodeId)
     const answeredAt = cachedCollectionAnsweredAt(query, draft.nodeId)
     return collectionCardMeta(entry, { ...(page ? { page } : {}), ...(answeredAt ? { answeredAt } : {}) })
@@ -178,10 +183,7 @@ export default function PanelWizard(props: {
 
   // ── Step 4: destination and footprint ───────────────────────────────────────────────────────
 
-  // Which workspace's dashboards the Home destination offers. The launching scope's when it has one;
-  // otherwise the one the shell is showing, because a plugin region carries no workspace and "Home"
-  // from there means the Home you would get by clicking Home.
-  const homeWorkspaceId = () => props.scope.workspaceId ?? activeWorkspaceId()
+  // Which workspace's dashboards the Home destination offers (`homeWorkspaceId` above).
   const tabs = createMemo(() => homeTabs(dashboards(), homeWorkspaceId()))
 
   /** The Home destinations: the dashboards that exist, plus a new one.

@@ -1,5 +1,6 @@
 import { Show } from 'solid-js'
 import type { CollectionContribution } from '../registries/collections'
+import { useActiveWorkspaceId } from '../workspaces/useActiveWorkspaceId'
 import { Button, Field, SegmentedControl } from '../ui/primitives'
 import { Modal } from '../ui/Modal'
 import Picker from '../ui/Picker'
@@ -40,7 +41,9 @@ export default function PanelEditor(props: {
   onSave: (panel: PanelDefinition) => void
   onClose: () => void
 }) {
-  const draft = createPanelDraft(props)
+  // The preview draws from the cache a placed panel fills, and a workspace-scoped collection's answer is
+  // under the workspace the board is on (draft.ts, `workspaceId`).
+  const draft = createPanelDraft({ ...props, workspaceId: useActiveWorkspaceId() })
   const existing = draft.existing
   /** The words, about whether this panel has ever been saved rather than about whether there is a
    *  draft to edit; the wizard hands over both at once. */
