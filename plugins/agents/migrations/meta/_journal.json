@@ -8,6 +8,13 @@
       "when": 1786177104813,
       "tag": "0000_cold_william_stryker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787479012168,
+      "tag": "0001_unusual_the_hunter",
+      "breakpoints": true
     }
   ]
 }

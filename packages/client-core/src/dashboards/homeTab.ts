@@ -4,7 +4,8 @@ import { appStateBinding, type PersistedStateSlice } from '../persistence/persis
 import { MAX_TABS, type DashboardTab } from './persist'
 
 // The tab bar's own state and arithmetic. What a tab is lives in `persist.ts`: the placement scope
-// `home/<tabId>` and a name in the `tabs` list.
+// `home/<tabId>/<workspaceId>` and a name in the `tabs` list. Nothing here knows about the
+// workspace. These are list operations on the tabs of the one workspace the bar is showing.
 //
 // Which tab is active is device view state and never enters the node blob (docs/dashboards.md
 // § Placements). Create, rename, and reorder are all one write (`setHomeTabs`), so each verb only
@@ -30,7 +31,8 @@ const uniqueName = (tabs: readonly DashboardTab[], base: string): string => {
 }
 
 /** The list that creating a dashboard writes, plus the new tab's id (docs/dashboards.md §
- *  Placements: creating the first extra dashboard). */
+ *  Placements: creating the first extra dashboard). One workspace's list in, the same list out —
+ *  `setHomeTabs` is what puts the workspace back on it. */
 export function addTab(tabs: readonly DashboardTab[], name = ''): { tabs: DashboardTab[]; id: string } {
   const base = tabs.length ? [...tabs] : [{ id: '', name: 'Home' }]
   const id = crypto.randomUUID().slice(0, 8)

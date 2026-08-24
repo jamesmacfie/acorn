@@ -4,10 +4,32 @@ import { AGENT_PANE_ID } from './paneContribution'
 
 const [selectedByTask, setSelectedByTask] = createSignal<Record<string, string | undefined>>({})
 const [focusedRequestBySession, setFocusedRequestBySession] = createSignal<Record<string, string | undefined>>({})
+// Keyed by session rather than by task, so switching sessions in the sidebar and back returns to the
+// subagent you were reading instead of the top of the transcript.
+const [selectedSubagentBySession, setSelectedSubagentBySession] = createSignal<Record<string, string | undefined>>({})
 
 export const selectedManagedSession = (taskId: string): string | undefined => selectedByTask()[taskId]
 export const focusedManagedRequest = (sessionId: string): string | undefined =>
   focusedRequestBySession()[sessionId]
+export const selectedManagedSubagent = (sessionId: string): string | undefined =>
+  selectedSubagentBySession()[sessionId]
+
+// One signal, two readers that agree by construction: it is which subagent's run the main window is
+// showing, and the sidebar row for that subagent is the one drawn as selected. Absent means the
+// session's own stream.
+export function selectManagedSubagent(sessionId: string, subagentId: string): void {
+  setSelectedSubagentBySession((current) => ({ ...current, [sessionId]: subagentId }))
+}
+
+/** Back out of a subagent's run to the session's own stream. */
+export function clearManagedSubagent(sessionId: string): void {
+  setSelectedSubagentBySession((current) => {
+    if (current[sessionId] === undefined) return current
+    const next = { ...current }
+    delete next[sessionId]
+    return next
+  })
+}
 
 export function selectManagedSession(taskId: string, sessionId: string): void {
   setSelectedByTask((current) => ({ ...current, [taskId]: sessionId }))
@@ -21,12 +43,14 @@ export function clearManagedSession(taskId: string, expectedSessionId?: string):
     return next
   })
   if (!expectedSessionId) return
-  setFocusedRequestBySession((current) => {
-    if (!(expectedSessionId in current)) return current
-    const next = { ...current }
-    delete next[expectedSessionId]
-    return next
-  })
+  for (const clear of [setFocusedRequestBySession, setSelectedSubagentBySession]) {
+    clear((current) => {
+      if (!(expectedSessionId in current)) return current
+      const next = { ...current }
+      delete next[expectedSessionId]
+      return next
+    })
+  }
 }
 
 export function openManagedSession(taskId: string, sessionId: string, requestId?: string): void {

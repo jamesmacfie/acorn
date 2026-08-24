@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { createAnchoredPopover } from './anchor'
+import { createAnchoredPopover, type Placement } from './anchor'
 
 // Searchable popover picker: a button showing the current value opens a filter input + scrollable
 // list. Presentational chrome only; the parent supplies results(query) so it owns filtering and
@@ -27,7 +27,7 @@ export default function Picker<T>(props: {
   buttonClass?: string
   disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
   keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
-  placement?: 'top' | 'bottom'
+  placement?: Placement // 'bottom-end' for a trigger at the right edge, so the list opens leftward
 }) {
   const [filter, setFilter] = createSignal('')
   let rootRef: HTMLDivElement | undefined
@@ -38,7 +38,7 @@ export default function Picker<T>(props: {
   // min 300px so the list stays readable when the button is narrow (e.g. "base").
   const popover = createAnchoredPopover({
     anchor: () => rootRef,
-    placement: () => (props.placement === 'top' ? 'top-start' : 'bottom-start'),
+    placement: () => props.placement ?? 'bottom-start',
     minWidth: 300,
     disabled: () => !!props.disabled,
     onDismiss: () => setFilter(''),

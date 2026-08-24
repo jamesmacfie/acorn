@@ -188,14 +188,11 @@ export class AcpDriver implements AgentDriver {
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
+    // The node's log, not the transcript. An adapter writes its startup banner here, so this used to put
+    // a permanent row in the reader's conversation on every spawn, saying only how many bytes it could
+    // not show them. The content stays unlogged either way (docs/security.md, credential handling).
     child.stderr.on('data', (chunk: Buffer) => {
-      if (chunk.byteLength) {
-        void options.onEvent({
-          type: 'diagnostic',
-          level: 'warning',
-          message: providerStderrNotice(label, chunk.byteLength),
-        })
-      }
+      if (chunk.byteLength) console.warn(`[agents:provider] ${providerStderrNotice(label, chunk.byteLength)}`)
     })
     child.on('error', (error) => void options.onClosed(error))
     child.on('exit', (code) => void options.onClosed(

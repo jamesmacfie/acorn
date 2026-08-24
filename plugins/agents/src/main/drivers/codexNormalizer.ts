@@ -12,8 +12,8 @@ type JsonObject = Record<string, unknown>
 export const asObject = (value: unknown): JsonObject | null =>
   typeof value === 'object' && value != null && !Array.isArray(value) ? value as JsonObject : null
 
-const stringValue = (value: unknown): string | null => typeof value === 'string' ? value : null
-const numberValue = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null
+export const stringValue = (value: unknown): string | null => typeof value === 'string' ? value : null
+export const numberValue = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null
 
 function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | null {
   const type = stringValue(item.type)
@@ -62,14 +62,20 @@ function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | nul
         input: item.arguments == null ? undefined : JSON.stringify(item.arguments),
         output: completed && item.contentItems != null ? JSON.stringify(item.contentItems) : undefined,
       }
-    case 'collabAgentToolCall':
+    // The parent's own inter-agent tool, NOT the spawn: a live capture shows `tool: "wait"` with a null
+    // prompt and an empty receiver list while the session blocks on its children. The spawn arrives as
+    // a `subAgentActivity` item, which codexChildRouting.ts owns. This used to be titled "Agent wait"
+    // with `kind: 'subagent'`, which named the wrong thing twice.
+    case 'collabAgentToolCall': {
+      const tool = stringValue(item.tool)
       return {
         id,
-        title: `Agent ${stringValue(item.tool) ?? 'collaboration'}`,
-        kind: 'subagent',
+        title: tool === 'wait' ? 'Waiting for subagents' : `Subagents · ${tool ?? 'coordinate'}`,
+        kind: 'tool',
         status,
         input: stringValue(item.prompt) ?? undefined,
       }
+    }
     case 'webSearch':
       return { id, title: 'Web search', kind: 'search', status }
     case 'imageView':

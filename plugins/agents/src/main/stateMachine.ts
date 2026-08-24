@@ -3,6 +3,9 @@ import type {
   AgentNormalizedEvent,
   AgentRuntimeState,
   AgentSession,
+  AgentSubagent,
+  AgentSubagentStatus,
+  AgentSubagentUpdate,
 } from '@acorn/protocol/managedAgents.ts'
 
 export type AgentMachineState = {
@@ -83,10 +86,72 @@ export function projectAgentEvent(event: AgentNormalizedEvent): AgentSessionProj
       return { runtimeState: 'ready', attention: 'completed' }
     case 'error':
       return { runtimeState: event.retryable ? 'reconnecting' : 'failed', attention: 'error' }
+    // A subagent's progress is not the parent's own. Turn boundaries already own the session's state,
+    // and projecting 'working' here would let a child that settles after the parent's turn_completed
+    // drag the session back out of ready. Codex allows exactly that ordering.
+    case 'subagent':
     case 'usage':
     case 'diagnostic':
       return {}
   }
+}
+
+// Which statuses still count as work in flight. Everything else is settled, including `idle`: a Codex
+// child at rest is resumable rather than finished, which is a display distinction, not a lifecycle one.
+const ACTIVE_SUBAGENT_STATUSES: readonly AgentSubagentStatus[] = ['pending', 'running']
+
+// ponytail: keep every in-flight entry plus the last 20 settled ones. The session row is re-serialised
+// and broadcast after every event, so an unbounded roster would grow every frame; the full history
+// stays in the event ledger, which is what the transcript reads. Give the roster its own table and
+// route if a session ever needs more than this at a glance.
+const RETAINED_SETTLED_SUBAGENTS = 20
+
+function capSubagentRoster(roster: AgentSubagent[]): AgentSubagent[] {
+  const settled = roster.filter((entry) => !ACTIVE_SUBAGENT_STATUSES.includes(entry.status))
+  if (settled.length <= RETAINED_SETTLED_SUBAGENTS) return roster
+  const dropped = new Set(
+    [...settled]
+      .sort((left, right) => left.updatedAt - right.updatedAt)
+      .slice(0, settled.length - RETAINED_SETTLED_SUBAGENTS)
+      .map((entry) => entry.id),
+  )
+  // Filtered rather than rebuilt, so the roster keeps spawn order. A fan-out reads as the order it was
+  // launched in, and rows that update in place do not jump.
+  return roster.filter((entry) => !dropped.has(entry.id))
+}
+
+/**
+ * Folds one subagent update into the roster, field by field, absent meaning unchanged.
+ *
+ * Order-robust in both directions, which is a requirement rather than a nicety: on Codex a child
+ * thread's own traffic reaches us BEFORE the parent item that names it, so the entry that creates a
+ * row is often anonymous and a later update supplies the title. The reverse holds for a harness that
+ * only reports usage at completion.
+ */
+export function foldSubagentRoster(
+  current: AgentSubagent[],
+  update: AgentSubagentUpdate,
+  turnId: string | null,
+  timestamp: number,
+): AgentSubagent[] {
+  const existing = current.find((entry) => entry.id === update.id)
+  const merged: AgentSubagent = {
+    id: update.id,
+    turnId: existing?.turnId ?? turnId,
+    title: update.title || existing?.title || 'Subagent',
+    status: update.status ?? existing?.status ?? 'running',
+    role: update.role ?? existing?.role,
+    model: update.model ?? existing?.model,
+    providerAgentRef: update.providerAgentRef ?? existing?.providerAgentRef,
+    usage: update.usage ?? existing?.usage,
+    toolUseCount: update.toolUseCount ?? existing?.toolUseCount,
+    durationMs: update.durationMs ?? existing?.durationMs,
+    startedAt: existing?.startedAt ?? timestamp,
+    updatedAt: timestamp,
+  }
+  return capSubagentRoster(existing
+    ? current.map((entry) => entry.id === update.id ? merged : entry)
+    : [...current, merged])
 }
 
 export function decideAgentCommand(state: AgentMachineState, command: AgentMachineCommand): AgentMachineDecision {
@@ -186,6 +251,7 @@ export function evolveAgentState(
         activeTurnId: null,
       }
     case 'session_metadata':
+    case 'subagent':
     case 'usage':
     case 'diagnostic':
       return state

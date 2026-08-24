@@ -24,6 +24,7 @@ const session = (lastEventSeq: number): AgentSession => ({
   config: {},
   parentSessionId: null,
   parentTurnId: null,
+  subagents: [],
   lastEventSeq,
   lastReadSeq: 0,
   archivedAt: null,

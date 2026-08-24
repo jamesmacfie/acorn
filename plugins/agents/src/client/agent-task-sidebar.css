@@ -43,6 +43,18 @@
 .agent-task-state[data-state='blocked'],
 .agent-task-state[data-state='permission'] { color: var(--warn); }
 .agent-task-state[data-state='failed'] { color: var(--del-marker); }
+/* A subagent, indented under the session that spawned it. Two classes in the selector on purpose:
+   `.agent-task-row` is on the same element and would tie with a single class on specificity, so the
+   indent would land or not depending on rule order (docs/ui-design.md § Border roles covers the same
+   trap for widths). The guide line carries the relationship where indentation alone gets lost in a
+   dense roster. */
+.agent-task-subagent-row.ui-row {
+  padding-left: calc(var(--space-5) + var(--space-5));
+  border-left: var(--stripe-w) solid var(--border);
+  margin-left: var(--space-5);
+}
+.agent-task-subagent-row strong { font-weight: 400; color: var(--text-muted); }
+
 .agent-task-legacy-row { border-bottom: var(--divider); }
 .agent-task-legacy-row > .ui-row { border-bottom: 0; }
 .agent-task-gate-actions { display: flex; gap: var(--space-2); padding: 0 var(--space-5) var(--space-3) 31px; }

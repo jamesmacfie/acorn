@@ -290,7 +290,8 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         const previous = previousOptions.find((candidate) => candidate.id === option.id)
         if (!previous) throw new Error(`Provider did not advertise configuration option '${option.id}'.`)
         const advertised = previous as {
-          values?: Array<{ value?: unknown }>
+          label?: unknown
+          values?: Array<{ value?: unknown; label?: unknown }>
         }
         if (
           Array.isArray(advertised.values)
@@ -298,11 +299,27 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         ) {
           throw new Error(`Provider did not advertise value '${option.currentValue}' for '${option.id}'.`)
         }
-        return previous?.currentValue === option.currentValue ? [] : [{ id: option.id, value: option.currentValue }]
+        if (previous.currentValue === option.currentValue) return []
+        const chosen = advertised.values?.find((candidate) => candidate.value === option.currentValue)
+        return [{
+          id: option.id,
+          value: option.currentValue,
+          label: typeof advertised.label === 'string' ? advertised.label : option.id,
+          valueLabel: typeof chosen?.label === 'string' ? chosen.label : option.currentValue,
+        }]
       })
       if (changed.length) {
         const live = await this.ensureSession(before)
-        for (const option of changed) await live.handle?.setConfig?.(option.id, option.value)
+        for (const option of changed) {
+          await live.handle?.setConfig?.(option.id, option.value)
+          // A switched model or reasoning level belongs in the transcript, since it changes what every
+          // later turn means. Recorded as a diagnostic row: the transcript already draws those.
+          await this.record(sessionId, null, {
+            type: 'diagnostic',
+            level: 'info',
+            message: `${option.label} changed to ${option.valueLabel}`,
+          })
+        }
       }
     }
     if (patch.archived != null) {
@@ -430,7 +447,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       lines.push('## User', '', agentTurnInputText(turn), '')
       for (const event of snapshot.events.filter((item) => item.turnId === turn.id)) {
         if (event.event.type === 'assistant_message') lines.push(event.event.text)
-        else if (event.event.type === 'tool') lines.push(`- Tool: ${event.event.tool.title} — ${event.event.tool.status}`)
+        else if (event.event.type === 'tool') lines.push(`- Tool: ${event.event.tool.title} — ${event.event.tool.status ?? 'running'}`)
         else if (event.event.type === 'error') lines.push(`- Error: ${event.event.message}`)
       }
       lines.push('')

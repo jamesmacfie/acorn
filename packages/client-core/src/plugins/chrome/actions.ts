@@ -1,4 +1,4 @@
-import type { PluginChromeAction, PluginRailItem } from '@acorn/protocol/api.ts'
+import type { PluginChromeAction, PluginRailItem, Task } from '@acorn/protocol/api.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { sendRaw } from '../../apiClient'
 import { pushNotice } from '../../notifications/notifications'
@@ -55,6 +55,27 @@ const toast = (pluginId: string, title: string, detail?: string): void => {
   void pushNotice({ taskId: activeTaskId() ?? '', kind: 'plugin', title: `${pluginId}: ${title}`, at: Date.now(), ...(detail ? { detail } : {}) })
 }
 
+/** Take the reader to the task a click names, if it names one. `'unknown-task'` means the row named a
+ *  task this node does not have and the refusal has already been shown.
+ *
+ *  `activeTaskId()` is sticky: it's whichever task you last had open, not whichever screen you're looking
+ *  at now, so it stays put after you leave for a Source browse or the dashboard (tasks/tasks.ts,
+ *  `selectedSource`). Skipping the navigate just because it happens to still name this task was the bug:
+ *  a dashboard row for the task you left behind looked like a dead click, because the pane opened in a
+ *  task the reader wasn't looking at. */
+function goToTask(context: ChromeActionContext): Task | 'unknown-task' | undefined {
+  const named = context.taskId ? taskById(context.taskId) : undefined
+  if (context.taskId && !named) {
+    toast(context.pluginId, 'that task is not on this node', 'It may have been archived, or the list has not loaded yet.')
+    return 'unknown-task'
+  }
+  if (named && (named.id !== activeTaskId() || selectedSource())) {
+    activateTaskSignals(named)
+    context.navigate?.(pathForTask(named))
+  }
+  return named
+}
+
 export function runChromeAction(action: PluginChromeAction, context: ChromeActionContext): void {
   switch (action.verb) {
     case 'openPane': {
@@ -72,25 +93,22 @@ export function runChromeAction(action: PluginChromeAction, context: ChromeActio
       // ponytail: the lookup is the active node's task cache, so a row from a panel pointed at another node
       // lands on the refusal below rather than switching nodes first the way the attention inbox does.
       // Switch here too if panels over remote nodes become a thing people click.
-      const named = context.taskId ? taskById(context.taskId) : undefined
-      if (context.taskId && !named) {
-        return toast(context.pluginId, 'that task is not on this node', 'It may have been archived, or the list has not loaded yet.')
-      }
-      // `activeTaskId()` is sticky: it's whichever task you last had open, not whichever screen you're
-      // looking at now, so it stays put after you leave to a Source browse or the dashboard
-      // (tasks/tasks.ts, `selectedSource`). Skipping the navigate just because it happens to still name
-      // this task was the bug: a dashboard row for the task you left behind looked like a dead click,
-      // because the pane opened in a task the reader wasn't looking at.
-      if (named && (named.id !== activeTaskId() || selectedSource())) {
-        activateTaskSignals(named)
-        context.navigate?.(pathForTask(named))
-      }
+      const named = goToTask(context)
+      if (named === 'unknown-task') return
       const taskId = named?.id ?? activeTaskId()
       if (!taskId) return toast(context.pluginId, 'open a task first', 'This opens a pane, and a pane belongs to a task.')
       // The row id travels as a retained pane intent, which is the mechanism that already closed this
       // exact mount-order race for core panes (registries/clientEvents.ts): the intent is held until the
       // pane consumes it, so a pane opening for the first time is not a race against its own mount.
       openPane(taskId, action.pane, context.item === undefined ? undefined : { kind: 'plugin:select', item: context.item.id })
+      return
+    }
+    case 'openTask': {
+      // The whole verb: go there and stop. A row whose thing IS a task has nowhere else to send the
+      // reader, and picking a pane for them would be this verb pretending to be `openPane`.
+      const named = goToTask(context)
+      if (named === 'unknown-task') return
+      if (!named) return toast(context.pluginId, 'that row names no task', 'This opens a task, so the row has to say which one.')
       return
     }
     case 'navigate': {
