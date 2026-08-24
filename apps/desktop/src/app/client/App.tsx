@@ -248,7 +248,12 @@ export default function App() {
   // Active workspace is derived from the current project. The active node's list, because the route
   // carries no node, so the workspace the shell is showing is whichever one the active node has for
   // this repo.
-  const activeWorkspace = () => workspaceForProject(workspaces.data, params.projectId)
+  const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
+  // Which project the shell is "in". The generic task route (`/t/:taskId`) carries no projectId, so
+  // without the task fallback the workspace and project pickers went blank the moment you opened a
+  // task, and the per-workspace view memory below never saw a workspace change.
+  const contextProjectId = () => params.projectId ?? activeTask()?.projectId
+  const activeWorkspace = () => workspaceForProject(workspaces.data, contextProjectId())
   // Every node's workspaces, for the topbar picker. Grouped rather than merged: a workspace belongs to
   // exactly one node, and two nodes both having a "Default" is the normal case.
   const fleetWorkspaces = createFleetWorkspaces()
@@ -301,7 +306,6 @@ export default function App() {
     }, { defer: true }),
   )
 
-  const activeTask = () => tasks.data?.find((w) => w.id === activeTaskId()) ?? null
   const slotContext = (): UiSlotContext => ({
     taskActive: inTaskView(),
     terminalOpen: termOpen(),
@@ -357,7 +361,7 @@ export default function App() {
           </Show>
           <Show when={scopedProjects().length}>
             <Picker<Project>
-              label={scopedProjects().find((project) => project.id === params.projectId)?.name ?? 'Select a project'}
+              label={scopedProjects().find((project) => project.id === contextProjectId())?.name ?? 'Select a project'}
               ariaLabel="Project"
               placeholder="Filter projects…"
               emptyText="No projects."
@@ -366,7 +370,7 @@ export default function App() {
                 return q ? scopedProjects().filter((project) => project.name.toLowerCase().includes(q)) : scopedProjects()
               }}
               rowLabel={(project) => project.name}
-              isActive={(project) => project.id === params.projectId}
+              isActive={(project) => project.id === contextProjectId()}
               disabled={!selectedSource() && !!activeTask()}
               onSelect={(project) => {
                 if (!selectedSource()) {
