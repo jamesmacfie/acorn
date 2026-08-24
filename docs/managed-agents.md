@@ -211,6 +211,14 @@ Cancellation, timeout, provider disconnect, and restart are explicit states. A l
 lost without killing the provider process, and the client reattaches from the session sequence or
 terminal replay tail.
 
+A session reference the agent has forgotten is recoverable, not fatal. Agents keep their own session
+stores and prune them, and Claude Code keys its store by working directory, so a checkout that moved
+leaves the reference on the row pointing at nothing. When `session/load` comes back with the
+protocol's resource-not-found code, the ACP driver starts a fresh provider session instead, warns in
+the transcript that the agent cannot see the history above it, and lets the `session_metadata`
+projection replace the dead reference. Rethrowing instead would fail the start on every attempt while
+the queued turn waited for a dispatch that could never happen.
+
 A provider's stderr goes to the node's log as a byte count, not to the transcript. The content is
 withheld from both because it can carry credentials, and a count the reader cannot act on does not
 belong in their conversation.

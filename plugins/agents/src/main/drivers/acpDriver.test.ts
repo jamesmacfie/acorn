@@ -1,6 +1,34 @@
 import { describe, expect, it } from 'vitest'
+import { fileURLToPath } from 'node:url'
+import type { AgentNormalizedEvent, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { AcpDriver } from './acpDriver'
 import { harnessCapabilities } from './harness'
+
+const sessionWithRef = (providerSessionRef: string): AgentSession => ({
+  id: 'session-1',
+  taskId: 'task-1',
+  providerId: 'stub',
+  profileId: 'stub',
+  kind: 'interactive',
+  driverKind: 'acp',
+  driverVersion: 'acp-1',
+  providerSessionRef,
+  controller: 'acorn',
+  runtimeState: 'creating',
+  attention: 'none',
+  statusAuthority: 'protocol',
+  title: 'Stub session',
+  model: null,
+  config: {},
+  parentSessionId: null,
+  parentTurnId: null,
+  subagents: [],
+  lastEventSeq: 0,
+  lastReadSeq: 0,
+  archivedAt: null,
+  createdAt: 0,
+  updatedAt: 0,
+})
 
 // The generic driver's one branch worth pinning: resolving the two spawn forms into a descriptor
 // without spawning anything. `probe()` never throws, so a harness that cannot start shows up as a row
@@ -58,6 +86,43 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     expect(descriptor.authenticated).toBe(true)
     // Asked about the resolved absolute path, not the bare name.
     expect(asked).toEqual([descriptor.executable])
+  })
+
+  // The recovery worth pinning, because the alternative is a session nobody can use: the agent's store
+  // no longer holds the reference on the row, and every start retries it and fails.
+  it('starts a fresh provider session when the agent no longer has the stored one', async () => {
+    const events: AgentNormalizedEvent[] = []
+    const handle = await new AcpDriver({
+      id: 'stub',
+      profileId: 'stub',
+      label: 'Stub',
+      spawn: {
+        entry: () => fileURLToPath(new URL('./testFixtures/forgetfulAcpAgent.mjs', import.meta.url)),
+      },
+      quirks: { sessionPersistence: true },
+    }).start({
+      session: sessionWithRef('d2c6edee-10be-460b-a636-083f68dcde6f'),
+      cwd: process.cwd(),
+      env: {},
+      noProviderExecutionHistory: false,
+      onEvent: (event) => {
+        events.push(event)
+      },
+      onClosed: () => {},
+    })
+
+    try {
+      expect(handle.providerSessionRef).toBe('fresh-session-id')
+      // The reader is told the agent cannot see the transcript above, and the row's dead reference is
+      // replaced by the session_metadata projection.
+      expect(events.filter((event) => event.type === 'diagnostic' && event.level === 'warning')).toHaveLength(1)
+      expect(events).toContainEqual(expect.objectContaining({ type: 'session_state', state: 'ready' }))
+      expect(events).toContainEqual(
+        expect.objectContaining({ type: 'session_metadata', providerSessionRef: 'fresh-session-id' }),
+      )
+    } finally {
+      await handle.stop()
+    }
   })
 
   it('derives capabilities from the protocol baseline plus the declared quirks', () => {

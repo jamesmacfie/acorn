@@ -3,6 +3,7 @@
 import {
   ClientSideConnection,
   ndJsonStream,
+  RequestError,
   type Agent,
   type Client,
   type ContentBlock,
@@ -23,6 +24,10 @@ import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDri
 import { providerStderrNotice } from './diagnostics'
 
 const DRIVER_VERSION = 'acp-1'
+
+// JSON-RPC code the protocol reserves for a resource the agent cannot find. On `session/load` it means
+// the session reference is dead, which is the one load failure worth recovering from.
+const ACP_RESOURCE_NOT_FOUND = -32002
 
 type PendingPermission = {
   resolve(response: RequestPermissionResponse): void
@@ -226,15 +231,7 @@ export class AcpDriver implements AgentDriver {
 
     let providerSessionRef = options.session.providerSessionRef
     let configOptions: readonly SessionConfigOption[] = []
-    if (providerSessionRef && supportsLoad) {
-      const loaded = await agent.loadSession!({
-        sessionId: providerSessionRef,
-        cwd: options.cwd,
-        additionalDirectories: [],
-        mcpServers: [],
-      })
-      configOptions = loaded?.configOptions ?? []
-    } else {
+    const createSession = async (): Promise<void> => {
       const created = await agent.newSession({
         cwd: options.cwd,
         additionalDirectories: [],
@@ -242,6 +239,31 @@ export class AcpDriver implements AgentDriver {
       })
       providerSessionRef = created.sessionId
       configOptions = created.configOptions ?? []
+    }
+    if (providerSessionRef && supportsLoad) {
+      try {
+        const loaded = await agent.loadSession!({
+          sessionId: providerSessionRef,
+          cwd: options.cwd,
+          additionalDirectories: [],
+          mcpServers: [],
+        })
+        configOptions = loaded?.configOptions ?? []
+      } catch (error) {
+        // The agent no longer holds the session this row points at. Claude Code, for one, keys its
+        // store by working directory, so a checkout that moved or a pruned transcript both land here.
+        // Without the fallback the row's dead reference is retried on every start, the queued turn
+        // never dispatches, and the session is stuck reporting provider_start_failed.
+        if (!(error instanceof RequestError) || error.code !== ACP_RESOURCE_NOT_FOUND) throw error
+        await createSession()
+        await options.onEvent({
+          type: 'diagnostic',
+          level: 'warning',
+          message: `${label} no longer has the earlier conversation, so this session starts fresh. The transcript above is Acorn's copy; the agent cannot see it.`,
+        })
+      }
+    } else {
+      await createSession()
     }
     replaying = false
     await options.onEvent({
