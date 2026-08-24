@@ -112,3 +112,9 @@ the file projection; it is not sent to GitHub.
 
 The `?file=` route/query anchor is resolved after the file model is available, then scrolls to the
 file and line without forcing all other files to hydrate.
+
+Scroll position and collapsed files are remembered per review scope for the session
+(`reviewViewState.ts`): a task review and the classic browser keep separate entries for the same PR,
+and a task's entries are evicted when it is archived. Both are tied to the files signature, so new
+commits drop the stale position and collapse choices instead of restoring them against a different
+diff. An explicit `?file=` navigation wins over a saved scroll position.
