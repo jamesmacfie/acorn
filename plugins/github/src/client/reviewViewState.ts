@@ -16,9 +16,17 @@ export type ReviewDiffScrollPosition = ReviewScrollPosition & {
   filesSignature: string
 }
 
+/** Collapsed diff files, tied to the files signature they were collapsed against: a force-push or
+    new commit changes the file set, so stale paths are dropped rather than restored. */
+export type ReviewDiffCollapsedFiles = {
+  filesSignature: string
+  paths: string[]
+}
+
 type ReviewViewState = {
   navigator?: ReviewScrollPosition
   diff?: ReviewDiffScrollPosition
+  diffCollapsed?: ReviewDiffCollapsedFiles
 }
 
 const viewStates = new Map<string, ReviewViewState>()
@@ -41,6 +49,14 @@ export const rememberReviewDiffScroll = (scope: ReviewViewScope, position: Revie
 
 export const reviewDiffScroll = (scope: ReviewViewScope): ReviewDiffScrollPosition | undefined =>
   viewStates.get(scopeKey(scope))?.diff
+
+export const rememberReviewDiffCollapsed = (scope: ReviewViewScope, collapsed: ReviewDiffCollapsedFiles): void => {
+  const key = scopeKey(scope)
+  viewStates.set(key, { ...viewStates.get(key), diffCollapsed: collapsed })
+}
+
+export const reviewDiffCollapsed = (scope: ReviewViewScope): ReviewDiffCollapsedFiles | undefined =>
+  viewStates.get(scopeKey(scope))?.diffCollapsed
 
 export function evictReviewViewStates(taskId: string): void {
   const prefix = `task:${taskId}:`

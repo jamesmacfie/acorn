@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   evictReviewViewStates,
+  rememberReviewDiffCollapsed,
   rememberReviewDiffScroll,
   rememberReviewNavigatorScroll,
+  reviewDiffCollapsed,
   reviewDiffScroll,
   reviewNavigatorScroll,
 } from './reviewViewState'
@@ -36,6 +38,16 @@ describe('review view state', () => {
     expect(reviewDiffScroll(browseScope)?.top).toBe(80)
   })
 
+  it('keeps collapsed diff files beside the scroll position without clobbering it', () => {
+    const scope = { routeKey: 'oak/acorn#7' }
+    rememberReviewDiffScroll(scope, { top: 640, left: 0, viewMode: 'unified', filesSignature: 'sig-1' })
+    rememberReviewDiffCollapsed(scope, { filesSignature: 'sig-1', paths: ['src/a.ts', 'src/b.ts'] })
+
+    expect(reviewDiffCollapsed(scope)).toEqual({ filesSignature: 'sig-1', paths: ['src/a.ts', 'src/b.ts'] })
+    expect(reviewDiffScroll(scope)?.top).toBe(640)
+    expect(reviewDiffCollapsed({ taskId: 'other-task', routeKey: 'oak/acorn#7' })).toBeUndefined()
+  })
+
   it('evicts every review position owned by an archived task', () => {
     const first = { taskId: 'archived-review-task', routeKey: 'oak/acorn#1' }
     const second = { taskId: 'archived-review-task', routeKey: 'oak/acorn#2' }
@@ -47,12 +59,14 @@ describe('review view state', () => {
       viewMode: 'unified',
       filesSignature: 'signature',
     })
+    rememberReviewDiffCollapsed(second, { filesSignature: 'signature', paths: ['src/a.ts'] })
     rememberReviewNavigatorScroll(retained, { top: 30, left: 0 })
 
     evictReviewViewStates('archived-review-task')
 
     expect(reviewNavigatorScroll(first)).toBeUndefined()
     expect(reviewDiffScroll(second)).toBeUndefined()
+    expect(reviewDiffCollapsed(second)).toBeUndefined()
     expect(reviewNavigatorScroll(retained)?.top).toBe(30)
   })
 })

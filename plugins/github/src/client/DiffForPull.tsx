@@ -10,7 +10,7 @@ import { EmptyState, FileHead, type LineComposerController, type ThreadCollapseC
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { buildDiffRows, buildDiffRowsAsync, buildRenderableRows, type CodeRow, createDiffHydrator, createDiffMeasureSchedulers, createDiffVirtualizer, DIFF_LOAD_ROW_HEIGHT, estimateRowSize, estimateSplitBandSize, expandGapAsync, gapId, type GapRow, isCodeRow, maxLineCols, type ParsedFile, plainTokenize, type Row, rowIdentityKeys, type SplitBand, splitBandIdentityKeys, toBands, tokenizeDocument, type ViewMode } from '@acorn/plugin-api/ui/diff'
 import { createDiffScrollRestoration } from './reviewScrollRestoration'
-import type { ReviewViewScope } from './reviewViewState'
+import { rememberReviewDiffCollapsed, reviewDiffCollapsed, type ReviewViewScope } from './reviewViewState'
 import { createDiffFindController } from './DiffFindController'
 import { DiffToolbar } from './DiffToolbar'
 import { DiffCanvas } from './DiffCanvas'
@@ -63,14 +63,16 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   // set changes.
   const [expanded, setExpanded] = createSignal<Map<string, CodeRow[]>>(new Map())
   const [lineComposer, setLineComposer] = createSignal<{ key: string; body: string } | null>(null)
-  // Collapsed diff files (header row stays, body rows are dropped from the row model). Session-only.
+  // Collapsed diff files (header row stays, body rows are dropped from the row model). Remembered
+  // per review scope for the session, like the scroll position, and reseeded by the filesSignature
+  // effect below so navigating away and back keeps a file collapsed.
   const [collapsedFiles, setCollapsedFiles] = createSignal<Set<string>>(new Set())
-  const toggleFileCollapse = (path: string) =>
-    setCollapsedFiles((prev) => {
-      const next = new Set(prev)
-      if (!next.delete(path)) next.add(path)
-      return next
-    })
+  const toggleFileCollapse = (path: string) => {
+    const next = new Set(collapsedFiles())
+    if (!next.delete(path)) next.add(path)
+    setCollapsedFiles(next)
+    rememberReviewDiffCollapsed(reviewScope, { filesSignature: filesSignature(), paths: [...next] })
+  }
   const [threadCollapsed, setThreadCollapsed] = createSignal<Map<string, boolean>>(new Map())
   const shouldUsePlainTokenizer = (file: PullFile) => {
     const patch = file.patch ?? ''
@@ -121,7 +123,10 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     lastTarget = ''
     setParsedByPath(new Map())
     setExpanded(new Map())
-    setCollapsedFiles(new Set<string>())
+    // Restore the scope's collapsed files if they were saved against this same file set; a changed
+    // signature means new commits, and a collapse decision about the old diff does not carry over.
+    const savedCollapsed = reviewDiffCollapsed(reviewScope)
+    setCollapsedFiles(new Set(savedCollapsed?.filesSignature === signature ? savedCollapsed.paths : []))
     setLineComposer(null)
     // The empty → populated transition is initial query hydration, not a changed PR. A genuine
     // signature change invalidates the old pixel position because the diff's geometry changed.
