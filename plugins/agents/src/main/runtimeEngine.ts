@@ -93,6 +93,10 @@ export class ManagedAgentEngine {
   protected readonly eventMaterializer: ProviderEventMaterializer
   protected providerCache: { expiresAt: number; descriptors: AgentProviderDescriptor[] } | null = null
   protected pumping = false
+  // Set when pump() is called while a scan is already running. That call cannot be a no-op: the scan's
+  // queuedHeads snapshot predates the turn that triggered it, and a scan that starts nothing does not
+  // loop, so the turn would sit queued until an unrelated event pumped again.
+  protected pumpRequested = false
   protected stopped = false
   protected interactiveStreak = 0
 
@@ -165,6 +169,10 @@ export class ManagedAgentEngine {
     }
     await this.attachments.collectGarbage()
     await this.webhooks.reconcile()
+    // Turns queued when the process last exited have nothing else to wake them: pump() runs on enqueue,
+    // on a provider start, and when a turn settles, none of which happen on their own after a restart.
+    // Not awaited, because draining spawns a provider child per session and boot waits on reconcile().
+    void this.pump()
   }
 
   // Releases what this engine holds, in the order docs/managed-agents.md § Operations and failure
@@ -308,12 +316,16 @@ export class ManagedAgentEngine {
   }
 
   protected async pump(): Promise<void> {
-    if (this.pumping || this.stopped) return
+    if (this.stopped) return
+    if (this.pumping) {
+      this.pumpRequested = true
+      return
+    }
     this.pumping = true
     try {
       for (;;) {
+        this.pumpRequested = false
         const heads = await this.store.queuedHeads()
-        if (heads.length === 0) return
         const workspaceActive = new Map<string, number>()
         const providerActive = new Map<string, number>()
         for (const live of this.live.values()) {
@@ -414,7 +426,9 @@ export class ManagedAgentEngine {
             })
           started = true
         }
-        if (!started) return
+        // Rescan while there is a reason to: a start moves that session on to its next queued head, and
+        // a pump call raised during the pass wants a queue snapshot newer than the one it read.
+        if (!started && !this.pumpRequested) return
       }
     } finally {
       this.pumping = false

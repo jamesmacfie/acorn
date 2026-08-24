@@ -207,6 +207,11 @@ are revalidated against the owning task.
 ## Operations and failure
 
 Only one turn dispatches per session. Workspace and provider ceilings bound concurrency.
+The dispatcher is edge-triggered: it scans the queue when a turn is enqueued, when a provider starts,
+and when a turn settles. A scan that starts nothing rescans when a call arrived while it was running,
+because that call's turn cannot be in the snapshot the scan is working from, and the reconcile pass
+runs one scan at boot. Without both, a turn queued at the wrong moment waits for an unrelated session
+to finish a turn before anything looks at it again.
 Cancellation, timeout, provider disconnect, and restart are explicit states. A live stream can be
 lost without killing the provider process, and the client reattaches from the session sequence or
 terminal replay tail.
