@@ -1,10 +1,10 @@
 import { createEffect, createSignal, createResource, For, onCleanup, onMount, Show } from 'solid-js'
-import { bytesOf, clientEvents, consumePaneIntent, debounce, formatSize, handlePluginContentLinkClick, openPane, renderMarkdown, type Task, type Workspace } from '@acorn/plugin-api/client'
+import { bytesOf, clientEvents, consumePaneIntent, debounce, formatSize, handlePluginContentLinkClick, openPane, type Task, type Workspace } from '@acorn/plugin-api/client'
 import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import { libraryCollapsed, notesSelectionFor, rememberNotesSelection, setLibraryCollapsed } from './notesPaneState'
 import './notes.css'
-import { Alert, Button, createArmedConfirm, EmptyState, Input, ListDetail, Row, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, createArmedConfirm, EmptyState, Input, ListDetail, Markdown, Row, Toolbar } from '@acorn/plugin-api/ui'
 import { toast } from '@acorn/plugin-api/client'
 
 // The Notes pane (docs/notes-and-memory.md § Notes). Autosave: debounce(save, 1500), flush on
@@ -338,10 +338,11 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                   <span class="notes-save-state muted">{saving() ? 'saving…' : ''}</span>
                 </Toolbar>
                 <Show when={!preview()} fallback={
-                  <div
-                    class="notes-preview ui-markdown"
+                  <Markdown
+                    class="notes-preview"
+                    text={body()}
+                    copy
                     onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
-                    innerHTML={renderMarkdown(body())}
                   />
                 }>
                   <textarea
