@@ -33,6 +33,7 @@ import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../r
 import Icon from '../ui/Icon'
 import IconPicker, { randomIconName } from '../ui/IconPicker'
 import './tabrail.css'
+import { RailTab } from './RailTab'
 import { taskOriginAppearance } from '../tasks/origin'
 import { Alert, Button, Checkbox, Select, StatusDot } from '../ui/primitives'
 import { Menu } from '../ui/Menu'
@@ -325,9 +326,8 @@ export default function TabRail() {
       <div class="tabrail-zone tabrail-sources">
         <For each={sources()}>
           {(s) => (
-            <button
-              type="button"
-              class="tabrail-tab tabrail-source"
+            <RailTab
+              class="tabrail-source"
               classList={{ active: selectedSource() === s.id }}
               data-tip={s.label}
               data-tip-sub="Browse"
@@ -335,7 +335,7 @@ export default function TabRail() {
               onClick={() => selectSource(s.id)}
             >
               <Icon name={s.glyph} />
-            </button>
+            </RailTab>
           )}
         </For>
       </div>
@@ -407,9 +407,8 @@ export default function TabRail() {
                 open={() => menuId() === w.id}
                 onOpenChange={(open) => setMenuId(open ? w.id : null)}
                 trigger={() => (
-                  <button
-                    type="button"
-                    class="tabrail-tab tabrail-task"
+                  <RailTab
+                    class="tabrail-task"
                     classList={{ active: !selectedSource() && w.id === activeTaskId() }}
                     style={accent() ? { 'border-left-color': accent() } : undefined}
                     data-tip={w.title}
@@ -428,7 +427,7 @@ export default function TabRail() {
                       name={w.icon ?? wsGlyph() ?? originIcon(w.origin)}
                       title={taskOriginAppearance(w.origin).tooltip}
                     />
-                  </button>
+                  </RailTab>
                 )}
               >
                 {(menu) => (

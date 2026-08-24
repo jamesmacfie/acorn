@@ -12,29 +12,33 @@ export { parsePanelDefinition }
 // surface, with placements referencing them by id; and an unresolved id survives as inert rather
 // than being dropped.
 
-/** `(surface, ownerId, projectId?)`. All three surfaces are drawn: `home` (a tab per `ownerId`),
- *  `pane`, and `plugin-region`, a rail source's side panel or a plugin pane's aside owned as
- *  `<pluginId>:<somethingId>` (dashboards/region.ts). */
+/** `(surface, ownerId, workspaceId?)`. All three surfaces are drawn: `home` (a tab per `ownerId`,
+ *  per workspace), `pane`, and `plugin-region`, a rail source's side panel or a plugin pane's aside
+ *  owned as `<pluginId>:<somethingId>` (dashboards/region.ts). */
 export type PlacementSurface = 'home' | 'pane' | 'plugin-region'
 
 export type PlacementScope = {
   surface: PlacementSurface
   /** The pane id, or `pluginId:regionId`. Absent for `home`, which has one of itself. */
   ownerId?: string
-  projectId?: string
+  /** Which workspace's board this is. Home carries one, because a panel's rows link to that
+   *  workspace's work and a board composed in one has nothing to say in another; a plugin region
+   *  does not, being already pinned to the surface it hangs off. Absent is the pre-workspace board
+   *  (`adoptLegacyHome`). */
+  workspaceId?: string
 }
 
-export const HOME_PLACEMENT: PlacementScope = { surface: 'home' }
-
-/** A Home tab is the scope `{ surface: 'home', ownerId: tabId }`. The default tab's id is `''`, which
- *  `placementScopeKey` collapses back to the bare `home` key, so every blob written before tabs
- *  existed is already a valid one-tab state. */
-export const homeTabScope = (tabId: string): PlacementScope => ({ surface: 'home', ownerId: tabId })
+/** A Home tab is the scope `{ surface: 'home', ownerId: tabId, workspaceId }`, keyed `home/<tab>/<ws>`
+ *  — the default tab's id is `''`, so its key is `home//<ws>`. With no workspace known the encoder
+ *  drops both trailing segments and the key is the bare `home`, which is every blob written before
+ *  tabs or workspaces existed: already a valid one-tab state. */
+export const homeTabScope = (tabId: string, workspaceId?: string): PlacementScope =>
+  ({ surface: 'home', ownerId: tabId, workspaceId })
 
 /** Segments are encoded so an owner id containing the separator, as `pluginId:regionId` does, can never
- *  be read as two. Trailing empties are dropped, so home's key is just `home`. */
+ *  be read as two. Trailing empties are dropped, so a home key with no workspace is just `home`. */
 export const placementScopeKey = (scope: PlacementScope): string => {
-  const segments = [scope.surface, scope.ownerId ?? '', scope.projectId ?? ''].map(encodeURIComponent)
+  const segments = [scope.surface, scope.ownerId ?? '', scope.workspaceId ?? ''].map(encodeURIComponent)
   while (segments.length > 1 && segments[segments.length - 1] === '') segments.pop()
   return segments.join('/')
 }
@@ -54,15 +58,18 @@ export type DashboardState = {
    *  Geometry is per (scope, panel), never on the definition, so the same panel placed on Home and
    *  in a task pane has two rects. */
   layouts: Record<string, Record<PanelId, Rect>>
-  /** The named Home tabs, in display order. Absent, or one entry, means no tab bar.
+  /** The named Home tabs of every workspace, in display order. Absent, or one entry, means no tab bar.
    *
-   *  Only names and order live here. A tab's content is ordinary `placements` and `layouts` under
-   *  the `home/<tabId>` key, so a client that drops this key loses the names and keeps the panels. */
+   *  Only names, order, and the owning workspace live here. A tab's content is ordinary `placements`
+   *  and `layouts` under the `home/<tabId>/<workspaceId>` key, so a client that drops this key loses
+   *  the names and keeps the panels. */
   tabs?: DashboardTab[]
 }
 
-/** `id: ''` is the default tab (the bare `home` scope). */
-export type DashboardTab = { id: string; name: string }
+/** `id: ''` is the default tab (the workspace's bare `home//<ws>` scope). A tab belongs to one
+ *  workspace, and identity is the pair: every workspace has its own default tab, all of them `''`.
+ *  `workspaceId` absent is the pre-workspace board (`adoptLegacyHome`). */
+export type DashboardTab = { id: string; name: string; workspaceId?: string }
 
 export const emptyDashboards = (): DashboardState => ({ panels: {}, placements: {}, layouts: {} })
 
@@ -86,34 +93,43 @@ const parseRect = (raw: unknown): Rect | undefined => {
   }
 }
 
-// The tab codec (docs/dashboards.md § Persistence): at most `MAX_TABS`, names trimmed to
-// `MAX_TAB_NAME` characters rather than dropped, because dropping a name would strand its panels
+// The tab codec (docs/dashboards.md § Persistence): at most `MAX_TABS` per workspace, names trimmed
+// to `MAX_TAB_NAME` characters rather than dropped, because dropping a name would strand its panels
 // behind a recovered "Untitled".
 
 export const MAX_TABS = 8
 const MAX_TAB_NAME = 60
 
+/** Identity is `(workspaceId, id)`, not `id`: every workspace's default tab is `''`. */
+const tabKey = (workspaceId: string, id: string): string => `${workspaceId}\n${id}`
+
 const parseTabs = (raw: unknown): DashboardTab[] => {
   if (!Array.isArray(raw)) return []
   const seen = new Set<string>()
+  // Per workspace, so one workspace at the cap can never cost another its dashboards.
+  const counts = new Map<string, number>()
   const tabs: DashboardTab[] = []
   for (const entry of raw) {
-    if (tabs.length >= MAX_TABS) break
     if (!isRecord(entry)) continue
     // `''` is a legal id, being the default tab, so the check is the type rather than truthiness.
-    const { id, name } = entry
-    if (typeof id !== 'string' || typeof name !== 'string' || !name.trim() || seen.has(id)) continue
-    seen.add(id)
-    tabs.push({ id, name: name.trim().slice(0, MAX_TAB_NAME) })
+    const { id, name, workspaceId } = entry
+    if (typeof id !== 'string' || typeof name !== 'string' || !name.trim()) continue
+    const workspace = typeof workspaceId === 'string' && workspaceId ? workspaceId : ''
+    if (seen.has(tabKey(workspace, id)) || (counts.get(workspace) ?? 0) >= MAX_TABS) continue
+    seen.add(tabKey(workspace, id))
+    counts.set(workspace, (counts.get(workspace) ?? 0) + 1)
+    tabs.push({ id, name: name.trim().slice(0, MAX_TAB_NAME), ...(workspace ? { workspaceId: workspace } : {}) })
   }
   return tabs
 }
 
-/** The tab id a placement key names, or `undefined` for a key that isn't a Home tab's. `home` is the
- *  default tab, `home/<id>` is a named one, and anything longer carries a `projectId` segment. */
-export const homeTabIdOf = (key: string): string | undefined => {
+/** The tab id a placement key names within one workspace, or `undefined` for a key that is not that
+ *  workspace's Home tab. `home//<ws>` is its default tab, `home/<id>/<ws>` a named one; the bare
+ *  `home` and `home/<id>` are the pre-workspace board, which is the `workspaceId: undefined` case. */
+export const homeTabIdOf = (key: string, workspaceId?: string): string | undefined => {
   const segments = key.split('/')
-  if (segments[0] !== 'home' || segments.length > 2) return undefined
+  if (segments[0] !== 'home' || segments.length > 3) return undefined
+  if (decodeURIComponent(segments[2] ?? '') !== (workspaceId ?? '')) return undefined
   return decodeURIComponent(segments[1] ?? '')
 }
 
@@ -121,18 +137,18 @@ export const homeTabIdOf = (key: string): string | undefined => {
  *  name, appended as "Untitled". That recovers from a client that dropped `tabs`, survives a
  *  partially-written blob, and keeps deleting a name from deleting a composition.
  *
- *  The bare `home` scope is always a candidate, panels or not, because it is the default tab and
- *  has no delete. Empty when the blob names no tabs, since one dashboard draws no bar. */
-export function homeTabs(state: DashboardState): DashboardTab[] {
-  const named = state.tabs ?? []
+ *  The workspace's bare scope is always a candidate, panels or not, because it is the default tab
+ *  and has no delete. Empty when the workspace names no tabs, since one dashboard draws no bar. */
+export function homeTabs(state: DashboardState, workspaceId?: string): DashboardTab[] {
+  const named = (state.tabs ?? []).filter((tab) => (tab.workspaceId ?? '') === (workspaceId ?? ''))
   if (!named.length) return []
   const seen = new Set(named.map((tab) => tab.id))
   const recovered: DashboardTab[] = []
-  for (const key of ['home', ...Object.keys(state.placements)]) {
-    const id = homeTabIdOf(key)
+  for (const key of [placementScopeKey(homeTabScope('', workspaceId)), ...Object.keys(state.placements)]) {
+    const id = homeTabIdOf(key, workspaceId)
     if (id === undefined || seen.has(id)) continue
     seen.add(id)
-    recovered.push({ id, name: 'Untitled' })
+    recovered.push({ id, name: 'Untitled', ...(workspaceId ? { workspaceId } : {}) })
   }
   return [...named, ...recovered]
 }
@@ -266,10 +282,15 @@ export const unplacePanel = (scope: PlacementScope, id: PanelId): void =>
   })
 
 /** Create, rename and reorder, all the same write: names and order are the whole of what `tabs` holds.
- *  Held to the codec's own caps, so a store write and a parsed blob can't disagree. */
-export const setHomeTabs = (tabs: readonly DashboardTab[]): void =>
+ *  Held to the codec's own caps, so a store write and a parsed blob can't disagree.
+ *
+ *  `tabs` is one workspace's list and replaces only that workspace's slice; every other workspace's
+ *  tabs are carried through untouched, because the caller only ever sees its own. */
+export const setHomeTabs = (tabs: readonly DashboardTab[], workspaceId?: string): void =>
   void setDashboards((state) => {
-    const parsed = parseTabs(tabs)
+    const others = (state.tabs ?? []).filter((tab) => (tab.workspaceId ?? '') !== (workspaceId ?? ''))
+    const mine = tabs.map((tab) => ({ ...tab, ...(workspaceId ? { workspaceId } : {}) }))
+    const parsed = parseTabs([...others, ...mine])
     const { tabs: _dropped, ...rest } = state
     return parsed.length ? { ...rest, tabs: parsed } : rest
   })
@@ -279,16 +300,56 @@ export const setHomeTabs = (tabs: readonly DashboardTab[]): void =>
  *
  *  The default tab isn't deletable. "Delete" of the bare scope would just be "empty it", and it's the
  *  one tab that has to remain reachable. */
-export const removeHomeTab = (tabId: string): void =>
+export const removeHomeTab = (tabId: string, workspaceId?: string): void =>
   void setDashboards((state) => {
     if (!tabId) return state
-    const key = placementScopeKey(homeTabScope(tabId))
+    const key = placementScopeKey(homeTabScope(tabId, workspaceId))
     const { [key]: _panels, ...placements } = state.placements
     const { [key]: _rects, ...layouts } = state.layouts
     const { tabs: _named, ...rest } = state
-    const tabs = (state.tabs ?? []).filter((tab) => tab.id !== tabId)
+    const tabs = (state.tabs ?? []).filter((tab) => tab.id !== tabId || (tab.workspaceId ?? '') !== (workspaceId ?? ''))
     return { ...rest, placements, layouts, ...(tabs.length ? { tabs } : {}) }
   })
+
+// ── Adopting the pre-workspace board ──────────────────────────────────────────────────────────
+
+/** Move a board written before Home was per-workspace into the workspace it is first opened in.
+ *
+ *  Boards used to be one composition shared by every workspace, which is how a panel came to link at
+ *  work that lives somewhere you cannot get to from where the panel is drawn. The bare `home` and
+ *  `home/<tab>` keys are what that era wrote; this re-keys them to `home//<ws>` and `home/<tab>/<ws>`
+ *  and stamps the matching names, once, whichever workspace the person opens Home in first. There is
+ *  no honest better guess: the old board named no workspace, so any other choice would be as
+ *  arbitrary and would leave the panels invisible until they found them.
+ *
+ *  Never overwrites: a key the workspace already has means the board it would land on is somebody's
+ *  own, so the legacy one stays where it is rather than replacing it. Returns the same state when
+ *  there is nothing to adopt, so the caller can run it on every render without writing anything. */
+export function adoptLegacyHome(state: DashboardState, workspaceId: string): DashboardState {
+  if (!workspaceId) return state
+  const rekey = new Map<string, string>()
+  for (const key of new Set([...Object.keys(state.placements), ...Object.keys(state.layouts)])) {
+    const tabId = homeTabIdOf(key)
+    if (tabId === undefined) continue
+    const target = placementScopeKey(homeTabScope(tabId, workspaceId))
+    if (state.placements[target] || state.layouts[target]) continue
+    rekey.set(key, target)
+  }
+  const named = state.tabs ?? []
+  const stale = named.some((tab) => tab.workspaceId === undefined)
+  if (!rekey.size && !stale) return state
+  const moved = <T>(record: Record<string, T>): Record<string, T> =>
+    Object.fromEntries(Object.entries(record).map(([key, value]) => [rekey.get(key) ?? key, value]))
+  return {
+    ...state,
+    placements: moved(state.placements),
+    layouts: moved(state.layouts),
+    ...(named.length ? { tabs: named.map((tab) => (tab.workspaceId === undefined ? { ...tab, workspaceId } : tab)) } : {}),
+  }
+}
+
+export const adoptLegacyHomeDashboards = (workspaceId: string): void =>
+  void setDashboards((state) => adoptLegacyHome(state, workspaceId))
 
 // ── Slice ─────────────────────────────────────────────────────────────────────────────────────
 

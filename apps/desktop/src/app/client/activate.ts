@@ -2,6 +2,7 @@ import { initClientPlugins } from '@acorn/client-core/registries/plugin.ts'
 import { disabledNodePlugins, refreshNodePlugins } from '@acorn/client-core/node/nodePlugins.ts'
 import { pluginFailureAttention } from '@acorn/client-core/node/pluginFailures.ts'
 import { attentionRegistry } from '@acorn/client-core/registries/attention.ts'
+import { collectionKey, collectionRegistry } from '@acorn/client-core/registries/collections.ts'
 import { noticeKindContributions } from '@acorn/client-core/notifications/kindContributions.ts'
 import { directPreferenceSlices } from '@acorn/client-core/persistence/preferenceSlices.ts'
 import { purgeRetiredLocalStorage } from '@acorn/client-core/persistence/legacyStorage.ts'
@@ -13,6 +14,7 @@ import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
 import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { uiSlotRegistry } from '@acorn/client-core/registries/uiSlots.tsx'
 import { taskStatusPollerContribution } from '@acorn/client-core/tasks/taskStatus.ts'
+import { TASKS_COLLECTION_ID, tasksCollection } from '@acorn/client-core/tasks/tasksCollection.ts'
 import { settingsPageContributions } from './pageContributions'
 import { clientPlugins } from './plugins'
 import { activateScopedStateEviction } from './scopedEviction'
@@ -38,6 +40,10 @@ pollerRegistry.register(taskStatusPollerContribution)
 // Core's own attention source: plugins this node installed but could not start. Registered here
 // rather than by a plugin, because the plugin that failed is not running to report itself.
 attentionRegistry.register(pluginFailureAttention)
+// Core's own collection: this node's tasks, for a dashboard panel. Registered here for the same reason
+// as the attention source above, that there is no plugin whose data this is, and it is what lets anyone
+// rebuild the task list Home used to draw for everybody whether they read it or not.
+collectionRegistry.register({ ...tasksCollection, pluginId: 'core', id: collectionKey('core', TASKS_COLLECTION_ID) })
 activateScopedStateEviction()
 // Bytes an older release left in localStorage, some of them credential-bearing. This runs before
 // anything renders, and in the shell rather than in the plugin that wrote them: a loaded plugin's

@@ -3,23 +3,10 @@ import { onScopeEvicted } from '@acorn/plugin-api/client'
 import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
 import AgentRequestCard from './AgentRequestCard'
-import { buildConversationItems } from './conversationItems'
-import { EmptyState } from '@acorn/plugin-api/ui'
-
-const VISIBLE_EVENT_TYPES = new Set([
-  'user_message',
-  'assistant_message',
-  'reasoning',
-  'tool',
-  'plan',
-  'usage',
-  'file_change',
-  'terminal',
-  'artifact',
-  'turn_completed',
-  'error',
-  'diagnostic',
-])
+import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
+import { nextFollowing } from './followScroll'
+import { Button, EmptyState } from '@acorn/plugin-api/ui'
+import { subagentSummary } from './subagentDisplay'
 
 // Deliberately not virtualized. The virtualizer this used to run called `measure()` on every new event,
 // which clears the item size cache, so every row fell back to the size estimate, the canvas height
@@ -33,6 +20,10 @@ const VISIBLE_EVENT_TYPES = new Set([
 // A plain Map, in memory for the life of the window. Scroll position is worth remembering across a pane
 // unmount, not worth a store or a round trip to disk. Cleared with the roster it keys off, so a node
 // switch can't leave positions behind for sessions that are gone.
+//
+// Only positions the reader chose are held. A session left at the bottom has no entry, because a pixel
+// offset is the wrong thing to save for it: the bottom moves as the session runs, so replaying the offset
+// lands short of it and the reader comes back a screenful up from where they left.
 const scrollTopBySession = new Map<string, number>()
 onScopeEvicted((e) => {
   if (e.scope === 'node-switched') scrollTopBySession.clear()
@@ -42,36 +33,68 @@ export default function AgentTranscript(props: {
   taskId: string
   snapshot: AgentSessionSnapshot
   focusRequestId?: string
+  focusSubagentId?: string
+  onExitSubagent: () => void
   onRequestResolved: () => void
 }) {
   const [scrollElement, setScrollElement] = createSignal<HTMLDivElement>()
-  const items = createMemo(() =>
-    buildConversationItems(props.snapshot.events).filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type)))
+  const conversation = createMemo(() => buildConversationItems(props.snapshot.events))
+  // The selected subagent's card, when there is one. A complex child run does not fit in a box inside
+  // its parent's stream, so selecting it moves the whole window onto that run: the transcript renders
+  // the card's own children as its top level, which the projection already built as a tree.
+  const focused = createMemo(() => {
+    const id = props.focusSubagentId
+    return id ? findSubagentItem(conversation(), id) : undefined
+  })
+  const focusedSubagent = createMemo(() => {
+    const event = focused()?.event
+    return event?.type === 'subagent' ? event.subagent : undefined
+  })
+  // Falls back to the session's own stream when the card is not there: selecting a subagent under
+  // another session loads that snapshot afterwards, and a truncated replay may never have carried it.
+  const items = createMemo(() => visibleConversationItems(focused()?.children ?? conversation()))
   const pending = createMemo(() => props.snapshot.requests.filter((request) =>
     request.status === 'pending' || request.status === 'resolving'))
-  // Appending an event and growing the last event's text are both worth following down; nothing else
-  // about a snapshot should move the scroll position.
-  const tail = createMemo(() => {
-    const last = items().at(-1)
-    return `${items().length}:${last?.lastSeq ?? 0}`
-  })
-
   const sessionId = createMemo(() => props.snapshot.session.id)
+  // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
+  // different lists, so one key would restore the wrong offset every time the reader stepped in or out.
+  const viewId = createMemo(() => focused() ? `${sessionId()}:${props.focusSubagentId}` : sessionId())
 
-  let wasNearBottom = true
-  let frame = 0
+  // Follow the bottom until the reader scrolls away from it, and pick it up again when they scroll back.
+  // Everything below is driven by the list resizing rather than by the snapshot changing: a streamed
+  // message keeps growing after the event that carried it, and code highlighting settles a frame or two
+  // later again, so any write timed off the data lands short of a bottom that has since moved.
+  let following = true
   let target: number | null = null
   let applied = -1
   const nearBottom = (element: HTMLDivElement) =>
     element.scrollHeight - element.scrollTop - element.clientHeight < 96
+  // Armed by the reader's own input and spent on the next scroll event, which is how `nextFollowing`
+  // tells a decision to scroll up from the browser clamping scrollTop under a shrinking list. Momentum
+  // keeps delivering scroll events long after the gesture, but following is already off by then, and
+  // every new gesture re-arms this.
+  let userDriven = false
+  const noteInput = () => {
+    userDriven = true
+  }
+  const pin = () => {
+    const element = scrollElement()
+    if (!element) return
+    element.scrollTop = element.scrollHeight
+    applied = element.scrollTop
+    scrollTopBySession.delete(viewId())
+  }
   const noteScroll = () => {
     const element = scrollElement()
     if (!element) return
-    // Our own restore write echoes back as a scroll event; a real scroll ends the restore.
+    // Our own writes echo back as scroll events, by which time the list has usually grown again, so the
+    // write we just made would measure as "scrolled up". Skip them.
     if (element.scrollTop === applied) return
     target = null
-    wasNearBottom = nearBottom(element)
-    scrollTopBySession.set(sessionId(), element.scrollTop)
+    following = nextFollowing({ following, nearBottom: nearBottom(element), userDriven })
+    userDriven = false
+    if (following) scrollTopBySession.delete(viewId())
+    else scrollTopBySession.set(viewId(), element.scrollTop)
   }
   // Leaving the task unmounts this pane, so the reader must land back where they were. Code highlighting
   // resolves after mount and keeps growing the list, so the browser clamps an early write. Re-apply the
@@ -83,28 +106,26 @@ export default function AgentTranscript(props: {
     applied = element.scrollTop
     if (element.scrollTop < target - 1) return
     target = null
-    wasNearBottom = nearBottom(element)
+    following = nearBottom(element)
   }
-  const growth = new ResizeObserver(applyTarget)
+  // The list grows for two reasons and the response differs: while restoring we chase the saved offset,
+  // otherwise we sit on the bottom. The scroll element is observed too, because the pending-request strip
+  // above it appearing shortens the viewport without touching the list.
+  const growth = new ResizeObserver(() => {
+    if (target !== null) applyTarget()
+    else if (following) pin()
+  })
   onCleanup(() => growth.disconnect())
-  // Switching sessions in the sidebar swaps the snapshot without remounting, so this covers both mount
-  // and session change.
-  createEffect(on(sessionId, (id) => {
+  // Switching sessions or stepping into a subagent swaps the list without remounting, so this covers
+  // mount and every change of view. A memo as the dep, not an inline getter: `on()` runs its callback on
+  // every notification without comparing the input, and the signal behind the focus prop is one record
+  // covering every session, so an inline getter would reset the scroll when another session's row moved.
+  createEffect(on(viewId, (id) => {
     target = scrollTopBySession.get(id) ?? null
-    wasNearBottom = target === null
-    applyTarget()
+    following = target === null
+    if (target === null) pin()
+    else applyTarget()
   }))
-  // Follow the tail only while the reader is already at the tail. Scrolling up to read, or to select, is
-  // a decision to stop following, so the next event must not yank the viewport back down.
-  createEffect(on(tail, () => {
-    if (!wasNearBottom) return
-    cancelAnimationFrame(frame)
-    frame = requestAnimationFrame(() => {
-      const element = scrollElement()
-      if (element) element.scrollTop = element.scrollHeight
-    })
-  }, { defer: true }))
-  onCleanup(() => cancelAnimationFrame(frame))
 
   return (
     <div class="agent-transcript-wrap">
@@ -121,12 +142,31 @@ export default function AgentTranscript(props: {
           </For>
         </div>
       </Show>
-      <div class="agent-transcript" ref={setScrollElement} onScroll={noteScroll}>
+      <Show when={focusedSubagent()}>
+        {(subagent) => (
+          <div class="agent-subagent-crumb">
+            <Button variant="bare" size="sm" onClick={props.onExitSubagent}>← {props.snapshot.session.title}</Button>
+            <span><strong>{subagent().title ?? 'Subagent'}</strong><small>{subagentSummary(subagent())}</small></span>
+          </div>
+        )}
+      </Show>
+      <div
+        class="agent-transcript"
+        ref={(element) => {
+          setScrollElement(element)
+          growth.observe(element)
+        }}
+        onScroll={noteScroll}
+        onWheel={noteInput}
+        onTouchMove={noteInput}
+        onPointerDown={noteInput}
+        onKeyDown={noteInput}
+      >
         <Show
           when={items().length}
           fallback={
             <EmptyState icon={<span class="agent-empty-mark">✦</span>}>
-              This session is ready for its first turn.
+              {focusedSubagent() ? 'This subagent has not reported anything yet.' : 'This session is ready for its first turn.'}
             </EmptyState>
           }
         >
@@ -141,6 +181,7 @@ export default function AgentTranscript(props: {
                 <AgentEventCard
                   item={item()}
                   taskId={props.taskId}
+                  sessionId={sessionId()}
                   turn={props.snapshot.turns.find((turn) => turn.id === item().turnId)}
                 />
               )}

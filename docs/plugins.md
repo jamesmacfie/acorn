@@ -1003,7 +1003,10 @@ kinds of contribution come out of one manifest:
     contribution whose route answered — the same rule as `refResolvers`' `providerId`, for the same
     reason. A mixed board routes clicks on that stamp.
   - **A row action takes the context-free verb set only.** A panel row has no rail row to promote and
-    no routed project to substitute, so `createTask` and `navigate` are not in the union. An action
+    no routed project to substitute, so `createTask` and `navigate` are not in the union. `openTask` is
+    in it, and is the one verb that needs nothing but the row's own `taskId`: go to that task and stop,
+    for a row whose thing *is* a task. From a click site with no row, a command or a slot badge, it has
+    nothing to aim at and the host refuses it out loud rather than doing nothing. An action
     may declare an optional `risk` tier — `read` | `write` | `execute`, the same vocabulary an agent
     tool uses — and anything above `read` is armed: the *host* draws the confirmation from the tier
     and dispatches nothing until it is accepted. Never a new verb, and never plugin-drawn

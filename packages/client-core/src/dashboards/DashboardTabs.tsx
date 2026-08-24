@@ -7,9 +7,9 @@ import { ContextMenu, Menu, type MenuContext } from '../ui/Menu'
 import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './homeTab'
 import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persist'
 
-// The Home tab bar (docs/dashboards.md § Persistence). It draws a list of names and calls three
-// functions; a tab's content is the ordinary `home/<tabId>` placement the grid beside it renders, so
-// there is nothing here about panels at all.
+// The Home tab bar (docs/dashboards.md § Persistence). It draws one workspace's list of names and
+// calls three functions; a tab's content is the ordinary `home/<tabId>/<workspaceId>` placement the
+// grid beside it renders, so there is nothing here about panels at all.
 //
 // This is not `ui/Tabs.tsx`, which is the one judgement call in the file. A tab here carries an
 // inline rename input and an overflow trigger, and neither can live inside a `<button role="tab">`
@@ -22,6 +22,9 @@ import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persi
 
 export default function DashboardTabs(props: {
   tabs: readonly DashboardTab[]
+  /** Whose dashboards these are. Every write is scoped to it, so a workspace can only ever rewrite
+   *  its own slice of the one `tabs` list. */
+  workspaceId?: string
   active: string
   onSelect: (id: string) => void
 }) {
@@ -51,7 +54,7 @@ export default function DashboardTabs(props: {
 
   const create = () => {
     const { tabs, id } = addTab(props.tabs)
-    setHomeTabs(tabs)
+    setHomeTabs(tabs, props.workspaceId)
     props.onSelect(id)
     // Straight into the rename, because a tab called "New dashboard" forever is what happens when
     // naming it is a second trip.
@@ -66,12 +69,12 @@ export default function DashboardTabs(props: {
     const name = value.trim()
     // A blank name would be dropped by the codec and the tab would come back as "Untitled", which is
     // a strange thing for "rename" to do. Nothing typed, nothing changed.
-    if (name && name !== tab.name) setHomeTabs(renameTab(props.tabs, tab.id, name))
+    if (name && name !== tab.name) setHomeTabs(renameTab(props.tabs, tab.id, name), props.workspaceId)
     focusTab(tab.id)
   }
 
   const remove = (tab: DashboardTab) => {
-    removeHomeTab(tab.id)
+    removeHomeTab(tab.id, props.workspaceId)
     if (props.active === tab.id) props.onSelect('')
   }
 
@@ -83,19 +86,19 @@ export default function DashboardTabs(props: {
       <Menu.Item
         context={menu}
         disabled={props.tabs[0]?.id === tab.id}
-        onSelect={() => setHomeTabs(shiftTab(props.tabs, tab.id, -1))}
+        onSelect={() => setHomeTabs(shiftTab(props.tabs, tab.id, -1), props.workspaceId)}
       >
         Move left
       </Menu.Item>
       <Menu.Item
         context={menu}
         disabled={props.tabs[props.tabs.length - 1]?.id === tab.id}
-        onSelect={() => setHomeTabs(shiftTab(props.tabs, tab.id, 1))}
+        onSelect={() => setHomeTabs(shiftTab(props.tabs, tab.id, 1), props.workspaceId)}
       >
         Move right
       </Menu.Item>
-      {/* The default tab is the bare `home` scope. "Delete" of it would only mean "empty it", and it
-          is the one tab that must stay reachable. */}
+      {/* The default tab is the workspace's bare `home//<ws>` scope. "Delete" of it would only mean
+          "empty it", and it is the one tab that must stay reachable. */}
       <Show when={tab.id}>
         <Menu.Separator />
         {/* Armed, and the copy says what survives: arrangement is real work, definitions are not at

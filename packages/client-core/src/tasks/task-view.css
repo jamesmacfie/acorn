@@ -139,25 +139,18 @@
   border-left: var(--chrome-divider);
   background: var(--bg-subtle);
 }
-.pane-switch-btn {
-  width: 100%;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* These are .tabrail-tab, the same element the left rail uses, so hover stays a plain icon-and-
+   background change. They were Button variant="bare" and inherited .ui-btn:hover's accent
+   border-color, which lit up the bottom and right edges the left rail never shows. */
+.pane-switcher .tabrail-tab {
   font-family: var(--font-glyph);
-}
-.pane-switch-btn.ui-btn[data-variant='bare'] {
-  font-size: var(--fs-lg);
-  border-bottom: var(--divider);
+  border-left: 0;
   border-right: var(--tab-active-w) solid transparent;
 }
-.pane-switch-btn.ui-btn[data-variant='bare']:hover:not(:disabled) { background: var(--bg-hover); }
-.pane-switch-btn.ui-btn[data-variant='bare'].active { background: var(--bg-selected); color: var(--text); border-right-color: var(--accent); }
+.pane-switcher .tabrail-tab.active { border-right-color: var(--accent); }
 /* Close-task ✕ sits at the bottom of the rail, set off from the pane switches above it. */
-.pane-switch-close { margin-top: auto; }
-.pane-switch-close.ui-btn[data-variant='bare'] { border-bottom: 0; border-top: var(--chrome-divider); }
-.pane-switch-close.ui-btn[data-variant='bare']:hover:not(:disabled) { color: var(--del-marker); }
+.pane-switcher .pane-switch-close { margin-top: auto; border-bottom: 0; border-top: var(--chrome-divider); }
+.pane-switcher .pane-switch-close:hover { color: var(--del-marker); }
 
 /* Close-task confirmation modal bits (reuses the shared .overlay shell). */
 .close-actions { display: flex; justify-content: flex-end; gap: var(--space-5); }

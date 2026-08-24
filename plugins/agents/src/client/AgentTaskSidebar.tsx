@@ -1,11 +1,14 @@
-import { createEffect, createMemo, createResource, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, For, Index, onCleanup, onMount, Show } from 'solid-js'
 import { capabilities, clientCapability, refreshSessions, requestTerminalFocus, sessions, setTerminalOpen, type Task, wsOnStatus } from '@acorn/plugin-api/client'
-import { Badge, Button, Row } from '@acorn/plugin-api/ui'
+import { Badge, Button, Row, StatusDot } from '@acorn/plugin-api/ui'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
+import { sessionModelLabel } from './agentConfigOptions'
+import { subagentTone } from './stateTone'
+import { subagentSummary } from './subagentDisplay'
 import { WORKFLOW_CONTROL } from '../contract/workflowControl'
 import './agent-task-sidebar.css'
 
@@ -38,7 +41,9 @@ export default function AgentTaskSidebar(props: {
   task: Task
   managedSessions: AgentSession[]
   selectedSessionId?: string
+  selectedSubagentId?: string
   onSelectSession: (sessionId: string, requestId?: string) => void
+  onSelectSubagent: (sessionId: string, subagentId: string) => void
   onError: (message: string) => void
 }) {
   // The desktop probe, on the capability rather than on a PTY accessor's null return. CommandPalette
@@ -151,31 +156,61 @@ export default function AgentTaskSidebar(props: {
 
         <section class="agent-task-sidebar-section">
           <div class="agent-task-sidebar-label">Managed sessions</div>
-          <For each={props.managedSessions} fallback={<p class="muted agent-task-sidebar-empty">No managed sessions in this task.</p>}>
-            {(session) => (
-              <Row
-                density="compact"
-                class="agent-task-row managed-agent-session-row"
-                selected={session.id === props.selectedSessionId}
-                leading={
-                  <span class="agent-task-state" data-state={session.runtimeState}>
-                    {RUNTIME_GLYPH[session.runtimeState] ?? '·'}
-                  </span>
-                }
-                trailing={
-                  !['none', 'unread'].includes(session.attention)
-                    ? <Badge tone={session.attention === 'error' ? 'del' : 'warn'} size="xs">
-                        {session.attention.replace('_', ' ')}
-                      </Badge>
-                    : undefined
-                }
-                onActivate={() => props.onSelectSession(session.id)}
-              >
-                <strong>{session.title}</strong>
-                <small>{session.providerId} · {session.runtimeState}</small>
-              </Row>
-            )}
-          </For>
+          {/*
+            `Index`, not `For`. The store replaces a session's object on every event it receives, so
+            reference keying remounted the row, and now its subagent rows, several times a second
+            during a fan-out. Position keying keeps the DOM and updates the text in place.
+          */}
+          <Show when={props.managedSessions.length} fallback={<p class="muted agent-task-sidebar-empty">No managed sessions in this task.</p>}>
+            <Index each={props.managedSessions}>
+              {(session) => (
+                <>
+                  <Row
+                    density="compact"
+                    class="agent-task-row managed-agent-session-row"
+                    selected={session().id === props.selectedSessionId}
+                    leading={
+                      <span class="agent-task-state" data-state={session().runtimeState}>
+                        {RUNTIME_GLYPH[session().runtimeState] ?? '·'}
+                      </span>
+                    }
+                    trailing={
+                      !['none', 'unread'].includes(session().attention)
+                        ? <Badge tone={session().attention === 'error' ? 'del' : 'warn'} size="xs">
+                            {session().attention.replace('_', ' ')}
+                          </Badge>
+                        : undefined
+                    }
+                    onActivate={() => props.onSelectSession(session().id)}
+                  >
+                    <strong>{session().title}</strong>
+                    <small>{[session().providerId, sessionModelLabel(session()), session().runtimeState].filter(Boolean).join(' · ')}</small>
+                  </Row>
+                  {/*
+                    The subagent roster, indented under the session that spawned it. Read straight off
+                    the session row, which the WebSocket pushes after every event this node records, so
+                    these rows appear and settle live for every session in the task and not only the one
+                    that happens to be open. Nothing extra is fetched (docs/managed-agents.md §
+                    Subagents).
+                  */}
+                  <Index each={session().subagents}>
+                    {(subagent) => (
+                      <Row
+                        density="compact"
+                        class="agent-task-row agent-task-subagent-row"
+                        selected={session().id === props.selectedSessionId && subagent().id === props.selectedSubagentId}
+                        leading={<StatusDot tone={subagentTone(subagent().status)} />}
+                        onActivate={() => props.onSelectSubagent(session().id, subagent().id)}
+                      >
+                        <strong>{subagent().title}</strong>
+                        <small>{subagentSummary(subagent())}</small>
+                      </Row>
+                    )}
+                  </Index>
+                </>
+              )}
+            </Index>
+          </Show>
         </section>
 
         <Show when={legacy().length}>

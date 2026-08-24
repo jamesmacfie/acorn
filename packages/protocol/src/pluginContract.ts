@@ -166,6 +166,9 @@ const chromeAction = z.discriminatedUnion('verb', [
   // A pane the same manifest declares under `frames`, checked below. The clicked row's id rides along
   // as a pane intent (client-core/registries/clientEvents.ts).
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
+  // Go to the task the click names and stop there, for a row whose thing IS a task. Only a dashboard
+  // row carries one (@acorn/protocol/collections.ts), so elsewhere the host refuses it out loud.
+  z.object({ verb: z.literal('openTask') }),
   // A project-scoped pane the same manifest declares, reached by navigating to the route declared for
   // it. Separate from `openPane` because `openPane` mutates a task's persisted layout and this changes
   // the URL, which also keeps `openPane`'s "open a task first" refusal honest.
@@ -196,6 +199,9 @@ const refresh = z.number().int().min(30).max(86_400).optional()
 // has neither in scope.
 const contextFreeAction = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
+  // Go to a task and stop there. Only a dashboard row carries the task it means (collections.ts), so
+  // from a command or a badge this verb has nothing to aim at and the host says so.
+  z.object({ verb: z.literal('openTask') }),
   z.object({ verb: z.literal('runNodeAction'), path: pluginRoute }),
   z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
   z.object({ verb: z.literal('openOverlay'), overlay: z.string().min(1).max(64) }),

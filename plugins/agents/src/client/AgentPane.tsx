@@ -7,8 +7,11 @@ import {
   clearManagedSession,
   focusedManagedRequest,
   openManagedSession,
+  clearManagedSubagent,
   selectManagedSession,
+  selectManagedSubagent,
   selectedManagedSession,
+  selectedManagedSubagent,
 } from './managedSelection'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from './AgentComposer'
@@ -180,10 +183,9 @@ export default function AgentPane(props: { task: Task }) {
       managedAgentStore.removeSession(session.id)
       if (next) selectManagedSession(props.task.id, next.id)
       else clearManagedSession(props.task.id, session.id)
-      if (result.provider !== 'deleted') {
-        setError(result.provider === 'unsupported'
-          ? 'Local history was deleted. This provider does not expose remote deletion.'
-          : `Local history was deleted, but provider deletion failed: ${result.detail ?? 'unknown error'}`)
+      // ponytail: 'unsupported' is normal for most providers, so it is not worth a banner.
+      if (result.provider === 'failed') {
+        setError(`Local history was deleted, but provider deletion failed: ${result.detail ?? 'unknown error'}`)
       }
     }, false)
   }
@@ -370,6 +372,7 @@ export default function AgentPane(props: { task: Task }) {
         <Picker<AgentProviderDescriptor>
           label={<><Icon name="plus" /> New</>}
           ariaLabel="New"
+          placement="bottom-end"
           placeholder="Filter providers…"
           emptyText="No managed providers available."
           results={(query) => (providers() ?? []).filter((item) =>
@@ -404,7 +407,18 @@ export default function AgentPane(props: { task: Task }) {
             task={props.task}
             managedSessions={taskSessions()}
             selectedSessionId={selectedSessionId()}
-            onSelectSession={(sessionId, requestId) => openManagedSession(props.task.id, sessionId, requestId)}
+            selectedSubagentId={selectedSessionId() ? selectedManagedSubagent(selectedSessionId()!) : undefined}
+            onSelectSession={(sessionId, requestId) => {
+              // Picking the session row is how you come back out of a subagent's run.
+              clearManagedSubagent(sessionId)
+              openManagedSession(props.task.id, sessionId, requestId)
+            }}
+            onSelectSubagent={(sessionId, subagentId) => {
+              // The session first: a sub-row under a session that is not the open one has to bring its
+              // parent's transcript up before there is a card to scroll to.
+              if (sessionId !== selectedSessionId()) openManagedSession(props.task.id, sessionId)
+              selectManagedSubagent(sessionId, subagentId)
+            }}
             onError={setError}
           />
         }
@@ -445,6 +459,8 @@ export default function AgentPane(props: { task: Task }) {
                       taskId={props.task.id}
                       snapshot={value()}
                       focusRequestId={focusedManagedRequest(session().id)}
+                      focusSubagentId={selectedManagedSubagent(session().id)}
+                      onExitSubagent={() => clearManagedSubagent(session().id)}
                       onRequestResolved={() => void managedAgentStore.loadSnapshot(session().id)}
                     />
                     <QueuedAgentTurns
@@ -456,13 +472,20 @@ export default function AgentPane(props: { task: Task }) {
                   </>
                 )}
               </Show>
-              <AgentComposer
-                session={session()}
-                disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
-                previousAutomaticContext={previousAutomaticContext()}
-                onSessionUpdated={managedAgentStore.upsertSession}
-                onSent={() => void managedAgentStore.loadSnapshot(session().id)}
-              />
+              {/* Gone while a subagent's run owns the window. The composer only ever addresses the
+                  session, so leaving it under a subagent's transcript would read as "reply to this
+                  subagent", which is not a thing either harness offers. The draft survives: it lives in
+                  a module signal keyed by session (managedDrafts.ts) plus localStorage, not in the
+                  component, so stepping into a subagent and back leaves half-typed text alone. */}
+              <Show when={!selectedManagedSubagent(session().id)}>
+                <AgentComposer
+                  session={session()}
+                  disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
+                  previousAutomaticContext={previousAutomaticContext()}
+                  onSessionUpdated={managedAgentStore.upsertSession}
+                  onSent={() => void managedAgentStore.loadSnapshot(session().id)}
+                />
+              </Show>
             </>
           )}
         </Show>

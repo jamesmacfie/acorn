@@ -1,19 +1,42 @@
 import { describe, expect, it } from 'vitest'
 import { openPane } from '@acorn/plugin-api/client'
-import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import type { AgentConfigOption, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { agentSessionsCollection, sessionRow } from './collectionContribution'
 import { activateManagedAgentPaneIntents, selectedManagedSession } from './managedSelection'
 
-const session = {
+const session: AgentSession = {
   id: 's1',
   taskId: 't1',
   providerId: 'claude',
+  profileId: 'claude',
+  kind: 'interactive',
+  driverKind: 'acp',
+  driverVersion: '1',
+  providerSessionRef: null,
+  controller: 'acorn',
   runtimeState: 'working',
   attention: 'none',
+  statusAuthority: 'protocol',
   title: '',
   model: null,
+  config: {
+    configOptions: [{
+      id: 'model',
+      label: 'Model',
+      category: 'model',
+      currentValue: 'claude-opus-4-1',
+      values: [{ value: 'claude-opus-4-1', label: 'Claude Opus 4.1' }],
+    }] satisfies AgentConfigOption[],
+  },
+  parentSessionId: null,
+  parentTurnId: null,
+  subagents: [],
+  lastEventSeq: 0,
+  lastReadSeq: 0,
+  archivedAt: null,
+  createdAt: 1_700_000_000_000,
   updatedAt: 1_700_000_000_000,
-} as AgentSession
+}
 
 // The one thing worth pinning: the declared schema and the row mapping can drift apart silently. Rename a
 // field id on one side and the panel renders empty cells with nothing thrown anywhere.
@@ -23,6 +46,8 @@ describe('agent sessions collection', () => {
     expect(Object.keys(row.values).sort()).toEqual(agentSessionsCollection.schema.fields.map((f) => f.id).sort())
     expect(row.values.title).toBe('claude')
     expect(row.values.state).toBe('working')
+    // The `model` column is never written, so a row that read it showed an empty column forever.
+    expect(row.values.model).toBe('Claude Opus 4.1')
   })
 
   it('sends the click to the session’s own task, and selects it on arrival', () => {

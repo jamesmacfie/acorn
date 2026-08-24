@@ -1,0 +1,844 @@
+{
+ "capturedWith": {
+  "cli": "Claude Code 2.1.241",
+  "adapter": "@agentclientprotocol/claude-agent-acp 0.54.1"
+ },
+ "prompt": "two subagents in parallel, each using Glob/Bash and Read",
+ "notes": [
+  "Every session/update the adapter sent, in order. `_meta.claudeCode.toolName` is 'Agent' on the",
+  "spawning calls; `parentToolUseId` tags what each subagent did; the completion update carries",
+  "`toolResponse` with agentId/agentType/resolvedModel and no toolName of its own.",
+  "No agent_message_chunk is tagged: this CLI never forwards a subagent's own prose.",
+  "Verbatim except for 1 available_commands_update notification(s), 26 KB of slash-command descriptions with nothing to do with subagents, removed to keep the fixture readable."
+ ],
+ "updates": [
+  {
+   "sessionUpdate": "usage_update",
+   "used": 31470,
+   "size": 1000000
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Agent"
+    }
+   },
+   "toolCallId": "toolu_0198MSE26vSEC7huH778XR1n",
+   "sessionUpdate": "tool_call",
+   "rawInput": {},
+   "status": "pending",
+   "title": "Task",
+   "kind": "think",
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Agent"
+    }
+   },
+   "toolCallId": "toolu_0198MSE26vSEC7huH778XR1n",
+   "sessionUpdate": "tool_call_update",
+   "rawInput": {
+    "description": "Read alpha.txt first line",
+    "prompt": "Working directory: /private/tmp/acorn-subagent-probe/work\n\nDo exactly this, in this order:\n1. Use the Glob tool with pattern \"*\" to list the files in that directory.\n2. Use the Read tool to read alpha.txt.\n\nThen return only the first line of alpha.txt, verbatim, as your final output. Do not write or modify any files.",
+    "subagent_type": "general-purpose",
+    "run_in_background": false
+   },
+   "title": "Read alpha.txt first line",
+   "kind": "think",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "Working directory: /private/tmp/acorn-subagent-probe/work\n\nDo exactly this, in this order:\n1. Use the Glob tool with pattern \"*\" to list the files in that directory.\n2. Use the Read tool to read alpha.txt.\n\nThen return only the first line of alpha.txt, verbatim, as your final output. Do not write or modify any files."
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Agent"
+    }
+   },
+   "toolCallId": "toolu_01UAyu6PYcngbLTs5yypyYVB",
+   "sessionUpdate": "tool_call",
+   "rawInput": {},
+   "status": "pending",
+   "title": "Task",
+   "kind": "think",
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Agent"
+    }
+   },
+   "toolCallId": "toolu_01UAyu6PYcngbLTs5yypyYVB",
+   "sessionUpdate": "tool_call_update",
+   "rawInput": {
+    "description": "Read beta.txt first line",
+    "prompt": "Working directory: /private/tmp/acorn-subagent-probe/work\n\nDo exactly this, in this order:\n1. Use the Glob tool with pattern \"*\" to list the files in that directory.\n2. Use the Read tool to read beta.txt.\n\nThen return only the first line of beta.txt, verbatim, as your final output. Do not write or modify any files.",
+    "subagent_type": "general-purpose",
+    "run_in_background": false
+   },
+   "title": "Read beta.txt first line",
+   "kind": "think",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "Working directory: /private/tmp/acorn-subagent-probe/work\n\nDo exactly this, in this order:\n1. Use the Glob tool with pattern \"*\" to list the files in that directory.\n2. Use the Read tool to read beta.txt.\n\nThen return only the first line of beta.txt, verbatim, as your final output. Do not write or modify any files."
+     }
+    }
+   ]
+  },
+  {
+   "sessionUpdate": "usage_update",
+   "used": 32188,
+   "size": 1000000
+  },
+  {
+   "sessionUpdate": "usage_update",
+   "used": 32188,
+   "size": 1000000,
+   "_meta": {
+    "_claude/rateLimit": {
+     "status": "allowed_warning",
+     "resetsAt": 1788220800,
+     "rateLimitType": "overage",
+     "utilization": 1.02,
+     "isUsingOverage": false,
+     "surpassedThreshold": 1
+    }
+   }
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "ToolSearch",
+     "parentToolUseId": "toolu_0198MSE26vSEC7huH778XR1n"
+    }
+   },
+   "toolCallId": "toolu_01BP6vNNq4ryv2LGsxKmyWcA",
+   "sessionUpdate": "tool_call",
+   "rawInput": {
+    "query": "select:Glob",
+    "max_results": 3
+   },
+   "status": "pending",
+   "title": "ToolSearch",
+   "kind": "other",
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "matches": [],
+      "query": "select:Glob",
+      "total_deferred_tools": 39
+     },
+     "toolName": "ToolSearch"
+    }
+   },
+   "toolCallId": "toolu_01BP6vNNq4ryv2LGsxKmyWcA",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "ToolSearch",
+     "parentToolUseId": "toolu_0198MSE26vSEC7huH778XR1n"
+    }
+   },
+   "toolCallId": "toolu_01BP6vNNq4ryv2LGsxKmyWcA",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": "No matching deferred tools found",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "No matching deferred tools found"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "ToolSearch",
+     "parentToolUseId": "toolu_01UAyu6PYcngbLTs5yypyYVB"
+    }
+   },
+   "toolCallId": "toolu_01Noq7YGCKhxQjE9TLcF4sB2",
+   "sessionUpdate": "tool_call",
+   "rawInput": {
+    "query": "select:Glob",
+    "max_results": 1
+   },
+   "status": "pending",
+   "title": "ToolSearch",
+   "kind": "other",
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "matches": [],
+      "query": "select:Glob",
+      "total_deferred_tools": 39
+     },
+     "toolName": "ToolSearch"
+    }
+   },
+   "toolCallId": "toolu_01Noq7YGCKhxQjE9TLcF4sB2",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "ToolSearch",
+     "parentToolUseId": "toolu_01UAyu6PYcngbLTs5yypyYVB"
+    }
+   },
+   "toolCallId": "toolu_01Noq7YGCKhxQjE9TLcF4sB2",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": "No matching deferred tools found",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "No matching deferred tools found"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Bash",
+     "parentToolUseId": "toolu_0198MSE26vSEC7huH778XR1n"
+    }
+   },
+   "toolCallId": "toolu_019q1EdZzY2dU1EWVN1xihSv",
+   "sessionUpdate": "tool_call",
+   "rawInput": {
+    "command": "ls -la /private/tmp/acorn-subagent-probe/work",
+    "description": "List files in work directory"
+   },
+   "status": "pending",
+   "title": "ls -la /private/tmp/acorn-subagent-probe/work",
+   "kind": "execute",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "List files in work directory"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "ToolSearch",
+     "parentToolUseId": "toolu_01UAyu6PYcngbLTs5yypyYVB"
+    }
+   },
+   "toolCallId": "toolu_013Z5tdRKzSmm6HU3EuoUXKJ",
+   "sessionUpdate": "tool_call",
+   "rawInput": {
+    "query": "glob file pattern matching list files",
+    "max_results": 5
+   },
+   "status": "pending",
+   "title": "ToolSearch",
+   "kind": "other",
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "matches": [
+       "CronList",
+       "mcp__plugin_playwright_playwright__browser_file_upload",
+       "DesignSync",
+       "LSP",
+       "Monitor"
+      ],
+      "query": "glob file pattern matching list files",
+      "total_deferred_tools": 39
+     },
+     "toolName": "ToolSearch"
+    }
+   },
+   "toolCallId": "toolu_013Z5tdRKzSmm6HU3EuoUXKJ",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "ToolSearch",
+     "parentToolUseId": "toolu_01UAyu6PYcngbLTs5yypyYVB"
+    }
+   },
+   "toolCallId": "toolu_013Z5tdRKzSmm6HU3EuoUXKJ",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": [
+    {
+     "type": "tool_reference",
+     "tool_name": "CronList"
+    },
+    {
+     "type": "tool_reference",
+     "tool_name": "mcp__plugin_playwright_playwright__browser_file_upload"
+    },
+    {
+     "type": "tool_reference",
+     "tool_name": "DesignSync"
+    },
+    {
+     "type": "tool_reference",
+     "tool_name": "LSP"
+    },
+    {
+     "type": "tool_reference",
+     "tool_name": "Monitor"
+    }
+   ],
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "Tool: CronList"
+     }
+    },
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "Tool: mcp__plugin_playwright_playwright__browser_file_upload"
+     }
+    },
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "Tool: DesignSync"
+     }
+    },
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "Tool: LSP"
+     }
+    },
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "Tool: Monitor"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Bash",
+     "parentToolUseId": "toolu_01UAyu6PYcngbLTs5yypyYVB"
+    }
+   },
+   "toolCallId": "toolu_01XC3v41VgFwbUkWqujK7Q2T",
+   "sessionUpdate": "tool_call",
+   "rawInput": {
+    "command": "ls -la /private/tmp/acorn-subagent-probe/work",
+    "description": "List files in work directory"
+   },
+   "status": "pending",
+   "title": "ls -la /private/tmp/acorn-subagent-probe/work",
+   "kind": "execute",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "List files in work directory"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "stdout": "644  alpha.txt  25B\n644  beta.txt  24B",
+      "stderr": "",
+      "interrupted": false,
+      "isImage": false,
+      "noOutputExpected": false
+     },
+     "toolName": "Bash"
+    }
+   },
+   "toolCallId": "toolu_019q1EdZzY2dU1EWVN1xihSv",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Bash",
+     "parentToolUseId": "toolu_0198MSE26vSEC7huH778XR1n"
+    }
+   },
+   "toolCallId": "toolu_019q1EdZzY2dU1EWVN1xihSv",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": "644  alpha.txt  25B\n644  beta.txt  24B",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "```console\n644  alpha.txt  25B\n644  beta.txt  24B\n```"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Read",
+     "parentToolUseId": "toolu_0198MSE26vSEC7huH778XR1n"
+    }
+   },
+   "toolCallId": "toolu_01HP8Pzo7PtNyazrbB6PVMrh",
+   "sessionUpdate": "tool_call",
+   "rawInput": {
+    "file_path": "/private/tmp/acorn-subagent-probe/work/alpha.txt"
+   },
+   "status": "pending",
+   "title": "Read /private/tmp/acorn-subagent-probe/work/alpha.txt",
+   "kind": "read",
+   "locations": [
+    {
+     "path": "/private/tmp/acorn-subagent-probe/work/alpha.txt",
+     "line": 1
+    }
+   ],
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "type": "text",
+      "file": {
+       "filePath": "/private/tmp/acorn-subagent-probe/work/alpha.txt",
+       "content": "alpha-marker-line\nsecond\n",
+       "numLines": 3,
+       "startLine": 1,
+       "totalLines": 3
+      }
+     },
+     "toolName": "Read"
+    }
+   },
+   "toolCallId": "toolu_01HP8Pzo7PtNyazrbB6PVMrh",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Read",
+     "parentToolUseId": "toolu_0198MSE26vSEC7huH778XR1n"
+    }
+   },
+   "toolCallId": "toolu_01HP8Pzo7PtNyazrbB6PVMrh",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": "1\talpha-marker-line\n2\tsecond\n3\t",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "```\n1\talpha-marker-line\n2\tsecond\n3\t\n```"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "stdout": "644  alpha.txt  25B\n644  beta.txt  24B",
+      "stderr": "",
+      "interrupted": false,
+      "isImage": false,
+      "noOutputExpected": false
+     },
+     "toolName": "Bash"
+    }
+   },
+   "toolCallId": "toolu_01XC3v41VgFwbUkWqujK7Q2T",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Bash",
+     "parentToolUseId": "toolu_01UAyu6PYcngbLTs5yypyYVB"
+    }
+   },
+   "toolCallId": "toolu_01XC3v41VgFwbUkWqujK7Q2T",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": "644  alpha.txt  25B\n644  beta.txt  24B",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "```console\n644  alpha.txt  25B\n644  beta.txt  24B\n```"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Read",
+     "parentToolUseId": "toolu_01UAyu6PYcngbLTs5yypyYVB"
+    }
+   },
+   "toolCallId": "toolu_01S3sUK9omnHXSQYVAKEkQ8d",
+   "sessionUpdate": "tool_call",
+   "rawInput": {
+    "file_path": "/private/tmp/acorn-subagent-probe/work/beta.txt"
+   },
+   "status": "pending",
+   "title": "Read /private/tmp/acorn-subagent-probe/work/beta.txt",
+   "kind": "read",
+   "locations": [
+    {
+     "path": "/private/tmp/acorn-subagent-probe/work/beta.txt",
+     "line": 1
+    }
+   ],
+   "content": []
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "type": "text",
+      "file": {
+       "filePath": "/private/tmp/acorn-subagent-probe/work/beta.txt",
+       "content": "beta-marker-line\nsecond\n",
+       "numLines": 3,
+       "startLine": 1,
+       "totalLines": 3
+      }
+     },
+     "toolName": "Read"
+    }
+   },
+   "toolCallId": "toolu_01S3sUK9omnHXSQYVAKEkQ8d",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Read",
+     "parentToolUseId": "toolu_01UAyu6PYcngbLTs5yypyYVB"
+    }
+   },
+   "toolCallId": "toolu_01S3sUK9omnHXSQYVAKEkQ8d",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": "1\tbeta-marker-line\n2\tsecond\n3\t",
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "```\n1\tbeta-marker-line\n2\tsecond\n3\t\n```"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "status": "completed",
+      "prompt": "Working directory: /private/tmp/acorn-subagent-probe/work\n\nDo exactly this, in this order:\n1. Use the Glob tool with pattern \"*\" to list the files in that directory.\n2. Use the Read tool to read alpha.txt.\n\nThen return only the first line of alpha.txt, verbatim, as your final output. Do not write or modify any files.",
+      "agentId": "a86ffe1ce124458eb",
+      "agentType": "general-purpose",
+      "content": [
+       {
+        "type": "text",
+        "text": "One deviation to flag: the Glob tool isn't available in my toolset, so I listed the directory with `ls` instead. It holds two files, `alpha.txt` and `beta.txt`. I read `/private/tmp/acorn-subagent-probe/work/alpha.txt` with the Read tool as asked, and wrote nothing.\n\nFirst line, verbatim:\n\nalpha-marker-line"
+       }
+      ],
+      "resolvedModel": "claude-opus-5[1m]",
+      "totalDurationMs": 20473,
+      "totalTokens": 19216,
+      "totalToolUseCount": 3,
+      "usage": {
+       "input_tokens": 2,
+       "cache_creation_input_tokens": 119,
+       "cache_read_input_tokens": 18965,
+       "output_tokens": 130,
+       "output_tokens_details": {
+        "thinking_tokens": 0
+       },
+       "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+       },
+       "service_tier": "standard",
+       "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 119
+       },
+       "inference_geo": "not_available",
+       "iterations": [
+        {
+         "input_tokens": 2,
+         "output_tokens": 130,
+         "cache_read_input_tokens": 18965,
+         "cache_creation_input_tokens": 119,
+         "cache_creation": {
+          "ephemeral_5m_input_tokens": 119,
+          "ephemeral_1h_input_tokens": 0
+         },
+         "type": "message"
+        }
+       ],
+       "speed": "standard"
+      },
+      "toolStats": {
+       "readCount": 1,
+       "searchCount": 0,
+       "bashCount": 1,
+       "editFileCount": 0,
+       "linesAdded": 0,
+       "linesRemoved": 0,
+       "otherToolCount": 1
+      }
+     },
+     "toolName": "Agent"
+    }
+   },
+   "toolCallId": "toolu_0198MSE26vSEC7huH778XR1n",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Agent"
+    }
+   },
+   "toolCallId": "toolu_0198MSE26vSEC7huH778XR1n",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": [
+    {
+     "type": "text",
+     "text": "One deviation to flag: the Glob tool isn't available in my toolset, so I listed the directory with `ls` instead. It holds two files, `alpha.txt` and `beta.txt`. I read `/private/tmp/acorn-subagent-probe/work/alpha.txt` with the Read tool as asked, and wrote nothing.\n\nFirst line, verbatim:\n\nalpha-marker-line"
+    },
+    {
+     "type": "text",
+     "text": "agentId: a86ffe1ce124458eb (use SendMessage with to: 'a86ffe1ce124458eb', summary: '<5-10 word recap>' to continue this agent)\n<usage>subagent_tokens: 19216\ntool_uses: 3\nduration_ms: 20473</usage>"
+    }
+   ],
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "One deviation to flag: the Glob tool isn't available in my toolset, so I listed the directory with `ls` instead. It holds two files, `alpha.txt` and `beta.txt`. I read `/private/tmp/acorn-subagent-probe/work/alpha.txt` with the Read tool as asked, and wrote nothing.\n\nFirst line, verbatim:\n\nalpha-marker-line"
+     }
+    },
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "agentId: a86ffe1ce124458eb (use SendMessage with to: 'a86ffe1ce124458eb', summary: '<5-10 word recap>' to continue this agent)\n<usage>subagent_tokens: 19216\ntool_uses: 3\nduration_ms: 20473</usage>"
+     }
+    }
+   ]
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolResponse": {
+      "status": "completed",
+      "prompt": "Working directory: /private/tmp/acorn-subagent-probe/work\n\nDo exactly this, in this order:\n1. Use the Glob tool with pattern \"*\" to list the files in that directory.\n2. Use the Read tool to read beta.txt.\n\nThen return only the first line of beta.txt, verbatim, as your final output. Do not write or modify any files.",
+      "agentId": "aaaa2e18d3f83e2b4",
+      "agentType": "general-purpose",
+      "content": [
+       {
+        "type": "text",
+        "text": "beta-marker-line\n\nOne note: the Glob tool isn't available in this session, so I listed the directory with `ls` instead. The files are `/private/tmp/acorn-subagent-probe/work/alpha.txt` and `/private/tmp/acorn-subagent-probe/work/beta.txt`. I read beta.txt with the Read tool as asked, and nothing was written or changed."
+       }
+      ],
+      "resolvedModel": "claude-opus-5[1m]",
+      "totalDurationMs": 20185,
+      "totalTokens": 26606,
+      "totalToolUseCount": 4,
+      "usage": {
+       "input_tokens": 2,
+       "cache_creation_input_tokens": 117,
+       "cache_read_input_tokens": 26358,
+       "output_tokens": 129,
+       "output_tokens_details": {
+        "thinking_tokens": 0
+       },
+       "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+       },
+       "service_tier": "standard",
+       "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 117
+       },
+       "inference_geo": "not_available",
+       "iterations": [
+        {
+         "input_tokens": 2,
+         "output_tokens": 129,
+         "cache_read_input_tokens": 26358,
+         "cache_creation_input_tokens": 117,
+         "cache_creation": {
+          "ephemeral_5m_input_tokens": 117,
+          "ephemeral_1h_input_tokens": 0
+         },
+         "type": "message"
+        }
+       ],
+       "speed": "standard"
+      },
+      "toolStats": {
+       "readCount": 1,
+       "searchCount": 0,
+       "bashCount": 1,
+       "editFileCount": 0,
+       "linesAdded": 0,
+       "linesRemoved": 0,
+       "otherToolCount": 2
+      }
+     },
+     "toolName": "Agent"
+    }
+   },
+   "toolCallId": "toolu_01UAyu6PYcngbLTs5yypyYVB",
+   "sessionUpdate": "tool_call_update"
+  },
+  {
+   "_meta": {
+    "claudeCode": {
+     "toolName": "Agent"
+    }
+   },
+   "toolCallId": "toolu_01UAyu6PYcngbLTs5yypyYVB",
+   "sessionUpdate": "tool_call_update",
+   "status": "completed",
+   "rawOutput": [
+    {
+     "type": "text",
+     "text": "beta-marker-line\n\nOne note: the Glob tool isn't available in this session, so I listed the directory with `ls` instead. The files are `/private/tmp/acorn-subagent-probe/work/alpha.txt` and `/private/tmp/acorn-subagent-probe/work/beta.txt`. I read beta.txt with the Read tool as asked, and nothing was written or changed."
+    },
+    {
+     "type": "text",
+     "text": "agentId: aaaa2e18d3f83e2b4 (use SendMessage with to: 'aaaa2e18d3f83e2b4', summary: '<5-10 word recap>' to continue this agent)\n<usage>subagent_tokens: 26606\ntool_uses: 4\nduration_ms: 20185</usage>"
+    }
+   ],
+   "content": [
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "beta-marker-line\n\nOne note: the Glob tool isn't available in this session, so I listed the directory with `ls` instead. The files are `/private/tmp/acorn-subagent-probe/work/alpha.txt` and `/private/tmp/acorn-subagent-probe/work/beta.txt`. I read beta.txt with the Read tool as asked, and nothing was written or changed."
+     }
+    },
+    {
+     "type": "content",
+     "content": {
+      "type": "text",
+      "text": "agentId: aaaa2e18d3f83e2b4 (use SendMessage with to: 'aaaa2e18d3f83e2b4', summary: '<5-10 word recap>' to continue this agent)\n<usage>subagent_tokens: 26606\ntool_uses: 4\nduration_ms: 20185</usage>"
+     }
+    }
+   ]
+  },
+  {
+   "sessionUpdate": "usage_update",
+   "used": 32746,
+   "size": 1000000
+  },
+  {
+   "sessionUpdate": "agent_message_chunk",
+   "content": {
+    "type": "text",
+    "text": ""
+   },
+   "messageId": "msg_011CeKUBNRVZX3cAqtEDvMe3"
+  },
+  {
+   "sessionUpdate": "agent_message_chunk",
+   "content": {
+    "type": "text",
+    "text": "Both"
+   },
+   "messageId": "msg_011CeKUBNRVZX3cAqtEDvMe3"
+  },
+  {
+   "sessionUpdate": "agent_message_chunk",
+   "content": {
+    "type": "text",
+    "text": " first lines:\n\n- alpha.txt \u2192 `alpha-marker-line`\n- beta.txt \u2192 `beta-marker-line`\n\nOne thing worth knowing: neither subagent had the Glob tool available"
+   },
+   "messageId": "msg_011CeKUBNRVZX3cAqtEDvMe3"
+  },
+  {
+   "sessionUpdate": "agent_message_chunk",
+   "content": {
+    "type": "text",
+    "text": ", so both listed the directory with `ls` instead. They each read their file with Read, and nothing was written."
+   },
+   "messageId": "msg_011CeKUBNRVZX3cAqtEDvMe3"
+  },
+  {
+   "sessionUpdate": "usage_update",
+   "used": 32843,
+   "size": 1000000
+  },
+  {
+   "sessionUpdate": "usage_update",
+   "used": 32843,
+   "size": 1000000,
+   "cost": {
+    "amount": 0.49502374999999993,
+    "currency": "USD"
+   }
+  }
+ ]
+}

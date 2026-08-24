@@ -5,6 +5,7 @@ import type {
   AgentNormalizedEvent,
   AgentRequest,
   AgentSession,
+  AgentSubagent,
   AgentTurn,
   AgentUsage,
 } from '@acorn/protocol/managedAgents.ts'
@@ -36,6 +37,7 @@ export const mapAgentSession = (row: typeof schema.agentSessions.$inferSelect): 
   config: parseJson(row.configJson, {}),
   parentSessionId: row.parentSessionId,
   parentTurnId: row.parentTurnId,
+  subagents: parseJson<AgentSubagent[]>(row.subagentsJson, []),
   lastEventSeq: row.lastEventSeq,
   lastReadSeq: row.lastReadSeq,
   archivedAt: row.archivedAt,
