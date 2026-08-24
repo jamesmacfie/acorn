@@ -465,6 +465,7 @@ export default function AgentPane(props: { task: Task }) {
                     />
                     <QueuedAgentTurns
                       sessionId={session().id}
+                      runtimeState={value().session.runtimeState}
                       turns={value().turns}
                       onChanged={() => managedAgentStore.loadSnapshot(session().id)}
                       onError={setError}
