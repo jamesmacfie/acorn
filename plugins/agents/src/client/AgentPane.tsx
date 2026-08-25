@@ -370,7 +370,7 @@ export default function AgentPane(props: { task: Task }) {
         </Show>
         <AgentUsageIndicator />
         <Picker<AgentProviderDescriptor>
-          label={<><Icon name="plus" /> New</>}
+          label={<><Icon name="plus" class="glyph" /> New</>}
           ariaLabel="New"
           placement="bottom-end"
           placeholder="Filter providers…"
