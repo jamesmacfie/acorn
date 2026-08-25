@@ -231,7 +231,9 @@ and a fork continues the session it came from at the settings that session was r
 
 Settings reads the option list to draw pickers off the newest session that advertised one, because a
 provider reports its models and reasoning levels only once a session is running. A provider you have
-not run inside the 50 most recent sessions shows no pickers until you run it again.
+not run inside the 50 most recent sessions shows no pickers until you run it again. Each pick is the
+save, as everywhere else under Settings: there is no save button, and a write that fails says so and
+refetches the stored row.
 
 ## Context, files, and attachments
 
