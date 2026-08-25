@@ -181,6 +181,30 @@ be tested against what the harness actually sent.
   out. The composer is hidden while a subagent's run is showing: it only ever addresses the session, so
   leaving it there would read as a way to reply to the subagent, which neither harness offers. The draft
   is held per session outside the component, so stepping in and back does not lose typed text.
+- The composer draws `@file`, `/command` and `$skill` each in its own theme colour
+  (`--mention-file`, `--mention-command`, `--mention-skill`). A textarea cannot colour part of
+  its own value, so a `<pre>` mirrors the draft over it and the textarea's own text is transparent;
+  the two share every property that decides where a glyph lands, and above 20,000 characters the
+  mirror is dropped and the textarea paints itself. A command or skill is coloured only when the
+  session advertises that name, so `9/11` stays prose and a misspelled `/reviw` stays visibly plain.
+  File mentions come from the same walk that builds the turn's file parts, so what is coloured is what
+  is sent.
+- Typing any of the three sigils opens the same dropdown: `@` lists worktree files, `/` the commands
+  and `$` the skills the session advertises. Rows are `PickerRow`, the row the context picker draws,
+  so a name sits over its description rather than sharing a line with it. The list scrolls once it
+  passes 280px, and the arrow keys scroll it themselves rather than calling `scrollIntoView`, which
+  would be free to scroll the transcript behind the composer as well. Only `@` waits on a fetch, so a
+  command list that arrived with the session is never held behind the worktree walk. The `＋` picker
+  still inserts the same tokens for anyone who would rather browse than type.
+- Hovering a coloured command or skill shows its description, through the app's `data-tip` tooltip.
+  The mirror is inert except for those spans, which take the pointer and hand the caret straight back
+  to the textarea on mousedown, so clicking a token still puts the cursor where it was clicked.
+- ⌘⇧↩, or the expand button in the corner of the box, lays the composer over the detail column at full
+  height, which is the same chord the shell uses to maximise a pane and the nearest meaning it has
+  while the caret is in a textarea. It is not a registered keybinding, because a task-scoped binding
+  never fires from inside a typing target and a rebindable row that did nothing would be a lie. The
+  transcript is covered rather than collapsed, so it keeps its scroll position, and the state is
+  session-only and per composer.
 - Changing a provider config option — the model, the reasoning level, the permission profile — writes
   a row into the transcript, so reading back a session shows where the switch happened rather than
   leaving every later turn to be read under whatever the setting is now. The switch also becomes the

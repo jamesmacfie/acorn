@@ -42,6 +42,18 @@
   --state-warn: var(--warn);
   --state-bad: var(--del-marker);
 
+  /* One colour per kind of composer token, each borrowed from the theme so Dracula's yellow and
+     Nord's cyan arrive for free rather than the composer naming hues no palette contains. Derived
+     rather than primitives because every primitive is required of a plugin-contributed theme
+     (pluginContract.ts), so growing that list would refuse every theme written before this line.
+     Red is left out: a skill nobody is worried about should not read as an error. A path takes the
+     accent, which is the palette's own identity colour — and in the two monochrome default themes
+     --accent is --text, so a file mention there reads as weight rather than colour, which is the
+     same thing every other accent-coloured surface does under those themes. */
+  --mention-file: var(--accent);
+  --mention-command: var(--warn);
+  --mention-skill: var(--add-marker);
+
   /* Theme-independent: a find highlight has to stay legible over syntax-coloured code in every
      theme, and the modal scrim is black in all 12 today. */
   --find-hit-bg: rgba(255, 200, 0, 0.28);

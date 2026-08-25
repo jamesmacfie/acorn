@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type Placement } from './anchor'
+import PickerRow from './PickerRow'
 
 // Searchable popover picker: a button showing the current value opens a filter input + scrollable
 // list. Presentational chrome only; the parent supplies results(query) so it owns filtering and
@@ -98,23 +99,14 @@ export default function Picker<T>(props: {
               <ul class="repo-picker-list">
                 <For each={items()}>
                   {(item) => (
-                    <li
-                      class="repo-picker-row"
-                      classList={{ active: props.isActive(item), disabled: props.isDisabled?.(item) }}
-                    >
-                      {props.leading?.(item)}
-                      <button
-                        type="button"
-                        class="repo-picker-name"
-                        disabled={props.isDisabled?.(item)}
-                        onClick={() => choose(item)}
-                      >
-                        <span>{props.rowLabel(item)}</span>
-                        <Show when={props.rowDescription?.(item)}>
-                          {(description) => <small>{description()}</small>}
-                        </Show>
-                      </button>
-                    </li>
+                    <PickerRow
+                      label={props.rowLabel(item)}
+                      description={props.rowDescription?.(item)}
+                      active={props.isActive(item)}
+                      disabled={props.isDisabled?.(item)}
+                      leading={props.leading?.(item)}
+                      onSelect={() => choose(item)}
+                    />
                   )}
                 </For>
               </ul>

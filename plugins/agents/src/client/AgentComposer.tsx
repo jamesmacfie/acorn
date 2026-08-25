@@ -43,6 +43,9 @@ export default function AgentComposer(props: {
   const [contextPickerId, setContextPickerId] = createSignal('')
   const [dismissedAutomaticPayload, setDismissedAutomaticPayload] = createSignal<string>()
   const [error, setError] = createSignal('')
+  // Session-only, like the terminal drawer's own maximise: a composer that stayed full height across
+  // a relaunch would hide the transcript of a session nobody had started typing into yet.
+  const [expanded, setExpanded] = createSignal(false)
   const composerSessionId = createMemo(() => props.session.id)
   const configOptions = createMemo<AgentConfigOption[]>(
     () => {
@@ -97,6 +100,7 @@ export default function AgentComposer(props: {
   createEffect(on(composerSessionId, (sessionId) => {
     hydrateManagedDraft(sessionId, localStorage.getItem(draftKey(sessionId)) ?? '')
     setError('')
+    setExpanded(false)
     setContextPickerId('')
     setDismissedAutomaticPayload(undefined)
     let ids: string[] = []
@@ -308,7 +312,7 @@ export default function AgentComposer(props: {
   let fileInput: HTMLInputElement | undefined
 
   return (
-    <div class="agent-composer-shell">
+    <div class="agent-composer-shell" classList={{ expanded: expanded() }}>
       <div class="agent-composer-context">
         <For each={configOptions()}>
           {(option) => (
@@ -379,11 +383,15 @@ export default function AgentComposer(props: {
         <AgentMentionTextarea
           taskId={props.session.taskId}
           value={draft()}
+          commands={commands()}
+          skills={skills()}
+          expanded={expanded()}
           disabled={props.disabled}
           placeholder={disabledMessage() ?? 'Ask the agent…  @file  /command  $skill'}
           onValue={setDraft}
           onFiles={(files) => void addFiles(files)}
           onSubmit={() => void send()}
+          onToggleExpanded={() => setExpanded((current) => !current)}
         />
         <div class="agent-composer-actions">
           <Button

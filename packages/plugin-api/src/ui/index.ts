@@ -15,6 +15,8 @@ export {
 } from '@acorn/client-core/ui/primitives.tsx'
 export { default as Icon } from '@acorn/client-core/ui/Icon.tsx'
 export { default as Picker } from '@acorn/client-core/ui/Picker.tsx'
+// The row on its own, for a list that opens from typing rather than from Picker's trigger button.
+export { default as PickerRow } from '@acorn/client-core/ui/PickerRow.tsx'
 export { default as Popover } from '@acorn/client-core/ui/Popover.tsx'
 export { Menu } from '@acorn/client-core/ui/Menu.tsx'
 export { CollapsibleSection } from '@acorn/client-core/ui/CollapsibleSection.tsx'

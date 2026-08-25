@@ -326,56 +326,107 @@
 }
 .agent-composer:focus-within { border-color: var(--accent); }
 .agent-mention-input { position: relative; }
-.agent-composer textarea {
+/* The mirror and the textarea are the same box drawn twice: one paints colour, the other takes the
+   typing. Every property that decides where a glyph lands is declared for both here, because the
+   two drifting apart is the only way this technique fails. */
+.agent-composer textarea,
+.agent-mention-mirror {
   width: 100%;
+  padding: var(--space-5);
+  font: inherit;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.agent-composer textarea {
   max-height: 200px;
   resize: vertical;
-  padding: var(--space-5);
   color: var(--text);
   background: transparent;
   border: 0;
   outline: 0;
-  font: inherit;
-  line-height: 1.45;
 }
+.agent-mention-mirror {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--text);
+}
+.agent-mention-input.highlighted textarea { color: transparent; caret-color: var(--text); }
+/* Left at the browser default, a selection paints an opaque band over the mirror and the coloured
+   text vanishes while it is selected. */
+.agent-mention-input.highlighted textarea::selection {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+/* The mirror is inert apart from its tokens, which take the pointer so a command can be hovered for
+   its description. The span's own mousedown hands the caret back to the textarea. */
+/* A colour per kind, so a path does not read as a command. */
+.agent-mention-token {
+  font-weight: var(--fw-medium);
+  pointer-events: auto;
+  cursor: default;
+}
+.agent-mention-token.file { color: var(--mention-file); }
+.agent-mention-token.command { color: var(--mention-command); }
+.agent-mention-token.skill { color: var(--mention-skill); }
+/* Compounded with .ui-btn, because a class handed to a primitive ties with it on specificity and
+   would lose to whichever sheet loads last (docs/ui-design.md § Migration tiers). */
+.ui-btn.agent-composer-expand {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: var(--z-base);
+  padding: var(--space-1);
+  color: var(--text-faint);
+  background: none;
+  border: 0;
+  opacity: 0;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+.agent-mention-input:hover .ui-btn.agent-composer-expand,
+.ui-btn.agent-composer-expand:focus-visible,
+.ui-btn.agent-composer-expand[aria-pressed='true'] { opacity: 1; }
+.ui-btn.agent-composer-expand:hover { color: var(--text); }
+/* Expanded, the composer covers the detail column the way a maximised terminal covers the pane
+   region, rather than taking a flex share and leaving the transcript half a screen. Laid over the
+   transcript instead of collapsing it, so the transcript keeps its scroll position for the moment
+   the box shrinks again. The session list is outside this box and stays reachable. */
+.managed-agent-pane .ui-listdetail-detail { position: relative; }
+.agent-composer-shell.expanded {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-float);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+/* `margin: 0 auto` on the composer turns off the stretch a flex column would otherwise give it. */
+.agent-composer-shell.expanded .agent-composer {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.agent-composer-shell.expanded .agent-mention-input { flex: 1; min-height: 0; }
+.agent-composer-shell.expanded textarea { height: 100%; max-height: none; resize: none; }
+/* The surface only: the rows inside are PickerRow, so the mention list and the context picker's
+   list are the same list. Anchored above the box rather than portalled, because it follows a caret
+   in a textarea that is already the right width. */
 .agent-mention-suggestions {
   position: absolute;
   bottom: calc(100% + var(--space-2));
   left: var(--space-3);
   z-index: var(--z-picker);
   width: min(520px, calc(100% - var(--space-6)));
-  max-height: 280px;
-  overflow-y: auto;
-  padding: var(--space-2);
   background: var(--bg);
   border: var(--control-border);
   box-shadow: var(--shadow-popover);
 }
-.agent-mention-suggestions > p { margin: 0; padding: var(--space-3); font-size: var(--fs-xs); }
-.agent-mention-suggestion.ui-btn {
-  width: 100%;
-  min-height: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  text-align: left;
-}
-.agent-mention-suggestion.selected.ui-btn { color: var(--text); background: var(--bg-selected); }
-.agent-mention-suggestion strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.agent-mention-suggestion small {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.agent-mention-suggestions .repo-picker-list { max-height: 280px; }
+.agent-mention-suggestions > p { margin: 0; }
 .agent-composer-actions {
   display: flex;
   align-items: center;
