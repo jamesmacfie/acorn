@@ -14,7 +14,7 @@ export const claudeHarness: HarnessLaunchSpec = {
   id: 'claude',
   profileId: 'claude-code',
   label: 'Claude Code',
-  glyph: 'C',
+  glyph: 'brand:agents/claude',
   spawn: {
     // Resolved host-side, not from a plugin directory. The adapter is a dependency of the desktop
     // bundle (apps/desktop/package.json), so only `createRequire` can find it. A contributed harness

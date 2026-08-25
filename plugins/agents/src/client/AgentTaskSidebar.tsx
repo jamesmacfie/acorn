@@ -7,6 +7,7 @@ import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient
 import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
 import { sessionModelLabel } from './agentConfigOptions'
+import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import { subagentTone } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
 import { WORKFLOW_CONTROL } from '../contract/workflowControl'
@@ -228,7 +229,12 @@ export default function AgentTaskSidebar(props: {
                     onActivate={() => props.onSelectSession(session().id)}
                   >
                     <strong>{session().title}</strong>
-                    <small>{[session().providerId, sessionModelLabel(session()), session().runtimeState].filter(Boolean).join(' · ')}</small>
+                    <small>
+                      <Show when={providerMarkName(session().providerId)}>
+                        {(mark) => <ProviderGlyph glyph={mark()} label={session().providerId} />}
+                      </Show>
+                      {[session().providerId, sessionModelLabel(session()), session().runtimeState].filter(Boolean).join(' · ')}
+                    </small>
                   </Row>
                   {/*
                     The subagent roster, indented under the session that spawned it. Read straight off

@@ -35,6 +35,13 @@
 }
 .agent-task-row .ui-row-body strong { font-size: var(--fs-sm); font-weight: 500; }
 .agent-task-row .ui-row-body small { color: var(--text-faint); font-size: var(--fs-2xs); }
+/* The provider's mark, ahead of its name on the sub-line. It has to restate the colour because the
+   rule above paints the whole line --text-faint and wins on specificity, and it sizes off the line it
+   sits in, which is already the smallest type in the app. */
+.agent-task-row .ui-row-body small .managed-agent-provider-glyph {
+  margin-inline-end: var(--space-2);
+  color: var(--brand-legible);
+}
 .agent-task-state { color: var(--text-faint); font-family: var(--font-glyph); }
 .agent-task-state[data-state='working'],
 .agent-task-state[data-state='starting'],

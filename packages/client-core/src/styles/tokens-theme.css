@@ -54,6 +54,14 @@
   --mention-command: var(--warn);
   --mention-skill: var(--add-marker);
 
+  /* A brand's own colour, pulled toward the theme's foreground until it is readable on it. A brand hex
+     is authored against white: OpenAI's #412991 sits at 1.7:1 on a dark pane, well under the 3:1 a
+     glyph wants, and no single authored hex can clear both directions. 45% is the most brand that
+     clears 3:1 in all twelve themes; solarized dark with that purple is the tight one, at 3.03:1.
+     --brand is set per element by brandStyle() in ui/brandMarks.ts, so this resolves per mark; with
+     none set it is the accent, mixed the same way. See docs/ui-design.md § Brand colour. */
+  --brand-legible: color-mix(in srgb, var(--brand, var(--accent)) 45%, var(--text));
+
   /* Theme-independent: a find highlight has to stay legible over syntax-coloured code in every
      theme, and the modal scrim is black in all 12 today. */
   --find-hit-bg: rgba(255, 200, 0, 0.28);

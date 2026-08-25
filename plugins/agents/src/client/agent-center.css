@@ -125,10 +125,9 @@
   display: grid !important;
   flex: none;
   place-items: center;
-  /* One colour, tinted rather than filled, so a dark brand hex stays legible on a dark theme without
-     the mark declaring a light and dark pair. If a provider's glyph does disappear, that pair is the
-     upgrade. */
-  color: var(--brand, var(--accent));
+  /* The glyph takes the provider's colour held to the theme's contrast; the background and border stay
+     raw tints of it, where the brand hex is doing no reading work. */
+  color: var(--brand-legible);
   background: color-mix(in srgb, var(--brand, var(--accent)) 8%, transparent);
   border: var(--surface-bw) solid color-mix(in srgb, var(--brand, var(--accent)) 25%, var(--border));
   font: 600 var(--fs-sm) var(--font-mono);

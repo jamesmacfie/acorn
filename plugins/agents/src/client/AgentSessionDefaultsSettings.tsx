@@ -7,6 +7,7 @@ import {
   type AgentSessionDefaults,
 } from '../shared/sessionDefaults'
 import { managedAgentApi } from './managedClient'
+import ProviderGlyph from './ProviderGlyph'
 import {
   agentSessionDefaultsOptions,
   agentSessionDefaultsQueryKey,
@@ -89,7 +90,10 @@ export default function AgentSessionDefaultsSettings() {
         <For each={providers()?.filter((provider) => provider.installed) ?? []}>
           {(provider) => (
             <section class="settings-subsection">
-              <h3 class="settings-label">{provider.label}</h3>
+              <h3 class="settings-label agent-defaults-provider">
+                <ProviderGlyph glyph={provider.glyph} label={provider.label} />
+                {provider.label}
+              </h3>
               <Show
                 when={advertised()[provider.id]?.length}
                 fallback={
