@@ -56,6 +56,11 @@ const enumValue = z.object({
   id: z.string().min(1).max(64),
   label: z.string().min(1).max(80),
   tone: z.enum(['ok', 'warn', 'bad', 'muted', 'accent']).optional(),
+  // An icon name the host resolves the way it resolves every other one (docs/ui-design.md § Icons),
+  // drawn in place of the value's dot. A state a shape can carry, such as a stop sign or a warning
+  // triangle, is read at a glance where five dots differing only in hue are not. A name the host has
+  // no icon for falls back to the dot, so this is a hint and never a requirement.
+  icon: z.string().min(1).max(64).optional(),
 })
 
 // Display hints hang off the field, never off a panel. Grafana's `FieldConfig` lesson: a unit or a tone

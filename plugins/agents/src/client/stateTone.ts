@@ -7,14 +7,40 @@ import type { AgentSubagentStatus } from '@acorn/protocol/managedAgents.ts'
 
 type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'accent'
 
-/** A managed session's runtime state, as shown in the pane header, task sidebar and Agent Center. */
+/** A managed session's runtime state, as shown in the pane header, task sidebar, Agent Center and the
+ *  sessions dashboard panel.
+ *
+ *  A finished session is muted rather than green. Most rows in a busy task are finished, so colouring
+ *  all of them buries the one that is running or needs an answer. Green is reserved for work in
+ *  flight, which is the row worth finding. */
 export const runtimeTone = (state: string): Tone => {
-  if (state === 'ready') return 'ok'
-  if (state === 'working' || state === 'connecting' || state === 'reconnecting') return 'accent'
-  if (state === 'waiting') return 'warn'
+  if (state === 'working') return 'ok'
+  if (state === 'creating' || state === 'connecting' || state === 'replaying' || state === 'reconnecting') {
+    return 'accent'
+  }
+  if (state === 'waiting' || state === 'cancelling' || state === 'stopped') return 'warn'
   if (state === 'failed') return 'bad'
   return 'muted'
 }
+
+/** The icon for a runtime state, beside the tone above, because the two are one decision: a shape
+ *  and a colour saying the same thing. Host icon names (docs/ui-design.md § Icons), so both the
+ *  sidebar's own markup and the dashboard panel's enum values draw from this one map. */
+const RUNTIME_ICON: Record<string, string> = {
+  creating: 'clock',
+  connecting: 'clock',
+  replaying: 'clock',
+  ready: 'circle',
+  working: 'loader-circle',
+  waiting: 'circle-alert',
+  cancelling: 'loader-circle',
+  reconnecting: 'loader-circle',
+  stopped: 'circle-stop',
+  failed: 'triangle-alert',
+  archived: 'archive',
+}
+
+export const runtimeIcon = (state: string): string => RUNTIME_ICON[state] ?? 'circle-dashed'
 
 /* A tool call's dot lives elsewhere: its status is a protocol type the changes plugin also renders,
    so `agentToolTone` sits beside the renderer contract in client-core instead. */

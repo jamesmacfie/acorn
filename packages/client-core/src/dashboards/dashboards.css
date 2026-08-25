@@ -917,6 +917,26 @@
   gap: var(--space-2);
   white-space: nowrap;
 }
+/* An enum value's icon, where the plugin named one. Sized to the dot it stands in for rather than to
+   the label beside it, and given the wider gap a shape needs: a dot reads as punctuation at 4px, an
+   icon at that distance reads as part of the first word. */
+.dash-cell-enum-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-end: var(--space-2);
+  color: var(--text-faint);
+}
+.dash-cell-enum-icon svg { width: var(--space-5); height: var(--space-5); }
+.dash-cell-enum-icon[data-tone='ok'] { color: var(--state-ok); }
+.dash-cell-enum-icon[data-tone='warn'] { color: var(--state-warn); }
+.dash-cell-enum-icon[data-tone='bad'] { color: var(--state-bad); }
+.dash-cell-enum-icon[data-tone='accent'] { color: var(--accent); }
+.dash-cell-enum-icon[data-tone='muted'] { color: var(--text-faint); }
+/* A loader that stands still says the opposite of what it is for, so the one icon name that means
+   "in progress" turns wherever a plugin names it. The keyframe is base.css; the `.spin` class it
+   goes with is not, because that class stops itself under prefers-reduced-motion and this rotation
+   is the only sign a row is moving. */
+.dash-cell-enum-icon[data-icon='loader-circle'] svg { animation: spin 1s linear infinite; }
 
 /* A monogram, not a photograph. The mark is the initials of the same display string beside it
    (dashboards/format.ts, personInitials), because the wire carries a name and not an account. Sized off
