@@ -43,7 +43,16 @@ export const initialAgentMachineState = (): AgentMachineState => ({
 
 // The database projection and the richer in-memory reducer share this one pure transition map.
 // Provider adapters produce facts; neither persistence nor process supervision invents state.
-export function projectAgentEvent(event: AgentNormalizedEvent): AgentSessionProjection {
+//
+// `turnId` is null for an event that belongs to no turn Acorn dispatched, which is why it gates the
+// turn-scoped cases below. A harness can stream after the prompt call it was answering has already
+// returned: Claude Code did, five minutes past an `end_turn`, and the trailing message projected
+// 'working' onto a session with no turn left to complete it. `turn_completed` is the only event that
+// clears 'working', and it only fires as sendTurn's return value, so nothing was coming.
+export function projectAgentEvent(
+  event: AgentNormalizedEvent,
+  turnId: string | null,
+): AgentSessionProjection {
   switch (event.type) {
     case 'session_state':
       return {
@@ -62,7 +71,7 @@ export function projectAgentEvent(event: AgentNormalizedEvent): AgentSessionProj
           : undefined,
       }
     case 'user_message':
-      return { runtimeState: 'working', attention: 'none' }
+      return turnId ? { runtimeState: 'working', attention: 'none' } : {}
     case 'assistant_message':
     case 'reasoning':
     case 'tool':
@@ -70,7 +79,9 @@ export function projectAgentEvent(event: AgentNormalizedEvent): AgentSessionProj
     case 'artifact':
     case 'file_change':
     case 'terminal':
-      return { runtimeState: 'working', attention: 'unread' }
+      // Attention still moves without a turn. A stray message is unread content worth a nudge; it is
+      // just not evidence that work is in flight.
+      return turnId ? { runtimeState: 'working', attention: 'unread' } : { attention: 'unread' }
     case 'request':
       return {
         runtimeState: 'waiting',
@@ -198,21 +209,24 @@ export function evolveAgentState(
           ? null
           : state.activeTurnId,
       }
-    case 'user_message':
-      return {
-        ...state,
-        runtimeState: 'working',
-        attention: 'none',
-        activeTurnId: turnId ?? state.activeTurnId,
-      }
+    case 'user_message': {
+      const active = turnId ?? state.activeTurnId
+      if (!active) return state
+      return { ...state, runtimeState: 'working', attention: 'none', activeTurnId: active }
+    }
     case 'assistant_message':
     case 'reasoning':
     case 'tool':
     case 'plan':
     case 'file_change':
     case 'terminal':
-    case 'artifact':
-      return { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: turnId ?? state.activeTurnId }
+    case 'artifact': {
+      // Same turn gate as projectAgentEvent, for the same reason. The reducer knows more than the
+      // projection does, so it asks whether any turn is in flight rather than just this event's.
+      const active = turnId ?? state.activeTurnId
+      if (!active) return { ...state, attention: 'unread' }
+      return { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: active }
+    }
     case 'request':
       return {
         ...state,

@@ -108,9 +108,25 @@ describe('subagent roster projection', () => {
   it('keeps a subagent\u2019s progress out of the session\u2019s own state', () => {
     // A child that settles after the parent’s turn_completed would otherwise drag the session back
     // out of ready, and Codex allows exactly that ordering.
-    expect(projectAgentEvent({ type: 'subagent', subagent: { id: 's1', status: 'running' } })).toEqual({})
+    expect(projectAgentEvent({ type: 'subagent', subagent: { id: 's1', status: 'running' } }, 'turn-1')).toEqual({})
     const ready = evolveAgentState(initialAgentMachineState(), { type: 'turn_completed' }, 'turn-1')
     expect(evolveAgentState(ready, { type: 'subagent', subagent: { id: 's1', status: 'idle' } }, null))
       .toMatchObject({ runtimeState: 'ready' })
+  })
+
+  it('keeps a turnless stream event out of the session’s runtime state', () => {
+    // A harness can stream after the prompt call it was answering returned. turn_completed only fires
+    // as sendTurn's return value, so a trailing message that projected 'working' would strand the
+    // session there: nothing left to complete it, and 'working' blocks the next dispatch.
+    const stray = { type: 'assistant_message', text: 'One more thing' } as const
+    expect(projectAgentEvent(stray, null)).toEqual({ attention: 'unread' })
+    expect(projectAgentEvent(stray, 'turn-1')).toEqual({ runtimeState: 'working', attention: 'unread' })
+
+    const ready = evolveAgentState(initialAgentMachineState(), { type: 'turn_completed' }, 'turn-1')
+    expect(evolveAgentState(ready, stray, null)).toMatchObject({
+      runtimeState: 'ready',
+      attention: 'unread',
+      activeTurnId: null,
+    })
   })
 })

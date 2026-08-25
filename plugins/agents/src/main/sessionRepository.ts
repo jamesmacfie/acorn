@@ -72,7 +72,7 @@ export class AgentSessionRepository {
 
   async recordEvent(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentEventRecord> {
     const timestamp = now()
-    const projection = projectAgentEvent(event)
+    const projection = projectAgentEvent(event, turnId)
     const eventId = randomUUID()
     const row = this.db.transaction((tx) => {
       const current = tx
