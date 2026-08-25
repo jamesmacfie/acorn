@@ -198,6 +198,11 @@ rather than cascaded onto the session's own `archivedAt`, because removing a pro
 tasks outright and no cascade would visit those rows. A read that names a task id is exempt, because
 the task pane is looking at that task.
 
+Archiving is the only way the UI retires a session. Both the pane header's menu and the three-dot
+menu on each row in the task's session list offer rename, archive, and, while the agent is running,
+stop; archive asks first. The delete route still exists for a caller that means it, but it is no
+longer a menu item one click away from a transcript that cannot be recovered.
+
 ## New-session defaults
 
 A new session starts on the settings the owner last used, not on the provider's own choice. Switch
