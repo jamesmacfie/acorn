@@ -98,7 +98,7 @@
 .agent-request-card p { margin: var(--space-2) 0; color: var(--text-muted); }
 .agent-question { display: grid; gap: var(--space-2); margin-top: var(--space-4); font-size: var(--fs-sm); }
 .agent-question input,
-.agent-question select {
+.agent-question .ui-select {
   padding: var(--space-3);
   color: var(--text);
   background: var(--bg-subtle);

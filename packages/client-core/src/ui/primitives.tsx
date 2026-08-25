@@ -1,6 +1,11 @@
-import { createEffect, createSignal, Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
+import {
+  createEffect, createSignal, For, onCleanup, onMount, Show, splitProps,
+  type ComponentProps, type JSX,
+} from 'solid-js'
+import { Dynamic, Portal } from 'solid-js/web'
+import { createAnchoredPopover, type AnchoredPopover } from './anchor'
 import { createArmedConfirm } from './confirm'
+import { nextListIndex } from './focus'
 import type { SplitDrag } from './split'
 import { cx } from './cx'
 
@@ -67,8 +72,8 @@ type ControlOwn = {
   kind?: 'filter' | 'bare'
 }
 
-const controlAttrs = (own: ControlOwn & { class?: string }) => ({
-  class: cx('ui-input', own.class),
+const controlAttrs = (own: ControlOwn & { class?: string }, base = 'ui-input') => ({
+  class: cx(base, own.class),
   'data-size': own.size ?? 'md',
   'data-width': own.width ?? 'full',
   'data-kind': own.kind,
@@ -81,9 +86,182 @@ export function Input(props: ComponentProps<'input'> & ControlOwn) {
   return <input {...rest} {...controlAttrs(own)} />
 }
 
+/** The open list. Mounted only while the popover is open, so the row refs and the active index
+ *  start empty on every open rather than accumulating a copy of the list. */
+function SelectList(props: {
+  popover: AnchoredPopover
+  options: () => HTMLOptionElement[]
+  value: () => string | undefined
+  ariaLabel?: string
+  onPick: (option: HTMLOptionElement) => void
+}) {
+  let listRef: HTMLDivElement | undefined
+  // Read the rows back out of the DOM rather than collecting them as they mount: options can arrive
+  // while the list is open, and a collected array keeps handing the arrow keys rows that have been
+  // detached since.
+  const enabled = () => [...listRef?.querySelectorAll<HTMLButtonElement>('.ui-menu-item:not([disabled])') ?? []]
+  const [active, setActive] = createSignal(0)
+  const focusAt = (index: number) => {
+    const list = enabled()
+    if (!list.length) return
+    setActive(index)
+    list[index]?.focus()
+  }
+  // Opening on the current value is what the native control does, and it is what makes the arrow
+  // keys mean "the next one" rather than "the second one".
+  onMount(() => queueMicrotask(() => {
+    const chosen = enabled().findIndex((row) => row.dataset.value === props.value())
+    focusAt(chosen < 0 ? 0 : chosen)
+  }))
+
+  return (
+    <Portal>
+      <div
+        ref={(el) => {
+          listRef = el
+          props.popover.setSurface(el)
+        }}
+        class="ui-popover ui-select-list"
+        role="listbox"
+        aria-label={props.ariaLabel}
+        style={props.popover.surfaceStyle()}
+        onKeyDown={(event) => {
+          const list = enabled()
+          if (!list.length) return
+          const next = nextListIndex(active(), list.length, event.key)
+          if (next === active() && event.key !== 'Home' && event.key !== 'End') return
+          event.preventDefault()
+          focusAt(next)
+        }}
+      >
+        <For each={props.options()}>
+          {(option) => (
+            <button
+              type="button"
+              class="ui-menu-item"
+              role="option"
+              data-value={option.value}
+              aria-selected={option.value === props.value()}
+              disabled={option.disabled}
+              onClick={() => props.onPick(option)}
+            >
+              <span class="ui-menu-label">{option.text}</span>
+            </button>
+          )}
+        </For>
+      </div>
+    </Portal>
+  )
+}
+
+/** A select whose list we draw ourselves.
+ *
+ *  The native <select> stays in the DOM, hidden, as the option list, the value store and the event
+ *  source: call sites keep writing <option> children and reading `event.currentTarget.value` in
+ *  onChange, and neither has to know the popup changed. Only the popup is ours, because the one the
+ *  platform draws ignores every token in the stylesheet. */
 export function Select(props: ComponentProps<'select'> & ControlOwn) {
-  const [own, rest] = splitProps(props, ['size', 'invalid', 'width', 'kind', 'class'])
-  return <select {...rest} {...controlAttrs(own)} />
+  const [own, trigger, rest] = splitProps(
+    props,
+    ['size', 'invalid', 'width', 'kind', 'class'],
+    ['id', 'title', 'disabled', 'aria-label', 'aria-labelledby'],
+  )
+  let native: HTMLSelectElement | undefined
+  let triggerRef: HTMLButtonElement | undefined
+
+  // The hidden select is read, not modelled, so a signal has to say when to read it again. Options
+  // arrive from the caller's <For> long after mount (a repository list, a branch list), and the
+  // observer is what notices.
+  const [version, setVersion] = createSignal(0)
+  const bump = () => setVersion((n) => n + 1)
+  onMount(() => {
+    if (!native) return
+    const observer = new MutationObserver(() => bump())
+    observer.observe(native, { attributes: true, characterData: true, childList: true, subtree: true })
+    onCleanup(() => observer.disconnect())
+    bump()
+  })
+  // Solid writes `value` as a property, which no observer sees.
+  createEffect(() => {
+    void rest.value
+    bump()
+  })
+  // Options usually arrive after the value does, and a <select> told to hold a value it has no
+  // option for quietly falls back to the first one, which left a picker restored from a saved
+  // project sitting on the wrong row. Put the caller's value back once its option turns up.
+  createEffect(() => {
+    version()
+    const wanted = rest.value
+    if (!native || wanted == null || Array.isArray(wanted)) return
+    const want = String(wanted)
+    if (native.value === want || ![...native.options].some((option) => option.value === want)) return
+    native.value = want
+    bump()
+  })
+
+  const options = (): HTMLOptionElement[] => {
+    version()
+    return native ? [...native.options] : []
+  }
+  const value = () => {
+    version()
+    return native?.value
+  }
+  const label = () => {
+    version()
+    return native?.selectedOptions[0]?.text ?? ''
+  }
+
+  const popover = createAnchoredPopover({
+    anchor: () => triggerRef,
+    minWidth: 'anchor',
+    // A select near the bottom of a pane would otherwise open past the bottom of the window. Clamp
+    // pulls the list back inside, over the trigger, which is what the platform's own popup does.
+    clamp: true,
+    disabled: () => !!trigger.disabled,
+    onDismiss: () => triggerRef?.focus(),
+  })
+
+  const pick = (option: HTMLOptionElement) => {
+    popover.close()
+    if (!native || option.disabled) return
+    native.value = option.value
+    // The caller's onChange is bound to the select, so the change has to come from the select.
+    native.dispatchEvent(new Event('change', { bubbles: true }))
+    bump()
+  }
+
+  return (
+    <>
+      <select {...rest} ref={native} disabled={trigger.disabled} class="ui-select-native" tabindex={-1} aria-hidden="true" />
+      <button
+        type="button"
+        {...trigger}
+        ref={triggerRef}
+        {...controlAttrs(own, 'ui-input ui-select')}
+        aria-haspopup="listbox"
+        aria-expanded={popover.open()}
+        onClick={() => popover.toggle()}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+          event.preventDefault()
+          popover.show()
+        }}
+      >
+        <span class="ui-select-value">{label()}</span>
+        <span class="ui-select-chevron" aria-hidden="true">▾</span>
+      </button>
+      <Show when={popover.open()}>
+        <SelectList
+          popover={popover}
+          options={options}
+          value={value}
+          ariaLabel={trigger['aria-label'] ?? undefined}
+          onPick={pick}
+        />
+      </Show>
+    </>
+  )
 }
 
 export function Textarea(props: ComponentProps<'textarea'> & ControlOwn & { mono?: boolean }) {

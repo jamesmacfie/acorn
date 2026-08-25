@@ -82,6 +82,19 @@
 .ui-input[data-invalid] { border-color: var(--danger); }
 textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 
+/* Select: the trigger wears .ui-input so it lines up with every other control, and the list is a
+   .ui-popover borrowing the menu's item vocabulary. The native <select> is still in the DOM as the
+   value store; see primitives.tsx (Select) for why. */
+.ui-select { display: flex; align-items: center; gap: var(--space-3); text-align: left; cursor: pointer; }
+.ui-select-native { display: none; }
+.ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-select-chevron { flex: none; color: var(--text-faint); font-size: var(--fs-2xs); }
+.ui-select-list { max-height: min(60vh, 420px); overflow-y: auto; }
+/* Without this the labels wrap instead of widening the list, and the list was sized to fit the
+   trigger it opened under. */
+.ui-select-list .ui-menu-item { white-space: nowrap; }
+.ui-select-list .ui-menu-item[aria-selected='true'] { background: var(--bg-selected); }
+
 .ui-field { display: flex; flex-direction: column; gap: var(--space-3); }
 .ui-field[data-layout='row'] { flex-direction: row; align-items: center; gap: var(--space-4); }
 /* See docs/ui-design.md § How the primitives are built (Field) for `data-layout='split'`. */
