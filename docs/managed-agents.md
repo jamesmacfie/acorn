@@ -199,10 +199,17 @@ be tested against what the harness actually sent.
   every later update folds there wherever it arrives from, because a provider need not repeat the
   attribution on each one. Claude's adapter in particular tags a subagent's `tool_call` and its final
   `tool_call_update` and leaves the one in between untagged.
+- A subagent's mark is the same icon-and-colour pair a session gets (`RuntimeStateIcon.tsx`), so a
+  running child turns the same loader as a working session: one glance answers "is this moving?" for
+  both kinds of row. Its line names the status, the role where that is not already the title, and the
+  model. Codex never names a child's model and Claude only names it once the child has finished, so
+  until then the line shows the session's own, which is what a child inherits unless the spawn asked for
+  another. The token count is collected on the roster but not shown: Codex's arrives in bursts and
+  Claude's only at completion, so the number a reader watched was mostly stale.
 - What reaches a subagent's stream is narrower than its parent's, and it differs by harness rather than
-  by choice: a Codex child sends prose, reasoning, tool calls and diffs, and its own status and token
-  usage become the row rather than cards; a Claude subagent sends tool calls and diffs only, since the
-  CLI does not forward a subagent's prose. A Codex child's plan is dropped, because `plan` carries no
+  by choice: a Codex child sends prose, reasoning, tool calls and diffs, and its own status becomes the
+  row rather than cards; a Claude subagent sends tool calls and diffs only, since the CLI does not
+  forward a subagent's prose. A Codex child's plan is dropped, because `plan` carries no
   attribution and a child's plan is not the session's.
 - Selecting a sub-row, or the card's own **Open**, moves the whole message window onto that subagent's
   run: the transcript renders the card's children as its top level and a header names the subagent, with
