@@ -133,6 +133,7 @@ because its data comes from a route on your always-running node half.
 | `themes` | 8 | A **colour** theme: `{ id, label, dark?, tokens }`, where `tokens` is the complete palette. You write no CSS — the host generates the block. See below. |
 | `contextMenus` | 8 | A row on a host-drawn right-click menu: `{ id, location, label, icon?, order?, when?, action }`. `location` is from a closed list (`task.row` today); `when` is a map of literals that must all equal the target's facts; `action` takes the narrow verb set and receives the id of what was right-clicked. |
 | `extensionPoints` | 4 | A strip inside one of **your** panes that other plugins may fill: `{ id, label, location, surface }`. `location` is from a closed list (`pane.footer` today) and `surface` must be a `pane` this manifest declares. You write no code for it — the host draws the strip. |
+| `schedules` | 4 | Work the node runs on a timer: `{ id, name, run, cadence, timeout? }`. `run` is a POST on your own namespace, called with `{ scheduleId }`, and its response is ignored beyond ok or error. `timeout` is seconds, defaulting to 60. The host mints the key from your plugin id, which is what opts the schedule into the 300-second plugin cadence floor. See `docs/schedules.md`. |
 | `taskChecks` | 4 | What you have to say when the owner archives a task, and the cleanup you offer to do: `{ id, check, apply?, timeout? }`. `check` is a GET answering `{ concern }`; `apply` is a POST the archive runs if the owner leaves your checkbox ticked. See below. |
 | `extensions` | 8 | Rows **you** put inside another plugin's point: `{ id, point, label, order?, items, onSelect?, refresh? }`. `point` is `<ownerPluginId>:<pointId>`, `items` is a GET on your own namespace, `onSelect` takes the narrow verb set. |
 | `harnesses` | 4 | A managed agent acorn starts, drives and draws a transcript for: `{ id, label, glyph?, spawn, envPassthrough?, quirks?, probes?, terminal? }`. The only contribution that names a program acorn will run, and the only node-side one that needs no bundle at all. See [§ Harnesses](#harnesses). |
@@ -337,6 +338,7 @@ accepts it, which predates the split and should not be relied on.)
 | Verb | Effect |
 | --- | --- |
 | `openPane` | Push a task-scoped pane from this manifest into the active task's layout, carrying the clicked row's id as a pane intent. |
+| `openTask` | Go to the task the row names, and stop. For a row whose subject *is* a task, where picking a pane on the reader's behalf would be `openPane` wearing another name. A row that names no task gets a toast saying so. |
 | `navigate` | Change the URL to the route this manifest declared for a project-scoped pane, with the selected row as the addressed item. |
 | `runNodeAction` | POST to a path inside `/v2/p/<id>/`. |
 | `createTask` | Host-owned promotion: the row supplies the task seed, the host owns the modal, the ownership check and the ordering. |
@@ -344,7 +346,7 @@ accepts it, which predates the split and should not be relied on.)
 | `openOverlay` | Open a full-screen picker this manifest declares. |
 | `surfaceAction` | Deliver this command's own id to the frame region of a `document-over-frame` pane. The only verb whose effect lands inside a plugin. |
 
-Commands, slot badges and a source's `emptyState` take a **five-verb subset**: `openPane`,
+Commands, slot badges and a source's `emptyState` take a **six-verb subset**: `openPane`, `openTask`,
 `runNodeAction`, `openUrl`, `openOverlay`, `surfaceAction`. `createTask` and `navigate` are absent
 because they need a selected row and a routed project respectively, and a command registry row has
 neither. A verb that parses and can then only fail is worse for an author than one the manifest
@@ -440,15 +442,22 @@ What a loaded plugin's `ctx` does **not** have, whatever the manifest says: `ctx
 boundary; a `(Request, PluginRequestContext) => Response` function can, so `ctx.routes.fetch(handler)`
 is the door. The host strips the mount before calling you, so a request to
 `/v2/p/<id>/greeting` reaches your handler as `/greeting` — the same relative path a mounted router
-would see. `ctx.storage`, `ctx.core`, `ctx.tools`, `ctx.contextSections`, `ctx.providers`,
+would see. `ctx.storage`, `ctx.core`, `ctx.tools`, `ctx.schedules`, `ctx.collections`,
+`ctx.nodeActions`, `ctx.taskChecks`, `ctx.harnesses`, `ctx.contextSections`, `ctx.providers`,
 `ctx.capabilities`, `ctx.events.send`/`status`/`notice` and `ctx.log` are all present, shaped by the
 manifest.
+
+The five registries between `tools` and `contextSections` are owner-bound: the host stamps your plugin
+id onto whatever you register, so a schedule, collection, node action, task check or harness cannot be
+filed under another package's name. Four of them are also manifest keys, and the host synthesises those
+declarations through this same seam, so declare in the manifest by preference — that is the copy the
+owner reads at install.
 
 ## The client half
 
 A frame is a **host-generated iframe document**, not a component in the shell's tree. The shell
 serves it from a content-addressed cache on `app-plugin://<bundle-hash>/`, and the handler answers
-exactly four paths (`apps/desktop/src/app/main/pluginScheme.ts`):
+exactly four paths (`apps/desktop/src-tauri/src/plugin_scheme.rs`):
 
 - `/` and `/index.html` — the generated document. The plugin owns what runs; it does not own the
   document, the CSP or the bootstrap, which is what keeps the policy un-overridable by markup.
