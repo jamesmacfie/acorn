@@ -57,7 +57,24 @@
   gap: var(--space-3);
   padding: var(--space-6);
 }
-.managed-agent-provider-cards span { color: var(--text-muted); font-size: var(--fs-sm); }
+/* The card's second line. A direct child, because the title line now holds a glyph of its own and a
+   descendant selector greyed it out. */
+.managed-agent-provider-card > span { color: var(--text-muted); font-size: var(--fs-sm); }
+
+/* A provider's mark beside its name, on the onboarding cards, the New picker's rows and each block in
+   Settings -> Agent defaults. --brand-legible is the mark's own colour, held to the theme's contrast;
+   the token carries the reasoning (docs/ui-design.md § Brand colour). */
+.managed-agent-provider-glyph {
+  display: inline-flex;
+  flex: none;
+  vertical-align: -0.125em;
+  color: var(--brand-legible);
+}
+/* The picker row brings its own gap; a run of text does not. :where() so neither rule can outrank
+   what a surface says about its own glyph later. */
+:where(.managed-agent-provider-card strong, .agent-defaults-provider) .managed-agent-provider-glyph {
+  margin-inline-end: var(--space-3);
+}
 
 .agent-transcript-wrap {
   flex: 1;
@@ -487,7 +504,9 @@
 
 .agent-queued-turns {
   flex: 0 0 auto;
-  margin: 0 var(--space-4) var(--space-2);
+  /* Same 880px box as the composer below, so a queued follow-up never reads wider than the box it feeds. */
+  width: min(880px, 100% - 2 * var(--space-4));
+  margin: 0 auto var(--space-2);
   padding: var(--space-2);
   border: var(--surface-border);
   border-radius: var(--radius-md);
