@@ -9,7 +9,8 @@ import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'
 import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { Alert, EmptyState, Icon, Input, Row, SegmentedControl, Select, StatusDot } from '@acorn/plugin-api/ui'
-import { providerTone, runtimeTone } from './stateTone'
+import RuntimeStateIcon from './RuntimeStateIcon'
+import { providerTone } from './stateTone'
 import './agent-center.css'
 
 
@@ -259,7 +260,7 @@ export default function AgentCenter() {
                   </small>
                 </span>
                 <span class="agent-center-state">
-                  <StatusDot tone={runtimeTone(session.runtimeState)} />
+                  <RuntimeStateIcon state={session.runtimeState} />
                   <span>{session.runtimeState}<small>{session.attention === 'none' ? '' : session.attention.replace('_', ' ')}</small></span>
                 </span>
                 <span class="muted">{elapsed(session.updatedAt)}</span>
