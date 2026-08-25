@@ -1,0 +1,15 @@
+.agent-state-icon { display: inline-flex; align-items: center; color: var(--text-faint); }
+/* Sized to the dot it replaced rather than to the words beside it. At 1em an icon matches the line
+   it sits in and reads as a second piece of content instead of as a marker. */
+.agent-state-icon svg { width: var(--space-5); height: var(--space-5); }
+/* The loader turns while the agent is mid-flight. No prefers-reduced-motion guard, unlike core's
+   `.spin`: this is the whole signal that an agent is running, and a 10px rotation is not the kind of
+   motion that setting is there to stop. */
+.agent-state-icon[data-state='working'] svg,
+.agent-state-icon[data-state='cancelling'] svg,
+.agent-state-icon[data-state='reconnecting'] svg { animation: spin 1s linear infinite; }
+.agent-state-icon[data-tone='ok'] { color: var(--state-ok); }
+.agent-state-icon[data-tone='warn'] { color: var(--state-warn); }
+.agent-state-icon[data-tone='bad'] { color: var(--state-bad); }
+.agent-state-icon[data-tone='accent'] { color: var(--accent); }
+.agent-state-icon[data-tone='muted'] { color: var(--text-faint); }

@@ -42,46 +42,19 @@
   margin-inline-end: var(--space-2);
   color: var(--brand-legible);
 }
-/* The state icon. Faint is the resting colour, so a settled session sits quiet and only the states
-   worth reading carry a hue: green while it works, warn once it stops, red when it fails. A finished
-   session is deliberately not green — most rows in a busy task are finished, and colouring all of
-   them drowns out the one that needs you. */
-.agent-task-state {
-  color: var(--text-faint);
-  font-family: var(--font-glyph);
-  /* The height is the title's line box, and the icon centres inside it. The row aligns its children
-     to the top, so a box that is only as tall as its 10px icon rides above the title beside it. A
-     text glyph never showed this because a line box came with it. */
-  display: inline-flex;
-  align-items: center;
-  height: calc(var(--fs-sm) * var(--lh));
-}
-/* Sized down to sit with the row's smallest type and the 8px subagent dot below it. At 1em an icon
-   is the full 13px of the title line and reads as a second piece of content rather than a marker. */
-.agent-task-state svg { width: var(--space-5); height: var(--space-5); }
-/* The loader turns while the agent is mid-flight. No prefers-reduced-motion guard, unlike core's
-   `.spin`: this is the whole signal that an agent is running, and a 10px rotation is not the kind of
-   motion that setting is there to stop. */
-.agent-task-state[data-state='working'] svg,
-.agent-task-state[data-state='cancelling'] svg,
-.agent-task-state[data-state='reconnecting'] svg { animation: spin 1s linear infinite; }
-/* The terminal and workflow rows below, which still draw a text glyph and have their own state
-   words. A managed session carries `data-tone` as well, and the tone rules that follow win on
-   document order where the two vocabularies share a word. */
+/* The terminal and workflow rows, which still draw a text glyph and have state words of their own.
+   A managed session's mark is RuntimeStateIcon and is styled with it. */
+.agent-task-state { color: var(--text-faint); font-family: var(--font-glyph); }
 .agent-task-state[data-state='starting'],
 .agent-task-state[data-state='working'] { color: var(--state-ok); }
 .agent-task-state[data-state='waiting'],
 .agent-task-state[data-state='blocked'],
 .agent-task-state[data-state='permission'] { color: var(--warn); }
 .agent-task-state[data-state='failed'] { color: var(--del-marker); }
-/* A managed session's colour comes from `runtimeTone`, the same function the Agent Center, the pane
-   header and the sessions dashboard panel read. One mapping, so a state cannot be green here and
-   grey two surfaces over. */
-.agent-task-state[data-tone='ok'] { color: var(--state-ok); }
-.agent-task-state[data-tone='warn'] { color: var(--state-warn); }
-.agent-task-state[data-tone='bad'] { color: var(--state-bad); }
-.agent-task-state[data-tone='accent'] { color: var(--accent); }
-.agent-task-state[data-tone='muted'] { color: var(--text-faint); }
+/* A session row aligns its children to the top, so the mark needs the title's line box to centre in.
+   Without it a box only as tall as its 10px icon rides above the title beside it, which a text glyph
+   never showed because a line box came with it. */
+.agent-task-row .agent-state-icon { height: calc(var(--fs-sm) * var(--lh)); }
 /* A subagent, indented under the session that spawned it. Two classes in the selector on purpose:
    `.agent-task-row` is on the same element and would tie with a single class on specificity, so the
    indent would land or not depending on rule order (docs/ui-design.md § Border roles covers the same

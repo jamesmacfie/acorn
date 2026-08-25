@@ -21,8 +21,8 @@ import ProviderGlyph from './ProviderGlyph'
 import QueuedAgentTurns from './QueuedAgentTurns'
 import { latestAutomaticTaskContext } from './automaticTaskContext'
 import { canStopAgent } from './agentActivity'
-import { Alert, Button, Card, EmptyState, Field, Icon, Input, ListDetail, Menu, Modal, Picker, StatusDot } from '@acorn/plugin-api/ui'
-import { runtimeTone } from './stateTone'
+import { Alert, Button, Card, EmptyState, Field, Icon, Input, ListDetail, Menu, Modal, Picker } from '@acorn/plugin-api/ui'
+import RuntimeStateIcon from './RuntimeStateIcon'
 import './managed-agents.css'
 
 const capability = (provider: AgentProviderDescriptor | undefined, name: string): boolean =>
@@ -308,7 +308,7 @@ export default function AgentPane(props: { task: Task }) {
           {(session) => (
             <>
               <span class="managed-agent-state">
-                <StatusDot tone={runtimeTone(session().runtimeState)} />{session().runtimeState}
+                <RuntimeStateIcon state={session().runtimeState} />{session().runtimeState}
               </span>
               <Button
                 disabled={!canStopAgent(session())}

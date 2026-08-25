@@ -8,19 +8,12 @@ import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
 import { sessionModelLabel } from './agentConfigOptions'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
-import { runtimeIcon, runtimeTone, subagentTone } from './stateTone'
+import RuntimeStateIcon from './RuntimeStateIcon'
+import { subagentTone } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
 import { WORKFLOW_CONTROL } from '../contract/workflowControl'
 import './agent-task-sidebar.css'
-
-function RuntimeIcon(props: { state: string }) {
-  return (
-    <span class="agent-task-state" data-state={props.state} data-tone={runtimeTone(props.state)}>
-      <Icon name={runtimeIcon(props.state)} />
-    </span>
-  )
-}
 
 const LEGACY_GLYPH: Record<string, string> = {
   starting: '◔',
@@ -141,7 +134,7 @@ export default function AgentTaskSidebar(props: {
                 <Row
                   density="compact"
                   class="agent-task-row"
-                  leading={<RuntimeIcon state="waiting" />}
+                  leading={<RuntimeStateIcon state="waiting" />}
                   trailing={<Badge tone="warn" size="xs">{request.kind.replace('_', ' ')}</Badge>}
                   onActivate={() => props.onSelectSession(session.id, request.providerRequestId)}
                 >
@@ -168,7 +161,7 @@ export default function AgentTaskSidebar(props: {
                     density="compact"
                     class="agent-task-row managed-agent-session-row"
                     selected={session().id === props.selectedSessionId}
-                    leading={<RuntimeIcon state={session().runtimeState} />}
+                    leading={<RuntimeStateIcon state={session().runtimeState} />}
                     trailing={
                       <>
                         <Show when={!['none', 'unread'].includes(session().attention)}>
