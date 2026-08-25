@@ -2,32 +2,34 @@ import { describe, expect, it } from 'vitest'
 import { subagentStatusLabel, subagentSummary } from './subagentDisplay'
 
 describe('subagent display', () => {
-  it('says idle in full', () => {
-    // "Idle" alone reads as stalled. A Codex child at rest is finished and resumable, which is the
-    // opposite of stuck.
-    expect(subagentStatusLabel('idle')).toBe('Idle, resumable')
+  it('calls a resting subagent idle, the same word a session at rest gets', () => {
+    expect(subagentStatusLabel('idle')).toBe('Idle')
   })
 
   it('reports only what the harness actually sent', () => {
-    // Codex mid-run: a live token count off the child thread, and no model, ever.
-    expect(subagentSummary({ id: 's1', title: 'alpha', status: 'running', usage: { contextUsed: 20_740 } }))
-      .toBe('Working · 20,740 tok')
-    // Claude at completion: model, tokens, tool uses and duration all arrive together.
+    // Codex mid-run: no model, ever, so the session's own stands in for the one the child inherited.
+    expect(subagentSummary({ id: 's1', title: 'alpha', status: 'running' }, 'GPT-5.6 Sol'))
+      .toBe('Working · GPT-5.6 Sol')
+    // Claude at completion: model, tool uses and duration all arrive together, and the child's own
+    // model wins over the session's.
     expect(subagentSummary({
       id: 's2',
       title: 'Read alpha.txt first line',
       status: 'completed',
       role: 'general-purpose',
       model: 'claude-opus-5[1m]',
-      usage: { contextUsed: 17_375 },
       toolUseCount: 3,
       durationMs: 1_538,
-    })).toBe('Completed · general-purpose · claude-opus-5[1m] · 17,375 tok · 3 tool uses · 1.5s')
+    }, 'claude-sonnet-5')).toBe('Completed · general-purpose · claude-opus-5[1m] · 3 tool uses · 1.5s')
+  })
+
+  it('says nothing about a model nobody named', () => {
+    expect(subagentSummary({ id: 's1', title: 'alpha', status: 'running' })).toBe('Working')
   })
 
   it('does not say the name twice', () => {
     // Codex names a subagent from its agent path, so title and role are the same word.
-    expect(subagentSummary({ id: 's1', title: 'alpha', role: 'alpha', status: 'idle' })).toBe('Idle, resumable')
+    expect(subagentSummary({ id: 's1', title: 'alpha', role: 'alpha', status: 'idle' })).toBe('Idle')
   })
 
   it('agrees with itself about one tool use', () => {

@@ -46,7 +46,7 @@ export const runtimeIcon = (state: string): string => RUNTIME_ICON[state] ?? 'ci
    so `agentToolTone` sits beside the renderer contract in client-core instead. */
 
 /** A subagent's status, in its transcript card and its sidebar row. `idle` is settled rather than
- *  in flight: a Codex child rests resumable when it is done, and an accent dot on a resting subagent
+ *  in flight: a Codex child rests resumable when it is done, and an accent mark on a resting subagent
  *  reads as stuck. The word for each status lives in subagentDisplay.ts. */
 export const subagentTone = (status: AgentSubagentStatus | undefined): Tone => {
   if (status === 'running' || status === 'pending') return 'accent'
@@ -54,6 +54,21 @@ export const subagentTone = (status: AgentSubagentStatus | undefined): Tone => {
   if (status === 'failed') return 'bad'
   return 'muted'
 }
+
+/** The shape beside that colour, the pair RUNTIME_ICON makes for a session. A subagent that is running
+ *  gets the same turning loader as a session that is working, because a reader scanning the sidebar is
+ *  asking one question of both kinds of row: is this thing moving? An idle subagent borrows `ready`'s
+ *  circle for the same reason: it is resting, not finished. */
+const SUBAGENT_ICON: Record<AgentSubagentStatus, string> = {
+  pending: 'clock',
+  running: 'loader-circle',
+  idle: 'circle',
+  completed: 'circle-check',
+  failed: 'triangle-alert',
+}
+
+export const subagentIcon = (status: AgentSubagentStatus | undefined): string =>
+  status ? SUBAGENT_ICON[status] : SUBAGENT_ICON.running
 
 /** A provider's install/auth health in the Agent Center header. */
 export const providerTone = (health: 'ok' | 'error' | 'missing'): Tone => {

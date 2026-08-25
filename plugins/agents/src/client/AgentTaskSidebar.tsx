@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, For, Index, onCleanup, onMount, Show } from 'solid-js'
 import { capabilities, clientCapability, refreshSessions, requestTerminalFocus, sessions, setTerminalOpen, type Task, wsOnStatus } from '@acorn/plugin-api/client'
-import { Badge, Button, Icon, Menu, Row, StatusDot } from '@acorn/plugin-api/ui'
+import { Badge, Button, Icon, Menu, Row } from '@acorn/plugin-api/ui'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
@@ -8,8 +8,7 @@ import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
 import { sessionModelLabel } from './agentConfigOptions'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
-import RuntimeStateIcon from './RuntimeStateIcon'
-import { subagentTone } from './stateTone'
+import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
 import { WORKFLOW_CONTROL } from '../contract/workflowControl'
@@ -233,11 +232,11 @@ export default function AgentTaskSidebar(props: {
                         density="compact"
                         class="agent-task-row agent-task-subagent-row"
                         selected={session().id === props.selectedSessionId && subagent().id === props.selectedSubagentId}
-                        leading={<StatusDot tone={subagentTone(subagent().status)} />}
+                        leading={<SubagentStateIcon status={subagent().status} />}
                         onActivate={() => props.onSelectSubagent(session().id, subagent().id)}
                       >
                         <strong>{subagent().title}</strong>
-                        <small>{subagentSummary(subagent())}</small>
+                        <small>{subagentSummary(subagent(), sessionModelLabel(session()))}</small>
                       </Row>
                     )}
                   </Index>

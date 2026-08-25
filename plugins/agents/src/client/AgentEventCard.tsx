@@ -5,8 +5,8 @@ import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
 import { managedAgentApi } from './managedClient'
 import { AgentToolCallCard } from './toolRendererRegistry'
-import { Button, StatusDot } from '@acorn/plugin-api/ui'
-import { subagentTone } from './stateTone'
+import { Button } from '@acorn/plugin-api/ui'
+import { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
 import { selectManagedSubagent } from './managedSelection'
 import { visibleConversationItems } from './conversationItems'
@@ -50,6 +50,8 @@ export default function AgentEventCard(props: {
   item: AgentConversationItem
   taskId: string
   sessionId: string
+  /** The session's own model, which a subagent card shows when the harness never named the child's. */
+  sessionModel?: string
   turn?: AgentTurn
 }) {
   const event = () => props.item.event
@@ -148,9 +150,9 @@ export default function AgentEventCard(props: {
               onToggle={(toggle) => setOpen(toggle.currentTarget.open)}
             >
               <summary>
-                <StatusDot tone={subagentTone(subagent().status)} />
+                <SubagentStateIcon status={subagent().status} />
                 <span class="agent-subagent-title">{subagent().title ?? 'Subagent'}</span>
-                <span class="muted">{subagentSummary(subagent())}</span>
+                <span class="muted">{subagentSummary(subagent(), props.sessionModel)}</span>
                 {/* Straight to the dedicated view, for a run too long to read in a box. `onClick` stops
                     the event rather than the default, so the button does not also toggle the summary. */}
                 <Button
@@ -175,6 +177,7 @@ export default function AgentEventCard(props: {
                       item={child()}
                       taskId={props.taskId}
                       sessionId={props.sessionId}
+                      sessionModel={props.sessionModel}
                       turn={props.turn}
                     />
                   )}

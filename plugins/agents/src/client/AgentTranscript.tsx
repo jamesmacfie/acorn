@@ -6,6 +6,7 @@ import AgentEventCard from './AgentEventCard'
 import AgentRequestCard from './AgentRequestCard'
 import { buildConversationItems, findSubagentItem, visibleConversationItems } from './conversationItems'
 import { nextFollowing } from './followScroll'
+import { sessionModelLabel } from './agentConfigOptions'
 import { Button, EmptyState } from '@acorn/plugin-api/ui'
 import { subagentSummary } from './subagentDisplay'
 import { agentSessionIsStarting } from './agentComposerState'
@@ -62,6 +63,7 @@ export default function AgentTranscript(props: {
   const pending = createMemo(() => props.snapshot.requests.filter((request) =>
     request.status === 'pending' || request.status === 'resolving'))
   const sessionId = createMemo(() => props.snapshot.session.id)
+  const sessionModel = createMemo(() => sessionModelLabel(props.snapshot.session))
   // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
   // different lists, so one key would restore the wrong offset every time the reader stepped in or out.
   const viewId = createMemo(() => focused() ? `${sessionId()}:${props.focusSubagentId}` : sessionId())
@@ -129,6 +131,12 @@ export default function AgentTranscript(props: {
   createEffect(on(viewId, (id) => {
     target = scrollTopBySession.get(id) ?? null
     following = target === null
+    // The click that opened a subagent armed this on the way out of the parent's stream. Left armed, it
+    // is spent on the first scroll event the new view produces, and stepping into a running subagent
+    // clamps scrollTop the moment the shorter list renders, so that event reads as "the reader scrolled
+    // up" and the run stops following its own bottom. Whose input it was does not survive the view it
+    // was made in.
+    userDriven = false
     if (target === null) pin()
     else applyTarget()
   }))
@@ -152,7 +160,10 @@ export default function AgentTranscript(props: {
         {(subagent) => (
           <div class="agent-subagent-crumb">
             <Button variant="bare" size="sm" onClick={props.onExitSubagent}>← {props.snapshot.session.title}</Button>
-            <span><strong>{subagent().title ?? 'Subagent'}</strong><small>{subagentSummary(subagent())}</small></span>
+            <span>
+              <strong>{subagent().title ?? 'Subagent'}</strong>
+              <small>{subagentSummary(subagent(), sessionModel())}</small>
+            </span>
           </div>
         )}
       </Show>
@@ -198,6 +209,7 @@ export default function AgentTranscript(props: {
                     item={item()}
                     taskId={props.taskId}
                     sessionId={sessionId()}
+                    sessionModel={sessionModel()}
                     turn={props.snapshot.turns.find((turn) => turn.id === item().turnId)}
                   />
                 )}

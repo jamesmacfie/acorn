@@ -137,7 +137,7 @@ describe('CodexChildRouter over the capture', () => {
 
   it('does not call a child idle before it has ever run', () => {
     // A child's first thread/status/changed is `idle`, before it starts. Reporting that as settled
-    // flashes "Idle, resumable" on a subagent that has not done anything yet.
+    // flashes "Idle" on a subagent that has not done anything yet.
     const { rosterFor } = replay()
     for (const threadId of childThreadIds) {
       const statuses = rosterFor(threadId).flatMap((update) => update.status ? [update.status] : [])
