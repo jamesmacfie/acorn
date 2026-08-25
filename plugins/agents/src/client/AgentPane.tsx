@@ -20,6 +20,7 @@ import AgentUsageIndicator from './AgentUsageIndicator'
 import ProviderGlyph from './ProviderGlyph'
 import QueuedAgentTurns from './QueuedAgentTurns'
 import { latestAutomaticTaskContext } from './automaticTaskContext'
+import { canStopAgent } from './agentActivity'
 import { Alert, Button, Card, EmptyState, Field, Icon, Input, ListDetail, Menu, Modal, Picker, StatusDot } from '@acorn/plugin-api/ui'
 import { runtimeTone } from './stateTone'
 import './managed-agents.css'
@@ -310,7 +311,7 @@ export default function AgentPane(props: { task: Task }) {
                 <StatusDot tone={runtimeTone(session().runtimeState)} />{session().runtimeState}
               </span>
               <Button
-                disabled={!['working', 'waiting', 'cancelling'].includes(session().runtimeState)}
+                disabled={!canStopAgent(session())}
                 onClick={() => void action(() => managedAgentApi.cancel(session().id))}
               >
                 Stop
