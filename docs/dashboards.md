@@ -33,7 +33,8 @@ The wire contract is `@acorn/protocol/collections.ts`. A route answers:
 ```jsonc
 {
   "schema": { "fields": [{ "id": "status", "name": "Status", "type": "enum", "role": "status",
-                           "values": [{ "id": "open", "label": "Open", "tone": "accent" }] }] },
+                           "values": [{ "id": "open", "label": "Open", "tone": "accent",
+                                        "icon": "circle-dot" }] }] },
   "rows": [{ "id": "acme/web#412", "values": { "status": "open" },
              "action": { "verb": "openUrl", "url": "https://github.com/acme/web/pull/412" } }]
 }
@@ -54,7 +55,7 @@ Seven field types and five roles. Both closed, both versioned with the protocol.
 | `number` | formatted, with the field's declared `unit` | sort, `sum`/`avg`/`min`/`max` |
 | `boolean` | check or dash | filter |
 | `datetime` | absolute plus "2h ago"; epoch milliseconds on the wire | sort, before/after |
-| `enum` | toned chip, from the field's declared values | group-by (kanban), filter |
+| `enum` | toned chip, from the field's declared values, with the value's `icon` in place of its dot | group-by (kanban), filter |
 | `person` | a monogram plus the name | filter |
 | `link` | anchor that does not trigger the row's own action | click-through |
 
@@ -394,6 +395,13 @@ series inside it, on the shared measure scale. That is a third shape by arithmet
 which is why it needed no codec change and why a client that does not draw it renders the ungrouped
 bar rather than nothing. The split is offered only where it is representable: any enum for a line,
 and any enum but the category axis for a bar, so a single-enum collection is never offered one.
+
+A value may also name an `icon`, which a cell draws in place of the dot, in the value's own tone. Five
+dots differing only in hue are read one at a time; a stop sign, a warning triangle and a turning
+loader are read at a glance. The name goes through the host's ordinary icon resolution
+(docs/ui-design.md § Icons), and a name with no icon behind it falls back to the dot, so this is a
+hint and never a requirement. A value whose icon is `loader-circle` turns, since a still loader says
+the opposite of what it is for. Charts ignore the icon and keep the tone: a bar is already a shape.
 
 Every mark carries an attribute rather than a colour, and which one depends on what the mark is
 saying. A value the plugin gave a tone carries `data-tone`, the five-value status vocabulary

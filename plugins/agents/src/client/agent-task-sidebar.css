@@ -64,20 +64,24 @@
    motion that setting is there to stop. */
 .agent-task-state[data-state='working'] svg,
 .agent-task-state[data-state='cancelling'] svg,
-.agent-task-state[data-state='reconnecting'] svg { animation: agent-task-spin 1s linear infinite; }
-@keyframes agent-task-spin { to { transform: rotate(1turn); } }
-.agent-task-state[data-state='working'],
-.agent-task-state[data-state='starting'] { color: var(--state-ok); }
-.agent-task-state[data-state='creating'],
-.agent-task-state[data-state='connecting'],
-.agent-task-state[data-state='replaying'],
-.agent-task-state[data-state='reconnecting'] { color: var(--accent); }
+.agent-task-state[data-state='reconnecting'] svg { animation: spin 1s linear infinite; }
+/* The terminal and workflow rows below, which still draw a text glyph and have their own state
+   words. A managed session carries `data-tone` as well, and the tone rules that follow win on
+   document order where the two vocabularies share a word. */
+.agent-task-state[data-state='starting'],
+.agent-task-state[data-state='working'] { color: var(--state-ok); }
 .agent-task-state[data-state='waiting'],
 .agent-task-state[data-state='blocked'],
-.agent-task-state[data-state='permission'],
-.agent-task-state[data-state='cancelling'],
-.agent-task-state[data-state='stopped'] { color: var(--state-warn); }
-.agent-task-state[data-state='failed'] { color: var(--state-bad); }
+.agent-task-state[data-state='permission'] { color: var(--warn); }
+.agent-task-state[data-state='failed'] { color: var(--del-marker); }
+/* A managed session's colour comes from `runtimeTone`, the same function the Agent Center, the pane
+   header and the sessions dashboard panel read. One mapping, so a state cannot be green here and
+   grey two surfaces over. */
+.agent-task-state[data-tone='ok'] { color: var(--state-ok); }
+.agent-task-state[data-tone='warn'] { color: var(--state-warn); }
+.agent-task-state[data-tone='bad'] { color: var(--state-bad); }
+.agent-task-state[data-tone='accent'] { color: var(--accent); }
+.agent-task-state[data-tone='muted'] { color: var(--text-faint); }
 /* A subagent, indented under the session that spawned it. Two classes in the selector on purpose:
    `.agent-task-row` is on the same element and would tie with a single class on specificity, so the
    indent would land or not depending on rule order (docs/ui-design.md § Border roles covers the same

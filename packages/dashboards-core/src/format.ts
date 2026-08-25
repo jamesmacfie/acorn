@@ -15,7 +15,7 @@ export type FormattedCell =
   | { kind: 'number'; text: string }
   | { kind: 'boolean'; value: boolean; text: string }
   | { kind: 'datetime'; absolute: string; relative: string }
-  | { kind: 'enum'; label: string; tone: PanelTone }
+  | { kind: 'enum'; label: string; tone: PanelTone; icon?: string }
   | { kind: 'person'; name: string; initials: string }
   | { kind: 'link'; url: string; text: string }
 
@@ -80,7 +80,7 @@ export function formatCell(
       const declared = field.values?.find((candidate) => candidate.id === id)
       // A value the schema never declared still renders. A query-shaped collection can't always know
       // its values ahead of the data; it just can't be pre-toned or pre-ordered.
-      return { kind: 'enum', label: declared?.label ?? id, tone: declared?.tone ?? 'muted' }
+      return { kind: 'enum', label: declared?.label ?? id, tone: declared?.tone ?? 'muted', icon: declared?.icon }
     }
     case 'person': {
       const name = String(value)

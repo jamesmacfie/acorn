@@ -8,32 +8,16 @@ import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
 import { sessionModelLabel } from './agentConfigOptions'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
-import { subagentTone } from './stateTone'
+import { runtimeIcon, runtimeTone, subagentTone } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
 import { WORKFLOW_CONTROL } from '../contract/workflowControl'
 import './agent-task-sidebar.css'
 
-/* Lucide names, one per runtime state. The colour is CSS, keyed on the same `data-state` the span
-   carries, so the two stay in one place each rather than half a mapping in either. */
-const RUNTIME_ICON: Record<string, string> = {
-  creating: 'clock',
-  connecting: 'clock',
-  replaying: 'clock',
-  ready: 'circle',
-  working: 'loader-circle',
-  waiting: 'circle-alert',
-  cancelling: 'loader-circle',
-  reconnecting: 'loader-circle',
-  stopped: 'circle-stop',
-  failed: 'triangle-alert',
-  archived: 'archive',
-}
-
 function RuntimeIcon(props: { state: string }) {
   return (
-    <span class="agent-task-state" data-state={props.state}>
-      <Icon name={RUNTIME_ICON[props.state] ?? 'circle-dashed'} />
+    <span class="agent-task-state" data-state={props.state} data-tone={runtimeTone(props.state)}>
+      <Icon name={runtimeIcon(props.state)} />
     </span>
   )
 }

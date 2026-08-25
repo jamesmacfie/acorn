@@ -13,7 +13,7 @@ import type {
 import { sessionModelLabel } from './agentConfigOptions'
 import { managedAgentApi } from './managedClient'
 import { AGENT_PANE_ID } from './paneContribution'
-import { runtimeTone } from './stateTone'
+import { runtimeIcon, runtimeTone } from './stateTone'
 
 export const SESSIONS_COLLECTION_ID = 'sessions'
 
@@ -43,8 +43,10 @@ const ATTENTION_LABELS: Record<AgentAttentionReason, string> = {
   none: 'Nothing',
 }
 
+// Icon and tone both come from the pair in stateTone.ts, so a panel row and a sidebar row draw the
+// same state the same way.
 const stateValues: PluginCollectionEnumValue[] = Object.entries(STATE_LABELS)
-  .map(([id, label]) => ({ id, label, tone: runtimeTone(id) }))
+  .map(([id, label]) => ({ id, label, tone: runtimeTone(id), icon: runtimeIcon(id) }))
 
 // Only the reasons that block the owner get a warning tone. `completed` is a nudge and the rest are
 // quiet, the same split ATTENTION_COPY makes for the inbox.

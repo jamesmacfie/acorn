@@ -3,6 +3,7 @@ import { useNavigate } from '@solidjs/router'
 import type { PluginCollectionCell, PluginCollectionField } from '@acorn/protocol/collections.ts'
 import { openInAppUrl } from '../../registries/contentLinks'
 import { activeTaskId } from '../../tasks/tasks'
+import Icon from '../../ui/Icon'
 import { StatusDot } from '../../ui/primitives'
 import { formatCell, type FormattedCell } from '../format'
 
@@ -25,7 +26,15 @@ export default function Cell(props: { field: PluginCollectionField; value: Plugi
       <Match when={of('enum')()}>
         {(value) => (
           <span class="dash-cell-enum">
-            <StatusDot tone={value().tone} />
+            {/* An icon when the plugin named one, the dot otherwise. Both wear the value's tone, so
+                the colour vocabulary is the same either way and only the shape changes. */}
+            <Show when={value().icon} fallback={<StatusDot tone={value().tone} />}>
+              {(name) => (
+                <span class="dash-cell-enum-icon" data-tone={value().tone} data-icon={name()}>
+                  <Icon name={name()} />
+                </span>
+              )}
+            </Show>
             {value().label}
           </span>
         )}

@@ -36,6 +36,11 @@ describe('formatCell', () => {
     // A query-shaped collection cannot always know its values ahead of the data.
     expect(formatCell(declared, 'surprise')).toEqual({ kind: 'enum', label: 'surprise', tone: 'muted' })
     expect(formatCell(field({ type: 'enum' }), 'open')).toEqual({ kind: 'enum', label: 'open', tone: 'muted' })
+    // The icon rides along with the value that declared it, and a value nobody declared has none, so
+    // the cell falls back to the dot rather than to an icon borrowed from a neighbour.
+    const iconed = field({ type: 'enum', values: [{ id: 'working', label: 'Working', tone: 'ok', icon: 'loader-circle' }] })
+    expect(formatCell(iconed, 'working')).toMatchObject({ icon: 'loader-circle' })
+    expect(formatCell(iconed, 'surprise')).toEqual({ kind: 'enum', label: 'surprise', tone: 'muted' })
   })
 
   it('only calls a link a link when the host would actually open it', () => {
