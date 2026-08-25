@@ -17,6 +17,7 @@ export const DERIVED_THEME_TOKENS = [
   '--surface-sunken', '--accent-fg',
   '--state-ok', '--state-warn', '--state-bad',
   '--find-hit-bg', '--find-current-bg', '--scrim-color',
+  '--mention',
 ] as const
 
 /** Series identity, for a chart mark asking "which one" rather than "how is this doing." See
@@ -83,7 +84,7 @@ export const INVARIANT_TOKENS = [
   '--z-base', '--z-sticky', '--z-resizer', '--z-float', '--z-rail', '--z-panel',
   '--z-popover', '--z-drawer', '--z-drawer-menu', '--z-overlay', '--z-modal',
   '--z-picker', '--z-toast', '--z-tooltip',
-  '--brand-github', '--brand-linear', '--brand-rollbar', '--brand-fg',
+  '--brand-fg',
   '--tabular',
 ] as const
 

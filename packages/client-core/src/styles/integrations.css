@@ -120,8 +120,9 @@
   border-radius: var(--radius);
 }
 
-/* Logo slot, a branded square; carries a real mark (SVG) or a monogram fallback. Adding a provider
-   later = drop in its mark + a data-provider colour rule. */
+/* Logo slot, a branded square; carries a real mark (SVG) or a monogram fallback. The square takes its
+   colour from `--brand`, which brandStyle() sets from the mark itself, so adding a provider later is
+   the mark alone and no rule here names it. */
 .integration-logo {
   flex: none;
   width: 30px;
@@ -129,14 +130,11 @@
   display: grid;
   place-items: center;
   border-radius: var(--radius-lg);
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--brand, var(--bg-hover));
+  color: var(--brand-on, var(--text));
 }
 .integration-logo svg { width: 18px; height: 18px; display: block; }
 .integration-logo-mono { font-weight: 700; font-size: var(--fs-md); line-height: 1; font-family: var(--font-glyph); }
-.integration-logo[data-provider='github'] { background: var(--brand-github); color: var(--brand-fg); }
-.integration-logo[data-provider='linear'] { background: var(--brand-linear); color: var(--brand-fg); }
-.integration-logo[data-provider='rollbar'] { background: var(--brand-rollbar); color: var(--brand-fg); }
 
 .integration-meta { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1; }
 .integration-title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

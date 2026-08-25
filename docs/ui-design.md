@@ -49,7 +49,7 @@ The token contract splits three ways, and only the first is declarable:
 | Group | Count | Who writes it |
 | --- | --- | --- |
 | **Palette primitives** (`--bg`, `--text`, `--accent`, `--del-marker`, …) | 22 | The manifest, in full. `@acorn/protocol/themeTokens.ts` is the list, so the node can refuse an incomplete map at parse time without importing the client. |
-| **Derived** (`--danger`, `--surface-sunken`, `--state-ok`, …) | 12 | `:root`, once, as `var()` references into the palette — so they follow every theme for free. A manifest naming one is refused: restating it in a theme block is what would break the derivation. |
+| **Derived** (`--danger`, `--surface-sunken`, `--state-ok`, …) | 13 | `:root`, once, as `var()` references into the palette — so they follow every theme for free. A manifest naming one is refused: restating it in a theme block is what would break the derivation. |
 | **Self-description** (`--is-dark`, `--color-scheme`, `--syntax-fg`) | 3 | The host, from the theme's one `dark` boolean. They are not colours, so they cannot go through the colour check, and a theme that could set them could tell the terminal it was dark while rendering a light palette. |
 
 Validation is "every primitive present, no unknown key, every value a hex colour or a flat colour
@@ -101,6 +101,14 @@ adding one is a one-line change rather than a 12-block edit. A theme block, incl
 plugin-contributed one, is refused if it restates a derived token: the refusal is only correct while
 these stay one-place references.
 
+`--mention`, the colour the agent composer draws `@file`, `/command` and `$skill` in, is
+`var(--warn)`. It is derived for a second reason: a palette primitive is required of every plugin
+theme, so adding one there would refuse every theme written before it. `--warn` is the choice because
+it is the only palette colour distinct from `--text` in all 12 themes — `--accent` is literally
+`--text` in the default light and dark ones — so each theme lends its own amber rather than the
+composer naming a hue no palette contains. Promote it to a primitive when a theme wants a mention
+colour separate from its warning colour, and expect that to be a breaking manifest change.
+
 Three more tokens are colour but fit neither category: `--viz-series-1`, `--viz-series-2`, and
 `--viz-series-3` identify "which one" on a chart rather than describing status, so they are real
 values on `:root`, not primitives (adding them there would reject every theme already in the wild
@@ -147,9 +155,7 @@ otherwise; `--z-drawer-menu` outranks `--z-drawer` for the terminal drawer's own
 from inside it. `--z-tooltip` sits far above everything, because the tooltip portal must never be
 occluded and has no interactive children that could trap focus against it. `calc(var(--z-x) ± 1)` is
 allowed on top of a rung, for a surface that stacks one step above it. The same file holds
-third-party brand colours (`--brand-github` and so on), kept as tokens even though they are not
-themeable so the "no colour literal outside the axis files" check has somewhere to point, and
-`--tabular` (`tabular-nums`), which every pack needs for diff gutters, line counts, and timestamps.
+`--brand-fg`, what sits on top of a brand colour, and `--tabular` (`tabular-nums`), which every pack needs for diff gutters, line counts, and timestamps.
 
 ### Runtime-set custom properties
 
@@ -382,6 +388,39 @@ plugin's client bundle runs in a sandboxed iframe on its own origin, and a funct
 MessagePort — and a rail source's logo has to draw whether or not that plugin's frame is mounted.
 The retired design note (`docs/future/icons.md`, in git history) records the alternatives this
 rules out.
+
+### Brand colour
+
+A mark can carry `color`, the brand's own six-digit hex, and that is where a third-party colour lives.
+The alternative, a `--brand-<name>` token in `tokens-invariant.css` paired with a
+`[data-provider='<name>']` rule in `integrations.css`, is closed to plugins: core has to know the name
+to write the rule, so a fourth provider needs a core change, and any surface without a matching rule
+falls back to `--accent` whoever the provider is.
+
+`brandStyle(name)` in `ui/brandMarks.ts` turns an icon name into two custom properties on the element
+that renders the mark: `--brand` for the fill, and `--brand-on` for whatever sits on top of it, which
+is `--brand-fg`. A surface reads them with a fallback, so a mark with no colour and a plain Lucide name
+both keep the surface's own look:
+
+```css
+.integration-logo { background: var(--brand, var(--bg-hover)); color: var(--brand-on, var(--text)); }
+```
+
+Two rules govern where a brand colour may go.
+
+**It must not be the only thing carrying contrast.** A hex authored by a third party cannot know your
+theme, and GitHub's `#24292f` on a dark pane is black on near-black. Fill a shape with it and put
+`--brand-fg` on top, the way the integrations logo does, or tint with it, the way Agent Center's
+session icon does at 8%. Colouring a bare glyph on the pane background is the one that breaks, and the
+fix if a mark ever does disappear is a light and dark pair on the mark, not a rule in core.
+
+**It is validated as a hex, not as a CSS colour.** The string reaches a `style` attribute, and a
+colour slot accepts `url()`, so any-CSS-colour would let a manifest make an outbound request.
+`pluginContract.ts` checks `/^#[0-9a-f]{6}$/i`.
+
+A frame is the exception to all of this, because it is a separate origin and a separate JS realm with
+no reach into the registry. It draws its own copy of the mark, so it sets its own `--brand` inline;
+see `plugins/linear/src/frame/app.tsx`.
 
 A mark is one SVG path's `d` attribute in a 24x24 box, not a full SVG document. A document would
 allow `<script>`, `<use href>`, `<image href>`, `<foreignObject>`, `on*` handlers, and CSS

@@ -42,6 +42,16 @@ describe('brand marks', () => {
     expect(result.success && result.data.icon?.d).toBe('M12 .297c-6.63 0-12 5.373-12 12Z')
   })
 
+  it('accepts a six-digit hex colour and refuses every other CSS colour', () => {
+    expect(withIcons({ icon: { d: 'M0 0Z', color: '#5E6AD2' } }).success).toBe(true)
+    // The string reaches a `style` attribute, and a colour slot accepts `url()`, which would make the
+    // request. See docs/ui-design.md section Brand colour.
+    expect(withIcons({ icon: { d: 'M0 0Z', color: 'url(https://evil.example/x)' } }).success).toBe(false)
+    expect(withIcons({ icon: { d: 'M0 0Z', color: 'red' } }).success).toBe(false)
+    expect(withIcons({ icon: { d: 'M0 0Z', color: '#5E6AD2; background: url(x)' } }).success).toBe(false)
+    expect(withIcons({ icon: { d: 'M0 0Z', color: '#5E6' } }).success).toBe(false)
+  })
+
   it('refuses anything the `d` grammar cannot express', () => {
     // The whole trust argument for shipping path data instead of an SVG document rests on this: if a mark
     // cannot carry a tag, a url() or an event handler, there is nothing in it to sanitise.

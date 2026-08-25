@@ -466,12 +466,12 @@ export type InstalledPluginRow = {
   apiVersion: string
   permissions: import('./pluginContract.ts').NodePluginPermissions
   contributions: import('./pluginContract.ts').PluginContributions
-  // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document. The
-  // device registers `icon` as `brand:<pluginId>` and each `icons` key as `brand:<pluginId>/<key>`,
-  // stamping the prefix from the roster row so a package can't claim another's mark. See
-  // client-core/ui/brandMarks.ts and docs/ui-design.md § Icons.
-  icon?: { d: string }
-  icons?: Record<string, { d: string }>
+  // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
+  // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
+  // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't
+  // claim another's mark. See client-core/ui/brandMarks.ts and docs/ui-design.md § Icons.
+  icon?: { d: string; color?: string }
+  icons?: Record<string, { d: string; color?: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
   // the sha256 the node computed, and it's a cache-key hint only: the device hashes the bytes it
   // received and refuses a mismatch, because a compromised node can lie here

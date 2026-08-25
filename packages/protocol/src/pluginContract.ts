@@ -43,6 +43,10 @@ const PATH_D_RE = /^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\s+-]+$/
 const brandMark = z.object({
   // Authored in a 24x24 box, like simple-icons. The renderer hardcodes that viewBox.
   d: z.string().min(1).max(4_096).regex(PATH_D_RE, 'icon must be a single SVG path `d` string'),
+  // The brand's own colour, which the mark's surfaces read as `--brand`. Six-digit hex rather than any
+  // CSS colour on purpose: this string reaches a `style` attribute, and a colour slot accepts `url()`,
+  // which would let a manifest make an outbound request. See docs/ui-design.md section Icons.
+  color: z.string().regex(/^#[0-9a-f]{6}$/i, 'icon colour must be a six-digit hex, such as #24292f').optional(),
 })
 
 // Relative only. Rejecting `/` and `..` here keeps hostile paths away from the loader's confinement

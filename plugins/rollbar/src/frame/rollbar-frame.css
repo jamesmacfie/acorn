@@ -8,7 +8,7 @@
 button { font: inherit; }
 .rb-app { height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--bg); color: var(--text); }
 .rb-header { min-height: 2.375rem; display: flex; align-items: center; gap: var(--space-3, .375rem); padding: 0 var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
-.rb-brand-mark { color: var(--brand-rollbar, var(--accent)); }
+.rb-brand-mark { color: var(--brand, var(--accent)); }
 .rb-brand { letter-spacing: .01em; }
 /* ListDetail owns the split, the column width and the divider. What is left is this frame's padding. */
 .rb-targets { overflow-y: auto; padding: var(--space-3, .375rem); }

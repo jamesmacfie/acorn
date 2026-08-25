@@ -1,13 +1,12 @@
 import { For, Match, Show, Switch } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import { brandMarkRegistry } from './brandMarks'
+import { BRAND, brandMarkRegistry } from './brandMarks'
 import { iconNodes as nodes } from './iconNodes'
 
 export const ICON_NAMES = Object.keys(nodes)
 
 // Two families behind one name. See docs/ui-design.md § Icons for the resolution order and the
-// `brand:` prefix.
-const BRAND = 'brand:'
+// `brand:` prefix, which brandMarks.ts owns because brandStyle resolves the same names.
 
 export default function Icon(props: { name: string; size?: number | string; class?: string; title?: string }) {
   const brand = () => (props.name.startsWith(BRAND) ? brandMarkRegistry.get(props.name.slice(BRAND.length)) : undefined)

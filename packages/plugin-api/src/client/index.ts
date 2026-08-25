@@ -39,7 +39,7 @@ export { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 export type { SourceContribution, SourceRouteContribution } from '@acorn/client-core/registries/sources.ts'
 // Brand-mark registration. See docs/ui-design.md § Icons for the two feeders and the `brand:<id>`
 // glyph name they share.
-export { brandMarkRegistry } from '@acorn/client-core/ui/brandMarks.ts'
+export { brandMarkRegistry, brandStyle } from '@acorn/client-core/ui/brandMarks.ts'
 // Core's own URL for a project. A plugin building its own routes on top of `/p/:projectId` needs a
 // way back to the bare project path, deselecting an item, a breadcrumb, without hardcoding a shape
 // core owns.

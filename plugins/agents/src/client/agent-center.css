@@ -125,9 +125,12 @@
   display: grid !important;
   flex: none;
   place-items: center;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  border: var(--surface-bw) solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  /* One colour, tinted rather than filled, so a dark brand hex stays legible on a dark theme without
+     the mark declaring a light and dark pair. If a provider's glyph does disappear, that pair is the
+     upgrade. */
+  color: var(--brand, var(--accent));
+  background: color-mix(in srgb, var(--brand, var(--accent)) 8%, transparent);
+  border: var(--surface-bw) solid color-mix(in srgb, var(--brand, var(--accent)) 25%, var(--border));
   font: 600 var(--fs-sm) var(--font-mono);
 }
 .agent-center-state { display: flex !important; flex-direction: row !important; align-items: center; gap: var(--space-3); }
