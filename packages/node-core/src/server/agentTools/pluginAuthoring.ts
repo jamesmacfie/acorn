@@ -54,7 +54,10 @@ const verbs = (schema: JsonSchema | undefined): string[] =>
 // has no runtime value to read, so no test can catch this drift.
 const BRIDGE_KINDS = {
   api: "an HTTP call against this frame's node, checked against the manifest's `permissions.api` scopes; your own /v2/p/<id>/ namespace always passes",
-  subscribe: 'subscribe to a shell channel the manifest declared in `permissions.events`',
+  subscribe:
+    'subscribe to a channel the manifest declared in `permissions.events`: one of the shell\'s own, or your own '
+    + '`plugin:<id>:<verb>`, which your node half broadcasts on with `ctx.events.send`. That second one is how a frame '
+    + 'gets live data without polling; another plugin\'s is refused like its routes are',
   'state.get': `read durable host-kept state, keyed (pluginId, key)`,
   'state.set': `write it; values are capped at ${MAX_PLUGIN_STATE_BYTES} bytes`,
   ui: 'the closed host-effect set (see uiOps)',
@@ -177,6 +180,13 @@ node, so two constraints carry everything:
    them (\`img-src 'self' data:\`). \`connect-src\` is \`'none'\`: a frame has no network at all, only the
    MessagePort. You cannot import \`@acorn/plugin-api/ui/sdk\` — inline the ~30-line handshake instead.
 
+## Start from the scaffold if you can run it
+
+\`npm create acorn-plugin <name>\` writes this whole profile — manifest, node half, and a \`client.js\` with the
+handshake already inlined — as a directory with no dependencies and no build step. If the node's machine can
+run it, run it and edit what it wrote; the rest of this is what to change and why. If it cannot, write the
+files by hand from the layout below.
+
 ## The layout
 
     <dir>/acorn-plugin.json    the manifest; the only fixed filename
@@ -192,8 +202,12 @@ migration plus a tombstone.
 A loaded plugin's \`ctx\` has no \`ctx.routes.register\` (Hono cannot cross a process boundary) and no
 \`ctx.events.channel\`/\`streams\`. The door is \`ctx.routes.fetch((request, context) => Response)\`; the host
 strips the mount, so \`/v2/p/<id>/greeting\` reaches you as \`/greeting\`. \`ctx.storage\`, \`ctx.core\`,
-\`ctx.tools\`, \`ctx.contextSections\`, \`ctx.providers\`, \`ctx.capabilities\`,
-\`ctx.events.send\`/\`status\`/\`notice\` and \`ctx.log\` are there, shaped by the manifest.
+\`ctx.tools\`, \`ctx.schedules\`, \`ctx.collections\`, \`ctx.nodeActions\`, \`ctx.taskChecks\`, \`ctx.harnesses\`,
+\`ctx.contextSections\`, \`ctx.providers\`, \`ctx.capabilities\`, \`ctx.events.send\`/\`status\`/\`notice\` and
+\`ctx.log\` are there, shaped by the manifest. The five registries between \`tools\` and \`contextSections\` are
+owner-bound: the host stamps your plugin id on whatever you register, so you cannot file a schedule, a
+collection or a harness under another package's name. Declaring the same thing in the manifest goes through
+the same seam, so pick one — the manifest is what the owner reads at install.
 
 ## The loop — you cannot install anything, so ask
 
