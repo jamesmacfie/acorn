@@ -58,7 +58,7 @@ function registerBuiltInUsageCollectors(probeDir: string): void {
     agentUsageCollectors.register({
       provider: 'codex',
       label: 'Codex',
-      glyph: '⌘',
+      glyph: 'brand:agents/codex',
       collect: () => collectCodexUsage({ cwd: probeDir }),
     }),
   ]

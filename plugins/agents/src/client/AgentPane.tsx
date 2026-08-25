@@ -17,6 +17,7 @@ import AgentTranscript from './AgentTranscript'
 import AgentComposer from './AgentComposer'
 import AgentTaskSidebar from './AgentTaskSidebar'
 import AgentUsageIndicator from './AgentUsageIndicator'
+import ProviderGlyph from './ProviderGlyph'
 import QueuedAgentTurns from './QueuedAgentTurns'
 import { latestAutomaticTaskContext } from './automaticTaskContext'
 import { Alert, Button, Card, EmptyState, Field, Icon, Input, ListDetail, Menu, Modal, Picker, StatusDot } from '@acorn/plugin-api/ui'
@@ -359,6 +360,7 @@ export default function AgentPane(props: { task: Task }) {
           emptyText="No managed providers available."
           results={(query) => (providers() ?? []).filter((item) =>
             item.label.toLowerCase().includes(query.trim().toLowerCase()))}
+          leading={(item) => <ProviderGlyph glyph={item.glyph} label={item.label} />}
           rowLabel={(item) => item.label}
           rowDescription={(item) =>
             item.installed ? item.executableVersion ?? 'Available' : item.diagnostics[0] ?? 'Not installed'}
@@ -424,7 +426,10 @@ export default function AgentPane(props: { task: Task }) {
                       disabled={!providerDescriptor.installed || creating()}
                       onActivate={() => void createSession(providerDescriptor)}
                     >
-                      <strong>{providerDescriptor.label}</strong>
+                      <strong>
+                        <ProviderGlyph glyph={providerDescriptor.glyph} label={providerDescriptor.label} />
+                        {providerDescriptor.label}
+                      </strong>
                       <span>{providerDescriptor.installed ? 'Start managed session' : providerDescriptor.diagnostics[0] ?? 'Unavailable'}</span>
                     </Card>
                   )}

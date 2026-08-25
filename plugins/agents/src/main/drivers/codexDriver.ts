@@ -86,7 +86,7 @@ export class CodexAgentDriver implements AgentDriver {
       id: this.providerId,
       profileId: this.profileId,
       label: 'Codex',
-      glyph: '⌘',
+      glyph: 'brand:agents/codex',
       driverKind: 'codex-app-server',
       driverVersion: DRIVER_VERSION,
       installed: executable != null,
