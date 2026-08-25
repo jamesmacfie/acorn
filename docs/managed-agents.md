@@ -326,6 +326,13 @@ Cancellation, timeout, provider disconnect, and restart are explicit states. A l
 lost without killing the provider process, and the client reattaches from the session sequence or
 terminal replay tail.
 
+Only a turn moves a session into `working`. A harness can stream past the prompt call it was
+answering, and `turn_completed` fires only as that call's return value, so an event carrying no turn
+records into the transcript and marks the session unread without claiming work is in flight. Nothing
+would clear the claim otherwise, and `working` blocks every later dispatch. Stop settles a session
+that reports work with no turn to cancel, rather than returning quietly and leaving the button to act
+on a state it cannot reach.
+
 Interactive creation is accepted once its session row is durable, not once its provider process is
 ready. A startup failure therefore settles that visible row as `failed` and records the error in its
 event ledger; it is not reported as a late failure of a create request whose resource already exists.

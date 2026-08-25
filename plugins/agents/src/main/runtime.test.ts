@@ -9,7 +9,7 @@ import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices, type CoreServices } from '@acorn/node-core/main/core/index.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentNormalizedEvent, AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import type {
   AgentDriver,
   AgentDriverSession,
@@ -263,6 +263,21 @@ class DeferredStartDriver implements AgentDriver {
   }
 }
 
+/** Keeps streaming after the prompt call it was answering has already returned. Claude Code did this
+ *  five minutes past an `end_turn`, and the trailing message stranded the session in 'working'. */
+class TrailingEventDriver extends FakeAgentDriver {
+  #emit: AgentDriverStartOptions['onEvent'] | null = null
+
+  override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    this.#emit = options.onEvent
+    return super.start(options)
+  }
+
+  async push(event: AgentNormalizedEvent): Promise<void> {
+    await this.#emit?.(event)
+  }
+}
+
 describe('managed agent runtime conformance', () => {
   // Two real databases, matching the shape of the thing under test. `testDb` is core's, holding the
   // workspace, project, and task rows seedTask writes, which the runtime reaches through CoreServices.
@@ -468,6 +483,57 @@ describe('managed agent runtime conformance', () => {
     )
     expect(published).toEqual([...published].sort((a, b) => a - b))
     expect(snapshot.events.some((event) => event.event.type === 'assistant_message')).toBe(true)
+  })
+
+  it('holds a settled session settled when the provider streams past its turn', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new TrailingEventDriver()
+    registry.registerNative('fake', () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Exercise the protocol.' }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+    const completed = await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+    expect(completed.session.runtimeState).toBe('ready')
+
+    // A zero timeout makes wait() a plain read of the current snapshot.
+    const read = () => runtime!.wait(session.id, 0, 'ready', 0)
+
+    await driver.push({ type: 'assistant_message', text: 'One more thing.' })
+    const trailing = await read()
+
+    // The message lands in the transcript and marks the session unread, but it does not claim work is
+    // in flight. Nothing would clear that claim: turn_completed only fires as sendTurn's return value.
+    expect(trailing.events.at(-1)?.event).toMatchObject({ type: 'assistant_message' })
+    expect(trailing.session.runtimeState).toBe('ready')
+    expect(trailing.session.attention).toBe('unread')
+
+    // And Stop settles a session that reports work with no turn to cancel, instead of returning
+    // quietly and leaving 'working' to block every later dispatch.
+    await driver.push({ type: 'session_state', state: 'working' })
+    expect((await read()).session.runtimeState).toBe('working')
+    await runtime.cancelTurn(session.id)
+    expect((await read()).session.runtimeState).toBe('ready')
   })
 
   it('acknowledges a durable queued turn even when provider startup fails afterward', async () => {

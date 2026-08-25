@@ -326,7 +326,18 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const live = this.live.get(sessionId)
     const active = await this.store.activeTurn(sessionId)
     const target = turnId ?? active?.id
-    if (!target) return
+    if (!target) {
+      // Stop with nothing to cancel used to return quietly, which made the button a no-op on exactly
+      // the session that needed it: the row said 'working', so Stop was enabled, but no turn row
+      // existed to cancel and 'working' blocks dispatch, so the next prompt queued forever. Settle the
+      // session instead. The provider child is alive and idle, and if it is not, pump respawns it.
+      const session = await this.store.getSession(sessionId)
+      if (!session || !['working', 'waiting', 'cancelling'].includes(session.runtimeState)) return
+      await this.store.expirePendingRequests(sessionId)
+      await this.record(sessionId, null, { type: 'session_state', state: 'ready' })
+      void this.pump()
+      return
+    }
     if (!active || active.id !== target) {
       await this.store.cancelTurn(target)
       void this.pump()
