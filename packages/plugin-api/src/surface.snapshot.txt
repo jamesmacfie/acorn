@@ -374,6 +374,7 @@ ui: Modal
 ui: ModelConnectionPicker
 ui: NonCodeRow
 ui: Picker
+ui: PickerRow
 ui: Popover
 ui: Row
 ui: SectionHeader

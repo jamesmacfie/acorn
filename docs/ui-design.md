@@ -49,7 +49,7 @@ The token contract splits three ways, and only the first is declarable:
 | Group | Count | Who writes it |
 | --- | --- | --- |
 | **Palette primitives** (`--bg`, `--text`, `--accent`, `--del-marker`, …) | 22 | The manifest, in full. `@acorn/protocol/themeTokens.ts` is the list, so the node can refuse an incomplete map at parse time without importing the client. |
-| **Derived** (`--danger`, `--surface-sunken`, `--state-ok`, …) | 13 | `:root`, once, as `var()` references into the palette — so they follow every theme for free. A manifest naming one is refused: restating it in a theme block is what would break the derivation. |
+| **Derived** (`--danger`, `--surface-sunken`, `--state-ok`, …) | 15 | `:root`, once, as `var()` references into the palette — so they follow every theme for free. A manifest naming one is refused: restating it in a theme block is what would break the derivation. |
 | **Self-description** (`--is-dark`, `--color-scheme`, `--syntax-fg`) | 3 | The host, from the theme's one `dark` boolean. They are not colours, so they cannot go through the colour check, and a theme that could set them could tell the terminal it was dark while rendering a light palette. |
 
 Validation is "every primitive present, no unknown key, every value a hex colour or a flat colour
@@ -101,13 +101,16 @@ adding one is a one-line change rather than a 12-block edit. A theme block, incl
 plugin-contributed one, is refused if it restates a derived token: the refusal is only correct while
 these stay one-place references.
 
-`--mention`, the colour the agent composer draws `@file`, `/command` and `$skill` in, is
-`var(--warn)`. It is derived for a second reason: a palette primitive is required of every plugin
-theme, so adding one there would refuse every theme written before it. `--warn` is the choice because
-it is the only palette colour distinct from `--text` in all 12 themes — `--accent` is literally
-`--text` in the default light and dark ones — so each theme lends its own amber rather than the
-composer naming a hue no palette contains. Promote it to a primitive when a theme wants a mention
-colour separate from its warning colour, and expect that to be a breaking manifest change.
+`--mention-file`, `--mention-command` and `--mention-skill` are the colours the agent composer draws
+its three kinds of token in: `var(--accent)`, `var(--warn)` and `var(--add-marker)`. They are derived
+for a second reason: a palette primitive is required of every plugin theme, so adding three there
+would refuse every theme written before them. Each borrows a palette colour rather than naming a hue
+of its own, so a theme lends its own — Dracula's yellow, Nord's cyan. `--del-marker` is deliberately
+unused: a skill nobody is worried about should not read as an error. A file mention takes the accent,
+which means it reads as weight rather than colour under the two monochrome default themes, where
+`--accent` is `--text`; that is what every other accent-coloured surface does there too. Promote them
+to primitives when a theme wants mention colours separate from its accent and status colours, and
+expect that to be a breaking manifest change.
 
 Three more tokens are colour but fit neither category: `--viz-series-1`, `--viz-series-2`, and
 `--viz-series-3` identify "which one" on a chart rather than describing status, so they are real
