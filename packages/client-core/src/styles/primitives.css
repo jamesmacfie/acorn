@@ -348,6 +348,9 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
   cursor: pointer;
 }
 .ui-check[data-nested] { padding-left: var(--space-9); }
+/* A one-line label centres on its box. `flex-start` above is only for the hint variant, where the
+   box belongs at the top of the two-line stack. */
+.ui-check:not(:has(.ui-check-hint)) { align-items: center; }
 .ui-check-label { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .ui-check-hint { color: var(--text-muted); font-size: var(--fs-xs); }
 .ui-check-box {

@@ -129,3 +129,7 @@
   pointer-events: none;
   z-index: var(--z-base);
 }
+
+/* The no-branch tick sits between the branch field and Create, so it gets its own breathing room
+   instead of the form's tight gap on both sides. */
+.tabrail-nobranch { padding: var(--space-3) 0; }
