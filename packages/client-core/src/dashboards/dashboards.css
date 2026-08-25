@@ -436,12 +436,6 @@
    centred is right. */
 .ui-field[data-layout='split']:has(> .dash-param-choices) { align-items: start; }
 
-/* The box centred on its own line rather than flush with the line's top. `.ui-check` aligns to the top
-   because it has to carry a hint underneath; a choice here is one line of the same type as the caption
-   beside it, so both line boxes are the same height and start at the same y. Centre the square in that
-   line and the first choice reads exactly level with the caption. */
-.dash-param-choices > .ui-check { align-items: center; }
-
 /* Two labelled fields abreast. `start`, not `center`: a hint that wraps to two lines under one of them
    must not shift the other one's control. */
 .dash-editor-pair {

@@ -515,6 +515,7 @@ export default function TabRail() {
                     </Show>
                     <Checkbox
                       size="sm"
+                      class="tabrail-nobranch"
                       label="Use the project folder and its current branch"
                       title="The task works in the project folder on whatever branch is checked out, with no worktree"
                       checked={noBranch()}
