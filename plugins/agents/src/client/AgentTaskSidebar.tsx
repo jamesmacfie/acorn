@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, For, Index, onCleanup, onMount, Show } from 'solid-js'
 import { capabilities, clientCapability, refreshSessions, requestTerminalFocus, sessions, setTerminalOpen, type Task, wsOnStatus } from '@acorn/plugin-api/client'
-import { Badge, Button, Row, StatusDot } from '@acorn/plugin-api/ui'
+import { Badge, Button, Icon, Menu, Row, StatusDot } from '@acorn/plugin-api/ui'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
@@ -44,6 +44,9 @@ export default function AgentTaskSidebar(props: {
   selectedSubagentId?: string
   onSelectSession: (sessionId: string, requestId?: string) => void
   onSelectSubagent: (sessionId: string, subagentId: string) => void
+  /** The row menu hands the action back up: AgentPane owns the confirm and rename dialogs, and the
+   *  selection bookkeeping archiving a session needs. */
+  onSessionAction: (session: AgentSession, action: 'rename' | 'archive' | 'stop') => void
   onError: (message: string) => void
 }) {
   // The desktop probe, on the capability rather than on a PTY accessor's null return. CommandPalette
@@ -175,11 +178,52 @@ export default function AgentTaskSidebar(props: {
                       </span>
                     }
                     trailing={
-                      !['none', 'unread'].includes(session().attention)
-                        ? <Badge tone={session().attention === 'error' ? 'del' : 'warn'} size="xs">
+                      <>
+                        <Show when={!['none', 'unread'].includes(session().attention)}>
+                          <Badge tone={session().attention === 'error' ? 'del' : 'warn'} size="xs">
                             {session().attention.replace('_', ' ')}
                           </Badge>
-                        : undefined
+                        </Show>
+                        <Menu
+                          ariaLabel="Session actions"
+                          placement="bottom-end"
+                          trigger={({ toggle, open }) => (
+                            <Button
+                              variant="bare"
+                              size="sm"
+                              iconOnly
+                              class="agent-task-row-menu"
+                              aria-label="Session actions"
+                              aria-haspopup="menu"
+                              aria-expanded={open()}
+                              // The row itself is a button; without this, opening the menu also
+                              // selects the row underneath it.
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                toggle()
+                              }}
+                            >
+                              <Icon name="ellipsis" />
+                            </Button>
+                          )}
+                        >
+                          {(menu) => (
+                            <>
+                              <Show when={['working', 'waiting', 'cancelling'].includes(session().runtimeState)}>
+                                <Menu.Item context={menu} onSelect={() => props.onSessionAction(session(), 'stop')}>
+                                  Stop
+                                </Menu.Item>
+                              </Show>
+                              <Menu.Item context={menu} onSelect={() => props.onSessionAction(session(), 'rename')}>
+                                Rename session
+                              </Menu.Item>
+                              <Menu.Item context={menu} onSelect={() => props.onSessionAction(session(), 'archive')}>
+                                Archive session…
+                              </Menu.Item>
+                            </>
+                          )}
+                        </Menu>
+                      </>
                     }
                     onActivate={() => props.onSelectSession(session().id)}
                   >

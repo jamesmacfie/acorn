@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { setTerminalOpen, type Task } from '@acorn/plugin-api/client'
-import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
+import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
 import {
@@ -139,9 +139,8 @@ export default function AgentPane(props: { task: Task }) {
     }, false)
   }
 
-  async function archive() {
-    const session = selected()
-    if (!session) return
+  async function archive(session: AgentSession) {
+    setDialog(null)
     const next = taskSessions().find((candidate) => candidate.id !== session.id)
     await action(async () => {
       managedAgentStore.upsertSession(await managedAgentApi.patch(session.id, { archived: true }))
@@ -150,44 +149,29 @@ export default function AgentPane(props: { task: Task }) {
     }, false)
   }
 
-  // Prompt-for-text is not arm-to-confirm, and neither is a permanent delete: window.prompt and
+  // Prompt-for-text is not arm-to-confirm, and neither is archiving: window.prompt and
   // window.confirm are unstyled in Electron and suppressed outright in a sandboxed frame, so both
-  // become dialogs. `dialog` carries which one is open.
-  const [dialog, setDialog] = createSignal<'rename' | 'delete' | null>(null)
+  // become dialogs. `dialog` carries which one is open and which session it addresses, because the
+  // sidebar's row menu can act on a session that is not the open one.
+  const [dialog, setDialog] = createSignal<{ kind: 'rename' | 'archive'; session: AgentSession } | null>(null)
   const [renameText, setRenameText] = createSignal('')
 
-  function openRename() {
-    const session = selected()
-    if (!session) return
-    setRenameText(session.title)
-    setDialog('rename')
+  // One entry point for both menus: the header's, which always addresses the open session, and the
+  // sidebar row's, which names its own.
+  function sessionAction(session: AgentSession, kind: 'rename' | 'archive' | 'stop') {
+    if (kind === 'stop') return void action(() => managedAgentApi.cancel(session.id))
+    if (kind === 'rename') setRenameText(session.title)
+    setDialog({ kind, session })
   }
 
   async function rename() {
-    const session = selected()
+    const target = dialog()?.session
     const title = renameText().trim()
     setDialog(null)
-    if (!session || !title || title === session.title) return
+    if (!target || !title || title === target.title) return
     await action(async () => {
-      managedAgentStore.upsertSession(await managedAgentApi.patch(session.id, { title }))
+      managedAgentStore.upsertSession(await managedAgentApi.patch(target.id, { title }))
     })
-  }
-
-  async function remove() {
-    const session = selected()
-    setDialog(null)
-    if (!session) return
-    const next = taskSessions().find((candidate) => candidate.id !== session.id)
-    await action(async () => {
-      const result = await managedAgentApi.remove(session.id)
-      managedAgentStore.removeSession(session.id)
-      if (next) selectManagedSession(props.task.id, next.id)
-      else clearManagedSession(props.task.id, session.id)
-      // ponytail: 'unsupported' is normal for most providers, so it is not worth a banner.
-      if (result.provider === 'failed') {
-        setError(`Local history was deleted, but provider deletion failed: ${result.detail ?? 'unknown error'}`)
-      }
-    }, false)
   }
 
   async function exportHistory(format: 'json' | 'markdown') {
@@ -302,11 +286,10 @@ export default function AgentPane(props: { task: Task }) {
             run: () => void verifyImportedResume(),
           }]
         : []),
-      { id: 'rename', label: 'Rename session', run: () => openRename() },
+      { id: 'rename', label: 'Rename session', run: () => sessionAction(session, 'rename') },
       { id: 'export-markdown', label: 'Export Markdown', run: () => void exportHistory('markdown') },
       { id: 'export-json', label: 'Export lossless JSON', run: () => void exportHistory('json') },
-      { id: 'archive', label: 'Archive session', run: () => void archive() },
-      { id: 'delete', label: 'Delete permanently…', run: () => setDialog('delete') },
+      { id: 'archive', label: 'Archive session…', run: () => sessionAction(session, 'archive') },
     ]
   })
 
@@ -356,7 +339,6 @@ export default function AgentPane(props: { task: Task }) {
                         context={menu}
                         disabled={!!item.disabled}
                         title={item.description}
-                        tone={item.id === 'delete' ? 'danger' : 'neutral'}
                         onSelect={() => item.run()}
                       >
                         {item.label}
@@ -419,6 +401,7 @@ export default function AgentPane(props: { task: Task }) {
               if (sessionId !== selectedSessionId()) openManagedSession(props.task.id, sessionId)
               selectManagedSubagent(sessionId, subagentId)
             }}
+            onSessionAction={sessionAction}
             onError={setError}
           />
         }
@@ -492,7 +475,7 @@ export default function AgentPane(props: { task: Task }) {
         </Show>
 
       </ListDetail>
-      <Show when={dialog() === 'rename'}>
+      <Show when={dialog()?.kind === 'rename'}>
         <Modal onClose={() => setDialog(null)} title="Rename session" size="sm">
           <Modal.Body>
             <Field label="Title">
@@ -511,16 +494,18 @@ export default function AgentPane(props: { task: Task }) {
         </Modal>
       </Show>
 
-      <Show when={dialog() === 'delete'}>
-        <Modal onClose={() => setDialog(null)} title="Delete session history" size="sm" role="alertdialog">
-          <Modal.Body>
-            <p>Permanently delete local history for “{selected()?.title}”? This cannot be undone.</p>
-          </Modal.Body>
-          <Modal.Actions>
-            <Button variant="bare" onClick={() => setDialog(null)}>Cancel</Button>
-            <Button variant="solid" tone="danger" onClick={() => void remove()}>Delete permanently</Button>
-          </Modal.Actions>
-        </Modal>
+      <Show when={dialog()?.kind === 'archive' ? dialog()!.session : undefined}>
+        {(session) => (
+          <Modal onClose={() => setDialog(null)} title="Archive session" size="sm" role="alertdialog">
+            <Modal.Body>
+              <p>Archive “{session().title}”? It leaves this task’s list and stays readable under the archived filter in Agent Center.</p>
+            </Modal.Body>
+            <Modal.Actions>
+              <Button variant="bare" onClick={() => setDialog(null)}>Cancel</Button>
+              <Button variant="solid" onClick={() => void archive(session())}>Archive</Button>
+            </Modal.Actions>
+          </Modal>
+        )}
       </Show>
     </section>
   )
