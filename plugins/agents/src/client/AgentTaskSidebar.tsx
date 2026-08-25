@@ -13,18 +13,32 @@ import { subagentSummary } from './subagentDisplay'
 import { WORKFLOW_CONTROL } from '../contract/workflowControl'
 import './agent-task-sidebar.css'
 
-const RUNTIME_GLYPH: Record<string, string> = {
-  creating: '◔',
-  connecting: '◔',
-  replaying: '◔',
-  ready: '○',
-  working: '●',
-  waiting: '‼',
-  cancelling: '◐',
-  reconnecting: '◐',
-  stopped: '■',
-  failed: '×',
-  archived: '□',
+/* Lucide names, one per runtime state. The colour is CSS, keyed on the same `data-state` the span
+   carries, so the two stay in one place each rather than half a mapping in either. */
+const RUNTIME_ICON: Record<string, string> = {
+  creating: 'clock',
+  connecting: 'clock',
+  replaying: 'clock',
+  ready: 'circle',
+  working: 'loader-circle',
+  waiting: 'circle-alert',
+  cancelling: 'loader-circle',
+  reconnecting: 'loader-circle',
+  stopped: 'circle-stop',
+  failed: 'triangle-alert',
+  archived: 'archive',
+}
+
+/** States where the agent is mid-flight, so the loader actually turns. `.spin` is base.css, and it
+ *  already stands still under prefers-reduced-motion. */
+const SPINNING = new Set(['working', 'cancelling', 'reconnecting'])
+
+function RuntimeIcon(props: { state: string }) {
+  return (
+    <span class="agent-task-state" data-state={props.state}>
+      <Icon name={RUNTIME_ICON[props.state] ?? 'circle-dashed'} class={SPINNING.has(props.state) ? 'spin' : undefined} />
+    </span>
+  )
 }
 
 const LEGACY_GLYPH: Record<string, string> = {
@@ -146,7 +160,7 @@ export default function AgentTaskSidebar(props: {
                 <Row
                   density="compact"
                   class="agent-task-row"
-                  leading={<span class="agent-task-state" data-state="waiting">‼</span>}
+                  leading={<RuntimeIcon state="waiting" />}
                   trailing={<Badge tone="warn" size="xs">{request.kind.replace('_', ' ')}</Badge>}
                   onActivate={() => props.onSelectSession(session.id, request.providerRequestId)}
                 >
@@ -173,11 +187,7 @@ export default function AgentTaskSidebar(props: {
                     density="compact"
                     class="agent-task-row managed-agent-session-row"
                     selected={session().id === props.selectedSessionId}
-                    leading={
-                      <span class="agent-task-state" data-state={session().runtimeState}>
-                        {RUNTIME_GLYPH[session().runtimeState] ?? '·'}
-                      </span>
-                    }
+                    leading={<RuntimeIcon state={session().runtimeState} />}
                     trailing={
                       <>
                         <Show when={!['none', 'unread'].includes(session().attention)}>
