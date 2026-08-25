@@ -310,10 +310,6 @@ export default function AgentComposer(props: {
   return (
     <div class="agent-composer-shell">
       <div class="agent-composer-context">
-        <span class="agent-policy">
-          Provider policy
-          <strong>{configOptions().find((option) => option.category === 'permission')?.currentValue ?? 'provider default'}</strong>
-        </span>
         <For each={configOptions()}>
           {(option) => (
             <Field class="agent-config-field" label={option.label} layout="row">
