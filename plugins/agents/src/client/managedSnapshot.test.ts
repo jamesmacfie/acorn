@@ -4,7 +4,7 @@ import type {
   AgentSession,
   AgentSessionSnapshot,
 } from '@acorn/protocol/managedAgents.ts'
-import { mergeManagedSnapshot } from './managedSnapshot'
+import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 
 const session = (lastEventSeq: number): AgentSession => ({
   id: 'session',
@@ -51,6 +51,14 @@ const snapshot = (lastEventSeq: number, events: AgentEventRecord[]): AgentSessio
 })
 
 describe('managed-agent snapshot reconciliation', () => {
+  it('does not let a slower mutation response replace a newer WebSocket session row', () => {
+    const connected = { ...session(1), runtimeState: 'connecting' as const, updatedAt: 20 }
+    const creationResponse = { ...session(0), runtimeState: 'creating' as const, updatedAt: 10 }
+
+    expect(newestManagedSession(connected, creationResponse)).toBe(connected)
+    expect(newestManagedSession(creationResponse, connected)).toBe(connected)
+  })
+
   it('does not lose a live event when an older HTTP snapshot resolves later', () => {
     const live = snapshot(2, [event(1, 'first'), event(2, 'live')])
     const staleHttp = snapshot(1, [event(1, 'first')])

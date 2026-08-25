@@ -29,6 +29,13 @@ export const PrefKeys = {
   startupContextInjection: 'startup_context_injection',
   onboarded: 'onboarded',
   agentToolPermissions: AGENT_TOOLS_PERMS_PREF_KEY,
+  // How a tool call's disclosure starts out in an agent transcript, and the reader's last toggle when
+  // the setting is `sticky` (plugins/agents/src/client/toolFoldPrefs.ts). A JSON `{ mode, last }` in
+  // one key, because the remembered toggle is only meaningful next to the mode that reads it.
+  //
+  // The device's, like `theme` and `diffView`. It describes how this screen draws a transcript, not
+  // anything about the node the session ran on.
+  agentToolFold: 'agent_tool_fold',
   dockerPrefs: 'docker_prefs',
   taskLayoutsScoped: 'core:task-layouts',
   editorOpenFilesScoped: 'editor:open-files',

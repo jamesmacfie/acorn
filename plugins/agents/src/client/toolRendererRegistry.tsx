@@ -1,6 +1,7 @@
-import { createSignal, For, Show, type Component } from 'solid-js'
+import { createSignal, For, mergeProps, Show, type Component } from 'solid-js'
 import { agentToolTone, type AgentToolRendererProps, agentToolRendererRegistry } from '@acorn/plugin-api/client'
 import { StatusDot } from '@acorn/plugin-api/ui'
+import { useAgentToolFold } from './toolFoldPrefs'
 
 export type {
   AgentToolRendererContribution,
@@ -32,17 +33,23 @@ const AgentToolHead: Component<AgentToolRendererProps> = (props) => (
 // A disclosure with nothing behind it is worse than no disclosure: the reader clicks a card that opens
 // onto nothing. Providers report plenty of calls with neither output nor a path, so those render flat.
 const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
-  // Seeded from the call's state, then the reader's own, the way the subagent card does it. A reactive
-  // `open` would shut a card the moment its call finished, which is when somebody is most likely to be
-  // reading it. Seeding here rather than in the parent is what still opens a call whose output streams
-  // while it runs, and the card only holds that state for as long as it stays mounted — see the note on
-  // Show's children in AgentEventCard for what used to remount it on every event.
-  const [open, setOpen] = createSignal(props.tool.status === 'running')
+  // Seeded from the reader's setting, then the reader's own. A reactive `open` would shut a card the
+  // moment its call finished, which is when somebody is most likely to be reading it, and the card
+  // only holds this state for as long as it stays mounted — see the note on Show's children in
+  // AgentEventCard for what used to remount it on every event.
+  //
+  // The setting, not the call's status. Status was what made this differ by harness: codex reports a
+  // started call as `running`, the ACP path reports it as `pending` and never as `running` at all, so
+  // one provider's cards opened themselves and the other's never did.
+  const [open, setOpen] = createSignal(props.defaultOpen)
   return (
     <details
       class="agent-tool ui-fold"
       open={open()}
-      onToggle={(toggle) => setOpen(toggle.currentTarget.open)}
+      onToggle={(toggle) => {
+        setOpen(toggle.currentTarget.open)
+        props.onOpenChange(toggle.currentTarget.open)
+      }}
     >
       <summary class="ui-fold-summary">
         <span class="ui-fold-marker" aria-hidden="true" />
@@ -66,8 +73,20 @@ const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
   </Show>
 )
 
-export const AgentToolCallCard: Component<AgentToolRendererProps> = (props) => {
+/**
+ * Resolves the reader's fold setting once and hands it to whichever renderer draws this call, the
+ * built-in one or a contributed one. Here rather than in the transcript so a contributed renderer
+ * honours the setting without the transcript having to pass anything down for it.
+ */
+export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultOpen' | 'onOpenChange'>> = (props) => {
+  const fold = useAgentToolFold()
+  // Read at mount and not tracked, because the seed in the fold is not either: changing the setting
+  // decides how the next card opens, it does not reach back and reopen every card the reader has shut.
+  const defaultOpen = fold.startsOpen()
+  // `mergeProps`, not a spread: a spread would read `props.tool` once and freeze it, and the transcript
+  // hands out a fresh tool object on every snapshot.
+  const full = mergeProps(props, { defaultOpen, onOpenChange: fold.onToggle })
   const contribution = () =>
     agentToolRendererRegistry.entries().find((candidate) => candidate.matches(props.tool))
-  return contribution()?.component(props) ?? <GenericAgentTool {...props} />
+  return contribution()?.component(full) ?? <GenericAgentTool {...full} />
 }

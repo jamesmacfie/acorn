@@ -13,6 +13,7 @@ import { activateManagedAgentNotifications } from './managedStore'
 import { agentPaneContribution } from './paneContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
 import { agentCenterSourceContribution } from './sourceContribution'
+import { agentToolFoldSlice } from './toolFoldPrefs'
 
 const AgentConcurrencySettings = lazy(() => import('./AgentConcurrencySettings'))
 const AgentPricingSettings = lazy(() => import('./AgentPricingSettings'))
@@ -37,6 +38,9 @@ export const agentsClientPlugin: ClientPlugin = {
     // The same roster the stat counts and the inbox filters, with a schema on it, so a dashboard panel
     // can be composed over running agents (collectionContribution.ts).
     ctx.collections.register(agentSessionsCollection)
+    // How a transcript's tool cards start out (toolFoldPrefs.ts). This device's, so the slice is
+    // declared here and the key is listed as device-owned in persistence/devicePrefs.ts.
+    ctx.persistedState.register(agentToolFoldSlice)
     ctx.settingsPages.register({
       id: 'agent-concurrency', label: 'Agent concurrency', group: 'general', order: 44, requires: 'desktop',
       component: AgentConcurrencySettings,

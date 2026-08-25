@@ -1,6 +1,7 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import type { AgentConfigOption } from '@acorn/protocol/managedAgents.ts'
+import { prefsOptions } from '@acorn/plugin-api/client'
 import { Checkbox, Field, Select } from '@acorn/plugin-api/ui'
 import {
   defaultAgentSessionDefaults,
@@ -13,6 +14,11 @@ import {
   agentSessionDefaultsQueryKey,
   saveAgentSessionDefaults,
 } from './sessionDefaultsClient'
+import {
+  type AgentToolFoldMode,
+  readAgentToolFoldPrefs,
+  saveAgentToolFoldPrefs,
+} from './toolFoldPrefs'
 
 // Settings -> Agent defaults: what a new session of each provider starts on
 // (docs/managed-agents.md § New-session defaults).
@@ -20,6 +26,7 @@ export default function AgentSessionDefaultsSettings() {
   const queryClient = useQueryClient()
   const stored = createQuery(() => agentSessionDefaultsOptions())
   const [providers] = createResource(() => managedAgentApi.providers())
+  const prefs = createQuery(() => prefsOptions(true))
   const [recent] = createResource(() => managedAgentApi.sessions({}))
   const [error, setError] = createSignal('')
 
@@ -57,6 +64,12 @@ export default function AgentSessionDefaultsSettings() {
       void queryClient.invalidateQueries({ queryKey: agentSessionDefaultsQueryKey })
     }
   }
+
+  // A different store from everything above: the fold setting is this device's preference about how a
+  // transcript is drawn, not part of the record the node keeps of what a session launches with.
+  const fold = () => readAgentToolFoldPrefs(prefs.data)
+  const chooseFold = (mode: AgentToolFoldMode) =>
+    void saveAgentToolFoldPrefs(queryClient, { ...fold(), mode })
 
   const choose = (providerId: string, optionId: string, value: string) => {
     const forProvider = { ...record().pinned[providerId] }
@@ -124,6 +137,26 @@ export default function AgentSessionDefaultsSettings() {
           )}
         </For>
       </Show>
+
+      <section class="settings-subsection">
+        <h3 class="settings-label">Transcript</h3>
+        <Field
+          label="Tool call display"
+          hint="How a tool call's output starts out when it first appears. This one is a setting for this device, not for a provider."
+          layout="split"
+        >
+          <Select
+            aria-label="Tool call display"
+            size="sm"
+            value={fold().mode}
+            onChange={(event) => chooseFold(event.currentTarget.value as AgentToolFoldMode)}
+          >
+            <option value="collapsed">Start collapsed</option>
+            <option value="expanded">Start expanded</option>
+            <option value="sticky">Carry my last one forward</option>
+          </Select>
+        </Field>
+      </section>
 
       <Show when={error()}><p class="settings-error" role="alert">{error()}</p></Show>
     </div>

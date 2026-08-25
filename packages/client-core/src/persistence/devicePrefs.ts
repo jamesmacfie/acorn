@@ -20,6 +20,7 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.lastTask,
   PrefKeys.lastSource,
   PrefKeys.homeTab,
+  PrefKeys.agentToolFold,
   PrefKeys.dockerPrefs,
   PrefKeys.diskWarningAcked,
   PrefKeys.exclusiveSlots,

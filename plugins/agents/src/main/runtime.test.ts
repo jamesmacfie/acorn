@@ -221,6 +221,48 @@ class FailingStartDriver implements AgentDriver {
   }
 }
 
+/** Holds the provider handshake open so creation acknowledgement and readiness can be asserted
+ * independently. The real Claude and Codex drivers spend this interval negotiating their protocol
+ * sessions; a test gate makes that delay deterministic. */
+class DeferredStartDriver implements AgentDriver {
+  readonly providerId = 'deferred-start'
+  readonly profileId = 'deferred-start'
+  stops = 0
+  #entered!: () => void
+  #release!: () => void
+  readonly entered = new Promise<void>((resolve) => {
+    this.#entered = resolve
+  })
+  readonly #gate = new Promise<void>((resolve) => {
+    this.#release = resolve
+  })
+
+  async probe(): Promise<AgentProviderDescriptor> {
+    return descriptor(this.providerId)
+  }
+
+  release(): void {
+    this.#release()
+  }
+
+  async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    const providerSessionRef = randomUUID()
+    await options.onEvent({ type: 'session_state', state: 'connecting' })
+    this.#entered()
+    await this.#gate
+    await options.onEvent({ type: 'session_metadata', providerSessionRef })
+    await options.onEvent({ type: 'session_state', state: 'ready' })
+    return {
+      providerSessionRef,
+      ready: true,
+      async sendTurn() { return {} },
+      async cancel() {},
+      async resolveRequest() {},
+      stop: async () => { this.stops++ },
+    }
+  }
+}
+
 describe('managed agent runtime conformance', () => {
   // Two real databases, matching the shape of the thing under test. `testDb` is core's, holding the
   // workspace, project, and task rows seedTask writes, which the runtime reaches through CoreServices.
@@ -249,6 +291,140 @@ describe('managed agent runtime conformance', () => {
     pluginDb.cleanup()
     testDb.cleanup()
     await rm(dataDir, { recursive: true, force: true })
+  })
+
+  it('acknowledges an interactive session once durable while its provider keeps connecting', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new DeferredStartDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    const opening = runtime.acceptSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+    await driver.entered
+    const result = await Promise.race([
+      opening.then((session) => ({ kind: 'accepted' as const, session })),
+      new Promise<{ kind: 'timeout' }>((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), 50)),
+    ])
+    driver.release()
+
+    expect(result.kind).toBe('accepted')
+    if (result.kind !== 'accepted') return
+    expect(result.session.runtimeState).toBe('creating')
+    expect((await runtime.store.requireSession(result.session.id)).runtimeState).toBe('connecting')
+    expect((await runtime.wait(result.session.id, 0, 'ready', 2_000)).session.runtimeState).toBe('ready')
+  })
+
+  it('settles an acknowledged interactive session when provider startup fails', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new FailingStartDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    const accepted = await runtime.acceptSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+    const failed = await runtime.wait(accepted.id, 0, 'stopped', 2_000)
+
+    expect(accepted.runtimeState).toBe('creating')
+    expect(failed.session.runtimeState).toBe('failed')
+    expect(failed.events.some((record) =>
+      record.event.type === 'error' && record.event.code === 'provider_start_failed')).toBe(true)
+  })
+
+  it('keeps the internal creation contract blocked until the provider is ready', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new DeferredStartDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    let settled = false
+    const opening = runtime.createSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'workflow',
+      config: {},
+    }).then((session) => {
+      settled = true
+      return session
+    })
+    await driver.entered
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    driver.release()
+    expect((await opening).runtimeState).toBe('ready')
+  })
+
+  it('joins an acknowledged session startup before runtime shutdown completes', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new DeferredStartDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    await runtime.acceptSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+    await driver.entered
+    let stopped = false
+    const stopping = runtime.stop().then(() => { stopped = true })
+    await Promise.resolve()
+    expect(stopped).toBe(false)
+
+    driver.release()
+    await stopping
+    expect(driver.stops).toBe(1)
+    runtime = null
   })
 
   it('persists a provider transcript before publishing ordered events', async () => {
@@ -786,8 +962,13 @@ describe('managed agent runtime conformance', () => {
     expect(options.find((option) => option.id === 'model')?.currentValue).toBe('opus')
     // 'nonsense' is not one of the values the provider advertised, so the provider's own choice stands.
     expect(options.find((option) => option.id === 'reasoning')?.currentValue).toBe('medium')
-    expect((await runtime.store.snapshot(session.id, 0)).events.flatMap((record) =>
+    const startupEvents = (await runtime.store.snapshot(session.id, 0)).events
+    expect(startupEvents.flatMap((record) =>
       record.event.type === 'diagnostic' ? [record.event.message] : [])).toContain('Model changed to Opus 5')
+    expect(startupEvents.findLastIndex((record) =>
+      record.event.type === 'session_state' && record.event.state === 'ready'))
+      .toBeGreaterThan(startupEvents.findIndex((record) =>
+        record.event.type === 'diagnostic' && record.event.message === 'Model changed to Opus 5'))
     // Applying a stored default is not the owner switching anything.
     expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
   })

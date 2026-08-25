@@ -32,6 +32,8 @@ type InsertChoice = {
 export default function AgentComposer(props: {
   session: AgentSession
   disabled?: boolean
+  /** Startup keeps the draft editable, but cannot accept a turn until metadata and defaults settle. */
+  submitDisabled?: boolean
   previousAutomaticContext?: AgentContextSnapshot
   onSent: () => void
   onSessionUpdated: (session: AgentSession) => void
@@ -190,7 +192,12 @@ export default function AgentComposer(props: {
 
   async function send() {
     const text = draft().trim()
-    if ((!text && !attachments().length && !contexts().length) || sending() || props.disabled) return
+    if (
+      (!text && !attachments().length && !contexts().length)
+      || sending()
+      || props.disabled
+      || props.submitDisabled
+    ) return
     setSending(true)
     setError('')
     try {
@@ -336,7 +343,7 @@ export default function AgentComposer(props: {
                 size="sm"
                 width="auto"
                 value={option.currentValue ?? ''}
-                disabled={props.disabled}
+                disabled={props.disabled || props.submitDisabled}
                 onChange={(event) => void updateOption(option, event.currentTarget.value)}
               >
                 <For each={option.values}>
@@ -487,8 +494,9 @@ export default function AgentComposer(props: {
             size="sm"
             class="agent-send"
             busy={sending()}
+            title={props.submitDisabled ? 'Wait for the agent to finish connecting.' : undefined}
             disabled={(!draft().trim() && !attachments().length && !contexts().length)
-              || contextBudget().overLimit || props.disabled}
+              || contextBudget().overLimit || props.disabled || props.submitDisabled}
             onClick={() => void send()}
           >
             Send

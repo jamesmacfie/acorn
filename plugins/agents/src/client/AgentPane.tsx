@@ -21,6 +21,7 @@ import ProviderGlyph from './ProviderGlyph'
 import QueuedAgentTurns from './QueuedAgentTurns'
 import { latestAutomaticTaskContext } from './automaticTaskContext'
 import { canStopAgent } from './agentActivity'
+import { agentSessionIsStarting } from './agentComposerState'
 import { Alert, Button, Card, EmptyState, Field, Icon, Input, ListDetail, Menu, Modal, Picker } from '@acorn/plugin-api/ui'
 import RuntimeStateIcon from './RuntimeStateIcon'
 import './managed-agents.css'
@@ -441,7 +442,14 @@ export default function AgentPane(props: { task: Task }) {
         >
           {(session) => (
             <>
-              <Show when={snapshot()} fallback={<div class="managed-agent-loading">Loading conversation…</div>}>
+              <Show
+                when={snapshot()}
+                fallback={
+                  <EmptyState busy>
+                    {agentSessionIsStarting(session()) ? 'Connecting…' : 'Loading conversation…'}
+                  </EmptyState>
+                }
+              >
                 {(value) => (
                   <>
                     <AgentTranscript
@@ -471,6 +479,7 @@ export default function AgentPane(props: { task: Task }) {
                 <AgentComposer
                   session={session()}
                   disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
+                  submitDisabled={agentSessionIsStarting(session())}
                   previousAutomaticContext={previousAutomaticContext()}
                   onSessionUpdated={managedAgentStore.upsertSession}
                   onSent={() => void managedAgentStore.loadSnapshot(session().id)}

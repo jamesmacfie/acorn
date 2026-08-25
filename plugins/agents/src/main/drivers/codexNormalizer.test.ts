@@ -39,4 +39,24 @@ describe('Codex app-server normalization', () => {
       },
     })).toEqual([{ type: 'usage', usage: { inputTokens: 10, outputTokens: 5, cachedInputTokens: 2, contextUsed: 17, contextSize: 100 } }])
   })
+
+  it('maps each Codex plan snapshot with its structured status intact', () => {
+    expect(normalizeCodexNotification({
+      method: 'turn/plan/updated',
+      params: {
+        plan: [
+          { step: 'Inspect `session/start`', status: 'completed' },
+          { step: 'Update the projection', status: 'inProgress' },
+          { step: 'Verify the UI', status: 'pending' },
+        ],
+      },
+    })).toEqual([{
+      type: 'plan',
+      entries: [
+        { id: 'plan-0', text: 'Inspect `session/start`', status: 'completed' },
+        { id: 'plan-1', text: 'Update the projection', status: 'in_progress' },
+        { id: 'plan-2', text: 'Verify the UI', status: 'pending' },
+      ],
+    }])
+  })
 })

@@ -1,5 +1,20 @@
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 
+const STARTING_STATES: ReadonlySet<AgentSession['runtimeState']> = new Set([
+  'creating',
+  'connecting',
+  'replaying',
+  'reconnecting',
+])
+
+/** The provider is still establishing an input-ready protocol session. Drafting remains local and
+ * available during these states, but submitting would race startup metadata and saved defaults. */
+export function agentSessionIsStarting(
+  session: Pick<AgentSession, 'runtimeState'>,
+): boolean {
+  return STARTING_STATES.has(session.runtimeState)
+}
+
 export function agentComposerDisabledMessage(
   session: Pick<AgentSession, 'controller' | 'runtimeState'>,
   disabled = false,

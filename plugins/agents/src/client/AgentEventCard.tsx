@@ -1,6 +1,6 @@
 import { createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
-import type { AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
+import type { AgentPlanEntry, AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
 import { managedAgentApi } from './managedClient'
@@ -24,6 +24,12 @@ const usageLine = (usage: AgentUsage): string => [
 
 const artifactSize = (byteSize?: number): string =>
   byteSize == null ? '' : `${Math.max(1, Math.round(byteSize / 1024)).toLocaleString()} KiB · `
+
+const PLAN_STATUS: Record<AgentPlanEntry['status'], { glyph: string; label: string }> = {
+  pending: { glyph: '○', label: 'Pending' },
+  in_progress: { glyph: '●', label: 'In progress' },
+  completed: { glyph: '✓', label: 'Completed' },
+}
 
 const copy = (text: string): void => {
   void navigator.clipboard.writeText(text)
@@ -181,9 +187,16 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'plan'}>
         <section class="agent-plan">
           <div class="agent-card-title">Plan</div>
-          <ol>
+          <ol class="agent-plan-list">
             <For each={(event() as Extract<ReturnType<typeof event>, { type: 'plan' }>).entries}>
-              {(entry) => <li data-state={entry.status}>{entry.status === 'completed' ? '✓' : entry.status === 'in_progress' ? '●' : '○'} {entry.text}</li>}
+              {(entry) => (
+                <li data-state={entry.status} aria-current={entry.status === 'in_progress' ? 'step' : undefined}>
+                  <span class="agent-plan-status glyph" role="img" aria-label={PLAN_STATUS[entry.status].label}>
+                    {PLAN_STATUS[entry.status].glyph}
+                  </span>
+                  <AgentMarkdown class="agent-plan-text" text={entry.text} taskId={props.taskId} />
+                </li>
+              )}
             </For>
           </ol>
         </section>

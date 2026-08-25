@@ -58,6 +58,24 @@ describe('ACP tool call normalization', () => {
       status: 'in_progress',
     }).status).toBe('running')
   })
+
+  // Without this a running call has nothing to disclose, because output only lands on the completion
+  // update, so its card cannot honour the reader's fold setting until the call is over.
+  it('carries a call’s parameters through as its input', () => {
+    expect(toolEvent({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'bash-1',
+      title: 'ls -la /tmp',
+      rawInput: { command: 'ls -la /tmp', description: 'List files' },
+    }).input).toBe('{\n  "command": "ls -la /tmp",\n  "description": "List files"\n}')
+  })
+
+  it('sends no input for parameters there is nothing to show for', () => {
+    for (const rawInput of [undefined, null, {}, 'a string', ['an', 'array'], 42]) {
+      expect(toolEvent({ sessionUpdate: 'tool_call', toolCallId: 'bash-1', title: 'Bash', rawInput }).input)
+        .toBeUndefined()
+    }
+  })
 })
 
 // Driven by a real capture rather than hand-written shapes. `_meta.claudeCode` is an extension bag, so

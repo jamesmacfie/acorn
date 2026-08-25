@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentController, AgentRuntimeState } from '@acorn/protocol/managedAgents.ts'
-import { agentComposerDisabledMessage } from './agentComposerState'
+import {
+  agentComposerDisabledMessage,
+  agentSessionIsStarting,
+} from './agentComposerState'
 
 function message(controller: AgentController, runtimeState: AgentRuntimeState, disabled = true) {
   return agentComposerDisabledMessage({ controller, runtimeState }, disabled)
@@ -24,5 +27,14 @@ describe('agentComposerDisabledMessage', () => {
 
   it('returns no message while the composer is enabled', () => {
     expect(message('acorn', 'ready', false)).toBeUndefined()
+  })
+
+  it('keeps a startup draft editable while submission waits for readiness', () => {
+    for (const runtimeState of ['creating', 'connecting', 'replaying', 'reconnecting'] as const) {
+      expect(agentSessionIsStarting({ runtimeState })).toBe(true)
+    }
+    for (const runtimeState of ['ready', 'working', 'waiting', 'cancelling', 'stopped', 'failed', 'archived'] as const) {
+      expect(agentSessionIsStarting({ runtimeState })).toBe(false)
+    }
   })
 })

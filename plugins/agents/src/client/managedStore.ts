@@ -3,7 +3,7 @@ import { onScopeEvicted, pushManagedAgentNotice } from '@acorn/plugin-api/client
 import { wsOnAgentFrame } from './wsChannel'
 import type { AgentEventRecord, AgentSession, AgentSessionSnapshot, AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
-import { mergeManagedSnapshot } from './managedSnapshot'
+import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 
 const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
@@ -28,14 +28,14 @@ function upsertSession(session: AgentSession): void {
   setSessions((current) => {
     const found = current.some((item) => item.id === session.id)
     const next = found
-      ? current.map((item) => item.id === session.id ? session : item)
+      ? current.map((item) => item.id === session.id ? newestManagedSession(item, session) : item)
       : [...current, session]
     return next.sort(byRecent)
   })
   setSnapshots((current) => {
     const snapshot = current[session.id]
     return snapshot
-      ? { ...current, [session.id]: { ...snapshot, session } }
+      ? { ...current, [session.id]: { ...snapshot, session: newestManagedSession(snapshot.session, session) } }
       : current
   })
 }

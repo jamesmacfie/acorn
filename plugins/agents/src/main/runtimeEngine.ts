@@ -82,6 +82,10 @@ export class ManagedAgentEngine {
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
   protected readonly onCompletedTurn?: (taskId: string, transcriptTail: string) => Promise<void>
   protected readonly live = new Map<string, LiveSession>()
+  // A newly persisted session is visible to the client before its provider finishes starting. Hold
+  // the driver's early `ready` fact until product initialization (including saved defaults) is done,
+  // so `ready` continues to mean that a first turn may use the advertised configuration safely.
+  private readonly readinessHolds = new Set<string>()
   // Every in-flight provider reconnect delay (onProviderClosed schedules up to three per session).
   // Tracked so stop() can cancel them: a timer that fires after teardown calls ensureSession, which
   // spawns a provider child against a closed SQLite handle.
@@ -189,6 +193,21 @@ export class ManagedAgentEngine {
     this.providerCache = null
   }
 
+  protected holdSessionReadiness(sessionId: string): void {
+    this.readinessHolds.add(sessionId)
+  }
+
+  protected discardSessionReadinessHold(sessionId: string): void {
+    this.readinessHolds.delete(sessionId)
+  }
+
+  protected async completeSessionReadiness(sessionId: string): Promise<void> {
+    this.readinessHolds.delete(sessionId)
+    if (this.stopped) return
+    await this.record(sessionId, null, { type: 'session_state', state: 'ready' })
+    void this.pump()
+  }
+
   protected async ensureSession(session: AgentSession): Promise<LiveSession> {
     // The only door into spawning or reconnecting a provider child. Checked here, not at each call
     // site, because after stop() the database handle is about to close and a turn still in flight
@@ -236,12 +255,17 @@ export class ManagedAgentEngine {
       onClosed: (error) => this.onProviderClosed(session.id, error),
     })
     try {
-      live.handle = await live.startPromise
+      const handle = await live.startPromise
+      // stopLive waits for the same start promise and owns stopping the handle. The starter must not
+      // republish readiness or repopulate `live` while teardown is draining it.
+      if (this.stopped || live.stopping) throw new Error('The managed agent runtime is shutting down.')
+      live.handle = handle
       live.reconnectAttempt = 0
       void this.pump()
       return live
     } catch (error) {
       this.live.delete(session.id)
+      if (this.stopped || live.stopping) throw error
       await this.record(session.id, null, {
         type: 'error',
         code: 'provider_start_failed',
@@ -259,6 +283,11 @@ export class ManagedAgentEngine {
   }
 
   protected async onProviderEvent(sessionId: string, event: AgentNormalizedEvent): Promise<void> {
+    if (
+      event.type === 'session_state'
+      && event.state === 'ready'
+      && this.readinessHolds.has(sessionId)
+    ) return
     const live = this.live.get(sessionId)
     if (live && !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type)) {
       live.acceptedResponse = true
@@ -481,7 +510,8 @@ export class ManagedAgentEngine {
     if (!live) return
     live.stopping = true
     this.live.delete(sessionId)
-    if (live.handle) await live.handle.stop().catch(() => undefined)
+    const handle = live.handle ?? await live.startPromise?.catch(() => null)
+    if (handle) await handle.stop().catch(() => undefined)
     await this.providerEvents.flush(sessionId)
   }
 }
