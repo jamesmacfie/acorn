@@ -44,6 +44,7 @@ client: agentToolRendererRegistry
 client: agentToolTone
 client: allProjects
 client: brandMarkRegistry
+client: brandStyle
 client: bytesOf
 client: canPickFolder
 client: capabilities
@@ -364,6 +365,8 @@ ui: Kbd
 ui: KeyValueEditor
 ui: LineComposerController
 ui: ListDetail
+ui: Markdown
+ui: MarkdownOptions
 ui: MentionTextarea
 ui: Menu
 ui: Meter
