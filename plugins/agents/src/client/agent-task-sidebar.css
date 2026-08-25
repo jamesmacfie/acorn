@@ -47,6 +47,16 @@
    session is deliberately not green — most rows in a busy task are finished, and colouring all of
    them drowns out the one that needs you. */
 .agent-task-state { color: var(--text-faint); font-family: var(--font-glyph); display: inline-flex; }
+/* Sized down to sit with the row's smallest type and the 8px subagent dot below it. At 1em an icon
+   is the full 13px of the title line and reads as a second piece of content rather than a marker. */
+.agent-task-state svg { width: var(--space-5); height: var(--space-5); }
+/* The loader turns while the agent is mid-flight. No prefers-reduced-motion guard, unlike core's
+   `.spin`: this is the whole signal that an agent is running, and a 10px rotation is not the kind of
+   motion that setting is there to stop. */
+.agent-task-state[data-state='working'] svg,
+.agent-task-state[data-state='cancelling'] svg,
+.agent-task-state[data-state='reconnecting'] svg { animation: agent-task-spin 1s linear infinite; }
+@keyframes agent-task-spin { to { transform: rotate(1turn); } }
 .agent-task-state[data-state='working'],
 .agent-task-state[data-state='starting'] { color: var(--state-ok); }
 .agent-task-state[data-state='creating'],

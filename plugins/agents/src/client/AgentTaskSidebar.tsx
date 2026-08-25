@@ -30,14 +30,10 @@ const RUNTIME_ICON: Record<string, string> = {
   archived: 'archive',
 }
 
-/** States where the agent is mid-flight, so the loader actually turns. `.spin` is base.css, and it
- *  already stands still under prefers-reduced-motion. */
-const SPINNING = new Set(['working', 'cancelling', 'reconnecting'])
-
 function RuntimeIcon(props: { state: string }) {
   return (
     <span class="agent-task-state" data-state={props.state}>
-      <Icon name={RUNTIME_ICON[props.state] ?? 'circle-dashed'} class={SPINNING.has(props.state) ? 'spin' : undefined} />
+      <Icon name={RUNTIME_ICON[props.state] ?? 'circle-dashed'} />
     </span>
   )
 }
