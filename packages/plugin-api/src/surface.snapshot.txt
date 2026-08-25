@@ -295,8 +295,13 @@ testkit: testGate
 testkit: testSecretEnv
 testkit: validatePluginConfig
 ui/diff: CodeRow
+ui/diff: CommentSide
 ui/diff: DIFF_LOAD_ROW_HEIGHT
+ui/diff: DiffCollapsedFiles
 ui/diff: DiffFile
+ui/diff: DiffScrollState
+ui/diff: DiffSource
+ui/diff: DiffViewScope
 ui/diff: FindHighlight
 ui/diff: GapRow
 ui/diff: ParsedFile
@@ -313,6 +318,7 @@ ui/diff: createDiffHydrator
 ui/diff: createDiffMeasureSchedulers
 ui/diff: createDiffVirtualizer
 ui/diff: createSplitScrollSync
+ui/diff: diffScopeKey
 ui/diff: estimateRowSize
 ui/diff: estimateSplitBandSize
 ui/diff: expandGap
@@ -354,6 +360,7 @@ ui: Composer
 ui: CopyButton
 ui: DescriptionList
 ui: DiffLine
+ui: DiffPane
 ui: DocumentTabs
 ui: EmptyState
 ui: Field

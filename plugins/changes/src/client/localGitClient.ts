@@ -1,6 +1,6 @@
 // Local-changes review over loopback HTTP: was `window.acorn.terminal.local`. Pure-Node
 // on the server, so it works in a plain browser (dev:node) too.
-import { localActionRoute, localBlobRoute, localChangesRoute, localDiffRoute } from '../shared/api'
+import { localActionRoute, localChangesRoute, localDiffRoute, localNewSideRoute } from '../shared/api'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 
@@ -11,7 +11,7 @@ const post = <T>(url: string, body?: unknown) =>
 export const localGitApi = {
   changes: (taskId: string) => readJson<LocalChange[]>(localChangesRoute(taskId)),
   diff: (taskId: string, path: string, scope: 'unstaged' | 'staged') => readJson<{ patch: string } | { error: string }>(localDiffRoute(taskId, path, scope)),
-  blob: (taskId: string, path: string, ref?: string) => readJson<{ text: string } | { error: string }>(localBlobRoute(taskId, path, ref)),
+  newSide: (taskId: string, path: string, scope: 'unstaged' | 'staged') => readJson<{ text: string } | { error: string }>(localNewSideRoute(taskId, path, scope)),
   stage: (taskId: string, path: string) => post<ActionResult>(localActionRoute(taskId, 'stage'), { path }),
   unstage: (taskId: string, path: string) => post<ActionResult>(localActionRoute(taskId, 'unstage'), { path }),
   discard: (taskId: string, path: string, untracked?: boolean) => post<ActionResult>(localActionRoute(taskId, 'discard'), { path, untracked }),

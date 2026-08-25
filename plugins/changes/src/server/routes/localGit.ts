@@ -12,7 +12,8 @@ export type GitActionResult = { ok: boolean; reason?: string }
 export type LocalGitBridge = {
   changes(taskId: string): Promise<LocalChange[]>
   diff(taskId: string, path: string, scope: LocalScope): Promise<{ patch: string } | { error: string }>
-  blob(taskId: string, path: string, ref?: string): Promise<{ text: string } | { error: string }>
+  /** The new side of the file's diff, whole, so the pane can fill an expanded gap. */
+  newSide(taskId: string, path: string, scope: LocalScope): Promise<{ text: string } | { error: string }>
   stage(taskId: string, path: string): Promise<GitActionResult>
   unstage(taskId: string, path: string): Promise<GitActionResult>
   discard(taskId: string, path: string, untracked?: boolean): Promise<GitActionResult>
@@ -42,10 +43,10 @@ export const localGit = new Hono<AppEnv>()
     if (!path) return respondError(c, 400, 'bad_request')
     return viaBridge(c, LOCAL_GIT, (b) => b.diff(id(c), path, c.req.query('scope') === 'staged' ? 'staged' : 'unstaged'))
   })
-  .get('/:id/local/blob', (c) => {
+  .get('/:id/local/new-side', (c) => {
     const path = c.req.query('path')
     if (!path) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, LOCAL_GIT, (b) => b.blob(id(c), path, c.req.query('ref') ?? undefined))
+    return viaBridge(c, LOCAL_GIT, (b) => b.newSide(id(c), path, c.req.query('scope') === 'staged' ? 'staged' : 'unstaged'))
   })
   .post('/:id/local/stage', async (c) => {
     const p = pathBody.safeParse(await c.req.json().catch(() => null))

@@ -21,7 +21,8 @@
   font-family: var(--font-mono);
 }
 .changes-empty { padding: var(--space-5); font-size: var(--fs-sm); }
-.changes-diff { flex: 1; min-width: 0; overflow: auto; }
+/* No rule for the diff column: DiffPane is the ListDetail's detail child, and .ui-listdetail-detail
+   is already the flex column with hidden overflow the viewer's own scroller expects. */
 
 /* File-row "add to agent" affordance. :focus-within as well as :hover, since a keyboard user could
    not otherwise reach it. */
@@ -34,6 +35,10 @@
 .changes-push-status { text-transform: none; letter-spacing: normal; font-weight: 400; color: var(--text-muted); }
 .review-note {
   display: flex;
+  /* Its own line under the code, not squeezed in beside it. `.diff-row` is `flex-wrap: wrap` and
+     `.diff-code` is `flex: 1 1 0`, so without a full basis both fit on one line and the code shrinks
+     to make room. Core's inline composer (`.diff-composer`) does the same thing for the same reason. */
+  flex-basis: 100%;
   align-items: baseline;
   gap: var(--space-4);
   margin: var(--space-1) 0 var(--space-1) 90px;

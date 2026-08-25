@@ -1,18 +1,27 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { agentSessionsFor, fileStatusMeta, formatFileReference, projectsOptions, readJson, sendReferenceToAgent, type Task, taskBridge, taskStatus } from '@acorn/plugin-api/client'
+import { agentSessionsFor, clientEvents, fileStatusMeta, formatFileReference, projectsOptions, readJson, sendReferenceToAgent, type Task, taskBridge, taskStatus } from '@acorn/plugin-api/client'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { reviewNotesRoute, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
-import { Alert, Button, CopyButton, DiffLine, ListDetail, NonCodeRow, Row, createArmedConfirm, type LineComposerController } from '@acorn/plugin-api/ui'
-import { buildDiffRowsAsync, type CodeRow, isCodeRow, type Row as DiffRow, tokenizeDocument } from '@acorn/plugin-api/ui/diff'
+import { Alert, Button, CopyButton, DiffPane, ListDetail, Row, createArmedConfirm } from '@acorn/plugin-api/ui'
+import type { CodeRow, DiffFile, DiffSource } from '@acorn/plugin-api/ui/diff'
 import { localGitApi } from './localGitClient'
-import { changeKey, groupChanges, pickSelected, toPullFile } from './model'
+import { changeKey, groupChanges, pickSelected, stackFor, toPullFile } from './model'
 import './changes.css'
 
-// ChangesPane: a PR-style "Files changed" view over the task worktree's uncommitted changes. Uses
-// client-core's shared diff viewer (synth, gitdiff-parser, DiffRows) fed by local:changes and
-// local:diff instead of GitHub patches. Refreshes on the dirty-poll signal (taskStatus).
+// ChangesPane: a PR-style "Files changed" view over the task worktree's uncommitted changes. The
+// diff column is the shared viewer (client-core's DiffPane, docs/diff-rendering.md), the same
+// component the GitHub pull-request pane renders, filled in from local:changes and local:diff rather
+// than from provider patches. Refreshes on the dirty-poll signal (taskStatus).
+//
+// The list on the left is a navigator, not a selector: every file's hunks are stacked in one
+// scroller and clicking a row scrolls to it, the way the pull-request pane's file list works. The
+// per-file git actions stay on the rows. One staging area is stacked at a time; `stackFor` in
+// model.ts says why.
+// One viewer per task pane, so the scope's route key is a constant rather than a coordinate.
+const CHANGES_ROUTE_KEY = 'changes'
+
 export default function ChangesPane(props: { task: Task }) {
   const api = taskBridge()
   const projects = createQuery(() => projectsOptions(true))
@@ -39,25 +48,6 @@ export default function ChangesPane(props: { task: Task }) {
   const groups = createMemo(() => groupChanges(changes() ?? []))
   const selected = createMemo(() => pickSelected(groups(), selectedKey()))
 
-  const [rows] = createResource(
-    () => {
-      const sel = selected()
-      return sel ? { taskId: props.task.id, sel, tick: taskStatus(props.task.id)?.dirtyCount ?? 0 } : null
-    },
-    async (src): Promise<DiffRow[]> => {
-      const res = await localGitApi.diff(src.taskId, src.sel.path, src.sel.staged ? 'staged' : 'unstaged')
-      if ('error' in res) return []
-      const file = toPullFile(src.sel, res.patch)
-      // Whole-file view: the patch carries full context (server -U1e6), so this drops the expand
-      // gaps and hunk-header rows. Every line is already shown, with +/- highlights.
-      const diff = (await buildDiffRowsAsync(file, tokenizeDocument)).filter((r) => r.kind !== 'gap' && r.kind !== 'hunk')
-      return [{ kind: 'file', file }, ...(diff.length ? diff : [{ kind: 'nodiff' } as DiffRow])]
-    },
-    { initialValue: [] },
-  )
-
-  const noop = async () => {}
-
   // "Add file/line to agent": drops a path[:line] draft into the agent composer.
   async function sendRef(ref: string) {
     const res = await sendReferenceToAgent(props.task.id, ref)
@@ -76,26 +66,102 @@ export default function ChangesPane(props: { task: Task }) {
   const unsent = () => (notes() ?? []).filter((n) => n.sentAt == null)
   const [sendMsg, setSendMsg] = createSignal('')
 
-  const composers = new Map<string, LineComposerController>()
-  function composerFor(key: string): LineComposerController {
-    let c = composers.get(key)
-    if (!c) {
-      const [isOpen, setOpen] = createSignal(false)
-      const [body, setBody] = createSignal('')
-      c = { isOpen, body, setOpen, setBody }
-      composers.set(key, c)
-    }
-    return c
-  }
-
   const anchorOf = (r: CodeRow): { side: ReviewNote['side']; line: number } | null =>
     r.newNo != null ? { side: 'additions', line: r.newNo } : r.oldNo != null ? { side: 'deletions', line: r.oldNo } : null
 
-  async function createNote(r: CodeRow, body: string) {
+  const notesForRow = (r: CodeRow): ReviewNote[] => {
     const a = anchorOf(r)
-    if (!a) return
-    await addReviewNote(props.task.id, { path: r.path, side: a.side, startLine: a.line, endLine: a.line, snippet: r.raw, body })
-    await refetchNotes()
+    if (!a) return []
+    return (notes() ?? []).filter((n) => n.path === r.path && n.side === a.side && n.endLine === a.line)
+  }
+
+  // The stacked file set, and the changes behind it so fetchPatches can find a path's staging area.
+  // A memo, not a plain getter: the viewer reads the file list from several memos of its own, and a
+  // fresh DiffFile per read would rebuild the row model's file rows for nothing.
+  const stack = createMemo(() => stackFor(groups(), selected()))
+  const diffFiles = createMemo<DiffFile[]>(() => stack().map((c) => toPullFile(c, null)))
+
+  // The diff column's whole contract with the shared viewer: the stacked files, their patches read on
+  // demand, and review notes as the annotation the viewer itself has no concept of.
+  const source: DiffSource = {
+    scope: { taskId: props.task.id, routeKey: CHANGES_ROUTE_KEY },
+    files: diffFiles,
+    loading: () => changes.loading,
+    // Which files, and separately what they say. An agent saving a file moves the second every poll,
+    // and the viewer keeps the reader's scroll position for that; a file appearing or going moves the
+    // first, which does reset it.
+    signature: () => stack().map(changeKey).join('\0'),
+    contentSignature: () => `${stack().map((c) => `${changeKey(c)}:${c.additions}:${c.deletions}`).join('\0')}:${taskStatus(props.task.id)?.dirtyCount ?? 0}`,
+    // Only after a click. pickSelected falls back to the first row so something renders on open, and
+    // treating that as a scroll target would mean the remembered offset never won.
+    selectedPath: () => (selectedKey() ? selected()?.path ?? '' : ''),
+    cachedFile: () => null,
+    fetchPatches: async (paths) => {
+      const byPath = new Map(stack().map((c) => [c.path, c]))
+      const out: DiffFile[] = []
+      for (const path of paths) {
+        const change = byPath.get(path)
+        if (!change) continue
+        const res = await localGitApi.diff(props.task.id, path, change.staged ? 'staged' : 'unstaged')
+        // Thrown, not swallowed: the viewer turns a failed patch read into a row that says so and
+        // offers Retry.
+        if ('error' in res) throw new Error(res.error)
+        out.push(toPullFile(change, res.patch))
+      }
+      return out
+    },
+    // Fills an expanded gap. `sha` is the staging area toPullFile put there, which is what says
+    // whether the new side is the index or the file on disk.
+    fileText: async ({ path, sha }) => {
+      const res = await localGitApi.newSide(props.task.id, path, sha === 'staged' ? 'staged' : 'unstaged')
+      if ('error' in res) throw new Error(res.error)
+      return res.text
+    },
+    canComment: () => true,
+    addComment: async (body, { row }) => {
+      const a = anchorOf(row)
+      if (!a) return
+      await addReviewNote(props.task.id, { path: row.path, side: a.side, startLine: a.line, endLine: a.line, snippet: row.raw, body })
+    },
+    invalidate: () => {
+      void refetch()
+      void refetchNotes()
+    },
+    draftPrefix: `changes:${props.task.id}`,
+    hasLineExtra: (row) => notesForRow(row).length > 0,
+    // Which notes exist and where, so adding or deleting one re-measures the row it sits under. The
+    // body length is in it because the note wraps, so its text is part of the height.
+    lineExtraSignature: () => (notes() ?? []).map((n) => `${n.path}:${n.side}:${n.endLine}:${n.body.length}`).join('\0'),
+    lineExtra: (row) => (
+      <For each={notesForRow(row)}>
+        {(note) => (
+          <div class="review-note" classList={{ 'review-note-sent': note.sentAt != null }}>
+            <span class="review-note-status" title={note.sentAt ? 'Sent to agent' : 'Not sent yet'}>
+              {note.sentAt ? '✓ sent' : '● unsent'}
+            </span>
+            <span class="review-note-body">{note.body}</span>
+            <Button
+              variant="bare"
+              size="sm"
+              iconOnly
+              tone="danger"
+              title="Delete note"
+              aria-label="Delete note"
+              onClick={() => void deleteReviewNote(props.task.id, note.id).then(() => refetchNotes())}
+            >✕</Button>
+          </div>
+        )}
+      </For>
+    ),
+    lineAction: {
+      title: '⌥-click: add line reference to the agent composer',
+      run: (row, event) => {
+        if (!event.altKey) return
+        const line = row.newNo ?? row.oldNo
+        if (line != null) void sendRef(formatFileReference(row.path, line))
+      },
+    },
+    find: { commandId: 'changes.diff.find', description: 'Find in changes', category: 'Changes', pane: 'changes' },
   }
 
   // Stage and commit actions. Discard is destructive, so it requires explicit confirmation.
@@ -136,12 +202,6 @@ export default function ChangesPane(props: { task: Task }) {
     setPushing(false)
     if (res.ok) setPushMsg('Pushed')
     else setActionError(res.reason ?? 'Push failed.')
-  }
-
-  const notesForRow = (r: CodeRow): ReviewNote[] => {
-    const a = anchorOf(r)
-    if (!a) return []
-    return (notes() ?? []).filter((n) => n.path === r.path && n.side === a.side && n.endLine === a.line)
   }
 
   async function sendNotes() {
@@ -214,7 +274,12 @@ export default function ChangesPane(props: { task: Task }) {
                           density="compact"
                           reveal
                           selected={selected() != null && changeKey(selected()!) === changeKey(c)}
-                          onActivate={() => setSelectedKey(changeKey(c))}
+                          onActivate={() => {
+                            setSelectedKey(changeKey(c))
+                            // The viewer skips a scroll to the file it last targeted, so clicking the
+                            // same row twice would do nothing. This is the force-scroll signal.
+                            clientEvents.emit('presentation:file-scroll', { routeKey: CHANGES_ROUTE_KEY, path: c.path })
+                          }}
                           title={c.oldPath ? `${c.oldPath} → ${c.path}` : c.path}
                           leading={<span class={`file-status file-status-${status().tone}`}>{status().letter}</span>}
                           meta={
@@ -275,68 +340,7 @@ export default function ChangesPane(props: { task: Task }) {
           </>
         }
       >
-        <div class="diff compare-diff changes-diff">
-          <div class="diff-rows">
-            <For each={rows() ?? []}>
-              {(row) => (
-                <div
-                  class="diff-row"
-                  classList={{
-                    'diff-hunk': row.kind === 'hunk',
-                    'diff-add': row.kind === 'insert',
-                    'diff-del': row.kind === 'delete',
-                    'diff-file-row': row.kind === 'file',
-                    'diff-thread-row': row.kind === 'nodiff' || row.kind === 'load',
-                  }}
-                  title={isCodeRow(row) ? '⌥-click: add line reference to the agent composer' : undefined}
-                  onClick={(e) => {
-                    if (!e.altKey || !isCodeRow(row)) return
-                    const line = row.newNo ?? row.oldNo
-                    if (line != null) void sendRef(formatFileReference(row.path, line))
-                  }}
-                >
-                  <Show
-                    when={isCodeRow(row) ? row : null}
-                    fallback={
-                      <NonCodeRow row={row as Exclude<DiffRow, CodeRow>} onMutated={() => void refetch()} resolveThread={noop} reply={noop} />
-                    }
-                  >
-                    {(r) => (
-                      <>
-                        <DiffLine
-                          r={r()}
-                          canAdd={anchorOf(r()) != null}
-                          addComment={(body) => createNote(r(), body)}
-                          onMutated={() => void refetchNotes()}
-                          composer={composerFor(`${r().path}:${r().kind}:${r().oldNo ?? ''}:${r().newNo ?? ''}`)}
-                        />
-                        <For each={notesForRow(r())}>
-                          {(note) => (
-                            <div class="review-note" classList={{ 'review-note-sent': note.sentAt != null }}>
-                              <span class="review-note-status" title={note.sentAt ? 'Sent to agent' : 'Not sent yet'}>
-                                {note.sentAt ? '✓ sent' : '● unsent'}
-                              </span>
-                              <span class="review-note-body">{note.body}</span>
-                              <Button
-                                variant="bare"
-                                size="sm"
-                                iconOnly
-                                tone="danger"
-                                title="Delete note"
-                                aria-label="Delete note"
-                                onClick={() => void deleteReviewNote(props.task.id, note.id).then(() => refetchNotes())}
-                              >✕</Button>
-                            </div>
-                          )}
-                        </For>
-                      </>
-                    )}
-                  </Show>
-                </div>
-              )}
-            </For>
-          </div>
-        </div>
+        <DiffPane source={source} />
       </ListDetail>
     </section>
     </Show>

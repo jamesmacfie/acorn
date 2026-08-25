@@ -1,9 +1,9 @@
-import { createSplitScrollSync } from '@acorn/plugin-api/ui/diff'
 import { For, onCleanup, onMount, Show } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
-import { DiffLine, type LineComposerController, NonCodeRow, SplitCell, type ThreadCollapseController } from '@acorn/plugin-api/ui'
-import { type CodeRow, type FindHighlight, type GapRow, isCodeRow, type Row, type SplitBand, type ViewMode } from '@acorn/plugin-api/ui/diff'
-import type { Thread } from '../contract/api'
+import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from '../ui/diff/DiffRows'
+import type { FindHighlight } from '../ui/diff/find'
+import { isCodeRow, type CodeRow, type DiffThread, type GapRow, type Row, type SplitBand, type ViewMode } from '../ui/diff/model'
+import { createSplitScrollSync } from '../ui/diff/splitScrollSync'
 
 type VirtualItem = { index: number; start: number; end: number }
 type DiffVirtualizer = {
@@ -32,16 +32,20 @@ export function DiffCanvas(props: {
   expandGap: (gap: GapRow) => Promise<void>
   retryDiff: (path: string) => void
   mentions: () => string[]
-  threadCollapse: (thread: Thread) => ThreadCollapseController
+  threadCollapse: (thread: DiffThread) => ThreadCollapseController
   fileCollapsed: (path: string) => boolean
   onToggleFileCollapse: (path: string) => void
   lineComment: (row: CodeRow) => { side: 'LEFT' | 'RIGHT'; lineNo: number; key: string; canAdd: boolean }
-  addComment: (body: string, path: string, lineNo: number, side: 'LEFT' | 'RIGHT') => Promise<unknown>
+  addComment: (body: string, row: CodeRow, side: 'LEFT' | 'RIGHT', lineNo: number) => Promise<unknown>
   composerFor: (key: string) => LineComposerController
   splitComposer: (row: CodeRow | null, side: 'LEFT' | 'RIGHT') => LineComposerController | undefined
-  headSha: Accessor<string | null>
+  canComment: Accessor<boolean>
   invalidate: () => void
   findHighlight: (row: CodeRow) => FindHighlight | undefined
+  /** The source's own annotation under a code row. See DiffSource.lineExtra. */
+  lineExtra?: (row: CodeRow) => JSX.Element
+  /** The source's own click affordance on a code row. See DiffSource.lineAction. */
+  lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
 }) {
   const virtualRows = () => props.virt.getVirtualItems().flatMap((vi) => {
     const row = props.rows()[vi.index]
@@ -79,6 +83,10 @@ export function DiffCanvas(props: {
                     'diff-thread-row': row.kind === 'thread' || row.kind === 'nodiff' || row.kind === 'load',
                   }}
                   data-index={vi.index}
+                  title={props.lineAction && isCodeRow(row) ? props.lineAction.title : undefined}
+                  onClick={props.lineAction && isCodeRow(row)
+                    ? ((e) => props.lineAction!.run(row, e))
+                    : undefined}
                   ref={(el) => {
                     rowEl = el
                     if (props.shouldMeasureRow(row)) props.scheduleElementMeasure('unified', el)
@@ -106,15 +114,18 @@ export function DiffCanvas(props: {
                     {(code) => {
                       const comment = props.lineComment(code())
                       return (
-                        <DiffLine
-                          r={code()}
-                          canAdd={comment.canAdd}
-                          addComment={(body) => props.addComment(body, code().path, comment.lineNo, comment.side)}
-                          onMutated={props.invalidate}
-                          composer={comment.canAdd ? props.composerFor(comment.key) : undefined}
-                          mentions={props.mentions()}
-                          highlight={props.findHighlight(code())}
-                        />
+                        <>
+                          <DiffLine
+                            r={code()}
+                            canAdd={comment.canAdd}
+                            addComment={(body) => props.addComment(body, code(), comment.side, comment.lineNo)}
+                            onMutated={props.invalidate}
+                            composer={comment.canAdd ? props.composerFor(comment.key) : undefined}
+                            mentions={props.mentions()}
+                            highlight={props.findHighlight(code())}
+                          />
+                          {props.lineExtra?.(code())}
+                        </>
                       )
                     }}
                   </Show>
@@ -182,28 +193,40 @@ export function DiffCanvas(props: {
                     }
                   >
                     {(pair) => (
-                      <div class="diff-split-pair">
-                        <SplitCell
-                          r={pair().left}
-                          gutter={pair().left?.oldNo ?? null}
-                          canAdd={!!props.headSha() && pair().left?.oldNo != null}
-                          addComment={(body) => props.addComment(body, pair().left!.path, pair().left!.oldNo!, 'LEFT')}
-                          onMutated={props.invalidate}
-                          composer={props.splitComposer(pair().left, 'LEFT')}
-                          mentions={props.mentions()}
-                          highlight={pair().left ? props.findHighlight(pair().left!) : undefined}
-                        />
-                        <SplitCell
-                          r={pair().right}
-                          gutter={pair().right?.newNo ?? null}
-                          canAdd={!!props.headSha() && pair().right?.newNo != null}
-                          addComment={(body) => props.addComment(body, pair().right!.path, pair().right!.newNo!, 'RIGHT')}
-                          onMutated={props.invalidate}
-                          composer={props.splitComposer(pair().right, 'RIGHT')}
-                          mentions={props.mentions()}
-                          highlight={pair().right ? props.findHighlight(pair().right!) : undefined}
-                        />
-                      </div>
+                      <>
+                        <div class="diff-split-pair">
+                          <SplitCell
+                            r={pair().left}
+                            gutter={pair().left?.oldNo ?? null}
+                            canAdd={props.canComment() && pair().left?.oldNo != null}
+                            addComment={(body) => props.addComment(body, pair().left!, 'LEFT', pair().left!.oldNo!)}
+                            onMutated={props.invalidate}
+                            composer={props.splitComposer(pair().left, 'LEFT')}
+                            mentions={props.mentions()}
+                            highlight={pair().left ? props.findHighlight(pair().left!) : undefined}
+                          />
+                          <SplitCell
+                            r={pair().right}
+                            gutter={pair().right?.newNo ?? null}
+                            canAdd={props.canComment() && pair().right?.newNo != null}
+                            addComment={(body) => props.addComment(body, pair().right!, 'RIGHT', pair().right!.newNo!)}
+                            onMutated={props.invalidate}
+                            composer={props.splitComposer(pair().right, 'RIGHT')}
+                            mentions={props.mentions()}
+                            highlight={pair().right ? props.findHighlight(pair().right!) : undefined}
+                          />
+                        </div>
+                        {/* Below the pair rather than inside a cell: an annotation is about the line,
+                            and both columns can be showing the same one. */}
+                        <Show when={props.lineExtra}>
+                          {(extra) => (
+                            <>
+                              <Show when={pair().left}>{(left) => extra()(left())}</Show>
+                              <Show when={pair().right}>{(right) => extra()(right())}</Show>
+                            </>
+                          )}
+                        </Show>
+                      </>
                     )}
                   </Show>
                 </div>

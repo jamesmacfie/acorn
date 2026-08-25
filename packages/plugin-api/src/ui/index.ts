@@ -67,3 +67,8 @@ export { default as ModelConnectionPicker, defaultModelIdFor } from '@acorn/clie
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.
 export { DiffLine, FileHead, NonCodeRow, SplitCell } from '@acorn/client-core/ui/diff/DiffRows.tsx'
 export type { LineComposerController, ThreadCollapseController } from '@acorn/client-core/ui/diff/DiffRows.tsx'
+// The whole viewer as one component: virtualized unified and split lists, find, sticky file header,
+// per-file collapse, gap expansion, and the comment layer. Driven by a `DiffSource` from ./ui/diff.
+// A plugin reaching for the row components directly is building a simpler surface than this one, the
+// way the compare preview does.
+export { DiffPane } from '@acorn/client-core/diff/DiffPane.tsx'

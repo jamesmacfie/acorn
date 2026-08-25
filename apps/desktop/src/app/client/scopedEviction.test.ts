@@ -3,7 +3,7 @@ import { editorOpen, openFiles } from '@acorn/plugin-editor/client/editorState.t
 import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '@acorn/plugin-editor/client/editorTreeState.ts'
 import { editorViewState, rememberEditorViewState } from '@acorn/plugin-editor/client/editorViewState.ts'
 import { prFilterFor, setPrFilter } from '@acorn/plugin-github/client/pullList/filterState.ts'
-import { rememberReviewDiffScroll, reviewDiffScroll } from '@acorn/plugin-github/client/reviewViewState.ts'
+import { diffScroll, rememberDiffScroll } from '@acorn/client-core/diff/viewState.ts'
 import { activeTerminal, rememberActiveTerminal, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
 import { managedAgentStore } from '@acorn/plugin-agents/client/managedStore.ts'
 import {
@@ -38,8 +38,8 @@ describe('scoped lifecycle eviction', () => {
     setMaximizedPane(taskId, 'editor')
     editorOpen(taskId, 'src/a.ts', false)
     setEditorTreeDirectoryOpen(taskId, 'src', true)
-    const reviewScope = { taskId, routeKey: 'oak/acorn#42' }
-    rememberReviewDiffScroll(reviewScope, {
+    const diffScope = { taskId, routeKey: 'oak/acorn#42' }
+    rememberDiffScroll(diffScope, {
       top: 4_800,
       left: 0,
       viewMode: 'unified',
@@ -63,7 +63,7 @@ describe('scoped lifecycle eviction', () => {
     expect(maximizedPane(taskId)).toBeUndefined()
     expect(openFiles(taskId)).toEqual([])
     expect(editorTreeDirectoryOpen(taskId, 'src')).toBe(false)
-    expect(reviewDiffScroll(reviewScope)).toBeUndefined()
+    expect(diffScroll(diffScope)).toBeUndefined()
     expect(activeTerminal(taskId)).toBeUndefined()
     expect(consumePaneIntent(taskId, 'editor')).toBeUndefined()
     expect(consumeTerminalFocusIntent(taskId)).toBeUndefined()
