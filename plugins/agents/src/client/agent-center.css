@@ -27,7 +27,7 @@
 .agent-center-stats strong { color: var(--text); font-size: var(--fs-xl); }
 
 .agent-center-filters input,
-.agent-center-filters select {
+.agent-center-filters .ui-select {
   min-width: 0;
   min-height: var(--control-h);
   padding: 0 var(--space-3);
