@@ -110,7 +110,3 @@
   height: 100%;
   padding: var(--space-2) var(--space-3);
 }
-
-/* The topbar toggle. Was borrowing core's `.theme-toggle`; ToggleButton owns the control and its
-   pressed state, so this is only the topbar's tighter padding. */
-.terminal-topbar-toggle { padding: var(--space-1) var(--space-3); }
