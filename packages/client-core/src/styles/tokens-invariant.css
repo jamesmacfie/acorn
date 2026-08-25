@@ -19,11 +19,8 @@
   --z-tooltip: 1000;
 
   /* ── Brand marks ───────────────────────────────────────────────────────────────────────────
-     Third-party identity, not themeable: GitHub's black stays black in Nord. See docs/ui-design.md
-     § Token axes for why these are kept as tokens anyway. */
-  --brand-github: #24292f;
-  --brand-linear: #5e6ad2;
-  --brand-rollbar: #f24f4f;
+     What sits on top of a brand colour. The colours themselves ride on the mark now, as `--brand`,
+     because core cannot know a third party's hex. See docs/ui-design.md § Icons. */
   --brand-fg: #ffffff;
 
   /* Numeric alignment: load-bearing for diff gutters, line counts and timestamps in every pack. */

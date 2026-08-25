@@ -22,6 +22,9 @@ describe('no phantom tokens', () => {
       '--l', '--r', // Shiki emits both syntax colours inline per token
       '--state-color', '--label-color', // inline per-element props carrying live Linear API colours
       '--chip-color', // Chip's `color` prop — the shared successor to the two above
+      // A brand's own colour and what sits on it, from brandStyle() in ui/brandMarks.ts. Third-party
+      // identity rather than a design decision, which is why it comes from the mark and not a token.
+      '--brand', '--brand-on',
       '--meter-value', '--kv-extra-cols',
       '--diff-cols',
       '--dash-cell', '--dash-pitch',
@@ -75,8 +78,8 @@ describe('literal ratchets (these may only go down)', () => {
     expect(count(/font-size:\s*\d/g)).toBeLessThanOrEqual(4)
   })
 
-  // Third-party brand marks live in tokens-invariant.css, so nothing outside the axis files spells
-  // a colour.
+  // A third-party brand colour rides on its mark, in TypeScript or a plugin manifest, so nothing in
+  // any stylesheet spells a colour.
   it('colour literals outside the axis sheets', () => {
     const leaked = sheets
       .filter((f) => !f.name.startsWith('tokens-'))

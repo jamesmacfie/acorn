@@ -36,7 +36,7 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
       </Show>
       <For each={agentUsageStore.snapshot()?.providers ?? []}>
         {(provider) => (
-          <div class="agent-usage-provider" data-provider={provider.provider}>
+          <div class="agent-usage-provider">
             <div class="agent-usage-provider-head">
               <StatusDot tone={usageTone(provider.health)} />
               <strong>{provider.label}</strong>

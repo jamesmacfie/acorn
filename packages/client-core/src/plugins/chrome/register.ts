@@ -113,12 +113,12 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   // `providerId` follows below: a package can't claim another package's mark, and `icons` is no more
   // able to than `icon`. `add` already warns on a collision with a core mark, and core wins.
   if (installed.icon) {
-    const { d } = installed.icon
-    add('icon', pluginId, () => brandMarkRegistry.register({ id: pluginId, d }))
+    const { d, color } = installed.icon
+    add('icon', pluginId, () => brandMarkRegistry.register({ id: pluginId, d, color }))
   }
   for (const [key, mark] of Object.entries(installed.icons ?? {})) {
     const id = `${pluginId}/${key}`
-    add('icon', id, () => brandMarkRegistry.register({ id, d: mark.d }))
+    add('icon', id, () => brandMarkRegistry.register({ id, d: mark.d, color: mark.color }))
   }
 
   const frames = contributions.frames ?? []

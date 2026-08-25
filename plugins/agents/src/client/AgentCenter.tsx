@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
-import { activateTaskSignals, activeNodeId, createFleetQuery, nodes, pathForTask, readJson, setActiveNode, type Task, tasksOptions, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import { activateTaskSignals, activeNodeId, brandStyle, createFleetQuery, nodes, pathForTask, readJson, setActiveNode, type Task, tasksOptions, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { tasksRoute } from '@acorn/protocol/api.ts'
 import { isActiveAgent, needsAttention } from './agentActivity'
 import { managedAgentApi } from './managedClient'
@@ -244,7 +244,7 @@ export default function AgentCenter() {
             return (
               <Row class="agent-center-row" onActivate={() => open(row)}>
                 <span class="agent-center-session">
-                  <span class="agent-center-session-icon" data-provider={session.providerId}>
+                  <span class="agent-center-session-icon" style={brandStyle(providerGlyph(session.providerId))}>
                     <Icon name={providerGlyph(session.providerId)} />
                   </span>
                   <span><strong>{session.title}</strong><small>{session.providerId} · {session.kind}</small></span>

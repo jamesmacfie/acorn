@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import CopyButton from '../ui/CopyButton'
 import Icon from '../ui/Icon'
+import { brandStyle } from '../ui/brandMarks'
 import {
   connectIntegration,
   deleteIntegration,
@@ -15,9 +16,12 @@ import { integrationsKey, integrationsOptions } from '../queries'
 import { Alert, Button, Chip } from '../ui/primitives'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
+  // The tint comes off the mark the provider names, not off a rule keyed to its id, so a plugin that
+  // ships a mark ships the colour with it.
+  const glyph = () => props.provider?.glyph ?? props.provider?.label[0] ?? '?'
   return (
-    <span class="integration-logo" data-provider={props.provider?.id}>
-      <span class="integration-logo-mono"><Icon name={props.provider?.glyph ?? props.provider?.label[0] ?? '?'} /></span>
+    <span class="integration-logo" style={brandStyle(glyph())}>
+      <span class="integration-logo-mono"><Icon name={glyph()} /></span>
     </span>
   )
 }

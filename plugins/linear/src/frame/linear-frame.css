@@ -13,7 +13,7 @@ button { font: inherit; }
 
 .ln-app { height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--bg); color: var(--text); }
 .ln-brandbar { min-height: 2.375rem; display: flex; align-items: center; gap: var(--space-3, .375rem); padding: 0 var(--space-6, .75rem); border-bottom: var(--control-bw, .0625rem) solid var(--border); }
-.ln-brand-mark { color: var(--brand-linear, var(--accent)); }
+.ln-brand-mark { color: var(--brand, var(--accent)); }
 .ln-brand { letter-spacing: .01em; }
 /* ListDetail owns the split, the column width and the divider. What's left is this frame's padding and
    the narrow-width rule at the foot of the file. */
