@@ -7,6 +7,7 @@ import { Alert, Button, Chip, Field, Picker, Popover, Select } from '@acorn/plug
 import { hydrateManagedDraft, managedDraft, setManagedDraft } from './managedDrafts'
 import { sameAgentConfigOptions } from './agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
+import { canStopAgent } from './agentActivity'
 import { parseFileMentions } from './fileMentions'
 import AgentContextPickerModal from './AgentContextPickerModal'
 import AgentMentionTextarea from './AgentMentionTextarea'
@@ -225,6 +226,19 @@ export default function AgentComposer(props: {
     }
   }
 
+  // Escape in the composer, which is the same request as the header's Stop button and reaches the
+  // same route. The draft is deliberately left alone: Escape is a reflex key, and a composer that
+  // threw away typed text on it would lose work nothing can get back.
+  async function stop() {
+    if (!canStopAgent(props.session)) return
+    setError('')
+    try {
+      await managedAgentApi.cancel(props.session.id)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to stop this agent.')
+    }
+  }
+
   async function updateOption(option: AgentConfigOption, value: string) {
     const nextOptions = configOptions().map((item) =>
       item.id === option.id ? { ...item, currentValue: value } : item)
@@ -391,6 +405,7 @@ export default function AgentComposer(props: {
           onValue={setDraft}
           onFiles={(files) => void addFiles(files)}
           onSubmit={() => void send()}
+          onStop={canStopAgent(props.session) ? () => void stop() : undefined}
           onToggleExpanded={() => setExpanded((current) => !current)}
         />
         <div class="agent-composer-actions">

@@ -10,6 +10,7 @@ import { sessionModelLabel } from './agentConfigOptions'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import { subagentTone } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
+import { canStopAgent } from './agentActivity'
 import { WORKFLOW_CONTROL } from '../contract/workflowControl'
 import './agent-task-sidebar.css'
 
@@ -220,7 +221,7 @@ export default function AgentTaskSidebar(props: {
                         >
                           {(menu) => (
                             <>
-                              <Show when={['working', 'waiting', 'cancelling'].includes(session().runtimeState)}>
+                              <Show when={canStopAgent(session())}>
                                 <Menu.Item context={menu} onSelect={() => props.onSessionAction(session(), 'stop')}>
                                   Stop
                                 </Menu.Item>

@@ -31,6 +31,8 @@ export default function AgentMentionTextarea(props: {
   onValue(value: string): void
   onFiles(files: File[]): void
   onSubmit(): void
+  /** Absent when there is no run to stop, which is what keeps Escape out of the way when idle. */
+  onStop?: () => void
   onToggleExpanded?: () => void
 }) {
   // Only fetched for `@`. A session whose composer never asks for a file never pays for the walk.
@@ -250,6 +252,15 @@ export default function AgentMentionTextarea(props: {
               setDismissed(true)
               return
             }
+          }
+          // One key, innermost thing first: the dropdown above closes before Escape reaches the run.
+          // With nothing to stop it stays unclaimed, and because the overlay listener stands down on
+          // `defaultPrevented` (dismissable.ts), an un-prevented Escape still closes a modal that the
+          // composer happens to be sitting inside.
+          if (event.key === 'Escape' && props.onStop) {
+            event.preventDefault()
+            props.onStop()
+            return
           }
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault()
