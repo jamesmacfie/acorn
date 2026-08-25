@@ -1,3 +1,4 @@
+import { createRoot } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDismissable } from './dismissable'
 
@@ -9,6 +10,19 @@ const keyEvent = (k: string, shiftKey = false) => {
 }
 
 const focusable = () => ({ focus: vi.fn(), hidden: false, getAttribute: () => null })
+
+// Stands in for the document the overlay listens on, and hands back the Escape listeners it took.
+const fakeDocument = (extra: Record<string, unknown> = {}) => {
+  const listeners: Array<(event: KeyboardEvent) => void> = []
+  Reflect.set(globalThis, 'document', {
+    ...extra,
+    addEventListener: (_: string, fn: (event: KeyboardEvent) => void) => listeners.push(fn),
+    removeEventListener: (_: string, fn: (event: KeyboardEvent) => void) => listeners.splice(listeners.indexOf(fn), 1),
+  })
+  return (event: KeyboardEvent) => listeners.slice().forEach((fn) => fn(event))
+}
+
+const mounted = () => ({ isConnected: true }) as unknown as HTMLElement
 
 afterEach(() => {
   Reflect.deleteProperty(globalThis, 'document')
@@ -56,7 +70,7 @@ describe('createDismissable', () => {
     const first = focusable()
     const last = focusable()
     const root = { querySelectorAll: () => [first, last] } as unknown as HTMLElement
-    Reflect.set(globalThis, 'document', { activeElement: last })
+    fakeDocument({ activeElement: last })
 
     const { event, preventDefault } = keyEvent('Tab')
     createDismissable({ onDismiss: vi.fn(), container: () => root }).onKeyDown(event)
@@ -69,10 +83,35 @@ describe('createDismissable', () => {
     const first = focusable()
     const last = focusable()
     const root = { querySelectorAll: () => [first, last] } as unknown as HTMLElement
-    Reflect.set(globalThis, 'document', { activeElement: first })
+    fakeDocument({ activeElement: first })
 
     createDismissable({ onDismiss: vi.fn(), container: () => root }).onKeyDown(keyEvent('Tab', true).event)
     expect(last.focus).toHaveBeenCalledOnce()
+  })
+
+  it('dismisses on Escape pressed outside the dialog, topmost overlay first', () => {
+    const press = fakeDocument()
+    const outer = vi.fn()
+    const inner = vi.fn()
+    createRoot((dispose) => {
+      createDismissable({ onDismiss: outer, container: () => mounted(), trapFocus: false })
+      createDismissable({ onDismiss: inner, container: () => mounted(), trapFocus: false })
+      press(keyEvent('Escape').event)
+      expect(inner).toHaveBeenCalledOnce()
+      expect(outer).not.toHaveBeenCalled()
+      dispose()
+    })
+  })
+
+  it('leaves Escape alone once the dialog is gone', () => {
+    const press = fakeDocument()
+    const onDismiss = vi.fn()
+    createRoot((dispose) => {
+      createDismissable({ onDismiss, container: () => ({ isConnected: false }) as unknown as HTMLElement, trapFocus: false })
+      press(keyEvent('Escape').event)
+      expect(onDismiss).not.toHaveBeenCalled()
+      dispose()
+    })
   })
 
   it('does not trap when no container is supplied', () => {

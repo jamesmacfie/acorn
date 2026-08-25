@@ -491,8 +491,14 @@ Modal dismissal (Escape, backdrop click, Tab focus containment) is `ui/dismissab
 returning handlers rather than a component; markup stays at the call site. Nine call sites
 hand-wrote this before it existed, five of them with only a backdrop click and nothing else, so Tab
 walked straight out of the dialog into the page behind it and Escape did nothing. `Modal` and
-`Drawer` both use it verbatim, which is what keeps them purely cosmetic and safely reviewable. The
-overlay palettes (command palette, file finder, workspace switcher) do not use it:
+`Drawer` both use it verbatim, which is what keeps them purely cosmetic and safely reviewable.
+
+Escape is handled twice on purpose: once on the dialog element, and once on the document. The
+element handler alone only fires while focus sits inside the dialog, and focus drops back to the
+body as soon as the focused child unmounts, so a modal could end up ignoring Escape entirely. The
+document handler answers for the topmost dialog that is still in the page, which lets a stack of
+them unwind one press at a time, and it stands down when the element handler has already claimed
+the key. The overlay palettes (command palette, file finder, workspace switcher) do not use it:
 `createOverlayPalette` already owns their dismissal, focus restore, and single-active-overlay
 coordination.
 
