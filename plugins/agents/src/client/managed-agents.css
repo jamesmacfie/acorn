@@ -39,18 +39,26 @@
 .managed-agent-head .repo-picker-tools .ui-btn { width: var(--control-h); border-left: var(--chrome-divider); }
 
 .managed-agent-error { flex: none; padding: var(--space-3) var(--space-5); }
-/* EmptyState owns the centring and the muted body; this keeps the onboarding pane's own width. */
-.managed-agent-onboarding { max-width: 640px; padding: var(--space-8); }
+/* EmptyState owns the centring and the muted body; this keeps the onboarding pane's own width and
+   puts it in the middle of the detail column, which stretches its children edge to edge. */
+.managed-agent-onboarding { width: 100%; max-width: 720px; margin-inline: auto; padding: var(--space-8); }
 .managed-agent-onboarding .ui-empty-title { font-size: var(--fs-xl); }
+/* EmptyState wraps its children in a 42ch line of prose. The card row is not prose. */
+.managed-agent-onboarding .ui-empty-text { width: 100%; max-width: none; }
 .agent-empty-mark { color: var(--accent); font-size: calc(var(--fs-xl) * 1.67); }
+/* Wrapped flex, not a grid: a grid keeps its three tracks whatever the count, so two providers left a
+   hole on the right and a fourth would sit off to the left. Wrapping centres every row it makes. */
 .managed-agent-provider-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-5);
-  margin-top: var(--space-7);
+  margin: var(--space-7) auto 0;
+  max-width: calc(200px * 3 + var(--space-5) * 2);
 }
 /* Card owns the surface and its interactive states; this is the provider card's inner stack. */
 .managed-agent-provider-card {
+  flex: 0 1 200px;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
