@@ -39,7 +39,6 @@
 .managed-agent-head .repo-picker-tools .ui-btn { width: var(--control-h); border-left: var(--chrome-divider); }
 
 .managed-agent-error { flex: none; padding: var(--space-3) var(--space-5); }
-.managed-agent-loading { margin: auto; color: var(--text-muted); }
 /* EmptyState owns the centring and the muted body; this keeps the onboarding pane's own width. */
 .managed-agent-onboarding { max-width: 640px; padding: var(--space-8); }
 .managed-agent-onboarding .ui-empty-title { font-size: var(--fs-xl); }
@@ -277,8 +276,31 @@
 .agent-subagent-crumb small { color: var(--text-faint); font-size: var(--fs-2xs); }
 
 .agent-card-title { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
-.agent-plan ol { margin: var(--space-3) 0 0; padding-left: var(--space-6); }
-.agent-plan li[data-state='completed'] { color: var(--text-muted); text-decoration: line-through; }
+.agent-plan-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-plan-list > li {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1em minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+.agent-plan-status { text-align: center; }
+.agent-plan-list > li[data-state='pending'] .agent-plan-status { color: var(--text-faint); }
+.agent-plan-list > li[data-state='in_progress'] .agent-plan-status { color: var(--accent); }
+.agent-plan-list > li[data-state='completed'] .agent-plan-status { color: var(--success); }
+.agent-plan-text { min-width: 0; }
+.agent-plan-text > :first-child { margin-top: 0; }
+.agent-plan-text > :last-child { margin-bottom: 0; }
+.agent-plan-list > li[data-state='completed'] .agent-plan-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
 .agent-artifact-link {
   width: 100%;
   display: flex;

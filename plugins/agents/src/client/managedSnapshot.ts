@@ -1,6 +1,7 @@
 import type {
   AgentEventRecord,
   AgentRequest,
+  AgentSession,
   AgentSessionSnapshot,
   AgentTurn,
 } from '@acorn/protocol/managedAgents.ts'
@@ -11,19 +12,23 @@ const mergeById = <T extends { id: string }>(current: T[], incoming: T[]): T[] =
   return [...merged.values()]
 }
 
+/** HTTP reads and mutation responses can resolve after a newer WebSocket projection. Sequence is the
+ * authority; updatedAt breaks ties for writes such as rename that do not append an event. */
+export function newestManagedSession(current: AgentSession, incoming: AgentSession): AgentSession {
+  const currentIsNewer = current.lastEventSeq > incoming.lastEventSeq
+    || (
+      current.lastEventSeq === incoming.lastEventSeq
+      && current.updatedAt > incoming.updatedAt
+    )
+  return currentIsNewer ? current : incoming
+}
+
 export function mergeManagedSnapshot(
   current: AgentSessionSnapshot | undefined,
   incoming: AgentSessionSnapshot,
 ): AgentSessionSnapshot {
   if (!current) return incoming
-  const currentSessionIsNewer = current.session.lastEventSeq > incoming.session.lastEventSeq
-    || (
-      current.session.lastEventSeq === incoming.session.lastEventSeq
-      && current.session.updatedAt > incoming.session.updatedAt
-    )
-  const session = currentSessionIsNewer
-    ? current.session
-    : incoming.session
+  const session = newestManagedSession(current.session, incoming.session)
   return {
     session,
     turns: mergeById<AgentTurn>(current.turns, incoming.turns)

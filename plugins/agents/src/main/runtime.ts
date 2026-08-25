@@ -34,14 +34,41 @@ import {
  * and scheduling live in ManagedAgentEngine; this class owns lifecycle policy and user commands.
  */
 export class ManagedAgentRuntime extends ManagedAgentEngine {
+  private readonly sessionInitializations = new Map<string, Promise<AgentSession>>()
+
   async createSession(
     input: CreateAgentSessionInput,
     idempotencyKey?: string,
   ): Promise<AgentSession> {
+    const reserved = await this.reserveSession(input, idempotencyKey)
+    return reserved.created
+      ? this.startCreatedSession(reserved.session)
+      : reserved.session
+  }
+
+  /**
+   * Interactive HTTP creation is acknowledged once the row is durable. The provider handshake keeps
+   * running under runtime ownership and publishes its lifecycle over the existing agent WebSocket.
+   * Internal workflow callers keep using createSession(), whose ready-on-return contract is unchanged.
+   */
+  async acceptSession(
+    input: CreateAgentSessionInput,
+    idempotencyKey?: string,
+  ): Promise<AgentSession> {
+    if (input.kind !== 'interactive') return this.createSession(input, idempotencyKey)
+    const reserved = await this.reserveSession(input, idempotencyKey)
+    if (reserved.created) void this.startCreatedSession(reserved.session).catch(() => undefined)
+    return reserved.session
+  }
+
+  private async reserveSession(
+    input: CreateAgentSessionInput,
+    idempotencyKey?: string,
+  ): Promise<{ session: AgentSession; created: boolean }> {
     assertBoundedJson('Agent session configuration', input.config, MAX_AGENT_CONFIG_BYTES)
     if (idempotencyKey) {
       const existing = await this.store.operationResult<AgentSession>(idempotencyKey, 'session.create')
-      if (existing) return this.store.requireSession(existing.id)
+      if (existing) return { session: await this.store.requireSession(existing.id), created: false }
     }
     const provider = (await this.providers()).find((candidate) => candidate.id === input.providerId)
     if (!provider) throw new Error(`Managed provider is not registered: ${input.providerId}`)
@@ -57,14 +84,50 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     }
     const session = await this.store.createSession(input, provider)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
-    await this.ensureSession(session)
-    // Interactive sessions only, and not a fork. A workflow step names the model it wants in its own
-    // policy, and a fork continues the session it came from, so neither is the owner opening something
-    // new for the defaults to answer for.
-    if (session.kind === 'interactive' && !input.parentSessionId) {
-      await this.applySessionDefaults(session.id, provider.id)
+    return { session, created: true }
+  }
+
+  private startCreatedSession(session: AgentSession): Promise<AgentSession> {
+    const existing = this.sessionInitializations.get(session.id)
+    if (existing) return existing
+    const initialization = this.initializeCreatedSession(session)
+    this.sessionInitializations.set(session.id, initialization)
+    void initialization.then(
+      () => this.sessionInitializations.delete(session.id),
+      () => this.sessionInitializations.delete(session.id),
+    )
+    return initialization
+  }
+
+  private async initializeCreatedSession(session: AgentSession): Promise<AgentSession> {
+    this.holdSessionReadiness(session.id)
+    try {
+      await this.ensureSession(session)
+      // Interactive sessions only, and not a fork. A workflow step names the model it wants in its own
+      // policy, and a fork continues the session it came from, so neither is the owner opening something
+      // new for the defaults to answer for.
+      if (session.kind === 'interactive' && !session.parentSessionId) {
+        await this.applySessionDefaults(session.id, session.providerId).catch(async (error) => {
+          await this.record(session.id, null, {
+            type: 'diagnostic',
+            level: 'warning',
+            message: `Your saved defaults could not be read for this session: ${error instanceof Error ? error.message : 'unknown error'}`,
+          })
+        })
+      }
+      await this.completeSessionReadiness(session.id)
+      return this.store.requireSession(session.id)
+    } catch (error) {
+      this.discardSessionReadinessHold(session.id)
+      throw error
     }
-    return this.store.requireSession(session.id)
+  }
+
+  override async stop(): Promise<void> {
+    await super.stop()
+    // Provider start is now allowed to outlive its HTTP request, but never the plugin database it may
+    // still update. super.stop() stops/awaits each live start; this joins the policy continuation too.
+    await Promise.allSettled(this.sessionInitializations.values())
   }
 
   /**

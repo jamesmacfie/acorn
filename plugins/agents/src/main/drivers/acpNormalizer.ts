@@ -162,6 +162,28 @@ function claudeToolMeta(meta: unknown): ClaudeToolMeta {
 // is the older name the adapter still maps, and both land on the same tool.
 const SUBAGENT_TOOLS = new Set(['Agent', 'Task'])
 
+/**
+ * A call's own parameters, so a card has something to show before its output arrives. Without this the
+ * only thing the ACP path ever filled in was output, which lands on the completion update, so a
+ * running call had nothing to disclose and its card could not honour the reader's fold setting until
+ * it had finished.
+ *
+ * Pretty-printed JSON rather than a per-tool reading of it: every tool names its parameters
+ * differently, and a table of which field to pull for which tool name would need an entry for every
+ * tool a harness adds. The bounds are the materializer's, which promotes anything past 64 KiB to an
+ * artifact, so a call that carries a whole file in its parameters does not land in SQLite.
+ */
+const toolInput = (rawInput: unknown): string | undefined => {
+  if (rawInput == null || typeof rawInput !== 'object' || Array.isArray(rawInput)) return undefined
+  if (!Object.keys(rawInput).length) return undefined
+  try {
+    return JSON.stringify(rawInput, null, 2)
+  } catch {
+    // A cycle, which no wire value should have and none is worth a card for.
+    return undefined
+  }
+}
+
 // Absent stays absent. ACP sends a status only when it changes, so an update that carries nothing but
 // command output would otherwise reset a finished call to running once the transcript folds the two.
 function toolStatus(status: string | null | undefined): AgentToolCall['status'] {
@@ -245,6 +267,7 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
           title: update.title ?? '',
           kind: update.kind ?? undefined,
           status,
+          input: toolInput(update.rawInput),
           output: text || undefined,
           subagentId,
         },

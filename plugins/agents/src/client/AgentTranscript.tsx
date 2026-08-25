@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, For, Index, on, onCleanup, Show } from 'solid-js'
-import { onScopeEvicted } from '@acorn/plugin-api/client'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import { onScopeEvicted, prefsOptions } from '@acorn/plugin-api/client'
 import type { AgentSessionSnapshot } from '@acorn/protocol/managedAgents.ts'
 import AgentEventCard from './AgentEventCard'
 import AgentRequestCard from './AgentRequestCard'
@@ -7,6 +8,8 @@ import { buildConversationItems, findSubagentItem, visibleConversationItems } fr
 import { nextFollowing } from './followScroll'
 import { Button, EmptyState } from '@acorn/plugin-api/ui'
 import { subagentSummary } from './subagentDisplay'
+import { agentSessionIsStarting } from './agentComposerState'
+import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPrefs'
 
 // Deliberately not virtualized. The virtualizer this used to run called `measure()` on every new event,
 // which clears the item size cache, so every row fell back to the size estimate, the canvas height
@@ -38,6 +41,9 @@ export default function AgentTranscript(props: {
   onRequestResolved: () => void
 }) {
   const [scrollElement, setScrollElement] = createSignal<HTMLDivElement>()
+  const queryClient = useQueryClient()
+  const prefs = createQuery(() => prefsOptions(true))
+  const foldSetting = createAgentToolFoldSetting(() => prefs.data, queryClient)
   const conversation = createMemo(() => buildConversationItems(props.snapshot.events))
   // The selected subagent's card, when there is one. A complex child run does not fit in a box inside
   // its parent's stream, so selecting it moves the whole window onto that run: the transcript renders
@@ -165,8 +171,15 @@ export default function AgentTranscript(props: {
         <Show
           when={items().length}
           fallback={
-            <EmptyState icon={<span class="agent-empty-mark">✦</span>}>
-              {focusedSubagent() ? 'This subagent has not reported anything yet.' : 'This session is ready for its first turn.'}
+            <EmptyState
+              busy={!focusedSubagent() && agentSessionIsStarting(props.snapshot.session)}
+              icon={<span class="agent-empty-mark">✦</span>}
+            >
+              {focusedSubagent()
+                ? 'This subagent has not reported anything yet.'
+                : agentSessionIsStarting(props.snapshot.session)
+                  ? 'Connecting…'
+                  : 'This session is ready for its first turn.'}
             </EmptyState>
           }
         >
@@ -176,16 +189,20 @@ export default function AgentTranscript(props: {
               `For` keys by reference, so it would recreate the whole list on each streamed event and take
               any in-progress selection with it. Position-keyed rows keep their DOM.
             */}
-            <Index each={items()}>
-              {(item) => (
-                <AgentEventCard
-                  item={item()}
-                  taskId={props.taskId}
-                  sessionId={sessionId()}
-                  turn={props.snapshot.turns.find((turn) => turn.id === item().turnId)}
-                />
-              )}
-            </Index>
+            {/* One fold setting for the whole list, read by every tool card below it. See the note on
+                createAgentToolFoldSetting for why it is not resolved per card. */}
+            <AgentToolFoldContext.Provider value={foldSetting}>
+              <Index each={items()}>
+                {(item) => (
+                  <AgentEventCard
+                    item={item()}
+                    taskId={props.taskId}
+                    sessionId={sessionId()}
+                    turn={props.snapshot.turns.find((turn) => turn.id === item().turnId)}
+                  />
+                )}
+              </Index>
+            </AgentToolFoldContext.Provider>
           </div>
         </Show>
       </div>

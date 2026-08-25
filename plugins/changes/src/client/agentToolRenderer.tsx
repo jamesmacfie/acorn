@@ -6,14 +6,18 @@ export const changesAgentToolRenderer: AgentToolRendererContribution = {
   id: 'changes.agent-file-tool',
   matches: (tool) => Boolean(tool.paths?.length),
   component: (props) => {
-    // Seeded from the call's state, then the reader's own: a reactive `open` shuts the card on the next
-    // event, since the transcript rebuilds its rows on every snapshot.
-    const [open, setOpen] = createSignal(props.tool.status === 'running')
+    // Seeded from the reader's fold setting, then the reader's own: a reactive `open` shuts the card on
+    // the next event, since the transcript rebuilds its rows on every snapshot. `onOpenChange` is what
+    // lets the "carry my last one forward" setting learn from this card as well as the built-in one.
+    const [open, setOpen] = createSignal(props.defaultOpen)
     return (
       <details
         class="agent-tool ui-fold"
         open={open()}
-        onToggle={(toggle) => setOpen(toggle.currentTarget.open)}
+        onToggle={(toggle) => {
+          setOpen(toggle.currentTarget.open)
+          props.onOpenChange(toggle.currentTarget.open)
+        }}
       >
         <summary class="ui-fold-summary">
           <span class="ui-fold-marker" aria-hidden="true" />

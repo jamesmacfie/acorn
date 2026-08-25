@@ -49,7 +49,10 @@ export function managedAgentsBridge(runtime: ManagedAgentRuntime): ManagedAgents
     artifacts: (sessionId) => guarded(() => runtime.artifacts.list(sessionId)),
     artifact: (artifactId) => guarded(() => runtime.artifacts.get(artifactId)),
     artifactContent: (artifactId) => guarded(() => runtime.artifacts.read(artifactId)),
-    createSession: (input, idempotencyKey) => guarded(() => runtime.createSession(input, idempotencyKey)),
+    // A device needs the durable row so it can select the conversation while the provider connects.
+    // Workflow execution bypasses this HTTP bridge and keeps runtime.createSession's ready-on-return
+    // contract (main/sessionExecute.ts).
+    createSession: (input, idempotencyKey) => guarded(() => runtime.acceptSession(input, idempotencyKey)),
     importTranscript: (input) => guarded(() => runtime.importTranscript(input)),
     verifyImportedResume: (sessionId) => guarded(() => runtime.verifyImportedResume(sessionId)),
     listSessions: (filter) => guarded(() => runtime.store.listSessions(filter)),

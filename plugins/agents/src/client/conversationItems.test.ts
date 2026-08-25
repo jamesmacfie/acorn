@@ -74,6 +74,38 @@ describe('conversation projection', () => {
     expect(items.map((item) => item.event.type === 'usage' ? item.event.usage.contextUsed : null)).toEqual([10, 20])
   })
 
+  it('folds full plan snapshots within a turn and keeps another turn separate', () => {
+    const items = buildConversationItems([
+      event(1, {
+        type: 'plan',
+        entries: [
+          { id: 'plan-0', text: 'Inspect the boundary', status: 'in_progress' },
+          { id: 'plan-1', text: 'Make the change', status: 'pending' },
+        ],
+      }, 'turn-1'),
+      event(2, { type: 'assistant_message', text: 'The boundary is clear.', messageId: 'a' }, 'turn-1'),
+      event(3, {
+        type: 'plan',
+        entries: [
+          { id: 'plan-0', text: 'Inspect the boundary', status: 'completed' },
+          { id: 'plan-1', text: 'Make the change', status: 'in_progress' },
+        ],
+      }, 'turn-1'),
+      event(4, {
+        type: 'plan',
+        entries: [{ id: 'plan-0', text: 'Review the result', status: 'in_progress' }],
+      }, 'turn-2'),
+    ])
+
+    expect(items.map((item) => item.event.type)).toEqual(['plan', 'assistant_message', 'plan'])
+    expect(items[0].event.type === 'plan' && items[0].event.entries).toEqual([
+      { id: 'plan-0', text: 'Inspect the boundary', status: 'completed' },
+      { id: 'plan-1', text: 'Make the change', status: 'in_progress' },
+    ])
+    expect(items[0].lastSeq).toBe(3)
+    expect(items[2].turnId).toBe('turn-2')
+  })
+
   it('nests a subagent\u2019s run inside its own card', () => {
     const items = buildConversationItems([
       event(1, { type: 'assistant_message', text: 'delegating', messageId: 'a' }),

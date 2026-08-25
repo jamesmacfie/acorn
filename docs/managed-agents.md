@@ -153,13 +153,38 @@ be tested against what the harness actually sent.
   against white and OpenAI's purple is unreadable on a dark pane.
 - The Agent pane shows the current transcript, composer, queue, context, requests, artifacts, and a
   same-task roster.
+- Starting an interactive session acknowledges the durable row before waiting for the provider CLI.
+  The pane selects that row immediately, draws a **Connecting…** state above the composer, and keeps
+  the draft editable while Send and provider configuration remain disabled. `ready` is published only
+  after the provider handshake, session metadata, and saved new-session defaults have all settled, so
+  the first turn cannot race the model or reasoning settings it is meant to use. Workflow creation
+  keeps its ready-on-return contract because its caller has no draft UI to occupy the wait.
 - A tool call is one card, no matter how many updates a provider sends for it. The event ledger still
   stores a row per update, which is what replay and any later timing question read; the transcript
   folds those rows by turn and tool id, so a command shows one panel whose status and output change in
-  place. Output sits behind a disclosure toggle that is open while the call is running, and a call with
-  neither output nor a path renders as a flat row instead, so no card opens onto nothing. A provider
-  reports a status only when it changes, so an update carrying nothing but output leaves the last
-  reported status alone.
+  place. A call's parameters and output sit behind a disclosure toggle, and a call with nothing to show
+  for either renders as a flat row instead, so no card opens onto nothing. A provider reports a status
+  only when it changes, so an update carrying nothing but output leaves the last reported status alone.
+- Whether that toggle starts open is the reader's setting, **Tool call display** in Settings -> Agent
+  defaults: start collapsed, start expanded, or carry the reader's last toggle forward. It is a device
+  preference (`agent_tool_fold`), so it sits on that page beside settings the node keeps. The default is
+  collapsed, which means a running command's output no longer scrolls into view unattended.
+  `AgentToolCallCard` resolves the setting once and passes `defaultOpen` and `onOpenChange` to whichever
+  renderer draws the call, so a contributed renderer honours the setting and trains the carry-forward
+  mode without reading the preference itself.
+- A card seeds that state at mount and then leaves it alone. Read reactively it would shut the card the
+  moment its call finished, which is when somebody is most likely to be reading it.
+- The setting, and not the call's reported status, is what decides this. Status was what used to make
+  the answer differ by harness with nothing in the product saying so: Codex reports a started call as
+  `running`, while the ACP path reports `pending` and then `completed` and never `running` at all, so
+  one provider's cards opened themselves and the other's never did. For the same reason the ACP path
+  maps a call's `rawInput` into the card as pretty-printed JSON. Output only lands on the completion
+  update there, since Acorn declines ACP's terminal capability, so without the parameters a running
+  Claude call had nothing to disclose and could not honour the setting until it was over.
+- A plan update is a complete snapshot. Every snapshot remains in the durable ledger, while the
+  transcript folds snapshots from one turn into the card the first one opened; a new turn starts a new
+  card. Each step has one structured status marker and renders its text through the transcript Markdown
+  policy, in a status-and-text grid that keeps wrapped lines inside the card.
 - Usage folds the same way, one line per turn. A turn's last usage update can arrive after the turn is
   marked complete and so carries no turn id; it updates the line it belongs to rather than starting
   another. That is how a cost joins a line that started with only a context count.
@@ -271,6 +296,11 @@ not run inside the 50 most recent sessions shows no pickers until you run it aga
 save, as everywhere else under Settings: there is no save button, and a write that fails says so and
 refetches the stored row.
 
+The same page carries one setting that is not a session default and does not travel with the node:
+**Tool call display**, under a Transcript heading, which is a device preference about how a transcript
+draws its tool cards (section Client surfaces). It is there because that is where somebody looks for
+it, not because it shares a store with anything above it.
+
 ## Context, files, and attachments
 
 Context is assembled by the Node from registered task sections and sent as an immutable snapshot.
@@ -295,6 +325,12 @@ to finish a turn before anything looks at it again.
 Cancellation, timeout, provider disconnect, and restart are explicit states. A live stream can be
 lost without killing the provider process, and the client reattaches from the session sequence or
 terminal replay tail.
+
+Interactive creation is accepted once its session row is durable, not once its provider process is
+ready. A startup failure therefore settles that visible row as `failed` and records the error in its
+event ledger; it is not reported as a late failure of a create request whose resource already exists.
+The runtime tracks the detached initialization through shutdown so it cannot outlive the plugin
+database.
 
 A session reference the agent has forgotten is recoverable, not fatal. Agents keep their own session
 stores and prune them, and Claude Code keys its store by working directory, so a checkout that moved

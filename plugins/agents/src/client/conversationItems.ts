@@ -105,9 +105,10 @@ const subagentIdOf = (event: AgentNormalizedEvent): string | undefined => {
 type Stream = {
   items: AgentConversationItem[]
   usageCardAt: number | undefined
+  planCardAtByTurn: Map<string, number>
 }
 
-const newStream = (): Stream => ({ items: [], usageCardAt: undefined })
+const newStream = (): Stream => ({ items: [], usageCardAt: undefined, planCardAtByTurn: new Map() })
 
 export function buildConversationItems(events: AgentEventRecord[]): AgentConversationItem[] {
   const top = newStream()
@@ -124,16 +125,17 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
   // to whoever opened it, and every later update folds there wherever it arrives from.
   const toolCards = new Map<string, { stream: Stream; at: number }>()
 
-  // Two kinds of row report a running total rather than a moment, so each is folded into the card it
-  // started rather than appended. The event ledger still stores a row per provider update, which is
-  // what replay and any later timing question read.
+  // Tools, usage, subagents, and plans report evolving state rather than separate moments, so each is
+  // folded into the card it started rather than appended. The event ledger still stores a row per
+  // provider update, which is what replay and any later timing question read. A plan is a complete
+  // snapshot and folds only within its own turn; a later turn's plan is a separate piece of work.
   //
   // A tool call is keyed by turn and tool id, so a command reads as one panel whose status and output
-  // change in place. Usage is keyed by turn, with one allowance: a turn's last usage update can arrive
-  // after the turn is marked complete, which leaves it with no turn id, and it belongs to the line it
-  // is updating. That trailing update is how a cost reaches a line that started with only a context
-  // count, which used to render as a second, near-identical line. A subagent folds like a tool call,
-  // by id, so a completion summary lands on the card the spawn opened.
+  // change in place. Plans are keyed by turn. Usage is keyed by turn, with one allowance: a turn's last
+  // usage update can arrive after the turn is marked complete, which leaves it with no turn id, and it
+  // belongs to the line it is updating. That trailing update is how a cost reaches a line that started
+  // with only a context count, which used to render as a second, near-identical line. A subagent folds
+  // like a tool call, by id, so a completion summary lands on the card the spawn opened.
   const toolKey = (record: AgentEventRecord, tool: AgentToolCall) =>
     `${record.turnId ?? 'session'}:${tool.id}`
   // Which existing card this record updates, and in which stream. `undefined` means it opens a new one.
@@ -145,6 +147,10 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
     if (record.event.type === 'subagent') {
       const at = subagentCardAt.get(record.event.subagent.id)
       return at === undefined ? undefined : { stream: top, at }
+    }
+    if (record.event.type === 'plan' && record.turnId !== null) {
+      const at = stream.planCardAtByTurn.get(record.turnId)
+      return at === undefined ? undefined : { stream, at }
     }
     if (record.event.type !== 'usage' || stream.usageCardAt === undefined) return undefined
     return record.turnId === null || record.turnId === stream.items[stream.usageCardAt].turnId
@@ -180,6 +186,9 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
       toolCards.set(toolKey(record, record.event.tool), { stream, at: stream.items.length })
     }
     if (record.event.type === 'usage') stream.usageCardAt = stream.items.length
+    if (record.event.type === 'plan' && record.turnId !== null) {
+      stream.planCardAtByTurn.set(record.turnId, stream.items.length)
+    }
 
     const previous = stream.items[stream.items.length - 1]
     if (
