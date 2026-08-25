@@ -3,11 +3,67 @@
 The shared diff viewer is in client-core and is used by the GitHub PR pane and Changes pane. It
 renders provider patches and local Git diffs through the same row model.
 
+It arrives in two layers, and the split is enforced (`tools/arch/boundaries.test.ts`, "client-core
+ui/ is pure presentation"):
+
+- `ui/diff/` is the toolkit: the row model, the row components, the virtualizer, the find pass, the
+  hydrator. Props in, DOM out, no application state, so a plugin can reach for a piece of it to build
+  a simpler surface. The compare preview does exactly that.
+- `diff/` is the viewer: `DiffPane` and the parts only it uses. This layer reads preferences,
+  registers a command and a keybinding, and keeps session scroll state, none of which `ui/` may do.
+
+`DiffPane` is the whole viewer as one component, and a caller drives it through a `DiffSource`
+(`diff/source.ts`). Both are on the plugin API, `DiffPane` on `@acorn/plugin-api/ui` and the port
+type on `@acorn/plugin-api/ui/diff`.
+
+## The source port
+
+`DiffSource` is how the viewer knows nothing about pull requests or working trees. The caller resolves
+its own queries and hands over accessors and callbacks: which files, where the patch bodies come from,
+which threads to interleave, what a comment does. Two rules keep the seam honest. The members are
+plain functions rather than a provider object the viewer could reach through, and an omitted optional
+member hides its affordance rather than needing a stub, so a source with no `fileText` renders gaps
+that cannot be expanded and a source with no `reply` gets thread rows whose reply box is disabled.
+
+`signature` and `contentSignature` are separate on purpose. The first says which files are on screen,
+and changing it drops the remembered scroll offset and the collapsed files. The second says what those
+files currently claim, and changing it re-reads the patches while leaving the reader where they were. A
+working tree needs the two apart, because an agent saving a file mid-review moves the content every
+poll and treating that as a new diff would throw the reader back to the top each time. A pull request
+does not: a new commit is both, so the GitHub pane sets only `signature`.
+
+Two members exist for what a caller draws that the viewer has no concept of: `lineExtra` puts content
+under a code row, inside the virtualized row so its height is measured, and `lineAction` adds a click
+affordance on a code line. The changes pane uses the first for review notes and the second for
+Alt-click to send a line reference to the agent.
+
+`plugins/github/src/client/DiffForPull.tsx` and `plugins/changes/src/client/ChangesPane.tsx` are the
+two implementations, and both are short enough to read in one sitting. That is the measure of whether
+the port is the right size.
+
 ## Data flow
 
 The GitHub plugin returns file metadata plus an optional patch. Large or missing patch bodies are
 loaded lazily from the blob route. The Changes plugin obtains a local diff through the core Git
 service. Both paths normalize into file/hunk/line rows before rendering.
+
+The changes pane's list is a navigator, not a selector: every file's hunks are stacked in one
+scroller and clicking a row scrolls to it, the way the pull-request pane's list works. The per-file
+git actions stay on the rows.
+
+It stacks one staging area at a time, and `stackFor` in `plugins/changes/src/client/model.ts` says
+why: a file staged and then edited again appears in both groups, and the row model keys a file by its
+path alone, so a combined stack would hold two files claiming the same identity. Which area is on
+screen is the group the highlighted row sits in, and the default is the first unstaged change, because
+one staged file should not hide twenty unstaged ones from a reader who has not clicked anything.
+
+Filling a gap needs the new side of the diff, and for a working tree that is not a ref: `git show`
+reads objects, and the new side of an unstaged diff has never been written to one. `localNewSideText`
+serves both cases, the index for a staged diff and the file on disk for an unstaged one, and refuses a
+symlink because a repo can hold one pointing anywhere and the path arrives over HTTP. The pane carries
+the staging area in `DiffFile.sha`, which the viewer never reads and hands straight back through
+`fileText`. A deleted file gets a null `sha`, which is how its gaps render inert: there is no new side
+of a file that is gone.
 
 The row types (`DiffFile`, `DiffThread`, and their siblings, in `ui/diff/model.ts`) are structural
 rather than named after either plugin's wire types. GitHub's `PullFile` and `Thread` and Changes'
@@ -110,11 +166,16 @@ Inline thread anchors use file path, side, and line coordinates. Thread state is
 PR detail and updates through GitHub mutations. Viewed-file state is local app data and is merged into
 the file projection; it is not sent to GitHub.
 
-The `?file=` route/query anchor is resolved after the file model is available, then scrolls to the
-file and line without forcing all other files to hydrate.
+The source's selected path is resolved after the file model is available, then scrolls to that file
+without forcing all other files to hydrate. The GitHub pane reads it from `?file=`.
 
-Scroll position and collapsed files are remembered per review scope for the session
-(`reviewViewState.ts`): a task review and the classic browser keep separate entries for the same PR,
-and a task's entries are evicted when it is archived. Both are tied to the files signature, so new
-commits drop the stale position and collapse choices instead of restoring them against a different
-diff. An explicit `?file=` navigation wins over a saved scroll position.
+Scroll position and collapsed files are remembered per scope for the session (`diff/viewState.ts`): a
+task and the classic browser keep separate entries for the same content, and a task's entries are
+evicted when it is archived. Both are tied to the files signature, so new commits drop the stale
+position and collapse choices instead of restoring them against a different diff. An explicit file
+navigation wins over a saved scroll position.
+
+The pull-request navigator, the summary column beside the diff, keeps its own scroll entry in
+`plugins/github/src/client/reviewViewState.ts`. It is the GitHub pane's own surface, so it stays with
+that plugin, but it keys by the same scope through the exported `diffScopeKey` rather than spelling
+the key a second time.

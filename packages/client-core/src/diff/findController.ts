@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, on } from 'solid-js'
 import type { Accessor } from 'solid-js'
-import { type CodeRow, collectMatches, type FindHighlight, type Row, type SplitBand, type ViewMode } from '@acorn/plugin-api/ui/diff'
+import { collectMatches, type FindHighlight } from '../ui/diff/find'
+import type { CodeRow, Row, SplitBand, ViewMode } from '../ui/diff/model'
 
 type ScrollTarget = {
   scrollToIndex: (index: number, options?: { align?: 'auto' | 'start' | 'center' | 'end' }) => void

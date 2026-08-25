@@ -226,7 +226,7 @@ describe('primitive adoption', () => {
     'plugins/editor/src/client/EditorPane.tsx',
     'plugins/editor/src/client/FilePalette.tsx',
     'plugins/editor/src/client/FileTree.tsx',
-    'plugins/github/src/client/DiffToolbar.tsx',
+    'packages/client-core/src/diff/DiffToolbar.tsx',
     'plugins/onboarding/src/client/OnboardingWizard.tsx',
     'plugins/http/src/frame/RequestTabs.tsx',
     // Tier 4 (see docs/ui-design.md § Migration tiers and their two invariant tests).

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import gitdiffParser from 'gitdiff-parser'
@@ -11,7 +11,7 @@ import {
   isValidRelPath,
   localChanges,
   localDiff,
-  localFileBlob,
+  localNewSideText,
   mergeNumstat,
   parsePorcelainV2,
   stageFile,
@@ -132,11 +132,22 @@ describe('local diff over a real worktree', () => {
     expect(rename?.oldPath).toBe('src/a.ts')
   })
 
-  it('localFileBlob reads the HEAD side and rejects bad refs/paths', async () => {
-    writeFileSync(join(dir, 'src', 'a.ts'), 'dirty\n')
-    expect((await localFileBlob(dir, 'src/a.ts')).text).toBe('line1\nline2\nline3\n')
-    await expect(localFileBlob(dir, '../etc')).rejects.toThrow('Invalid path')
-    await expect(localFileBlob(dir, 'src/a.ts', '--evil')).rejects.toThrow('Invalid ref')
+  it('localNewSideText reads the working tree unstaged and the index staged', async () => {
+    writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nSTAGED\nline3\n')
+    await stageFile(dir, 'src/a.ts')
+    // Now the three sides differ: HEAD has line2, the index has STAGED, the file on disk has DIRTY.
+    writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nDIRTY\nline3\n')
+
+    expect((await localNewSideText(dir, 'src/a.ts', 'unstaged')).text).toBe('line1\nDIRTY\nline3\n')
+    expect((await localNewSideText(dir, 'src/a.ts', 'staged')).text).toBe('line1\nSTAGED\nline3\n')
+  })
+
+  it('localNewSideText refuses a path out of the worktree and a symlink in it', async () => {
+    await expect(localNewSideText(dir, '../etc', 'unstaged')).rejects.toThrow('Invalid path')
+    await expect(localNewSideText(dir, '/etc/passwd', 'unstaged')).rejects.toThrow('Invalid path')
+    // A repo can hold a symlink pointing anywhere, and this path arrives over HTTP.
+    symlinkSync('/etc/passwd', join(dir, 'src', 'link.ts'))
+    await expect(localNewSideText(dir, 'src/link.ts', 'unstaged')).rejects.toThrow('Not a regular file')
   })
 
   // About 15 sequential git spawns, over vitest's 5s default on a busy machine.

@@ -30,7 +30,9 @@ export const reviewNotesKey = (taskId: string) => ['review-notes', taskId] as co
 export const localChangesRoute = (taskId: string) => `/v2/p/changes/tasks/${taskId}/local/changes`
 export const localDiffRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
   `/v2/p/changes/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`
-export const localBlobRoute = (taskId: string, path: string, ref?: string) =>
-  `/v2/p/changes/tasks/${taskId}/local/blob?path=${encodeURIComponent(path)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`
+// The new side of a file's diff, for filling a gap the reader expands. Scoped like the diff itself:
+// the index for a staged diff, the working tree for an unstaged one.
+export const localNewSideRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
+  `/v2/p/changes/tasks/${taskId}/local/new-side?path=${encodeURIComponent(path)}&scope=${scope}`
 export const localActionRoute = (taskId: string, action: 'stage' | 'unstage' | 'discard' | 'commit' | 'stage-all' | 'unstage-all' | 'discard-all' | 'push') =>
   `/v2/p/changes/tasks/${taskId}/local/${action}`

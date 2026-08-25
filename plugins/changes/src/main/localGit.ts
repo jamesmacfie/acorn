@@ -4,7 +4,7 @@
 // localDiff.ts. Pure Node, so it works in dev:node too. Wired in main/serverBridges.ts.
 import type { CoreServices } from '@acorn/plugin-api/node'
 import type { LocalGitBridge } from '../server/routes/localGit'
-import { commitStaged, discardAll, discardFile, localChanges, localDiff, localFileBlob, pushBranch, stageAll, stageFile, unstageAll, unstageFile } from './localDiff'
+import { commitStaged, discardAll, discardFile, localChanges, localDiff, localNewSideText, pushBranch, stageAll, stageFile, unstageAll, unstageFile } from './localDiff'
 
 // Takes CoreServices, not a database handle: this module shells out to git in the task's worktree
 // and needs only core's task-to-worktree resolution (docs/data-layer.md § Plugin databases).
@@ -29,16 +29,18 @@ export function localGitBridge(core: Pick<CoreServices, 'tasks'>, broadcastStatu
       try {
         // Whole-file context: the pane shows the entire file with changes highlighted, so no expand
         // affordances are needed. 1e6 lines caps any real file.
-        return await localDiff(root, path, scope === 'staged' ? 'staged' : 'unstaged', 1_000_000)
+        // git's default -U3, so the pane shows hunks with expandable gaps between them rather than
+        // every line of every file (docs/diff-rendering.md).
+        return await localDiff(root, path, scope === 'staged' ? 'staged' : 'unstaged')
       } catch (e) {
         return { error: e instanceof Error ? e.message : 'diff failed' }
       }
     },
-    blob: async (taskId, path, ref) => {
+    newSide: async (taskId, path, scope) => {
       const root = await core.tasks.root(taskId)
       if (!root) return { error: 'No worktree yet.' }
       try {
-        return await localFileBlob(root, path, ref ?? 'HEAD')
+        return await localNewSideText(root, path, scope === 'staged' ? 'staged' : 'unstaged')
       } catch (e) {
         return { error: e instanceof Error ? e.message : 'read failed' }
       }

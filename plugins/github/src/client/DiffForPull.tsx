@@ -1,37 +1,25 @@
-import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
+import { createMemo } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
-import { filesKey } from '../contract/api'
-import { clientEvents, PrefKeys, prefsOptions, readDraft, registerCommands, savePref, writeDraft } from '@acorn/plugin-api/client'
+import { filesKey, filePatchKey, pullKey, type PullFile } from '../contract/api'
 import { fetchFilePatches, fileBlobOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
-import { filePatchKey, pullKey, type PullFile, type Thread } from '../contract/api'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
-import { EmptyState, FileHead, type LineComposerController, type ThreadCollapseController } from '@acorn/plugin-api/ui'
-import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { buildDiffRows, buildDiffRowsAsync, buildRenderableRows, type CodeRow, createDiffHydrator, createDiffMeasureSchedulers, createDiffVirtualizer, DIFF_LOAD_ROW_HEIGHT, estimateRowSize, estimateSplitBandSize, expandGapAsync, gapId, type GapRow, isCodeRow, maxLineCols, type ParsedFile, plainTokenize, type Row, rowIdentityKeys, type SplitBand, splitBandIdentityKeys, toBands, tokenizeDocument, type ViewMode } from '@acorn/plugin-api/ui/diff'
-import { createDiffScrollRestoration } from './reviewScrollRestoration'
-import { rememberReviewDiffCollapsed, reviewDiffCollapsed, type ReviewViewScope } from './reviewViewState'
-import { createDiffFindController } from './DiffFindController'
-import { DiffToolbar } from './DiffToolbar'
-import { DiffCanvas } from './DiffCanvas'
-import { createDiffStickyFile } from './DiffStickyFile'
+import { DiffPane } from '@acorn/plugin-api/ui'
+import type { DiffSource } from '@acorn/plugin-api/ui/diff'
 
-// Right (Diff) pane: renders every changed file's diff stacked in one virtualized list
-// (docs/diff-rendering.md). Each file opens with a header row; `?file=` is the scroll target rather
-// than a file picker (the file list, finder, and [ / ] all set it).
+// Right (Diff) pane: the shared diff shell (client-core's DiffPane, docs/diff-rendering.md) filled in
+// from a pull request. Everything here answers one of the shell's questions and nothing more: which
+// files, where their patch bodies come from, which threads to interleave, and what a comment does.
 //
-// The files query returns the full changed-file payload up front. `fetchPatches` below only covers
-// a body still missing from a partial or restored cache; binary and too-large files have no patch
-// and render a "No diff" row instead. Review threads interleave at render time (matched by path), so
-// a thread mutation rerenders without re-tokenizing patches.
+// The files query returns the full changed-file payload up front. `fetchPatches` below only covers a
+// body still missing from a partial or restored cache; binary and too-large files have no patch and
+// the shell renders a "No diff" row instead.
 export type PullRoute = {
   owner: string
   repo: string
   number: string
   key: string
 }
-const HIGHLIGHT_MAX_PATCH_CHARS = 120_000
-const HIGHLIGHT_MAX_PATCH_LINES = 2_000
 
 export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?: string }) {
   const searchParams = props.router ? useSearchParams()[0] : {}
@@ -39,59 +27,25 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   const owner = props.route.owner
   const repo = props.route.repo
   const number = props.route.number
-  const reviewScope: ReviewViewScope = { taskId: props.taskId, routeKey: props.route.key }
 
   const files = createQuery(() => filesOptions(owner, repo, number, true))
   const detail = createQuery(() => pullDetailOptions(owner, repo, number, true))
-  const prefs = createQuery(() => prefsOptions(true))
   const mentionsQuery = createQuery(() => mentionsOptions(owner, repo, true))
-  const mentionsList = () => mentionsQuery.data ?? []
-  const headSha = () => detail.data?.pull?.headSha ?? null
-  let lastTarget = ''
 
-  const viewMode = (): ViewMode => (prefs.data?.[PrefKeys.diffView] === 'split' ? 'split' : 'unified')
-  const setViewMode = async (mode: ViewMode) => {
-    await savePref(queryClient, PrefKeys.diffView, mode)
-  }
+  // A force-push or a new commit changes this, which is the shell's signal to drop parse state, the
+  // remembered scroll offset, and any collapsed files.
+  const signature = createMemo(() => (files.data ?? []).map((file) => `${file.path}:${file.sha}:${file.additions}:${file.deletions}`).join('\0'))
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) })
-
-  // Patch bodies arrive with the PR's files query. Hydration then parses/tokenizes automatically in
-  // priority order: selected/visible file first, the rest in small idle batches.
-  const [parsedByPath, setParsedByPath] = createSignal<Map<string, ParsedFile>>(new Map())
-  // Context lines revealed by clicking a gap, keyed by that gap's stable identity. Reset when the file
-  // set changes.
-  const [expanded, setExpanded] = createSignal<Map<string, CodeRow[]>>(new Map())
-  const [lineComposer, setLineComposer] = createSignal<{ key: string; body: string } | null>(null)
-  // Collapsed diff files (header row stays, body rows are dropped from the row model). Remembered
-  // per review scope for the session, like the scroll position, and reseeded by the filesSignature
-  // effect below so navigating away and back keeps a file collapsed.
-  const [collapsedFiles, setCollapsedFiles] = createSignal<Set<string>>(new Set())
-  const toggleFileCollapse = (path: string) => {
-    const next = new Set(collapsedFiles())
-    if (!next.delete(path)) next.add(path)
-    setCollapsedFiles(next)
-    rememberReviewDiffCollapsed(reviewScope, { filesSignature: filesSignature(), paths: [...next] })
-  }
-  const [threadCollapsed, setThreadCollapsed] = createSignal<Map<string, boolean>>(new Map())
-  const shouldUsePlainTokenizer = (file: PullFile) => {
-    const patch = file.patch ?? ''
-    if (patch.length > HIGHLIGHT_MAX_PATCH_CHARS) return true
-    let lines = 1
-    for (let i = 0; i < patch.length; i++) {
-      if (patch.charCodeAt(i) === 10 && ++lines > HIGHLIGHT_MAX_PATCH_LINES) return true
-    }
-    return false
-  }
-
-  const hydrator = createDiffHydrator({
-    parseFile: async (file) => ({
-      file,
-      diff: shouldUsePlainTokenizer(file) ? buildDiffRows(file, plainTokenize) : await buildDiffRowsAsync(file, tokenizeDocument),
-    }),
-    onParsed: (parsedFile) => setParsedByPath((prev) => new Map(prev).set(parsedFile.file.path, parsedFile)),
+  const source: DiffSource = {
+    scope: { taskId: props.taskId, routeKey: props.route.key },
+    files: () => files.data,
+    loading: () => files.isLoading,
+    signature,
+    selectedPath: () => typeof searchParams.file === 'string' ? searchParams.file : '',
+    threads: () => detail.data?.threads,
+    mentions: () => mentionsQuery.data ?? [],
     // Patch-body source, checked in order: the per-path patch cache entry, then the warmed files
-    // query (which also resolves binary/too-large files to their legitimate null patch).
+    // query (which also resolves binary and too-large files to their legitimate null patch).
     cachedFile: (path) => {
       const direct = queryClient.getQueryData<PullFile>(filePatchKey(owner, repo, number, path))
       if (direct) return direct
@@ -106,362 +60,23 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
       }
       return fetched
     },
-  })
-  onCleanup(hydrator.dispose)
-
-  const parsed = createMemo<ParsedFile[]>(() => {
-    const parsedFiles = parsedByPath()
-    return (files.data ?? []).map((file) => {
-      const parsedFile = parsedFiles.get(file.path)
-      if (parsedFile) return parsedFile
-      return { file, diff: [{ kind: 'load', file, status: hydrator.status(file.path) === 'error' ? 'error' : 'loading' }] }
-    })
-  })
-
-  const filesSignature = createMemo(() => (files.data ?? []).map((file) => `${file.path}:${file.sha}:${file.additions}:${file.deletions}`).join('\0'))
-  createEffect(on(filesSignature, (signature, previous) => {
-    lastTarget = ''
-    setParsedByPath(new Map())
-    setExpanded(new Map())
-    // Restore the scope's collapsed files if they were saved against this same file set; a changed
-    // signature means new commits, and a collapse decision about the old diff does not carry over.
-    const savedCollapsed = reviewDiffCollapsed(reviewScope)
-    setCollapsedFiles(new Set(savedCollapsed?.filesSignature === signature ? savedCollapsed.paths : []))
-    setLineComposer(null)
-    // The empty → populated transition is initial query hydration, not a changed PR. A genuine
-    // signature change invalidates the old pixel position because the diff's geometry changed.
-    if (previous && signature !== previous) resetScrollPosition(true)
-    hydrator.reset(files.data ?? [], typeof searchParams.file === 'string' ? searchParams.file : undefined)
-  }))
-
-  createEffect(on(
-    () => [filesSignature(), typeof searchParams.file === 'string' ? searchParams.file : ''] as const,
-    ([, selectedPath]) => {
-      const list = files.data ?? []
-      if (!list.length) return
-      const selected = selectedPath ? list.find((file) => file.path === selectedPath) : undefined
-      const target = selected ?? list[0]
-      if (target) hydrator.prioritize(target.path)
-    },
-  ))
-
-  const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), detail.data?.threads, expanded(), collapsedFiles()))
-  const rowKeys = createMemo(() => rowIdentityKeys(rows()))
-  const maxCols = createMemo(() => maxLineCols(rows()))
-
-  // Fetch the file's head body once (cached by immutable sha), slice the gap's hidden lines, and
-  // splice them into the row stream by recording them in `expanded`.
-  const handleExpand = async (gap: GapRow) => {
-    if (gap.sha == null) return
-    const body = await queryClient.fetchQuery(fileBlobOptions(owner, repo, gap.sha))
-    const lines = await expandGapAsync(gap, body.text, tokenizeDocument)
-    setExpanded((prev) => new Map(prev).set(gapId(gap), lines))
-  }
-
-  // Split bands from the same interleaved rows (see toBands). Keep this cold in unified mode:
-  // building and keying split bands is pure overhead while the main diff list is active.
-  const bands = createMemo<SplitBand[]>(() => (viewMode() === 'split' ? toBands(rows()) : []))
-  const bandKeys = createMemo(() => splitBandIdentityKeys(bands()))
-
-  // Scroll element as a signal so the virtualizer re-attaches when it (re)mounts; it lives behind a
-  // `<Show>` (no PR, or split mode) so it is absent at this component's onMount. The virtualizer
-  // reads the element's size only when getScrollElement first returns it. Publishing the ref inside
-  // requestAnimationFrame guarantees that read happens after layout, when offsetHeight is real,
-  // rather than in the same tick a cached query fills rows(); otherwise it freezes a 0-height
-  // viewport and the range stays empty. measure() then drives the post-layout re-read.
-  const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
-  const virt = createDiffVirtualizer({
-    items: rows,
-    keys: rowKeys,
-    keyPrefix: 'row',
-    estimateSize: (row) => (row ? estimateRowSize(row) : DIFF_LOAD_ROW_HEIGHT),
-    scrollEl,
-  })
-  const splitVirt = createDiffVirtualizer({
-    items: bands,
-    keys: bandKeys,
-    keyPrefix: 'band',
-    estimateSize: estimateSplitBandSize,
-    scrollEl,
-  })
-
-  const { scheduleVirtualMeasure, scheduleElementMeasure, cancel: cancelMeasures } = createDiffMeasureSchedulers(
-    { unified: virt, split: splitVirt },
-    scrollEl,
-  )
-
-  onMount(() => {
-    const commands = registerCommands([
-      { id: 'github.diff.find', title: 'Find in diff', category: 'navigation', run: find.openFind },
-    ])
-    const bindings = registerKeybindings([{
-      id: 'github.diff.find', command: 'github.diff.find', description: 'Find in diff', category: 'Pull requests',
-      defaultChord: 'meta+f', when: props.router ? 'typing-exempt' : 'pane',
+    // Immutable by sha, so one fetch per blob serves every gap in that file.
+    fileText: async ({ sha }) => (await queryClient.fetchQuery(fileBlobOptions(owner, repo, sha))).text,
+    canComment: () => detail.data?.pull?.headSha != null,
+    addComment: (body, { row, side, lineNo }) => addReviewComment(owner, repo, number, body, row.path, lineNo, side),
+    reply: (databaseId, body) => replyReview(owner, repo, number, databaseId, body),
+    resolveThread: (threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved),
+    invalidate: () => void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) }),
+    draftPrefix: `${owner}/${repo}/${number}`,
+    // In router mode this pane owns the route, so the chord is claimed globally; in a task it is one
+    // pane among several and has to be scoped to win only when the reader is looking at it.
+    find: {
+      commandId: 'github.diff.find',
+      description: 'Find in diff',
+      category: 'Pull requests',
       ...(props.router ? {} : { pane: 'pr' }),
-    }])
-    onCleanup(() => { bindings.dispose(); commands.dispose() })
-  })
-
-  // Only threads are measured (docs/diff-rendering.md § Row geometry): every code row is exactly
-  // DIFF_LINE_HEIGHT, so there is nothing left to correct after the estimate.
-  const shouldMeasureRow = (row: Row) => row.kind === 'thread'
-  const shouldMeasureBand = (band: SplitBand) => band.kind === 'full' && band.row.kind === 'thread'
-
-  const find = createDiffFindController({ rows, bands, viewMode, unified: virt, split: splitVirt })
-
-  const [scrollTop, setScrollTop] = createSignal(0)
-  const { virtualRows, virtualBands, stickyFile } = createDiffStickyFile({
-    rows,
-    bands,
-    viewMode,
-    virt,
-    splitVirt,
-    scrollTop,
-    files: () => files.data ?? [],
-  })
-  const stickyHead = () => (
-    <Show when={stickyFile()}>
-      {(f) => (
-        <div class="diff-sticky-file">
-          <FileHead file={f()} collapsed={collapsedFiles().has(f().path)} onToggleCollapse={toggleFileCollapse} />
-        </div>
-      )}
-    </Show>
-  )
-
-  const threadLayoutSignature = createMemo(() => {
-    const collapsed = threadCollapsed()
-    return (detail.data?.threads ?? []).map((thread) => `${thread.threadId}:${thread.resolved}:${collapsed.get(thread.threadId) ?? thread.resolved}`).join('\0')
-  })
-  const threadCollapseFor = (thread: Thread): ThreadCollapseController => ({
-    collapsed: () => threadCollapsed().get(thread.threadId) ?? thread.resolved,
-    setCollapsed: (collapsed) =>
-      setThreadCollapsed((prev) => {
-        const next = new Map(prev)
-        next.set(thread.threadId, collapsed)
-        return next
-      }),
-  })
-  let serverThreadResolved = new Map<string, boolean>()
-  createEffect(() => {
-    const threads = detail.data?.threads ?? []
-    const ids = new Set(threads.map((thread) => thread.threadId))
-    const resolvedChanges = new Map<string, boolean>()
-    for (const thread of threads) {
-      const previous = serverThreadResolved.get(thread.threadId)
-      if (previous != null && previous !== thread.resolved) resolvedChanges.set(thread.threadId, thread.resolved)
-    }
-    serverThreadResolved = new Map(threads.map((thread) => [thread.threadId, thread.resolved]))
-    setThreadCollapsed((prev) => {
-      if (prev.size === 0 && resolvedChanges.size === 0) return prev
-      let changed = false
-      const next = new Map(prev)
-      for (const id of next.keys()) {
-        if (!ids.has(id)) {
-          next.delete(id)
-          changed = true
-        }
-      }
-      for (const [id, resolved] of resolvedChanges) {
-        if (!resolved) {
-          if (next.delete(id)) changed = true
-        } else if (!next.has(id)) {
-          next.set(id, true)
-          changed = true
-        }
-      }
-      return changed ? next : prev
-    })
-  })
-  createEffect(() => {
-    const paths = new Set<string>()
-    if (viewMode() === 'split') {
-      for (const { band } of virtualBands()) {
-        if (band.kind === 'pair') {
-          if (band.left) paths.add(band.left.path)
-          if (band.right) paths.add(band.right.path)
-        } else if (band.row.kind === 'file' || band.row.kind === 'load') {
-          paths.add(band.row.file.path)
-        } else if (band.row.kind === 'gap') {
-          paths.add(band.row.path)
-        }
-      }
-    } else {
-      for (const { row } of virtualRows()) {
-        if (row.kind === 'file' || row.kind === 'load') paths.add(row.file.path)
-        else if (isCodeRow(row) || row.kind === 'gap') paths.add(row.path)
-      }
-    }
-    if (paths.size) hydrator.prioritize([...paths])
-  })
-  createEffect(() => {
-    if (scrollEl()) {
-      virt.measure()
-      if (viewMode() === 'split') splitVirt.measure()
-    }
-  })
-  createEffect(() => {
-    rows().length
-    if (scrollEl()) scheduleVirtualMeasure('unified')
-  })
-  createEffect(() => {
-    if (viewMode() !== 'split') return
-    bands().length
-    if (scrollEl()) scheduleVirtualMeasure('split')
-  })
-  // Depend on the composer's *key* through a memo (equality-checked), not the composer object: the
-  // object is replaced on every keystroke, and re-measuring per keystroke remounts the virtual rows,
-  // which destroys the focused textarea (flicker and lost selection). Only opening, closing, or
-  // moving the composer changes row heights.
-  const lineComposerKey = createMemo(() => lineComposer()?.key ?? null)
-  createEffect(() => {
-    lineComposerKey()
-    if (!scrollEl()) return
-    scheduleVirtualMeasure('unified')
-    if (viewMode() === 'split') scheduleVirtualMeasure('split')
-  })
-  createEffect(() => {
-    threadLayoutSignature()
-    if (!scrollEl()) return
-    scheduleVirtualMeasure('unified')
-    if (viewMode() === 'split') scheduleVirtualMeasure('split')
-  })
-  const scrollRestoration = createDiffScrollRestoration({
-    scope: reviewScope,
-    viewMode,
-    filesSignature,
-    selectedPath: () => typeof searchParams.file === 'string' ? searchParams.file : '',
-    scrollEl,
-    setScrollEl,
-    setScrollTop,
-    measure: (mode) => mode === 'split' ? splitVirt.measure() : virt.measure(),
-  })
-  onCleanup(() => {
-    cancelMeasures()
-  })
-  const resetScrollPosition = scrollRestoration.reset
-  // Every progressive hydration pass changes the virtual content height. A pending position is
-  // retried after the row model updates so a deep saved offset is not lost to placeholder clamping.
-  createEffect(() => {
-    rows()
-    if (viewMode() === 'split') bands()
-    scrollRestoration.retry()
-  })
-
-  const scrollToFile = (path: string, force = false) => {
-    const all = rows()
-    const idx = all.findIndex((r) => r.kind === 'file' && r.file.path === path)
-    if (idx < 0) return false
-    hydrator.prioritize(path)
-    if (!force && path === lastTarget) return true
-    lastTarget = path
-    if (viewMode() === 'split') {
-      const bandIdx = bands().findIndex((band) => band.kind === 'full' && band.row.kind === 'file' && band.row.file.path === path)
-      if (bandIdx < 0) return false
-      splitVirt.scrollToIndex(bandIdx, { align: 'start' })
-    } else {
-      virt.scrollToIndex(idx, { align: 'start' })
-    }
-    return true
+    },
   }
 
-  onMount(() => {
-    const off = clientEvents.on('presentation:file-scroll', (detail) => {
-      if (!detail || detail.routeKey !== props.route.key) return
-      lastTarget = ''
-      scrollToFile(detail.path, true)
-    })
-    onCleanup(off)
-  })
-
-  // Scroll to the file named in `?file=` once summaries have created the file headers
-  // (docs/diff-rendering.md § Review threads and state). Loading that file's patch is prioritized
-  // separately so navigation doesn't wait for tokenization.
-  createEffect(() => {
-    const path = typeof searchParams.file === 'string' ? searchParams.file : ''
-    if (!path) {
-      lastTarget = ''
-      return
-    }
-    scrollToFile(path)
-  })
-
-  const lineComment = (r: CodeRow) => {
-    const side = r.oldNo != null && r.newNo == null ? 'LEFT' : 'RIGHT'
-    const lineNo = side === 'LEFT' ? r.oldNo : r.newNo
-    return {
-      side: side as 'LEFT' | 'RIGHT',
-      lineNo: lineNo ?? 0,
-      key: lineNo == null ? '' : commentTargetKey(r.path, side, lineNo),
-      canAdd: !!headSha() && lineNo != null,
-    }
-  }
-
-  const commentTargetKey = (path: string, side: 'LEFT' | 'RIGHT', lineNo: number) => JSON.stringify([path, side, lineNo])
-  // Persist an in-progress new-line comment per line so it survives navigation/reload. The composer
-  // is single-slot (one open line at a time), so we seed body from the draft when it opens and write
-  // back on edit; submitting sets body to '' which removes the key.
-  const lineDraftKey = (key: string) => `line-comment:${owner}/${repo}/${number}:${key}`
-  const composerFor = (key: string): LineComposerController => ({
-    isOpen: () => lineComposer()?.key === key,
-    body: () => {
-      const current = lineComposer()
-      return current?.key === key ? current.body : ''
-    },
-    setOpen: (open) => {
-      setLineComposer((current) => {
-        if (open) return { key, body: current?.key === key ? current.body : readDraft(lineDraftKey(key)) }
-        return current?.key === key ? null : current
-      })
-    },
-    setBody: (body) => {
-      writeDraft(lineDraftKey(key), body)
-      setLineComposer({ key, body })
-    },
-  })
-
-  const splitComposer = (r: CodeRow | null, side: 'LEFT' | 'RIGHT') => {
-    const lineNo = side === 'LEFT' ? r?.oldNo : r?.newNo
-    return r && lineNo != null ? composerFor(commentTargetKey(r.path, side, lineNo)) : undefined
-  }
-
-  return (
-    <Show
-      when={files.data?.length}
-      fallback={<EmptyState align="start" busy={files.isLoading}>{files.isLoading ? 'Loading…' : 'No files.'}</EmptyState>}
-    >
-      <DiffToolbar find={find} viewMode={viewMode} setViewMode={setViewMode} />
-      <DiffCanvas
-        viewMode={viewMode}
-        rows={rows}
-        bands={bands}
-        virt={virt}
-        splitVirt={splitVirt}
-        stickyHead={stickyHead}
-        publishScrollEl={(element, mode) => scrollRestoration.publish(element, mode)}
-        onScroll={(element) => scrollRestoration.onScroll(element)}
-        maxCols={maxCols}
-        scheduleElementMeasure={scheduleElementMeasure}
-        shouldMeasureRow={shouldMeasureRow}
-        shouldMeasureBand={shouldMeasureBand}
-        onMutated={invalidate}
-        resolveThread={(threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved)}
-        replyReview={(databaseId, body) => replyReview(owner, repo, number, databaseId, body)}
-        expandGap={handleExpand}
-        retryDiff={(path) => hydrator.retry(path)}
-        mentions={mentionsList}
-        threadCollapse={threadCollapseFor}
-        fileCollapsed={(path) => collapsedFiles().has(path)}
-        onToggleFileCollapse={toggleFileCollapse}
-        lineComment={lineComment}
-        addComment={(body, path, lineNo, side) => addReviewComment(owner, repo, number, body, path, lineNo, side)}
-        composerFor={composerFor}
-        splitComposer={splitComposer}
-        headSha={headSha}
-        invalidate={invalidate}
-        findHighlight={find.findHighlight}
-      />
-
-    </Show>
-  )
+  return <DiffPane source={source} />
 }
