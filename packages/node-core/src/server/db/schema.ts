@@ -72,8 +72,6 @@ export const workspaces = sqliteTable('workspaces', {
   name: text('name').notNull(), // editable label
   isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false), // the catch-all group
   sort: integer('sort').notNull().default(0), // selector ordering
-  icon: text('icon'), // JSON WorkspaceIcon ({"kind":"emoji","value":"🌰"} | {"kind":"lucide",…} | {"kind":"github"}); null → derived default
-  color: text('color'), // preset token key ('green'|'blue'|…) or 6-hex; null → derived from name hash
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })
@@ -93,6 +91,7 @@ export const projects = sqliteTable(
     workspaceId: text('workspace_id').notNull(), // → workspaces.id; a project lives in exactly one workspace
     sort: integer('sort').notNull().default(0),
     hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
+    color: text('color'), // optional task-tab accent: preset key or 6-hex; null = no project accent
     // VCS facet: 'git' when a .git entry was detected at `path`, null for a plain folder.
     vcs: text('vcs'),
     defaultBranch: text('default_branch'), // cached from origin/HEAD or the GitHub API; null when unknown

@@ -114,8 +114,8 @@
    on the two title rows. */
 .tabrail-menu .ui-menu-label-row { max-width: 180px; }
 
-/* Workspace identity accent (docs/workspaces-and-tasks.md): task rows carry their workspace's colour as
-   the 3px left accent, tinted per workspace. */
+/* Project identity accent (docs/workspaces-and-tasks.md): every task for a coloured project carries
+   its optional 3px strip. Uncoloured active tabs retain the normal application accent above. */
 .tabrail-task { border-left-width: var(--stripe-w); }
 
 /* Pin-to-top marker (docs/panes.md). */

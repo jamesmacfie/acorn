@@ -61,16 +61,6 @@
 .repo-picker-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .repo-picker-chevron { flex: none; color: var(--text-muted); font-size: var(--fs-2xs); }
 
-/* Workspace colour dot leading the workspace-picker rows (docs/workspaces-and-tasks.md). */
-.ws-color-dot {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  margin-left: var(--space-3);
-  border: var(--control-border);
-  display: inline-block;
-}
-
 .repo-picker-popover {
   position: absolute;
   top: calc(100% + 4px);

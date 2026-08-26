@@ -196,7 +196,7 @@ export async function detectProject(db: AppDatabase, id: string): Promise<Projec
   return getProject(db, id)
 }
 
-export type PatchProjectInput = Partial<{ name: string; workspaceId: string; hidden: boolean; sort: number; path: string }>
+export type PatchProjectInput = Partial<{ name: string; workspaceId: string; hidden: boolean; color: string | null; sort: number; path: string }>
 
 export async function patchProject(db: AppDatabase, id: string, patch: PatchProjectInput): Promise<CreateProjectResult> {
   const project = await getProject(db, id)
@@ -213,6 +213,7 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
     set.workspaceId = patch.workspaceId
   }
   if (patch.hidden !== undefined) set.hidden = patch.hidden
+  if (patch.color !== undefined) set.color = patch.color
   if (patch.sort !== undefined) set.sort = patch.sort
   if (patch.path !== undefined) {
     // Mapping a folder onto a project with no path yet (the "clone or pick folder" affordance for

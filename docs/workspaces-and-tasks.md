@@ -5,10 +5,15 @@ machine-scoped identity for one folder or one known remote repository.
 
 ## Workspace and project
 
-A workspace has a name, sort order, icon, and colour. A project belongs to exactly one workspace and
-has a stable opaque ID, display name, optional folder path, and optional Git/GitHub facets. A project
-may be a plain folder or a Git checkout. Facets are cached observations and may be refreshed; the
-project ID is the application identity.
+A workspace has a name and sort order. It deliberately carries no icon or colour: the workspace
+switcher is structural navigation, not repository identity. A project belongs to exactly one
+workspace and has a stable opaque ID, display name, optional folder path, optional colour, and
+optional Git/GitHub facets. A project may be a plain folder or a Git checkout. Facets are cached
+observations and may be refreshed; the project ID is the application identity.
+
+The project colour is an optional machine-local accent edited in Settings → Projects. Every task for
+that project draws it as the strip down the left of its left-rail tab. Clearing the colour removes the
+project strip; an active tab still uses the application theme's normal active accent.
 
 `path` is nullable and the model tolerates a path-null project, but nothing creates one. The GitHub
 importer's "defer" action was the only producer, and it is gone. Rows that predate that stay readable

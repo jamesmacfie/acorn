@@ -7,7 +7,6 @@ import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
 import type { Workspace, WorkspaceExternalProjectsResponse, WorkspaceProjectRef, WorkspaceSeed } from '@acorn/protocol/api.ts'
-import { isValidWorkspaceColor, isValidWorkspaceIcon, parseWorkspaceIcon, serializeWorkspaceIcon } from '@acorn/protocol/workspaceIdentity.ts'
 import { getConnection } from '../integrations/connections'
 
 // Workspaces (docs/workspaces-and-tasks.md): named groups of Projects, the top-level unit.
@@ -15,6 +14,7 @@ import { getConnection } from '../integrations/connections'
 const workspaceExternalProjectsBody = z.object({
   projects: z.array(z.object({ integrationId: z.string().min(1), externalId: z.string().min(1) })).optional(),
 })
+const workspacePatchBody = z.object({ name: z.string().trim().min(1) }).strict()
 
 async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]> {
   const rows = await db.select().from(schema.workspaces).orderBy(schema.workspaces.sort)
@@ -32,8 +32,6 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
     name: r.name,
     isDefault: r.isDefault,
     sort: r.sort,
-    icon: parseWorkspaceIcon(r.icon),
-    color: r.color,
     projects: (projectsByWs.get(r.id) ?? []).sort((a, b) => a.sort - b.sort),
   }))
 }
@@ -67,35 +65,17 @@ export const workspaces = new Hono<AppEnv>()
     const now = Date.now()
     const id = randomUUID()
     await db.insert(schema.workspaces).values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
-    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, icon: null, color: null, projects: [] } satisfies Workspace)
+    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, projects: [] } satisfies Workspace)
   })
-  // Update a workspace's identity (name / icon / colour). Project configuration is owned by the
-  // project routes.
+  // Workspace identity is its name. Project colour and project configuration belong to project routes.
   .patch('/:id', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string; icon?: unknown; color?: string | null }
-    const set: { name?: string; icon?: string | null; color?: string | null; updatedAt: number } = { updatedAt: Date.now() }
-    if (body.name !== undefined) {
-      if (!body.name.trim()) return respondError(c, 400, 'bad_request')
-      set.name = body.name.trim()
-    }
-    // Identity (docs/workspaces-and-tasks.md): icon is a validated JSON union stored as text; colour a preset token
-    // or 6-hex. Explicit null clears either back to the derived default.
-    if (body.icon !== undefined) {
-      if (body.icon === null) set.icon = null
-      else if (isValidWorkspaceIcon(body.icon)) set.icon = serializeWorkspaceIcon(body.icon)
-      else return respondError(c, 400, 'bad_request')
-    }
-    if (body.color !== undefined) {
-      if (body.color === null || body.color === '') set.color = null
-      else if (isValidWorkspaceColor(body.color)) set.color = body.color
-      else return respondError(c, 400, 'bad_request')
-    }
-    if (set.name === undefined && set.icon === undefined && set.color === undefined) return respondError(c, 400, 'bad_request')
+    const parsed = workspacePatchBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
     const id = c.req.param('id')
     const [existing] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, id))
     if (!existing) return respondError(c, 404, 'not_found')
-    await db.update(schema.workspaces).set(set).where(eq(schema.workspaces.id, id))
+    await db.update(schema.workspaces).set({ name: parsed.data.name, updatedAt: Date.now() }).where(eq(schema.workspaces.id, id))
     return c.json({ ok: true })
   })
   .delete('/:id', async (c) => {

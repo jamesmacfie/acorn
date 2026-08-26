@@ -6,7 +6,6 @@ import {
   projectRoute,
   projectsRoute,
   type Workspace,
-  type WorkspaceIcon,
   workspaceExternalProjectsRoute,
   type WorkspaceExternalProject,
   workspaceRoute,
@@ -43,9 +42,6 @@ export const deleteProject = (id: string) =>
 export const setProjectWorkspace = (id: string, workspaceId: string) => patchProject(id, { workspaceId })
 export const setProjectHidden = (id: string, hidden: boolean) => patchProject(id, { hidden })
 export const renameWorkspace = async (id: string, name: string) => patchWorkspace(id, { name })
-// Build/run/db/preview config is Project-scoped; edit it via the Project API/bridge.
-// Only workspace identity is patched here: icon (null clears) and colour (preset token or hex; null clears).
-export const setWorkspaceIcon = async (id: string, icon: WorkspaceIcon | null) => patchWorkspace(id, { icon })
-export const setWorkspaceColor = async (id: string, color: string | null) => patchWorkspace(id, { color })
+// Build/run/db/preview config and project colour are Project-scoped; edit them via the Project API.
 export const deleteWorkspace = async (id: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'DELETE' }, (res) => `workspace ${res.status}`)

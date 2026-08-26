@@ -25,7 +25,7 @@ const makeApp = () => {
 const jsonReq = (url: string, method: string, body: unknown) =>
   new Request(`http://acorn.test${url}`, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
-describe('workspace icon + colour', () => {
+describe('workspace identity', () => {
   let t: TestDb
   let app: Hono<AppEnv>
 
@@ -49,31 +49,19 @@ describe('workspace icon + colour', () => {
     return all.find((w) => w.id === id)
   }
 
-  it('PATCHes icon + colour and reads them back', async () => {
+  it('PATCHes a workspace name and reads it back', async () => {
     const w = await create()
-    expect(w.icon).toBeNull()
-    expect(w.color).toBeNull()
-    const res = await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { icon: { kind: 'emoji', value: '🌰' }, color: 'green' }), {} as Env)
+    const res = await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { name: 'Acorn' }), {} as Env)
     expect(res.status).toBe(200)
     const back = await read(w.id)
-    expect(back?.icon).toEqual({ kind: 'emoji', value: '🌰' })
-    expect(back?.color).toBe('green')
+    expect(back?.name).toBe('Acorn')
   })
 
-  it('clears icon/colour with explicit null', async () => {
+  it('rejects an empty or unrelated patch', async () => {
     const w = await create()
-    await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { icon: { kind: 'github' }, color: '#8250df' }), {} as Env)
-    const res = await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { icon: null, color: null }), {} as Env)
-    expect(res.status).toBe(200)
-    const back = await read(w.id)
-    expect(back?.icon).toBeNull()
-    expect(back?.color).toBeNull()
-  })
-
-  it('rejects invalid icon or colour payloads', async () => {
-    const w = await create()
-    expect((await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { icon: { kind: 'image', value: 'x.png' } }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { color: 'reddish' }), {} as Env)).status).toBe(400)
+    expect((await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', {}), {} as Env)).status).toBe(400)
+    expect((await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { color: 'green' }), {} as Env)).status).toBe(400)
+    expect((await app.fetch(jsonReq(`/api/workspaces/${w.id}`, 'PATCH', { name: 'Acorn', icon: { kind: 'github' } }), {} as Env)).status).toBe(400)
   })
 
   it('404s a PATCH for an unknown workspace id', async () => {

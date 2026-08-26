@@ -17,7 +17,7 @@ import { railStatusItems } from '../tasks/railStatus'
 import { workingCountFor } from '../tasks/agentSessions'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
-import { resolveWorkspaceColor } from '@acorn/protocol/workspaceIdentity.ts'
+import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
 import { dedupeBranch, slugifyBranch, withBranchPrefix } from '@acorn/protocol/branch.ts'
 import { taskBridge } from '../tasks/taskBridge'
 import { registerCommands } from '../registries/commands'
@@ -362,17 +362,10 @@ export default function TabRail() {
                 status: st(),
                 archiving: isArchiving(w.id),
               })
-            // Workspace identity on the row: a 3px accent in the workspace's colour, matching the
-            // active-row accent convention.
-            const ws = () => workspaceForProject(workspaces.data, w.projectId)
-            const accent = () => {
-              const g = ws()
-              return g ? resolveWorkspaceColor(g.color, g.name) : undefined
-            }
-            const wsGlyph = () => {
-              const icon = ws()?.icon
-              return icon?.kind === 'emoji' ? icon.value : null
-            }
+            // Project identity owns the optional 3px accent. The task's projectId is the stable join;
+            // workspace membership only scopes which task rows are visible.
+            const project = () => projects.data?.find((candidate) => candidate.id === w.projectId)
+            const accent = () => resolveProjectColor(project()?.color) ?? undefined
             return (
             <div
               class="tabrail-item"
@@ -422,9 +415,9 @@ export default function TabRail() {
                     aria-expanded={menuId() === w.id}
                     onClick={() => onRowClick(w)}
                   >
-                    {/* The task's own icon wins, then the workspace's, then the origin default. */}
+                    {/* Task icon is independent of workspace/project grouping. */}
                     <Icon
-                      name={w.icon ?? wsGlyph() ?? originIcon(w.origin)}
+                      name={w.icon ?? originIcon(w.origin)}
                       title={taskOriginAppearance(w.origin).tooltip}
                     />
                   </RailTab>

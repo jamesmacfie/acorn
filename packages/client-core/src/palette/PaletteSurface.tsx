@@ -12,9 +12,8 @@ import './palette.css'
 // Beside the hook rather than in ui/, because it imports OverlayPalette's type and the ui/ purity rule
 // carves out `palette/model.ts` only. Behaviour stays in the hook; this is the chrome.
 //
-// Each caller keeps its own row body: the palettes render label and hint, the file finders render dir
-// and name, and the workspace palette leads with a colour dot. A shared row shape would grow a slot per
-// caller, which is the markup it's replacing.
+// Each caller keeps its own row body: the palettes render label and hint, while the file finders render
+// dir and name. A shared row shape would grow a slot per caller, which is the markup it's replacing.
 //
 // Deliberately not absorbing Picker (anchored, filtered, non-modal) or Modal. The three-way distinction
 // is argued in Modal.tsx and dismissable.ts.

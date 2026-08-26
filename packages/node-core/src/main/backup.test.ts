@@ -58,8 +58,6 @@ beforeEach(async () => {
     name: 'Runn',
     isDefault: true,
     sort: 0,
-    icon: null,
-    color: null,
     createdAt: now,
     updatedAt: now,
   })
