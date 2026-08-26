@@ -16,6 +16,7 @@ import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { pluginState } from '@acorn/node-core/server/plugin/pluginState.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { schema, type AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { assembleNodeGraph } from '../../src/server/composition'
 import { buildPluginStateBridge } from '../../src/server/pluginState'
 
@@ -24,6 +25,23 @@ import { buildPluginStateBridge } from '../../src/server/pluginState'
 // context, provider registration, descriptor projection) against production plugin code rather than
 // a fixture.
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+
+// The rows a rail request scopes against: the Rollbar connection whose id the stubbed provider hands
+// back, a workspace with a project in it, and the mapping between the two.
+async function seedRailScope(db: AppDatabase): Promise<void> {
+  const now = 1
+  await db.insert(schema.integrations).values({
+    id: 'rollbar-production', userId: 'dogfood-user', provider: 'rollbar', label: 'Production',
+    authRef: 'sealed', authKind: 'api-key', createdAt: now, updatedAt: now,
+  })
+  await db.insert(schema.workspaces).values({ id: 'dogfood-workspace', name: 'Dogfood', createdAt: now, updatedAt: now })
+  await db.insert(schema.projects).values({
+    id: 'dogfood-project', name: 'widget', workspaceId: 'dogfood-workspace', createdAt: now, updatedAt: now,
+  })
+  await db.insert(schema.workspaceExternalProjects).values({
+    workspaceId: 'dogfood-workspace', integrationId: 'rollbar-production', externalId: 'project-1', createdAt: now,
+  })
+}
 
 describe('loading rollbar from disk', () => {
   let dataRoot = ''
@@ -94,7 +112,11 @@ describe('loading rollbar from disk', () => {
       expect(response.status).toBe(403)
       expect(await response.json()).toMatchObject({ error: { code: 'provider_not_connected' } })
 
-      const rail = await providerRoute!.fetch!(new Request('http://rollbar.test/rail-items'), {
+      // The rail is workspace-scoped: it lists the connections the routed project's workspace links,
+      // and nothing without a scope to intersect. So the dogfood has to seed the same three rows a
+      // real install has (connection, workspace with a project, mapping) for the route to answer.
+      await seedRailScope(core.db)
+      const rail = await providerRoute!.fetch!(new Request('http://rollbar.test/rail-items?project=dogfood-project'), {
         userId: 'dogfood-user',
         principal: { kind: 'device', userId: 'dogfood-user', deviceId: 'dogfood-device' },
         providers: {

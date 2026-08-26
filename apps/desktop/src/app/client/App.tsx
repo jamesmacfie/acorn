@@ -44,6 +44,7 @@ import { createTaskDeepLink } from '@acorn/client-core/tasks/taskDeepLink.ts'
 import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/registries/corePaths.ts'
 import { availableSources } from '@acorn/client-core/tabs/sources.ts'
+import { createSourceScope } from '@acorn/client-core/tabs/sourceScope.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so Monaco, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
@@ -216,15 +217,6 @@ export default function App() {
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
   const [collapsed, setCollapsed] = createSignal(false)
 
-  createEffect(() => {
-    const current = selectedSource()
-    const connected = integrations.data?.integrations
-    if (!current || !connected) return
-    if (!availableSources(connected).some((source) => source.id === current)) {
-      setSelectedSource(defaultSourceId() ?? null)
-    }
-  })
-
   createAppStartupRestore({
     queryClient,
     prefs: () => prefs.data,
@@ -254,6 +246,20 @@ export default function App() {
   // task, and the per-workspace view memory below never saw a workspace change.
   const contextProjectId = () => params.projectId ?? activeTask()?.projectId
   const activeWorkspace = () => workspaceForProject(workspaces.data, contextProjectId())
+  const sourceScope = createSourceScope(() => activeWorkspace()?.id)
+
+  // Whatever source was selected has to still be on offer. A workspace switch can take one away:
+  // a browse source only appears where its provider is connected and the workspace links one of its
+  // projects, and neither is a fact about the source alone.
+  createEffect(() => {
+    const current = selectedSource()
+    const connected = integrations.data?.integrations
+    if (!current || !connected) return
+    if (!availableSources(connected, sourceScope()).some((source) => source.id === current)) {
+      setSelectedSource(defaultSourceId() ?? null)
+    }
+  })
+
   // Every node's workspaces, for the topbar picker. Grouped rather than merged: a workspace belongs to
   // exactly one node, and two nodes both having a "Default" is the normal case.
   const fleetWorkspaces = createFleetWorkspaces()
