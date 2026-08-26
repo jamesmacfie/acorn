@@ -8,6 +8,7 @@
 // Keep the route templates and query keys byte-identical when you move them. A retyped route
 // template compiles fine and 404s at runtime, and a changed query key orphans a user's persisted
 // IndexedDB cache, which has no buster.
+import type { PullRef } from './pullRef'
 
 export type Repo = {
   id: number
@@ -46,6 +47,15 @@ export type Pull = {
   mergeStateStatus: string | null
   autoMergeEnabled: boolean
 }
+
+export type TaskPullRelation = {
+  pull: PullRef
+  role: 'primary' | 'related'
+  provenance: 'agent'
+  sessionId: string
+  requestId?: string
+}
+export type TaskPullRelationsResponse = { pulls: TaskPullRelation[] }
 
 // Closed PRs are paginated on demand (one GitHub page per fetch); nextPage is null at the end.
 export type ClosedPullsPage = { pulls: Pull[]; nextPage: number | null }
@@ -117,6 +127,7 @@ export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed'
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
 export const createPullRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls`
+export const taskPullsRoute = (taskId: string) => `/v2/p/github/tasks/${encodeURIComponent(taskId)}/pulls`
 export const repoLabelsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'labels')
 export const fileSummariesRoute = (owner: string, repo: string, number: string | number) => `${pullRoute(owner, repo, number, 'files')}?summary=1`
 export const filePatchRoute = (owner: string, repo: string, number: string | number, path: string) =>
@@ -145,6 +156,7 @@ export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') 
 // The closed list is an infinite query, so its key includes the `pages` shape marker.
 export const closedPullsKey = (owner: string, repo: string) => ['pulls', owner, repo, 'closed', 'pages'] as const
 export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, repo] as const
+export const taskPullsKey = (taskId: string) => ['task-pulls', taskId] as const
 export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
 export const repoLabelsKey = (owner: string, repo: string) => ['labels', owner, repo] as const

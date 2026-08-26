@@ -252,6 +252,7 @@ are authoritative.
 | `/v2/p/github/repos` | Repository mirror and refresh |
 | `/v2/p/github/repos/:owner/:repo/pulls` | Open/closed PR lists, batch prefetch, create PR |
 | `/v2/p/github/repos/:owner/:repo/pulls/:number` | PR detail, files, blob bodies, and write actions |
+| `/v2/p/github/tasks/:taskId/pulls` | Durable Acorn-created PR relations for a task |
 | `/v2/p/github/repos/:owner/:repo/actions/*` | Actions jobs/logs and rerun |
 | `/v2/p/github/repos/:owner/:repo/labels` | Label choices |
 | `/v2/p/github/repos/:owner/:repo/mentions` | Mention autocomplete participants |

@@ -6,6 +6,7 @@
 // the rollback of everything registered here all stay in host.ts, because they are decisions about a
 // set of plugins and this is one plugin's surface.
 import type { CoreServices } from '../../main/core'
+import type { Env } from '../../main/bindings'
 import type { NodePermissions, PluginCollectionDescriptor, PluginCommandDescriptor, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../../main/pluginManifest'
 import { scopeCapabilities, scopeCore } from '../../main/pluginPermissions'
 import { registerAgentTool } from '../agentTools/registry'
@@ -24,6 +25,7 @@ import type { NodePluginContext, PluginFetchHandler, PluginStorage } from './typ
 import { parsePluginChannel, pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
 import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../main/notify'
+import { buildPluginRequestContext } from './requestContext'
 
 // What the loader learned about a plugin it took off disk, and the one flag that separates a loaded
 // plugin from a built-in: its presence means "contain its failures" and "shape its context from the
@@ -64,6 +66,9 @@ export type PluginContextOptions = {
   plugin: string
   capabilities: CapabilityRegistry
   core: CoreServices
+  // Host bindings let non-route contributions use the same provider runtime as an authenticated
+  // request. Optional for context-shape unit tests that never exercise credential access.
+  env?: Env
   loaded?: LoadedPluginBinding
   // Both tiers' storage, and the only place this file looks for it. The caller derives it, from
   // `loaded.storage` for a plugin off disk and from the plugin's own `migrationsModule` for a built-in,
@@ -204,6 +209,23 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
       },
       connection: (provider) => connectionProviderRegistry.register(provider, plugin),
       model: (adapter) => modelProviderRegistry.register(adapter, plugin),
+      withConnection: async (userId, providerId, visit) => {
+        if (!options.env) throw new Error(`Plugin '${plugin}' requested a provider credential without host bindings.`)
+        let visited = false
+        const values = await buildPluginRequestContext(
+          options.env,
+          { kind: 'internal', scope: 'service', userId },
+          plugin,
+        ).providers.withConnections(providerId, async (connection, secret) => {
+          // `withConnections` intentionally walks every connection for provider-resource fan-out.
+          // A write must choose one or it could perform the action twice, so take the first usable row
+          // in the host's stable connection order.
+          if (visited) return undefined
+          visited = true
+          return visit(connection, secret)
+        })
+        return values[0]
+      },
     },
     // Rung 1 of the containment ladder for a loaded plugin: only the capability ids and CoreServices
     // facets its manifest declared. See main/pluginPermissions.ts. This is least privilege for

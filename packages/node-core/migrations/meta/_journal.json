@@ -29,6 +29,13 @@
       "when": 1787695190315,
       "tag": "0003_cynical_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787712234035,
+      "tag": "0004_real_centennial",
+      "breakpoints": true
     }
   ]
 }

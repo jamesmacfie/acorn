@@ -166,6 +166,14 @@ export type PluginProviderRegistry = {
   // A text-generation adapter for an already-registered connection provider. Register the connection
   // first; the registry refuses an adapter naming an unknown one.
   model(adapter: ModelProviderAdapter): void
+  // Node-side work such as an agent tool has no HTTP request context, but may still need the
+  // credential of a provider this plugin owns. The host lends the first usable connection for one
+  // callback and keeps decryption/redaction inside the same scoped runtime used by routes.
+  withConnection<T>(
+    userId: string,
+    providerId: string,
+    visit: PluginProviderConnectionVisitor<T>,
+  ): Promise<T | undefined>
 }
 
 // The client-notification surface, and the only one there is.

@@ -86,8 +86,10 @@ A task contains:
 - One required `projectId`.
 - An optional branch and optional worktree path.
 - An origin: `github-pr`, `linear`, `rollbar`, or `local`.
-- Optional pull-request number, title and icon, rail sort, status, archive timestamp, and parent task.
+- Optional primary pull-request number, title and icon, rail sort, status, archive timestamp, and parent task.
 - Task links to external items, and feature-owned terminal, agent, and pane state.
+- Zero or more durable `task_pulls` relations for PRs Acorn created in the task. The scalar primary
+  still owns worktree, checks, and task-context behavior; related PRs are review-only neighbours.
 
 A task can be branchless: a null branch runs in the project root. A branch creates an isolated Git
 worktree lazily, when the first filesystem-dependent surface needs one. The project row, not a copied

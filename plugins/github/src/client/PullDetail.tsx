@@ -15,6 +15,7 @@ import { PullSummary } from './PullSummary'
 import { buildConversationEntries, buildThreadSnippetIndex } from './pullDetail/model'
 import { createNavigatorScrollRestoration } from './reviewScrollRestoration'
 import type { ReviewViewScope } from './reviewViewState'
+import type { PullRef } from '../contract/pullRef'
 import './styles/pull-detail.css'
 import './styles/checks-panel.css'
 
@@ -22,16 +23,16 @@ const labelColor = (color: string | null | undefined) => (color ? `#${color}` : 
 
 // Mid (Navigator) pane: PR header, description, changed files, checks, and conversation. Bodies are
 // GitHub-sanitized HTML, rendered via innerHTML.
-export default function PullDetail(props: { task?: Task } = {}) {
+export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnly?: boolean } = {}) {
   // A contributed pane is task-scoped and must render without a Router. The route-owned browse
   // surface still uses params, so only acquire router context for that variant.
   const params = props.task ? null : useParams()
   const qc = useQueryClient()
   const projects = createQuery(() => projectsOptions(true))
   const routedProject = () => projects.data?.find((project) => project.id === params?.projectId)
-  const o = () => props.task?.github?.owner ?? routedProject()?.github?.owner ?? ''
-  const r = () => props.task?.github?.name ?? routedProject()?.github?.name ?? ''
-  const n = () => (props.task?.pullNumber != null ? String(props.task.pullNumber) : params?.number ?? '')
+  const o = () => props.pull?.owner ?? props.task?.github?.owner ?? routedProject()?.github?.owner ?? ''
+  const r = () => props.pull?.repo ?? props.task?.github?.name ?? routedProject()?.github?.name ?? ''
+  const n = () => props.pull?.number ?? (props.task?.pullNumber != null ? String(props.task.pullNumber) : params?.number ?? '')
   const repoKnown = () => !!o() && !!r()
   const hasRepoParams = () => !!o() && !!r()
   const hasPullParams = () => hasRepoParams() && !!n()
@@ -98,7 +99,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
   // PRs/repos resolve through the current project's GitHub facet before entering the project-keyed
   // SPA route.
   const navigate = useNavigate()
-  const onContentClick = makeContentLinkHandler(navigate)
+  const onContentClick = makeContentLinkHandler(navigate, { taskId: props.task?.id })
   // Which bare `CRA-404`-shaped tokens are safe to linkify here, and for whom. Learned from the refs
   // already confirmed in this PR by their full URLs, so the prefix is witnessed rather than guessed.
   // The host owns both halves, and it works for any provider whose links appear in a body.
@@ -213,6 +214,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
               draft={{ run: (isDraft) => draft.mutateAsync(isDraft), pending: draft.isPending }}
               reopen={{ run: () => reopen.mutateAsync(), pending: reopen.isPending }}
               actionError={actionError}
+              readOnly={props.readOnly}
               conflicting={conflicting()}
               conflicts={() => conflicts.data}
               conflictsLoading={() => conflicts.isLoading}
@@ -291,6 +293,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                       <span class="label-row-name">{l.name}</span>
                       <Button
                         variant="bare" class="label-row-remove"
+                        hidden={props.readOnly}
                         data-armed={armed.armed() === `label:${l.name}` ? '' : undefined}
                         title={armed.armed() === `label:${l.name}` ? 'Click again to remove' : 'Remove label'}
                         onClick={() => { if (armed.request(`label:${l.name}`)) run(removeLabel(o(), r(), n(), l.name)) }}
@@ -302,6 +305,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                 </For>
               </ul>
               <div class="label-picker">
+                <Show when={!props.readOnly}>
                 <Picker<Label>
                   label="Add label…"
                   placeholder="Filter labels…"
@@ -314,7 +318,8 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   leading={(label) => (
                     <span class="label-picker-swatch" style={{ background: labelColor(label.color) }} aria-hidden="true" />
                   )}
-                />
+                  />
+                </Show>
               </div>
             </CollapsibleSection>
 
@@ -330,7 +335,8 @@ export default function PullDetail(props: { task?: Task } = {}) {
                           aria-label="Mark viewed"
                           title="Mark viewed"
                           checked={f.viewed}
-                          onChange={(e) => run(setViewed(o(), r(), n(), f.path, e.currentTarget.checked))}
+                          disabled={props.readOnly}
+                          onChange={(e) => { if (!props.readOnly) run(setViewed(o(), r(), n(), f.path, e.currentTarget.checked)) }}
                         />
                         <button type="button" class="file-open" onClick={() => selectFile(f.path)}>
                           <span class={`file-status file-status-${status().tone}`} title={status().label}>
@@ -372,7 +378,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                             </a>
                           )}
                         </Show>
-                        <Show when={FAILED_STATUSES.has((ck.status ?? '').toLowerCase()) && ck.runId != null}>
+                        <Show when={!props.readOnly && FAILED_STATUSES.has((ck.status ?? '').toLowerCase()) && ck.runId != null}>
                           <Button disabled={rerunned().has(ck.runId!)} onClick={() => triggerRerun(ck.runId!)}>
                             {rerunned().has(ck.runId!) ? 'Queued' : 'Rerun'}
                           </Button>
@@ -386,6 +392,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
 
             <CollapsibleSection class="nav-section" persistKey="conversation" open label="Comments/Commits" count={conversationEntries().length}>
               <Show when={detail.data}>
+                <Show when={!props.readOnly}>
                 <Composer
                   class="composer"
                   placeholder="Leave a comment…"
@@ -396,6 +403,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   onSubmit={submitComment}
                   hint={<><Kbd size="xs">⌘↵</Kbd> to comment</>}
                 />
+                </Show>
               </Show>
               <div class="conversation-items" ref={convRef} onClick={onContentClick}>
                 <For each={conversationEntries()} fallback={<span class="muted conversation-empty">No comments or commits.</span>}>
@@ -417,6 +425,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                       </span>
                       <Button
                         variant="bare" class="label-row-remove"
+                        hidden={props.readOnly}
                         data-armed={armed.armed() === `reviewer:${login}` ? '' : undefined}
                         title={armed.armed() === `reviewer:${login}` ? 'Click again to remove' : 'Remove review request'}
                         onClick={() => { if (armed.request(`reviewer:${login}`)) run(removeReviewer(o(), r(), n(), login)) }}
@@ -428,6 +437,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                 </For>
               </ul>
               <div class="label-picker">
+                <Show when={!props.readOnly}>
                 <Picker<string>
                   label="Request review…"
                   placeholder="Filter people…"
@@ -439,7 +449,9 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   buttonClass="label-picker-button"
                   leading={(login) => <UserAvatar login={login} />}
                 />
+                </Show>
               </div>
+              <Show when={!props.readOnly}>
               <Composer
                 class="composer"
                 placeholder="Leave a review comment…"
@@ -461,6 +473,7 @@ export default function PullDetail(props: { task?: Task } = {}) {
                   </>
                 }
               />
+              </Show>
             </CollapsibleSection>
             <Show when={openCheck()}>
               {(c) => <ChecksPanel owner={o()} repo={r()} runId={c().runId} jobName={c().name} onClose={() => setOpenCheck(null)} />}

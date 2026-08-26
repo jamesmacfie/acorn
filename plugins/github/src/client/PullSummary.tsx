@@ -34,6 +34,7 @@ export function PullSummary(props: {
   draft: { run: (draft: boolean) => Promise<unknown>; pending: boolean }
   reopen: AsyncAction
   actionError: Accessor<string>
+  readOnly?: boolean
   conflicting: boolean
   conflicts: Accessor<PullConflicts | undefined>
   conflictsLoading: Accessor<boolean>
@@ -74,7 +75,7 @@ export function PullSummary(props: {
           <span>{props.fileSummary().count} files · <span class="file-stat add">+{props.fileSummary().additions}</span> / <span class="file-stat del">−{props.fileSummary().deletions}</span></span>
           <Show when={formatRelativeTime(props.pull().updatedAt)}>{(age) => <span>{age()}</span>}</Show>
         </div>
-        <Show when={props.pull().state === 'open'}>
+        <Show when={!props.readOnly && props.pull().state === 'open'}>
           <div class="pr-actions">
             <Show when={!props.pull().autoMergeEnabled}>
               <Select size="sm" width="auto" aria-label="Merge method" value={props.mergeMethod()} onChange={(e) => props.setMergeMethod(e.currentTarget.value)}>
@@ -94,7 +95,7 @@ export function PullSummary(props: {
             <Button onClick={() => props.run(props.draft.run(!props.pull().draft))} disabled={props.draft.pending}>{props.pull().draft ? 'Ready for review' : 'Convert to draft'}</Button>
           </div>
         </Show>
-        <Show when={props.pull().state === 'closed'}><div class="pr-actions"><Button onClick={() => props.run(props.reopen.run())} disabled={props.reopen.pending}>Reopen</Button></div></Show>
+        <Show when={!props.readOnly && props.pull().state === 'closed'}><div class="pr-actions"><Button onClick={() => props.run(props.reopen.run())} disabled={props.reopen.pending}>Reopen</Button></div></Show>
         <Show when={props.actionError()}><Alert>{props.actionError()}</Alert></Show>
       </div>
 

@@ -46,7 +46,7 @@ Core owns data shared by multiple features:
 | Area | Tables |
 | --- | --- |
 | Identity/transport | `devices`, `idempotency`, `audit` |
-| Workspaces/tasks | `workspaces`, `projects`, `workspace_external_projects`, `tasks`, `task_links` |
+| Workspaces/tasks | `workspaces`, `projects`, `workspace_external_projects`, `tasks`, `task_links`, `task_pulls` |
 | Project configuration/trust | `projects`, `config_acks` |
 | Provider registry | `integrations` |
 | External item projection | `issues`, `issue_resources`, provider `sync_state` markers |
@@ -56,6 +56,8 @@ Core owns data shared by multiple features:
 
 Core table definitions are in `packages/node-core/src/server/db/schema.ts`. `devices` stores only
 token hashes. `integrations` stores encrypted provider credentials plus non-secret provider metadata.
+`task_pulls` stores task-owned PR relations created through Acorn, including managed-agent
+provenance; the GitHub mirror remains plugin-owned and disposable.
 `config_acks` stores the exact hash and snapshot of trusted executable repository configuration. The
 three schedule tables split state from definition by owner. A schedule declared by core or a plugin
 keeps its definition in the registry and only its overrides and run state in `schedule_state`, while

@@ -93,6 +93,7 @@ client: openInAppUrl
 client: openPane
 client: openRefPanel
 client: openRepoConfigTrust
+client: openTarget
 client: paneContribution
 client: parseInAppTarget
 client: parseJson

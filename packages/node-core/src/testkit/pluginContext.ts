@@ -89,10 +89,12 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   // a schedule leaves it claimed for the whole file.
   const undos: (() => void)[] = []
 
+  const env = testEnv({ DB: core.db, SECRETS: secrets })
   const ctx = buildPluginContext({
     plugin: name,
     capabilities: new CapabilityRegistry(),
     core: services,
+    env,
     onUndo: (undo) => void undos.push(undo),
     // Both tiers get storage passed the same way as in production: the caller derives the handle and
     // the binding carries the loader's raw one (server/plugin/context.ts).
@@ -106,7 +108,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   return {
     ...ctx,
     db: core.db,
-    env: testEnv({ DB: core.db, SECRETS: secrets }),
+    env,
     dataDir,
     encryptionKey: TEST_ENCRYPTION_KEY,
     cleanup: () => {

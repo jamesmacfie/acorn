@@ -5,15 +5,16 @@ import { projectsOptions, type Task } from '@acorn/plugin-api/client'
 import { routeKey as makeRouteKey } from './fileNavigation'
 import { DiffForPull, type PullRoute } from './DiffForPull'
 import { EmptyState } from '@acorn/plugin-api/ui'
+import type { PullRef } from '../contract/pullRef'
 
-export default function DiffView(props: { task?: Task } = {}) {
+export default function DiffView(props: { task?: Task; pull?: PullRef; readOnly?: boolean } = {}) {
   const params = props.task ? null : useParams()
   const projects = createQuery(() => projectsOptions(true))
   const route = createMemo<PullRoute | null>(() => {
     const project = projects.data?.find((candidate) => candidate.id === params?.projectId)
-    const owner = props.task?.github?.owner ?? project?.github?.owner
-    const repo = props.task?.github?.name ?? project?.github?.name
-    const number = props.task?.pullNumber != null ? String(props.task.pullNumber) : params?.number
+    const owner = props.pull?.owner ?? props.task?.github?.owner ?? project?.github?.owner
+    const repo = props.pull?.repo ?? props.task?.github?.name ?? project?.github?.name
+    const number = props.pull?.number ?? (props.task?.pullNumber != null ? String(props.task.pullNumber) : params?.number)
     if (!owner || !repo || !number) return null
     return {
       owner,
@@ -25,7 +26,7 @@ export default function DiffView(props: { task?: Task } = {}) {
 
   return (
     <Show when={route()} keyed fallback={<EmptyState align="start">Select a PR.</EmptyState>}>
-      {(r) => <DiffForPull route={r} router={!props.task} taskId={props.task?.id} />}
+      {(r) => <DiffForPull route={r} router={!props.task} taskId={props.task?.id} readOnly={props.readOnly} />}
     </Show>
   )
 }

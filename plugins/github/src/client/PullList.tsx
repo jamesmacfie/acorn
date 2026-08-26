@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { activateTaskSignals, CHECK_TONE, checksState, clientEvents, createTask, formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, registerCommands, rowHeight, scanContentRefs, type Task, tasksKey, tasksOptions, watchAppearance, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import { activateTaskSignals, CHECK_TONE, checksState, clientEvents, formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, registerCommands, rowHeight, watchAppearance, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
 import { type Pull } from '../contract/api'
@@ -12,6 +12,7 @@ import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { githubBrowsePath } from './routes'
 import './styles/pull-list.css'
 import { Alert, Badge, Button, EmptyState, Input, Row, StatusDot } from '@acorn/plugin-api/ui'
+import { promotePullToTask } from './pullTasks'
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
 // route params before it can ask for the repo's PRs. The list is virtualized in its own scroll
@@ -103,33 +104,15 @@ export default function PullList() {
   async function promoteToTask(pr: Pull) {
     const projectId = params.projectId
     if (!projectId || !owner() || !repo() || !pr.headRef) return
-    // If a task for this PR already exists, focus it instead of creating a duplicate.
-    const existing = (await queryClient.ensureQueryData(tasksOptions(true)).catch(() => [] as Task[]))
-      .find((t) => t.status === 'active' && t.origin === 'github-pr' && t.projectId === projectId && t.pullNumber === pr.number)
-    if (existing) {
-      activateTaskSignals(existing, { pane: 'pr' })
-      return navigate(pathForTask(existing))
-    }
-    // Fetch the detail (cached if warm) so the body is present, then seed a task_link for every
-    // Linear ticket the PR references. A PR can resolve several, and the task links them all.
-    //
-    // The scan is provider-agnostic, because the host reads every registered recogniser. The
-    // attribution is not: a task link needs a connection id, and the only one derivable here is the
-    // sole connected Linear. Widening it means asking each provider for its own sole connection,
-    // which is a promotion-flow change rather than a scanner one.
-    const detail = await queryClient.ensureQueryData(pullDetailOptions(owner(), repo(), String(pr.number), true)).catch(() => undefined)
-    const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
-    const linears = (integrations?.integrations ?? []).filter((i) => i.providerId === 'linear' && i.status === 'connected')
-    const soleLinear = linears.length === 1 ? linears[0].id : null
-    const links = soleLinear
-      ? scanContentRefs([detail?.pull?.body])
-          .filter((r) => r.providerId === 'linear')
-          .map((r) => ({ connectionId: soleLinear, identifier: r.item, ref: { displayId: r.item, url: r.url } }))
-      : []
-    const w = await createTask({ origin: 'github-pr', projectId, branch: pr.headRef, pullNumber: pr.number, links })
-    await queryClient.invalidateQueries({ queryKey: tasksKey })
+    const w = await promotePullToTask(queryClient, {
+      projectId,
+      owner: owner(),
+      repo: repo(),
+      number: String(pr.number),
+      headRef: pr.headRef,
+    })
     activateTaskSignals(w, { pane: 'pr' })
-    navigate(`${githubBrowsePath(projectId)}/${pr.number}`)
+    navigate(pathForTask(w))
   }
 
   let rowPrefetch: { cancel: () => void } | null = null

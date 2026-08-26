@@ -144,7 +144,7 @@ describe('createProject / detectProject', () => {
 
   // tasks.project_id carries no foreign key, so nothing in the database enforces this. Left undone it
   // strands rows that no rail can show and no screen can delete.
-  it('deletes a project together with its tasks and their links, and leaves other projects alone', async () => {
+  it('deletes a project together with its task relations, and leaves other projects alone', async () => {
     const doomed = join(dir, 'doomed')
     const survivor = join(dir, 'survivor')
     mkdirSync(doomed)
@@ -165,12 +165,17 @@ describe('createProject / detectProject', () => {
       { taskId: 'doomed-1', integrationId: 'linear', provider: 'linear', identifier: 'ENG-1', createdAt: 1 },
       { taskId: 'keeper', integrationId: 'linear', provider: 'linear', identifier: 'ENG-2', createdAt: 1 },
     ])
+    await testDb.db.insert(schema.taskPulls).values([
+      { taskId: 'doomed-2', repoOwner: 'acme', repoName: 'web', pullNumber: 10, role: 'related', provenance: 'agent', sessionId: 'session-a', createdAt: 1 },
+      { taskId: 'keeper', repoOwner: 'acme', repoName: 'api', pullNumber: 20, role: 'related', provenance: 'agent', sessionId: 'session-b', createdAt: 1 },
+    ])
 
     await deleteProject(testDb.db, a.project.id)
 
     expect((await testDb.db.select().from(schema.projects)).map((row) => row.id)).toEqual([b.project.id])
     expect((await testDb.db.select().from(schema.tasks)).map((row) => row.id)).toEqual(['keeper'])
     expect((await testDb.db.select().from(schema.taskLinks)).map((row) => row.taskId)).toEqual(['keeper'])
+    expect((await testDb.db.select().from(schema.taskPulls)).map((row) => row.taskId)).toEqual(['keeper'])
   })
 
 })

@@ -243,6 +243,7 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
 export async function deleteProject(db: AppDatabase, id: string): Promise<void> {
   const taskIds = (await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.projectId, id))).map((row) => row.id)
   if (taskIds.length) {
+    await db.delete(schema.taskPulls).where(inArray(schema.taskPulls.taskId, taskIds))
     await db.delete(schema.taskLinks).where(inArray(schema.taskLinks.taskId, taskIds))
     await db.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds))
   }

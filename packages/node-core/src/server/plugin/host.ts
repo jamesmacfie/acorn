@@ -317,6 +317,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       plugin: plugin.name,
       capabilities: options.capabilities,
       core: options.core,
+      env: options.env,
       loaded,
       ...(storage ? { storage } : {}),
       onUndo: (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]),
@@ -434,6 +435,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       plugin: name,
       capabilities: options.capabilities,
       core: options.core,
+      env: options.env,
       loaded: next.binding,
       storage: {
         open: () => {

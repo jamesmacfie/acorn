@@ -21,6 +21,8 @@ import { repos } from '../server/routes/repos'
 import { failingChecksFor, mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { githubClientId } from './config'
+import { githubAgentTools } from '../main/agentTools'
+import { taskPulls } from '../server/routes/taskPulls'
 
 export const githubPlugin = (): NodePlugin => {
   return {
@@ -70,6 +72,7 @@ export const githubPlugin = (): NodePlugin => {
       // URL, so it holds no mirror state and takes no handle.
       ctx.routes.register(actions, { prefix: '/repos' })
       ctx.routes.register(prCreate(store), { prefix: '/repos' })
+      ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
       ctx.routes.register(mentions(store), { prefix: '/repos' })
       // `pinned_repos` moved out of core, so /v2/core/pins became /v2/p/github/pins. The repo
       // selector is the only caller.
@@ -91,6 +94,8 @@ export const githubPlugin = (): NodePlugin => {
       // takes no handle.
       ctx.routes.register(githubDeviceAuth(githubClientId), { prefix: '', note: '/auth/device/* — OAuth device-flow connect' })
       ctx.routes.register(githubImport(store, ctx.core), { prefix: '', note: 'POST /import — import mirrored repositories into core projects' })
+
+      for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status())) ctx.tools.register(tool)
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
         pullRequest: (userId, repoOwner, repoName, pullNumber) => mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),

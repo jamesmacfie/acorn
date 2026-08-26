@@ -3,6 +3,7 @@ import { contentLinkRegistry, openInAppUrl, parseInAppTarget } from '@acorn/clie
 import { type Project, setProjectsLookup } from '@acorn/plugin-api/testkit/client'
 import { activeRefPanel, closeRefPanel, refPanelRegistry } from '@acorn/client-core/registries/refPanels.ts'
 import { githubContentLinkContributions, makeContentLinkHandler } from './contentLinks'
+import { consumePaneIntent } from '@acorn/plugin-api/client'
 
 // Only github's own recognisers are asserted here. Linear's recogniser moved to plugins/linear with
 // its contribution; a github test importing linear's client would cross the plugin boundary the arch
@@ -60,7 +61,21 @@ const project = (id: string, owner: string, name: string) => ({ id, github: { ow
 // echoed back the same owner/repo the test wrote would agree with itself whatever the casing, which
 // is how the case-insensitivity bug below survived earlier versions of this suite.
 describe('project-keyed content navigation', () => {
-  afterEach(() => setProjectsLookup(() => []))
+  afterEach(() => {
+    setProjectsLookup(() => [])
+    consumePaneIntent('task-current', 'pr')
+  })
+
+  it('selects a PR tab when a task-scoped PR body links another pull request', () => {
+    const navigate = vi.fn()
+    const { event, preventDefault } = click(hrefAnchor('https://github.com/acme/widget/pull/77'))
+
+    makeContentLinkHandler(navigate, { taskId: 'task-current' })(event)
+
+    expect(consumePaneIntent('task-current', 'pr')).toEqual({ kind: 'plugin:select', item: 'acme/widget#77' })
+    expect(preventDefault).toHaveBeenCalledOnce()
+    expect(navigate).not.toHaveBeenCalled()
+  })
 
   it('resolves GitHub links through the project facet', () => {
     setProjectsLookup(() => [project('project-acorn', 'runn', 'acorn')])
