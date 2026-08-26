@@ -38,6 +38,9 @@ export default {
       order: 30,
       providerId: 'rollbar',
       items: '/v2/p/rollbar/rail-items',
+      // The rail route reads `?project=` (src/server/routes/rollbar.ts), so the shell offers a project
+      // picker on this source and re-fetches the list when the project changes.
+      projectScoped: true,
       onSelect: { verb: 'openPane', pane: 'rollbar' },
     }],
     commands: [{

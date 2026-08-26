@@ -63,11 +63,19 @@ provider's URL scheme in `index.tsx`.
 
 Core owns its own URLs as constants in `registries/corePaths.ts` (`/p/:projectId`,
 `/p/:projectId/new`, `/t/:taskId`) and never resolves them through the registry. A contributed route
-addresses something inside a surface; it does not decide whether the surface renders. Every browse
-source scopes itself to the routed project and renders at `/p/:projectId`. GitHub's `/pulls/:number`
-and Linear's `/issues/:identifier` select an item within that surface. A source that gates its render
-on its own route match becomes unreachable, because selecting a source in the rail sets a signal
-rather than navigating.
+addresses something inside a surface; it does not decide whether the surface renders. A browse source
+renders at `/p/:projectId`, and GitHub's `/pulls/:number` and Linear's `/issues/:identifier` select an
+item within that surface. A source that gates its render on its own route match becomes unreachable,
+because selecting a source in the rail sets a signal rather than navigating.
+
+Reading the routed project is opt in: `SourceContribution.projectScoped`, and `projectScoped` on the
+manifest twin. GitHub, Linear, and Rollbar declare it; Home, Fleet, Docker, and the agent centre do
+not. Every affordance that changes the project asks `sourceIsProjectScoped` about the source on
+screen, which is why the topbar picker is absent on Home rather than sitting there moving nothing but
+the breadcrumb, and why a command that does the same job cannot disagree with it. A manifest source
+that declares it also gets `?project=` on its items route and the project in its cache key; one that
+does not is fetched once and shared across projects, because its rows are the same rows either way.
+The picker still appears in a task view, where nothing else names the task's project.
 
 The one thing core asks a plugin for is where a task lives. `SourceContribution.taskPath` lets a
 source claim a task's URL, so GitHub puts a PR-backed task at its PR URL, and `pathForTask` falls

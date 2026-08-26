@@ -65,7 +65,15 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   // The project rides in the dependency rather than being read from `params` inside the fetch, so it
   // reaches the cache key as well as the path. The fan-out serves its last answer on mount, so both
   // halves have to agree on scope.
-  const scope = () => ({ revision: chromeDeps(props.pluginId), projectId: params.projectId })
+  //
+  // A source that didn't declare `projectScoped` drops out of both. Its rows are the same rows in every
+  // project, so carrying the project would split one cache entry into one per project and refetch the
+  // identical list on every project switch. The `navigate` verb below still gets the project, because
+  // that addresses a surface at `/p/:projectId/x/…` whether or not the rail cares.
+  const scope = () => ({
+    revision: chromeDeps(props.pluginId),
+    projectId: props.descriptor.projectScoped ? params.projectId : undefined,
+  })
   const [result, { refetch }] = createFleetQuery(
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
     (node, { projectId }, signal) => readRailItems(

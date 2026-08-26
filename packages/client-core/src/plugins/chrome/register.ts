@@ -219,6 +219,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       glyph: descriptor.glyph,
       order: descriptor.order,
       ...(descriptor.providerId ? { providerId: descriptor.providerId } : {}),
+      ...(descriptor.projectScoped ? { projectScoped: true } : {}),
       when: () => pluginEnabledOnNode(chromeNode(), pluginId),
       component: () => createComponent(ChromeSourcePanel, { pluginId, descriptor }),
       // A row's `task` block is the promotion capability. Registered independently of row selection, so
