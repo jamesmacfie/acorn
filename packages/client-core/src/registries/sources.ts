@@ -42,6 +42,10 @@ export type SourceContribution<Item = unknown> = {
   component?: Component
   defaultPane?: string
   requiredCapability?: string
+  // Does this surface read the routed project? Opt in, because most sources don't, and a source that
+  // never said it was project-aware almost certainly isn't. The shell shows the project picker only
+  // for sources that declare it, so Home no longer offers a control that changes nothing there.
+  projectScoped?: boolean
   // The owning plugin may declare the initial browse surface (docs/frontend.md § Registries and
   // plugins), so the shell does not need to know which provider is bundled first.
   isDefault?: boolean
@@ -60,6 +64,12 @@ export type SourceContribution<Item = unknown> = {
 export const sourceRegistry = new Registry<SourceContribution<any>>('source')
 
 const sourceOrder = (a: SourceContribution, b: SourceContribution): number => a.order - b.order || a.id.localeCompare(b.id)
+
+/** Does the source currently on screen read the routed project? Every affordance that changes the
+ *  project asks this one question, so the topbar picker and a command that does the same job can
+ *  never disagree about where choosing a project means something. */
+export const sourceIsProjectScoped = (sourceId: string | null | undefined): boolean =>
+  !!sourceRegistry.get(sourceId ?? '')?.projectScoped
 
 // Resolved lazily: plugins populate the registry after this module evaluates. docs/frontend.md §
 // Registries and plugins covers the default/order fallback.

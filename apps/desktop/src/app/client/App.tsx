@@ -41,7 +41,7 @@ import { startClientPollers } from '@acorn/client-core/registries/pollers.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/persistence/appStartup.ts'
 import { createTaskDeepLink } from '@acorn/client-core/tasks/taskDeepLink.ts'
-import { defaultSourceId, sourceRegistry } from '@acorn/client-core/registries/sources.ts'
+import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/registries/corePaths.ts'
 import { availableSources } from '@acorn/client-core/tabs/sources.ts'
 
@@ -321,6 +321,16 @@ export default function App() {
     },
   })
 
+  // The project picker appears where choosing a project changes something: a source that declared
+  // itself project-scoped, or a task view, where it is the only thing naming the task's project
+  // (`/t/:taskId` carries no projectId, so the breadcrumb shows the brand instead). On Home it used to
+  // sit there looking like navigation and move nothing but the breadcrumb.
+  //
+  // Through `sourceIsProjectScoped` rather than a local check, so a palette command that switches
+  // project can ask the same question and the two can never disagree.
+  const showProjectPicker = () => scopedProjects().length > 0
+    && (inTaskView() || sourceIsProjectScoped(selectedSource()))
+
   const toggleCollapsed = () => setCollapsed((value) => !value)
 
   // New-task mode: core's own route, so the pattern is a constant rather than a registry lookup.
@@ -359,7 +369,7 @@ export default function App() {
               onSelect={(entry) => selectFleetWorkspace(entry, navigate)}
             />
           </Show>
-          <Show when={scopedProjects().length}>
+          <Show when={showProjectPicker()}>
             <Picker<Project>
               label={scopedProjects().find((project) => project.id === contextProjectId())?.name ?? 'Select a project'}
               ariaLabel="Project"

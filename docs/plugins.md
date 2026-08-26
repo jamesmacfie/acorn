@@ -843,7 +843,11 @@ kinds of contribution come out of one manifest:
   bundle at all, and therefore no trust prompt — nothing of its executes on the device. A source may
   declare `createTask`; its row supplies the task seed and optional external link, while the host owns
   the modal, origin namespace, connection ownership check, create-before-link ordering, and
-  partial-failure reporting. A source may also declare an `emptyState` — one bounded message and at most
+  partial-failure reporting. A source may declare `projectScoped`, which says its items route reads
+  the shell's project: the host then appends `?project=` to that route, keys the cache by it, and
+  offers the topbar project picker while the source is on screen. It is opt in, so a manifest written
+  before the field and a plugin that never thought about projects both get one shared list instead of
+  an identical one refetched per project (docs/frontend.md § the router is registry-driven). A source may also declare an `emptyState` — one bounded message and at most
   one context-free action — shown when its route answered with *no items*, in place of the host's fixed
   "Nothing here yet.". Not when the fetch failed: an unreachable node already has its own banner, and
   telling someone "nothing is assigned to you" because a request timed out is a claim the host has no

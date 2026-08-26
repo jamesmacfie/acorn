@@ -77,6 +77,9 @@ export default {
       order: 20,
       providerId: 'linear',
       items: '/v2/p/linear/rail-items',
+      // The rail route reads `?project=` (src/server/routes/linear.ts), so the shell offers a project
+      // picker on this source and re-fetches the list when the project changes.
+      projectScoped: true,
       // `navigate`, not `openPane`: the detail belongs to the project, so clicking a row changes the
       // URL and the surface beside the list follows. It is also what mounts `linear-issue` at all.
       onSelect: { verb: 'navigate', surface: 'linear-issue' },

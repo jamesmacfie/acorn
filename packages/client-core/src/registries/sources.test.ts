@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultSourceId, sourceRegistry, sourceRouteContributions, taskPathFromSources, taskTracksRef, type SourceContribution } from './sources'
+import { defaultSourceId, sourceIsProjectScoped, sourceRegistry, sourceRouteContributions, taskPathFromSources, taskTracksRef, type SourceContribution } from './sources'
 import type { Task } from '../queries'
 
 const source = (id: string, order: number, isDefault?: boolean): SourceContribution => ({
@@ -113,6 +113,23 @@ describe('taskTracksRef', () => {
       expect(taskTracksRef(task, { providerId: 'linear', displayId: 'ENG-1' })).toBe(false)
     } finally {
       github.dispose()
+    }
+  })
+})
+
+describe('project scope', () => {
+  it('is opt in, so an unknown or undeclared source reports false', () => {
+    const quiet = sourceRegistry.register(source('test.scope.quiet', 1))
+    const scoped = sourceRegistry.register({ ...source('test.scope.loud', 2), projectScoped: true })
+    try {
+      expect(sourceIsProjectScoped('test.scope.loud')).toBe(true)
+      expect(sourceIsProjectScoped('test.scope.quiet')).toBe(false)
+      // No source at all is the task view, where the shell decides for itself.
+      expect(sourceIsProjectScoped(null)).toBe(false)
+      expect(sourceIsProjectScoped('test.scope.absent')).toBe(false)
+    } finally {
+      scoped.dispose()
+      quiet.dispose()
     }
   })
 })

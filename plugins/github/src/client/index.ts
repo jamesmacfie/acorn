@@ -33,6 +33,8 @@ export const githubClientPlugin: ClientPlugin = {
     // gates the source on the GitHub integration.
     ctx.sources.register({
       id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
+      // GithubBrowse lists the routed project's pull requests, so the shell offers a project picker here.
+      projectScoped: true,
       routes: githubRouteContributions,
       // A PR-backed task lives at its PR URL. The claim belongs here, where the shape of a PR URL is
       // known, rather than in core's route registry.

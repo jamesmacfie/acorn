@@ -260,6 +260,11 @@ const sourceDescriptor = z.object({
   providerId: z.string().min(1).max(64).optional(),
   // GET → { items: PluginRailItem[] }
   items: pluginRoute,
+  // Does this rail read the routed project? Opt in, so an older manifest and a plugin that never
+  // thought about projects both land on `false`, which is true of most of them. Declaring it turns on
+  // the shell's project picker for this source and adds `?project=` to the items route
+  // (client-core/plugins/chrome/ChromeSourcePanel.tsx).
+  projectScoped: z.boolean().optional(),
   onSelect: chromeAction.optional(),
   // Shown when the route answered with no items, not when it failed. An unreachable node has its own
   // banner, and "nothing is assigned to you" after a timeout is a lie told on the plugin's behalf.
