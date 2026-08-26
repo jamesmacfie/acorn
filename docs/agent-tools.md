@@ -23,6 +23,10 @@ and task lookup.
 Tool groups cover task and context inspection, Git and changes, notes, memory, terminal handoff,
 workflow controls, database operations, Docker, and browser operations.
 
+GitHub contributes the write-tier `github_pull_create` tool. It is available only for a managed
+session on a task with a GitHub project and branch, creates from that branch, and records the session
+in core's task-PR relation before returning whether the new PR became primary or related.
+
 ## Projections
 
 The same registry is projected into:

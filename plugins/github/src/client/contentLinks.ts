@@ -7,6 +7,8 @@ import {
   type ContentLinkContribution,
   handlePluginContentLinkClick,
   type InAppTarget,
+  openPane,
+  parseInAppTarget,
 } from '@acorn/plugin-api/client'
 import { formatPullRef } from '../contract/pullRef'
 import { githubBrowsePath } from './routes'
@@ -70,8 +72,18 @@ const projectIdFor = (target: InAppTarget): string | null =>
 // `prefer: 'refPanel'` is the one local choice: a reader half-way through a diff who clicks a link
 // wants a glance, not a replaced surface. It is a preference, so a provider with no panel installed
 // still gets its pane or route.
-export function makeContentLinkHandler(navigate: (to: string) => void) {
+export function makeContentLinkHandler(navigate: (to: string) => void, options?: { taskId?: string }) {
   return (e: MouseEvent) => {
+    if (options?.taskId && !e.defaultPrevented && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+      const anchor = (e.target as Element | null)?.closest?.('a')
+      const href = anchor?.getAttribute('href')
+      const target = href ? parseInAppTarget(href) : null
+      if (target?.kind === 'pr' && str(target.item)) {
+        e.preventDefault()
+        openPane(options.taskId, 'pr', { kind: 'plugin:select', item: str(target.item) })
+        return
+      }
+    }
     handlePluginContentLinkClick(e, { taskId: activeTaskId(), prefer: 'refPanel', navigate })
   }
 }

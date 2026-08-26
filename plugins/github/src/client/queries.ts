@@ -35,6 +35,8 @@ import {
   reposRoute,
   runJobsKey,
   runJobsRoute,
+  taskPullsKey,
+  taskPullsRoute,
   type Branch,
   type ClosedPullsPage,
   type Compare,
@@ -48,6 +50,7 @@ import {
   type PullFilesPatchRequest,
   type Repo,
   type RunJobs,
+  type TaskPullRelationsResponse,
 } from '../contract/api'
 
 type QueryContext = { signal?: AbortSignal }
@@ -65,6 +68,13 @@ export const pullsOptions = (owner: string, repo: string, state: 'open' | 'close
   refetchInterval: 60_000,
   refetchIntervalInBackground: false,
   queryFn: async ({ signal }: QueryContext): Promise<Pull[]> => readJson<Pull[]>(pullsRoute(owner, repo, state), { signal }),
+})
+
+export const taskPullsOptions = (taskId: string, enabled: boolean) => ({
+  queryKey: taskPullsKey(taskId),
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<TaskPullRelationsResponse> =>
+    readJson<TaskPullRelationsResponse>(taskPullsRoute(taskId), { signal }),
 })
 
 // Closed PRs paginate on demand: one GitHub page per fetch, load-more advances pageParam.

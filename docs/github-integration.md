@@ -44,6 +44,13 @@ mentions, labels, reviewers, comments, review threads, and create-PR. Mutations 
 then update or invalidate the affected mirror so a subsequent read does not serve a known pre-write
 value.
 
+The task-scoped `github_pull_create` agent tool shares the same create service as the interactive
+route. It infers the head from the task branch, uses the requested base, and atomically attaches the
+created PR through `CoreServices.tasks.attachPull`: the first attachment claims
+`tasks.pull_number`, while later attachments become durable related rows with the managed session id.
+Shelling out to `gh pr create` still has only branch-adoption semantics and does not gain agent
+attribution.
+
 The "my pull requests" collection filters by involvement (review-requested, assigned, authored) as a
 live GitHub search rather than a mirror query. Assignees are never mirrored, and review requests only
 mirror through the PR-detail sync, which runs only for PRs already in the mirror because this account
@@ -92,6 +99,23 @@ the common API envelope and surfaced as GitHub-specific status where the UI need
 
 A PR can promote to a task. The task stores the core project ID and pull number; the project's GitHub
 facet supplies provider owner/name metadata. Subsequent task context and changes use the owning Node.
+The PR pane keeps that scalar PR as its primary and adds read-only tabs from three sources: durable
+`task_pulls` relations, the connected base/head graph of the mirrored open-PR list, and PR links in
+the primary description, comments, reviews, and threads. Stack and mention evidence is derived on
+read, so retargeting a stack or editing out a link removes it without a cleanup migration. A linked
+task destination wins over agent, mention, and stack destinations; an agent destination opens the
+recorded managed session through the existing notice-target seam.
+
+Selecting a related PR with no task shows `+ TASK` in the Navigator header. Promotion reuses the
+repository-list workflow: the new task takes the matching core project, the PR head branch and pull
+number, and any unambiguous Linear references from the PR body. If exactly one other active task
+already owns that PR, the tab opens it instead; several owners keep the explicit task chooser.
+
+Within a task PR body, another GitHub PR link is a `plugin:select` intent for the existing PR pane,
+not a route change or reference-panel overlay. The selected tab changes what `PullDetail` and
+`DiffView` read but never changes the current task's scalar primary, branch, or worktree. All GitHub writes,
+including diff comments and thread actions, are omitted on a non-primary tab.
+
 Linear reference panels are contributed through a provider contract, so the GitHub plugin does not
 import Linear's implementation. Linear is a loaded plugin, so the panel it renders there is a
 sandboxed frame whose overlay chrome the host draws. GitHub does depend on `@acorn/plugin-linear` for

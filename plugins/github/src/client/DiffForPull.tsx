@@ -21,7 +21,7 @@ export type PullRoute = {
   key: string
 }
 
-export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?: string }) {
+export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?: string; readOnly?: boolean }) {
   const searchParams = props.router ? useSearchParams()[0] : {}
   const queryClient = useQueryClient()
   const owner = props.route.owner
@@ -62,10 +62,13 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     },
     // Immutable by sha, so one fetch per blob serves every gap in that file.
     fileText: async ({ sha }) => (await queryClient.fetchQuery(fileBlobOptions(owner, repo, sha))).text,
-    canComment: () => detail.data?.pull?.headSha != null,
-    addComment: (body, { row, side, lineNo }) => addReviewComment(owner, repo, number, body, row.path, lineNo, side),
-    reply: (databaseId, body) => replyReview(owner, repo, number, databaseId, body),
-    resolveThread: (threadId, resolved) => resolveThread(owner, repo, number, threadId, resolved),
+    canComment: () => !props.readOnly && detail.data?.pull?.headSha != null,
+    ...(!props.readOnly ? {
+      addComment: (body: string, { row, side, lineNo }: Parameters<NonNullable<DiffSource['addComment']>>[1]) =>
+        addReviewComment(owner, repo, number, body, row.path, lineNo, side),
+      reply: (databaseId: number, body: string) => replyReview(owner, repo, number, databaseId, body),
+      resolveThread: (threadId: string, resolved: boolean) => resolveThread(owner, repo, number, threadId, resolved),
+    } : {}),
     invalidate: () => void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) }),
     draftPrefix: `${owner}/${repo}/${number}`,
     // In router mode this pane owns the route, so the chord is claimed globally; in a task it is one

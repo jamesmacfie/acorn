@@ -1,12 +1,9 @@
-import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { pullsResource } from '../resourceKeys'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import type { Branch, Compare } from '../../contract/api'
 import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { githubToken } from '../githubToken'
-import { repos, syncState } from '../../node/schema'
-import { repoMatches } from '../repoMatch'
+import { createPullRequest } from '../createPull'
 
 // Open-a-PR support: branch list + base..head compare (both read-only proxies, no local mirror,
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts
@@ -113,31 +110,8 @@ export const prCreate = (db: PluginDatabase) => new Hono<AppEnv>()
     if (!title?.trim() || !base || !head) return respondError(c, 400, 'bad_request')
     // Resolved after validation: a request we are about to reject should not cost a credential read.
     const token = await githubToken(c)
-    const res = await gh(token, `/repos/${owner}/${repo}/pulls`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title.trim(), body: body ?? '', base, head, draft: !!draft }),
-    })
-    if (res.status === 422) {
-      // GitHub's 422 prose (PR exists / no commits / bad branch) moves to `detail`; the machine
-      // code is always `validation_failed` so the client branches on a stable value.
-      const detail = (await res.json().catch(() => ({}))) as { message?: string; errors?: { message?: string }[] }
-      const message = detail.errors?.[0]?.message ?? detail.message
-      return respondError(c, 422, 'validation_failed', message ? [message] : undefined)
-    }
-    const err = ghError(res)
-    if (err) return respondError(c, err.status, err.error)
-    const created = (await res.json()) as { number: number }
-
-    // Bust the open-PR list cache so it refetches with the new PR on navigation.
-    const [repoRow] = await db
-      .select({ id: repos.id })
-      .from(repos)
-      .where(and(eq(repos.userId, uid), repoMatches(owner, repo)))
-    if (repoRow)
-      await db
-        .delete(syncState)
-        .where(and(eq(syncState.userId, uid), eq(syncState.resource, pullsResource(repoRow.id, 'open'))))
-
-    return c.json({ number: created.number })
+    const result = await createPullRequest(token, db, uid, owner, repo, { title, body, base, head, draft })
+    return result.ok
+      ? c.json({ number: result.number })
+      : respondError(c, result.failure.status, result.failure.error, result.failure.detail)
   })

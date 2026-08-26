@@ -1,4 +1,5 @@
-import { blob, index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm'
+import { blob, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const syncState = sqliteTable(
   'sync_state',
@@ -160,6 +161,33 @@ export const tasks = sqliteTable('tasks', {
   updatedAt: integer('updated_at').notNull(),
   archivedAt: integer('archived_at'), // set on archive; row kept for history/teardown audit
 })
+
+// Pull requests Acorn created while acting inside a task. `tasks.pull_number` remains the task's
+// operational primary (worktree/checks/context); these rows preserve the one-to-many relation and
+// agent provenance that GitHub cannot reconstruct after the fact. Repository identity is stored with
+// the number because #42 is meaningful only inside one repository.
+export const taskPulls = sqliteTable(
+  'task_pulls',
+  {
+    taskId: text('task_id').notNull(), // → tasks.id
+    repoOwner: text('repo_owner').notNull(),
+    repoName: text('repo_name').notNull(),
+    pullNumber: integer('pull_number').notNull(),
+    role: text('role').notNull(), // 'primary' | 'related'
+    provenance: text('provenance').notNull(), // 'agent'
+    sessionId: text('session_id').notNull(),
+    requestId: text('request_id'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.taskId, t.repoOwner, t.repoName, t.pullNumber] }),
+    index('task_pulls_repo_pull_idx').on(t.repoOwner, t.repoName, t.pullNumber),
+    // Related rows are unlimited. Only one durable attachment may record that it won the task's
+    // primary slot; SQLite serialises the attach transaction and this constraint protects the
+    // invariant if another writer is added later.
+    uniqueIndex('task_pulls_one_primary_idx').on(t.taskId).where(sql`${t.role} = 'primary'`),
+  ],
+)
 
 // Zero or more external items a task references (Linear tickets, Rollbar errors). `integrationId` pins
 // the item to a specific connection, since two Linears could each have an `ENG-42`; `provider` is kept

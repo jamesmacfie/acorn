@@ -1,4 +1,43 @@
 /* PR detail (mid / Navigator pane). */
+.pr-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.pr-pull-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  min-height: var(--pane-head-h);
+  overflow-x: auto;
+  border-bottom: var(--chrome-divider);
+  background: var(--bg);
+}
+.pr-pull-tab {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border-right: var(--divider);
+  border-bottom: var(--tab-active-w) solid transparent;
+}
+.pr-pull-tab.active { border-bottom-color: var(--accent); background: var(--bg-selected); }
+.pr-pull-tab-select,
+.pr-pull-tab-target {
+  min-height: calc(var(--pane-head-h) - var(--tab-active-w));
+  color: var(--text-muted);
+}
+.pr-pull-tab-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.pr-pull-tab.active .pr-pull-tab-select { color: var(--text); }
+.pr-pull-tab-target.ui-btn[data-variant='bare'] { width: 26px; padding-inline: 0; border: 0; border-radius: 0; }
+.pr-pull-tab-select:focus-visible,
+.pr-pull-tab-target:focus-visible { box-shadow: var(--ring); outline: none; }
+.pr-pane-task-error { margin: var(--space-2) var(--pane-pad); }
 .pr-detail-header {
   padding: 14px var(--pane-pad);
   border-bottom: var(--chrome-divider);

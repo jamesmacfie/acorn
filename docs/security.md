@@ -571,6 +571,13 @@ with the credential-injecting broker below—rather than add a long-lived secret
 put a proxy in front of the item store. Each new callback- or object-shaped contract added to this
 list raises the cost of that move; prefer a route the host fetches when one can express the job.
 
+Node-side contributions with no request, currently GitHub's task-scoped create-PR agent tool, use the
+singular `ctx.providers.withConnection(userId, providerId, callback)` counterpart. The host checks
+that the plugin owns the provider, chooses only the first usable connection so a write cannot fan
+out, lends the secret for that callback, and applies the same scrub-on-throw scope. It exists because
+a task-scoped child cannot call provider-spending routes directly; the write-tier tool invocation is
+the authorization event, and the trusted Node plugin performs the provider operation.
+
 Implementation notes for the target broker: this is a `ctx.core` facet (`secrets: true` in the manifest gates it), and
 it is the *only* thing `secrets: true` grants — there is no "read secret value" call on the
 public surface at all, so there is nothing to abuse or deprecate later. The Node has no general

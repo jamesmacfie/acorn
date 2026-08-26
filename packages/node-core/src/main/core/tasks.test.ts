@@ -114,3 +114,50 @@ describe('adoptPullNumbers project matching', () => {
     ]))
   })
 })
+
+describe('task pull attachments', () => {
+  let t: TestDb
+
+  beforeEach(async () => {
+    t = makeTestDb()
+    await t.db.insert(schema.workspaces).values({ id: 'workspace-pulls', name: 'Pulls', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'project-pulls', name: 'widget', path: null, workspaceId: 'workspace-pulls', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'Acme', githubName: 'Widget', githubRepoId: 1,
+      createdAt: now, updatedAt: now,
+    })
+    await t.db.insert(schema.tasks).values({
+      id: 'task-pulls', title: 'Pull task', origin: 'local', projectId: 'project-pulls', branch: 'feat/pulls',
+      worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now,
+    })
+  })
+
+  afterEach(() => t.cleanup())
+
+  it('claims one primary and records later agent-created pulls as related', async () => {
+    const tasks = createTaskService(t.db)
+    const first = await tasks.attachPull('task-pulls', {
+      repoOwner: 'ACME', repoName: 'WIDGET', pullNumber: 41, sessionId: 'session-one',
+    })
+    const second = await tasks.attachPull('task-pulls', {
+      repoOwner: 'acme', repoName: 'widget', pullNumber: 42, sessionId: 'session-two', requestId: 'request-two',
+    })
+
+    expect(first.role).toBe('primary')
+    expect(second.role).toBe('related')
+    expect((await tasks.load('task-pulls'))?.pullNumber).toBe(41)
+    expect(await tasks.pulls('task-pulls')).toEqual([
+      expect.objectContaining({ pullNumber: 41, role: 'primary', sessionId: 'session-one' }),
+      expect.objectContaining({ pullNumber: 42, role: 'related', sessionId: 'session-two', requestId: 'request-two' }),
+    ])
+  })
+
+  it('is idempotent for the same task pull and rejects another repository', async () => {
+    const tasks = createTaskService(t.db)
+    const seed = { repoOwner: 'acme', repoName: 'widget', pullNumber: 41, sessionId: 'session-one' }
+    expect(await tasks.attachPull('task-pulls', seed)).toEqual(await tasks.attachPull('task-pulls', { ...seed, sessionId: 'later-session' }))
+    await expect(tasks.attachPull('task-pulls', {
+      repoOwner: 'acme', repoName: 'other', pullNumber: 9, sessionId: 'session-one',
+    })).rejects.toThrow(/does not match/)
+  })
+})

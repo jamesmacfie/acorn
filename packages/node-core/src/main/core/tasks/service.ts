@@ -27,6 +27,25 @@ export type TaskLinkRef = { provider: string; integrationId: string; identifier:
 // name.
 export type ChildTaskSeed = { title: string; branch: string }
 
+export type TaskPullRelation = {
+  taskId: string
+  repoOwner: string
+  repoName: string
+  pullNumber: number
+  role: 'primary' | 'related'
+  provenance: 'agent'
+  sessionId: string
+  requestId?: string
+}
+
+export type AttachTaskPullInput = {
+  repoOwner: string
+  repoName: string
+  pullNumber: number
+  sessionId: string
+  requestId?: string
+}
+
 export type TaskService = {
   // The task's plugin-facing projection (main/taskWorktree.ts § TaskRef), or undefined when the id
   // does not resolve. A TaskRef, never the `tasks` row (docs/plugins.md § What is published, and
@@ -82,6 +101,11 @@ export type TaskService = {
   // renders one note per linked Linear ticket, and it needs the connection id as well as the
   // identifier, because the same ticket through two Linear connections is two rows.
   links(taskId: string): Promise<TaskLinkRef[]>
+  pulls(taskId: string): Promise<TaskPullRelation[]>
+  // Attach a PR created through a task-scoped agent tool. The task's scalar primary remains the
+  // operational truth; the first transaction that finds it empty claims it and later creates become
+  // related. The durable row retains provenance for both outcomes.
+  attachPull(taskId: string, input: AttachTaskPullInput): Promise<TaskPullRelation>
   adoptPullNumbers(repoOwner: string, repoName: string, branchToPull: ReadonlyMap<string, number>): Promise<number>
   // Materialise a fan-out child task under a parent (docs/workflows.md) and return its id. The
   // worktree is not created here. `resolveCwd` does that when the child's first step runs, the same
@@ -156,6 +180,93 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
         .select({ provider: schema.taskLinks.provider, integrationId: schema.taskLinks.integrationId, identifier: schema.taskLinks.identifier })
         .from(schema.taskLinks)
         .where(eq(schema.taskLinks.taskId, taskId)),
+    pulls: async (taskId) => {
+      const rows = await db.select().from(schema.taskPulls).where(eq(schema.taskPulls.taskId, taskId)).orderBy(schema.taskPulls.createdAt)
+      return rows.map((row) => ({
+        taskId: row.taskId,
+        repoOwner: row.repoOwner,
+        repoName: row.repoName,
+        pullNumber: row.pullNumber,
+        role: row.role as TaskPullRelation['role'],
+        provenance: row.provenance as TaskPullRelation['provenance'],
+        sessionId: row.sessionId,
+        ...(row.requestId ? { requestId: row.requestId } : {}),
+      }))
+    },
+    attachPull: async (taskId, input) => {
+      if (!Number.isSafeInteger(input.pullNumber) || input.pullNumber <= 0) throw new Error('Pull number must be a positive integer.')
+      if (!input.sessionId.trim()) throw new Error('A managed agent session is required to attach a pull request.')
+      const repoOwner = normalizeGithubPart(input.repoOwner)
+      const repoName = normalizeGithubPart(input.repoName)
+
+      return db.transaction((tx) => {
+        const task = tx.select({
+          id: schema.tasks.id,
+          pullNumber: schema.tasks.pullNumber,
+          projectOwner: schema.projects.githubOwner,
+          projectName: schema.projects.githubName,
+        })
+          .from(schema.tasks)
+          .leftJoin(schema.projects, eq(schema.projects.id, schema.tasks.projectId))
+          .where(eq(schema.tasks.id, taskId))
+          .get()
+        if (!task) throw new Error('Task not found.')
+        if (
+          !task.projectOwner || !task.projectName
+          || normalizeGithubPart(task.projectOwner) !== repoOwner
+          || normalizeGithubPart(task.projectName) !== repoName
+        ) throw new Error('Pull request repository does not match the task project.')
+
+        const existing = tx.select().from(schema.taskPulls).where(and(
+          eq(schema.taskPulls.taskId, taskId),
+          eq(schema.taskPulls.repoOwner, repoOwner),
+          eq(schema.taskPulls.repoName, repoName),
+          eq(schema.taskPulls.pullNumber, input.pullNumber),
+        )).get()
+        if (existing) {
+          return {
+            taskId: existing.taskId,
+            repoOwner: existing.repoOwner,
+            repoName: existing.repoName,
+            pullNumber: existing.pullNumber,
+            role: existing.role as TaskPullRelation['role'],
+            provenance: existing.provenance as TaskPullRelation['provenance'],
+            sessionId: existing.sessionId,
+            ...(existing.requestId ? { requestId: existing.requestId } : {}),
+          }
+        }
+
+        const claimsPrimary = task.pullNumber == null || task.pullNumber === input.pullNumber
+        const role: TaskPullRelation['role'] = claimsPrimary ? 'primary' : 'related'
+        if (claimsPrimary) {
+          // A user may have cleared or replaced the scalar primary since an older agent attachment.
+          // Demote that historical row before recording the new winner so the partial unique index
+          // and the operational scalar agree again.
+          tx.update(schema.taskPulls)
+            .set({ role: 'related' })
+            .where(and(eq(schema.taskPulls.taskId, taskId), eq(schema.taskPulls.role, 'primary')))
+            .run()
+        }
+        if (task.pullNumber == null) {
+          tx.update(schema.tasks)
+            .set({ pullNumber: input.pullNumber, updatedAt: Date.now() })
+            .where(and(eq(schema.tasks.id, taskId), isNull(schema.tasks.pullNumber)))
+            .run()
+        }
+        const relation: TaskPullRelation = {
+          taskId,
+          repoOwner,
+          repoName,
+          pullNumber: input.pullNumber,
+          role,
+          provenance: 'agent',
+          sessionId: input.sessionId,
+          ...(input.requestId ? { requestId: input.requestId } : {}),
+        }
+        tx.insert(schema.taskPulls).values({ ...relation, requestId: relation.requestId ?? null, createdAt: Date.now() }).run()
+        return relation
+      })
+    },
     createChild: async (parentTaskId, seed) => {
       const parent = await loadTask(db, parentTaskId)
       if (!parent) throw new Error('Parent task not found.')

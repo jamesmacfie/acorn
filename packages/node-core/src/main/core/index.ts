@@ -65,7 +65,7 @@ export function createCoreServices(options: {
 }
 
 export { SecretService }
-export type { ChildTaskSeed, TaskLinkRef, TaskRunConfig, TaskService } from './tasks/service'
+export type { AttachTaskPullInput, ChildTaskSeed, TaskLinkRef, TaskPullRelation, TaskRunConfig, TaskService } from './tasks/service'
 export type { IdentityService } from './identity/identity'
 export type { ProjectService } from './projects'
 // The shapes ProjectService hands back and takes in. A plugin that calls the seam has to name them,
