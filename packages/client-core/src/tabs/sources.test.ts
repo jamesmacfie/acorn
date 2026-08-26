@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Integration } from '@acorn/protocol/api.ts'
+import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import { availableSources } from './sources'
 import { sourceRegistry } from '../registries/sources'
 
@@ -115,5 +116,47 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
       a.dispose()
       b.dispose()
     }
+  })
+
+  // The third gate. A provider that enumerates projects only earns a rail row where the workspace
+  // follows one of its projects; a Rollbar connection is one Rollbar project, so an unlinked
+  // workspace used to see the linked workspace's errors.
+  describe('the workspace mapping gate', () => {
+    const provider = (id: string, supportsProjects?: boolean): PublicIntegrationProvider => ({
+      id,
+      label: id,
+      kind: 'issue-tracker',
+      glyph: id,
+      connection: { authKind: 'api-key', fields: [], connectable: true, disconnectable: true },
+      capabilities: {},
+      ...(supportsProjects ? { supportsProjects: true } : {}),
+    })
+    const providers = [provider('github'), provider('linear', true), provider('rollbar', true)]
+    const connected = [integration('github'), integration('linear'), integration('rollbar')]
+
+    it('hides a project-enumerating source when the workspace links none of its projects', () => {
+      expect(availableSources(connected, { providers, linked: [] }).map((s) => s.id)).toEqual(['github'])
+    })
+
+    it('shows it once the workspace links one of its projects', () => {
+      const linked = [{ integrationId: 'rollbar', externalId: 'project-a' }]
+      expect(availableSources(connected, { providers, linked }).map((s) => s.id)).toEqual(['github', 'rollbar'])
+    })
+
+    it('reads the mapping by connection, not by provider', () => {
+      // Two Rollbar connections, one linked. The gate is about this provider having *something*
+      // followed here, so the source appears; which connection's items show is the route's call.
+      const two = [...connected, { ...integration('rollbar'), id: 'rollbar-b' }]
+      const linked = [{ integrationId: 'rollbar-b', externalId: 'project-b' }]
+      expect(availableSources(two, { providers, linked }).map((s) => s.id)).toContain('rollbar')
+      expect(availableSources(two, { providers, linked: [{ integrationId: 'someone-else', externalId: 'x' }] }).map((s) => s.id)).not.toContain('rollbar')
+    })
+
+    it('does not gate while either half is still loading', () => {
+      // Mid-load the rail must not flicker a row away and back on every workspace switch.
+      expect(availableSources(connected).map((s) => s.id)).toEqual(['github', 'linear', 'rollbar'])
+      expect(availableSources(connected, { providers }).map((s) => s.id)).toEqual(['github', 'linear', 'rollbar'])
+      expect(availableSources(connected, { linked: [] }).map((s) => s.id)).toEqual(['github', 'linear', 'rollbar'])
+    })
   })
 })

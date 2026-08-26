@@ -12,6 +12,7 @@ import { projectPath } from '../registries/corePaths'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { capabilities } from '../capabilities'
 import { availableSources } from './sources'
+import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
 import { railStatusItems } from '../tasks/railStatus'
 import { workingCountFor } from '../tasks/agentSessions'
@@ -118,6 +119,7 @@ export default function TabRail() {
   // roster.
   const activeProjectId = () => params.projectId ?? query.data?.find((task) => task.id === activeTaskId())?.projectId
   const activeWorkspace = () => workspaceForProject(workspaces.data, activeProjectId())
+  const sourceScope = createSourceScope(() => activeWorkspace()?.id)
   const visibleTasks = () => {
     const ws = activeWorkspace()
     const all = query.data ?? []
@@ -126,7 +128,7 @@ export default function TabRail() {
     return applyRailOrder(scoped, railOrder())
   }
 
-  const sources = () => availableSources(integrations.data?.integrations)
+  const sources = () => availableSources(integrations.data?.integrations, sourceScope())
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)

@@ -39,6 +39,16 @@ A rail source may also gate itself with a `when` predicate, for relevance that i
 question. Core's own Fleet home is the one user of it: the predicate is true only once more than one
 Node is registered, so a single-Node install never sees a rail entry for a concept it has not met.
 
+A rail source behind a provider that enumerates projects (`supportsProjects`, see
+[integrations](./integrations.md)) has a third gate: the active workspace has to link one of that
+provider's projects. Connecting Rollbar or Linear is account-wide, but what their items are *about* is
+per workspace, so a connected-but-unlinked source drew a row whose surface either sat empty or listed
+another workspace's items. The mapping is read from core's own workspace rows rather than from the
+plugin, so the gate holds whatever a plugin's manifest says, and it does not apply until both the
+provider list and the mapping have loaded, so the rail does not flicker a row away and back on every
+workspace switch. Linking happens in Settings → the workspace → Linked provider projects, which is
+also the only way back once a source is hidden.
+
 A Fleet home node card can also carry a plugin's own number beside core's task count
 (`registries/nodeStats.ts`). The card lives in client-core, which cannot import the agents or
 workflows plugins to ask them directly, so a plugin registers its own labelled count instead. A stat

@@ -49,4 +49,26 @@ describe('Rollbar loaded routes', () => {
       items: [{ title: 'rollbar-b', task: { origin: 'rollbar', link: { connectionId: 'rollbar-b' } } }],
     })
   })
+
+  // The counterpart to the intersection above: no `?project=` means no scope to intersect with, and a
+  // rail that fell back to every connection put one workspace's errors in front of every other
+  // workspace.
+  it('returns no rail rows without a project scope', async () => {
+    const fetch = createRollbarFetch({
+      byId: async () => null,
+      externalProjects: async () => [],
+    })
+    const context = await makeTestRequestContext({
+      plugin: 'rollbar',
+      principal: { kind: 'device', userId: 'user-1', deviceId: 'device-1' },
+      providers: {
+        connections: async () => [{ id: 'rollbar-a' } as never],
+        resource: async () => { throw new Error('the route asked Rollbar for items it has no scope for') },
+      },
+    })
+
+    const response = await fetch(new Request('http://rollbar.test/rail-items'), context)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ items: [] })
+  })
 })

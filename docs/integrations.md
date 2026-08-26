@@ -101,11 +101,12 @@ renders the reference panel github's PR detail shows, all as manifest descriptor
 frame rather than compiled contributions. It contributes a project source, so its workspaces appear
 in core's project picker.
 
-The rail lists only the issues of the projects a workspace has linked. With none linked, the source
-declares its own `emptyState` ("no linked Linear projects") rather than falling back to any issues.
-See descriptors in [the plugins doc](./plugins.md). An earlier version fell back to the viewer's own
-open issues, cover for a rail that had no way to explain an empty list. That fallback is gone, since
-a source can author the message itself. See the linear-migration summary in
+The rail lists only the issues of the projects a workspace has linked, and with none linked the shell
+does not draw the source at all (see the source gates in [the frontend doc](./frontend.md)). Its
+`emptyState` therefore speaks to the case that remains: projects are linked and none of them has an
+active issue. See descriptors in [the plugins doc](./plugins.md). An earlier version fell back to the
+viewer's own open issues, cover for a rail that had no way to explain an empty list. That fallback is
+gone, since a source can author the message itself. See the linear-migration summary in
 [the third-party README](./third-party/README.md).
 
 The rail used to be a client-side browse pane with its own filtering, sorting, and faceting over a
@@ -145,6 +146,10 @@ therefore makes no outbound call: it returns the single project recorded on the 
 token was validated. It is declared rather than omitted because Rollbar's rail scopes on the
 connection ids in a workspace's mapping, so without one selectable row that mapping could not be
 expressed at all.
+
+That scoping closes rather than falls open. A rail request with no `?project=` on it, which is what a
+stale plugin package sends, returns no rows instead of every connection's, because the alternative was
+one workspace's errors listed under every other workspace.
 
 An occurrence detail is capped for size: up to 10 trace chains, 200 frames total, 7 code lines per
 frame, 8 KiB per string, and 192 KiB per detail (`CAPS` in `plugins/rollbar/src/server/normalize.ts`).

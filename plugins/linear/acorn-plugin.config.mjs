@@ -83,10 +83,14 @@ export default {
       // `navigate`, not `openPane`: the detail belongs to the project, so clicking a row changes the
       // URL and the surface beside the list follows. It is also what mounts `linear-issue` at all.
       onSelect: { verb: 'navigate', surface: 'linear-issue' },
-      // Message only, no action, because no verb in the context-free set reaches the destination.
+      // Message only, no action, because no verb in the context-free set reaches a settings page:
       // `openPane` addresses a task pane, `openUrl` leaves the app, and the settings modal is shell
-      // state behind a client event with no descriptor form. So the message says where to go.
-      emptyState: { message: 'No linked Linear projects. Choose some in Settings → this workspace → Linked provider projects.' },
+      // state behind a client event with no descriptor form.
+      //
+      // It no longer offers to link projects either. The shell hides this source outright where the
+      // workspace links none (client-core/tabs/sources.ts), so the only empty list left to explain is
+      // linked projects with nothing active in them.
+      emptyState: { message: 'No active issues in this workspace’s linked Linear projects.' },
     }],
     // `openPane: 'linear'` is the task pane, deliberately not the project surface. A content link is
     // clicked inside a PR conversation, a note, or an agent transcript, and each of those has a task.
