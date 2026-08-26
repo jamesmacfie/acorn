@@ -375,9 +375,13 @@
 .agent-mention-input { position: relative; }
 /* The mirror and the textarea are the same box drawn twice: one paints colour, the other takes the
    typing. Every property that decides where a glyph lands is declared for both here, because the
-   two drifting apart is the only way this technique fails. */
+   two drifting apart is the only way this technique fails. `display: block` is one of them: left
+   inline, the textarea leaves a descender gap under itself, the mirror inherits that gap through
+   `inset: 0`, and the taller box runs out of scroll 5px early. Scrolled to the bottom the mirror
+   then sits a few pixels below the caret. */
 .agent-composer textarea,
 .agent-mention-mirror {
+  display: block;
   width: 100%;
   padding: var(--space-5);
   font: inherit;
