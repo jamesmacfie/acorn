@@ -199,11 +199,11 @@ write-only.
 | `GET` | `/v2/core/workspaces` | List workspaces and their project membership |
 | `POST` | `/v2/core/workspaces/bootstrap` | Initialize the default workspace |
 | `POST` | `/v2/core/workspaces` | Create a workspace |
-| `PATCH` | `/v2/core/workspaces/:id` | Update workspace identity |
+| `PATCH` | `/v2/core/workspaces/:id` | Rename a workspace |
 | `DELETE` | `/v2/core/workspaces/:id` | Delete a non-default workspace |
 | `GET` | `/v2/core/projects` | List local projects and their facets |
 | `POST` | `/v2/core/projects` | Add or import a project |
-| `PATCH` | `/v2/core/projects/:id` | Update project identity, folder, or visibility |
+| `PATCH` | `/v2/core/projects/:id` | Update project identity, colour, folder, or visibility |
 | `GET` | `/v2/core/workspaces/:id/external-projects` | List provider projects linked to a workspace |
 | `PUT` | `/v2/core/workspaces/:id/external-projects` | Replace provider projects linked to a workspace |
 | `GET` | `/v2/core/tasks` | List active tasks on this Node |

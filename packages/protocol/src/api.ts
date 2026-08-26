@@ -55,20 +55,11 @@ export type BrowserRule = {
   trigger: 'load'
   action: BrowserRuleAction
 }
-// Workspace identity (docs/workspaces-and-tasks.md): a JSON-stored icon union, which grows without
-// migrations, and a colour (preset token key or 6-hex). null means derived defaults: a name-hash
-// colour and an initial glyph.
-export type WorkspaceIcon =
-  | { kind: 'emoji'; value: string }
-  | { kind: 'lucide'; value: string }
-  | { kind: 'github' }
 export type Workspace = {
   id: string
   name: string
   isDefault: boolean
   sort: number
-  icon: WorkspaceIcon | null
-  color: string | null
   projects: WorkspaceProjectRef[]
 }
 export type WorkspaceSeed = { name: string }
@@ -84,13 +75,15 @@ export type Project = {
   workspaceId: string
   sort: number
   hidden: boolean
+  // Optional owner-selected accent for this project's task tabs. null means no project accent.
+  color: string | null
   vcs: 'git' | null
   defaultBranch: string | null
   remoteUrl: string | null
   github: { owner: string; name: string; repoId: number | null } | null
 }
 export type ProjectSeed = { path: string; workspaceId?: string; name?: string }
-export type ProjectPatch = Partial<{ name: string; workspaceId: string; hidden: boolean; sort: number; path: string }>
+export type ProjectPatch = Partial<{ name: string; workspaceId: string; hidden: boolean; color: string | null; sort: number; path: string }>
 export type ProjectsResponse = { projects: Project[] }
 export type WorkspaceProjectRef = { id: string; name: string; sort: number }
 export type ProjectConfig = {

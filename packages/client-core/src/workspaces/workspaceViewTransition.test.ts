@@ -7,8 +7,6 @@ const workspace = (id: string, projectId: string, name: string): Workspace => ({
   name: id,
   isDefault: false,
   sort: 0,
-  icon: null,
-  color: null,
   projects: [{ id: projectId, name, sort: 0 }],
 })
 

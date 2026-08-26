@@ -201,7 +201,7 @@ the four packs, which is how the Database pane ended up borderless everywhere bu
 
 `--stripe-w` and `--marker-w` are a related pair with the same kind of trap. `--marker-w` says "this
 row is selected," which a pack may legitimately express as a background fill instead of a bar. `--stripe-w`
-carries information in its colour instead (a workspace's identity colour, warn-versus-sent on a review
+carries information in its colour instead (a project's task-tab colour, warn-versus-sent on a review
 note), so a pack may zero `--marker-w` but must never zero `--stripe-w`: doing so deletes state rather
 than restyling it.
 
@@ -368,7 +368,7 @@ migration incremental.
 
 The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
 names before and will again) and so brand marks stay out of `ICON_NAMES`, which `ui/IconPicker.tsx`
-enumerates for user-chosen workspace and task icons. Putting them in that picker is then a
+enumerates for user-chosen task icons. Putting them in that picker is then a
 deliberate one-line decision rather than something that happens by accident.
 
 **A mark belongs in core if and only if a core surface renders it.** Otherwise it belongs to the

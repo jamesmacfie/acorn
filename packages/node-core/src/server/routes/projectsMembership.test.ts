@@ -158,4 +158,21 @@ describe('project rows own workspace membership and visibility', () => {
     const listed = (await (await call('/api/projects', 'GET')).json()) as { projects: Project[] }
     expect(listed.projects.find((row) => row.id === project.id)?.hidden).toBe(true)
   })
+
+  it('stores, returns, clears, and validates the project task-tab colour', async () => {
+    const folder = join(dir, 'coloured')
+    mkdirSync(folder)
+    const created = await call('/api/projects', 'POST', { path: folder })
+    const { project } = (await created.json()) as { project: Project }
+    expect(project.color).toBeNull()
+
+    const coloured = await call(`/api/projects/${project.id}`, 'PATCH', { color: '#8250df' })
+    expect(coloured.status).toBe(200)
+    expect(((await coloured.json()) as { project: Project }).project.color).toBe('#8250df')
+
+    expect((await call(`/api/projects/${project.id}`, 'PATCH', { color: 'reddish' })).status).toBe(400)
+    const cleared = await call(`/api/projects/${project.id}`, 'PATCH', { color: null })
+    expect(cleared.status).toBe(200)
+    expect(((await cleared.json()) as { project: Project }).project.color).toBeNull()
+  })
 })

@@ -1,16 +1,15 @@
 import { createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { projectsOptions, workspacesKey } from '../queries'
-import { deleteWorkspace, renameWorkspace, setWorkspaceColor, setWorkspaceIcon } from '../workspaces/mutations'
+import { deleteWorkspace, renameWorkspace } from '../workspaces/mutations'
 import type { Workspace } from '@acorn/protocol/api.ts'
-import { resolveWorkspaceColor, WORKSPACE_COLORS } from '@acorn/protocol/workspaceIdentity.ts'
 import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
 import { ProjectConfig } from './WorkspaceProjectSettings'
 import WorkspaceExternalProjects from './WorkspaceExternalProjects'
 import { Button } from '../ui/primitives'
 
-// Settings → per-workspace page: workspace identity (name / icon / colour) + membership + delete.
+// Settings → per-workspace page: workspace name + membership + delete.
 // Build/run/db/preview config is repo-level (docs/workspaces-and-tasks.md § Worktrees and setup): a
 // workspace groups repos, but setup/dev/db/preview describe one project, so those editors live in
 // ProjectConfig, one per project.
@@ -22,34 +21,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
   const projects = createQuery(() => projectsOptions(true))
   const [name, setName] = createSignal(props.workspace.name)
   const [busy, setBusy] = createSignal(false)
-  const [emoji, setEmoji] = createSignal(props.workspace.icon?.kind === 'emoji' ? props.workspace.icon.value : '')
-  const [color, setColor] = createSignal(props.workspace.color ?? '')
-  const [hex, setHex] = createSignal(props.workspace.color && !(props.workspace.color in WORKSPACE_COLORS) ? props.workspace.color : '')
   const refresh = () => qc.invalidateQueries({ queryKey: workspacesKey })
-
-  // Identity (docs/workspaces-and-tasks.md § Workspace and project): emoji icon (blank clears back to
-  // the derived initial) plus a colour swatch row (preset tokens) with a free hex input. Saves
-  // immediately, since these are single scalars.
-  const saveIcon = async (value: string) => {
-    setBusy(true)
-    try {
-      await setWorkspaceIcon(props.workspace.id, value.trim() ? { kind: 'emoji', value: value.trim() } : null)
-      await refresh()
-    } finally {
-      setBusy(false)
-    }
-  }
-  const saveColor = async (value: string | null) => {
-    setColor(value ?? '')
-    if (value == null || value in WORKSPACE_COLORS) setHex('')
-    setBusy(true)
-    try {
-      await setWorkspaceColor(props.workspace.id, value)
-      await refresh()
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const saveName = async () => {
     const n = name().trim()
@@ -86,55 +58,6 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
 
   return (
     <div class="settings-section">
-      <div class="settings-field">
-        <span class="settings-label">Icon &amp; colour</span>
-        <div class="ws-identity-row">
-          <span class="ws-identity-preview" style={{ 'border-color': resolveWorkspaceColor(color() || null, props.workspace.name) }}>
-            {emoji() || props.workspace.name.slice(0, 1).toUpperCase()}
-          </span>
-          <input
-            class="ui-input ws-emoji-input"
-            type="text"
-            maxlength="4"
-            placeholder="🌰"
-            title="Emoji icon — blank uses the workspace initial"
-            value={emoji()}
-            onInput={(e) => setEmoji(e.currentTarget.value)}
-            onBlur={() => void saveIcon(emoji())}
-          />
-          <div class="ws-swatches">
-            <For each={Object.entries(WORKSPACE_COLORS)}>
-              {([key, value]) => (
-                <button
-                  type="button"
-                  class="ws-swatch"
-                  classList={{ active: color() === key }}
-                  style={{ background: value }}
-                  title={key}
-                  disabled={busy()}
-                  onClick={() => void saveColor(key)}
-                />
-              )}
-            </For>
-            <input
-              class="ui-input ws-hex-input"
-              type="text"
-              placeholder="#8250df"
-              value={hex()}
-              onInput={(e) => setHex(e.currentTarget.value)}
-              onBlur={() => {
-                const v = hex().trim()
-                if (!v) return
-                if (/^#?[0-9a-fA-F]{6}$/.test(v)) void saveColor(v.startsWith('#') ? v : `#${v}`)
-              }}
-            />
-            <Button disabled={busy() || !color()} onClick={() => void saveColor(null)}>
-              Reset
-            </Button>
-          </div>
-        </div>
-      </div>
-
       <label class="settings-field">
         <span class="settings-label">Name</span>
         <div class="integration-key-row">

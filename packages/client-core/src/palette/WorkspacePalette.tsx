@@ -1,6 +1,5 @@
 import { createMemo, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { resolveWorkspaceColor } from '@acorn/protocol/workspaceIdentity.ts'
 import { createFleetWorkspaces, selectFleetWorkspace, type FleetWorkspace } from '../workspaces/fleetWorkspaces'
 import { fuzzyScore } from './model'
 import { createOverlayPalette } from './overlay'
@@ -41,8 +40,6 @@ export default function WorkspacePalette() {
     selectFleetWorkspace(entry, navigate)
   }
 
-  const glyph = (w: FleetWorkspace['workspace']) => (w.icon?.kind === 'emoji' ? `${w.icon.value} ` : '')
-
   return (
     <PaletteSurface
       palette={palette}
@@ -55,8 +52,7 @@ export default function WorkspacePalette() {
         const w = entry.workspace
         return (
           <>
-            <span class="ws-color-dot" style={{ background: resolveWorkspaceColor(w.color, w.name) }} />
-            <span class="palette-label">{glyph(w)}{w.name}</span>
+            <span class="palette-label">{w.name}</span>
             <Show when={fleet().grouped}>
               <span class="palette-hint muted">{entry.node.label}</span>
             </Show>

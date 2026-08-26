@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { Project, ProjectsResponse } from '@acorn/protocol/api.ts'
+import { isValidProjectColor } from '@acorn/protocol/projectColor.ts'
 import { createProject, deleteProject, detectProject, getProject, listProjects, patchProject, type ProjectRow } from '../../main/projects'
 import { getProjectConfig, setProjectConfig, setProjectRunTargets } from '../../main/projectConfig'
 import { getDb } from '../db'
@@ -16,6 +17,7 @@ const patchBody = z.object({
   name: z.string().max(120).optional(),
   workspaceId: z.string().optional(),
   hidden: z.boolean().optional(),
+  color: z.string().refine(isValidProjectColor).nullable().optional(),
   sort: z.number().int().optional(),
   path: z.string().min(1).optional(),
 })
@@ -52,6 +54,7 @@ export const toWireProject = (row: ProjectRow): Project => ({
   workspaceId: row.workspaceId,
   sort: row.sort,
   hidden: row.hidden,
+  color: row.color,
   vcs: (row.vcs as 'git' | null) ?? null,
   defaultBranch: row.defaultBranch,
   remoteUrl: row.remoteUrl,

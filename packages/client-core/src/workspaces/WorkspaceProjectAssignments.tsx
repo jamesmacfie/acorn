@@ -2,6 +2,7 @@ import { createMemo, createSignal, For, Index, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Project, Workspace } from '@acorn/protocol/api.ts'
+import { PROJECT_COLORS, resolveProjectColor } from '@acorn/protocol/projectColor.ts'
 import { projectsKey, projectsOptions, tasksKey, tasksOptions, workspacesKey, workspacesOptions } from '../queries'
 import { createProject, createWorkspace, deleteProject, deleteWorkspace, patchProject, renameWorkspace } from './mutations'
 import { canPickFolder, pickFolder } from '../platform'
@@ -195,6 +196,7 @@ export default function WorkspaceProjectAssignments() {
                   onRename={renameInPlace}
                   onMove={move}
                   onHide={(id, hidden) => void guard(() => patchProject(id, { hidden }), 'Could not update project.')}
+                  onColor={(id, color) => void guard(() => patchProject(id, { color }), 'Could not update project colour.')}
                   onMapFolder={(id) => void mapFolder(id)}
                   onDelete={setConfirmDelete}
                 />
@@ -217,6 +219,7 @@ export default function WorkspaceProjectAssignments() {
               onRename={renameInPlace}
               onMove={move}
               onHide={(id, hidden) => void guard(() => patchProject(id, { hidden }), 'Could not update project.')}
+              onColor={(id, color) => void guard(() => patchProject(id, { color }), 'Could not update project colour.')}
               onMapFolder={(id) => void mapFolder(id)}
               onDelete={setConfirmDelete}
             />
@@ -310,6 +313,7 @@ function ProjectRows(props: {
   onRename: (field: HTMLInputElement, current: string, save: (name: string) => Promise<unknown>) => Promise<void>
   onMove: (project: Project, workspaceId: string) => void
   onHide: (id: string, hidden: boolean) => void
+  onColor: (id: string, color: string | null) => void
   onMapFolder: (id: string) => void
   onDelete: (project: Project) => void
 }) {
@@ -319,14 +323,39 @@ function ProjectRows(props: {
     <Index each={props.rows}>
       {(project) => (
         <div class="ws-row" classList={{ 'ws-row-hidden': project().hidden }}>
-          <Button
-            variant="bare" class="onboarding-eye"
-            title={project().hidden ? 'Hidden — click to show' : 'Hide this project'}
-            aria-pressed={project().hidden}
-            onClick={() => props.onHide(project().id, !project().hidden)}
-          >
-            {project().hidden ? '⊘' : '◉'}
-          </Button>
+          <span class="ws-row-controls">
+            <Button
+              variant="bare" class="onboarding-eye"
+              title={project().hidden ? 'Hidden — click to show' : 'Hide this project'}
+              aria-pressed={project().hidden}
+              onClick={() => props.onHide(project().id, !project().hidden)}
+            >
+              {project().hidden ? '⊘' : '◉'}
+            </Button>
+            <input
+              class="ws-project-color"
+              classList={{ 'ws-project-color-empty': !project().color }}
+              type="color"
+              aria-label={`Task tab colour for ${project().name}`}
+              title={project().color ? 'Change task tab colour' : 'Choose a task tab colour'}
+              value={resolveProjectColor(project().color) ?? PROJECT_COLORS.gray}
+              disabled={project().hidden || props.busy}
+              onChange={(event) => props.onColor(project().id, event.currentTarget.value)}
+            />
+            <Show when={project().color}>
+              <Button
+                variant="bare"
+                class="ws-project-color-clear"
+                iconOnly
+                aria-label={`Clear task tab colour for ${project().name}`}
+                title="Clear task tab colour"
+                disabled={project().hidden || props.busy}
+                onClick={() => props.onColor(project().id, null)}
+              >
+                <Icon name="x" />
+              </Button>
+            </Show>
+          </span>
           <Input
             class="ws-row-name"
             aria-label={`Name of ${project().name}`}
