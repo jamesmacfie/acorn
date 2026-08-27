@@ -20,10 +20,12 @@ export type ProjectService = {
   // Provider project mappings belong to core's workspace model. Core callers may omit providerIds;
   // loaded plugins are wrapped with the provider ids the host registered for their plugin owner, so
   // another provider's connection and external id never cross the CoreServices boundary.
+  // `projectId` is '' when the link covers the whole workspace, and a project id when it covers only
+  // that one project. A caller drawing a project-scoped surface keeps the rows that match either.
   externalProjects(
     workspaceId: string,
     providerIds?: readonly string[],
-  ): Promise<Array<{ connectionId: string; externalId: string }>>
+  ): Promise<Array<{ connectionId: string; externalId: string; projectId: string }>>
   create(input: ProjectCreateRefInput): Promise<ProjectRef>
   update(id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null>
   config(id: string): Promise<ProjectConfigResponse | null>
@@ -55,6 +57,7 @@ export function createProjectService(db: AppDatabase): ProjectService {
         .select({
           connectionId: schema.workspaceExternalProjects.integrationId,
           externalId: schema.workspaceExternalProjects.externalId,
+          projectId: schema.workspaceExternalProjects.projectId,
         })
         .from(schema.workspaceExternalProjects)
         .innerJoin(schema.integrations, eq(schema.integrations.id, schema.workspaceExternalProjects.integrationId))

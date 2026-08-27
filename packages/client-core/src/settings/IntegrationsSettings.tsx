@@ -13,6 +13,7 @@ import {
 } from '../integrations/integrationClient'
 import { createDeviceFlow } from '../integrations/deviceFlow'
 import { integrationsKey, integrationsOptions } from '../queries'
+import ConnectionProjectMap from './ConnectionProjectMap'
 import { Alert, Button, Chip } from '../ui/primitives'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
@@ -120,6 +121,7 @@ export default function IntegrationsSettings() {
           {(connection) => {
             const provider = () => byId().get(connection.providerId)
             return (
+              <div class="integration-entry">
               <div class="integration-card">
                 <IntegrationLogo provider={provider()} />
                 <div class="integration-meta">
@@ -145,6 +147,12 @@ export default function IntegrationsSettings() {
                     <Button variant="ghost" tone="danger" onClick={() => void disconnect(connection.id)} disabled={busy()}>Disconnect</Button>
                   </Show>
                 </div>
+              </div>
+              {/* Only a provider that enumerates projects has a map to draw. A disabled connection
+                  keeps its map visible and editable: turning it off is a pause, not an unlink. */}
+              <Show when={provider()?.supportsProjects}>
+                <ConnectionProjectMap connection={connection} />
+              </Show>
               </div>
             )
           }}

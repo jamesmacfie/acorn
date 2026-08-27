@@ -148,6 +148,23 @@
   padding: var(--space-1) 9px;
 }
 
+/* A connection and its project map read as one unit, so the card and the map share an outer block
+   rather than the map floating as a sibling of the next connection's card. */
+.integration-entry { display: flex; flex-direction: column; gap: var(--space-3); }
+.integration-map {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  margin-left: var(--space-7);
+  border-left: var(--divider);
+}
+.integration-map-row { display: flex; align-items: center; gap: var(--space-4); }
+/* The external project's own name is the row's subject, so it takes the space and the target follows
+   it. Both truncate rather than wrap: a Linear project name can be a sentence. */
+.integration-map-name { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.integration-map-target { flex: 1; min-width: 0; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* "Add integration": the trigger. */
 .integration-add-btn {
   align-self: flex-start;

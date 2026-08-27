@@ -63,8 +63,6 @@
 .tree-file.ui-row,
 .tree-dir.ui-row { min-height: auto; padding-block: 3px; }
 
-/* File tab bar: flat/square, 1px borders; italic marks the ephemeral preview tab. DocumentTabs owns
-   the strip, the tabs, the dirty dot and the close buttons. What is left is this pane's tighter row
-   height and its mono filenames. */
-.editor-tabs { min-height: 30px; }
-.editor-tabs .ui-doctab-label { min-height: 30px; font-family: var(--font-mono); }
+/* The file tab bar is DocumentTabs with nothing added: the strip, the tabs, the mono filenames, the
+   dirty dot, the close buttons and the strip height all come from the primitive. This pane used to
+   run it 18px shorter than every other tab strip in the app. */

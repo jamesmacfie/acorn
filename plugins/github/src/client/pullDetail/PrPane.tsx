@@ -197,7 +197,7 @@ export function PrPane(props: { task: Task }) {
     <div class="pr-pane">
       <Show when={tabs().length > 1}>
         <nav
-          class="pr-pull-tabs"
+          class="pr-pull-tabs ui-doctabs"
           role="tablist"
           aria-label="Task pull requests"
           onKeyDown={(event) => {
@@ -213,13 +213,13 @@ export function PrPane(props: { task: Task }) {
             const linked = () => linkedTaskRows(tab)
             const labelIcon = () => kind() === 'mention' ? 'link-2' : kind() === 'stack' ? 'git-branch' : null
             return (
-              <span class="pr-pull-tab" classList={{ active: selectedKey() === key() }} data-tip={taskPullTabTooltip(tab, props.task.id)}>
+              <span class="ui-doctab" data-active={selectedKey() === key() ? '' : undefined} data-tip={taskPullTabTooltip(tab, props.task.id)}>
                 <button
                   type="button"
                   role="tab"
                   aria-selected={selectedKey() === key()}
                   tabindex={selectedKey() === key() ? 0 : -1}
-                  class="pr-pull-tab-select"
+                  class="ui-doctab-label"
                   onClick={() => selectTab(tab)}
                 >
                   <Show when={labelIcon()}>{(icon) => <Icon name={icon()} size={13} />}</Show>

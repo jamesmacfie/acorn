@@ -43,6 +43,7 @@
   --control-h-xs: 24px;
   --topbar-h: 52px;
   --pane-head-h: 44px;
+  --tab-h: 42px;
 
   /* Inset pane cards. No markup change, purely these three. */
   --shell-pad: var(--space-4);

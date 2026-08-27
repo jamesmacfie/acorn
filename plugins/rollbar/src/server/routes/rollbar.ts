@@ -77,8 +77,9 @@ async function listItems(
 const allFailed = (response: RollbarItemsResponse, connectionCount: number): boolean =>
   response.items.length === 0 && response.failures.length > 0 && response.failures.length === connectionCount
 
-// Which connections the routed project's workspace follows. A Rollbar connection is one Rollbar
-// project (see the token hint in provider.ts), so the mapping is the whole filter.
+// Which connections the routed project follows. A Rollbar connection is one Rollbar project (see the
+// token hint in provider.ts), so the mapping is the whole filter. A link may narrow itself to one
+// project in the workspace, in which case only that project's rail keeps it.
 //
 // No project scope means no rows, not every row: falling back to all connections showed one
 // workspace's errors in every other workspace. Linear's rail closes the same way.
@@ -87,7 +88,8 @@ async function scopedConnections(c: Context<AppEnv>, projects?: RollbarProjectSc
   if (!projectId || !projects) return []
   const project = await projects.byId(projectId)
   if (!project) return []
-  const mapped = new Set((await projects.externalProjects(project.workspaceId)).map((row) => row.connectionId))
+  const rows = await projects.externalProjects(project.workspaceId)
+  const mapped = new Set(rows.filter((row) => !row.projectId || row.projectId === projectId).map((row) => row.connectionId))
   return (await rollbarConnections(c, PROVIDER)).filter((connection) => mapped.has(connection.id))
 }
 

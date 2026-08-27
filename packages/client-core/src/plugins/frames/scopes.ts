@@ -172,6 +172,10 @@ const RULES: readonly RouteRule[] = [
   // else's connected account. A provider reaches its own projects through its own descriptor, which is
   // where it declared them; nothing needs to read a sibling's through the bridge.
   { path: shape(`/v2/core/integrations/${SEG}/projects`), scopes: {} },
+  // Which workspaces and projects follow a connection's external projects. Unmappable for the same
+  // reason as the row above, plus one of its own: the write replaces the connection's whole map, so a
+  // frame that reached it could quietly unfollow everything the owner had set up.
+  { path: shape(`/v2/core/integrations/${SEG}/mappings`), scopes: {} },
 ]
 
 export type ApiDecision = { allowed: true } | { allowed: false; reason: string }

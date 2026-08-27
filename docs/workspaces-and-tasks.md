@@ -62,22 +62,29 @@ Provider projects from Linear and Rollbar are separate external references in
 `workspace_external_projects`, keyed by the exact integration connection. They do not become local
 projects and do not change project identity.
 
-The mapping is edited in Settings → the workspace's page → **Linked provider projects**, and that
-surface is the host's for every provider rather than any one plugin's. The reason is ownership: the
-table is core's, the route is core's (`PUT /v2/core/workspaces/:id/external-projects`, which replaces
-the whole set for the workspace), and a plugin cannot write it at all — every workspace mutation is
-permanently unmappable on the frame bridge, and `CoreServices.projects` exposes a provider-scoped read
-with no write. When the only writer lived inside the Linear plugin's browse pane, deleting that pane
-made the mapping unwritable and left every integration silently unscoped.
+A link may name one project in the workspace instead of the whole of it. That is what lets two
+repositories in one workspace show different Linear issues or different Rollbar errors: the routed
+project names the workspace, then keeps the links that either name it or name no project at all.
 
-The providers decide which of them appear, not the picker. A provider declares a `projects` source
+The map is edited in Settings → Integrations, under the connection itself, and that surface is the
+host's for every provider rather than any one plugin's. Under the connection because one Linear or
+Rollbar connection usually serves every workspace on the machine, so its whole map reads better in one
+place than a checkbox list repeated on every workspace page. The host's because of ownership: the
+table is core's, the routes are core's (`PUT /v2/core/integrations/:id/mappings` replaces every row
+one connection owns; `PUT /v2/core/workspaces/:id/external-projects` is the same table from the
+workspace's side), and a plugin cannot write it at all — both are permanently unmappable on the frame
+bridge, and `CoreServices.projects` exposes a provider-scoped read with no write. When the only writer
+lived inside the Linear plugin's browse pane, deleting that pane made the mapping unwritable and left
+every integration silently unscoped.
+
+The providers decide which of them appear, not the map. A provider declares a `projects` source
 on its contribution, and one that declares none is absent rather than present and empty
-([integrations.md](./integrations.md)). Selection is edited one project at a time against the loaded
-set, so a provider whose list fails to load, or one that is not on screen, keeps its rows.
+([integrations.md](./integrations.md)). A link is added and removed one at a time against the rows the
+server holds, so a connection whose list fails to load still shows its links, by external id.
 
 A rail scoped to nothing mapped is not always empty: Rollbar, which has no linked-project concept,
 reads every connection unscoped. Linear, which does have one, declares its own `emptyState` for "no
-linked projects" instead of falling back to any issues ([integrations.md § Linear](./integrations.md)).
+followed projects" instead of falling back to any issues ([integrations.md § Linear](./integrations.md)).
 
 ## Task
 

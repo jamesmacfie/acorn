@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IntegrationProjectsResponse, Workspace, WorkspaceExternalProject, WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
+import type { IntegrationMapping, IntegrationMappingsResponse, IntegrationProjectsResponse, Workspace, WorkspaceExternalProject, WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '../db'
 import { SecretService } from '../../main/core/secrets'
 import type { AppEnv } from '../middleware/auth'
@@ -16,7 +16,11 @@ import type { Env } from '../../main/bindings'
 // enumerate a connection's projects, write the mapping, and, the invariant the whole design turns on,
 // edit one provider's selection without disturbing anyone else's rows.
 //
-// Written at the route level because the picker itself is a component and vitest here cannot render one.
+// The same rows are also read and written from the connection's side, which is what Settings →
+// Integrations does now: one connection's whole map at once, including the links narrowed to a single
+// project rather than a whole workspace.
+//
+// Written at the route level because the map itself is a component and vitest here cannot render one.
 // What it covers is exactly what a manual pass would click, minus the pixels.
 
 vi.mock('../db', async (importOriginal) => {
@@ -132,6 +136,21 @@ describe('workspace external projects, end to end', () => {
   const setLinked = (workspaceId: string, projects: WorkspaceExternalProject[]) =>
     app.fetch(jsonReq(`/api/workspaces/${workspaceId}/external-projects`, 'PUT', { projects }), env())
 
+  const mapped = async (connectionId: string): Promise<IntegrationMapping[]> => {
+    const res = await app.fetch(new Request(`http://acorn.test/api/integrations/${connectionId}/mappings`), env())
+    expect(res.status).toBe(200)
+    return ((await res.json()) as IntegrationMappingsResponse).mappings
+  }
+
+  const setMapped = (connectionId: string, mappings: IntegrationMapping[]) =>
+    app.fetch(jsonReq(`/api/integrations/${connectionId}/mappings`, 'PUT', { mappings }), env())
+
+  const addProject = async (id: string, name: string, workspaceId: string): Promise<string> => {
+    const now = Date.now()
+    await t.db.insert(schema.projects).values({ id, name, path: `/tmp/${id}`, workspaceId, sort: 0, hidden: false, createdAt: now, updatedAt: now })
+    return id
+  }
+
   it('enumerates each connection independently, and one failing does not touch the others', async () => {
     const ok = await listProjects('tracker-1')
     expect(ok.status).toBe(200)
@@ -185,6 +204,65 @@ describe('workspace external projects, end to end', () => {
       { integrationId: 'broken-1', externalId: 'legacy-project' },
     ]))
     expect(await linked(workspace.id)).toHaveLength(3)
+  })
+
+  it('narrows a link to one project, and leaves the workspace-wide form alone', async () => {
+    const workspace = await createWorkspace('Runn')
+    const web = await addProject('project-web', 'web', workspace.id)
+    await addProject('project-api', 'api', workspace.id)
+
+    expect((await setLinked(workspace.id, [
+      { integrationId: 'tracker-1', externalId: 'proj-1' },
+      { integrationId: 'tracker-1', externalId: 'proj-2', projectId: web },
+    ])).status).toBe(200)
+
+    // Both come back, and the narrow one still says which project it is for. The wide one omits the
+    // field rather than carrying the '' the table stores.
+    expect(await linked(workspace.id)).toEqual(expect.arrayContaining([
+      { integrationId: 'tracker-1', externalId: 'proj-1' },
+      { integrationId: 'tracker-1', externalId: 'proj-2', projectId: 'project-web' },
+    ]))
+    expect(await linked(workspace.id)).toHaveLength(2)
+  })
+
+  it('refuses to scope a link to a project from another workspace', async () => {
+    const runn = await createWorkspace('Runn')
+    const other = await createWorkspace('Other')
+    const stray = await addProject('project-stray', 'stray', other.id)
+
+    expect((await setLinked(runn.id, [{ integrationId: 'tracker-1', externalId: 'proj-1', projectId: stray }])).status).toBe(400)
+    expect(await linked(runn.id)).toEqual([])
+  })
+
+  it('reads and replaces one connection\'s whole map across workspaces, without touching a sibling connection', async () => {
+    const runn = await createWorkspace('Runn')
+    const side = await createWorkspace('Side')
+    const web = await addProject('project-web', 'web', runn.id)
+
+    expect((await setMapped('tracker-1', [
+      { workspaceId: runn.id, externalId: 'proj-1' },
+      { workspaceId: runn.id, externalId: 'proj-2', projectId: web },
+      { workspaceId: side.id, externalId: 'proj-1' },
+    ])).status).toBe(200)
+    expect((await setMapped('errors-1', [{ workspaceId: runn.id, externalId: 'errors-1-project' }])).status).toBe(200)
+
+    expect(await mapped('tracker-1')).toEqual(expect.arrayContaining([
+      { workspaceId: runn.id, externalId: 'proj-1' },
+      { workspaceId: runn.id, externalId: 'proj-2', projectId: 'project-web' },
+      { workspaceId: side.id, externalId: 'proj-1' },
+    ]))
+
+    // Replacing this connection's map drops all three of its rows and keeps the sibling's, which is
+    // the whole reason the write is scoped to the connection rather than to a workspace.
+    expect((await setMapped('tracker-1', [{ workspaceId: side.id, externalId: 'proj-2' }])).status).toBe(200)
+    expect(await mapped('tracker-1')).toEqual([{ workspaceId: side.id, externalId: 'proj-2' }])
+    expect(await mapped('errors-1')).toEqual([{ workspaceId: runn.id, externalId: 'errors-1-project' }])
+  })
+
+  it('refuses a connection map the caller has no row for', async () => {
+    const workspace = await createWorkspace('Runn')
+    expect((await app.fetch(new Request('http://acorn.test/api/integrations/not-mine/mappings'), env())).status).toBe(403)
+    expect((await setMapped('not-mine', [{ workspaceId: workspace.id, externalId: 'proj-1' }])).status).toBe(403)
   })
 
   it('refuses a mapping naming a connection the caller has no row for', async () => {

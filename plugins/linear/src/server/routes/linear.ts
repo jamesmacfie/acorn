@@ -132,9 +132,10 @@ const triageRow = (row: StoredConnection, node: LinearNode): LinearProjectIssue 
 type LinearProjectScope = Pick<CoreServices['projects'], 'byId' | 'externalProjects'>
 
 /**
- * Which Linear projects the routed project's workspace follows, keyed by connection. Linked projects
- * hang off the workspace rather than the project, and the descriptor only ever gives us the project
- * (docs/workspaces-and-tasks.md § Workspace and project).
+ * Which Linear projects this rail should show, keyed by connection. A link hangs off the workspace,
+ * and may narrow itself to one project in it (docs/workspaces-and-tasks.md § Workspace and project),
+ * so the routed project decides twice: it names the workspace, then it filters that workspace's links
+ * down to the ones that either name it or name no project at all.
  *
  * `null` and an empty map mean the same thing to the only caller: no rows.
  */
@@ -149,9 +150,10 @@ async function mappedProjects(
   // Scoped to linear-owned providers for a loaded plugin, unscoped for a built-in. Either way the
   // caller intersects with its own connections below, so another provider's mapping cannot leak in.
   const rows = await projects.externalProjects(project.workspaceId)
-  if (!rows.length) return null
+  const scoped = rows.filter((row) => !row.projectId || row.projectId === projectId)
+  if (!scoped.length) return null
   const byConnection = new Map<string, string[]>()
-  for (const row of rows) {
+  for (const row of scoped) {
     byConnection.set(row.connectionId, [...(byConnection.get(row.connectionId) ?? []), row.externalId])
   }
   return byConnection

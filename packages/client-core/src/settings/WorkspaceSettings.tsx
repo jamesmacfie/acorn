@@ -6,7 +6,6 @@ import type { Workspace } from '@acorn/protocol/api.ts'
 import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
 import { ProjectConfig } from './WorkspaceProjectSettings'
-import WorkspaceExternalProjects from './WorkspaceExternalProjects'
 import { Button } from '../ui/primitives'
 
 // Settings → per-workspace page: workspace name + membership + delete.
@@ -14,8 +13,9 @@ import { Button } from '../ui/primitives'
 // workspace groups repos, but setup/dev/db/preview describe one project, so those editors live in
 // ProjectConfig, one per project.
 //
-// It also owns the workspace's linked provider projects (WorkspaceExternalProjects), which is core's
-// surface for every integration rather than any one plugin's; see the header there.
+// Which provider projects a workspace follows is edited from the connection instead, in Settings →
+// Integrations (settings/ConnectionProjectMap.tsx): one connection usually serves several workspaces,
+// so its whole map reads better in one place than a checkbox list repeated on every workspace page.
 export default function WorkspaceSettings(props: { workspace: Workspace; onDeleted: () => void }) {
   const qc = useQueryClient()
   const projects = createQuery(() => projectsOptions(true))
@@ -75,8 +75,6 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
           <span class="muted settings-hint">The Default workspace can't be renamed.</span>
         </Show>
       </label>
-
-      <WorkspaceExternalProjects workspace={props.workspace} />
 
       <Show when={(projects.data ?? []).some((project) => project.workspaceId === props.workspace.id)}>
         <div class="settings-field">

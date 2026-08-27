@@ -8,10 +8,10 @@ import { readJson } from './apiClient'
 import { activeNodeId } from './node/activeNode'
 import { drainMigratedPrefs, mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
 import { setPref } from './settings/savePref'
-import { integrationProjectsRoute, integrationsKey, integrationsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
+import { integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 
 export { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
-export type { Integration, IntegrationProject, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
+export type { Integration, IntegrationMapping, IntegrationProject, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
 
@@ -48,7 +48,7 @@ export const workspaceExternalProjectsOptions = (workspaceId: string | null, ena
 })
 
 // The projects one connection offers, for the workspace mapping picker
-// (settings/WorkspaceExternalProjects.tsx). Per connection, so a provider that is down shows its
+// (settings/ConnectionProjectMap.tsx). Per connection, so a provider that is down shows its
 // own error row and its siblings still list.
 //
 // No staleTime and no retry. A picker's list is a claim about the provider now (the surface this
@@ -62,6 +62,17 @@ export const integrationProjectsOptions = (connectionId: string, enabled: boolea
   gcTime: 0,
   queryFn: async ({ signal }: QueryContext): Promise<IntegrationProject[]> =>
     (await readJson<IntegrationProjectsResponse>(integrationProjectsRoute(connectionId), { signal })).projects,
+})
+
+// Where one connection's external projects show up: (workspace, external project, optional project)
+// rows, read from the connection's side so Settings can draw its whole map at once
+// (settings/ConnectionProjectMap.tsx). Core's table, so it stays a core query.
+export const integrationMappingsKey = (connectionId: string) => ['integration-mappings', connectionId] as const
+export const integrationMappingsOptions = (connectionId: string, enabled: boolean) => ({
+  queryKey: integrationMappingsKey(connectionId),
+  enabled: enabled && !!connectionId,
+  queryFn: async ({ signal }: QueryContext): Promise<IntegrationMapping[]> =>
+    (await readJson<IntegrationMappingsResponse>(integrationMappingsRoute(connectionId), { signal })).mappings,
 })
 
 export const prefsOptions = (enabled: boolean) => ({

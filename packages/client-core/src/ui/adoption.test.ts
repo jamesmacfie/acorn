@@ -246,7 +246,7 @@ describe('primitive adoption', () => {
     'packages/client-core/src/settings/NodeDevices.tsx',
     'packages/client-core/src/settings/SchedulesSettings.tsx',
     'packages/client-core/src/settings/ShortcutsSettings.tsx',
-    'packages/client-core/src/settings/WorkspaceExternalProjects.tsx',
+    'packages/client-core/src/settings/ConnectionProjectMap.tsx',
     'packages/client-core/src/tasks/TaskPaneHost.tsx',
     'packages/client-core/src/ui/ContributionBoundary.tsx',
     'packages/client-core/src/workspaces/WorkspaceProjectAssignments.tsx',

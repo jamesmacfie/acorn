@@ -131,15 +131,21 @@ export const projects = sqliteTable(
 // local projects into one workspace grouping. `integrationId` records which connection the project
 // belongs to, so a workspace can link projects across several integrations
 // (docs/workspaces-and-tasks.md).
+//
+// `projectId` narrows a link to one project in that workspace: the rails of every other project then
+// leave it out. Empty string, not null, means the whole workspace. It has to be a real value because
+// SQLite doesn't enforce a primary key across a nullable column, and this key is what stops the same
+// link being stored twice.
 export const workspaceExternalProjects = sqliteTable(
   'workspace_external_projects',
   {
     workspaceId: text('workspace_id').notNull(), // → workspaces.id
     integrationId: text('integration_id').notNull(), // → integrations.id
     externalId: text('external_id').notNull(), // the provider's project id within that connection
+    projectId: text('project_id').notNull().default(''), // → projects.id, or '' for the whole workspace
     createdAt: integer('created_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.integrationId, t.externalId] })],
+  (t) => [primaryKey({ columns: [t.workspaceId, t.integrationId, t.externalId, t.projectId] })],
 )
 
 // A task is the single-project unit of work (docs/workspaces-and-tasks.md): a project, an optional
