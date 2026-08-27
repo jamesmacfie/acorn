@@ -34,6 +34,18 @@
 .pr-filter { flex: none; margin-left: auto; width: min(44%, 160px); padding: 5px 7px; }
 
 .pr-num { color: var(--text-muted); flex-shrink: 0; }
+/* The row's leading strip: checks dot, state glyph, avatar, number. Row's own gap sits between the
+   four slots it owns, not inside one of them, so the spacing is set here. */
+.pr-row .ui-row-leading { gap: var(--space-3); }
+/* Reserved width so the dot's late arrival does not shift the rest of the row. Matches --ui-dot. */
+.pr-check { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--space-4); }
+/* Same three colours the detail header's state badge uses (pull-detail.css), repeated rather than
+   shared because that stylesheet only loads with the detail pane. */
+.pr-state { flex: none; }
+.pr-state-open { color: var(--add-marker); }
+.pr-state-closed { color: var(--del-marker); }
+.pr-state-draft { color: var(--text-muted); }
+.pr-avatar { display: inline-flex; align-items: center; }
 /* "Open as workspace" affordance. Button size="xs" owns the box; this is only the reveal
    (docs/workspaces-and-tasks.md). */
 .pr-ws-btn { opacity: 0; }

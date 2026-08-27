@@ -11,8 +11,14 @@ import { prFilterFor, setPrFilter } from './pullList/filterState'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { githubBrowsePath } from './routes'
 import './styles/pull-list.css'
-import { Alert, Badge, Button, EmptyState, Input, Row, StatusDot } from '@acorn/plugin-api/ui'
+import { Alert, Button, EmptyState, Icon, Input, Row, StatusDot, UserAvatar } from '@acorn/plugin-api/ui'
 import { promotePullToTask } from './pullTasks'
+
+// Draft / open / closed, as one glyph. The list route only ever reports `open` or `closed`: GitHub's
+// REST list calls a merged PR closed and the closed page carries no merged_at, so a merged PR wears
+// the closed icon here. The detail header, which reads the GraphQL mirror, still says "merged".
+const prState = (pull: Pull): 'draft' | 'open' | 'closed' => (pull.draft ? 'draft' : pull.state === 'open' ? 'open' : 'closed')
+const PR_STATE_ICON = { draft: 'git-pull-request-draft', open: 'git-pull-request', closed: 'git-pull-request-closed' }
 
 // Left-pane PR list for the routed repo. Access checks live on the server; this pane only needs
 // route params before it can ask for the repo's PRs. The list is virtualized in its own scroll
@@ -235,28 +241,28 @@ export default function PullList() {
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }}
                       leading={(
                         <>
+                          {/* The dot only exists once the warmed detail cache holds checks, so it
+                              gets a reserved slot: otherwise every row jogs sideways as the
+                              prefetch lands. */}
+                          <span class="pr-check">
+                            <Show when={checks().length}>
+                              <StatusDot tone={CHECK_TONE[checksState(checks())]} label={`Checks: ${checksState(checks())}`} />
+                            </Show>
+                          </span>
+                          <Icon class={`pr-state pr-state-${prState(pr)}`} name={PR_STATE_ICON[prState(pr)]} title={prState(pr)} size={14} />
+                          {/* The author column is gone, so the avatar carries the login on hover. */}
+                          <span class="pr-avatar" title={pr.author ?? undefined}><UserAvatar login={pr.author} /></span>
                           <span class="pr-num">#{pr.number}</span>
-                          <Show when={checks().length}>
-                            <StatusDot tone={CHECK_TONE[checksState(checks())]} />
-                          </Show>
                         </>
                       )}
-                      meta={(
-                        <>
-                          <span class="ui-row-field">{pr.author ?? ''}</span>
-                          <span class="ui-row-field">{formatRelativeTime(pr.updatedAt)}</span>
-                        </>
-                      )}
-                      metaFields={2}
+                      meta={<span class="ui-row-field">{formatRelativeTime(pr.updatedAt)}</span>}
+                      metaFields={1}
                       trailing={(
-                        <>
-                          <Show when={pr.draft}><Badge tone="warn" size="xs">draft</Badge></Show>
-                          <Show when={pr.headRef}>
-                            <Button size="xs" class="pr-ws-btn" title="Open as task" onClick={(e) => void openAsTask(e, pr)}>
-                              +TASK
-                            </Button>
-                          </Show>
-                        </>
+                        <Show when={pr.headRef}>
+                          <Button size="xs" class="pr-ws-btn" title="Open as task" onClick={(e) => void openAsTask(e, pr)}>
+                            +TASK
+                          </Button>
+                        </Show>
                       )}
                       title={pr.title}
                     >
