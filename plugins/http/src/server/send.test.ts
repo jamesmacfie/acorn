@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -212,8 +213,17 @@ describe('resolveVars — command execution context', () => {
     root = mkdtempSync(join(tmpdir(), 'acorn-http-command-'))
     const worktree = join(root, 'worktree')
     const base = join(root, 'base')
-    mkdirSync(worktree)
-    mkdirSync(base)
+    // A real checkout and a real `git worktree add`, not two bare directories. resolveTaskCwd
+    // verifies a persisted worktree path before handing it back, and its check reads the `gitdir:`
+    // pointer file, so a plain mkdir fails verification and the task falls back to the checkout.
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'ignore' })
+    execFileSync('git', ['init', '-q', '-b', 'main', base], { stdio: 'ignore' })
+    git(base, 'config', 'user.email', 't@t.test')
+    git(base, 'config', 'user.name', 'T')
+    writeFileSync(join(base, 'a.txt'), 'a')
+    git(base, 'add', '.')
+    git(base, 'commit', '-q', '-m', 'init')
+    git(base, 'worktree', 'add', '-q', '-b', 'feature/api-url', worktree)
     await fx.coreDb.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
     await fx.coreDb.insert(schema.projects).values({
       id: 'project-widget', name: 'widget', path: base, workspaceId: 'workspace-1', sort: 0, hidden: false,
