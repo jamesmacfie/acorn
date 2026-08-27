@@ -21,7 +21,7 @@ export function parseLinearRailItemId(value: string): LinearRailTarget | null {
 // `origin: 'linear'` must stay: `ownsTaskOrigin` matches the exact plugin id, and changing it splits
 // one provider's task history in two.
 export function linearRailItem(issue: LinearProjectIssue): PluginRailItem {
-  // Title, key, status, +TASK, the shape github's PR list has. Two columns, so the reserved tracks
+  // Title, key, status, row actions, the shape github's PR list has. Two columns, so the reserved tracks
   // leave room to read the title. Assignee, priority, and labels are a click away in the detail pane.
   //
   // Positional, and never filtered: an issue with no state keeps the empty cell, or its key slides

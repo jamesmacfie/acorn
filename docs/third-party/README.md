@@ -81,9 +81,11 @@ Worth stating, because the hard parts are the ones that went well:
   move exploration into the frame and say so, not to grow the descriptor vocabulary until it
   became a UI framework. That restraint is what keeps the closed verb set closed.
 - **The dual-action gap was closed in the host, not the manifest.** A row needed click-to-open and
-  `+TASK`, and rather than adding plugin callbacks or a second action verb, the host now reads the
-  row's existing `task` block as its promotion capability and draws the affordance itself. One
-  fewer thing a plugin can get wrong.
+  a way to promote itself into a task, and rather than adding plugin callbacks or a second action
+  verb, the host reads the row's existing `task` block as its promotion capability and draws the
+  affordance itself. That affordance is the shared `RowActions` ellipsis menu, so the row-level
+  actions a plugin gets are the ones the shell's own lists get. One fewer thing a plugin can get
+  wrong.
 
 ## http has moved, and the storage path is proven
 

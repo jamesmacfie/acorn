@@ -107,7 +107,7 @@ export function RollbarFrameApp(props: { bridge: AcornBridge }) {
         else {
           setPage({
             kind: 'empty',
-            message: 'No Rollbar items are linked to this task. Select one from the Rollbar rail or use +TASK to attach it.',
+            message: 'No Rollbar items are linked to this task. Select one from the Rollbar rail, then choose Create task from its row menu.',
           })
         }
       } catch (error) {
