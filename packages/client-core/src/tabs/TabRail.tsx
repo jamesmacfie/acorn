@@ -14,8 +14,8 @@ import { capabilities } from '../capabilities'
 import { availableSources } from './sources'
 import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
-import { railStatusItems } from '../tasks/railStatus'
-import { workingCountFor } from '../tasks/agentSessions'
+import { markersFor } from '../registries/railMarkers'
+import { railStatusMarkers } from '../tasks/railStatus'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
 import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
@@ -27,16 +27,14 @@ import { confirmWillEvent } from '../registries/willPhase'
 import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../persistence/prefKeys'
 import { completeTaskArchive, isArchiving, withArchiving } from '../tasks/archiveLifecycle'
-import { TaskSlotHost } from '../registries/uiSlots'
 import ExclusiveSlotHost from '../plugins/ExclusiveSlotHost'
 import { registerContextMenuItems, type TaskRowTarget } from '../registries/contextMenus'
 import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../registries/contextMenuHost'
-import Icon from '../ui/Icon'
 import IconPicker, { randomIconName } from '../ui/IconPicker'
 import './tabrail.css'
 import { RailTab } from './RailTab'
 import { taskOriginAppearance } from '../tasks/origin'
-import { Alert, Button, Checkbox, Select, StatusDot } from '../ui/primitives'
+import { Alert, Button, Checkbox, Select } from '../ui/primitives'
 import { Menu } from '../ui/Menu'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
@@ -330,14 +328,14 @@ export default function TabRail() {
           {(s) => (
             <RailTab
               class="tabrail-source"
-              classList={{ active: selectedSource() === s.id }}
-              data-tip={s.label}
+              label={s.label}
+              glyph={s.glyph}
+              active={selectedSource() === s.id}
+              markers={markersFor({ kind: 'source', id: s.id })}
               data-tip-sub="Browse"
-              aria-label={s.label}
+              aria-current={selectedSource() === s.id ? 'page' : undefined}
               onClick={() => selectSource(s.id)}
-            >
-              <Icon name={s.glyph} />
-            </RailTab>
+            />
           )}
         </For>
       </div>
@@ -354,16 +352,19 @@ export default function TabRail() {
             // repository source seam; the GitHub PR pane remains the authoritative check surface.
             const checks = () => []
             const st = () => taskStatus(w.id)
-            // One source of truth for the overlay icons below and the hover tooltip's legend, so
-            // the two cannot drift.
-            const statusItems = () =>
-              railStatusItems({
+            // Core's own states plus whatever plugins publish for this task. RailTab orders them,
+            // picks a free corner for each, and legends the lot in the hover tooltip, so the icons
+            // and the words cannot drift.
+            const markers = () => [
+              ...railStatusMarkers({
                 checks: w.pullNumber != null && checks().length ? checksState(checks()) : null,
-                working: workingCountFor(w.id),
                 unread: !!unreadForTask(w.id),
                 status: st(),
                 archiving: isArchiving(w.id),
-              })
+                pinned: isPinned(railOrder(), w.id),
+              }),
+              ...markersFor({ kind: 'task', id: w.id }),
+            ]
             // Project identity owns the optional 3px accent. The task's projectId is the stable join;
             // workspace membership only scopes which task rows are visible.
             const project = () => projects.data?.find((candidate) => candidate.id === w.projectId)
@@ -390,9 +391,6 @@ export default function TabRail() {
                 void onDrop(w.id)
               }}
             >
-              <Show when={isPinned(railOrder(), w.id)}>
-                <span class="tabrail-pin" title="Pinned to top"><Icon name="pin" /></span>
-              </Show>
               {/* The rail keeps owning which menu is open, because Cmd+1-9 navigation closes it and
                   that decision cannot live inside one menu instance. */}
               <Menu
@@ -402,27 +400,22 @@ export default function TabRail() {
                 open={() => menuId() === w.id}
                 onOpenChange={(open) => setMenuId(open ? w.id : null)}
                 trigger={() => (
+                  /* The task's own icon, independent of workspace/project grouping. */
                   <RailTab
                     class="tabrail-task"
-                    classList={{ active: !selectedSource() && w.id === activeTaskId() }}
-                    style={accent() ? { 'border-left-color': accent() } : undefined}
-                    data-tip={w.title}
+                    label={w.title}
+                    glyph={w.icon ?? originIcon(w.origin)}
+                    active={!selectedSource() && w.id === activeTaskId()}
+                    accent={accent()}
+                    markers={markers()}
                     data-tip-sub={[
                       w.branch ?? 'project folder',
                       taskOriginAppearance(w.origin).tooltip,
                     ].filter(Boolean).join(' · ')}
-                    data-tip-legend={statusItems().length ? JSON.stringify(statusItems().map((s) => ({ g: s.glyph, d: s.dotTone, t: s.tone, l: s.label }))) : undefined}
-                    aria-label={w.title}
                     aria-haspopup="menu"
                     aria-expanded={menuId() === w.id}
                     onClick={() => onRowClick(w)}
-                  >
-                    {/* Task icon is independent of workspace/project grouping. */}
-                    <Icon
-                      name={w.icon ?? originIcon(w.origin)}
-                      title={taskOriginAppearance(w.origin).tooltip}
-                    />
-                  </RailTab>
+                  />
                 )}
               >
                 {(menu) => (
@@ -436,17 +429,6 @@ export default function TabRail() {
                   </>
                 )}
               </Menu>
-              {/* Live status markers from railStatus.ts, mirrored in the hover tooltip. */}
-              <For each={statusItems()}>
-                {(s) => (
-                  <span class={s.overlayCls} title={s.label}>
-                    <Show when={s.glyph} fallback={<Show when={s.dotTone}>{(tone) => <StatusDot tone={tone()} />}</Show>}>
-                      {(g) => <Icon name={g()} />}
-                    </Show>
-                  </span>
-                )}
-              </For>
-              <TaskSlotHost slot="tabrail.task-row" taskId={w.id} />
             </div>
             )
           }}
@@ -462,9 +444,13 @@ export default function TabRail() {
         onClose={() => setRowMenu(null)}
         returnFocus={() => rowMenuReturnFocus}
       />
-      <button type="button" class="tabrail-add" data-tip="New task" data-tip-sub="Start a task on a new branch" aria-label="New task" onClick={openNew}>
-        +
-      </button>
+      <RailTab
+        class="tabrail-bottom"
+        label="New task"
+        glyph="plus"
+        data-tip-sub="Start a task on a new branch"
+        onClick={openNew}
+      />
       <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>
         {(d) => (

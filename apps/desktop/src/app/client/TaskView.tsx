@@ -222,18 +222,26 @@ export default function TaskView(props: {
           {(target) => (
             <RailTab
               class="pane-switch-run"
-              classList={{ active: target.running }}
-              data-tip={`${target.running ? 'Stop' : 'Run'} ${target.id}`}
+              label={`${target.running ? 'Stop' : 'Run'} ${target.id}`}
+              glyph={target.running ? 'square' : 'play'}
+              sublabel={target.id}
+              active={target.running}
               data-tip-sub={target.command}
-              aria-label={`${target.running ? 'Stop' : 'Run'} ${target.id}`}
+              aria-pressed={target.running}
               onClick={() => void toggleTarget(target.id, target.running)}
-            >
-              {target.running ? '■' : '▶'}<span class="pane-switch-run-id">{target.id}</span>
-            </RailTab>
+            />
           )}
         </For>
       </Show>
-      <RailTab classList={{ active: props.terminalOpen }} data-tip="Terminal" data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined} data-tip-sub="Shell in the worktree" aria-label="Terminal" onClick={props.onToggleTerminal}>{'>_'}</RailTab>
+      <RailTab
+        label="Terminal"
+        glyph="square-terminal"
+        active={props.terminalOpen}
+        data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined}
+        data-tip-sub="Shell in the worktree"
+        aria-expanded={props.terminalOpen}
+        onClick={props.onToggleTerminal}
+      />
     </>
   )
 

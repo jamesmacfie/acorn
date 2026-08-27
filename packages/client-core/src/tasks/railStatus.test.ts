@@ -1,30 +1,54 @@
 import { describe, expect, it } from 'vitest'
-import { railStatusItems } from './railStatus'
+import { railStatusMarkers, type RailStatusInputs } from './railStatus'
+import { resolveRailMarkers } from '../tabs/railMarkers'
 import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 
 const status = (p: Partial<TaskStatus>): TaskStatus => ({ taskId: 't', worktreePath: null, dirty: false, dirtyCount: 0, missing: false, ...p })
 
-describe('railStatusItems', () => {
+const inputs = (over: Partial<RailStatusInputs> = {}): RailStatusInputs => ({
+  checks: null, unread: false, status: status({}), archiving: false, pinned: false, ...over,
+})
+
+const placements = (over: Partial<RailStatusInputs>) =>
+  Object.fromEntries(resolveRailMarkers(railStatusMarkers(inputs(over))).placed.map((m) => [m.id, m.position]))
+
+describe('railStatusMarkers', () => {
   it('emits nothing when the task is idle and clean', () => {
-    expect(railStatusItems({ checks: null, working: 0, unread: false, status: status({}), archiving: false })).toEqual([])
+    expect(railStatusMarkers(inputs())).toEqual([])
   })
 
-  it('surfaces each active marker with a glyph or dot and a meaning', () => {
-    const items = railStatusItems({ checks: 'failure', working: 2, unread: true, status: status({ dirty: true, dirtyCount: 3 }), archiving: false })
-    expect(items.map((i) => i.key)).toEqual(['checks', 'working', 'needs', 'dirty'])
-    expect(items.every((i) => i.label && (i.glyph || i.dotTone))).toBe(true)
-    expect(items.find((i) => i.key === 'working')?.label).toBe('2 agents working')
-    expect(items.find((i) => i.key === 'dirty')?.label).toBe('Uncommitted changes (3)')
+  it('gives every marker a meaning and exactly one representation', () => {
+    const markers = railStatusMarkers(inputs({ checks: 'failure', unread: true, pinned: true, status: status({ dirty: true, dirtyCount: 3 }) }))
+    expect(markers.map((m) => m.id)).toEqual(['needs', 'pinned', 'checks', 'dirty'])
+    expect(markers.every((m) => m.label && !!m.icon !== !!m.dotTone && m.placements.length)).toBe(true)
+    expect(markers.find((m) => m.id === 'dirty')?.label).toBe('Uncommitted changes (3)')
   })
 
   it('shows repair, not dirty, when the worktree is missing', () => {
-    const keys = railStatusItems({ checks: null, working: 0, unread: false, status: status({ dirty: true, dirtyCount: 1, missing: true }), archiving: false }).map((i) => i.key)
-    expect(keys).toEqual(['repair'])
+    expect(railStatusMarkers(inputs({ status: status({ dirty: true, dirtyCount: 1, missing: true }) })).map((m) => m.id)).toEqual(['repair'])
   })
 
-  it('reports only the teardown while a task is archiving', () => {
-    const items = railStatusItems({ checks: 'failure', working: 2, unread: true, status: status({ dirty: true }), archiving: true })
-    expect(items.map((i) => i.key)).toEqual(['archiving'])
-    expect(items[0]!.overlayCls).toContain('spin')
+  it('gives every simultaneous state its own corner', () => {
+    // The busiest a core-only row gets: checks, an unread notice, a dirty worktree, pinned.
+    expect(placements({ checks: 'pending', unread: true, pinned: true, status: status({ dirty: true, dirtyCount: 2 }) })).toEqual({
+      needs: 'top-end',
+      pinned: 'top-start',
+      checks: 'bottom-end',
+      dirty: 'bottom-start',
+    })
+  })
+
+  it('crowds the pin out of the corner it shares with a missing worktree, without losing it', () => {
+    const resolved = resolveRailMarkers(railStatusMarkers(inputs({ pinned: true, unread: true, status: status({ missing: true }) })))
+    expect(resolved.placed.map((m) => [m.id, m.position])).toEqual([
+      ['needs', 'top-end'], ['repair', 'bottom-end'], ['pinned', 'top-start'],
+    ])
+    expect(resolved.legend.map((item) => item.l)).toContain('Pinned to top')
+  })
+
+  it('gives teardown the slot under the glyph and spins it', () => {
+    const resolved = resolveRailMarkers(railStatusMarkers(inputs({ archiving: true, unread: true })))
+    expect(resolved.placed.map((m) => [m.id, m.position])).toEqual([['archiving', 'bottom-center'], ['needs', 'top-end']])
+    expect(resolved.placed.find((m) => m.id === 'archiving')?.busy).toBe(true)
   })
 })

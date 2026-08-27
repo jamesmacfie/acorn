@@ -1176,9 +1176,13 @@ trust dialog and the command palette — a contribution there would paint over t
 whether to trust it. `drawer` is a rectangle with real UI in it, which is what a frame is for, and its
 slot context carries shell callbacks a descriptor cannot receive. `topbar.left` and
 `task.switcher.extra` are members of the client's slot union with no host rendering them at all, so a
-manifest naming one would parse and never appear. `tabrail.task-row` is per-task while a slot's `data`
-route is node-scoped — opening it would mean either the same badge on every row or one fetch per
-visible row per tick.
+manifest naming one would parse and never appear.
+
+A rail row is not on that list at all, in either direction. It used to be a client slot called
+`tabrail.task-row`, and Docker was its only user; what it actually handed out was permission to draw
+arbitrary markup and position it in the shell's own pixel geography, which is how Docker's marker and
+core's pin ended up in the same corner. It is gone. Rail status is published as data now, through the
+compiled registry described under [Rail markers](#rail-markers) below.
 
 ### Keeping a descriptor fresh
 
@@ -1286,6 +1290,56 @@ An entry is `{ id, location, label, icon?, order?, when?, action }`:
 Nothing here is reachable from a plugin frame. The registry is populated host-side from manifests the
 device read; the frame bridge gained no message kind and no route, so a frame can neither open a menu
 nor synthesise a selection on one.
+
+### Rail markers
+
+A **rail marker** is a small non-interactive status icon on a rail control: a task row, a rail source,
+a pane button. A compiled plugin publishes markers through `ctx.railMarkers`, next to the state that
+owns them:
+
+```ts
+ctx.railMarkers.register({
+  id: 'docker',
+  order: 50,
+  markers: (target) => {
+    if (target.kind !== 'task') return []
+    const running = dockerTaskSummary(target.id)?.running ?? 0
+    return running ? [{
+      id: 'running',
+      label: `${running} running container${running === 1 ? '' : 's'}`,
+      icon: 'brand:docker',
+      tone: 'accent',
+      placements: ['top-start', 'bottom-start'],
+    }] : []
+  },
+})
+```
+
+Three things are the host's, not the plugin's. **Where it goes**: `placements` is an ordered wish
+list, and the host hands out the first entry still free, so two plugins asking for the same corner get
+different corners rather than one on top of the other. **What it looks like**: `tone` is semantic, and
+the host owns the colour, the spin, and the icon resolution — a plugin stylesheet positioning a rail
+marker is a bug. **Whether it outranks anything**: contributed priorities are clamped below core's, so
+a plugin orders its own markers among themselves and never pushes a core lifecycle state such as
+"archiving" out of its slot. A marker that finds no free position keeps its place in the tooltip legend
+and the control's accessible description; it loses the pixels, never the state.
+
+Markers are descriptive. There is no click verb, because a marker lives inside a button and a button
+inside a button is not a thing — the action belongs to the rail control itself, a context menu, or a
+command.
+
+The agents plugin is the other consumer, and it shows what "beside the state that owns it" buys. Its
+marker is the task row's top-right corner: a turning loader while any agent in the task is moving,
+replaced outright by the alert glyph the moment one needs the owner. Core used to draw that spinner
+from terminal sessions alone, which meant a managed agent working away in the background left the row
+looking idle. The plugin knows about both kinds, so it publishes one answer for both, in the same
+shape vocabulary its pane header and task sidebar already use.
+
+`markers()` runs inside the consuming render, so it may read signals the plugin already owns.
+Registering through `ctx` rather than the registry directly is what lets the host take the markers back
+out when the plugin is disabled. Loaded plugins cannot publish markers yet; the design for a batched,
+node-scoped manifest contribution is in `docs/future/rail-tab.md`, and it waits for a loaded plugin
+with a status worth publishing.
 
 ### Cooperative extension points
 

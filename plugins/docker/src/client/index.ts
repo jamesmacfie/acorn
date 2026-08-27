@@ -4,7 +4,7 @@ import { dockerAgentContextContribution } from './agentContextContribution'
 import { dockerPrefsSlice } from './dockerPrefs'
 import { dockerTaskPollerContribution } from './dockerStore'
 import { dockerPaneContribution } from './paneContribution'
-import { dockerFooterSlotContribution, dockerRailSlotContribution } from './slotContribution'
+import { dockerFooterSlotContribution, dockerRailMarkerContribution } from './slotContribution'
 import { dockerSourceContribution } from './sourceContribution'
 
 const DockerSettings = lazy(() => import('./DockerSettings'))
@@ -30,7 +30,7 @@ export const dockerClientPlugin: ClientPlugin = {
     // A local source: no providerId, so no integration row gates it and it's always in the rail.
     ctx.sources.register(dockerSourceContribution)
     ctx.taskSlots.register(dockerFooterSlotContribution)
-    ctx.taskSlots.register(dockerRailSlotContribution)
+    ctx.railMarkers.register(dockerRailMarkerContribution)
     ctx.pollers.register(dockerTaskPollerContribution)
     ctx.agentContexts.register(dockerAgentContextContribution)
     ctx.persistedState.register(dockerPrefsSlice)

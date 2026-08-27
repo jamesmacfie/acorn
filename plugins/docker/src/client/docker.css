@@ -93,16 +93,6 @@
   overflow-x: auto;
 }
 
-/* Rail-row marker (top-left corner; checks dot owns top-right, dirty bottom-right) */
-.tabrail-docker {
-  position: absolute;
-  top: 4px;
-  left: 5px;
-  font-size: var(--fs-2xs);
-  line-height: 1;
-  color: var(--accent);
-  pointer-events: none;
-}
 
 /* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
 .docker-logs-bar { gap: var(--space-4); padding: var(--space-2) 0; background: none; border-bottom: 0; }

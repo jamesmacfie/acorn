@@ -64,7 +64,7 @@
 }
 .rail-tip-legend-ico.tone-accent { color: var(--accent); }
 .rail-tip-legend-ico.tone-warn { color: var(--warn); }
-.rail-tip-legend-ico.tone-del { color: var(--del-marker); }
+.rail-tip-legend-ico.tone-danger { color: var(--del-marker); }
 
 @keyframes rail-tip-in {
   from { opacity: 0; }

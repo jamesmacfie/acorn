@@ -143,8 +143,11 @@ the task is archived anyway.
 
 The teardown takes seconds, so while it runs the task's close button and its rail row both spin,
 whichever of the two started the archive. One shared flag in `client-core/tasks/archiveLifecycle.ts`
-holds it, cleared when the archive finishes or fails. On the rail row the teardown marker replaces
-the live status markers instead of stacking on them, because it shares the working spinner's slot.
+holds it, cleared when the archive finishes or fails. On the rail row the teardown is the
+highest-priority marker and it takes the slot under the task's glyph
+([ui-design.md § Rail controls and status markers](./ui-design.md)). It no longer blanks the row's
+other markers the way it used to: anything it outranks keeps its place in the hover tooltip, because a
+marker that loses its corner should lose the pixels, never the state.
 
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these

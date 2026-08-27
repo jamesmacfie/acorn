@@ -23,6 +23,11 @@ client: ProjectImporterProps
 client: ProjectPatch
 client: ProjectSeed
 client: REF_LINK_CLASS
+client: RailMarker
+client: RailMarkerContribution
+client: RailMarkerPosition
+client: RailMarkerTarget
+client: RailTone
 client: RefPanelProps
 client: RefPanelTarget
 client: SourceContribution

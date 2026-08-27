@@ -1,17 +1,16 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import Icon from './Icon'
 import { Kbd, StatusDot } from './primitives'
-import type { RailStatusItem } from '../tasks/railStatus'
+import type { RailLegendItem } from '../tabs/railMarkers'
 import './tips.css'
 
 // The app's tooltip contract: four data attributes, honoured on any element anywhere. See
 // docs/ui-design.md § Tooltips for the attributes, why they replace a wrapper component, and the
 // positioning rules.
 //
-// A legend row mirrors one rail status marker: its glyph (`g`) or StatusDot tone (`d`), a colour
-// tone (`t`), and its meaning (`l`). Serialised into `data-tip-legend` by the rail; see
-// railStatus.ts.
-type LegendItem = { g?: string; d?: RailStatusItem['dotTone']; t?: 'accent' | 'warn' | 'del'; l: string }
+// A legend row mirrors one rail status marker, placed or overflowed. RailTab serialises them into
+// `data-tip-legend`; the shape lives in tabs/railMarkers.ts.
+type LegendItem = RailLegendItem
 type Tip = { title: string; sub?: string; key?: string; legend?: LegendItem[]; anchor: number; y: number; side: 'left' | 'right' }
 
 /** The attribute set, typed, so call sites get completion instead of guessing the spelling. */

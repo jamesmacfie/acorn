@@ -51,17 +51,9 @@
 .notify-detail { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .notify-time { flex: none; margin-left: auto; }
 
-/* Rail needs-input marker (docs/terminal-and-agents.md): unread notice on a task row. */
-.tabrail-needs {
-  position: absolute;
-  top: 4px;
-  right: 5px;
-  font-size: var(--fs-xs);
-  line-height: 1;
-  color: var(--warn);
-  pointer-events: none;
-  z-index: var(--z-base);
-}
+/* The unread-notice marker on a task row moved to core's rail marker model
+   (client-core/tasks/railStatus.ts). The rail owns where a marker sits; a feature stylesheet
+   positioning one is the signal that placement escaped the host again. */
 
 /* The attention inbox's banner and node badge (notifications/attentionInbox.ts). The rows themselves
    reuse .notify-row: an attention item and a notice differ in lifecycle, not in shape. */

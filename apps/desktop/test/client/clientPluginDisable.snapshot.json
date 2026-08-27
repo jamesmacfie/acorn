@@ -16,7 +16,9 @@
       "github"
     ],
     "settingsPages": [
+      "agent-concurrency",
       "agent-pricing",
+      "agent-defaults",
       "docker",
       "terminal",
       "workflows"
@@ -25,12 +27,10 @@
       "overlay/palette.files",
       "overlay/palette.pull-files",
       "overlay/onboarding.first-run",
-      "topbar.right/terminal.topbar-toggle",
       "drawer/terminal.drawer"
     ],
     "taskSlots": [
-      "task.footer/docker-footer-badge",
-      "tabrail.task-row/docker-rail-badge"
+      "task.footer/docker-footer-badge"
     ],
     "contextSections": [
       "memory.section"
@@ -54,7 +54,12 @@
       "docker.task-containers",
       "workflows.triggers"
     ],
+    "railMarkers": [
+      "agents",
+      "docker"
+    ],
     "persistedState": [
+      "agents.tool-fold",
       "context.section-selection",
       "docker.prefs",
       "editor.open-files",
@@ -110,14 +115,16 @@
         "docker"
       ],
       "taskSlots": [
-        "task.footer/docker-footer-badge",
-        "tabrail.task-row/docker-rail-badge"
+        "task.footer/docker-footer-badge"
       ],
       "agentContexts": [
         "acorn-docker"
       ],
       "pollers": [
         "docker.task-containers"
+      ],
+      "railMarkers": [
+        "docker"
       ],
       "persistedState": [
         "docker.prefs"

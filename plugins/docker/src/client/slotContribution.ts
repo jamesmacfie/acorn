@@ -1,8 +1,8 @@
 import { lazy } from 'solid-js'
-import type { TaskSlotContribution } from '@acorn/plugin-api/client'
+import type { RailMarkerContribution, TaskSlotContribution } from '@acorn/plugin-api/client'
+import { dockerTaskSummary } from './dockerStore'
 
 const DockerFooterBadge = lazy(() => import('./DockerFooterBadge'))
-const DockerRailBadge = lazy(() => import('./DockerRailBadge'))
 
 export const dockerFooterSlotContribution: TaskSlotContribution = {
   id: 'docker-footer-badge',
@@ -11,9 +11,22 @@ export const dockerFooterSlotContribution: TaskSlotContribution = {
   component: DockerFooterBadge,
 }
 
-export const dockerRailSlotContribution: TaskSlotContribution = {
-  id: 'docker-rail-badge',
-  slot: 'tabrail.task-row',
+// The rail-row marker used to be a component in a `tabrail.task-row` slot, which meant Docker
+// positioning itself in the shell's pixel geography from its own stylesheet. It publishes the state
+// now and the host decides where it lands, so it can no longer collide with core's pin.
+export const dockerRailMarkerContribution: RailMarkerContribution = {
+  id: 'docker',
   order: 50,
-  component: DockerRailBadge,
+  markers: (target) => {
+    if (target.kind !== 'task') return []
+    const running = dockerTaskSummary(target.id)?.running ?? 0
+    if (!running) return []
+    return [{
+      id: 'running',
+      label: `${running} running container${running === 1 ? '' : 's'}`,
+      icon: 'brand:docker',
+      tone: 'accent',
+      placements: ['top-start', 'bottom-start'],
+    }]
+  },
 }

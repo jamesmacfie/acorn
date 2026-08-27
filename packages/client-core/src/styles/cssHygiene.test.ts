@@ -26,6 +26,9 @@ describe('no phantom tokens', () => {
       // identity rather than a design decision, which is why it comes from the mark and not a token.
       '--brand', '--brand-on',
       '--meter-value', '--kv-extra-cols',
+      // RailTab sets it from the validated project colour, which is a user's choice about one
+      // project rather than a design decision (tabs/RailTab.tsx).
+      '--rail-accent',
       '--diff-cols',
       '--dash-cell', '--dash-pitch',
     ])

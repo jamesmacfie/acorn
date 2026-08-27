@@ -21,9 +21,10 @@ switch disposes the previous task scope.
 ## Registries and plugins
 
 The client plugin host activates `apps/desktop/src/app/client/plugins.ts`. Plugins register panes,
-rail sources, commands/keybindings, settings pages, shell/task slots, palette rows, context sections,
-ref panels, agent contexts/renderers, pollers, persisted-state slices, Node stats, and attention sources. The host owns
-the returned disposables so a plugin can be disabled and reactivated without duplicate entries.
+rail sources, commands/keybindings, settings pages, shell/task slots, rail markers, palette rows,
+context sections, ref panels, agent contexts/renderers, pollers, persisted-state slices, Node stats,
+and attention sources. The host owns the returned disposables so a plugin can be disabled and
+reactivated without duplicate entries.
 
 Rail sources declare their `order` and may declare `isDefault`. `defaultSourceId()` resolves the
 explicit default lazily after plugin registration, with declared rail order as a bare-host fallback.
@@ -57,7 +58,15 @@ workflows plugins to ask them directly, so a plugin registers its own labelled c
 is fetched per Node the way the attention inbox is, but is not merged with it: an attention item is a
 navigable row with a severity and a target, and a stat is one integer with a label.
 
-Several client registries (`slots.ts`, `contextMenus.ts`, `extensionPoints.ts`, and
+A plugin's status markers on a rail control are data, not markup: `registries/railMarkers.ts` takes a
+callback returning marker descriptions for one task, source, or pane, and the host decides the corner,
+the colour, the spin, and the tooltip legend
+([ui-design.md § Rail controls and status markers](./ui-design.md)). The callback runs inside the
+consuming render, so a plugin reads signals it already owns and the rail re-renders when they change,
+rather than the host inventing a query observer per rail button. One throwing contribution is isolated;
+the rest of the control still draws.
+
+Several client registries (`slots.ts`, `railMarkers.ts`, `contextMenus.ts`, `extensionPoints.ts`, and
 `exclusiveSlots.ts`) hold no JSX import. The vitest suite for this package runs in a bare Node
 environment with no Solid transform, so a module that imports a `.tsx` file cannot be loaded by a test
 at all. Each of these registries keeps its rules (ordering, gates, resolution) in a plain module for
