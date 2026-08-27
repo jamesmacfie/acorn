@@ -22,34 +22,10 @@
    against the pane above it. */
 .terminal-resize { margin: 0; }
 
-/* Header: a scrolling tab strip (flex:1) plus pinned actions, so tabs never squish and the +, Ctrl+C
-   and close stay visible no matter how many sessions are open. */
-.terminal-tabs {
-  display: flex;
-  align-items: stretch;
-  border-bottom: var(--chrome-divider);
-  font: var(--fs-sm) / 1 var(--font-mono);
-  color: var(--text-muted);
-}
-/* DocumentTabs owns the strip, the tabs, the run-state dot and the close buttons. What's left is the
-   drawer's own bottom-accent tab look and its mono type. */
-.terminal-tabstrip { flex: 1; min-width: 0; border-bottom: 0; background: none; }
-.terminal-tabstrip .ui-doctab { border-right: 0; border-bottom: var(--tab-active-w) solid transparent; }
-.terminal-tabstrip .ui-doctab[data-active] { background: none; border-bottom-color: var(--accent); }
-.terminal-tabstrip .ui-doctab-label { min-height: auto; padding: var(--space-3) var(--space-4); font-family: var(--font-mono); }
-.terminal-tabstrip .ui-doctab-text { max-width: 220px; }
-.terminal-actions {
-  display: flex;
-  align-items: center;
-  flex: none;
-  gap: var(--space-1);
-  padding: 0 var(--space-2);
-  border-left: var(--chrome-divider);
-}
-.terminal-new.ui-btn[data-variant='bare'],
-.terminal-close.ui-btn[data-variant='bare'],
-.terminal-interrupt.ui-btn[data-variant='bare'] { padding: var(--space-1) var(--space-2); }
-.terminal-new.ui-btn[data-variant='bare'] { font-size: 16px; padding: 0 var(--space-4); }
+/* The drawer's header is DocumentTabs: the scrolling strip, the tabs, the run-state dot, the close
+   buttons and the pinned `actions` slot the +, ^C and ✕ ride in. This file used to hand-roll the
+   header around the strip and restyle the tabs into a shorter, underlined variant, which is how the
+   terminal ended up as the one tab strip in the app at a different height from the rest. */
 /* Menu owns the surface (portal, position, elevation, dismissal) and the item vocabulary. This is only
    the menu's width; `position: relative` on the wrapper went with the absolute positioning. */
 .terminal-menu {
@@ -58,11 +34,6 @@
 .terminal-interrupt.ui-btn[data-variant='bare'] {
   border: var(--control-border);
   border-radius: var(--radius);
-}
-.terminal-close {
-  font-size: var(--fs);
-  margin-right: var(--space-4);
-  margin-left: var(--space-1);
 }
 .terminal-unavailable { margin-top: 0; padding: var(--space-3) var(--space-4); }
 .terminal-drawer-btn {

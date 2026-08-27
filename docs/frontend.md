@@ -46,8 +46,10 @@ per workspace, so a connected-but-unlinked source drew a row whose surface eithe
 another workspace's items. The mapping is read from core's own workspace rows rather than from the
 plugin, so the gate holds whatever a plugin's manifest says, and it does not apply until both the
 provider list and the mapping have loaded, so the rail does not flicker a row away and back on every
-workspace switch. Linking happens in Settings → the workspace → Linked provider projects, which is
-also the only way back once a source is hidden.
+workspace switch. Linking happens in Settings → Integrations, under the connection, which is
+also the only way back once a source is hidden. The gate asks only whether the workspace follows
+anything of that provider's, not whether the routed project does: a source that vanished as you moved
+between repositories in one workspace would read as a bug, so it stays and shows its own empty state.
 
 A Fleet home node card can also carry a plugin's own number beside core's task count
 (`registries/nodeStats.ts`). The card lives in client-core, which cannot import the agents or

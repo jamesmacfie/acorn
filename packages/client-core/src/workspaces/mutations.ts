@@ -2,6 +2,8 @@
 // the core workspace/project keys after mutations.
 import { postJson, writeJson } from '../apiClient'
 import {
+  integrationMappingsRoute,
+  type IntegrationMapping,
   projectDetectRoute,
   projectRoute,
   projectsRoute,
@@ -22,6 +24,16 @@ export const setWorkspaceExternalProjects = async (workspaceId: string, projects
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ projects }),
   }, (response) => `workspace-projects ${response.status}`)
+
+// Replace one connection's whole map in a single write. The connection-side twin of the call above:
+// Settings edits an integration rather than a workspace at a time, and scoping the replace to the
+// connection is what keeps a sibling integration's rows out of it.
+export const setIntegrationMappings = async (connectionId: string, mappings: IntegrationMapping[]) =>
+  writeJson<{ ok: true }>(integrationMappingsRoute(connectionId), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mappings }),
+  }, (response) => `integration-mappings ${response.status}`)
 
 const patchWorkspace = (id: string, body: unknown) =>
   writeJson<{ ok: true }>(

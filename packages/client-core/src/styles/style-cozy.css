@@ -41,6 +41,7 @@
   --control-h-xs: 26px;
   --topbar-h: 56px;
   --pane-head-h: 52px;
+  --tab-h: 48px;
   --shell-pad: var(--space-3);
   --pane-gap: var(--space-3);
 

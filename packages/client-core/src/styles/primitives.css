@@ -89,7 +89,12 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-select-native { display: none; }
 .ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-select-chevron { flex: none; color: var(--text-faint); font-size: var(--fs-2xs); }
-.ui-select-list { max-height: min(60vh, 420px); overflow-y: auto; }
+/* The surface caps its height and the rows scroll inside it, so a filter box stays put instead of
+   scrolling away from the list it is narrowing. */
+.ui-select-list { max-height: min(60vh, 420px); }
+.ui-select-filter { flex: none; margin-bottom: var(--space-3); }
+.ui-select-options { overflow-y: auto; }
+.ui-select-nomatch { margin: 0; padding: var(--space-2) var(--space-4); font-size: var(--fs-sm); }
 /* Without this the labels wrap instead of widening the list, and the list was sized to fit the
    trigger it opened under. */
 .ui-select-list .ui-menu-item { white-space: nowrap; }
@@ -945,7 +950,10 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* ── DocumentTabs ───────────────────────────────────────────────────────────────────────────
    The closable tab strip. Overflow scrolls rather than squishing, which is the terminal strip's
    behaviour and the right one: a squished tab shows no filename at all. */
-.ui-doctabs { flex: none; display: flex; align-items: stretch; min-width: 0; border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
+/* The height lives on the strip, not only on the tabs: with no tabs open the strip is empty and
+   would otherwise measure whatever the buttons in `actions` come to, which left the terminal
+   drawer's header at icon height until the first session started. */
+.ui-doctabs { flex: none; display: flex; align-items: stretch; min-width: 0; min-height: var(--tab-h); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
 .ui-doctabs-strip { flex: 1; min-width: 0; display: flex; align-items: stretch; overflow-x: auto; }
 .ui-doctabs-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); }
 .ui-doctab {
@@ -965,14 +973,20 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   gap: var(--space-2);
   font: inherit;
   font-size: var(--fs-sm);
+  /* A document tab names a file or a session, so it is an identifier and stays mono in every pack.
+     Both consumers were asking for this on their own. */
+  font-family: var(--font-mono);
   color: var(--text-muted);
   background: none;
   border: 0;
   padding: 0 var(--space-2) 0 var(--space-4);
-  min-height: var(--pane-head-h);
+  min-height: var(--tab-h);
   cursor: pointer;
 }
 .ui-doctab[data-active] .ui-doctab-label { color: var(--text); }
+/* Same ring `.ui-tab` draws (styles/tabs.css), inset so it is not clipped by the tab's own edges.
+   Two of the three strips were relying on the browser's default outline. */
+.ui-doctab-label:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .ui-doctab-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-doctab-close.ui-btn { flex: none; padding: 0 var(--space-3); opacity: 0; }
 /* Keyboard-reachable, unlike the mouse-only ✕ this replaces. */

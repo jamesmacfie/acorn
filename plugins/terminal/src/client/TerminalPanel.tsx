@@ -6,7 +6,7 @@ import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { Alert, Button, createSplitDrag, DocumentTabs, EmptyState, Menu, SplitHandle } from '@acorn/plugin-api/ui'
+import { Alert, Button, createSplitDrag, DocumentTabs, EmptyState, Icon, Menu, SplitHandle } from '@acorn/plugin-api/ui'
 import { resolveTerminalFontSize } from './preferences'
 import './terminal.css'
 
@@ -232,48 +232,49 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
         <Show when={!maximized()}>
           <SplitHandle axis="y" drag={drawerDrag} class="terminal-resize" />
         </Show>
-        <header class="terminal-tabs">
-          {/* Was a hand-rolled strip: the ✕ was mouse-only, there were no arrow keys and no
-              tablist roles, and the pending shimmer had an unguarded keyframe. */}
-          <DocumentTabs
-            class="terminal-tabstrip"
-            idPrefix="terminal"
-            ariaLabel="Terminal sessions"
-            active={activeId() ?? ''}
-            onActivate={setActiveId}
-            onClose={(id) => {
-              const session = visibleSessions().find((candidate) => candidate.id === id)
-              if (session) void closeTab(session)
-            }}
-            tabs={[
-              ...visibleSessions().map((session) => ({
-                id: session.id,
-                label: session.title,
-                status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
-                title: session.idle ? 'Agent idle — may be waiting for input' : session.title,
-              })),
-              // The launching session has no id yet, so it cannot be activated or closed. It is a
-              // placeholder tab that the real session replaces.
-              ...(pendingTitle() ? [{ id: 'pending', label: pendingTitle()!, pending: true }] : []),
-            ]}
-          />
-          <div class="terminal-actions">
-            {/* Was an absolutely-positioned div with a full-viewport transparent backdrop for
-                click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
-                roles. Menu brings all of it. */}
-            <Menu
+        {/* Was a hand-rolled strip inside a hand-rolled header. DocumentTabs owns both halves now,
+            the tabs and the `actions` slot the +, ^C and ✕ ride in, so this drawer's header is the
+            same element at the same height as the editor's file tab bar. */}
+        <DocumentTabs
+          idPrefix="terminal"
+          ariaLabel="Terminal sessions"
+          active={activeId() ?? ''}
+          onActivate={setActiveId}
+          onClose={(id) => {
+            const session = visibleSessions().find((candidate) => candidate.id === id)
+            if (session) void closeTab(session)
+          }}
+          tabs={[
+            ...visibleSessions().map((session) => ({
+              id: session.id,
+              label: session.title,
+              status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
+              title: session.idle ? 'Agent idle — may be waiting for input' : session.title,
+            })),
+            // The launching session has no id yet, so it cannot be activated or closed. It is a
+            // placeholder tab that the real session replaces.
+            ...(pendingTitle() ? [{ id: 'pending', label: pendingTitle()!, pending: true }] : []),
+          ]}
+          actions={
+            <>
+              {/* Was an absolutely-positioned div with a full-viewport transparent backdrop for
+                  click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
+                  roles. Menu brings all of it. */}
+              <Menu
                 class="terminal-menu"
                 ariaLabel="New session"
                 trigger={({ toggle, open }) => (
                   <Button
-                    variant="bare" class="terminal-new"
+                    variant="bare"
+                    size="sm"
+                    iconOnly
                     disabled={busy() || !ws()}
                     title={ws() ? 'New session' : 'Select a task first'}
                     aria-haspopup="menu"
                     aria-expanded={open()}
                     onClick={toggle}
                   >
-                    +
+                    <Icon name="plus" />
                   </Button>
                 )}
               >
@@ -299,17 +300,18 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                     )}
                   </For>
                 )}
-            </Menu>
-            <Show when={activeRunning()}>
-              <Button variant="bare" class="terminal-interrupt" title="Interrupt (Ctrl-C)" onClick={() => void api.interrupt(activeId()!)}>
-                ^C
+              </Menu>
+              <Show when={activeRunning()}>
+                <Button variant="bare" size="sm" class="terminal-interrupt" title="Interrupt (Ctrl-C)" onClick={() => void api.interrupt(activeId()!)}>
+                  ^C
+                </Button>
+              </Show>
+              <Button variant="bare" size="sm" iconOnly onClick={props.onClose} title="Close drawer (sessions keep running)" aria-label="Close">
+                <Icon name="x" />
               </Button>
-            </Show>
-          </div>
-          <Button variant="bare" class="terminal-close" onClick={props.onClose} title="Close drawer (sessions keep running)" aria-label="Close">
-            ✕
-          </Button>
-        </header>
+            </>
+          }
+        />
 
         <Show when={error()}>{(msg) => <Alert class="terminal-error-banner">{msg()}</Alert>}</Show>
 

@@ -46,6 +46,8 @@ describe('CoreServices.projects', () => {
       { workspaceId: 'workspace-1', integrationId: 'rollbar-b', externalId: 'project-b', createdAt: now },
       { workspaceId: 'workspace-1', integrationId: 'rollbar-a', externalId: 'project-a', createdAt: now },
       { workspaceId: 'workspace-1', integrationId: 'linear-a', externalId: 'team-a', createdAt: now },
+      // The narrow form: this one follows a single project rather than the whole workspace.
+      { workspaceId: 'workspace-1', integrationId: 'linear-a', externalId: 'team-b', projectId: 'project-plain', createdAt: now },
     ])
   })
 
@@ -73,12 +75,13 @@ describe('CoreServices.projects', () => {
     ])
   })
 
-  it('returns opaque external-project mappings in deterministic order', async () => {
+  it('returns opaque external-project mappings in deterministic order, each with its project scope', async () => {
     const projects = createProjectService(testDb.db)
     expect(await projects.externalProjects('workspace-1')).toEqual([
-      { connectionId: 'linear-a', externalId: 'team-a' },
-      { connectionId: 'rollbar-a', externalId: 'project-a' },
-      { connectionId: 'rollbar-b', externalId: 'project-b' },
+      { connectionId: 'linear-a', externalId: 'team-a', projectId: '' },
+      { connectionId: 'linear-a', externalId: 'team-b', projectId: 'project-plain' },
+      { connectionId: 'rollbar-a', externalId: 'project-a', projectId: '' },
+      { connectionId: 'rollbar-b', externalId: 'project-b', projectId: '' },
     ])
     expect(await projects.externalProjects('missing')).toEqual([])
   })
@@ -86,11 +89,12 @@ describe('CoreServices.projects', () => {
   it('filters external-project mappings at the database boundary by provider', async () => {
     const projects = createProjectService(testDb.db)
     expect(await projects.externalProjects('workspace-1', ['rollbar'])).toEqual([
-      { connectionId: 'rollbar-a', externalId: 'project-a' },
-      { connectionId: 'rollbar-b', externalId: 'project-b' },
+      { connectionId: 'rollbar-a', externalId: 'project-a', projectId: '' },
+      { connectionId: 'rollbar-b', externalId: 'project-b', projectId: '' },
     ])
     expect(await projects.externalProjects('workspace-1', ['linear'])).toEqual([
-      { connectionId: 'linear-a', externalId: 'team-a' },
+      { connectionId: 'linear-a', externalId: 'team-a', projectId: '' },
+      { connectionId: 'linear-a', externalId: 'team-b', projectId: 'project-plain' },
     ])
     expect(await projects.externalProjects('workspace-1', [])).toEqual([])
   })

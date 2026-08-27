@@ -88,9 +88,10 @@ export default {
       // state behind a client event with no descriptor form.
       //
       // It no longer offers to link projects either. The shell hides this source outright where the
-      // workspace links none (client-core/tabs/sources.ts), so the only empty list left to explain is
-      // linked projects with nothing active in them.
-      emptyState: { message: 'No active issues in this workspace’s linked Linear projects.' },
+      // workspace links none (client-core/tabs/sources.ts), so the two empty lists left to explain are
+      // followed projects with nothing active in them, and a repository its workspace follows Linear
+      // for but which follows no Linear project of its own.
+      emptyState: { message: 'No active issues in the Linear projects this repository follows.' },
     }],
     // `openPane: 'linear'` is the task pane, deliberately not the project surface. A content link is
     // clicked inside a PR conversation, a note, or an agent transcript, and each of those has a task.

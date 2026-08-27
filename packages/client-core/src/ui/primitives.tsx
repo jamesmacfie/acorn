@@ -86,8 +86,14 @@ export function Input(props: ComponentProps<'input'> & ControlOwn) {
   return <input {...rest} {...controlAttrs(own)} />
 }
 
-/** The open list. Mounted only while the popover is open, so the row refs and the active index
- *  start empty on every open rather than accumulating a copy of the list. */
+/** How many options it takes before the list grows a filter box. A native <select> answers a
+ *  keystroke with type-ahead; ours draws its own list, so past this length it needs a real one. A
+ *  Linear connection offers up to 250 projects and a repository list is not much shorter. Below it,
+ *  a box above four rows is noise. */
+const FILTER_FROM = 8
+
+/** The open list. Mounted only while the popover is open, so the row refs, the filter text and the
+ *  active index start empty on every open rather than accumulating a copy of the list. */
 function SelectList(props: {
   popover: AnchoredPopover
   options: () => HTMLOptionElement[]
@@ -96,6 +102,18 @@ function SelectList(props: {
   onPick: (option: HTMLOptionElement) => void
 }) {
   let listRef: HTMLDivElement | undefined
+  let filterRef: HTMLInputElement | undefined
+  const [query, setQuery] = createSignal('')
+  const filtered = () => {
+    const text = query().trim().toLowerCase()
+    if (!text) return props.options()
+    return props.options().filter((option) => option.text.toLowerCase().includes(text))
+  }
+  // Measured against the whole list, not the filtered one: a box that disappeared once you had
+  // narrowed the list to seven rows would take the text you typed with it.
+  const filterable = () => props.options().length >= FILTER_FROM
+  // What Enter takes. The first row a click could reach, which is not always the first match.
+  const topMatch = () => filtered().find((option) => !option.disabled)
   // Read the rows back out of the DOM rather than collecting them as they mount: options can arrive
   // while the list is open, and a collected array keeps handing the arrow keys rows that have been
   // detached since.
@@ -108,8 +126,11 @@ function SelectList(props: {
     list[index]?.focus()
   }
   // Opening on the current value is what the native control does, and it is what makes the arrow
-  // keys mean "the next one" rather than "the second one".
+  // keys mean "the next one" rather than "the second one". A filtered list skips this: typing is the
+  // first thing you want to do there, so the box takes the caret from its own ref and the rows keep
+  // the current value marked without holding focus.
   onMount(() => queueMicrotask(() => {
+    if (filterable()) return
     const chosen = enabled().findIndex((row) => row.dataset.value === props.value())
     focusAt(chosen < 0 ? 0 : chosen)
   }))
@@ -122,10 +143,22 @@ function SelectList(props: {
           props.popover.setSurface(el)
         }}
         class="ui-popover ui-select-list"
-        role="listbox"
-        aria-label={props.ariaLabel}
         style={props.popover.surfaceStyle()}
         onKeyDown={(event) => {
+          // From the filter box the rows are somewhere to go, not somewhere you already are: Enter
+          // takes the top match and ArrowDown steps into the list. Every other key is typing, and
+          // must reach the input rather than being read as navigation.
+          if (event.target === filterRef) {
+            const match = topMatch()
+            if (event.key === 'Enter' && match) {
+              event.preventDefault()
+              props.onPick(match)
+            } else if (event.key === 'ArrowDown' && enabled().length) {
+              event.preventDefault()
+              focusAt(0)
+            }
+            return
+          }
           const list = enabled()
           if (!list.length) return
           const next = nextListIndex(active(), list.length, event.key)
@@ -134,21 +167,35 @@ function SelectList(props: {
           focusAt(next)
         }}
       >
-        <For each={props.options()}>
-          {(option) => (
-            <button
-              type="button"
-              class="ui-menu-item"
-              role="option"
-              data-value={option.value}
-              aria-selected={option.value === props.value()}
-              disabled={option.disabled}
-              onClick={() => props.onPick(option)}
-            >
-              <span class="ui-menu-label">{option.text}</span>
-            </button>
-          )}
-        </For>
+        <Show when={filterable()}>
+          <Input
+            ref={(el: HTMLInputElement) => { filterRef = el; queueMicrotask(() => el.focus()) }}
+            class="ui-select-filter"
+            kind="filter"
+            type="text"
+            placeholder="Filter…"
+            aria-label={props.ariaLabel ? `Filter ${props.ariaLabel}` : 'Filter the list'}
+            value={query()}
+            onInput={(event) => setQuery(event.currentTarget.value)}
+          />
+        </Show>
+        <div class="ui-select-options" role="listbox" aria-label={props.ariaLabel}>
+          <For each={filtered()} fallback={<p class="ui-select-nomatch muted">No matches.</p>}>
+            {(option) => (
+              <button
+                type="button"
+                class="ui-menu-item"
+                role="option"
+                data-value={option.value}
+                aria-selected={option.value === props.value()}
+                disabled={option.disabled}
+                onClick={() => props.onPick(option)}
+              >
+                <span class="ui-menu-label">{option.text}</span>
+              </button>
+            )}
+          </For>
+        </div>
       </div>
     </Portal>
   )

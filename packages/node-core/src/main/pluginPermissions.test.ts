@@ -8,7 +8,7 @@ import { scopeCapabilities, scopeCore } from './pluginPermissions'
 // A stand-in CoreServices: this module only picks properties off the object, so identity is all the
 // assertions need and building a real one would drag a database in for nothing.
 const marker = (name: string) => ({ marker: name }) as never
-const externalProjects = vi.fn(async () => [])
+const externalProjects = vi.fn(async (): Promise<{ connectionId: string; externalId: string; projectId: string }[]> => [])
 const CORE = {
   fs: marker('fs'),
   git: marker('git'),
@@ -90,7 +90,7 @@ describe('scopeCore', () => {
   })
 
   it('passes an explicit empty provider set when the plugin owns no providers', async () => {
-    const external = vi.fn(async () => [{ connectionId: 'foreign', externalId: 'project' }])
+    const external = vi.fn(async () => [{ connectionId: 'foreign', externalId: 'project', projectId: '' }])
     const services = scopeCore(
       { ...CORE, projects: { ...CORE.projects, externalProjects: external } } as CoreServices,
       permissions({ core: ['projects:read'] }),

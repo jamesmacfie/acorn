@@ -1,13 +1,15 @@
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { ConnectIntegrationRequest, IntegrationProjectsResponse, IntegrationsResponse, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
+import type { ConnectIntegrationRequest, IntegrationMappingsResponse, IntegrationProjectsResponse, IntegrationsResponse, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
 import { auditRequest } from '../auditRequest'
-import { getDb } from '../db'
+import { getDb, schema } from '../db'
 import {
   connectProvider,
   connectionSummary,
   credentialsFromBody,
   disconnectConnection,
+  getConnection,
   listConnections,
   rotateConnection,
   setConnectionDisabled,
@@ -19,10 +21,20 @@ import { providerError } from '../integrations/respondProvider'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
+import { projectInWorkspace } from './workspaces'
 
 // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation).
 const setDisabledBody = z.object({ disabled: z.boolean() })
 const connectBody = z.looseObject({ providerId: z.string().optional(), provider: z.string().optional() })
+// The whole map for one connection, replaced in a single write. Bounds match the workspace-side PUT
+// (routes/workspaces.ts) because both land in the same table.
+const mappingsBody = z.object({
+  mappings: z.array(z.object({
+    workspaceId: z.string().min(1),
+    externalId: z.string().min(1),
+    projectId: z.string().min(1).optional(),
+  })).max(500).optional(),
+})
 
 // Core-owned provider connection lifecycle. Provider descriptors validate and normalize credentials;
 // this route alone encrypts, stores, rotates, tests, disables, and disconnects connection rows.
@@ -89,6 +101,59 @@ export const integrations = new Hono<AppEnv>()
     })
     if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
     return c.json({ projects: result.value } satisfies IntegrationProjectsResponse)
+  })
+  // One connection's whole map: which workspace, and optionally which project inside it, follows each
+  // of its external projects. Settings edits an integration from its own side rather than a workspace
+  // at a time, so it needs to read and replace every row this connection owns in one go
+  // (docs/integrations.md § Project sources).
+  //
+  // Scoped to the connection, so a write here can never disturb a sibling integration's rows the way
+  // the workspace-side replace has to be careful to avoid.
+  .get('/:id/mappings', async (c) => {
+    const db = getDb(c.env)
+    const id = c.req.param('id')
+    if (!(await getConnection(db, ownerId(c), id))) return respondError(c, 403, 'provider_not_connected')
+    const rows = await db
+      .select()
+      .from(schema.workspaceExternalProjects)
+      .where(eq(schema.workspaceExternalProjects.integrationId, id))
+    return c.json({
+      mappings: rows.map((row) => ({
+        workspaceId: row.workspaceId,
+        externalId: row.externalId,
+        ...(row.projectId ? { projectId: row.projectId } : {}),
+      })),
+    } satisfies IntegrationMappingsResponse)
+  })
+  .put('/:id/mappings', async (c) => {
+    const parsed = mappingsBody.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'provider_bad_config')
+    const db = getDb(c.env)
+    const id = c.req.param('id')
+    if (!(await getConnection(db, ownerId(c), id))) return respondError(c, 403, 'provider_not_connected')
+    const mappings = parsed.data.mappings ?? []
+    // A project has to sit in the workspace it is being scoped under, or the link would match nothing
+    // for the rest of its life.
+    for (const mapping of mappings) {
+      if (mapping.projectId && !(await projectInWorkspace(db, mapping.projectId, mapping.workspaceId))) {
+        return respondError(c, 400, 'provider_bad_config')
+      }
+    }
+    const now = Date.now()
+    await db.delete(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.integrationId, id))
+    if (mappings.length) {
+      await db
+        .insert(schema.workspaceExternalProjects)
+        .values(mappings.map((mapping) => ({
+          workspaceId: mapping.workspaceId,
+          integrationId: id,
+          externalId: mapping.externalId,
+          projectId: mapping.projectId ?? '',
+          createdAt: now,
+        })))
+        .onConflictDoNothing()
+    }
+    return c.json({ ok: true })
   })
   .post('/:id/test', async (c) => {
     try {

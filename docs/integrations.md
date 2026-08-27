@@ -59,7 +59,7 @@ external-item cache and nothing else.
 
 A provider may declare a `projects` source on its connection contribution: given a connection and its
 unsealed credential, list the projects that connection offers as `{ id, label }`. It exists so core's
-own workspace-mapping picker can ask every provider the same question without knowing which provider it
+own project map can ask every provider the same question without knowing which provider it
 is asking, and it is served on a core route, `GET /v2/core/integrations/:id/projects`.
 
 Declaring it is optional and its absence is the answer rather than an error: a provider with nothing
@@ -75,6 +75,25 @@ re-checked before it is offered for selection. An entry's `id` becomes a databas
 or over-long one is dropped rather than truncated into a different project. The bound matches what
 the workspace-mapping write already accepts through Zod: up to 500 projects, ids and labels capped at
 200 bytes each, generous enough that no honest provider notices.
+
+### The map itself
+
+A link is a row in `workspace_external_projects`: a workspace, a connection, one of that connection's
+external projects, and optionally one project in that workspace. Leave the project off and every
+project in the workspace follows it; name one and only that project's rails do. `''` in the column is
+how the table spells "the whole workspace", because SQLite does not enforce a primary key across a
+nullable column and this key is what stops a link being stored twice.
+
+It is edited from the connection, in Settings → Integrations, not from a workspace at a time: one
+Linear or Rollbar connection usually serves every workspace on the machine, so its whole map reads
+better in one place. `GET` and `PUT /v2/core/integrations/:id/mappings` carry it. The write replaces
+every row that connection owns, across all workspaces, which is what keeps a sibling connection's
+rows out of it without anyone having to merge. `PUT /v2/core/workspaces/:id/external-projects` is the
+same table from the other side, still there for a plugin replacing its own provider's slice.
+
+Neither route is reachable from a plugin frame. Both spend nothing and read nothing outbound, but the
+connection-side write replaces a whole map, so a frame that reached it could quietly unfollow
+everything the owner had set up.
 
 It is deliberately not a mirrored resource under a reserved id. That contract mirrors external items:
 the provider is handed the external-item store and nothing else, and the sync engine re-reads that

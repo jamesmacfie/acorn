@@ -313,6 +313,29 @@ Several other primitives (Toolbar, EmptyState, DescriptionList, Table, Kbd, KeyV
 DocumentTabs) simply merge many near-identical hand-rolled versions, sometimes a dozen or more of
 them; there is nothing beyond the primitive itself to know.
 
+### Tab strips
+
+There are two, and they split on what a tab owns. `Tabs` (`.ui-tabs`) is a sub-nav: it switches
+panels within one view, and the panels belong to the caller. `DocumentTabs` (`.ui-doctabs`) is a
+document bar: each tab owns a file or a session, can be closed, and carries state such as a dirty
+dot or a run-state dot. Both take an `actions` slot for the controls pinned to the right of the
+strip, so a caller never wraps the strip in a header of its own to bolt a `+` onto it.
+
+Every strip is `--tab-h` tall, whichever of the two it is, and the floor sits on the strip as well
+as on each tab, so a `DocumentTabs` with nothing open still holds the height instead of shrinking to
+its action buttons. That token exists because the height drifted four ways before it: 40px in
+`Tabs`, `--pane-head-h` in `DocumentTabs`, 30px in the editor's file bar, and whatever the terminal
+drawer's line-height came to, which read as a bug in the drawer rather than as four independent
+decisions. A pack keeps `--tab-h` above `--control-h`, so a button can ride in the actions slot, and
+below `--pane-head-h`, so a strip under a pane header stays subordinate to it.
+
+The GitHub pane's related-PR strip borrows the `.ui-doctab` classes instead of calling
+`DocumentTabs`, because each of its tabs carries a leading kind icon and a trailing button that
+opens the linked task or agent, and the primitive has no slot for either. Sharing the classes is
+what keeps it the same height and the same look. Home's dashboard tabs are the one strip that
+matches neither: they sit in a section header's label seat as the heading itself, so they have no
+background, no bottom rule, and no strip height. See `dashboards.css`.
+
 ### Migration tiers and their two invariant tests
 
 `adoption.test.ts`'s `CONVERTED` list grew in four tiers, and a file only qualifies for one once it

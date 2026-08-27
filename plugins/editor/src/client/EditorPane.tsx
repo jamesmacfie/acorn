@@ -288,7 +288,6 @@ export default function EditorPane(props: { task: Task }) {
             {/* Was a hand-rolled strip: the dirty state was a string-concatenated ●, the close
                 button was mouse-only, and there were no arrow keys. */}
             <DocumentTabs
-              class="editor-tabs"
               idPrefix="editor"
               ariaLabel="Open files"
               active={active() ?? ''}

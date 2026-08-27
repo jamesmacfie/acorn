@@ -124,9 +124,15 @@ export type ProjectConfigResponse = { projectId: string; config: ProjectConfig }
 // connectionId pins the link to a specific credential. providerId is stamped by core from that row.
 export type TaskLink = { connectionId: string; providerId: string; identifier: string; ref?: ExternalRef }
 export type TaskLinkSeed = { connectionId: string; identifier: string; ref?: Omit<ExternalRef, 'providerId' | 'connectionId'>; providerId?: string }
-// A workspace's linked provider projects (docs/workspaces-and-tasks.md): (integrationId, externalId) pairs.
-export type WorkspaceExternalProject = { integrationId: string; externalId: string }
+// A workspace's linked provider projects (docs/workspaces-and-tasks.md): (integrationId, externalId)
+// pairs. `projectId` narrows the link to one project in that workspace; leave it off and the link
+// covers every project there.
+export type WorkspaceExternalProject = { integrationId: string; externalId: string; projectId?: string }
 export type WorkspaceExternalProjectsResponse = { projects: WorkspaceExternalProject[] }
+// The same links read and written from the connection's side rather than a workspace's, which is how
+// Settings shows one integration's whole map at once (docs/integrations.md § Project sources).
+export type IntegrationMapping = { workspaceId: string; externalId: string; projectId?: string }
+export type IntegrationMappingsResponse = { mappings: IntegrationMapping[] }
 // The projects one connection offers, for core's workspace picker. `id` is what a chosen row's
 // `externalId` becomes; `label` is display-only and already bounded by the node
 // (integrations/projectSource.ts). The provider that produced it is not the authority on either.
@@ -619,6 +625,7 @@ export const integrationsRoute = '/v2/core/integrations'
 export const integrationRoute = (id: string) => `/v2/core/integrations/${id}`
 export const integrationTestRoute = (id: string) => `/v2/core/integrations/${id}/test`
 export const integrationProjectsRoute = (id: string) => `/v2/core/integrations/${id}/projects`
+export const integrationMappingsRoute = (id: string) => `/v2/core/integrations/${id}/mappings`
 
 export const prefsKey = ['prefs'] as const
 // The suffixes identify the current response shapes and stop unrelated query data sharing keys.

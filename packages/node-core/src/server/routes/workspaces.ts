@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { eq, inArray, max } from 'drizzle-orm'
+import { and, eq, inArray, max } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
@@ -11,8 +11,33 @@ import { getConnection } from '../integrations/connections'
 
 // Workspaces (docs/workspaces-and-tasks.md): named groups of Projects, the top-level unit.
 
+/** A link row on the wire: '' is how the table spells "the whole workspace", the wire just omits it. */
+export const toExternalProject = (row: { integrationId: string; externalId: string; projectId: string }) => ({
+  integrationId: row.integrationId,
+  externalId: row.externalId,
+  ...(row.projectId ? { projectId: row.projectId } : {}),
+})
+
+/**
+ * Whether this project is one of the workspace's own. A link scoped to a project in some other
+ * workspace would never match anything, so it is a bad request rather than a row worth storing.
+ */
+export async function projectInWorkspace(db: ReturnType<typeof getDb>, projectId: string, workspaceId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: schema.projects.id })
+    .from(schema.projects)
+    .where(and(eq(schema.projects.id, projectId), eq(schema.projects.workspaceId, workspaceId)))
+    .limit(1)
+  return !!row
+}
+
 const workspaceExternalProjectsBody = z.object({
-  projects: z.array(z.object({ integrationId: z.string().min(1), externalId: z.string().min(1) })).optional(),
+  projects: z.array(z.object({
+    integrationId: z.string().min(1),
+    externalId: z.string().min(1),
+    // Omitted means the whole workspace. Stored as '' so the primary key covers it; see the schema.
+    projectId: z.string().min(1).optional(),
+  })).optional(),
 })
 const workspacePatchBody = z.object({ name: z.string().trim().min(1) }).strict()
 
@@ -95,7 +120,7 @@ export const workspaces = new Hono<AppEnv>()
   .get('/:id/external-projects', async (c) => {
     const db = getDb(c.env)
     const rows = await db.select().from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, c.req.param('id')))
-    return c.json({ projects: rows.map((r) => ({ integrationId: r.integrationId, externalId: r.externalId })) } satisfies WorkspaceExternalProjectsResponse)
+    return c.json({ projects: rows.map(toExternalProject) } satisfies WorkspaceExternalProjectsResponse)
   })
   .put('/:id/external-projects', async (c) => {
     const id = c.req.param('id')
@@ -110,12 +135,21 @@ export const workspaces = new Hono<AppEnv>()
     for (const project of projects) {
       if (!(await getConnection(db, uid, project.integrationId))) return respondError(c, 403, 'provider_not_connected')
     }
+    for (const project of projects) {
+      if (project.projectId && !(await projectInWorkspace(db, project.projectId, id))) return respondError(c, 400, 'bad_request')
+    }
     const now = Date.now()
     await db.delete(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
     if (projects.length) {
       await db
         .insert(schema.workspaceExternalProjects)
-        .values(projects.map((p) => ({ workspaceId: id, integrationId: p.integrationId, externalId: p.externalId, createdAt: now })))
+        .values(projects.map((p) => ({
+          workspaceId: id,
+          integrationId: p.integrationId,
+          externalId: p.externalId,
+          projectId: p.projectId ?? '',
+          createdAt: now,
+        })))
         .onConflictDoNothing()
     }
     return c.json({ ok: true })
