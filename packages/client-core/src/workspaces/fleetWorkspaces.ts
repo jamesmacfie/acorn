@@ -31,9 +31,12 @@ export function createFleetWorkspaces(): () => FleetWorkspaceList {
     const current = result()
     return {
       // Node order (main's list) then the node's own workspace order, so the picker does not reshuffle
-      // because one node answered faster.
+      // because one node answered faster. A workspace with no projects is left out: it has nowhere to
+      // navigate to (see selectFleetWorkspace below), so it would only ever be a dead row.
       entries: current.rows.flatMap((row) =>
-        row.data.map((workspace) => ({ workspace, nodeId: row.nodeId, node: row.node })),
+        row.data
+          .filter((workspace) => workspace.projects.length > 0)
+          .map((workspace) => ({ workspace, nodeId: row.nodeId, node: row.node })),
       ),
       unavailable: current.unavailable,
       grouped: nodes().length > 1,
