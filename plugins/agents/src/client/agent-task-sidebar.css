@@ -71,12 +71,6 @@
 .agent-task-legacy-row > .ui-row { border-bottom: 0; }
 .agent-task-gate-actions { display: flex; gap: var(--space-2); padding: 0 var(--space-5) var(--space-3) 31px; }
 
-/* The row's menu, hover-revealed the way Row's own `reveal` does it, but scoped to the button so the
-   attention badge beside it stays readable at a glance. */
-.agent-task-row-menu { opacity: 0; }
-.agent-task-row:hover .agent-task-row-menu,
-.agent-task-row:focus-within .agent-task-row-menu,
-.agent-task-row[data-selected] .agent-task-row-menu { opacity: 1; }
 
 @container (max-width: 700px) {
   .agent-task-sidebar { width: 190px; }

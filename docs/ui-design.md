@@ -299,6 +299,7 @@ Per-component notes, kept where the reason is not obvious from the CSS itself:
 | Field | `data-layout='split'` gives every label the same control-column width, so a stack of fields lines up on both edges. `row` is a different layout for an inline chip in a strip (the agent composer's config row), where a fixed column would stretch every chip to it. The split column width is a literal, not a token: one measurement, one rule, and a pack that wants a different width restates the rule. |
 | Badge / Chip | `tag` is the shape a pack may round; `pill` is a capsule in every pack. A static label is a Badge, an interactive or data-coloured one is a Chip. `data-colored` takes its colour from a `--chip-color` custom property the caller sets inline (a live provider colour from Linear or GitHub), with the dot carrying the colour so the label stays legible against any hue. |
 | Row | `data-fields` reserves fixed-width tracks so several facts read as columns rather than a sentence, the same width down the whole list; each track is `minmax(0, …)` rather than a bare width, because a grid track's default `min-width: auto` refuses to shrink below its content and would push a trailing action off a narrow pane. |
+| RowActions | The ellipsis menu on a list row. Reveals on the row's `:hover`, `:focus-within`, and `[data-selected]`, plus its own `aria-expanded`, and stops the click from reaching the row. See § Menus and right-click for why the reveal is scoped to the button rather than to `Row`'s trailing slot. |
 | StatusDot | Ten independent implementations had converged on two competing colour vocabularies (Docker's `--state-ok/warn/bad` and Agents' `--add-marker/--warn/--del-marker`); the status trio won because the dots read as status and are already derived theme tokens. |
 | Checkbox | Styles the native `<input>` rather than rebuilding it from divs, to keep the keyboard and screen-reader behaviour a rebuild would throw away; `accent-color` supplies most of the look. The switch variant is the same input and the same events, with `appearance: none` applied only there so the plain checkbox keeps its native mark. |
 | Select | Draws its own list, because the popup the platform draws ignores every token in the stylesheet. The native `<select>` stays in the DOM, hidden, holding the caller's `<option>` children and the value, and a picked row writes to it and dispatches `change`, so a call site keeps its children and its `onChange` exactly as written. A `MutationObserver` is what notices options that arrive after mount, and a second effect puts the caller's value back once its option turns up: a `<select>` asked for a value it has no option for falls back to the first one, which left a restored picker on the wrong row. The list takes the trigger's width as a floor and grows past it to fit the option labels, because the control shows one label and the list shows the longest. It clamps into the viewport and scrolls at `min(60vh, 420px)`, so a select at the bottom of a pane opens over itself rather than off the bottom of the window. |
@@ -612,6 +613,21 @@ one action. Core's own rows fit that shape — the tab rail's Pin/Unpin/Rename/A
 not inline JSX — which is what makes the contract real before a plugin uses it. Plugins declare the
 same thing from a manifest (`docs/plugins.md § Context menus`); the host binds the owner into the id
 and evaluates the declared predicate itself.
+
+`RowActions` is the button half of that shape as a component: an ellipsis `Button` wrapping a `Menu`,
+placed `bottom-end`, that swallows the click so the row underneath it does not activate. Every list
+row that offers an action uses it, so the affordance sits in the same corner and reads the same way
+in a plugin's list as in the shell's own. Today it holds one item in three lists, `Create task` in
+the GitHub pull list and in the rail list every descriptor source renders through. The agent session
+sidebar, which is where the pattern came from, keeps its stop, rename, and archive rows.
+
+It carries its own reveal rather than taking `Row`'s `reveal`, and the difference matters. `Row`
+hides the whole trailing slot, which is right when actions are all that slot holds. A rail row also
+puts a badge there, and a badge that disappears until you point at it is a badge nobody reads. So the
+CSS hangs off `.ui-row-actions` and keys on the row's `:hover`, `:focus-within`, and `[data-selected]`
+plus the button's own `aria-expanded`. The last one is not redundant: the surface is portalled, so
+while the menu is open, `:focus-within` on the row is false and the trigger would otherwise fade out
+from under the menu it opened.
 
 Both `Menu.tsx` and its anchoring hook (`ui/anchor.ts`) replaced hand-rolled implementations that
 had each solved less of the problem: TabRail's task menu had neither outside-click nor Escape nor

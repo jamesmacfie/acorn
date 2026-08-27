@@ -189,7 +189,7 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
         if (first) return open(first)
         setPage({
           kind: 'empty',
-          message: 'No Linear issues are linked to this task. Pick one from the Linear rail, or use +TASK to attach it.',
+          message: 'No Linear issues are linked to this task. Pick one from the Linear rail, then choose Create task from its row menu.',
         })
       } catch (error) {
         setPage({ kind: 'error', title: 'Could not read this task.', detail: detailOf(error) })

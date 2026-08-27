@@ -10,6 +10,8 @@ import { createFleetQuery } from '../../node/fanout'
 import { FRESHNESS_LABELS } from '../../node/freshness'
 import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, Toolbar } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
+import { Menu } from '../../ui/Menu'
+import { RowActions } from '../../ui/RowActions'
 import { runChromeAction } from './actions'
 import { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from './data'
 import { tasksKey, tasksOptions, workspacesOptions } from '../../queries'
@@ -119,10 +121,6 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
   }
   const [promoteItem, setPromoteItem] = createSignal<PluginRailItem | null>(null)
 
-  const promote = (event: MouseEvent, item: PluginRailItem): void => {
-    event.stopPropagation()
-    setPromoteItem(item)
-  }
 
   const select = (item: PluginRailItem): void => {
     if (props.descriptor.onSelect) runChromeAction(props.descriptor.onSelect, {
@@ -230,14 +228,17 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
                   trailing={(
                     <>
                       <Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>
+                      {/* Row-level actions behind the shared overflow menu. Creating a task is the
+                          only one today; task, workflow and agent verbs land here next, which is why
+                          this is a menu rather than the button it replaced. */}
                       <Show when={item.task && props.descriptor.onSelect?.verb !== 'createTask'}>
-                        <Button
-                          size="xs"
-                          aria-label={`Create or attach task for ${item.title}`}
-                          onClick={(event) => promote(event, item)}
-                        >
-                          +TASK
-                        </Button>
+                        <RowActions ariaLabel={`Actions for ${item.title}`}>
+                          {(menu) => (
+                            <Menu.Item context={menu} onSelect={() => setPromoteItem(item)}>
+                              Create task…
+                            </Menu.Item>
+                          )}
+                        </RowActions>
                       </Show>
                     </>
                   )}
@@ -288,7 +289,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
           <PromoteToTaskModal
             providerId={props.descriptor.id}
             item={item()}
-            headerLabel={`+TASK — ${item().id}`}
+            headerLabel={`Create task — ${item().id}`}
             itemTitle={item().title}
             attachTasks={attachTasks()}
             existingBranches={(tasks.data ?? []).flatMap((task) => task.branch ? [task.branch] : [])}

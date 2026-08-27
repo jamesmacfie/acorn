@@ -11,7 +11,7 @@ import { prFilterFor, setPrFilter } from './pullList/filterState'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { githubBrowsePath } from './routes'
 import './styles/pull-list.css'
-import { Alert, Button, EmptyState, Icon, Input, Row, StatusDot, UserAvatar } from '@acorn/plugin-api/ui'
+import { Alert, Button, EmptyState, Icon, Input, Menu, Row, RowActions, StatusDot, UserAvatar } from '@acorn/plugin-api/ui'
 import { promotePullToTask } from './pullTasks'
 
 // Draft / open / closed, as one glyph. The list route only ever reports `open` or `closed`: GitHub's
@@ -97,9 +97,7 @@ export default function PullList() {
   // branch. That makes this the only place a create failure can be reported, so keep the error path:
   // a node-offline createTask otherwise throws an uncaught rejection and the click looks dead.
   const [taskError, setTaskError] = createSignal('')
-  async function openAsTask(e: Event, pr: Pull) {
-    e.preventDefault()
-    e.stopPropagation()
+  async function openAsTask(pr: Pull) {
     setTaskError('')
     try {
       await promoteToTask(pr)
@@ -259,9 +257,13 @@ export default function PullList() {
                       metaFields={1}
                       trailing={(
                         <Show when={pr.headRef}>
-                          <Button size="xs" class="pr-ws-btn" title="Open as task" onClick={(e) => void openAsTask(e, pr)}>
-                            +TASK
-                          </Button>
+                          <RowActions ariaLabel={`Actions for pull request #${pr.number}`}>
+                            {(menu) => (
+                              <Menu.Item context={menu} onSelect={() => void openAsTask(pr)}>
+                                Create task
+                              </Menu.Item>
+                            )}
+                          </RowActions>
                         </Show>
                       )}
                       title={pr.title}

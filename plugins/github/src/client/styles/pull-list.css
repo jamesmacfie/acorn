@@ -46,11 +46,6 @@
 .pr-state-closed { color: var(--del-marker); }
 .pr-state-draft { color: var(--text-muted); }
 .pr-avatar { display: inline-flex; align-items: center; }
-/* "Open as workspace" affordance. Button size="xs" owns the box; this is only the reveal
-   (docs/workspaces-and-tasks.md). */
-.pr-ws-btn { opacity: 0; }
-.pr-row:hover .pr-ws-btn,
-.pr-row:focus-within .pr-ws-btn { opacity: 1; }
 .pr-load-more { display: block; width: 100%; text-align: center; }
 .pr-load-more.ui-btn[data-variant='bare'] {
   background: var(--bg);
@@ -58,6 +53,6 @@
   padding: 10px var(--pane-pad);
 }
 .pr-load-more.ui-btn[data-variant='bare']:hover:not(:disabled) { background: var(--bg-hover); }
-/* +TASK failure (PullList.tsx). The Alert primitive owns the colour and size; this is only the
+/* Create-task failure (PullList.tsx). The Alert primitive owns the colour and size; this is only the
    list's inset, which a shared component cannot know about. */
 .pr-task-error { margin: var(--space-2) var(--pane-pad); }

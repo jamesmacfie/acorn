@@ -6,7 +6,7 @@ export type TabDef = { id: string; label: string; count?: number }
 // Reusable tab strip (roles + arrow-key nav). Renders only the tablist and drives the active id;
 // the panels are the caller's. Panel ids are `${idPrefix}-panel-${id}` and tab ids
 // `${idPrefix}-tab-${id}` so callers can wire aria-labelledby back. Extracted from the Rollbar
-// item panel; also used by the +TASK create/attach modal.
+// item panel; also used by the create-task modal.
 export function Tabs(props: {
   tabs: readonly TabDef[]
   active: string

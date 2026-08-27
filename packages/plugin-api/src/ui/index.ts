@@ -19,6 +19,10 @@ export { default as Picker } from '@acorn/client-core/ui/Picker.tsx'
 export { default as PickerRow } from '@acorn/client-core/ui/PickerRow.tsx'
 export { default as Popover } from '@acorn/client-core/ui/Popover.tsx'
 export { Menu } from '@acorn/client-core/ui/Menu.tsx'
+// The per-row overflow menu. Every list that offers a row-level action ("Create task" today, more
+// to come) uses this rather than its own button, so the affordance sits in the same place and
+// reveals on the same rules in a plugin's list as in a first-party one.
+export { RowActions } from '@acorn/client-core/ui/RowActions.tsx'
 export { CollapsibleSection } from '@acorn/client-core/ui/CollapsibleSection.tsx'
 export { Composer } from '@acorn/client-core/ui/Composer.tsx'
 export { DocumentTabs } from '@acorn/client-core/ui/DocumentTabs.tsx'

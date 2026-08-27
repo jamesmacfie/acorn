@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, For, Index, onCleanup, onMount, Show } from 'solid-js'
 import { capabilities, clientCapability, refreshSessions, requestTerminalFocus, sessions, setTerminalOpen, type Task, wsOnStatus } from '@acorn/plugin-api/client'
-import { Badge, Button, Icon, Menu, Row } from '@acorn/plugin-api/ui'
+import { Badge, Button, Menu, Row, RowActions } from '@acorn/plugin-api/ui'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
@@ -168,29 +168,7 @@ export default function AgentTaskSidebar(props: {
                             {session().attention.replace('_', ' ')}
                           </Badge>
                         </Show>
-                        <Menu
-                          ariaLabel="Session actions"
-                          placement="bottom-end"
-                          trigger={({ toggle, open }) => (
-                            <Button
-                              variant="bare"
-                              size="sm"
-                              iconOnly
-                              class="agent-task-row-menu"
-                              aria-label="Session actions"
-                              aria-haspopup="menu"
-                              aria-expanded={open()}
-                              // The row itself is a button; without this, opening the menu also
-                              // selects the row underneath it.
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                toggle()
-                              }}
-                            >
-                              <Icon name="ellipsis" />
-                            </Button>
-                          )}
-                        >
+                        <RowActions ariaLabel="Session actions">
                           {(menu) => (
                             <>
                               <Show when={canStopAgent(session())}>
@@ -206,7 +184,7 @@ export default function AgentTaskSidebar(props: {
                               </Menu.Item>
                             </>
                           )}
-                        </Menu>
+                        </RowActions>
                       </>
                     }
                     onActivate={() => props.onSelectSession(session().id)}

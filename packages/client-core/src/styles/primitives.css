@@ -785,6 +785,16 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    just clicked. */
 .ui-row[data-reveal][data-selected] .ui-row-trailing { opacity: 1; }
 
+/* RowActions: the same reveal, but scoped to the overflow button instead of the whole trailing
+   slot, so a badge beside it stays visible. Opt-in per button rather than per row, so it needs no
+   `reveal` on the Row. `aria-expanded` covers the open menu: the surface is portalled, so
+   :focus-within does not reach back to the trigger. */
+.ui-row-actions { opacity: 0; }
+.ui-row:hover .ui-row-actions,
+.ui-row:focus-within .ui-row-actions,
+.ui-row[data-selected] .ui-row-actions,
+.ui-row-actions[aria-expanded='true'] { opacity: 1; }
+
 /* ── SplitHandle ────────────────────────────────────────────────────────────────────────────
    Lifted from `.pane-divider`: a wide hit area around a hairline. The negative margin keeps the
    handle from consuming layout space it does not visually occupy. */
