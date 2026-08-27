@@ -34,7 +34,10 @@ export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
   // often to poll. The device_code goes back to the client rather than being held here. It authorizes
   // nothing on this node, and pending state would add a lifecycle to get wrong.
   .post('/auth/device/start', async (c) => {
-    ownerId(c) // owner-gated: only the owner may begin connecting an account
+    // No gate here beyond the node's own authentication: any paired principal may open a device
+    // window. ownerId only reads the principal's user id, so this call asserts a principal exists
+    // and nothing more. Restricting the flow to the owner is phase 1 of the review program.
+    ownerId(c)
     const id = clientId()
     if (!id) return respondError(c, 503, 'provider_unavailable', ['GitHub integration is not configured on this node.'])
     const response = await fetch(DEVICE_CODE_URL, form({ client_id: id, scope: SCOPES }))

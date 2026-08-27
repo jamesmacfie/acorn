@@ -49,8 +49,8 @@ git changes, notes, memory, terminal run targets, browser automation, plus `plug
 cannot start a workflow or spawn another agent through MCP at all. This is the entire blocker and it
 is the smallest of the four.
 
-`docs/mcp.md` claims the surface includes "terminal/session operations, workflows, database/Docker
-operations". It does not. Fix that sentence whatever else happens here.
+Fixed in [docs/mcp.md](../mcp.md) on 2026-08-28: the section used to claim the surface included
+"terminal/session operations, workflows, database/Docker operations", and it never did.
 
 **2. MCP is welded to one task.** `packages/node-core/src/mcp/server.ts` sends every call to
 `/v2/core/tasks/${ACORN_TASK_ID}/tools/:name`, and `mayActOnTask` refuses a confined principal on any
