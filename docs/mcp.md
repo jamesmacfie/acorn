@@ -19,9 +19,22 @@ outstanding internal tokens.
 
 ## Tool surface
 
-The MCP server projects the Node agent-tool registry. It exposes task context, files, Git/changes,
-notes, memory, terminal/session operations, workflows, database/Docker operations, and preview/browser
-tools according to the enabled plugins and task scope.
+The MCP server projects the Node agent-tool registry, so the surface is whatever the enabled plugins
+register for the addressed task. [Agent tools](./agent-tools.md) owns the per-tool contract; the
+registered groups are:
+
+- Task and pull-request context, from core: `task_current`, `task_context`, `pr_current`,
+  `pr_changed_files`, `linked_issues`, `repo_info`.
+- Plugin authoring and the install request, from core: `plugin_authoring`, `plugin_request`.
+- Local git reads, from `changes`: `local_changes`, `local_diff`, `git_log`.
+- Notes, from `notes`, and memory, from `memory`.
+- The run targets a repo configures, from `terminal`: `run_targets`, `run_start`, `run_stop`,
+  `run_restart`, `run_status`.
+- Browser automation, from `browser`.
+- One write, from `github`: `github_pull_create`.
+
+Nothing here reads or writes a file, drives a workflow, opens a database, or talks to Docker. An
+agent that needs a file uses its own harness tools inside the worktree.
 
 The server returns structured results for absent task context, unavailable optional plugins, and
 provider errors. It never returns device tokens, provider credentials, raw secret fields, or arbitrary
