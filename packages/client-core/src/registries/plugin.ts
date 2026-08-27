@@ -10,6 +10,7 @@ import { nodeStatRegistry, type NodeStatContribution } from './nodeStats'
 import { paneRegistry, type PaneContribution } from './panes'
 import { refPanelRegistry, type RefPanelContribution } from './refPanels'
 import { pollerRegistry, type PollerContribution } from './pollers'
+import { railMarkerRegistry, type RailMarkerContribution } from './railMarkers'
 import { provideClientCapability, type ClientCapabilityId } from '../clientCapabilities'
 import type { Disposable, Registry } from './registry'
 import { settingsRegistry, type SettingsContribution } from './settings'
@@ -47,6 +48,9 @@ export type ClientPluginContext = {
   agentContexts: ClientContributionPoint<AgentContextContribution>
   agentToolRenderers: ClientContributionPoint<AgentToolRendererContribution>
   pollers: ClientContributionPoint<PollerContribution>
+  // Status markers drawn on a rail control by the host, published from the state that owns them
+  // (registries/railMarkers.ts). Data only; a marker has no click verb.
+  railMarkers: ClientContributionPoint<RailMarkerContribution>
   persistedState: ClientContributionPoint<PersistedStateSlice<unknown>>
   // One number on a Fleet home node card (docs/frontend.md § Registries and plugins;
   // registries/nodeStats.ts).
@@ -145,6 +149,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     agentContexts: own(agentContextRegistry),
     agentToolRenderers: own(agentToolRendererRegistry),
     pollers: own(pollerRegistry),
+    railMarkers: own(railMarkerRegistry),
     persistedState: own(persistedStateRegistry),
     nodeStats: own(nodeStatRegistry),
     attention: own(attentionRegistry),

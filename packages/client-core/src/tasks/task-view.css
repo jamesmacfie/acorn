@@ -152,9 +152,9 @@
   border-right: var(--tab-active-w) solid transparent;
 }
 .pane-switcher .tabrail-tab.active { border-right-color: var(--accent); }
-/* Close-task ✕ sits at the bottom of the rail, set off from the pane switches above it. */
-.pane-switcher .pane-switch-close { margin-top: auto; border-bottom: 0; border-top: var(--chrome-divider); }
-.pane-switcher .pane-switch-close:hover { color: var(--del-marker); }
+/* Close-task sits at the bottom of the rail, set off from the pane switches above it: same
+   `.tabrail-bottom` modifier and the same 52px box as the left rail's "+". Its danger hover comes
+   from RailTab's `tone`, not a class here. */
 
 /* Close-task confirmation modal bits (reuses the shared .overlay shell). */
 .close-actions { display: flex; justify-content: flex-end; gap: var(--space-5); }
@@ -168,16 +168,9 @@
    caller left. The project picker went with it and has nowhere to come back to, which is written
    up in docs/integrations.md § Linear. */
 
-/* Run-target buttons (docs/workflows.md §2): one ▶ per named target, id shown under the glyph. */
+/* Run-target buttons (docs/workflows.md §2): one play/stop glyph per named target, with the target
+   id underneath as RailTab's `sublabel`, which owns the small-text rule. */
 .pane-switch-run { flex-direction: column; gap: 1px; }
-.pane-switch-run-id {
-  font-size: 8px;
-  line-height: 1;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Registry-driven flat pane row. Relative weights are persisted by pane id; dividers own the gap
    so resize remains a two-neighbour operation. */

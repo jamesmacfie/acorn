@@ -123,6 +123,13 @@ host renders instead is the Node's own connection state, which is already reacti
 live/refreshing/stale/offline/error vocabulary `docs/ui-design.md` § States describes. A pane that
 wants to say more about its own data draws it in its own header, where the query is already in scope.
 
+A pane button in the right rail can still carry status markers, and that is not the same seam. A
+marker comes from `registries/railMarkers.ts`, which asks a plugin about a target it names — a task, a
+rail source, or a pane — and gets marker *data* back
+([ui-design.md § Rail controls and status markers](./ui-design.md)). The callback runs inside the
+rail's own render, so it costs no subscription the plugin does not already hold, and it is for state
+the plugin owns anyway rather than for the query status of the pane's own fetch.
+
 Find-in-files is backed by a ripgrep subprocess, not an editor feature, and that is not a stopgap.
 Monaco is an editor component with no filesystem or process access, so it provides find-within-a-file
 and nothing wider. Every editor that offers project-wide search, including the one Monaco was

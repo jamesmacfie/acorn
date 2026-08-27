@@ -19,11 +19,53 @@ and slots. A child webview is positioned over a pane host by the shell; page con
 owns the surrounding chrome.
 
 Both vertical rails, the TabRail on the left and the task pane switcher on the right, are built from
-one component: `tabs/RailTab.tsx`, a square icon tab styled by `.tabrail-tab`. It is not a Button.
-A rail tab hovers by changing its icon and background only, and `.ui-btn:hover` also moves
+one component: `tabs/RailTab.tsx`, a square 52px control styled by `.tabrail-tab`. Every control in
+both rails goes through it, including the bottom-pinned "+" on the left and "close task" on the
+right, which share the `.tabrail-bottom` modifier and therefore the same box. It is not a Button. A
+rail control hovers by changing its icon and background only, and `.ui-btn:hover` also moves
 `border-color`, which lit the right rail's own dividers on hover and made the two sides look
 unrelated. `.pane-switcher` restates only what genuinely differs on the right: the glyph font and an
 active accent on the right edge instead of the left.
+
+### Rail controls and status markers
+
+`RailTab` is presentation only. It takes a `label` (which becomes both the tooltip title and the
+accessible name), a `glyph` resolved through `ui/Icon.tsx`, and explicit `active`, `tone`, `accent`,
+`busy`, `sublabel`, and `markers` props. It never reads task state, asks a registry anything, or
+knows which rail it is in. `children` stays as an escape hatch for a genuinely compound centre;
+prefer `glyph` plus `sublabel`.
+
+Two states are worth spelling out. `active` sets the visual class only — the call site still supplies
+`aria-current`, `aria-pressed`, or `aria-expanded`, because source navigation, a multi-open pane, a
+running process, and an open drawer are four different things to say. `busy` swaps the glyph for the
+shared spinner, sets `aria-busy`, switches the tooltip to `busyLabel`, and refuses activation without
+applying native `disabled`, which would swallow the mouseover the tooltip needs.
+
+A **marker** is a small non-interactive status icon around the outside edge of a control: CI checks,
+an unread agent, a dirty worktree, a plugin's own state. A marker is data, not markup. It carries an
+id, a label in words, exactly one of an icon name or a `StatusDot` tone, an optional semantic tone,
+an optional `busy` spin, and an ordered list of the positions it would like:
+
+```
+top-start   top-end
+     bottom-center
+bottom-start   bottom-end
+```
+
+`tabs/railMarkers.ts` owns the rest, and the host owns it, not the caller and not a plugin
+stylesheet. It orders markers by priority (then id, so activation order never shows), gives each one
+the first position on its list that is still free, renders at most one marker per position, and keeps
+everything that missed out in the tooltip legend and the control's accessible description. Compact
+chrome may hide an icon; it must never hide a state. `bottom-center` is reserved for host lifecycle
+and activity, because it sits under the main glyph rather than in a corner.
+
+Core's markers come from `tasks/railStatus.ts`. Plugins publish theirs through
+`registries/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)); contributed priorities are
+clamped below core's, so a plugin can order its own markers among themselves but can never push a
+core lifecycle state out of its corner. Placement requests are preferences, never guarantees.
+
+A CSS selector in a feature or plugin stylesheet that positions a rail marker is the regression
+signal that placement escaped the host.
 
 ## Appearance
 
@@ -536,7 +578,7 @@ component:
 | `data-tip` | The tip text. Required; no attribute, no tip. |
 | `data-tip-sub` | A second, muted line. |
 | `data-tip-key` | A keyboard chord, rendered as a key cap. |
-| `data-tip-legend` | A JSON array of status markers (icon name, `StatusDot` tone, colour tone, meaning); see `tasks/railStatus.ts`. |
+| `data-tip-legend` | A JSON array of status markers (icon name, `StatusDot` tone, colour tone, meaning). `RailTab` serialises this from its own markers; call sites never build it. |
 
 A wrapper component adds an element around every trigger, which changes layout; attributes work on
 plugin-contributed markup, need no per-site listener, and cost one delegated listener for the whole
@@ -549,8 +591,8 @@ The tip is a singleton, positioned `fixed` so it escapes a scrolling list that c
 positioned children. Side is automatic: the right rail (`.pane-switcher`) flies left, everything
 else flies right, and the CSS offset anchors to whichever side the bubble is pinned to, with `right`
 rather than `left` plus a transform so the bubble keeps real layout width instead of squeezing to
-the edge. A legend entry mirrors one active rail status marker, so the tooltip both reports current
-state and teaches what each glyph on the rail means.
+the edge. A legend entry mirrors one active rail status marker, placed or crowded out, so the tooltip
+both reports current state and teaches what each glyph on the rail means.
 
 A sandboxed plugin frame has its own document, so the shell's tooltip singleton cannot see elements
 inside it and `data-tip` would otherwise be silently inert there. `ui/frameTips.ts` mounts the same

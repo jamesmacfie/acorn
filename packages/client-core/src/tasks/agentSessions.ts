@@ -1,7 +1,10 @@
-// "Which agents are running in this task": platform state, not terminal-drawer internals. The rail
-// spinner, the topbar badge, the notification edge tracker, the archive and quit concerns, and the
-// send-to-agent pickers all read it, so it lives in core. One status subscription, one session
-// list.
+// "Which agents are running in this task": platform state, not terminal-drawer internals. The
+// notification edge tracker, the archive and quit concerns, the send-to-agent pickers and the agents
+// plugin's rail marker all read it, so it lives in core. One status subscription, one session list.
+//
+// What it deliberately does not hold is a judgement about what those sessions mean. "This task has an
+// agent working" is the agents plugin's sentence, and it says it next to its own managed sessions
+// (plugins/agents/src/client/railMarkerContribution.ts).
 //
 // `capabilities().terminal` is the same probe taskBridge() and terminalApi() use (pinned by
 // ./taskBridge.test.ts), so off-desktop this is an empty list and no subscription.
@@ -75,15 +78,6 @@ export function agentSessionsFor(taskId: string | null): TerminalSession[] {
   return sessions()
     .filter((s) => s.kind === 'agent' && s.status === 'running' && s.taskId === taskId)
     .sort((a, b) => b.createdAt - a.createdAt)
-}
-
-// Agents actively working in a task. "Working" means a running agent that isn't idle. Keys off
-// taskId, not the URL: the rail's per-task spinner and the topbar badge both read this.
-export function workingCountFor(taskId: string | null): number {
-  if (!taskId) return 0
-  return sessions().filter(
-    (s) => s.kind === 'agent' && s.status === 'running' && !s.idle && s.taskId === taskId,
-  ).length
 }
 
 // Registered here rather than in the shell's evictor file, so this signal and the thing that clears

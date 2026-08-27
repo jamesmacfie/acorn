@@ -80,3 +80,19 @@ svg.glyph,
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { display: inline-block; animation: spin 1s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+/* For screen readers only. Three surfaces already asked for this class (contribution errors, plugin
+   frame failures, rail marker states) and nothing defined it, so each one was rendering its
+   assistive text on screen. Clipped rather than `display: none`, which would hide it from screen
+   readers too. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

@@ -42,7 +42,9 @@ export const uiSlotRegistry = new Registry<UiSlotContribution>('ui-slot')
 // Task-scoped slots, lighter than UiSlotContext: components get just the taskId, so hosts like the
 // worktree footer don't have to thread shell callbacks they don't own. Additive, so plugins contribute
 // badges without a core import of the plugin.
-export type TaskSlotId = 'task.footer' | 'tabrail.task-row'
+// `tabrail.task-row` used to be here. It was the escape hatch that let a plugin draw arbitrary JSX
+// and position it in the rail's own pixel geography; markers replaced it (registries/railMarkers.ts).
+export type TaskSlotId = 'task.footer'
 
 export type TaskSlotContribution = {
   id: string

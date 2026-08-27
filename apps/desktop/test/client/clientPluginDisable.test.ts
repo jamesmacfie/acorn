@@ -9,6 +9,7 @@ import { nodeStatRegistry } from '@acorn/client-core/registries/nodeStats.ts'
 import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
 import { initClientPlugins, type ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 import { pollerRegistry } from '@acorn/client-core/registries/pollers.ts'
+import { railMarkerRegistry } from '@acorn/client-core/registries/railMarkers.ts'
 import { refPanelRegistry } from '@acorn/client-core/registries/refPanels.ts'
 import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
 import { taskSlotRegistry, uiSlotRegistry } from '@acorn/client-core/registries/slots.ts'
@@ -31,6 +32,7 @@ const REGISTRIES = {
   agentContexts: agentContextRegistry,
   agentToolRenderers: agentToolRendererRegistry,
   pollers: pollerRegistry,
+  railMarkers: railMarkerRegistry,
   persistedState: persistedStateRegistry,
   nodeStats: nodeStatRegistry,
   attention: attentionRegistry,

@@ -11,12 +11,12 @@ import { ContributionBoundary } from '../ui/ContributionBoundary'
 // The linter cannot see that use, hence the suppression.
 // eslint-disable-next-line no-unused-vars -- used by the `use:paneFocus` directive on the pane element.
 import { paneFocus } from './paneFocus'
-import Icon from '../ui/Icon'
 import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
 import { defaultLayout, type LayoutAction } from './layout'
 import { formatChord } from './paneShortcuts'
 import { Button, EmptyState } from '../ui/primitives'
 import { RailTab } from '../tabs/RailTab'
+import { markersFor } from '../registries/railMarkers'
 import { createSplitDrag } from '../ui/split'
 
 export default function TaskPaneHost(props: {
@@ -168,26 +168,30 @@ export default function TaskPaneHost(props: {
         <For each={switcherPanes()}>
           {(pane) => (
             <RailTab
-              classList={{ active: showsPane(pane.id) }}
-              data-tip={pane.label}
+              label={pane.label}
+              glyph={pane.glyph}
+              active={showsPane(pane.id)}
+              markers={markersFor({ kind: 'pane', id: pane.id, taskId: props.task.id })}
               data-tip-key={props.shortcutFor?.(`pane.show.${pane.id}`) ? formatChord(props.shortcutFor(`pane.show.${pane.id}`)!) : pane.defaultChord ? formatChord(pane.defaultChord) : undefined}
               data-tip-sub={`${pane.description ?? pane.label} · ⌘-click to open beside`}
-              aria-label={pane.label}
+              aria-pressed={showsPane(pane.id)}
               onClick={(event) => onSwitch(pane.id, event)}
-            ><Icon name={pane.glyph} /></RailTab>
+            />
           )}
         </For>
         {props.extraButtons}
-        {/* Not `disabled` while closing: a disabled button swallows the mouseover the tooltip needs. */}
+        {/* Whole-control busy rather than a marker: while the teardown runs there is no close
+            action left to offer, so the glyph itself becomes the spinner. RailTab keeps it hoverable
+            and focusable, because a disabled button swallows the mouseover the tooltip needs. */}
         <RailTab
-          class="pane-switch-close"
-          data-tip={props.closing ? 'Removing…' : 'Close task'}
-          aria-label={props.closing ? 'Removing task' : 'Close task'}
-          aria-busy={props.closing || undefined}
-          onClick={() => { if (!props.closing) props.onCloseTask() }}
-        >
-          {props.closing ? <span class="spin">⠿</span> : '✕'}
-        </RailTab>
+          class="tabrail-bottom"
+          label="Close task"
+          glyph="x"
+          tone="danger"
+          busy={props.closing}
+          busyLabel="Removing…"
+          onClick={props.onCloseTask}
+        />
       </nav>
     </>
   )

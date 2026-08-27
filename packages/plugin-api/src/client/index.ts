@@ -46,6 +46,12 @@ export { brandMarkRegistry, brandStyle } from '@acorn/client-core/ui/brandMarks.
 // core owns.
 export { projectPath } from '@acorn/client-core/registries/corePaths.ts'
 export type { TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/registries/slots.ts'
+// Rail status markers (docs/plugins.md § Rail markers). A plugin publishes marker data next to the
+// state that owns it and the host draws the pixels: it picks the corner, the colour, the spin, and
+// the tooltip legend. The registry itself stays off this surface; register through
+// `ctx.railMarkers`, which binds the contribution to the plugin's own name.
+export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/registries/railMarkers.ts'
+export type { RailMarker, RailMarkerPosition, RailTone } from '@acorn/client-core/tabs/railMarkers.ts'
 export type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
 export type { PollerContribution } from '@acorn/client-core/registries/pollers.ts'
 // See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does.
