@@ -214,7 +214,6 @@ describe('primitive adoption', () => {
     'plugins/http/src/frame/index.tsx',
     'plugins/linear/src/frame/index.tsx',
     'plugins/rollbar/src/frame/index.tsx',
-    'plugins/terminal/src/client/slotContribution.tsx',
     // Tier 3 (see docs/ui-design.md § Migration tiers and their two invariant tests).
     'apps/desktop/src/app/client/CommandPalette.tsx',
     'packages/client-core/src/palette/WorkspacePalette.tsx',

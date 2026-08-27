@@ -9,6 +9,6 @@ export const contextClientPlugin: ClientPlugin = {
   init: (ctx) => {
     ctx.panes.register(contextPaneContribution)
     ctx.agentContexts.register(taskContextAgentContribution)
-    ctx.persistedState.register(contextSelectionSlice)
+    ctx.persistedStateSlices.register(contextSelectionSlice)
   },
 }

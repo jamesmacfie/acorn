@@ -10,8 +10,9 @@ import { contextSelectionSlice } from '@acorn/plugin-context/client/selectionSli
 import { dockerPrefsSlice } from '@acorn/plugin-docker/client/dockerPrefs.ts'
 import { editorOpenFilesSlice } from '@acorn/plugin-editor/client/openFilesSlice.ts'
 import { prFiltersSlice } from '@acorn/plugin-github/client/pullList/filterSlice.ts'
+import { agentToolFoldSlice } from '@acorn/plugin-agents/client/toolFoldPrefs.ts'
 
-// The four plugin slices are enumerated here rather than read from persistedStateRegistry because this
+// The plugin slices are enumerated here rather than read from persistedStateRegistry because this
 // Node-only conformance suite does not load SolidJS modules. The completeness check keeps the persisted
 // slice inventory aligned with the activated client plugins.
 const pluginSlices: readonly PersistedStateSlice<unknown>[] = [
@@ -19,6 +20,7 @@ const pluginSlices: readonly PersistedStateSlice<unknown>[] = [
   prFiltersSlice,
   contextSelectionSlice,
   dockerPrefsSlice,
+  agentToolFoldSlice,
 ] as readonly PersistedStateSlice<unknown>[]
 
 const slices: readonly PersistedStateSlice<unknown>[] = [
@@ -40,7 +42,7 @@ const ROOT = (() => {
 describe('persisted-state descriptor conformance', () => {
   it('covers every slice a plugin registers', () => {
     // Text-matched over the plugin entrypoints, the same technique tools/arch/boundaries.test.ts uses:
-    // a plugin that adds `ctx.persistedState.register(...)` without adding its slice above fails here
+    // a plugin that adds `ctx.persistedStateSlices.register(...)` without adding its slice above fails here
     // instead of shipping a descriptor nothing ever checked.
     const pluginsDir = join(ROOT, 'plugins')
     const registered = readdirSync(pluginsDir, { withFileTypes: true })
@@ -48,7 +50,7 @@ describe('persisted-state descriptor conformance', () => {
       .flatMap((entry) => {
         const index = join(pluginsDir, entry.name, 'src/client/index.ts')
         if (!existsSync(index)) return []
-        return [...readFileSync(index, 'utf8').matchAll(/ctx\.persistedState\.register\(/g)].map(() => entry.name)
+        return [...readFileSync(index, 'utf8').matchAll(/ctx\.persistedStateSlices\.register\(/g)].map(() => entry.name)
       })
     expect(registered.length).toBe(pluginSlices.length)
   })

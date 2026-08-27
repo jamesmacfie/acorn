@@ -21,15 +21,39 @@ switch disposes the previous task scope.
 ## Registries and plugins
 
 The client plugin host activates `apps/desktop/src/app/client/plugins.ts`. Plugins register panes,
-rail sources, commands/keybindings, settings pages, shell/task slots, rail markers, palette rows,
-context sections, ref panels, agent contexts/renderers, pollers, persisted-state slices, Node stats,
-and attention sources. The host owns the returned disposables so a plugin can be disabled and
+rail sources, commands/keybindings, settings pages, slots, rail markers, palette rows,
+context-section slots, ref panels, agent contexts/renderers, schedules, persisted-state slices, Node
+stats, attention sources, brand marks, and content links. The host owns the returned disposables so a plugin can be disabled and
 reactivated without duplicate entries.
 
 Rail sources declare their `order` and may declare `isDefault`. `defaultSourceId()` resolves the
 explicit default lazily after plugin registration, with declared rail order as a bare-host fallback.
 The shell consumes that accessor for initial selection, persistence, workspace restoration, and task
 fallbacks; provider-specific navigation commands belong to the owning plugin.
+
+**One slot registry, two component shapes.** `UiSlotId` names five shell slots plus `task.footer`, and
+the id picks what the component is handed: a shell slot gets the whole `UiSlotContext` (the active
+task, the terminal drawer's toggle and close, `openSettings`, `selectTask`), a task slot gets only a
+`taskId`, so a footer badge does not have to thread shell callbacks it does not own. `SlotHost` draws
+the first, `TaskSlotHost` the second, both over `uiSlotRegistry`. They were two registries with two id
+types until 2026-08-27, which cost a `ctx` member and a line in every contribution-kind list to express
+one difference.
+
+**Three gates, three names, three answers.** `requires` on a contribution is the platform question —
+is a desktop shell hosting this renderer, does this node run terminals — and it is answered by
+`hostCapabilities()` in `client-core/src/hostCapabilities.ts`. `when` is a free predicate the
+contribution supplies. A rail source's `requiresProvider` is a third question: given the integration
+behind `providerId` is connected, does it grant this capability. None of those is `ctx.capabilities`,
+which is a plugin publishing a typed function for another plugin to call. Two of the four were spelled
+with the word "capability" until 2026-08-27 and the fourth still is; the rename split them.
+
+Which registries carry which gate follows a rule now, rather than from history. **Every contribution the
+host filters before drawing takes `requires`**, because the question is the host's and the answer is the
+same everywhere, so an author never has to remember which registries opted in. `when` is deliberately
+not uniform: it is the contribution's own predicate over whatever context that draw site has — a task
+for a pane, `UiSlotContext` for a shell slot, nothing at all for a rail source — so it exists where the
+host has a context to hand it and is absent where there is none, such as a client schedule or a settings
+page. Sources, ref panels and extension points gained `requires` on 2026-08-27 to close that out.
 
 Every registry's `order` is a required field, not inferred from where its plugin activates. Plugin
 activation order is invisible in the code, so leaving order optional and falling back to activation

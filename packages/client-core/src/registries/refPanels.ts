@@ -1,5 +1,6 @@
 import { createSignal, type Component } from 'solid-js'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
+import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
 import { Registry } from './registry'
 import { onScopeEvicted } from './scopeEviction'
 
@@ -30,6 +31,9 @@ export type RefPanelContribution = {
   // client plugin host (registries/plugin.ts § declaredProvider), so a plugin cannot claim another's
   // items.
   providerId: string
+  // The platform question, the same field every host-filtered contribution takes
+  // (../hostCapabilities.ts).
+  requires?: HostCapabilityRequirement
   // Per-node presence, the same predicate the pane registry takes. A panel whose plugin is stopped on
   // the node being looked at is not a destination. Without the gate the click is claimed anyway and
   // `RefPanelHost` draws an empty overlay. Declining is what lets the caller try the next rung.
@@ -43,7 +47,8 @@ export const refPanelRegistry = new Registry<RefPanelContribution>('ref-panel')
 // host renders nothing rather than failing. That degradation is why this is looked up at render time
 // instead of imported.
 export const refPanelFor = (providerId: string): RefPanelContribution | undefined =>
-  refPanelRegistry.entries().find((entry) => entry.providerId === providerId && (!entry.when || entry.when()))
+  refPanelRegistry.entries().find((entry) =>
+    entry.providerId === providerId && hasHostCapability(entry.requires) && (!entry.when || entry.when()))
 
 // The open panel is shell state, not a signal owned by whichever surface asked. One module-level
 // signal here, one `RefPanelHost` mounted by the composition root, and callers that only say what to

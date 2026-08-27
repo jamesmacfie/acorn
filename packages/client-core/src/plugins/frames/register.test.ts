@@ -214,7 +214,7 @@ describe('syncFrameContributions', () => {
     const gates = () => [
       paneRegistry.get('board-pane')!.when!(task),
       refPanelRegistry.get('board-ref')!.when!(),
-      uiSlotRegistry.get('board-picker')!.when!(slotContext),
+      (uiSlotRegistry.get('board-picker') as import('../../registries/slots').ShellSlotContribution).when!(slotContext),
     ]
     expect(gates()).toEqual([true, true, true])
     setActiveNode('node-b')

@@ -221,7 +221,7 @@ Workspaces are machine-local groups. A project belongs to one workspace. A task 
 by one Node and one project. Task origins are `github-pr`, `linear`, `rollbar`, or `local`.
 
 The renderer shell is contribution-driven. Plugins register task panes, rail sources, command-palette
-rows, settings pages, slots, context sections, attention items, and node statistics. The shipped
+rows, settings pages, slots, context-section slots, attention sources, and node statistics. The shipped
 feature packages are GitHub, terminal, agents, editor, changes, notes, memory, context, workflows,
 Docker, preview, onboarding, and the built-in Claude, Codex, and Aider profiles registered by
 `plugins/agents`.
@@ -334,6 +334,8 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 - Why the plugin system is shaped this way, the decisions behind it, and where it is going:
   [extensibility](./extensibility.md). Read it before changing a plugin seam.
 - Extension and tool boundaries: [plugins](./plugins.md) and [agent tools](./agent-tools.md).
+- The one-page orientation map over that reference, naming every plugin surface with two worked
+  examples: [how a plugin fits together](./plugin-map.md).
 - The no-build-step authoring contract for a hand-written loaded plugin, with a worked example:
   [plugin authoring](./plugin-authoring.md).
 - Every shipped plugin, and which are first-party because they must be rather than because they were

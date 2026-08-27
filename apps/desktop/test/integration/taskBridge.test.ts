@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { capabilities } from '@acorn/client-core/capabilities.ts'
+import { hostCapabilities } from '@acorn/client-core/hostCapabilities.ts'
 import { canPickFolder, pickFolder } from '@acorn/client-core/platform/index.ts'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
 import { terminalApi } from '@acorn/plugin-terminal/client/terminalClient.ts'
@@ -30,9 +30,9 @@ describe('the folder picker is a desktop extra, not a feature gate', () => {
   it('reports itself absent without a host, and takes nothing else down with it', () => {
     setHost(undefined)
     expect(canPickFolder()).toBe(false)
-    expect(capabilities().desktop).toBe(false)
+    expect(hostCapabilities().desktop).toBe(false)
     // The regression this whole split exists to prevent.
-    expect(capabilities().terminal).toBe(true)
+    expect(hostCapabilities().terminal).toBe(true)
     expect(taskBridge()).not.toBeNull()
     expect(terminalApi()).not.toBeNull()
   })

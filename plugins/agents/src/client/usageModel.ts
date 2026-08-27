@@ -6,18 +6,7 @@ import type {
 import { sessionQuota } from '../shared/usage'
 
 export type UsageDetailRow = { label: string; value: string }
-
-const HEALTH_ICON: Record<AgentUsageHealth, string> = {
-  healthy: '🟢',
-  warning: '🟡',
-  critical: '🔴',
-  depleted: '⚪',
-  unknown: '⚪',
-}
-
-export function usageHealthIcon(health: AgentUsageHealth): string {
-  return HEALTH_ICON[health]
-}
+export type UsageSummaryEntry = { health: AgentUsageHealth; label: string; value: string }
 
 export function formatPercent(percent: number): string {
   return `${Math.round(percent)}%`
@@ -64,18 +53,15 @@ export function formatUpdated(capturedAt: number | null, now = Date.now()): stri
 
 // Whatever harnesses the snapshot came back with, in the node's order. The label travels with the row
 // (shared/usage.ts), so a harness the client has never heard of still gets named.
-export function usageTooltipSummary(snapshot: AgentUsageSnapshot | null): string {
-  const summary = (snapshot?.providers ?? [])
-    .map((provider) => {
-      const quota = sessionQuota(provider)
-      return quota
-        ? `${usageHealthIcon(quota.health)} ${provider.label} ${formatPercent(quota.percentRemaining)}`
-        : `⚪ ${provider.label} —`
-    })
-    .join(' · ')
-  // This string is the indicator button's label, so an empty one collapses the button. The placeholder
-  // names no harness, because only the node knows which ones exist.
-  return summary || 'reading usage…'
+export function usageSummaryEntries(snapshot: AgentUsageSnapshot | null): UsageSummaryEntry[] {
+  return (snapshot?.providers ?? []).map((provider) => {
+    const quota = sessionQuota(provider)
+    return {
+      health: quota?.health ?? 'unknown',
+      label: provider.label,
+      value: quota ? formatPercent(quota.percentRemaining) : '—',
+    }
+  })
 }
 
 export function providerUsageRows(provider: AgentProviderUsage, now = Date.now()): UsageDetailRow[] {

@@ -5,4 +5,4 @@
 // cannot drift out from under that regex; api.ts, at 650 lines, could.
 //
 // See docs/plugins.md § Activation for what bumping this number costs.
-export const PLUGIN_API_MAJOR = '2'
+export const PLUGIN_API_MAJOR = '3'

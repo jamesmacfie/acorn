@@ -1,5 +1,5 @@
 import { createResource, For, Show } from 'solid-js'
-import { activeTaskId, capabilities } from '@acorn/plugin-api/client'
+import { activeTaskId, hostCapabilities } from '@acorn/plugin-api/client'
 import { workflowApi } from '../contract/workflowClient'
 import { Alert, Button } from '@acorn/plugin-api/ui'
 
@@ -13,7 +13,7 @@ export default function WorkflowsSettings() {
   const [data, { refetch }] = createResource(
     () => taskId() ?? 'no-task',
     async () => {
-      const api = capabilities().terminal
+      const api = hostCapabilities().terminal
       const id = taskId()
       if (!api || !id) return { workflows: [], errors: [] }
       return workflowApi.defs(id)

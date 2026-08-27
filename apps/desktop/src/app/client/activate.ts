@@ -9,11 +9,11 @@ import { purgeRetiredLocalStorage } from '@acorn/client-core/persistence/legacyS
 import { persistedStateRegistry } from '@acorn/client-core/persistence/persistedState.ts'
 import { coreStateSlices } from '@acorn/client-core/persistence/stateSlices.ts'
 import { noticeKindRegistry } from '@acorn/client-core/registries/notices.ts'
-import { pollerRegistry } from '@acorn/client-core/registries/pollers.ts'
+import { clientScheduleRegistry } from '@acorn/client-core/registries/schedules.ts'
 import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
 import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { uiSlotRegistry } from '@acorn/client-core/registries/uiSlots.tsx'
-import { taskStatusPollerContribution } from '@acorn/client-core/tasks/taskStatus.ts'
+import { taskStatusScheduleContribution } from '@acorn/client-core/tasks/taskStatus.ts'
 import { TASKS_COLLECTION_ID, tasksCollection } from '@acorn/client-core/tasks/tasksCollection.ts'
 import { settingsPageContributions } from './pageContributions'
 import { clientPlugins } from './plugins'
@@ -34,9 +34,9 @@ for (const contribution of shellSlotContributions) uiSlotRegistry.register(contr
 for (const source of coreSourceContributions) sourceRegistry.register(source)
 // Core's own persisted state: the shell slices (selection, layouts, drawer height, notices) plus the
 // direct preference slices. Which features persist state is each plugin's own declaration now,
-// through ctx.persistedState. The app no longer holds a list of four plugin slices it does not own.
+// through ctx.persistedStateSlices. The app no longer holds a list of four plugin slices it does not own.
 for (const slice of [...coreStateSlices, ...directPreferenceSlices]) persistedStateRegistry.register(slice)
-pollerRegistry.register(taskStatusPollerContribution)
+clientScheduleRegistry.register(taskStatusScheduleContribution)
 // Core's own attention source: plugins this node installed but could not start. Registered here
 // rather than by a plugin, because the plugin that failed is not running to report itself.
 attentionRegistry.register(pluginFailureAttention)

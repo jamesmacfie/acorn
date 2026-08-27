@@ -13,7 +13,11 @@ export type ContextSectionSlotProps = {
   onPendingChange: (count: number) => void
 }
 
-export type ContextSectionContribution = {
+// A component drawn INSIDE a section the node assembled, not a section of its own. The node's
+// `ContextSectionContribution` (node-core/server/agentTools/contextSections.ts) is the one that
+// declares a section and produces its prompt text; this is a slot in the pane that renders one, which
+// is why it is named for the slot and lives beside the other slot registries.
+export type ContextSectionSlotContribution = {
   id: string
   // Which node-side section this renders under, by that section's id ('memory', 'pr', 'notes',
   // 'issues'). Not the same field as `id`: a section could host more than one contribution, and each
@@ -23,12 +27,12 @@ export type ContextSectionContribution = {
   component: Component<ContextSectionSlotProps>
 }
 
-export const contextSectionRegistry = new Registry<ContextSectionContribution>('context-section')
+export const contextSectionSlotRegistry = new Registry<ContextSectionSlotContribution>('context-section-slot')
 
 // Sorted by `order`, so registration order, and therefore plugin declaration order, can't affect what
 // the pane renders. Same rule the pane, settings and slot registries follow.
-export const contextSectionContributions = (sectionId: string): readonly ContextSectionContribution[] =>
-  contextSectionRegistry
+export const contextSectionSlots = (sectionId: string): readonly ContextSectionSlotContribution[] =>
+  contextSectionSlotRegistry
     .entries()
     .filter((entry) => entry.sectionId === sectionId)
     .sort((a, b) => a.order - b.order)

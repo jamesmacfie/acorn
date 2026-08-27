@@ -1,4 +1,4 @@
-import type { ClientCapabilityRequirement } from '../capabilities'
+import type { HostCapabilityRequirement } from '../hostCapabilities'
 import type { PaletteItem } from '../palette/model'
 import { Registry } from './registry'
 
@@ -17,7 +17,7 @@ export type PaletteRowSource = {
   // Order among contributed rows, so the list doesn't depend on plugin declaration order. Core's own
   // rows (actions, workspaces, go-to-task) always follow.
   order: number
-  requires?: ClientCapabilityRequirement
+  requires?: HostCapabilityRequirement
   // Called when the palette opens, per active task. `null` when there's no active task: a source with
   // nothing to offer outside a task returns no rows rather than being skipped, so the decision stays its
   // own.

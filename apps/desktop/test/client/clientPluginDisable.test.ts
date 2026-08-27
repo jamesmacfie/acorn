@@ -1,21 +1,22 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { agentContextRegistry } from '@acorn/client-core/registries/agentContexts.ts'
 import { agentToolRendererRegistry } from '@acorn/client-core/registries/agentToolRenderers.ts'
-import { contextSectionRegistry } from '@acorn/client-core/registries/contextSections.ts'
+import { contextSectionSlotRegistry } from '@acorn/client-core/registries/contextSectionSlots.ts'
 import { paletteRowRegistry } from '@acorn/client-core/registries/paletteRows.ts'
 import { attentionRegistry } from '@acorn/client-core/registries/attention.ts'
 import { collectionRegistry } from '@acorn/client-core/registries/collections.ts'
 import { nodeStatRegistry } from '@acorn/client-core/registries/nodeStats.ts'
 import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
 import { initClientPlugins, type ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
-import { pollerRegistry } from '@acorn/client-core/registries/pollers.ts'
+import { clientScheduleRegistry } from '@acorn/client-core/registries/schedules.ts'
 import { railMarkerRegistry } from '@acorn/client-core/registries/railMarkers.ts'
 import { refPanelRegistry } from '@acorn/client-core/registries/refPanels.ts'
 import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
-import { taskSlotRegistry, uiSlotRegistry } from '@acorn/client-core/registries/slots.ts'
+import { uiSlotRegistry } from '@acorn/client-core/registries/slots.ts'
 import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { persistedStateRegistry } from '@acorn/client-core/persistence/persistedState.ts'
 import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
+import { brandMarkRegistry } from '@acorn/client-core/ui/brandMarks.ts'
 import { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
 import { clientPlugins } from '../../src/app/client/plugins'
 import { readGolden, writeGolden } from './golden'
@@ -25,19 +26,22 @@ const REGISTRIES = {
   sources: sourceRegistry,
   settingsPages: settingsRegistry,
   slots: uiSlotRegistry,
-  taskSlots: taskSlotRegistry,
-  contextSections: contextSectionRegistry,
+  contextSectionSlots: contextSectionSlotRegistry,
   refPanels: refPanelRegistry,
   paletteRows: paletteRowRegistry,
   agentContexts: agentContextRegistry,
   agentToolRenderers: agentToolRendererRegistry,
-  pollers: pollerRegistry,
+  schedules: clientScheduleRegistry,
   railMarkers: railMarkerRegistry,
-  persistedState: persistedStateRegistry,
+  persistedStateSlices: persistedStateRegistry,
   nodeStats: nodeStatRegistry,
-  attention: attentionRegistry,
+  attentionSources: attentionRegistry,
   collections: collectionRegistry,
   contentLinks: contentLinkRegistry,
+  // Core registers its own `github` mark at module scope, so this list is never empty and no plugin
+  // owns that row. That is the point: a plugin's marks must come back after a disable, and a bare
+  // `brandMarkRegistry.register` would throw on the duplicate id instead.
+  brandMarks: brandMarkRegistry,
   projectImporters: projectImporterRegistry,
 } as const
 
@@ -55,8 +59,8 @@ const build = (make: (name: RegistryName) => readonly string[]): Snapshot => {
 }
 
 // Ids in registration order, not sorted: the order is part of what must survive a sibling's disable.
-// Two slot registries hold entries whose ids only differ by which slot they fill, so the slot is
-// folded into the key.
+// The slot registry holds entries whose ids only differ by which slot they fill, so the slot is folded
+// into the key.
 const snapshot = (): Snapshot =>
   build((name) =>
     REGISTRIES[name].entries().map((entry) => {

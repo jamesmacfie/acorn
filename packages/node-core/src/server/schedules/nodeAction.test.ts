@@ -5,7 +5,7 @@ import type { NodePermissions, PluginCommandDescriptor } from '../../main/plugin
 import { makeTestDb, testEnv } from '../../testkit/db'
 import { CapabilityRegistry } from '../plugin/capabilities'
 import { clearRegistrations, initPlugins } from '../plugin/host'
-import type { NodePlugin, PluginStorage } from '../plugin/types'
+import type { HostPluginContext, NodePlugin, PluginStorage } from '../plugin/types'
 import { nodeActions } from '../nodeActions/registry'
 import { consentStillCovers, registerNodeActionTarget } from './nodeAction'
 import { type Clock, Scheduler } from './scheduler'
@@ -52,8 +52,12 @@ function fakeClock() {
 
 afterEach(() => clearRegistrations(PLUGIN))
 
+// `nodeActions` is a host seam, not a plugin one (server/plugin/types.ts § HostPluginContext): in
+// production the only feeder is a manifest command with the `runNodeAction` verb. This suite needs the
+// risk tier, which no manifest declares yet, so it registers the way the host does and says so with a
+// cast rather than putting the member back on the authoring type.
 async function world(
-  register: (ctx: Parameters<NonNullable<NodePlugin['init']>>[0]) => void,
+  register: (ctx: HostPluginContext) => void,
   onCall: () => Response,
   observe?: (request: Request) => Promise<void>,
 ) {
@@ -69,7 +73,7 @@ async function world(
         await observe?.(request)
         return onCall()
       }, { prefix: '/actions' })
-      register(ctx)
+      register(ctx as HostPluginContext)
     },
   }
   await initPlugins([plugin], {
@@ -84,7 +88,7 @@ async function world(
 }
 
 const declare = (risk?: 'read' | 'write' | 'execute') =>
-  (ctx: Parameters<NonNullable<NodePlugin['init']>>[0]) =>
+  (ctx: HostPluginContext) =>
     ctx.nodeActions.register({
       actionId: 'prune-merged',
       name: 'Prune merged worktrees',
@@ -189,7 +193,7 @@ describe('creating and running one', () => {
       name: PLUGIN,
       init: (ctx) => {
         ctx.routes.fetch(() => { fired += 1; return new Response(null, { status: 204 }) }, { prefix: '/actions' })
-        ctx.nodeActions.register({ actionId: 'prune-merged', name: 'Prune merged worktrees', path: `/v2/p/${PLUGIN}/actions/prune`, risk })
+        ;(ctx as HostPluginContext).nodeActions.register({ actionId: 'prune-merged', name: 'Prune merged worktrees', path: `/v2/p/${PLUGIN}/actions/prune`, risk })
       },
     })
     try {

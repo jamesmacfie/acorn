@@ -126,7 +126,11 @@ without regenerating fails the same test, so the pair cannot drift apart in eith
 means editing `packages/protocol/src/pluginApiVersion.ts` and rebuilding every loaded package
 (`pnpm --filter @acorn/node build:plugin <id>` per package, plus
 `pnpm --filter @acorn/desktop run build:bundled-plugins`) — a stale package keeps the old number and stops
-loading. The major went to `2` on 2026-08-14, when the facade shed seventy-one names.
+loading. The major went to `2` on 2026-08-14, when the facade shed seventy-one names, and to `3` on
+2026-08-27, when four names moved to say what they mean: `capabilities` became `hostCapabilities`,
+`PollerContribution` became `ClientScheduleContribution`, and the two slot registries folded into one.
+Both bumps were batched deliberately — a rename is cheap while every plugin is in this repository and
+expensive the moment one is not.
 
 ### What is published, and what acorn promises about it
 
@@ -252,6 +256,16 @@ Node initialization happens before the listener accepts requests. A plugin can r
 - agent tools and task-context sections;
 - integration, connection, and model-provider descriptors;
 - a plugin-owned SQLite migration chain and disposal hook.
+
+Two things a plugin CANNOT register, because they are the host's to write on its behalf: node actions
+and managed-agent harnesses. Both come from the manifest — a command whose verb is `runNodeAction`, and
+`contributions.harnesses` — and the host replays them through `HostPluginContext`, a shape
+`server/plugin/types.ts` keeps deliberately off the authoring type. They sat on `NodePluginContext`
+until 2026-08-27, reading as members an author should reach for, and across 21 plugins nobody ever did.
+
+There is no `ctx.log` either. Two plugins used it and four reached past it for `console`, which is
+interchangeable with it at every call site, so the seam bought no attribution and cost a member. Prefix
+your own messages.
 
 The host supplies `CoreServices` for confined filesystem access, Git, processes, secrets, tasks,
 repositories, task context, model generation, preferences, and the machine identity. Plugins do not
@@ -1087,14 +1101,16 @@ kinds of contribution come out of one manifest:
     still what puts one in a panel editor, and this is the pointer the measure sampler dispatches
     through. A loaded plugin registers nothing here; the host synthesises its entries from the
     manifest's `collections` descriptors, which already carry `items`.
-  - **`ctx.nodeActions.register({ actionId, name, path, risk })`** — which of this plugin's actions a
-    person may put on a schedule, and how dangerous each one is. A loaded plugin's are synthesised
-    from its manifest **commands** whose verb is `runNodeAction`. Registering nothing means none of
-    this plugin's actions can be scheduled, which is the right default for most of them; an action
-    that declares no `risk` is treated as `execute`, so the omission fails safe rather than quiet.
+  `ctx.collections` is owner-bound by the host and cleared with everything else a plugin registered,
+  and it re-checks route confinement on every call rather than only at registration.
 
-  Both are owner-bound by the host and cleared with everything else a plugin registered, and both
-  re-check route confinement on every call rather than only at registration.
+  **Node actions have no `ctx` member.** Which of this plugin's actions a person may put on a schedule
+  is declared in the manifest, as a **command** whose verb is `runNodeAction`, and the host replays
+  that through a host-only seam (`HostPluginContext` in `server/plugin/types.ts`). Declaring nothing
+  means none of this plugin's actions can be scheduled, which is the right default for most of them;
+  an action that declares no `risk` is treated as `execute`, so the omission fails safe rather than
+  quiet. It sat on `NodePluginContext` until 2026-08-27, where it read as something an author writes,
+  and across 21 plugins nobody ever did.
 
   A `themes` entry is the descriptor tier taken to its limit: a **colour** theme with no route, no
   bundle and no CSS, declared as a map of the 22 palette tokens plus a `dark` flag. The host validates
@@ -1163,7 +1179,7 @@ native, and would be dead whenever no frame of that plugin happened to be mounte
 small surfaces are open to frames, and the answer to "I want a chip in the topbar" is to grow the
 descriptor vocabulary rather than to open a slot id to an iframe.
 
-That is why the `slots` enum is two names rather than the client's five, and why the refusals are
+That is why the `slots` enum is two names rather than the client's six, and why the refusals are
 recorded next to it in `@acorn/protocol/pluginContract.ts`:
 
 | Manifest slot | Host slot | Why |
@@ -1177,6 +1193,10 @@ whether to trust it. `drawer` is a rectangle with real UI in it, which is what a
 slot context carries shell callbacks a descriptor cannot receive. `topbar.left` and
 `task.switcher.extra` are members of the client's slot union with no host rendering them at all, so a
 manifest naming one would parse and never appear.
+
+Both host slots are rows in one registry now. `task.footer` had its own registry and its own `ctx`
+member until 2026-08-27; folding them left the id as the only thing that decides which context a
+component receives, which is what this table already assumed.
 
 A rail row is not on that list at all, in either direction. It used to be a client slot called
 `tabrail.task-row`, and Docker was its only user; what it actually handed out was permission to draw
@@ -1663,9 +1683,19 @@ major, chosen at boot and stable for the session — because contribution ids ar
 persisted layout keys and two versions registering at once would collide on them.
 
 Client initialization for compiled-in plugins is synchronous registration. The host exposes contribution points for panes,
-sources, settings pages, shell/task slots, context sections, provider reference panels, palette rows,
-agent contexts, agent-tool renderers, pollers, persisted-state slices, Node statistics, and attention
-items. An activation pass handles subscriptions or local storage initialization after all descriptors
+sources, settings pages, slots, context-section slots, provider reference panels, palette rows,
+agent contexts, agent-tool renderers, schedules, persisted-state slices, Node statistics, attention
+sources, brand marks, and content links. `slots` is one point for both shapes: the slot id decides
+whether the component receives the shell context or only a task id (`docs/frontend.md § Registries and
+plugins`). `schedules` is the same word the node half uses for the same idea, taking a raw `intervalMs`
+because a renderer poll is not a node cadence (`docs/schedules.md § Cadence`). `contextSectionSlots` is
+NOT the node's `contextSections`: the node declares a section and assembles its prompt text, and this
+registers a component that draws inside one.
+
+`ctx.contribute(registry, entry)` is the escape hatch beside them, and the line it sits on is: a
+registry the HOST owns gets a named member, and `contribute` is for a registry another PLUGIN
+published. Core's own two targets, brand marks and content links, took names on 2026-08-27; before
+that the line was drawn nowhere and every count of the contribution surface was two short. An activation pass handles subscriptions or local storage initialization after all descriptors
 exist.
 
 A contribution that names a provider must name its own plugin. `registries/plugin.ts`'s
@@ -1674,7 +1704,7 @@ contribution itself carries, the same way a Node route is confined to its own pa
 plugin could claim another plugin's integration rows, which is what `providerId` otherwise selects a
 rail source on.
 
-**`persistedState` has no manifest form, and will not get one.** A slice is not a value — it is a
+**`persistedStateSlices` has no manifest form, and will not get one.** A slice is not a value — it is a
 `{ codec, empty, unknownIds, maxBytes, legacy, binding: { values, hydrate } }` record the host drives
 through its own restore phases, reading and writing SHELL SIGNALS at boot before any frame exists, and
 clearing them on scope eviction. None of that survives a port: a descriptor cannot hand over a codec, and
@@ -1771,8 +1801,9 @@ there is: no route, no bundle, no build step.
 
 The two-feeder pattern again, with one difference that matters. A compiled plugin registers a launch
 spec directly with the driver registry in plugins/agents; a loaded one declares the harness in its
-manifest and the host synthesises the registration through `ctx.harnesses`. The difference is where the
-registration lands: schedules, collections and task checks land in a node-core registry, and a harness
+manifest and the host synthesises the registration through a host-only seam (`HostPluginContext` in
+`server/plugin/types.ts`; there is no `ctx.harnesses` for a plugin to call). The difference is where
+the registration lands: schedules, collections and task checks land in a node-core registry, and a harness
 lands in **another plugin's**, through the `agents.harnessRegistry` capability that plugins/agents
 publishes. The contract is `packages/node-core/src/server/plugin/harnesses.ts`, in node-core rather
 than in the agents plugin because the host is what delivers a harness and neither package may import
@@ -1836,6 +1867,20 @@ import edge between their packages. The motivating case was the agent task sideb
 `plugins/agents` to execute a session, two legitimate couplings pointing opposite ways, which is a
 package cycle that turbo refuses to build. Routing one direction through a capability id breaks the
 cycle.
+
+It carries the node registry's four verbs behind `ctx.capabilities` — `provide`, `get`, `require`,
+`ids` — so an author who learned one half does not get the other backwards. `clientCapability` and
+`requireClientCapability` are the same reads as free functions, for a component that has no `ctx` in
+hand. What it is emphatically NOT is the platform gate: that is `requires` on a contribution, answered
+by `hostCapabilities()`. Both were spelled "capability" until 2026-08-27, in opposite senses on the two
+halves.
+
+**Where a key lives.** With whichever side would otherwise have to import the other. On the node that is
+almost always the provider, and the registry says so: "the signature lives in the provider's
+`contract/`, never here". `WORKFLOW_CONTROL` is the exception that fixes the rule's wording — agents
+declares it, workflows provides it, and the id string still names the provider — because agents draws
+the control and workflows already imports agents. Cycle-breaking wins over provider-ownership. Put the
+key wherever it does not recreate the import you were avoiding, and say which in its own file.
 
 Like the Node's registry, it is not a DI container: it resolves nothing on its own, constructs
 nothing, and orders nothing. Call sites must resolve at call time, never at module scope or in a

@@ -45,7 +45,9 @@ export { brandMarkRegistry, brandStyle } from '@acorn/client-core/ui/brandMarks.
 // way back to the bare project path, deselecting an item, a breadcrumb, without hardcoding a shape
 // core owns.
 export { projectPath } from '@acorn/client-core/registries/corePaths.ts'
-export type { TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/registries/slots.ts'
+// One slot registry, two component shapes: the slot id picks which (docs/frontend.md § Registries and
+// plugins). `UiSlotContribution` is the union both arms satisfy.
+export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/registries/slots.ts'
 // Rail status markers (docs/plugins.md § Rail markers). A plugin publishes marker data next to the
 // state that owns it and the host draws the pixels: it picks the corner, the colour, the spin, and
 // the tooltip legend. The registry itself stays off this surface; register through
@@ -53,7 +55,7 @@ export type { TaskSlotContribution, UiSlotContribution } from '@acorn/client-cor
 export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/registries/railMarkers.ts'
 export type { RailMarker, RailMarkerPosition, RailTone } from '@acorn/client-core/tabs/railMarkers.ts'
 export type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
-export type { PollerContribution } from '@acorn/client-core/registries/pollers.ts'
+export type { ClientScheduleContribution } from '@acorn/client-core/registries/schedules.ts'
 // See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does.
 export { closeRefPanel, openRefPanel } from '@acorn/client-core/registries/refPanels.ts'
 // The props a first-party reference panel receives. The registry value itself stays off this
@@ -89,7 +91,7 @@ export { allProjects } from '@acorn/client-core/projects/projectLookup.ts'
 // manifest row, never from client code.
 export { refResolutionsOptions } from '@acorn/client-core/registries/refResolvers.ts'
 export type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
-export { contextSectionContributions } from '@acorn/client-core/registries/contextSections.ts'
+export { contextSectionSlots } from '@acorn/client-core/registries/contextSectionSlots.ts'
 export { agentContextContributions } from '@acorn/client-core/registries/agentContexts.ts'
 // prune candidate: agent-tool renderers are in-realm components drawn inside the transcript list, so
 // they cannot cross a sandbox boundary. First-party only, permanently (docs/extensibility.md § Two
@@ -151,10 +153,13 @@ export { canPickFolder, pickFolder, previewViews } from '@acorn/client-core/plat
 export type { PreviewState, PreviewViews } from '@acorn/client-core/platform/index.ts'
 
 // ── Capabilities, prefs, persisted state ──────────────────────────────────────────────────────
-// prune candidate: `capabilities` is the node's capability read model. A plugin should be asking
+// prune candidate: `hostCapabilities` is the node's capability read model. A plugin should be asking
 // ctx what it may do rather than reading the shared signal.
-export { capabilities } from '@acorn/client-core/capabilities.ts'
-export { clientCapability, clientCapabilityId } from '@acorn/client-core/clientCapabilities.ts'
+export { hostCapabilities } from '@acorn/client-core/hostCapabilities.ts'
+export type { HostCapabilities, HostCapabilityRequirement } from '@acorn/client-core/hostCapabilities.ts'
+// The other capability: a typed function another plugin published. Register through
+// `ctx.capabilities`; these two are for reading one from a component, which has no ctx in hand.
+export { clientCapability, clientCapabilityId, requireClientCapability } from '@acorn/client-core/clientCapabilities.ts'
 export { parseJson } from '@acorn/client-core/persistence/persistedState.ts'
 export type { PersistedStateSlice } from '@acorn/client-core/persistence/persistedState.ts'
 export { PersistedSliceKeys, PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'

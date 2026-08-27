@@ -115,7 +115,7 @@ task / agent / notification state
   -> positioned spans owned by core and notification CSS
 
 compiled plugin state
-  -> ctx.taskSlots.register({ slot: 'tabrail.task-row', component })
+  -> ctx.slots.register({ slot: 'tabrail.task-row', component })
   -> TaskSlotHost(taskId)
   -> arbitrary plugin JSX and plugin-owned absolute-position CSS
 ```

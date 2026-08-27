@@ -9,6 +9,7 @@ import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.
 import { Scheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
 import { agentDriverRegistry } from '@acorn/plugin-agents/main/drivers/registry.ts'
 import { assembleNodeGraph } from '../../src/server/composition'
 
@@ -22,7 +23,7 @@ const OPENCODE = {
   id: 'opencode',
   name: 'OpenCode',
   version: '0.1.0',
-  apiVersion: '2',
+  apiVersion: PLUGIN_API_MAJOR,
   icon: { d: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z' },
   contributions: {
     harnesses: [

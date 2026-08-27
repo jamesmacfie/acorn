@@ -1,6 +1,6 @@
 import type { Component } from 'solid-js'
 import type { Task } from '../queries'
-import { hasClientCapability, type ClientCapabilityRequirement } from '../capabilities'
+import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
 import { Registry } from './registry'
 
 export type PaneId = string
@@ -13,7 +13,7 @@ export type PaneContribution = {
   description?: string
   order: number
   defaultChord?: string
-  requires?: ClientCapabilityRequirement
+  requires?: HostCapabilityRequirement
   when?: (task: Task) => boolean
   component: Component<{ task: Task }>
   keepAlive?: 'dom' | 'none'
@@ -36,4 +36,4 @@ export const paneContribution = (id: PaneId): PaneContribution | undefined => pa
 export const paneIds = (): PaneId[] => paneContributions().map((pane) => pane.id)
 export const paneLabel = (id: PaneId): string => paneContribution(id)?.label ?? id
 export const paneAvailable = (pane: PaneContribution, task?: Task): boolean =>
-  hasClientCapability(pane.requires) && (!task || !pane.when || pane.when(task))
+  hasHostCapability(pane.requires) && (!task || !pane.when || pane.when(task))

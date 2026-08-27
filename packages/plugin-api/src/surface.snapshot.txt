@@ -1,10 +1,13 @@
-# plugin API major: 2
+# plugin API major: 3
 client: AgentToolRendererContribution
 client: AgentToolRendererProps
 client: CHECK_TONE
 client: ClientPlugin
+client: ClientScheduleContribution
 client: ContentLinkContribution
 client: FAILED_STATUSES
+client: HostCapabilities
+client: HostCapabilityRequirement
 client: InAppTarget
 client: IntegrationFlowContribution
 client: PaletteItem
@@ -14,7 +17,6 @@ client: PaneIntent
 client: PersistedSliceKeys
 client: PersistedStateSlice
 client: PluginRefResolution
-client: PollerContribution
 client: PrefKeys
 client: PreviewState
 client: PreviewViews
@@ -30,6 +32,7 @@ client: RailMarkerTarget
 client: RailTone
 client: RefPanelProps
 client: RefPanelTarget
+client: ShellSlotContribution
 client: SourceContribution
 client: SourceRouteContribution
 client: Task
@@ -52,7 +55,6 @@ client: brandMarkRegistry
 client: brandStyle
 client: bytesOf
 client: canPickFolder
-client: capabilities
 client: checkStatusTone
 client: checksState
 client: clientCapability
@@ -63,7 +65,7 @@ client: closeTunnelsForTask
 client: consumePaneIntent
 client: consumeTerminalFocusIntent
 client: contentLinkRegistry
-client: contextSectionContributions
+client: contextSectionSlots
 client: contextSnapshot
 client: createDeviceFlow
 client: createFleetQuery
@@ -82,6 +84,7 @@ client: formatSize
 client: fuzzyScore
 client: getHighlighter
 client: handlePluginContentLinkClick
+client: hostCapabilities
 client: integrationsOptions
 client: isAppDark
 client: isDarkColor
@@ -127,6 +130,7 @@ client: rememberActiveTerminal
 client: renderMarkdown
 client: requestTerminalFocus
 client: requestTerminalFocusIntent
+client: requireClientCapability
 client: rowHeight
 client: runApi
 client: saveJsonPref

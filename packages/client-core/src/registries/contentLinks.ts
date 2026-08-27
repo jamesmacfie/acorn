@@ -32,7 +32,7 @@ export type ContentLinkContribution = {
   // link: the ladder below looks the panel up by provider, never by a panel id a recogniser named.
   //
   // Bound to the registering plugin, on both tiers and by the host in both cases. A first-party plugin
-  // going through `ctx.contribute` hits registries/plugin.ts, `declaredProvider`, which throws when a
+  // going through `ctx.contentLinks` hits registries/plugin.ts, `declaredProvider`, which throws when a
   // plugin names a provider that is not its own. A manifest-declared recogniser never states it at all,
   // and plugins/chrome/register.ts stamps the plugin id. Optional, because a recogniser can legitimately
   // have no items of its own to show: github recognises PR and repo URLs and has no reference panel.

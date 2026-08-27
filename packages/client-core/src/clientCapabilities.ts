@@ -2,6 +2,13 @@
 // (@acorn/node-core/server/plugin/capabilities.ts). See docs/plugins.md § Collaboration rules for
 // why it exists, what it is not, and why it is a singleton unlike the node's.
 
+// Where a key lives: with whichever side would otherwise have to import the other. Usually that is the
+// provider, matching the node's rule that "the signature lives in the provider's contract/, never
+// here". WORKFLOW_CONTROL is the exception and the reason the rule is written as "otherwise": agents
+// declares it, workflows provides it, and the id string still names the provider, because agents draws
+// the control and workflows already imports agents. Cycle-breaking wins over provider-ownership; put
+// the key wherever it does not create the import you were avoiding, and say which in its own file.
+
 // A phantom-typed string. The brand is optional so a plain string literal still satisfies the type at
 // the declaration site, but `provide`/`get` infer T from it.
 export type ClientCapabilityId<T> = string & { readonly __signature?: (value: T) => void }
@@ -33,6 +40,14 @@ export function provideClientCapability<T>(id: ClientCapabilityId<T>, impl: T): 
 // (docs/plugins.md § Collaboration rules).
 export function clientCapability<T>(id: ClientCapabilityId<T>): T | undefined {
   return impls.get(id) as T | undefined
+}
+
+// For a capability whose provider cannot be disabled, so absence is a wiring bug rather than a state a
+// caller should branch on. Mirrors the node's `ctx.capabilities.require`.
+export function requireClientCapability<T>(id: ClientCapabilityId<T>): T {
+  const impl = impls.get(id)
+  if (impl === undefined) throw new Error(`client capability not provided: ${id}`)
+  return impl as T
 }
 
 export const clientCapabilityIds = (): string[] => [...impls.keys()].sort()

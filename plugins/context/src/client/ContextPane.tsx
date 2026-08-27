@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import { agentSessionsFor, bytesOf, clientEvents, consumePaneIntent, contextSectionContributions, formatSize, openPane, type PaneIntent, readJson, type Task, taskBridge, toast } from '@acorn/plugin-api/client'
+import { agentSessionsFor, bytesOf, clientEvents, consumePaneIntent, contextSectionSlots, formatSize, openPane, type PaneIntent, readJson, type Task, taskBridge, toast } from '@acorn/plugin-api/client'
 import { taskContextRoute, type ContextItem, type TaskContext } from '@acorn/protocol/api.ts'
 import { Alert, Button, Checkbox, CodeBlock, Meter, Picker, Toolbar } from '@acorn/plugin-api/ui'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
@@ -42,7 +42,7 @@ export default function ContextPane(props: { task: Task }) {
   const assembled = createMemo(() => (ctx() ? assembleBlockFrom(ctx()!, effective()) : null))
 
   const visibleSections = createMemo(() =>
-    (ctx()?.sections ?? []).filter((s) => contextSectionContributions(s.id).length > 0 || s.items.length > 0 || !!s.absent),
+    (ctx()?.sections ?? []).filter((s) => contextSectionSlots(s.id).length > 0 || s.items.length > 0 || !!s.absent),
   )
 
   const isOpen = (id: string) => expanded().has(id)
@@ -187,7 +187,7 @@ export default function ContextPane(props: { task: Task }) {
                     {/* Extra controls a plugin renders under its own section, such as memory's add
                         form and proposal queue. The pane asks the registry and does not know which
                         plugins answer. */}
-                    <For each={contextSectionContributions(section.id)}>
+                    <For each={contextSectionSlots(section.id)}>
                       {(contribution) => (
                         <Dynamic
                           component={contribution.component}

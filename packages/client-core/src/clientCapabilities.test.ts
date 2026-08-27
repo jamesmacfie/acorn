@@ -5,6 +5,7 @@ import {
   clientCapabilityId,
   clientCapabilityIds,
   provideClientCapability,
+  requireClientCapability,
 } from './clientCapabilities'
 
 type Greeter = { hello(): string }
@@ -33,6 +34,12 @@ describe('client capability registry', () => {
     // hits when it disposes a plugin's contributions and immediately re-registers them.
     first.dispose()
     expect(clientCapability(GREETER)?.hello()).toBe('second')
+  })
+
+  it('require throws where the miss happens, for a provider that cannot be disabled', () => {
+    expect(() => requireClientCapability(GREETER)).toThrow(/not provided/)
+    provideClientCapability(GREETER, { hello: () => 'hi' })
+    expect(requireClientCapability(GREETER).hello()).toBe('hi')
   })
 
   it('lists provided ids sorted', () => {

@@ -1,16 +1,15 @@
 import { For } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import { hasClientCapability } from '../capabilities'
+import { hasHostCapability } from '../hostCapabilities'
 import { ContributionBoundary } from '../ui/ContributionBoundary'
-import { taskSlotRegistry, uiSlotRegistry, type TaskSlotId, type UiSlotContext, type UiSlotId } from './slots'
+import { isTaskSlot, uiSlotRegistry, type ShellSlotContribution, type TaskSlotId, type UiSlotContext, type UiSlotId } from './slots'
 
-// The two slot hosts. The registries and their contribution types live in ./slots.ts, JSX-free, and
-// are re-exported here so `registries/uiSlots.tsx` stays the one import path callers already use.
-export {
-  taskSlotRegistry,
-  uiSlotRegistry,
-} from './slots'
+// The two slot hosts over the one registry. The registry and its contribution types live in
+// ./slots.ts, JSX-free, and are re-exported here so `registries/uiSlots.tsx` stays the one import path
+// callers already use.
+export { uiSlotRegistry } from './slots'
 export type {
+  ShellSlotContribution,
   TaskSlotContribution,
   TaskSlotId,
   UiSlotContext,
@@ -18,10 +17,12 @@ export type {
   UiSlotId,
 } from './slots'
 
+const ordered = (slot: UiSlotId) => [...uiSlotRegistry.entries()]
+  .filter((contribution) => contribution.slot === slot && hasHostCapability(contribution.requires))
+  .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+
 export function TaskSlotHost(props: { slot: TaskSlotId; taskId: string }) {
-  const contributions = () => [...taskSlotRegistry.entries()]
-    .filter((contribution) => contribution.slot === props.slot && hasClientCapability(contribution.requires))
-    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+  const contributions = () => ordered(props.slot).filter(isTaskSlot)
   return (
     <For each={contributions()}>
       {(contribution) => (
@@ -34,9 +35,9 @@ export function TaskSlotHost(props: { slot: TaskSlotId; taskId: string }) {
 }
 
 export function SlotHost(props: { slot: UiSlotId; context: UiSlotContext }) {
-  const contributions = () => [...uiSlotRegistry.entries()]
-    .filter((contribution) => contribution.slot === props.slot && hasClientCapability(contribution.requires) && (contribution.when?.(props.context) ?? true))
-    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+  const contributions = () => ordered(props.slot)
+    .filter((contribution): contribution is ShellSlotContribution => !isTaskSlot(contribution))
+    .filter((contribution) => contribution.when?.(props.context) ?? true)
   return (
     <For each={contributions()}>
       {(contribution) => (

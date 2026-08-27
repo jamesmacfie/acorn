@@ -21,7 +21,7 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import { SCHEDULER } from '../schedules'
 import type { CapabilityRegistry, Disposable } from './capabilities'
-import type { NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
+import type { HostPluginContext, NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
 import { parsePluginChannel, pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
 import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../main/notify'
@@ -106,14 +106,14 @@ export function revokePluginContext(ctx: NodePluginContext): void {
   revokers.get(ctx)?.()
 }
 
-export function buildPluginContext(options: PluginContextOptions): NodePluginContext {
+export function buildPluginContext(options: PluginContextOptions): HostPluginContext {
   const plugin = options.plugin
   // Undefined for a built-in, the manifest's `permissions.node` block for a plugin loaded from disk.
   // Everything below that differs between the two tiers keys off this one value.
   const permissions = options.loaded?.permissions
   const recordUndo = options.onUndo ?? (() => {})
   const pending = options.pending
-  const ctx: NodePluginContext = {
+  const ctx: HostPluginContext = {
     name: plugin,
     routes: {
       // Absent for a loaded plugin: a live Hono instance from another realm cannot survive the process
@@ -275,17 +275,12 @@ export function buildPluginContext(options: PluginContextOptions): NodePluginCon
           recordUndo(() => setStreamHandlers(null))
         },
     },
-    log: {
-      log: (...args: unknown[]) => console.log(`[plugin:${plugin}]`, ...args),
-      warn: (...args: unknown[]) => console.warn(`[plugin:${plugin}]`, ...args),
-      error: (...args: unknown[]) => console.error(`[plugin:${plugin}]`, ...args),
-    },
   }
 
   // ── Buffering and revocation, both for reload (server/plugin/host.ts) ───────────────────────────
   //
   // One post-pass rather than a wrapper at each of the ten registration sites. Every site above is
-  // contextually typed by NodePluginContext, so wrapping inline would cost every parameter an explicit
+  // contextually typed by HostPluginContext, so wrapping inline would cost every parameter an explicit
   // annotation and buy nothing.
   //
   // `routes`, `tools`, `contextSections` and `providers` are pure registrations, so they buffer into the

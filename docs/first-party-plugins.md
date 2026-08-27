@@ -85,7 +85,7 @@ should still land first-party.
 core (or the shell in front of it) with a hole it cannot degrade around. These are the `required`
 plugins: they cannot be disabled, so they cannot be optional, so they cannot be third-party.
 
-**E. Registries with no manifest form** — `persistedState`, `agentToolRenderers`, non-`footer`
+**E. Registries with no manifest form** — `persistedStateSlices`, `agentToolRenderers`, non-`footer`
 component slots, and the generic `ctx.contribute(registry, entry)` escape hatch. These take
 functions or components. Some are inherently first-party (B); others simply have no declarative
 equivalent yet, which is a gap rather than a law — noted per row where that is the case.
@@ -109,8 +109,10 @@ plugin id, stamps the capture time, and measures the snapshot bytes itself again
 512 KiB ceiling. Only `revision?()` did not survive, and deliberately: it is synchronous, and a
 descriptor answers across a fetch.
 
-First-party plugins still register both as functions through `ctx.contribute`, which is a carrier
-difference, not a capability one.
+First-party plugins still register both as functions, through `ctx.contentLinks` and
+`ctx.agentContexts`, which is a carrier difference, not a capability one. Neither goes through
+`ctx.contribute` any more: as of 2026-08-27 that escape hatch is for a registry another PLUGIN
+published, and a registry the host owns gets a named member instead.
 
 Two things that are **not** on this list, deliberately:
 
@@ -145,7 +147,7 @@ Ordered by how strong the first-party claim is.
 | Plugin | Why | Reason |
 | --- | --- | --- |
 | **changes** | Contributes an **agent-tool renderer** — the component that draws its tool's calls inline in the agents transcript, dozens per screen, sharing the list's scroll and selection. Everything else about it (its SQLite file, its pane, its agent tool, `LOCAL_GIT`) is available to loaded plugins. | B |
-| **github** | Publishes `GITHUB_MIRROR`, and uses `ctx.contribute` for its content-link recognisers — which now have a manifest form, so this is a carrier difference rather than a privilege. Notably **not** `required` any more. The most-privileged-looking plugin in the tree is now among the closest to portable; what actually keeps it here is `GITHUB_MIRROR` having a consumer. | D |
+| **github** | Publishes `GITHUB_MIRROR`, and uses `ctx.contentLinks` for its content-link recognisers — which now have a manifest form, so this is a carrier difference rather than a privilege. Notably **not** `required` any more. The most-privileged-looking plugin in the tree is now among the closest to portable; what actually keeps it here is `GITHUB_MIRROR` having a consumer. | D |
 | **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability rather than UI. | D, E |
 | **context** | Contributes a `persistedState` slice, which has no manifest form. Its `agentContexts` entry no longer counts — that has a descriptor now — but its `revision()` does: the composer reads it synchronously to key the automatic task-context snapshot, and a descriptor cannot answer synchronously. Small plugin, narrow reason. | E |
 

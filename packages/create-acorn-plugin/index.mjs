@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url'
  * published standalone and can't import the constant; see docs/plugin-authoring.md § Start from the
  * scaffold for how index.test.ts keeps the copy honest.
  */
-export const API_VERSION = '2'
+export const API_VERSION = '3'
 
 /** Manifest ids: `/^[a-z][a-z0-9-]{1,31}$/`. See docs/plugin-authoring.md § The manifest for the
  * dot-ban rule. Returns null when nothing usable survives. */
