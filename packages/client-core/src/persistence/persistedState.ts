@@ -26,13 +26,11 @@ export type PersistedStateSlice<T> = {
   unknownIds: 'retain-inert' | 'drop'
   maxBytes?: number
   binding?: PersistedStateBinding<T>
-  // Aggregate prefs are compatibility-only inputs. Canonical scoped keys always win.
-  legacy?: (prefs: Readonly<Record<string, string>>) => Readonly<Record<string, unknown>>
 }
 
 export const persistedStateRegistry = new Registry<PersistedStateSlice<unknown>>('persisted-state')
 
-// Every slice codec parses the same way: a persisted value arrives as a JSON string, but a legacy or
+// Every slice codec parses the same way: a persisted value arrives as a JSON string, but an
 // already-decoded value can arrive as the object itself. Malformed input returns undefined; codecs
 // are required to tolerate it (persistedState.conformance.test.ts).
 export const parseJson = (raw: unknown): unknown => {

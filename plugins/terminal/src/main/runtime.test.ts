@@ -31,7 +31,7 @@ describe('RuntimeService over real processes', () => {
   let targets: RunTarget[]
 
   const deps: RuntimeDeps = {
-    loadTargets: async () => ({ targets, cwd: dir }),
+    loadTargets: async () => ({ targets, cwd: dir, repoTargetIds: [] }),
     startSession: async (_taskId, target, cwd) => {
       const child = spawn('/bin/sh', ['-c', target.command], { cwd })
       const id = `s${children.size + 1}`
@@ -52,6 +52,9 @@ describe('RuntimeService over real processes', () => {
         return { ok: false, reason: e instanceof Error ? e.message : 'failed' }
       }
     },
+    // Required by RuntimeDeps rather than optional, which is the point: a deps object that omitted the
+    // gate used to compile, and a cloned repository's committed command then ran with no review.
+    authorizeRepoConfig: async () => {},
   }
 
   beforeEach(() => {

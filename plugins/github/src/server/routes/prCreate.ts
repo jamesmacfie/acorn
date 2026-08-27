@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import type { Branch, Compare } from '../../contract/api'
 import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
@@ -9,6 +10,17 @@ import { createPullRequest } from '../createPull'
 // branches/compare change too often and are cheap to fetch) and the create POST. Creating busts
 // the open-pulls sync_state so the list refetches the new PR; the PR detail mirror fills on
 // navigation via the existing pullDetail route.
+
+// `base` and `head` become branch names in a GitHub API body, so they are required and non-empty
+// here rather than checked afterwards. `title` keeps its own trim check below, which is what
+// rejects a title of spaces.
+const createBody = z.object({
+  title: z.string(),
+  body: z.string().optional(),
+  base: z.string().min(1),
+  head: z.string().min(1),
+  draft: z.boolean().optional(),
+})
 
 type GitHubCompareFile = {
   filename: string
@@ -100,14 +112,10 @@ export const prCreate = (db: PluginDatabase) => new Hono<AppEnv>()
     const uid = ownerId(c)
     const owner = c.req.param('owner')
     const repo = c.req.param('repo')
-    const { title, body, base, head, draft } = (await c.req.json().catch(() => ({}))) as {
-      title?: string
-      body?: string
-      base?: string
-      head?: string
-      draft?: boolean
-    }
-    if (!title?.trim() || !base || !head) return respondError(c, 400, 'bad_request')
+    const parsed = createBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const { title, body, base, head, draft } = parsed.data
+    if (!title.trim()) return respondError(c, 400, 'bad_request')
     // Resolved after validation: a request we are about to reject should not cost a credential read.
     const token = await githubToken(c)
     const result = await createPullRequest(token, db, uid, owner, repo, { title, body, base, head, draft })

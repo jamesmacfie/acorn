@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { editorOpen, openFiles } from '@acorn/plugin-editor/client/editorState.ts'
-import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '@acorn/plugin-editor/client/editorTreeState.ts'
-import { editorViewState, rememberEditorViewState } from '@acorn/plugin-editor/client/editorViewState.ts'
-import { prFilterFor, setPrFilter } from '@acorn/plugin-github/client/pullList/filterState.ts'
+import { editorOpen, openFiles } from '@acorn/plugin-editor/testkit/client'
+import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '@acorn/plugin-editor/testkit/client'
+import { editorViewState, rememberEditorViewState } from '@acorn/plugin-editor/testkit/client'
+import { prFilterFor, setPrFilter } from '@acorn/plugin-github/testkit/client'
 import { diffScroll, rememberDiffScroll } from '@acorn/client-core/diff/viewState.ts'
 import { activeTerminal, rememberActiveTerminal, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
-import { managedAgentStore } from '@acorn/plugin-agents/client/managedStore.ts'
+import { managedAgentStore } from '@acorn/plugin-agents/testkit/client'
 import {
   dispatchLayout,
   focusedPane,

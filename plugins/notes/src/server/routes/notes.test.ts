@@ -85,4 +85,25 @@ describe('notes-owned routes', () => {
     expect((await gated.fetch(request('/api/workspaces/ws1/notes'), {} as Env)).status).toBe(401)
     expect((await appFor({ kind: 'device', userId: 'james' }).fetch(request('/api/tasks/task1/notes'), {} as Env)).status).toBe(503)
   })
+
+  // The list and the create carry no trailing segment, so the original `/workspaces/:wsId/notes/*`
+  // gate did not reach them and a task-scoped agent could read and write the owner's workspace notes.
+  // Both forms are asserted, because the fix is the second `.use()` line and nothing else would fail
+  // if someone deleted it.
+  it('answers 403 to a task-confined principal on every workspace note path', async () => {
+    setRouteTestCapability(NOTES_STORE, fakeStore())
+    const app = appFor({ kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
+    const denied = [
+      request('/api/workspaces/ws1/notes'),
+      request('/api/workspaces/ws1/notes', 'POST', { title: 'Stolen' }),
+      request('/api/workspaces/ws1/notes/plan'),
+      request('/api/workspaces/ws1/notes/plan', 'PUT', { body: 'overwritten' }),
+      request('/api/workspaces/ws1/notes/plan', 'DELETE'),
+    ]
+    for (const attempt of denied) {
+      expect((await app.fetch(attempt, {} as Env)).status, `${attempt.method} ${attempt.url}`).toBe(403)
+    }
+    // Its own task's notes still answer, so the gate is confinement rather than a blanket refusal.
+    expect((await app.fetch(request('/api/tasks/task1/notes'), {} as Env)).status).toBe(200)
+  })
 })

@@ -44,7 +44,10 @@ describe('isDevicePref', () => {
       expect(isDevicePref(key), key).toBe(false)
       expect(isDevicePref(`${key}:node-a/task-1`), key).toBe(false)
     }
-    // …and their pre-scoped aggregates, which the slices still read as legacy input.
+    // …and their pre-scoped aggregates. No slice reads those keys any more (the readers went with
+    // the migration, 2026-08-28), but a device that upgraded across it can still hold one in
+    // localStorage, and `mergePrefs` lets the device win, so a stray one must not be classified as
+    // device-owned and shadow the node's copy forever.
     for (const key of [PrefKeys.taskLayouts, PrefKeys.taskPanesLegacy, PrefKeys.editorOpenFiles, PrefKeys.prFilters]) {
       expect(isDevicePref(key), key).toBe(false)
     }
@@ -100,8 +103,8 @@ describe('drainMigratedPrefs', () => {
 
     const drained = await drainMigratedPrefs('node-a', {}, async (key, value) => void written.push([key, value]))
 
-    // The pre-scoped aggregate goes too: it's a legacy input to the same slice, and leaving it on the
-    // device would keep the same fact in two places.
+    // The pre-scoped aggregate goes too: it names the same fact as the scoped keys beside it, and
+    // leaving it on the device would keep that fact in two places.
     expect(written).toEqual([[layoutKey, '{"panes":["local"]}'], [PrefKeys.taskLayouts, '{}']])
     expect(drained).toEqual({ [layoutKey]: '{"panes":["local"]}', [PrefKeys.taskLayouts]: '{}' })
     expect(store.has(`acorn-pref:${layoutKey}`)).toBe(false)

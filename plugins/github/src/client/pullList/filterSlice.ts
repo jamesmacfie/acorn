@@ -1,4 +1,4 @@
-import { parseJson, PersistedSliceKeys, type PersistedStateSlice, PrefKeys } from '@acorn/plugin-api/client'
+import { parseJson, PersistedSliceKeys, type PersistedStateSlice } from '@acorn/plugin-api/client'
 import { hydratePrFilter, prFilters, type PrFilter } from './filterState'
 
 // The PR list's own persisted-state descriptor: tab + text filter, per workspace. Owned here rather
@@ -25,8 +25,4 @@ export const prFiltersSlice: PersistedStateSlice<PrFilter> = {
   unknownIds: 'drop',
   maxBytes: 4 * 1024,
   binding: { values: prFilters, hydrate: hydratePrFilter },
-  legacy: (prefs) => {
-    const value = parseJson(prefs[PrefKeys.prFilters])
-    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-  },
 }

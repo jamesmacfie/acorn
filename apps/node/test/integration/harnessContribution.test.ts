@@ -10,7 +10,7 @@ import { Scheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts
 import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
-import { agentDriverRegistry } from '@acorn/plugin-agents/main/drivers/registry.ts'
+import { agentDriverRegistry } from '@acorn/plugin-agents/testkit'
 import { assembleNodeGraph } from '../../src/server/composition'
 
 // The acceptance test for harness contributions (docs/managed-agents.md § Harnesses). The opencode

@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { loadWorkflowFiles } from '@acorn/plugin-workflows/main/workflowFiles.ts'
-import { normalizePersistedWorkflow } from '@acorn/plugin-workflows/main/workflowValidation.ts'
+import { loadWorkflowFiles } from '@acorn/plugin-workflows/testkit'
+import { normalizePersistedWorkflow } from '@acorn/plugin-workflows/testkit'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
 registerBuiltInProfiles() // profiles come from the agents plugin

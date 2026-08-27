@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono'
+import { z } from 'zod'
 import {
   ISSUE_ID_QUERY,
   ISSUES_QUERY,
@@ -52,6 +53,11 @@ import { sortLinearIssues } from '../../shared/triage'
 // integration with per-item freshness, so they skip the serve-then-revalidate wrapper; this file owns
 // multi-connection resolution instead.
 const PROVIDER = 'linear'
+
+// `identifiers` is capped further down by the provider's own resolution budget; the schema's job is
+// only to say that what arrived is a list of strings.
+const issuesBody = z.object({ identifiers: z.array(z.string()).default([]) }) satisfies z.ZodType<LinearIssuesRequest, Partial<LinearIssuesRequest>>
+const commentBody = z.object({ body: z.string(), parentId: z.string().optional() })
 const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === 'linear.issues')!.ttlMs
 
 // The only host /uploads will spend a credential against: docs/integrations.md § Linear. Exported and
@@ -238,9 +244,9 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
     if (!storedConnections.length) return respondError(c, 403, 'provider_not_connected')
     const connections = await linearConnections(c)
 
-    const body = (await c.req.json().catch(() => ({}))) as Partial<LinearIssuesRequest>
-    const identifiers = [...new Set((body.identifiers ?? []).filter((s) => typeof s === 'string'))]
-      .slice(0, linearProvider.budgets.maxResolutionBatch)
+    const parsed = issuesBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const identifiers = [...new Set(parsed.data.identifiers)].slice(0, linearProvider.budgets.maxResolutionBatch)
     if (!identifiers.length) return c.json([] satisfies PluginRefResolutionBody[])
 
     // Not scoped to one connection: a bare `ENG-42` has no workspace yet, so the cache read spans
@@ -350,8 +356,9 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
     if (!connections.length) return respondError(c, 403, 'provider_not_connected')
 
     const identifier = c.req.param('identifier')
-    const { body, parentId } = (await c.req.json().catch(() => ({}))) as { body?: string; parentId?: string }
-    if (!body || !body.trim()) return respondError(c, 400, 'bad_request')
+    const parsed = commentBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success || !parsed.data.body.trim()) return respondError(c, 400, 'bad_request')
+    const { body, parentId } = parsed.data
 
     // commentCreate keys off the internal issue UUID; resolve it (and the owning connection's key).
     const filter = issuesFilter([identifier])

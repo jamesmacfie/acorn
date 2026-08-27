@@ -1,10 +1,15 @@
 {
   // Shared compiler options for every workspace package.
   //
-  // Packages are consumed as TypeScript SOURCE via exports maps ("./*": "./src/*") — no build step,
-  // no .d.ts emit, no project references. A consumer's tsc pulls its dependencies' sources into the
-  // same program, which is why allowImportingTsExtensions + noEmit are load-bearing: cross-package
-  // specifiers carry their real extension (@acorn/protocol/api.ts).
+  // Packages are consumed as TypeScript SOURCE via exports maps — no build step, no .d.ts emit, no
+  // project references. A consumer's tsc pulls its dependencies' sources into the same program, which
+  // is why allowImportingTsExtensions + noEmit are load-bearing: cross-package specifiers carry their
+  // real extension (@acorn/protocol/api.ts).
+  //
+  // Library packages export "./*": "./src/*", so the module system gives them no encapsulation and
+  // their boundaries are arch tests. Plugin packages name their subpaths, so moduleResolution
+  // "bundler" refuses a deep import into one at the import site (docs/architecture-overview.md §
+  // Package boundaries).
   //
   // Deliberately no "types" here. Each package declares its own (protocol: none; node packages:
   // node; client packages: vite/client + DOM), so a package cannot accidentally rely on globals it

@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*"
+    "./client/index.ts": "./src/client/index.ts",
+    "./contract/*": "./src/contract/*",
+    "./testkit/client": "./src/testkit/client.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",

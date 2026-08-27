@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { ReviewNote } from '../../shared/api'
 import { type AppEnv, type CoreServices, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { reviewNotes as reviewNotesTable } from '../../node/schema'
@@ -13,6 +14,24 @@ import { reviewNotes as reviewNotesTable } from '../../node/schema'
 // docs/data-layer.md § Plugin databases.
 
 type Row = typeof reviewNotesTable.$inferSelect
+
+// A note anchors to a range in a diff, so `endLine >= startLine` is part of the shape rather than a
+// follow-up check: a note that ends before it starts is not a note. `endLine` defaults to `startLine`
+// for the single-line case the client sends most often.
+const noteBody = z
+  .object({
+    path: z.string().min(1),
+    side: z.enum(['additions', 'deletions']),
+    startLine: z.number().int().min(1),
+    endLine: z.number().int().min(1).optional(),
+    snippet: z.string().nullish(),
+    body: z.string(),
+  })
+  .transform((note) => ({ ...note, endLine: note.endLine ?? note.startLine }))
+  .refine((note) => note.endLine >= note.startLine, { message: 'endLine must not precede startLine' })
+
+const editBody = z.object({ body: z.string() })
+const sentBody = z.object({ ids: z.array(z.string()).default([]) })
 
 const rowToNote = (r: Row): ReviewNote => ({
   id: r.id,
@@ -35,30 +54,19 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
     })
     .post('/:id/review-notes', async (c) => {
       const taskId = c.req.param('id')
-      const body = (await c.req.json().catch(() => ({}))) as Partial<ReviewNote>
-      const startLine = Number(body.startLine)
-      const endLine = Number(body.endLine ?? body.startLine)
-      if (
-        !body.path ||
-        typeof body.path !== 'string' ||
-        (body.side !== 'additions' && body.side !== 'deletions') ||
-        !Number.isInteger(startLine) ||
-        startLine < 1 ||
-        !Number.isInteger(endLine) ||
-        endLine < startLine ||
-        !body.body?.trim()
-      )
-        return respondError(c, 400, 'bad_request')
+      const parsed = noteBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success || !parsed.data.body.trim()) return respondError(c, 400, 'bad_request')
+      const note = parsed.data
       if (!(await core.tasks.load(taskId))) return respondError(c, 404, 'not_found')
       const row: Row = {
         id: randomUUID(),
         taskId,
-        path: body.path,
-        side: body.side,
-        startLine,
-        endLine,
-        snippet: typeof body.snippet === 'string' ? body.snippet : null,
-        body: body.body.trim(),
+        path: note.path,
+        side: note.side,
+        startLine: note.startLine,
+        endLine: note.endLine,
+        snippet: note.snippet ?? null,
+        body: note.body.trim(),
         sentAt: null,
         createdAt: Date.now(),
       }
@@ -67,11 +75,11 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
     })
     // Edit clears sentAt, so an edited note counts as unsent again (orca's pattern).
     .patch('/:id/review-notes/:noteId', async (c) => {
-      const body = (await c.req.json().catch(() => ({}))) as { body?: string }
-      if (!body.body?.trim()) return respondError(c, 400, 'bad_request')
+      const parsed = editBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success || !parsed.data.body.trim()) return respondError(c, 400, 'bad_request')
       await db
         .update(reviewNotesTable)
-        .set({ body: body.body.trim(), sentAt: null })
+        .set({ body: parsed.data.body.trim(), sentAt: null })
         .where(and(eq(reviewNotesTable.id, c.req.param('noteId')), eq(reviewNotesTable.taskId, c.req.param('id'))))
       return c.json({ ok: true })
     })
@@ -83,8 +91,8 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
     })
     // Stamp sentAt on confirmed delivery (the send loop's final step).
     .post('/:id/review-notes/sent', async (c) => {
-      const body = (await c.req.json().catch(() => ({}))) as { ids?: string[] }
-      const ids = (body.ids ?? []).filter((x): x is string => typeof x === 'string')
+      const parsed = sentBody.safeParse(await c.req.json().catch(() => null))
+      const ids = parsed.success ? parsed.data.ids : []
       if (!ids.length) return respondError(c, 400, 'bad_request')
       await db
         .update(reviewNotesTable)

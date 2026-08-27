@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
-import { type AppEnv, connectProvider, ownerId, providerError, respondError } from '@acorn/plugin-api/node'
+import { z } from 'zod'
+import { type AppEnv, connectProvider, ownerId, providerError, requireDevice, respondError } from '@acorn/plugin-api/node'
 import { GITHUB_PROVIDER } from '../githubToken'
 
 // GitHub OAuth via the device authorization grant, RFC 8628 (docs/github-integration.md §
@@ -8,6 +9,10 @@ import { GITHUB_PROVIDER } from '../githubToken'
 const DEVICE_CODE_URL = 'https://github.com/login/device/code'
 const TOKEN_URL = 'https://github.com/login/oauth/access_token'
 const SCOPES = 'repo read:org read:user'
+
+// The device code goes straight into a form body GitHub reads, so it is checked for shape before it
+// is sent rather than after GitHub rejects it.
+const pollBody = z.object({ deviceCode: z.string().min(1) })
 
 type DeviceCodeResponse = {
   device_code: string
@@ -30,13 +35,19 @@ const form = (body: Record<string, string>): RequestInit => ({
 })
 
 export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
+  // Owner-only, both halves. This plugin registers with `prefix: ''`, so these paths sit at
+  // /v2/p/github/auth/device/* where no core mount gate reaches them, and the router has to carry its
+  // own. Without it a task-scoped agent token could open a device window, show the owner a code for
+  // an account the agent controls, and end up with that account's token stored as the owner's GitHub
+  // connection: a confused deputy, with every later GitHub call made on the attacker's behalf.
+  // Connecting an account is always a person at a keyboard, so this is requireDevice rather than the
+  // requireProviderAccess that guards /v2/core/integrations, which is looser only because the node's
+  // own service-scope calls have to spend a credential it already holds.
+  .use('/auth/device/*', requireDevice)
   // Open a device-flow window. Returns what the UI must display: the code, where to type it, and how
   // often to poll. The device_code goes back to the client rather than being held here. It authorizes
   // nothing on this node, and pending state would add a lifecycle to get wrong.
   .post('/auth/device/start', async (c) => {
-    // No gate here beyond the node's own authentication: any paired principal may open a device
-    // window. ownerId only reads the principal's user id, so this call asserts a principal exists
-    // and nothing more. Restricting the flow to the owner is phase 1 of the review program.
     ownerId(c)
     const id = clientId()
     if (!id) return respondError(c, 503, 'provider_unavailable', ['GitHub integration is not configured on this node.'])
@@ -59,8 +70,9 @@ export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
   // long-polling here would tie up a request slot for up to 15 minutes per pending connection.
   .post('/auth/device/poll', async (c) => {
     const userId = ownerId(c)
-    const { deviceCode } = (await c.req.json().catch(() => ({}))) as { deviceCode?: string }
-    if (!deviceCode) return respondError(c, 400, 'bad_request')
+    const parsed = pollBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const { deviceCode } = parsed.data
 
     const id = clientId()
     if (!id) return respondError(c, 503, 'provider_unavailable', ['GitHub integration is not configured on this node.'])

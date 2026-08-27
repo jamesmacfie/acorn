@@ -169,7 +169,7 @@ describe('scope decides who may spend the owner provider credential', () => {
     const { Hono } = await import('hono')
     const { authMiddleware } = await import('@acorn/node-core/server/middleware/auth.ts')
     const { requireUser } = await import('@acorn/node-core/server/middleware/requireUser.ts')
-    const { githubToken } = await import('@acorn/plugin-github/server/githubToken.ts')
+    const { githubToken } = await import('@acorn/plugin-github/testkit')
     return new Hono()
       .use('/v2/*', authMiddleware)
       .use('/v2/*', requireUser)

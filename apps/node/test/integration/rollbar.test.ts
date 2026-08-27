@@ -7,15 +7,15 @@ import type {
   RollbarItemsResponse,
   RollbarOccurrenceDetail,
   RollbarOccurrencesResponse,
-} from '@acorn/plugin-rollbar/shared/api.ts'
+} from '@acorn/plugin-rollbar/testkit'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { rollbarFetch } from '@acorn/plugin-rollbar/server/index.ts'
+import { rollbarFetch } from '@acorn/plugin-rollbar/testkit'
 import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
-import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '@acorn/plugin-rollbar/server/syncPolicy.ts'
+import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '@acorn/plugin-rollbar/testkit'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
 import { integrations } from '@acorn/node-core/server/routes/integrations.ts'
-import { createRollbarFetch } from '@acorn/plugin-rollbar/server/routes/rollbar.ts'
+import { createRollbarFetch } from '@acorn/plugin-rollbar/testkit'
 import { servePluginFetch } from '@acorn/node-core/server/plugin/fetchRoute.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import '../registerProviders'

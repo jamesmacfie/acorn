@@ -37,8 +37,8 @@ const env = () =>
     ...testSecretEnv(ENC_KEY),
   }) as unknown as Env
 
-const post = (path: string, body?: unknown) => {
-  const app = new Hono<AppEnv>().use('/api/*', ...testGate(PRINCIPAL)).route('/api/github', githubDeviceAuth(() => 'client-id'))
+const post = (path: string, body?: unknown, principal: Principal = PRINCIPAL) => {
+  const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/github', githubDeviceAuth(() => 'client-id'))
   return app.fetch(
     new Request(`http://acorn.test/api/github${path}`, {
       method: 'POST',
@@ -141,6 +141,22 @@ describe('github device flow — poll', () => {
   it('requires a deviceCode', async () => {
     const res = await post('/auth/device/poll', {})
     expect(res.status).toBe(400)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+// This plugin registers with `prefix: ''`, so these paths sit at /v2/p/github/auth/device/* where no
+// core mount gate reaches them and the router has to carry its own. Without it a task-scoped agent
+// token could open a device window, show the owner a code for an account the agent controls, and end
+// up with that account's token stored as the owner's GitHub connection: every later GitHub call made
+// on the attacker's behalf.
+describe('github device flow — who may open one', () => {
+  it('refuses both halves to a task-scoped agent token, before any call to GitHub', async () => {
+    const agent: Principal = { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task-1' }
+    for (const path of ['/auth/device/start', '/auth/device/poll']) {
+      const res = await post(path, { deviceCode: 'dc' }, agent)
+      expect(res.status, path).toBe(403)
+    }
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

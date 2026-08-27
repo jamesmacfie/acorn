@@ -14,11 +14,11 @@
 // real plugin list, which is where the provider routers come from now.
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
-import { githubProvider } from '@acorn/plugin-github/server/provider.ts'
-import { createLinearFetch } from '@acorn/plugin-linear/server/routes/linear.ts'
-import { linearProvider } from '@acorn/plugin-linear/server/provider.ts'
-import { createRollbarFetch } from '@acorn/plugin-rollbar/server/routes/rollbar.ts'
-import { rollbarProvider } from '@acorn/plugin-rollbar/server/provider.ts'
+import { githubProvider } from '@acorn/plugin-github/testkit'
+import { createLinearFetch } from '@acorn/plugin-linear/testkit'
+import { linearProvider } from '@acorn/plugin-linear/testkit'
+import { createRollbarFetch } from '@acorn/plugin-rollbar/testkit'
+import { rollbarProvider } from '@acorn/plugin-rollbar/testkit'
 
 // Idempotent: several suites in one vitest worker may import this, and the registries throw on a
 // duplicate id. Keyed on the registry's own state rather than a local flag so it stays correct if a

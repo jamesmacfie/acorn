@@ -20,7 +20,6 @@ const stringCodec = {
   serialize: (value: string): unknown => value,
 }
 
-const legacyScalar = (key: string) => (prefs: Readonly<Record<string, string>>) => ({ '': prefs[key] ?? '' })
 
 // Every read goes through `resolveTheme` (settings/themes.ts), which falls back to the built-in
 // default when the stored id names a theme that is not registered right now: a plugin theme whose
@@ -95,7 +94,6 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
           options.navigate(valid ? saved : projectPath(fallback.id), { replace: true })
         },
       ),
-      legacy: legacyScalar(PrefKeys.lastPath),
     },
     {
       id: 'core.last-task', key: PrefKeys.lastTask, scope: 'app', restore: 'view', version: 1,
@@ -109,7 +107,6 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
           if (task) setActiveTaskId(task.id)
         },
       ),
-      legacy: legacyScalar(PrefKeys.lastTask),
     },
     {
       id: 'core.last-source', key: PrefKeys.lastSource, scope: 'app', restore: 'view', version: 1,
@@ -122,7 +119,6 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
           setSelectedSource(saved || defaultSourceId() || null)
         },
       ),
-      legacy: legacyScalar(PrefKeys.lastSource),
     },
     {
       id: 'core.left-collapsed', key: PrefKeys.leftCollapsed, scope: 'app', restore: 'workspace', version: 1,
@@ -132,7 +128,6 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
       },
       empty: () => false, unknownIds: 'drop', maxBytes: 1,
       binding: appStateBinding(options.collapsed, options.setCollapsed),
-      legacy: (prefs) => ({ '': prefs[PrefKeys.leftCollapsed] ?? '0' }),
     } as PersistedStateSlice<unknown>,
   ]
 

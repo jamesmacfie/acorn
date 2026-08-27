@@ -1,7 +1,7 @@
 import { homeTabSlice } from '../dashboards/homeTab'
 import { dashboardsSlice } from '../dashboards/persist'
 import { hydrateNoticeValues, notices, type Notice } from '../notifications/notifications'
-import { defaultLayout, normalizeLayout, parseTaskLayouts, type TaskLayout } from '../tasks/layout'
+import { defaultLayout, normalizeLayout, type TaskLayout } from '../tasks/layout'
 import { hydrateTaskLayout, taskLayouts } from '../tasks/tasks'
 import { PrefKeys, PersistedSliceKeys } from './prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from './persistedState'
@@ -31,7 +31,6 @@ const taskLayoutSlice: PersistedStateSlice<TaskLayout> = {
     values: taskLayouts,
     hydrate: hydrateTaskLayout,
   },
-  legacy: (prefs) => parseTaskLayouts(prefs[PrefKeys.taskLayouts], prefs[PrefKeys.taskPanesLegacy]),
 }
 
 const parseNotices = (raw: unknown): Notice[] => {

@@ -6,11 +6,11 @@ import { describe, expect, it } from 'vitest'
 import { coreStateSlices } from '@acorn/client-core/persistence/stateSlices.ts'
 import { directPreferenceSlices } from '@acorn/client-core/persistence/preferenceSlices.ts'
 import { stringifyPersistedValue, utf8Bytes, type PersistedStateSlice } from '@acorn/client-core/persistence/persistedState.ts'
-import { contextSelectionSlice } from '@acorn/plugin-context/client/selectionSlice.ts'
-import { dockerPrefsSlice } from '@acorn/plugin-docker/client/dockerPrefs.ts'
-import { editorOpenFilesSlice } from '@acorn/plugin-editor/client/openFilesSlice.ts'
-import { prFiltersSlice } from '@acorn/plugin-github/client/pullList/filterSlice.ts'
-import { agentToolFoldSlice } from '@acorn/plugin-agents/client/toolFoldPrefs.ts'
+import { contextSelectionSlice } from '@acorn/plugin-context/testkit/client'
+import { dockerPrefsSlice } from '@acorn/plugin-docker/testkit/client'
+import { editorOpenFilesSlice } from '@acorn/plugin-editor/testkit/client'
+import { prFiltersSlice } from '@acorn/plugin-github/testkit/client'
+import { agentToolFoldSlice } from '@acorn/plugin-agents/testkit/client'
 
 // The plugin slices are enumerated here rather than read from persistedStateRegistry because this
 // Node-only conformance suite does not load SolidJS modules. The completeness check keeps the persisted

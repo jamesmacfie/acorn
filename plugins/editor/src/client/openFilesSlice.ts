@@ -1,4 +1,4 @@
-import { parseJson, PersistedSliceKeys, type PersistedStateSlice, PrefKeys } from '@acorn/plugin-api/client'
+import { parseJson, PersistedSliceKeys, type PersistedStateSlice } from '@acorn/plugin-api/client'
 import { editorStateByTask, hydrateTaskEditorState, type TaskEditorState } from './editorState'
 
 // The editor's own persisted-state descriptor: open tabs and the active tab, per task. Owned here
@@ -38,9 +38,5 @@ export const editorOpenFilesSlice: PersistedStateSlice<TaskEditorState> = {
   binding: {
     values: editorStateByTask,
     hydrate: hydrateTaskEditorState,
-  },
-  legacy: (prefs) => {
-    const value = parseJson(prefs[PrefKeys.editorOpenFiles])
-    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
   },
 }

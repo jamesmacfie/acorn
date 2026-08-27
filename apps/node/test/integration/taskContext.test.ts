@@ -17,8 +17,8 @@ import {
 } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { taskContext } from '@acorn/node-core/server/routes/taskContext.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { mirroredPullRequest } from '@acorn/plugin-github/server/mirrorQueries.ts'
-import { pullRequests, prFiles, repos } from '@acorn/plugin-github/node/schema.ts'
+import { mirroredPullRequest } from '@acorn/plugin-github/testkit'
+import { pullRequests, prFiles, repos } from '@acorn/plugin-github/testkit'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
@@ -213,7 +213,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
     const { mkdtempSync, rmSync } = await import('node:fs')
     const { tmpdir } = await import('node:os')
     const { join } = await import('node:path')
-    const { NotesStore } = await import('@acorn/plugin-notes/main/notes.ts')
+    const { NotesStore } = await import('@acorn/plugin-notes/testkit')
     const dir = mkdtempSync(join(tmpdir(), 'acorn-ctx-notes-'))
     try {
       const store = new NotesStore(dir)

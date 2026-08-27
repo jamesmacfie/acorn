@@ -24,13 +24,9 @@ describe('loadRepoConfig (docs/workflows.md §2)', () => {
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-  it('absent files → DB fallback: scripts map through; scalar runCommand no longer creates a target', () => {
-    const cfg = loadRepoConfig(repoDir, userDir, {
-      setupScript: './setup.sh',
-      teardownScript: 'docker compose down',
-    })
+  it('absent files → DB fallback: a scalar runCommand no longer creates a target', () => {
+    const cfg = loadRepoConfig(repoDir, userDir, {})
     expect(cfg.errors).toEqual([])
-    expect(cfg.scripts).toEqual({ setup: './setup.sh', archive: 'docker compose down' })
     expect(cfg.runTargets).toEqual([]) // no dev script / config → no run button
     expect(cfg.copy).toEqual([])
   })
@@ -68,9 +64,12 @@ stop = "docker compose -p acorn-$ACORN_TASK_SLUG down"
 url = "http://localhost:8080"
 copy = [".env.local"]
 `)
-    const cfg = loadRepoConfig(repoDir, userDir, { setupScript: 'db-setup' })
-    expect(cfg.errors).toEqual([])
-    expect(cfg.scripts.setup).toBe('repo-setup')
+    const cfg = loadRepoConfig(repoDir, userDir, {})
+    // `[scripts] setup` is reported, not applied, once per layer that declares it (parseLayer).
+    expect(cfg.errors.map((e) => `${e.source}: ${e.message}`)).toEqual([
+      "repo: [scripts] setup is not read. Set the setup script in the project's settings.",
+      "user: [scripts] setup is not read. Set the setup script in the project's settings.",
+    ])
     const ids = cfg.runTargets.map((t) => t.id).sort()
     expect(ids).toEqual(['dev', 'lint', 'stack'])
     const dev = cfg.runTargets.find((t) => t.id === 'dev')
@@ -80,11 +79,9 @@ copy = [".env.local"]
     expect(stack?.url).toBe('http://localhost:8080')
   })
 
-  it('parses copy + archive-as-table and layout recipes', () => {
+  it('parses copy and layout recipes', () => {
     writeConfig(repoDir, `
 copy = [".env.local", ".env.development"]
-[scripts.archive]
-command = "docker compose down"
 [layout.review]
 panes = ["pr", "changes"]
 ratio = 0.5
@@ -94,7 +91,6 @@ browser = "run:dev"
     const cfg = loadRepoConfig(repoDir, null, {})
     expect(cfg.errors).toEqual([])
     expect(cfg.copy).toEqual(['.env.local', '.env.development'])
-    expect(cfg.scripts.archive).toBe('docker compose down')
     // `ratio` in the file is tolerated but not parsed: panes split equally (docs/workflows.md).
     expect(cfg.layouts).toEqual([{ id: 'review', panes: ['pr', 'changes'], terminal: 'dev', browser: 'run:dev' }])
   })
@@ -138,12 +134,22 @@ value = "https://app.test"
   })
 
   it('malformed TOML → structured error, not a throw; falls back to lower layers', () => {
-    writeConfig(repoDir, `[scripts\nsetup = broken`)
-    writeConfig(userDir, `[scripts]\nsetup = "user-setup"`)
-    const cfg = loadRepoConfig(repoDir, userDir, { setupScript: 'db-setup' })
+    writeConfig(repoDir, `[scripts.run.dev\ncommand = broken`)
+    writeConfig(userDir, `[scripts.run.dev]\ncommand = "user-dev"`)
+    const cfg = loadRepoConfig(repoDir, userDir, {})
     expect(cfg.errors).toHaveLength(1)
     expect(cfg.errors[0].source).toBe('repo')
-    expect(cfg.scripts.setup).toBe('user-setup')
+    expect(cfg.runTargets).toEqual([{ id: 'dev', command: 'user-dev', stop: undefined, url: undefined, urlCommand: undefined, icon: undefined, default: undefined }])
+  })
+
+  // The drift this replaced: `[scripts] setup` and `[scripts] archive` parsed, merged, and were read by
+  // nothing, so a repo could declare a setup script and watch it never run. They are reported now.
+  it('tells a repo that [scripts] setup and archive are not read', () => {
+    writeConfig(repoDir, `[scripts]\nsetup = "repo-setup"\n[scripts.archive]\ncommand = "docker compose down"`)
+    const messages = loadRepoConfig(repoDir, null, {}).errors.map((e) => e.message)
+    expect(messages).toHaveLength(2)
+    expect(messages[0]).toContain('[scripts] setup is not read')
+    expect(messages[1]).toContain('[scripts] archive is not read')
   })
 
   it('validates run targets: missing command and url+url_command conflicts are errors', () => {

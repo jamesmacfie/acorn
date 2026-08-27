@@ -52,6 +52,10 @@ const confineTaskQuery = (c: Context<AppEnv>): { taskId?: string } | null => {
 }
 
 export const knowledge = new Hono<AppEnv>()
+  // The compatibility alias for the notes routes carries the same gate as the real ones, spelled the
+  // same way and for the same reason (plugins/notes/src/server/routes/notes.ts). An alias that
+  // outlived its gate would be the whole finding again, one plugin over.
+  .use('/workspaces/:wsId/notes', requireDevice)
   .use('/workspaces/:wsId/notes/*', requireDevice)
   // --- memory ---
   .get('/memory', (c) => viaBridge(c, KNOWLEDGE, (b) => b.memoryList(c.req.query('projectId') ?? undefined)))

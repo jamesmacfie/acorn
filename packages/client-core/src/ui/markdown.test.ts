@@ -77,4 +77,16 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown('![shot](data:image/png;base64,iVBORw0KGgo=)', { images: 'placeholder' })).not.toContain('<img')
     expect(renderMarkdown('![](https://example.com/x.png)', { images: 'placeholder' })).toContain('[image: omitted]')
   })
+
+  // The three probes from the 2026-08-27 security review. Two of them threw before the strip landed,
+  // on a forged index into the code-span and image tables; the third is the same trick spelled with a
+  // real index, which would have restored a token the source never wrote.
+  it('escapes a source that spells the sentinel instead of throwing on it', () => {
+    const S = '\uE000'
+    expect(renderMarkdown(`${S}i0${S}`)).toBe('<p>i0</p>')
+    expect(renderMarkdown(`${S}i0${S}`, { images: 'placeholder' })).toBe('<p>i0</p>')
+    expect(renderMarkdown(`${S}7${S}`)).toBe('<p>7</p>')
+    // The sentinel next to real tokens: the source's copies are gone, inline()'s own survive.
+    expect(renderMarkdown(`${S}0${S} \`code\``)).toBe('<p>0 <code>code</code></p>')
+  })
 })

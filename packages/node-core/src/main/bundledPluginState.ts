@@ -1,5 +1,6 @@
-import { chmodSync, closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { writePrivateAtomic } from './dataRoot'
 import { z } from 'zod'
 import { PLUGIN_DB_DIR } from './pluginStorage'
 
@@ -41,16 +42,7 @@ const writeState = (dataRoot: string, state: BundledPluginState): void => {
   const root = rootFor(dataRoot)
   mkdirSync(root, { recursive: true, mode: 0o700 })
   const file = bundledPluginStatePath(dataRoot)
-  const temporary = `${file}.${process.pid}.tmp`
-  const fd = openSync(temporary, 'w', 0o600)
-  try {
-    writeSync(fd, `${JSON.stringify(state, null, 2)}\n`)
-    fsyncSync(fd)
-  } finally {
-    closeSync(fd)
-  }
-  renameSync(temporary, file)
-  chmodSync(file, 0o600)
+  writePrivateAtomic(file, `${JSON.stringify(state, null, 2)}\n`)
 }
 
 const setEntry = (dataRoot: string, id: string, entry: BundledPluginStateEntry): void => {

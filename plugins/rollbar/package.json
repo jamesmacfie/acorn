@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*"
+    "./node/index.ts": "./src/node/index.ts",
+    "./testkit": "./src/testkit/index.ts",
+    "./server/index.ts": "./src/server/index.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",

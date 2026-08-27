@@ -1,7 +1,19 @@
 // Per-repo matcher overrides: the `[docker]` table of `.acorn/config.toml`, layered
-// worktree-over-home like runConfig.ts. Non-executable configuration only, label keys and project
-// names, so unlike `[scripts.*]` it needs no repo-config trust gate (docs/security.md § Process,
-// path, and configuration controls).
+// worktree-over-home like runConfig.ts. Label keys and project names, no commands, and it is read
+// without the repo-config trust gate that `[scripts.*]` goes through.
+//
+// "It holds no commands" is not on its own what makes that safe, because what this table decides is
+// which containers a task is matched to, and `docker:exec:open` opens a shell in a container. Two
+// invariants are what keep the ungated read from reaching that shell, and both are load-bearing:
+//
+//   - Exec is ref-addressed, never matcher-addressed. The WS frame names the container it wants and
+//     `isDockerRef` validates it (plugins/docker/src/shared/model.ts). Widening the matcher adds rows
+//     to a list; it does not choose what a caller execs into.
+//   - The hub refuses every non-`term:` channel to a task-confined socket (main/wsHub.ts), so an agent
+//     cannot open a docker channel at all.
+//
+// If either one changes — an exec that resolves through the matcher, or a docker channel opened to a
+// task-confined socket — this table becomes an execution input and needs the trust gate.
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'

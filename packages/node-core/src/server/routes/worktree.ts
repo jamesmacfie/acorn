@@ -15,6 +15,7 @@ import { applyTaskChecks, collectTaskConcerns } from '../plugin/taskChecks'
 import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../bridge'
 import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
+import { isTaskConfined, mayActOnTask } from '../middleware/requireUser'
 import { respondError } from '../respond'
 
 // The PTY-coupled half of archive, and nothing else. Deliberately the exact dep bundle
@@ -124,7 +125,13 @@ async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: Archi
 // Mounted at /v2/core (server/index.ts): /task-statuses and /tasks/:id/* lifecycle.
 export const worktree = new Hono<AppEnv>()
   // Live dirty/changed-file status for every active task with a worktree, polled by the rail/footer.
-  .get('/task-statuses', async (c) => c.json(await computeTaskStatuses(getDb(c.env))))
+  //
+  // Filtered rather than gated, the same answer terminal's session roster gives (docs/security.md §
+  // Transport and auth). A task-scoped credential has a legitimate reason to ask about its own task,
+  // and no reason to be handed every other active task's id, absolute worktree path and dirty count.
+  // The filter also covers the plugin-frame caller, since `core.tasks:read` grants this path.
+  .get('/task-statuses', async (c) =>
+    c.json(await computeTaskStatuses(getDb(c.env), isTaskConfined(c) ? (taskId) => mayActOnTask(c, taskId) : undefined)))
   // --- task lifecycle ---
   .post('/tasks/:id/preview-url', async (c) => {
     const parsed = previewBody.safeParse(await c.req.json().catch(() => null))

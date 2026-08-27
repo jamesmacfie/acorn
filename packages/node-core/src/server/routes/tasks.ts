@@ -9,7 +9,7 @@ import { ICON_NAME_RE, type Task, type TaskLink, type TaskLinkSeed } from '@acor
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { externalRefForConnection, getConnection } from '../integrations/connections'
 import { ProviderOperationError } from '../integrations/types'
-import { ownerId } from '../middleware/requireUser'
+import { isTaskConfined, mayActOnTask, ownerId } from '../middleware/requireUser'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { getProject } from '../../main/projects'
 
@@ -114,9 +114,15 @@ async function stampedLink(db: ReturnType<typeof getDb>, userId: string, input: 
 }
 
 export const tasks = new Hono<AppEnv>()
+  // Filtered for a task-confined caller rather than gated, the same answer /task-statuses and
+  // terminal's session roster give (docs/security.md § Transport and auth). A row carries the task's
+  // title, branch and absolute worktree path, so the unfiltered list hands an agent the shape of every
+  // other piece of work on the machine. Its own row still comes back, because the renderer surfaces a
+  // frame draws are entitled to it.
   .get('/', async (c) => {
     const db = getDb(c.env)
-    const rows = await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')).orderBy(schema.tasks.sort)
+    const all = await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')).orderBy(schema.tasks.sort)
+    const rows = isTaskConfined(c) ? all.filter((row) => mayActOnTask(c, row.id)) : all
     if (!rows.length) return c.json([] as Task[])
     const ids = rows.map((r) => r.id)
     const linkRows = await db.select().from(schema.taskLinks).where(inArray(schema.taskLinks.taskId, ids))

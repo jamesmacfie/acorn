@@ -333,19 +333,41 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)].sort()).toEqual([...BROADCAST_BASELINE].sort())
   })
 
-  it('apps reach plugins through entrypoints or contract/ (shrinking baseline)', () => {
-    // Empty, and stays that way (docs/architecture-overview.md § Package boundaries: what an app may
-    // import). Tests are exempt.
-    const APP_DEEP_IMPORT_BASELINE: string[] = []
-    const ENTRYPOINTS = ['/node/index.ts', '/client/index.ts', '/main/index.ts']
-    const deep = EDGES.filter((e) => e.fromPkg.kind === 'app' && !isTestCode(e.fromFile))
-      .filter((e) => e.target.pkg?.kind === 'plugin' && e.target.pkg.name !== e.fromPkg.name)
-      .filter((e) => {
-        const rest = e.spec.split('/').slice(2)
-        return rest.length > 0 && rest[0] !== 'contract' && !ENTRYPOINTS.some((entry) => e.spec.endsWith(entry))
-      })
-      .map((e) => e.spec)
-    expect([...new Set(deep)].sort()).toEqual([...APP_DEEP_IMPORT_BASELINE].sort())
+  it('every plugin package declares an explicit exports map', () => {
+    // This rule replaced "apps reach plugins through entrypoints or contract/", which was a shrinking
+    // baseline at zero. The module system enforces that now: a plugin's `exports` map names four
+    // kinds of subpath and nothing else, so a deep import is a `tsc` error at the import site rather
+    // than a test failure somewhere else in the repo.
+    //
+    // What the compiler cannot tell you is that a map went back to `"./*": "./src/*"`, which would
+    // reopen every path at once and break no build. That is what this checks. It also checks that
+    // every declared target exists, because a map entry pointing at a moved file fails only for
+    // whoever imports it next.
+    const KINDS = /^\.\/(node\/index\.ts|client\/index\.ts|main\/index\.ts|contract\/\*|testkit|testkit\/client)$/
+    const problems: string[] = []
+    for (const pkg of PACKAGES.filter((p) => p.kind === 'plugin')) {
+      const manifest = JSON.parse(readFileSync(join(pkg.dir, 'package.json'), 'utf8')) as {
+        exports?: Record<string, string> | string
+      }
+      const exports = manifest.exports
+      if (!exports || typeof exports === 'string') {
+        problems.push(`${pkg.name}: no exports map`)
+        continue
+      }
+      for (const [subpath, target] of Object.entries(exports)) {
+        // `linear` and `rollbar` each declare `./server/index.ts` on top of the four kinds, because a
+        // `vi.mock` has to name the module the code under test imports and both plugins' routes
+        // import their own `../index` relatively. Their testkits record it; nothing else may.
+        const extra = subpath === './server/index.ts' && ['@acorn/plugin-linear', '@acorn/plugin-rollbar'].includes(pkg.name)
+        if (!KINDS.test(subpath) && !extra) problems.push(`${pkg.name}: ${subpath} is not an entrypoint, contract/, or testkit`)
+        const resolved = target.replace('/*', '')
+        if (!existsSync(join(pkg.dir, resolved))) problems.push(`${pkg.name}: ${subpath} -> ${target} does not exist`)
+      }
+    }
+    expect(problems.sort()).toEqual([])
+    // Anti-vacuity: the maps exist and carry traffic, rather than every plugin having an empty one.
+    const entrypoints = EDGES.filter((e) => e.target.pkg?.kind === 'plugin' && e.target.pkg.name !== e.fromPkg.name)
+    expect(entrypoints.length).toBeGreaterThan(40)
   })
 
   it('protocol declares no plugin route', () => {
@@ -722,6 +744,46 @@ describe('architecture boundaries', () => {
   // and defined by editor, `.new-pr-btn` worn by docker and defined by github, `.file-status*` worn by
   // core's diff rows and defined by github. Each meant a pane silently lost its styling when an
   // unrelated plugin was switched off, invisible to the compiler.
+  it('a request body is parsed, not cast', () => {
+    // docs/architecture-overview.md § Package boundaries: a mutation route parses its body with a Zod
+    // schema. The rule the review found drifted was written down and nowhere enforced, so ten route
+    // files had gone back to `as { field?: string }`, which type-checks and validates nothing.
+    //
+    // File-level, not call-level: a route file that parses one body and casts another is rare, and
+    // matching a `safeParse` to the `c.req.json()` it belongs to means parsing rather than grepping.
+    // The failure this catches is a file with no schema in it at all.
+    const ALLOWED = new Map([
+      // Hand-written validators over the same bodies, in `shared/` so the client runs them too. They
+      // return per-field messages the settings form displays, which is more than a Zod issue list
+      // gives, and the stored-preference reader parses through the same function. Rewriting them to
+      // satisfy a grep would lose the messages and validate no better.
+      ['plugins/agents/src/server/routes/usage.ts', 'validateAgentPricingPreferences and its two siblings in shared/'],
+    ])
+    const offenders: string[] = []
+    for (const pkg of PACKAGES) {
+      for (const file of walk(pkg.src)) {
+        if (isTestCode(file)) continue
+        const text = readFileSync(file, 'utf8')
+        // A mention inside a `//` comment is not a body read. Import edges deliberately do not strip
+        // comments (see IMPORT_RE) because a missed edge is the worse failure; here the opposite
+        // holds, and idempotency.ts describes `c.req.json()` in prose without calling it.
+        const reads = text
+          .split('\n')
+          .filter((line) => line.includes('c.req.json()') && !line.trimStart().startsWith('//') && !line.trimStart().startsWith('*'))
+        if (!reads.length || text.includes('safeParse')) continue
+        if (ALLOWED.has(rel(file))) continue
+        offenders.push(`${rel(file)}: ${reads.length} body read(s), no safeParse`)
+      }
+    }
+    expect(offenders.sort()).toEqual([])
+    // Anti-vacuity: the tree has mutation routes, and they do read bodies.
+    const readers = PACKAGES.flatMap((pkg) => walk(pkg.src)).filter((file) => readFileSync(file, 'utf8').includes('c.req.json()'))
+    expect(readers.length).toBeGreaterThan(20)
+    // And every allowlist entry still names a file that still reads a body, so an exception cannot
+    // outlive the code it excuses.
+    for (const [path] of ALLOWED) expect(readers.map(rel)).toContain(path)
+  })
+
   it('no plugin stylesheet styles another package\'s markup', () => {
     const pluginDirs = readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })
       .filter((e) => e.isDirectory()).map((e) => e.name)
