@@ -5,7 +5,7 @@ import { readJson } from '../apiClient'
 import { prefsOptions } from '../queries'
 import { saveJsonPref } from './savePref'
 import { PrefKeys } from '../persistence/prefKeys'
-import { toolPermissionsSchema, type ToolPermissions } from '@acorn/protocol/toolPermissions.ts'
+import { TOOL_TIER_DEFAULTS, toolPermissionsSchema, type ToolPermissions } from '@acorn/protocol/toolPermissions.ts'
 import { Checkbox } from '../ui/primitives'
 
 // Settings → Agent tools (docs/agent-tools.md § Projections): the permission surface over the
@@ -17,7 +17,7 @@ type ToolPerms = ToolPermissions
 const TIERS: { risk: ToolRisk; label: string; blurb: string }[] = [
   { risk: 'read', label: 'Read', blurb: 'Inspect context, notes, memory, git and the PR. No side effects.' },
   { risk: 'write', label: 'Write', blurb: 'Create or edit notes and propose memory (proposals stay human-gated).' },
-  { risk: 'execute', label: 'Execute', blurb: 'Drive the preview browser and run targets in the worktree.' },
+  { risk: 'execute', label: 'Execute', blurb: 'Drive the preview browser and run targets in the worktree. Off until you turn it on, including for tools added by a later release.' },
 ]
 
 export default function AgentToolsSettings() {
@@ -39,7 +39,9 @@ export default function AgentToolsSettings() {
     }
   })
 
-  const tierOn = (risk: ToolRisk) => (risk === 'read' ? true : (perms().tiers?.[risk] ?? true))
+  // Same fallback the node applies (node-core/server/agentTools/registry.ts § isToolPermitted), so an
+  // untouched execute tier draws as off here and is denied there rather than the two disagreeing.
+  const tierOn = (risk: ToolRisk) => (risk === 'read' ? true : (perms().tiers?.[risk] ?? TOOL_TIER_DEFAULTS[risk]))
   const toolOn = (t: AgentToolCatalogEntry) => perms().tools?.[t.name] ?? tierOn(t.risk)
 
   const write = (next: ToolPerms) => saveJsonPref(qc, PrefKeys.agentToolPermissions, next)

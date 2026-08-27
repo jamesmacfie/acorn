@@ -31,20 +31,11 @@ export function restorePersistedSlices(
 ): void {
   for (const phase of PHASES) {
     for (const slice of slices.filter((candidate) => candidate.restore === phase && candidate.binding)) {
-      const canonical: [string, unknown][] = []
       for (const [key, raw] of Object.entries(prefs)) {
         const scopeId = scopeIdFromStorageKey(slice, key)
-        if (scopeId !== null) canonical.push([scopeId, raw])
-      }
-      // Merge rather than switch wholesale: a process killed midway through the first scoped
-      // migration may have written only some canonical entries. Legacy fills the untouched scopes;
-      // canonical values override only the scopes that completed.
-      const values = new Map<string, unknown>(Object.entries(slice.legacy?.(prefs) ?? {}))
-      for (const [scopeId, raw] of canonical) {
-        if (raw === PERSISTED_STATE_TOMBSTONE) values.delete(scopeId)
-        else values.set(scopeId, raw)
-      }
-      for (const [scopeId, raw] of values) {
+        // A tombstone is a stored value that means "this scope is gone", written when the user
+        // removed one. It is not a value to parse.
+        if (scopeId === null || raw === PERSISTED_STATE_TOMBSTONE) continue
         try {
           slice.binding!.hydrate(scopeId, parseStored(slice, scopeId, raw))
         } catch (error) {

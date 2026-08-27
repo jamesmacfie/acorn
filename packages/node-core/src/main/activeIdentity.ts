@@ -1,5 +1,6 @@
-import { chmodSync, closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { writePrivateAtomic } from './dataRoot'
 
 // The identity bound to the machine-side internal token: the node's opaque owner id, minted at first
 // boot (main/core/identity/identity.ts). Persisting it explicitly beats guessing from whichever
@@ -28,16 +29,7 @@ export function activeIdentityStore(dataDir: string): ActiveIdentityStore {
     set(userId) {
       const next = userId.trim()
       if (!next || next === current) return
-      const temporary = `${file}.${process.pid}.tmp`
-      const fd = openSync(temporary, 'w', 0o600)
-      try {
-        writeSync(fd, `${next}\n`)
-        fsyncSync(fd)
-      } finally {
-        closeSync(fd)
-      }
-      renameSync(temporary, file)
-      chmodSync(file, 0o600)
+      writePrivateAtomic(file, `${next}\n`)
       current = next
     },
     clear(userId) {

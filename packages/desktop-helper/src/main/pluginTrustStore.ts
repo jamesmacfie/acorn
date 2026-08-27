@@ -1,9 +1,10 @@
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
+import { writePrivateAtomic } from '@acorn/node-core/main/dataRoot.ts'
 
 // This device's decisions about which plugin bundles it will run. See docs/plugins.md and
 // docs/security.md, "Third-party plugin bundles", for the key, the storage, and what "gained" means
@@ -295,7 +296,10 @@ export class PluginTrustStore {
     const path = join(this.userDataDir, TRUST_FILE)
     mkdirSync(this.userDataDir, { recursive: true, mode: 0o700 })
     const file = { version: 1, acks, devGrants } satisfies { version: 1; acks: PluginAck[]; devGrants: PluginDevGrant[] }
-    writeFileSync(path, `${JSON.stringify(file, null, 2)}\n`, { mode: 0o600 })
-    chmodSync(path, 0o600)
+    // The shared open-write-fsync-close-rename, not a plain write: a torn trust file is a security
+    // record the user set once, and the recovery from a half-written one is quarantine plus a prompt
+    // for every plugin. The blob cache next door deliberately keeps the looser variant; see
+    // pluginCache.ts § writeBundle.
+    writePrivateAtomic(path, `${JSON.stringify(file, null, 2)}\n`)
   }
 }

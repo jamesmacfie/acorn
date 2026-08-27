@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyLayoutAction, defaultLayout, migrateTaskPanes, normalizeLayout, parseTaskLayouts, type TaskLayout } from './layout'
+import { applyLayoutAction, defaultLayout, normalizeLayout, type TaskLayout } from './layout'
 
 const layout = (partial: Partial<TaskLayout>): TaskLayout => ({ panes: ['pr'], ...partial })
 
@@ -63,10 +63,5 @@ describe('pane layout persistence', () => {
     expect(normalizeLayout({ active: 'pr', pinned: ['changes', 'future.pane'] })).toEqual(
       layout({ panes: ['pr', 'changes', 'future.pane'], pinned: ['changes', 'future.pane'] }),
     )
-  })
-
-  it('migrates task_panes and falls back to it when task_layouts is malformed', () => {
-    expect(migrateTaskPanes({ t1: 'editor', t2: '' })).toEqual({ t1: defaultLayout('editor') })
-    expect(parseTaskLayouts('{not json', JSON.stringify({ t1: 'linear' })).t1).toEqual(defaultLayout('linear'))
   })
 })

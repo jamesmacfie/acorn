@@ -122,4 +122,29 @@ describe('worktree routes', () => {
     const gated = new Hono<AppEnv>().use('/core/*', requireUser).route('/core', worktree)
     expect((await gated.fetch(req('/core/task-statuses'), env())).status).toBe(401)
   })
+
+  // Filtered rather than gated: a task-scoped caller may ask about its own task, and each row carries
+  // another task's id, absolute worktree path and dirty count. The plugin-frame caller is covered by
+  // the same filter, since `core.tasks:read` grants this path.
+  it('answers a task-confined caller with its own task only', async () => {
+    const now = Date.now()
+    await testDb.db.insert(schema.tasks).values({
+      id: 'task2', projectId: 'project-widget', branch: 'other', title: 'someone else', status: 'active',
+      origin: 'local', worktreePath: dir, createdAt: now, updatedAt: now,
+    })
+
+    const confined = new Hono<AppEnv>()
+      .use('/core/*', async (c, next) => {
+        c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
+        await next()
+      })
+      .route('/core', worktree)
+    const mine = (await (await confined.fetch(req('/core/task-statuses'), env())).json()) as { taskId: string }[]
+    expect(mine.map((row) => row.taskId)).toEqual(['task1'])
+
+    // A device sees the whole roster, so the filter is confinement rather than a narrowed answer for
+    // everyone.
+    const all = (await (await authed().fetch(req('/core/task-statuses'), env())).json()) as { taskId: string }[]
+    expect(all.map((row) => row.taskId).sort()).toEqual(['task1', 'task2'])
+  })
 })

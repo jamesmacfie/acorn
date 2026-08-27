@@ -53,8 +53,12 @@ export function createApp() {
     // exist and which SQLite files open. A task-scoped agent must not read the list, which enumerates
     // the surface, or write it, which lets it disable the plugin whose gate it stands behind.
     .use(`${CORE_NAMESPACE}/plugins`, requireDevice)
-    // Both forms, like `pair` and `devices` above (docs/security.md § Transport and auth). Hono's
-    // trailing `/*` does not match the bare path, which is why both forms repeat everywhere below.
+    // Both forms, like `pair` and `devices` above (docs/security.md § Transport and auth), and the
+    // pattern every gate below repeats. Under the Hono this repo pins, a trailing `/*` does also match
+    // the bare path, so the second line is the load-bearing one and the first is belt. Whether that
+    // holds has moved between Hono versions; writing both makes the gate independent of it, and
+    // server/mountCoverage.test.ts reads the mount table the strict way so a single-form mount is
+    // reported rather than trusted.
     .use(`${CORE_NAMESPACE}/plugins/*`, requireDevice)
     // The audit trail, same class again: it names every device that has paired and every credential
     // connected to this node, the enumeration security.md forbids an agent-spawned child.
@@ -72,6 +76,22 @@ export function createApp() {
     // Even with the credentials scrubbed out, that is an exfiltration primitive in an agent's hands.
     .use(`${CORE_NAMESPACE}/backup`, requireDevice)
     .use(`${CORE_NAMESPACE}/backup/*`, requireDevice)
+    // Preferences, same class again, and the sharpest of the three below. The agent-tool permission
+    // ceiling is a preference key, so a task-scoped token that could write here would raise its own
+    // ceiling and then call the tool it had just granted itself. Only the settings UI writes these,
+    // always on a device principal; the node's own in-process PrefService.write does not pass here.
+    .use(`${CORE_NAMESPACE}/prefs`, requireDevice)
+    .use(`${CORE_NAMESPACE}/prefs/*`, requireDevice)
+    // A project row holds setupScript, devScript, devRestartScript, teardownScript and dbUrlScript,
+    // which this node executes on the next task. Writing one is arbitrary code execution with a
+    // delay on it, so it is an owner act. An agent tool that needs to read its own project's
+    // configuration gets a task-addressed route under /tasks/:id, never a widening of this gate.
+    .use(`${CORE_NAMESPACE}/projects`, requireDevice)
+    .use(`${CORE_NAMESPACE}/projects/*`, requireDevice)
+    // Workspaces are the top-level unit the owner organises by hand, and none of these routes is
+    // task-addressed, so nothing narrows a delete to the caller's own work.
+    .use(`${CORE_NAMESPACE}/workspaces`, requireDevice)
+    .use(`${CORE_NAMESPACE}/workspaces/*`, requireDevice)
     // Task scope, enforced by mount rather than per handler (docs/security.md § Transport and auth).
     .use(`${CORE_NAMESPACE}/tasks/:id`, requireTaskScope)
     .use(`${CORE_NAMESPACE}/tasks/:id/*`, requireTaskScope)

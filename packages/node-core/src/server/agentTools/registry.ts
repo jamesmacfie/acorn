@@ -1,6 +1,6 @@
 import type { z } from 'zod'
 import { AGENT_TOOLS_PERMS_PREF_KEY, type ToolRisk as SharedToolRisk } from '@acorn/protocol/api.ts'
-import { toolPermissionsSchema } from '@acorn/protocol/toolPermissions.ts'
+import { TOOL_TIER_DEFAULTS, toolPermissionsSchema } from '@acorn/protocol/toolPermissions.ts'
 
 export type ToolRisk = SharedToolRisk
 
@@ -51,9 +51,12 @@ export function parseToolPerms(raw: string | undefined): ToolPerms {
   }
 }
 
+// A per-tool preference wins over its tier, and a tier the owner has not set falls back to
+// TOOL_TIER_DEFAULTS rather than to `true` (@acorn/protocol/toolPermissions.ts, for why `execute` is
+// the one that denies).
 export function isToolPermitted(tool: Pick<AgentToolContribution, 'name' | 'risk'>, perms: ToolPerms): boolean {
   if (tool.risk === 'read') return perms.tools?.[tool.name] ?? true
-  return perms.tools?.[tool.name] ?? perms.tiers?.[tool.risk] ?? true
+  return perms.tools?.[tool.name] ?? perms.tiers?.[tool.risk] ?? TOOL_TIER_DEFAULTS[tool.risk]
 }
 
 // ─── The contribution point ─────────────────────────────────────────────────────────────────────

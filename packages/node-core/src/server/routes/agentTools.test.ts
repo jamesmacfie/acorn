@@ -152,6 +152,7 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
   })
 
   it('manifest lists available tools with JSON schema; dynamic `when` gates a tool per task', async () => {
+    await setPerms({ tiers: { execute: true } }) // execute denies by default; this case is about `when`
     const notReady = (await (await get('/api/tasks/t1/tools')).json()) as { tools: { name: string; inputSchema: unknown }[] }
     expect(notReady.tools.map((t) => t.name).sort()).toEqual(['read_tool', 'throws_tool', 'write_tool']) // exec_tool hidden
     expect(notReady.tools.find((t) => t.name === 'read_tool')?.inputSchema).toEqual({ type: 'object', properties: {} })
@@ -167,6 +168,25 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     const ready = (await (await get('/api/tasks/ready/tools')).json()) as { tools: { name: string }[] }
     expect(ready.tools.map((t) => t.name)).toEqual(expect.arrayContaining(['exec_tool', 'exec_tool_2']))
     expect(availabilityCalls).toBe(1)
+  })
+
+  // An installation that has never opened Settings → Agent tools has no preference row at all, which is
+  // the state every installation is in for a tool added by a later release. Execute has to deny there,
+  // or shipping a new run-target tool grants it to everyone on upgrade with nothing shown to the owner.
+  it('denies the execute tier when the owner has expressed no preference', async () => {
+    const manifest = (await (await get('/api/tasks/ready/tools')).json()) as { tools: { name: string }[] }
+    expect(manifest.tools.map((tool) => tool.name).sort()).toEqual(['read_tool', 'throws_tool', 'write_tool'])
+    expect((await post('/api/tasks/ready/tools/exec_tool', {})).status).toBe(404)
+    // The `when` predicate is never reached: a denied tier is decided before availability is asked.
+    expect(availabilityCalls).toBe(0)
+
+    // Read and write are the other half of the decision, and they stay allowed with no preference set.
+    expect((await post('/api/tasks/ready/tools/read_tool', {})).status).toBe(200)
+    expect((await post('/api/tasks/ready/tools/write_tool', { slug: 'x' })).status).toBe(200)
+
+    // Turning the tier on in settings is what makes it reachable, and nothing else.
+    await setPerms({ tiers: { execute: true } })
+    expect((await post('/api/tasks/ready/tools/exec_tool', {})).status).toBe(200)
   })
 
   it('runs a tool: validates input, passes taskId + session header to the handler', async () => {

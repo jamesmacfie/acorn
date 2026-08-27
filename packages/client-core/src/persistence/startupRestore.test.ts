@@ -20,13 +20,15 @@ describe('persisted state descriptors', () => {
       codec: { parse: String, serialize: String },
       empty: () => '',
       binding: { values: () => ({}), hydrate: () => restored.push(id) },
-      legacy: () => ({ '': id }),
     })
-    restorePersistedSlices([make('panes', 'panes'), make('workspace', 'workspace'), make('view', 'view')], {})
+    restorePersistedSlices(
+      [make('panes', 'panes'), make('workspace', 'workspace'), make('view', 'view')],
+      { panes: 'p', workspace: 'w', view: 'v' },
+    )
     expect(restored).toEqual(['workspace', 'view', 'panes'])
   })
 
-  it('derives scoped keys and prefers canonical values over a legacy aggregate', () => {
+  it('derives scoped keys, and hydrates every scope it finds one for', () => {
     const hydrated: [string, string][] = []
     const descriptor = slice<string>({
       id: 'layout',
@@ -36,13 +38,13 @@ describe('persisted state descriptors', () => {
       codec: { parse: String, serialize: String },
       empty: () => '',
       binding: { values: () => ({}), hydrate: (id, value) => hydrated.push([id, value]) },
-      legacy: () => ({ 'task/one': 'old', untouched: 'legacy' }),
     })
     const key = storageKeyFor(descriptor, 'task/one')
+    const other = storageKeyFor(descriptor, 'task/two')
     expect(key).toBe('core:layout:task%2Fone')
     expect(scopeIdFromStorageKey(descriptor, key)).toBe('task/one')
-    restorePersistedSlices([descriptor], { [key]: 'new' })
-    expect(hydrated).toEqual([['task/one', 'new'], ['untouched', 'legacy']])
+    restorePersistedSlices([descriptor], { [key]: 'new', [other]: 'also', unrelated: 'ignored' })
+    expect(hydrated).toEqual([['task/one', 'new'], ['task/two', 'also']])
   })
 
   it('serializes only codec output and exposes a UTF-8 byte guard', () => {
@@ -57,17 +59,19 @@ describe('persisted state descriptors', () => {
     expect(utf8Bytes(raw)).toBeGreaterThan(raw.length)
   })
 
-  it('uses scoped tombstones so an evicted legacy value cannot return', () => {
+  it('skips a tombstoned scope instead of parsing the marker as a value', () => {
     const hydrated: string[] = []
     const descriptor = slice<string>({
       id: 'filter', key: 'filter', scope: 'workspace', restore: 'view',
       codec: { parse: String, serialize: String }, empty: () => '',
       binding: { values: () => ({}), hydrate: (id) => hydrated.push(id) },
-      legacy: () => ({ removed: 'old', retained: 'old' }),
     })
     restorePersistedSlices([descriptor], {
       [storageKeyFor(descriptor, 'removed')]: PERSISTED_STATE_TOMBSTONE,
+      [storageKeyFor(descriptor, 'retained')]: 'kept',
     })
+    // A tombstone is what the node holds for a scope the user removed. Without the skip it would
+    // hydrate the literal `{"__acorn_deleted":true}` as that scope's value.
     expect(hydrated).toEqual(['retained'])
   })
 })

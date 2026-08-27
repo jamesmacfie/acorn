@@ -127,33 +127,3 @@ export function normalizeLayout(value: unknown): TaskLayout | null {
     ...(pinned.length ? { pinned } : {}),
   }
 }
-
-export function migrateTaskPanes(old: unknown): Record<string, TaskLayout> {
-  const out: Record<string, TaskLayout> = {}
-  if (!old || typeof old !== 'object') return out
-  for (const [taskId, pane] of Object.entries(old as Record<string, unknown>)) {
-    if (isPaneId(pane)) out[taskId] = defaultLayout(pane)
-  }
-  return out
-}
-
-export function parseTaskLayouts(layoutsJson: string | undefined, legacyPanesJson: string | undefined): Record<string, TaskLayout> {
-  if (layoutsJson) {
-    try {
-      const raw = JSON.parse(layoutsJson) as Record<string, unknown>
-      const out: Record<string, TaskLayout> = {}
-      for (const [taskId, value] of Object.entries(raw)) {
-        const layout = normalizeLayout(value)
-        if (layout) out[taskId] = layout
-      }
-      return out
-    } catch {
-      // Fall through to the legacy single-pane preference.
-    }
-  }
-  try {
-    return migrateTaskPanes(legacyPanesJson ? JSON.parse(legacyPanesJson) : {})
-  } catch {
-    return {}
-  }
-}

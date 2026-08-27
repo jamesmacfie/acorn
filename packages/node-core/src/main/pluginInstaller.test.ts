@@ -131,18 +131,45 @@ describe('resolving a source', () => {
     await expect(installPlugin(root, { github: 'acme/ntfy' })).rejects.toThrow(/acorn-plugin\.tgz/)
   })
 
-  it('resolves an npm package through the registry, recording its integrity', async () => {
-    const bytes = tarball(packageDir(), { nested: true })
+  // The registry's integrity string is checked against the bytes, not just written down. `serveNpm`
+  // takes whatever integrity the case wants to claim so the honest and the tampered-with paths run
+  // through exactly the same code.
+  const serveNpm = (bytes: Buffer, integrity: string | undefined) =>
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string | URL) =>
         String(input) === 'https://registry.npmjs.org/acorn-ntfy'
-          ? Response.json({ 'dist-tags': { latest: '1.0.0' }, versions: { '1.0.0': { dist: { tarball: 'https://registry.npmjs.org/a.tgz', integrity: 'sha512-abc' } } } })
+          ? Response.json({
+            'dist-tags': { latest: '1.0.0' },
+            versions: { '1.0.0': { dist: { tarball: 'https://registry.npmjs.org/a.tgz', ...(integrity ? { integrity } : {}) } } },
+          })
           : new Response(new Uint8Array(bytes), { status: 200 }),
       ),
     )
+
+  it('resolves an npm package through the registry, recording and verifying its integrity', async () => {
+    const bytes = tarball(packageDir(), { nested: true })
+    const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`
+    serveNpm(bytes, integrity)
     await installPlugin(root, { npm: 'acorn-ntfy' })
-    expect(readLockfile(root, 'ntfy')!.provenance).toEqual({ version: '1.0.0', integrity: 'sha512-abc' })
+    expect(readLockfile(root, 'ntfy')!.provenance).toEqual({ version: '1.0.0', integrity })
+  })
+
+  // The finding this closes: the integrity was recorded into provenance and never compared, so bytes
+  // that were not the published ones installed and ran with the node's own access.
+  it('refuses a package whose bytes do not match the published digest', async () => {
+    const bytes = tarball(packageDir(), { nested: true })
+    serveNpm(bytes, `sha512-${createHash('sha512').update('something else').digest('base64')}`)
+    await expect(installPlugin(root, { npm: 'acorn-ntfy' })).rejects.toThrow(/sha512 digest/)
+    expect(existsSync(join(pluginInstallRoot(root), 'ntfy'))).toBe(false)
+  })
+
+  // A package the registry says nothing verifiable about still installs. Refusing here would break
+  // every older package that only ever published a shasum, and the archive hash in the lockfile is
+  // still recorded either way.
+  it('installs when the registry publishes no integrity string', async () => {
+    serveNpm(tarball(packageDir(), { nested: true }), undefined)
+    await expect(installPlugin(root, { npm: 'acorn-ntfy' })).resolves.toMatchObject({ id: 'ntfy' })
   })
 })
 

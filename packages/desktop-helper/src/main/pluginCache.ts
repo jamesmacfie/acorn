@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { writePrivateAtomic } from '@acorn/node-core/main/dataRoot.ts'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { corePluginBundleRoute } from '@acorn/protocol/api.ts'
@@ -205,6 +206,12 @@ export class PluginCache {
 
   // Write to a temp file and rename, so a crash mid-write cannot leave a truncated file under a hash
   // that promises its contents. The temp name carries the hash for the same reason.
+  //
+  // Deliberately not node-core's `writePrivateAtomic`: that helper takes a string and fsyncs, and a
+  // bundle is bytes named by their own sha256 that the helper re-downloads when it is missing. The
+  // durability the fsync buys would be paid on every plugin update to protect a cache entry. The
+  // index and the trust store next door do call the helper, because losing those costs more than a
+  // download.
   private writeBundle(hash: string, bytes: Uint8Array): void {
     mkdirSync(this.dir, { recursive: true, mode: 0o700 })
     const target = join(this.dir, `${hash}.js`)
@@ -218,7 +225,6 @@ export class PluginCache {
     this.#entries = entries
     mkdirSync(this.dir, { recursive: true, mode: 0o700 })
     const path = join(this.dir, INDEX_FILE)
-    writeFileSync(path, `${JSON.stringify({ version: 1, entries } satisfies z.input<typeof indexSchema>, null, 2)}\n`, { mode: 0o600 })
-    chmodSync(path, 0o600)
+    writePrivateAtomic(path, `${JSON.stringify({ version: 1, entries } satisfies z.input<typeof indexSchema>, null, 2)}\n`)
   }
 }

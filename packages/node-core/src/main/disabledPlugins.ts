@@ -1,5 +1,6 @@
-import { chmodSync, closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { writePrivateAtomic } from './dataRoot'
 
 export type DisabledPluginsStore = {
   get(): readonly string[]
@@ -36,16 +37,7 @@ export function disabledPluginsStore(dataDir: string): DisabledPluginsStore {
     set(names) {
       const next = [...new Set(names.filter((name) => name.length > 0))].sort()
       mkdirSync(dataDir, { recursive: true, mode: 0o700 })
-      const temporary = `${file}.${process.pid}.tmp`
-      const fd = openSync(temporary, 'w', 0o600)
-      try {
-        writeSync(fd, `${JSON.stringify(next)}\n`)
-        fsyncSync(fd)
-      } finally {
-        closeSync(fd)
-      }
-      renameSync(temporary, file)
-      chmodSync(file, 0o600)
+      writePrivateAtomic(file, `${JSON.stringify(next)}\n`)
       current = next
     },
   }

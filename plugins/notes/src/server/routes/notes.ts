@@ -18,6 +18,15 @@ const mutationResult = async (operation: Promise<void>): Promise<{ ok: true }> =
 }
 
 export const notes = new Hono<AppEnv>()
+  // A workspace note belongs to the owner's whole workspace and is not addressed by task, so unlike a
+  // task note there is nothing here to narrow to the caller: the answer is device-only.
+  //
+  // Both forms on purpose. Under the Hono this repo pins, a trailing `/*` also matches the bare path,
+  // so the second line alone already covered the list and the create — verified in notes.test.ts,
+  // which drives a task-confined principal at every one of these paths and expects 403. Whether `/*`
+  // reaches the bare path has moved between Hono versions, and a gate that is correct only on the
+  // version installed today is the kind of thing that rots quietly, so the mount is written out.
+  .use('/workspaces/:wsId/notes', requireDevice)
   .use('/workspaces/:wsId/notes/*', requireDevice)
   .get('/workspaces/:wsId/notes', (c) => viaBridge(c, NOTES_STORE, (store) => store.list(workspaceLocation(c.req.param('wsId')))))
   .get('/workspaces/:wsId/notes/:slug', (c) => viaBridge(c, NOTES_STORE, (store) => store.read(workspaceLocation(c.req.param('wsId')), c.req.param('slug'))))

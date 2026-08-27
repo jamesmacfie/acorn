@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { hostCapabilities } from '@acorn/client-core/hostCapabilities.ts'
 import { canPickFolder, pickFolder } from '@acorn/client-core/platform/index.ts'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
-import { terminalApi } from '@acorn/plugin-terminal/client/terminalClient.ts'
+import { terminalApi } from '@acorn/plugin-terminal/testkit/client'
 
 // The probe split (git history: docs/future/node-first/platform-seam.md § The fix, item 3).
 //

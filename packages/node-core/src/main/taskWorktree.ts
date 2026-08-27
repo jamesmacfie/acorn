@@ -106,11 +106,16 @@ export const contextInjectionEnabled = async (db: AppDatabase, userId: string): 
 
 // Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md):
 // dirty + changed-file count via git, and `missing` when the dir vanished (removed outside acorn).
-export async function computeTaskStatuses(db: AppDatabase): Promise<TaskStatus[]> {
-  const rows = await db
+// `only` narrows the roster before any Git runs, for a caller entitled to one task rather than all of
+// them. Filtering here rather than at the route matters twice: the answer carries absolute worktree
+// paths, which is a layout disclosure, and each row costs a `git status`, so a confined caller polling
+// this would otherwise make the node do work for tasks it may not see.
+export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: string) => boolean): Promise<TaskStatus[]> {
+  const all = await db
     .select({ id: schema.tasks.id, worktreePath: schema.tasks.worktreePath })
     .from(schema.tasks)
     .where(and(eq(schema.tasks.status, 'active'), isNotNull(schema.tasks.worktreePath)))
+  const rows = only ? all.filter((row) => only(row.id)) : all
 
   // `git status` is async but still CPU/disk work. An unbounded Promise.all made every task start a
   // process at once, producing a periodic resource spike that grew with the task roster.
@@ -270,9 +275,8 @@ export async function projectSetup(db: AppDatabase, projectId: string): Promise<
 // Warnings are logged, never thrown, so a failed copy never blocks worktree creation.
 export async function copyConfiguredFiles(db: AppDatabase, t: Pick<TaskRef, 'projectId'>, checkout: string, worktreePath: string): Promise<void> {
   try {
-    const project = await projectForTask(db, t)
-    const config = project ? (await getProjectConfig(db, project.id))?.config : null
-    const cfg = loadRepoConfig(checkout, homedir(), { setupScript: config?.setupScript, teardownScript: config?.teardownScript })
+    // `copy` is repo/user config only, so this layer needs nothing from the project row.
+    const cfg = loadRepoConfig(checkout, homedir(), {})
     if (!cfg.copy.length) return
     const res = copyWorktreeFiles(checkout, worktreePath, cfg.copy)
     for (const w of res.warnings) console.warn(`[worktrees] ${w}`)
@@ -321,8 +325,6 @@ export async function taskRunConfig(
   }
   const config = project ? (await getProjectConfig(db, project.id))?.config : null
   const cfg = loadRepoConfig(cwd, homedir(), {
-    setupScript: config?.setupScript,
-    teardownScript: config?.teardownScript,
     devScript: config?.devScript,
     devRestartScript: config?.devRestartScript,
     runTargetsJson: config?.runTargets,

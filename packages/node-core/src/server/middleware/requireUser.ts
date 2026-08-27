@@ -67,9 +67,14 @@ export const isTaskConfined = (c: Context<AppEnv>): boolean => {
 // Middleware form of mayActOnTask, for a whole router whose paths are all `/:id/...` task-scoped
 // (docs/security.md § Transport and auth: the adversarial-review finding this closes). 404, not 403,
 // matching the agent-tool surface: the denial reveals nothing about which tasks exist.
+//
+// A missing `:id` denies too. Hono populates the parameter under every mount this gate is used at, so
+// there is no request that takes the second branch today; it is written this way because the first
+// version allowed the request when the id was absent, and a gate whose failure mode is "allow"
+// depends on a fact two files away staying true.
 export const requireTaskScope = createMiddleware<AppEnv>(async (c, next) => {
   const taskId = c.req.param('id')
-  if (taskId && !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')
+  if (!taskId || !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')
   await next()
 })
 

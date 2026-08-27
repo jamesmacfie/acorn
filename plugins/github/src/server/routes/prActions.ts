@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
+import { z } from 'zod'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { bustPrSync, resolvePr, setPrState } from './prContext'
@@ -10,6 +11,39 @@ import { comments, prLabels, pullRequests, reviewRequests, viewedFiles } from '.
 // a read within the TTL window reflects the change, and returns the canonical bit. The client
 // layers optimistic updates / invalidation on top.
 
+// Every body below is parsed, never cast (docs/architecture-overview.md § Package boundaries). Two
+// of these reach GitHub as protocol values rather than as content — the merge method becomes a
+// `merge_method` and a `PullRequestMergeMethod` enum member, and `side` becomes a review-comment
+// anchor — so an unchecked string here is a string GitHub interprets.
+//
+// A schema that only says `z.string()` still earns its place: it is what stops a number or an object
+// reaching a template literal or `JSON.stringify`. Where a route already answers a more specific code
+// than `bad_request` for an empty value, the schema keeps the field optional and the existing check
+// keeps the code.
+const MERGE_METHODS = ['merge', 'squash', 'rebase'] as const
+const mergeBody = z.object({ method: z.enum(MERGE_METHODS).default('merge') })
+const draftBody = z.object({ draft: z.boolean().default(false) })
+const commentBody = z.object({ body: z.string().optional() })
+const viewedBody = z.object({ path: z.string().min(1), viewed: z.boolean().default(false) })
+const reviewCommentBody = z.object({
+  body: z.string().optional(),
+  path: z.string().min(1),
+  line: z.number().int().positive(),
+  side: z.enum(['LEFT', 'RIGHT']).default('RIGHT'),
+})
+const threadResolveBody = z.object({ resolved: z.boolean().default(false) })
+const reviewBody = z.object({ body: z.string().optional(), event: z.enum(['APPROVE', 'REQUEST_CHANGES', 'COMMENT']) })
+const reviewerBody = z.object({ login: z.string().optional() })
+const labelBody = z.object({ name: z.string().optional() })
+
+/** The parsed body, or `null` when it does not fit. `missing` is what an absent body parses as, for the
+ *  routes whose fields are all defaulted and which have always accepted a bodyless POST. */
+async function readBody<S extends z.ZodType>(c: Context<AppEnv>, schema: S, missing?: unknown): Promise<z.infer<S> | null> {
+  const raw: unknown = await c.req.json().catch(() => missing ?? null)
+  const parsed = schema.safeParse(raw)
+  return parsed.success ? parsed.data : null
+}
+
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
 export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
@@ -17,11 +51,12 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
   .post('/:owner/:repo/pulls/:number/merge', async (c) => {
     const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
-    const { method } = (await c.req.json().catch(() => ({}))) as { method?: string }
+    const parsed = await readBody(c, mergeBody, {})
+    if (!parsed) return respondError(c, 400, 'bad_request')
     const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/merge`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ merge_method: method ?? 'merge' }),
+      body: JSON.stringify({ merge_method: parsed.method }),
     })
     if (res.status === 405 || res.status === 409) return respondError(c, 409, 'merge_failed')
     const err = ghError(res)
@@ -35,11 +70,12 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     if (!r.nodeId) return respondError(c, 409, 'node_id_unknown') // open the PR first to mirror its node id
-    const { method } = (await c.req.json().catch(() => ({}))) as { method?: string }
+    const parsed = await readBody(c, mergeBody, {})
+    if (!parsed) return respondError(c, 400, 'bad_request')
     const res = await ghGraphQL(
       r.token,
       `mutation($id:ID!,$m:PullRequestMergeMethod!){ enablePullRequestAutoMerge(input:{pullRequestId:$id, mergeMethod:$m}){ clientMutationId } }`,
-      { id: r.nodeId, m: (method ?? 'merge').toUpperCase() },
+      { id: r.nodeId, m: parsed.method.toUpperCase() },
     )
     const result = await ghGraphQLResult(res)
     if (!result.ok) {
@@ -92,7 +128,9 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     if (!r.nodeId) return respondError(c, 409, 'node_id_unknown') // open the PR first to mirror its node id
-    const { draft } = (await c.req.json().catch(() => ({}))) as { draft?: boolean }
+    const parsed = await readBody(c, draftBody, {})
+    if (!parsed) return respondError(c, 400, 'bad_request')
+    const { draft } = parsed
     const mutation = draft
       ? `mutation($id:ID!){ convertPullRequestToDraft(input:{pullRequestId:$id}){ clientMutationId } }`
       : `mutation($id:ID!){ markPullRequestReadyForReview(input:{pullRequestId:$id}){ clientMutationId } }`
@@ -118,7 +156,9 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
   .post('/:owner/:repo/pulls/:number/comments', async (c) => {
     const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
-    const { body } = (await c.req.json().catch(() => ({}))) as { body?: string }
+    const parsed = await readBody(c, commentBody, {})
+    if (!parsed) return respondError(c, 400, 'bad_request')
+    const { body } = parsed
     if (!body?.trim()) return respondError(c, 400, 'empty_body')
     const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/issues/${r.number}/comments`, {
       method: 'POST',
@@ -148,8 +188,9 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
   .post('/:owner/:repo/pulls/:number/viewed', async (c) => {
     const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
-    const { path, viewed } = (await c.req.json().catch(() => ({}))) as { path?: string; viewed?: boolean }
-    if (!path) return respondError(c, 400, 'bad_request')
+    const parsed = await readBody(c, viewedBody)
+    if (!parsed) return respondError(c, 400, 'bad_request')
+    const { path, viewed } = parsed
     const key = { userId: r.userId, repoId: r.repoId, number: r.number, path }
     const where = and(
       eq(viewedFiles.userId, r.userId),
@@ -166,17 +207,14 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     if (!r.headSha) return respondError(c, 409, 'head_sha_unknown') // open the PR first to mirror head sha
-    const { body, path, line, side } = (await c.req.json().catch(() => ({}))) as {
-      body?: string
-      path?: string
-      line?: number
-      side?: string
-    }
-    if (!body?.trim() || !path || !line) return respondError(c, 400, 'bad_request')
+    const parsed = await readBody(c, reviewCommentBody)
+    if (!parsed) return respondError(c, 400, 'bad_request')
+    const { body, path, line, side } = parsed
+    if (!body?.trim()) return respondError(c, 400, 'bad_request')
     const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body, commit_id: r.headSha, path, line, side: side ?? 'RIGHT' }),
+      body: JSON.stringify({ body, commit_id: r.headSha, path, line, side }),
     })
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
@@ -188,7 +226,9 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const commentId = c.req.param('commentId')
-    const { body } = (await c.req.json().catch(() => ({}))) as { body?: string }
+    const parsed = await readBody(c, commentBody, {})
+    if (!parsed) return respondError(c, 400, 'bad_request')
+    const { body } = parsed
     if (!body?.trim()) return respondError(c, 400, 'empty_body')
     const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/comments/${commentId}/replies`, {
       method: 'POST',
@@ -205,7 +245,9 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
     const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
     const threadId = c.req.param('threadId')
-    const { resolved } = (await c.req.json().catch(() => ({}))) as { resolved?: boolean }
+    const parsed = await readBody(c, threadResolveBody, {})
+    if (!parsed) return respondError(c, 400, 'bad_request')
+    const { resolved } = parsed
     const field = resolved ? 'resolveReviewThread' : 'unresolveReviewThread'
     const res = await ghGraphQL(r.token, `mutation($id:ID!){ ${field}(input:{threadId:$id}){ thread { id } } }`, {
       id: threadId,
@@ -222,9 +264,9 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
   .post('/:owner/:repo/pulls/:number/reviews', async (c) => {
     const r = await resolvePr(db, c)
     if ('error' in r) return respondError(c, r.status, r.error)
-    const { body, event } = (await c.req.json().catch(() => ({}))) as { body?: string; event?: string }
-    if (!event || !['APPROVE', 'REQUEST_CHANGES', 'COMMENT'].includes(event))
-      return respondError(c, 400, 'bad_request')
+    const parsed = await readBody(c, reviewBody)
+    if (!parsed) return respondError(c, 400, 'bad_request')
+    const { body, event } = parsed
     if ((event === 'REQUEST_CHANGES' || event === 'COMMENT') && !body?.trim())
       return respondError(c, 400, 'body_required')
     const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/reviews`, {
@@ -259,7 +301,9 @@ export const prActions = (db: PluginDatabase) => new Hono<AppEnv>()
 async function mutateReviewers(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 'remove') {
   const r = await resolvePr(db, c)
   if ('error' in r) return respondError(c, r.status, r.error)
-  const { login } = (await c.req.json().catch(() => ({}))) as { login?: string }
+  const parsed = await readBody(c, reviewerBody, {})
+  if (!parsed) return respondError(c, 400, 'bad_request')
+  const { login } = parsed
   if (!login?.trim()) return respondError(c, 400, 'empty_login')
   const res = await gh(r.token, `/repos/${r.owner}/${r.repo}/pulls/${r.number}/requested_reviewers`, {
     method: op === 'add' ? 'POST' : 'DELETE',
@@ -282,7 +326,9 @@ async function mutateReviewers(db: PluginDatabase, c: Context<AppEnv>, op: 'add'
 async function mutateLabels(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 'remove') {
   const r = await resolvePr(db, c)
   if ('error' in r) return respondError(c, r.status, r.error)
-  const { name } = (await c.req.json().catch(() => ({}))) as { name?: string }
+  const parsed = await readBody(c, labelBody, {})
+  if (!parsed) return respondError(c, 400, 'bad_request')
+  const { name } = parsed
   if (!name?.trim()) return respondError(c, 400, 'empty_name')
   const res =
     op === 'add'

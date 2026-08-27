@@ -27,8 +27,15 @@ export type MarkdownOptions = {
   images?: 'inline' | 'placeholder'
 }
 
-// Sentinel wrapping protected inline-token indexes. A private-use char esc() ignores and real text
-// never contains, so tokens survive escaping and subsequent Markdown transforms can't mutate them.
+// Sentinel wrapping protected inline-token indexes. A private-use char esc() ignores, so tokens
+// survive escaping and subsequent Markdown transforms can't mutate them.
+//
+// The input decides what is in it, so "real text never contains this" is a wish rather than a fact.
+// A source that spelled the sentinel itself used to forge an index into the `codes` and `images`
+// arrays and reach an entry that was never put there, and the restore then read `.alt` or `.replace`
+// off undefined and threw. renderMarkdown strips the character on the way in, once, which kills the
+// class rather than the two probes that found it: after the strip there is no way to write a sentinel
+// that inline() did not write itself.
 const S = '\uE000'
 
 // Inline pass on raw text: protect code spans and images, escape, then apply links / bold / italic.
@@ -73,7 +80,9 @@ const startsTable = (lines: string[], i: number): boolean =>
   lines[i].includes('|') && isTableSeparator(lines[i + 1])
 
 export function renderMarkdown(src: string, opts: MarkdownOptions = {}): string {
-  const lines = src.replace(/\r\n?/g, '\n').split('\n')
+  // Strip the sentinel before anything reads the source. See `S` above; this is the whole defence,
+  // and it belongs at the one entry point rather than at each of the six `inline()` call sites.
+  const lines = src.replaceAll(S, '').replace(/\r\n?/g, '\n').split('\n')
   const out: string[] = []
   let i = 0
   while (i < lines.length) {

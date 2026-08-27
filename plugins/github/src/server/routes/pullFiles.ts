@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { PullFile, PullFilesPatchRequest } from '../../contract/api'
 import { filesResource } from '../resourceKeys'
 import { type AppEnv, type Cached, ownerId, type PluginDatabase, type RefreshResult, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
@@ -20,6 +21,11 @@ const orderedByRequest = <T extends { path: string }>(files: T[], paths: string[
     return file ? [file] : []
   })
 }
+
+// Shape first, then the de-duplication the caller wants. The schema answers "is this a list of
+// non-empty strings"; `uniqueStringPaths` answers "in what order, with duplicates dropped", which is
+// not a shape question.
+const patchBody = z.object({ paths: z.array(z.string().min(1)) }) satisfies z.ZodType<PullFilesPatchRequest>
 
 const uniqueStringPaths = (paths: unknown): string[] | null => {
   if (!Array.isArray(paths)) return null
@@ -95,8 +101,8 @@ export const pullFiles = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner
   const summaryOnly = c.req.query('summary') === '1' && !path
   return handleFilesRead(db, c, { summaryOnly, paths: path ? [path] : undefined })
 }).post('/:owner/:repo/pulls/:number/files/patches', async (c) => {
-  const body = (await c.req.json().catch(() => null)) as PullFilesPatchRequest | null
-  const paths = uniqueStringPaths(body?.paths)
+  const parsed = patchBody.safeParse(await c.req.json().catch(() => null))
+  const paths = parsed.success ? uniqueStringPaths(parsed.data.paths) : null
   if (!paths) return respondError(c, 400, 'bad_paths')
   if (paths.length > MAX_PATCH_PATHS) return respondError(c, 400, 'too_many_paths')
   if (paths.length === 0) return c.json([])

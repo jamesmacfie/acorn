@@ -24,7 +24,6 @@ export type LayoutRecipe = {
 export type ConfigError = { source: string; message: string }
 
 export type RepoConfig = {
-  scripts: { setup: string | null; archive: string | null }
   runTargets: RunTarget[]
   copy: string[]
   layouts: LayoutRecipe[]
@@ -47,8 +46,6 @@ export type RepoConfig = {
 // formerly per-workspace columns). The `dev` run button comes from the dev script or explicit
 // config; see the layering comment in loadRepoConfig below.
 export type DbConfigFallback = {
-  setupScript?: string | null
-  teardownScript?: string | null
   devScript?: string | null // "run dev" command → a base `dev` target (repo config overrides)
   devRestartScript?: string | null // restart command for the base `dev` target
   runTargetsJson?: string | null // projects.run_targets (JSON column)
@@ -91,8 +88,6 @@ function parseRunTarget(id: string, v: unknown, source: string, errors: ConfigEr
 }
 
 type Layer = {
-  setup?: string
-  archive?: string
   run: Map<string, RunTarget>
   copy?: string[]
   layouts: Map<string, LayoutRecipe>
@@ -113,10 +108,21 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
   const scripts = doc.scripts
   if (scripts && typeof scripts === 'object') {
     const s = scripts as Record<string, unknown>
-    layer.setup = str(s.setup)
-    const archive = s.archive
-    // [scripts.archive] may be a bare string or a { command } table (13 §A example).
-    layer.archive = str(archive) ?? (archive && typeof archive === 'object' ? str((archive as Record<string, unknown>).command) : undefined)
+    // `[scripts] setup` and `[scripts] archive` are not read. They were parsed and merged over the
+    // project row for a while and nothing ever consumed the result: the setup script comes from
+    // `projects.setup_script` through projectSetup(), and the archive script from
+    // `projects.teardown_script` through main/archive.ts. A repo could declare either and watch it do
+    // nothing.
+    //
+    // Reported rather than wired. Wiring them would make a committed file run a command on worktree
+    // creation and on archive, and neither path asks the repo-config trust gate first, so it would be
+    // a new execution surface rather than a fix. Reported rather than dropped in silence, because the
+    // whole complaint was a declaration that quietly did nothing, and the palette already draws these.
+    for (const key of ['setup', 'archive'] as const) {
+      if (s[key] !== undefined) {
+        errors.push({ source, message: `[scripts] ${key} is not read. Set the ${key === 'setup' ? 'setup' : 'teardown'} script in the project's settings.` })
+      }
+    }
     const run = s.run
     if (run && typeof run === 'object') {
       for (const [id, v] of Object.entries(run as Record<string, unknown>)) {
@@ -236,10 +242,6 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
   for (const l of repo?.layouts.values() ?? []) layouts.set(l.id, l)
 
   return {
-    scripts: {
-      setup: repo?.setup ?? user?.setup ?? (db.setupScript?.trim() || null),
-      archive: repo?.archive ?? user?.archive ?? (db.teardownScript?.trim() || null),
-    },
     runTargets: [...run.values()],
     copy: repo?.copy ?? user?.copy ?? [],
     layouts: [...layouts.values()],

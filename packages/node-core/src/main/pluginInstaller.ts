@@ -14,8 +14,7 @@
 // runs it at the node's next start (pluginLoader.ts), which is why every result says
 // `installed-restart-required` rather than pretending the plugin is live.
 import { createHash, randomUUID } from 'node:crypto'
-import { createWriteStream, existsSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs'
-import { chmodSync, closeSync, fsyncSync, mkdirSync, openSync, writeSync } from 'node:fs'
+import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -25,6 +24,7 @@ import type {
   PluginUninstallResult,
   PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
+import { writePrivateAtomic } from './dataRoot'
 import { runProcess } from './core/exec/proc'
 import { resolveInRoot } from './core/filesystem/confinement'
 import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifest, type PluginManifest } from './pluginManifest'
@@ -153,7 +153,28 @@ export function guardUrl(raw: string): void {
 
 // ── Download and unpack ───────────────────────────────────────────────────────────────────────────
 
-async function download(url: string, dest: string): Promise<string> {
+// npm publishes each version's tarball digest as a Subresource Integrity string,
+// `<algorithm>-<base64 digest>`, optionally several separated by spaces. It was recorded into
+// provenance and never checked, which made it a note about the package rather than a statement about
+// the bytes on disk. This parses the strongest entry we can compute; an unrecognised algorithm returns
+// null and the caller treats that as "the registry told us nothing we can verify".
+const SRI_ALGORITHMS = ['sha512', 'sha384', 'sha256'] as const
+
+export function parseIntegrity(integrity: string | undefined): { algorithm: string; digest: string } | null {
+  if (!integrity) return null
+  const entries = integrity.trim().split(/\s+/).map((entry) => entry.split('-'))
+  for (const algorithm of SRI_ALGORITHMS) {
+    const match = entries.find(([name, digest]) => name === algorithm && digest)
+    if (match) return { algorithm, digest: match.slice(1).join('-') }
+  }
+  return null
+}
+
+// `expectIntegrity` is the registry's claim about these bytes. A plugin package is code that runs with
+// the node's own access, so a mismatch is refused rather than warned about: it means the archive is
+// not the one the registry published, which is either a corrupt transfer or someone between here and
+// the host choosing what runs.
+async function download(url: string, dest: string, expectIntegrity?: string): Promise<string> {
   guardUrl(url)
   const res = await fetch(url, { headers: { accept: 'application/octet-stream' }, signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
   if (!res.ok) fail(`${url} answered ${res.status}.`)
@@ -165,16 +186,25 @@ async function download(url: string, dest: string): Promise<string> {
   // Hashed and capped as it streams, so an oversized package is abandoned partway rather than after a
   // node has already written it all to disk.
   const hash = createHash('sha256')
+  const expected = parseIntegrity(expectIntegrity)
+  // A second digest only when there is something to compare it against, and in the registry's own
+  // algorithm rather than ours: sha256 above is the lockfile's record of what was installed, which is
+  // a different question from whether these are the published bytes.
+  const integrity = expected ? createHash(expected.algorithm) : null
   let total = 0
   const meter = new Transform({
     transform(chunk: Buffer, _encoding, done) {
       total += chunk.byteLength
       if (total > MAX_ARCHIVE_BYTES) return done(new PluginInstallError(`That package is larger than the ${MAX_ARCHIVE_BYTES} byte limit.`))
       hash.update(chunk)
+      integrity?.update(chunk)
       done(null, chunk)
     },
   })
   await pipeline(Readable.fromWeb(res.body as never), meter, createWriteStream(dest, { mode: 0o600 }))
+  if (expected && integrity!.digest('base64') !== expected.digest) {
+    fail(`That package does not match the ${expected.algorithm} digest the registry published for it. Nothing was installed.`)
+  }
   return hash.digest('hex')
 }
 
@@ -277,16 +307,7 @@ export function compareVersions(a: string, b: string): number | null {
 
 function writeLockfile(dataRoot: string, id: string, lock: PluginLockfile): void {
   const file = lockfilePath(dataRoot, id)
-  const temporary = `${file}.${process.pid}.tmp`
-  const fd = openSync(temporary, 'w', 0o600)
-  try {
-    writeSync(fd, `${JSON.stringify(lock, null, 2)}\n`)
-    fsyncSync(fd)
-  } finally {
-    closeSync(fd)
-  }
-  renameSync(temporary, file)
-  chmodSync(file, 0o600)
+  writePrivateAtomic(file, `${JSON.stringify(lock, null, 2)}\n`)
 }
 
 // The swap. Two renames on one filesystem with a rename-back on failure, which is why staging lives
@@ -364,7 +385,7 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
   try {
     const resolved = 'github' in source ? await resolveGithub(source) : 'npm' in source ? await resolveNpm(source) : { url: source.url, provenance: {} }
     const archive = join(staging, 'package.tgz')
-    const archiveSha256 = await download(resolved.url, archive)
+    const archiveSha256 = await download(resolved.url, archive, resolved.provenance.integrity)
     const unpacked = join(staging, 'unpacked')
     await unpack(archive, unpacked)
     const pkg = packageRoot(unpacked)

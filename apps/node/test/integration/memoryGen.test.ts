@@ -4,9 +4,9 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
-import { contentHashId } from '@acorn/plugin-memory/main/memory.ts'
-import { acceptProposal, generateMemoryProposals, rejectProposal, verifyCandidates, MEMORY_REVIEW_SCHEMA, type MemoryCandidate, type MemoryGenDeps } from '@acorn/plugin-memory/main/memoryGen.ts'
-import { MemoryProposalStore } from '@acorn/plugin-memory/main/memoryProposals.ts'
+import { contentHashId } from '@acorn/plugin-memory/testkit'
+import { acceptProposal, generateMemoryProposals, rejectProposal, verifyCandidates, MEMORY_REVIEW_SCHEMA, type MemoryCandidate, type MemoryGenDeps } from '@acorn/plugin-memory/testkit'
+import { MemoryProposalStore } from '@acorn/plugin-memory/testkit'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
 registerBuiltInProfiles() // profiles come from the agents plugin

@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
-import { NotesStore } from '@acorn/plugin-notes/main/notes.ts'
-import { workflowRuns, workflowSteps } from '@acorn/plugin-workflows/node/schema.ts'
-import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/main/workflowRunner.ts'
+import { NotesStore } from '@acorn/plugin-notes/testkit'
+import { workflowRuns, workflowSteps } from '@acorn/plugin-workflows/testkit'
+import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/testkit'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
 registerBuiltInProfiles() // profiles come from the agents plugin
