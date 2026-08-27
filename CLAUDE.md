@@ -13,5 +13,8 @@ or a contract changes.
 Run `pnpm lint` and the relevant tests before handing work back. `pnpm lint` is oxlint followed by
 `tsc --noEmit` in every package. The oxlint config is deliberately narrow (dead code and the
 `node:` protocol) because a linter arguing about style on day one is one people learn to ignore.
-For the desktop shell, use `pnpm --filter @acorn/desktop test`, which stages the bundle inputs and
-then runs the boot test and the Rust suite.
+For the whole suite, use `pnpm test`, not `turbo run test` directly: it keeps Turborepo's concurrency
+bound, and without that bound the tests that spawn processes or mint certificates time out under the
+load while passing in isolation. For the desktop shell alone, use
+`pnpm --filter @acorn/desktop test`, which stages the bundle inputs and then runs the boot test and
+the Rust suite.

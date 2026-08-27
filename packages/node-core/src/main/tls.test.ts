@@ -2,8 +2,8 @@ import { X509Certificate } from 'node:crypto'
 import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { ensureCert } from './tls'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { ensureCert, type NodeCertificate } from './tls'
 
 const roots: string[] = []
 const root = (): string => {
@@ -11,11 +11,20 @@ const root = (): string => {
   roots.push(dir)
   return dir
 }
-afterEach(() => {
+// afterAll, not afterEach: the shared mint above is made once, and an afterEach would delete its
+// root before the tests that read it ran.
+afterAll(() => {
   for (const dir of roots.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
 const mode = (path: string): string => (statSync(path).mode & 0o777).toString(8)
+
+// One mint for the two tests that only read a certificate's contents. The two that exercise
+// generation and reuse below keep their own fresh roots, since that is what they are about.
+let minted: NodeCertificate
+beforeAll(() => {
+  minted = ensureCert(root())
+})
 
 describe('the node TLS identity (docs/security.md § Transport and authentication)', () => {
   it('mints a private key + certificate, and keeps both to the owner', () => {
@@ -40,15 +49,14 @@ describe('the node TLS identity (docs/security.md § Transport and authenticatio
   })
 
   it('reports the certificate sha256 that a TLS peer will see', () => {
-    const cert = ensureCert(root())
-    const parsed = new X509Certificate(cert.certPem)
-    expect(parsed.fingerprint256.replace(/:/g, '').toLowerCase()).toBe(cert.fingerprint)
+    const parsed = new X509Certificate(minted.certPem)
+    expect(parsed.fingerprint256.replace(/:/g, '').toLowerCase()).toBe(minted.fingerprint)
   })
 
   // These three extensions are why the file is generated with explicit -addext rather than OpenSSL 3's
   // -x509 defaults, and each one buys something specific downstream.
   it('carries the loopback SAN, CA:TRUE and a long validity', () => {
-    const parsed = new X509Certificate(ensureCert(root()).certPem)
+    const parsed = new X509Certificate(minted.certPem)
     // The SAN is what lets a spawned Node child validate the hostname instead of disabling verification.
     expect(parsed.subjectAltName).toContain('127.0.0.1')
     expect(parsed.subjectAltName).toContain('localhost')

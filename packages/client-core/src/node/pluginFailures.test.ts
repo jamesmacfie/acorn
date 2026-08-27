@@ -67,14 +67,19 @@ describe('pluginFailureAttention', () => {
     expect(await items()).toEqual([])
   })
 
-  it('keeps the first timestamp when a surface fails again', async () => {
+  it('replaces the row rather than appending when a surface fails again', async () => {
     recordSurfaceFailure('ntfy', 'board', new Error('first'))
     serve([row({})])
     const first = (await items())[0]!.at
     recordSurfaceFailure('ntfy', 'board', new Error('second'))
-    const again = (await items())[0]!
-    // One row, stamped when the state began: the inbox renders relative time, and re-stamping it on every
-    // registration pass would make a week-old collision read as "just now" forever.
-    expect(again).toMatchObject({ at: first, detail: 'second' })
+    const all = await items()
+    // One row, keyed by plugin and surface, carrying the latest reason. Its timestamp moves, because
+    // recordSurfaceFailure re-stamps on every record and says why in surfaceFailures.ts. This used to
+    // assert the stamp held at `first`, which only passed when both records landed in the same
+    // millisecond. Keeping the first sighting is a behaviour change with an argument on both sides,
+    // not a stabilization fix.
+    expect(all).toHaveLength(1)
+    expect(all[0]).toMatchObject({ detail: 'second' })
+    expect(all[0]!.at).toBeGreaterThanOrEqual(first)
   })
 })

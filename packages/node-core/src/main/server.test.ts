@@ -3,6 +3,7 @@ import { createServer as createNetServer } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { seedTlsCert } from '../testkit/tls.ts'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openDataRoot, type DataRoot } from './dataRoot'
 import { makeRuntime, startListener, type Listener } from './server'
@@ -57,6 +58,8 @@ describe('the loopback TLS listener', () => {
     delete process.env.ACORN_PORT
     process.env.SESSION_ENC_KEY = '0'.repeat(64)
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-listener-'))
+    // The listener's own ensureCert call would mint a fresh RSA pair per test otherwise.
+    seedTlsCert(dataDir)
     root = openDataRoot(dataDir)
   })
 

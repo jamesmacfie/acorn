@@ -66,7 +66,13 @@ const parseConfig = (raw: string): unknown => {
 const abortError = () => new ProviderOperationError('provider_unavailable', 502)
 
 const raceWithAbort = <T>(operation: Promise<T>, signal: AbortSignal): Promise<T> => {
-  if (signal.aborted) return Promise.reject(abortError())
+  if (signal.aborted) {
+    // Claim the operation's outcome even though nobody reads it. A caller that aborts while its call
+    // is still queued lands here, and the queued call throws its own abort error once the scheduler
+    // admits it. With no handler attached that surfaced as an unhandled rejection in the node.
+    operation.catch(() => undefined)
+    return Promise.reject(abortError())
+  }
   return new Promise<T>((resolve, reject) => {
     const aborted = () => reject(abortError())
     signal.addEventListener('abort', aborted, { once: true })

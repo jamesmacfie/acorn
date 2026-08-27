@@ -14,8 +14,18 @@ pnpm db:check
 ```
 
 `pnpm test` rebuilds native modules for plain Node and runs Vitest through Turborepo with bounded
-concurrency. The desktop package's `test` stages the bundle inputs first, then runs its Vitest suites
-and the Rust unit tests, so the boot test always exercises fresh artifacts.
+concurrency, and reports every package rather than cancelling the rest on the first failure. Run it
+rather than `turbo run test` directly: the bound is what keeps the suite honest. Many of these tests
+spawn a real subprocess, mint a certificate, or run git, and turning the bound off oversubscribes the
+machine badly enough that they time out while passing in isolation.
+
+The desktop package's `test` stages the bundle inputs first, then runs its Vitest suites and the Rust
+unit tests, so the boot test always exercises fresh artifacts.
+
+Suites that do that kind of real work carry a 20-second test and hook timeout instead of Vitest's
+5-second default, set in `packages/node-core/vitest.config.ts`,
+`packages/desktop-helper/vitest.config.ts`, `apps/node/vitest.config.ts`, and
+`plugins/vitest.shared.ts`. A genuine hang still fails; it takes longer to say so.
 
 ## Test layers
 
