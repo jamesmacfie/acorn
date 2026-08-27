@@ -69,7 +69,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `id` | yes | Matches `/^[a-z][a-z0-9-]{1,31}$/` — 2 to 32 characters, lowercase, no dots. The dot ban is what keeps `<dataRoot>/plugins/<id>/` and `<dataRoot>/plugins/<id>.sqlite` in one directory without colliding. |
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
-| `apiVersion` | yes | Must equal this node's `PLUGIN_API_MAJOR` by **exact string match** — `'2'` today (`packages/protocol/src/pluginApiVersion.ts`). Anything else is a `failed` roster row with the mismatch as its reason. |
+| `apiVersion` | yes | Must equal this node's `PLUGIN_API_MAJOR` by **exact string match** — `'3'` today (`packages/protocol/src/pluginApiVersion.ts`). Anything else is a `failed` roster row with the mismatch as its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -239,7 +239,7 @@ This is the whole plugin that adds OpenCode:
   "id": "opencode",
   "name": "OpenCode",
   "version": "0.1.0",
-  "apiVersion": "2",
+  "apiVersion": "3",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [
@@ -443,15 +443,22 @@ boundary; a `(Request, PluginRequestContext) => Response` function can, so `ctx.
 is the door. The host strips the mount before calling you, so a request to
 `/v2/p/<id>/greeting` reaches your handler as `/greeting` — the same relative path a mounted router
 would see. `ctx.storage`, `ctx.core`, `ctx.tools`, `ctx.schedules`, `ctx.collections`,
-`ctx.nodeActions`, `ctx.taskChecks`, `ctx.harnesses`, `ctx.contextSections`, `ctx.providers`,
-`ctx.capabilities`, `ctx.events.send`/`status`/`notice` and `ctx.log` are all present, shaped by the
-manifest.
+`ctx.taskChecks`, `ctx.contextSections`, `ctx.providers`, `ctx.capabilities` and
+`ctx.events.send`/`status`/`notice` are all present, shaped by the manifest.
 
-The five registries between `tools` and `contextSections` are owner-bound: the host stamps your plugin
-id onto whatever you register, so a schedule, collection, node action, task check or harness cannot be
-filed under another package's name. Four of them are also manifest keys, and the host synthesises those
-declarations through this same seam, so declare in the manifest by preference — that is the copy the
-owner reads at install.
+The four registries between `tools` and `contextSections` are owner-bound: the host stamps your plugin
+id onto whatever you register, so a schedule, collection or task check cannot be filed under another
+package's name. Three of them are also manifest keys, and the host synthesises those declarations
+through this same seam, so declare in the manifest by preference — that is the copy the owner reads at
+install.
+
+**Node actions and harnesses have no `ctx` member at all.** The manifest is the only way in — a command
+whose verb is `runNodeAction`, and `contributions.harnesses` — and the host registers them for you
+through a shape a plugin never sees. They were on the authoring context until 2026-08-27; every seam a
+plugin could not usefully call was one more member to read past.
+
+**There is no `ctx.log`.** Use `console`, prefixed with your plugin id. The prefixed logger that used to
+be here was interchangeable with `console` at every call site, so nobody reached for it.
 
 ## The client half
 
@@ -633,7 +640,7 @@ contracts above.
   "id": "hello-acorn",
   "name": "Hello Acorn",
   "version": "0.1.0",
-  "apiVersion": "2",
+  "apiVersion": "3",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {

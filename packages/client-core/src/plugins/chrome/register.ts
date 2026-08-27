@@ -11,7 +11,7 @@ import { commandRegistry } from '../../registries/commands'
 import { keybindingRegistry } from '../../registries/keybindings'
 import type { Disposable } from '../../registries/registry'
 import { sourceRegistry } from '../../registries/sources'
-import { taskSlotRegistry, uiSlotRegistry } from '../../registries/slots'
+import { uiSlotRegistry } from '../../registries/slots'
 import { brandMarkRegistry } from '../../ui/brandMarks'
 import {
   loadedPluginStateOnNode,
@@ -237,15 +237,15 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   for (const descriptor of contributions.slots ?? []) {
     note(descriptor.refresh)
-    // Two manifest slot names, two registries. `footer` is a task slot: it draws inside a task's layout
-    // and gets a taskId it doesn't use. `topbar` is a shell slot whose context is the whole window. The
-    // badge component ignores both, because its data comes from a node route rather than anything the
-    // slot could hand it; what differs is which host draws it and when.
+    // Two manifest slot names, one registry, two contexts. `footer` is a task slot: it draws inside a
+    // task's layout and gets a taskId it doesn't use. `topbar` is a shell slot whose context is the
+    // whole window. The badge component ignores both, because its data comes from a node route rather
+    // than anything the slot could hand it; what differs is which host draws it and when.
     //
     // A slot name this client doesn't know is skipped rather than mapped to a default. A roster row is
     // bytes a node sent, and a newer node's `topbar.left` must not silently become the footer.
     if (descriptor.slot === 'footer') {
-      add('slot', descriptor.id, () => taskSlotRegistry.register({
+      add('slot', descriptor.id, () => uiSlotRegistry.register({
         id: descriptor.id,
         slot: 'task.footer',
         order: 500,
@@ -435,7 +435,7 @@ export function syncChromeContributions(): void {
   // One timer at the smallest declared interval rather than one per descriptor. The polling fallback is
   // for data that changes with no node-side trigger; the primary path is still the status ping.
   //
-  // Not a `pollerContribution`: `startClientPollers()` snapshots the registry once at app mount, and
+  // Not a `pollerContribution`: `startClientSchedules()` snapshots the registry once at app mount, and
   // this pass runs after the distribution round trip, so a poller registered here would never start.
   if (registered.size) watchChrome(refreshes.length ? Math.min(...refreshes) : undefined)
   else unwatchChrome()

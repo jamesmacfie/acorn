@@ -62,7 +62,7 @@ The internal docs are unusually honest and the public docs must not launder that
   grantable frame scopes — is genuinely enforced, by `frames/scopes.ts`.
 - There is no signing, no registry, no review, and no deprecation program. If discovery ever
   exists it will be explicitly unreviewed; trust is enforced on the user's devices.
-- The compatibility promise is exactly the `PLUGIN_API_MAJOR` promise ('2', exact string
+- The compatibility promise is exactly the `PLUGIN_API_MAJOR` promise ('3', exact string
   match): a plugin that loads under a major keeps loading under it. Nothing more is promised,
   and the compatibility page says so.
 

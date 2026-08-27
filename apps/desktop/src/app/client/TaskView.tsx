@@ -8,7 +8,7 @@ import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/registries/keybindings.ts'
 import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { addSession, refreshSessions, requestTerminalFocus } from '@acorn/client-core/tasks/agentSessions.ts'
-import { capabilities } from '@acorn/client-core/capabilities.ts'
+import { hostCapabilities } from '@acorn/client-core/hostCapabilities.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
 import { runApi } from '@acorn/client-core/tasks/runClient.ts'
@@ -37,7 +37,7 @@ export default function TaskView(props: {
   // `terminalSessions` is terminal's contract surface (create + list), not its renderer client: the
   // shell has no business holding write/attach/kill/resize, which is what importing
   // client/terminalClient handed it.
-  const hasEngine = () => capabilities().terminal
+  const hasEngine = () => hostCapabilities().terminal
   const bridge = taskBridge()
   const navigate = useNavigate()
   const queryClient = useQueryClient()

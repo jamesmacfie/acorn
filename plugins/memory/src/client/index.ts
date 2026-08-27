@@ -8,8 +8,8 @@ export const memoryClientPlugin: ClientPlugin = {
   init: (ctx) => {
     // Under the node-side `memory` section, which plugins/memory's own node part registers. Both halves
     // key on the same id, and neither plugin names the other.
-    ctx.contextSections.register({ id: 'memory.section', sectionId: 'memory', order: 10, component: MemorySection })
-    ctx.attention.register({
+    ctx.contextSectionSlots.register({ id: 'memory.section', sectionId: 'memory', order: 10, component: MemorySection })
+    ctx.attentionSources.register({
       id: 'memory.proposals', order: 20,
       fetch: async (nodeId, signal) => {
         const proposals = await memoryApi().proposals(undefined, { nodeId, signal })

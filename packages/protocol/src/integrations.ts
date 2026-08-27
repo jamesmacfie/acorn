@@ -39,6 +39,13 @@ export type ProviderCapabilities = Record<string, boolean | string | undefined> 
   textGeneration?: boolean
 }
 
+// The named capabilities above, without the index signature's `string`. Derived rather than written
+// out twice, so adding a capability above is the only edit. A contribution that gates on a provider
+// capability takes this, not a bare string.
+export type ProviderCapabilityName = keyof {
+  [K in keyof ProviderCapabilities as string extends K ? never : number extends K ? never : K]: 0
+}
+
 export type CredentialField = {
   id: string
   label: string

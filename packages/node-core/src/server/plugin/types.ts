@@ -21,10 +21,6 @@ import type { RouteResult } from '../sync/engine'
 import type { StoredConnection } from '../integrations/connections'
 import type { ExternalItemStore } from '../integrations/itemStore'
 
-// Prefixed console, so a plugin's warnings are attributable without every call site restating its own
-// name. No levels, transports or structured fields.
-export type PluginLogger = Pick<Console, 'log' | 'warn' | 'error'>
-
 export type PluginRouteOptions = {
   // Path inside this plugin's namespace: '' for a router owning the whole namespace, '/tasks' for
   // task-scoped sub-resources. The effective mount is /v2/p/<plugin><prefix>.
@@ -227,17 +223,9 @@ export type NodePluginContext = {
   // Both tiers, same as schedules: a loaded plugin's entries are synthesised from its manifest, and
   // nothing downstream can tell which feeder answered.
   collections: PluginCollectionRegistry
-  // Both tiers. Empty for most plugins: an action is listed here only when its author means "a person
-  // may reasonably want this to happen on a timer".
-  nodeActions: PluginNodeActionRegistry
   // Both tiers. A loaded plugin declares `taskChecks` in its manifest and the host synthesises the
   // registration through this seam.
   taskChecks: PluginTaskCheckRegistry
-  // Both tiers, same as taskChecks: a loaded plugin declares `harnesses` in its manifest and the host
-  // synthesises the registration through this seam. Delivered on to whichever plugin owns agent
-  // sessions, which is the one difference from its siblings — there is no registry here, only a
-  // capability handover (./harnesses.ts).
-  harnesses: PluginHarnessRegistry
   contextSections: PluginContextSectionRegistry
   providers: PluginProviderRegistry
   capabilities: PluginCapabilities
@@ -249,7 +237,18 @@ export type NodePluginContext = {
   core: CoreServices
   // Tell connected clients something changed. See PluginBroadcast above for why this isn't an event bus.
   events: PluginBroadcast
-  log: PluginLogger
+}
+
+// The two seams the host fills in on a plugin's behalf, kept off the authoring type above.
+//
+// Neither is something a plugin writes. A manifest declares node actions (as commands whose verb is
+// `runNodeAction`) and harnesses, and server/plugin/host.ts replays those declarations through here.
+// Sitting on `NodePluginContext` they read as members an author should reach for, and in 21 plugins
+// nobody ever did. `harnesses` is not even a registry: it is a handover to whichever plugin owns agent
+// sessions (./harnesses.ts).
+export type HostPluginContext = NodePluginContext & {
+  nodeActions: PluginNodeActionRegistry
+  harnesses: PluginHarnessRegistry
 }
 
 export type NodePlugin = {

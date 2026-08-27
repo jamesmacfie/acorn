@@ -9,7 +9,7 @@ import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/
 import { createFleetQuery } from '@acorn/client-core/node/fanout.ts'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
 import { nodes } from '@acorn/client-core/node/fleet.ts'
-import { hasClientCapability } from '@acorn/client-core/capabilities.ts'
+import { hasHostCapability } from '@acorn/client-core/hostCapabilities.ts'
 import { activeTaskId } from '@acorn/client-core/tasks/tasks.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { composeItems, fuzzyFilter, type PaletteItem } from '@acorn/client-core/palette/model.ts'
@@ -53,7 +53,7 @@ export default function CommandPalette() {
   // an error row rather than taking the palette down: a broken run-target fetch must not also hide the
   // workflow rows, the pane commands and go-to-task. That's also why this is one resource over all
   // sources rather than one each, since a single fetch generation keeps the list consistent.
-  const eligible = () => paletteRowSources().filter((source) => hasClientCapability(source.requires))
+  const eligible = () => paletteRowSources().filter((source) => hasHostCapability(source.requires))
   const [contributed, { refetch }] = createResource(
     () => (palette.open() ? (activeTaskId() ?? '') : null),
     (taskKey) => {

@@ -22,7 +22,7 @@ import type { ManifestHarnessSpawn } from './harnesses'
 import { runPluginScheduleRoute } from './scheduleRun'
 import { runPluginTaskApply, runPluginTaskCheck } from './taskCheckRun'
 import { clearTaskChecks } from './taskChecks'
-import type { NodePlugin, NodePluginContext, PluginStorage } from './types'
+import type { HostPluginContext, NodePlugin, NodePluginContext, PluginStorage } from './types'
 
 // Undos for what `clearRegistrations` can't reach on its own: the WS hub's two slots, which are module
 // singletons with no duplicate guard, and schedules, which live in the composition root's scheduler.
@@ -227,7 +227,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   //
   // A descriptor whose entry escapes its package is dropped with a warning rather than failing the boot.
   // It is one harness of a package that may contribute other things.
-  const registerManifestHarnesses = (ctx: NodePluginContext, name: string, binding?: LoadedPluginBinding): void => {
+  const registerManifestHarnesses = (ctx: HostPluginContext, name: string, binding?: LoadedPluginBinding): void => {
     const declared = binding?.harnesses ?? []
     if (declared.length === 0) return
     for (const descriptor of declared) {
@@ -275,7 +275,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   //
   // A command descriptor declares no tier, so `riskOf` pins these to `execute`, the strongest
   // confirmation. If the descriptor grows a `risk` field, this is the line that reads it.
-  const registerManifestNodeActions = (ctx: NodePluginContext, binding?: LoadedPluginBinding): void => {
+  const registerManifestNodeActions = (ctx: HostPluginContext, binding?: LoadedPluginBinding): void => {
     for (const command of binding?.commands ?? []) {
       if (command.action.verb !== 'runNodeAction') continue
       ctx.nodeActions.register({ actionId: command.id, name: command.title, path: command.action.path })

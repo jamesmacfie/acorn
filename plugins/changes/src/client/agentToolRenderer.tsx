@@ -26,7 +26,9 @@ export const changesAgentToolRenderer: AgentToolRendererContribution = {
             pulse={props.tool.status === 'running'}
             label={props.tool.status ?? 'running'}
           />
-          <span class="agent-tool-name" title={props.tool.title || undefined}>
+          {/* The shared truncation utility, not agents' `.agent-tool-name`: the card wears the host's
+              vocabulary for the box it sits in, but ellipsising its own label is nobody's business. */}
+          <span class="truncate" title={props.tool.title || undefined}>
             {props.tool.title || 'Tool'}
           </span>
           <Show when={props.tool.status && props.tool.status !== 'completed'}>

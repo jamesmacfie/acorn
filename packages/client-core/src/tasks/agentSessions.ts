@@ -6,10 +6,10 @@
 // agent working" is the agents plugin's sentence, and it says it next to its own managed sessions
 // (plugins/agents/src/client/railMarkerContribution.ts).
 //
-// `capabilities().terminal` is the same probe taskBridge() and terminalApi() use (pinned by
+// `hostCapabilities().terminal` is the same probe taskBridge() and terminalApi() use (pinned by
 // ./taskBridge.test.ts), so off-desktop this is an empty list and no subscription.
 import { createSignal } from 'solid-js'
-import { capabilities } from '../capabilities'
+import { hostCapabilities } from '../hostCapabilities'
 import { readJson } from '../apiClient'
 import { wsOnStatus } from '../wsClient'
 import { trackSessionEdges } from '../notifications/notifications'
@@ -27,7 +27,7 @@ const [sessions, setSessions] = createSignal<TerminalSession[]>([])
 export { sessions }
 
 export const refreshSessions = latestOnly(
-  async () => (capabilities().terminal ? await readJson<TerminalSession[]>(terminalSessionsRoute) : []),
+  async () => (hostCapabilities().terminal ? await readJson<TerminalSession[]>(terminalSessionsRoute) : []),
   (next) => {
     // Notification centre: compare against the last committed snapshot, never a stale request.
     trackSessionEdges(sessions(), next)
@@ -44,7 +44,7 @@ export const addSession = (s: TerminalSession): void => {
 // Pull once then track main-process idle/exit broadcasts. Returns an unsubscribe; a noop when the
 // terminal engine is absent (web build), so consumers naturally show nothing.
 export function initSessions(): () => void {
-  if (!capabilities().terminal) return () => {}
+  if (!hostCapabilities().terminal) return () => {}
   void refreshSessions()
   return wsOnStatus(() => void refreshSessions())
 }

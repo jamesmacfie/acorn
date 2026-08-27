@@ -53,7 +53,9 @@ is also why a data-only harness plugin needs no `exec` grant: it never spawns an
 **The delivery seam.** A manifest's `harnesses` entries reach the node host like schedules and task
 checks do. The composition root carries them on the loaded-plugin binding, and
 `node-core/server/plugin/host.ts` resolves each adapter entry inside the contributing package, turns
-each probe route into a call, and hands the result to `ctx.harnesses`. That facet forwards to the
+each probe route into a call, and hands the result to the host-only `harnesses` seam
+(`HostPluginContext` in `server/plugin/types.ts` — a plugin has no member to call, the manifest is the
+only way in). That facet forwards to the
 `agents.harnessRegistry` capability plugins/agents publishes, resolved at delivery time and never
 cached, so agents disabled means the same silent nothing every unmatched contribution gets, and
 re-enabling redelivers. A harness package with no node bundle still gets a real plugin row, so it is

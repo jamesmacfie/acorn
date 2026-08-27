@@ -1,6 +1,7 @@
 import type { Integration, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
-import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
+import type { ProviderCapabilityName, PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import type { SourceId } from '../tasks/tasks'
+import { hasHostCapability } from '../hostCapabilities'
 import { sourceRegistry } from '../registries/sources'
 
 export type SourceEntry = { id: SourceId; glyph: string; label: string }
@@ -14,7 +15,7 @@ export type SourceScope = {
 
 export function availableSources(integrations: Integration[] | undefined, scope?: SourceScope): SourceEntry[] {
   const rows = integrations ?? []
-  const has = (providerId: string, capability?: string) => rows.some(
+  const has = (providerId: string, capability?: ProviderCapabilityName) => rows.some(
     (i) => i.providerId === providerId && i.status !== 'disabled' && i.status !== 'needs-auth' && (!capability || i.capabilities[capability] === 'available'),
   )
   // A provider that enumerates projects (`supportsProjects`) shows its items per linked project, so
@@ -33,10 +34,12 @@ export function availableSources(integrations: Integration[] | undefined, scope?
   }
   return sourceRegistry
     .entries()
-    // Three independent gates, all AND-ed: `providerId` asks "is the integration behind this
-    // connected?", the mapping asks "does this workspace follow anything of its?", and `when` asks
-    // anything else the contribution needs (Fleet home: more than one node paired).
-    .filter((source) => (!source.providerId || (has(source.providerId, source.requiredCapability) && linked(source.providerId)))
+    // Four independent gates, all AND-ed: `requires` asks the platform question, `providerId` asks "is
+    // the integration behind this connected?", the mapping asks "does this workspace follow anything of
+    // its?", and `when` asks anything else the contribution needs (Fleet home: more than one node
+    // paired).
+    .filter((source) => hasHostCapability(source.requires)
+      && (!source.providerId || (has(source.providerId, source.requiresProvider) && linked(source.providerId)))
       && (source.when?.() ?? true))
     // `id` breaks a tie, so two sources declaring the same order still produce a stable rail
     // rather than one that depends on registration after all, the same tiebreak the slot hosts

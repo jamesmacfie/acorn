@@ -1,5 +1,5 @@
-import type { ClientCapabilityRequirement } from '../capabilities'
-import { hasClientCapability } from '../capabilities'
+import type { HostCapabilityRequirement } from '../hostCapabilities'
+import { hasHostCapability } from '../hostCapabilities'
 import { Registry, type Disposable } from './registry'
 
 export type CommandCategory = 'action' | 'navigation' | 'pane' | 'task' | 'terminal' | 'workspace'
@@ -10,7 +10,7 @@ export type CommandContribution = {
   category: CommandCategory
   hint?: string | (() => string | undefined)
   palette?: boolean
-  requires?: ClientCapabilityRequirement
+  requires?: HostCapabilityRequirement
   when?: () => boolean
   run: () => void | Promise<void>
 }
@@ -22,7 +22,7 @@ export const commandTitle = (command: CommandContribution): string =>
 export const commandHint = (command: CommandContribution): string | undefined =>
   typeof command.hint === 'function' ? command.hint() : command.hint
 export const commandAvailable = (command: CommandContribution): boolean =>
-  hasClientCapability(command.requires) && (command.when?.() ?? true)
+  hasHostCapability(command.requires) && (command.when?.() ?? true)
 
 export function executeCommand(id: string): Promise<void> {
   const command = commandRegistry.get(id)

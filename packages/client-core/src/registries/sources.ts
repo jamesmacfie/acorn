@@ -1,5 +1,7 @@
 import type { Component } from 'solid-js'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
+import type { ProviderCapabilityName } from '@acorn/protocol/integrations.ts'
+import type { HostCapabilityRequirement } from '../hostCapabilities'
 import { Registry } from './registry'
 
 export type SourcePromotionContext = {
@@ -36,12 +38,18 @@ export type SourceContribution<Item = unknown> = {
   providerId?: string
   glyph: string
   label: string
+  // The platform question, the same field every host-filtered contribution takes: does this renderer
+  // have a desktop shell, does this node run terminals (../hostCapabilities.ts).
+  requires?: HostCapabilityRequirement
   // An extra gate beyond `providerId`, for a source whose relevance is not an integration question.
   // Core's Fleet home is the one user of it (docs/frontend.md § Registries and plugins).
   when?: () => boolean
   component?: Component
   defaultPane?: string
-  requiredCapability?: string
+  // A third question again: given the integration behind `providerId` is connected, does it grant this
+  // capability? Not `requires`, which asks about the platform, and not a plugin-to-plugin capability
+  // either — the three used to share a word (docs/plugins.md § Collaboration rules).
+  requiresProvider?: ProviderCapabilityName
   // Does this surface read the routed project? Opt in, because most sources don't, and a source that
   // never said it was project-aware almost certainly isn't. The shell shows the project picker only
   // for sources that declare it, so Home no longer offers a control that changes nothing there.

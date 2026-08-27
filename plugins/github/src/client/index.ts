@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import { type ClientPlugin, contentLinkRegistry, readJson, setSelectedSource } from '@acorn/plugin-api/client'
+import { type ClientPlugin, readJson, setSelectedSource } from '@acorn/plugin-api/client'
 import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
 import { reposRoute } from '../contract/api'
 import { PULL_INVOLVEMENT, PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../contract/collections'
@@ -21,7 +21,7 @@ export const githubClientPlugin: ClientPlugin = {
   required: false,
   init: (ctx) => {
     // github.com PR and repo URLs, resolved in-app instead of opening a browser.
-    for (const contribution of githubContentLinkContributions) ctx.contribute(contentLinkRegistry, contribution)
+    for (const contribution of githubContentLinkContributions) ctx.contentLinks.register(contribution)
     // The glance-sized half of a pull request, for a reader in the middle of something else. A
     // recognised PR URL resolves through `providerId`, which the host binds to this plugin.
     ctx.refPanels.register({ id: 'github-pull', providerId: 'github', component: PullRefPanel })
@@ -108,6 +108,6 @@ export const githubClientPlugin: ClientPlugin = {
     ctx.integrationFlows.register(githubIntegrationFlow)
     ctx.panes.register(prPaneContribution)
     ctx.slots.register(pullFilePaletteSlotContribution)
-    ctx.persistedState.register(prFiltersSlice)
+    ctx.persistedStateSlices.register(prFiltersSlice)
   },
 }

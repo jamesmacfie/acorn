@@ -202,12 +202,14 @@ migration plus a tombstone.
 A loaded plugin's \`ctx\` has no \`ctx.routes.register\` (Hono cannot cross a process boundary) and no
 \`ctx.events.channel\`/\`streams\`. The door is \`ctx.routes.fetch((request, context) => Response)\`; the host
 strips the mount, so \`/v2/p/<id>/greeting\` reaches you as \`/greeting\`. \`ctx.storage\`, \`ctx.core\`,
-\`ctx.tools\`, \`ctx.schedules\`, \`ctx.collections\`, \`ctx.nodeActions\`, \`ctx.taskChecks\`, \`ctx.harnesses\`,
-\`ctx.contextSections\`, \`ctx.providers\`, \`ctx.capabilities\`, \`ctx.events.send\`/\`status\`/\`notice\` and
-\`ctx.log\` are there, shaped by the manifest. The five registries between \`tools\` and \`contextSections\` are
-owner-bound: the host stamps your plugin id on whatever you register, so you cannot file a schedule, a
-collection or a harness under another package's name. Declaring the same thing in the manifest goes through
-the same seam, so pick one — the manifest is what the owner reads at install.
+\`ctx.tools\`, \`ctx.schedules\`, \`ctx.collections\`, \`ctx.taskChecks\`, \`ctx.contextSections\`,
+\`ctx.providers\`, \`ctx.capabilities\` and \`ctx.events.send\`/\`status\`/\`notice\` are there, shaped by the
+manifest. Those registries are owner-bound: the host stamps your plugin id on whatever you register, so
+you cannot file a schedule or a collection under another package's name. Declaring the same thing in the
+manifest goes through the same seam, so pick one — the manifest is what the owner reads at install.
+Node actions and managed-agent harnesses have no \`ctx\` member at all: declare them in the manifest,
+which is the only way in (a command with the \`runNodeAction\` verb, and \`contributions.harnesses\`).
+There is no \`ctx.log\`; use \`console\`, prefixed with your plugin id.
 
 ## The loop — you cannot install anything, so ask
 

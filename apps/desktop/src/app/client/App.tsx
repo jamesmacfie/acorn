@@ -21,7 +21,7 @@ import { ToastHost } from '@acorn/client-core/notifications/ToastHost.tsx'
 import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/tasks/tasks.ts'
 import { isTerminalTarget } from '@acorn/client-core/lib/isTypingTarget.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
-import { capabilities } from '@acorn/client-core/capabilities.ts'
+import { hostCapabilities } from '@acorn/client-core/hostCapabilities.ts'
 import { desktopExtras } from '@acorn/client-core/platform/index.ts'
 import NodeGate from '@acorn/client-core/node/NodeGate.tsx'
 import NodeChip from '@acorn/client-core/node/NodeChip.tsx'
@@ -37,7 +37,7 @@ import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/re
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/registries/willPhase.tsx'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
 import { RefPanelHost } from '@acorn/client-core/registries/refPanelHost.tsx'
-import { startClientPollers } from '@acorn/client-core/registries/pollers.ts'
+import { startClientSchedules } from '@acorn/client-core/registries/schedules.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/persistence/appStartup.ts'
 import { createTaskDeepLink } from '@acorn/client-core/tasks/taskDeepLink.ts'
@@ -168,11 +168,11 @@ export default function App() {
 
   // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
   // badge can show agent-working activity. No-op when the node does not run the terminal plugin
-  // (capabilities()); the surfaces are ordinary HTTP+WS, so the hosting shell has no say in it.
+  // (hostCapabilities()); the surfaces are ordinary HTTP+WS, so the hosting shell has no say in it.
   onMount(() => {
-    if (!capabilities().terminal) return
+    if (!hostCapabilities().terminal) return
     onCleanup(initSessions())
-    onCleanup(startClientPollers())
+    onCleanup(startClientSchedules())
     onCleanup(initWorkflowNotices())
   })
 

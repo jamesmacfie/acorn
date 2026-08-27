@@ -41,6 +41,6 @@ export const editorClientPlugin: ClientPlugin = {
       defaultChord: 'meta+shift+f',
       when: 'task',
     })
-    ctx.persistedState.register(editorOpenFilesSlice)
+    ctx.persistedStateSlices.register(editorOpenFilesSlice)
   },
 }

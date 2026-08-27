@@ -9,6 +9,7 @@ import {
   type ExtensionPointLocation,
   type PluginExtensionItem,
 } from '@acorn/protocol/extensionPoints.ts'
+import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
 import { Registry } from './registry'
 
 export type { ExtensionPointLocation }
@@ -25,6 +26,9 @@ export type ExtensionPointContribution = {
   location: ExtensionPointLocation
   /** The owner's own surface the strip hangs off. */
   surface: string
+  /** The platform question, the same field every host-filtered contribution takes
+   *  (../hostCapabilities.ts). */
+  requires?: HostCapabilityRequirement
   /** Is the owning plugin running on the node being looked at? A point whose owner is not there has no
    *  surface on screen, so it has nothing to deliver into. */
   when?: () => boolean
@@ -41,6 +45,8 @@ export type ExtensionContribution = {
   point: string
   label: string
   order: number
+  /** As on the point above (../hostCapabilities.ts). */
+  requires?: HostCapabilityRequirement
   when?: () => boolean
   fetch: (signal: AbortSignal) => Promise<PluginExtensionItem[]>
   /** Absent when the contribution declared no verb, a read-only list, which is a real answer. */
@@ -74,9 +80,10 @@ export const extensionPointFor = (
  */
 export function extensionDeliveries(pointId: string): ExtensionContribution[] {
   const point = extensionPointRegistry.get(pointId)
-  if (!point || !takesPluginExtensions(point.location) || !(point.when?.() ?? true)) return []
+  if (!point || !takesPluginExtensions(point.location)) return []
+  if (!hasHostCapability(point.requires) || !(point.when?.() ?? true)) return []
   return extensionRegistry.entries()
-    .filter((entry) => entry.point === pointId && (entry.when?.() ?? true))
+    .filter((entry) => entry.point === pointId && hasHostCapability(entry.requires) && (entry.when?.() ?? true))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 }
 

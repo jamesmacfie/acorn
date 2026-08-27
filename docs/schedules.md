@@ -143,6 +143,12 @@ most 604,800s, a week.
 The calendar forms use node-local time, because the node is the owner's machine and "03:30" means
 their 03:30. Daylight saving does what local time does and nobody pretends otherwise.
 
+**The renderer has its own `ctx.schedules`, and it is not this one.** A client schedule takes a raw
+`intervalMs` with no floor and no budget (`client-core/src/registries/schedules.ts`), because below the
+300s floor a schedule *is* a poll, and polling is the client's job for a person who is present. Same
+word for the same idea, different shape where the difference is real. It was called `ctx.pollers` until
+2026-08-27, which made one idea look like two.
+
 ## Policies
 
 - **Jitter.** Interval cadences get ±5% random skew, so every hourly schedule minted at one boot does
@@ -188,12 +194,11 @@ The target is `{ pluginId, actionId, params }`. What runs is the same `runNodeAc
 takes: the plugin's own confined route, POSTed in process with the params as the body. A scheduled
 fire and a clicked one are indistinguishable to the handler. The schedule owns only when.
 
-What can be scheduled comes from a node-side registry with two feeders, the same shape schedules and
-collections have:
-
-- **Compiled.** `ctx.nodeActions.register({ actionId, name, path, risk })` in the plugin's node init.
-- **Loaded.** Synthesised from manifest commands whose verb is `runNodeAction`. There is no new
-  descriptor kind, so the plugin wire contract did not grow.
+What can be scheduled comes from a node-side registry with **one** feeder: manifest commands whose verb
+is `runNodeAction`, synthesised by the host. There is no new descriptor kind, so the plugin wire
+contract did not grow, and there is no `ctx` member either — the registration reaches the registry
+through a host-only seam (`HostPluginContext` in `server/plugin/types.ts`). It was on the authoring
+context until 2026-08-27, where it read as something a plugin writes and no plugin ever did.
 
 An action that declares no tier is treated as `execute`, the strongest. That is a deliberate repair
 rather than a default. A chrome action descriptor has no `risk` field, and "nobody has said what this

@@ -11,7 +11,7 @@ import { appStateBinding, parseJson, type PersistedStateSlice } from './persiste
 // to the store they bind, the dashboards one does, and is re-exported here rather than redeclared
 // so the composition root keeps registering one list. See
 // plugins/{editor/client/openFilesSlice,github/client/pullList/filterSlice,context/client/selectionSlice}.ts;
-// each plugin registers its own through `ctx.persistedState` in its client/index.ts. The
+// each plugin registers its own through `ctx.persistedStateSlices` in its client/index.ts. The
 // composition root registers only these and the direct preference slices (app/client/activate.ts).
 
 const taskLayoutSlice: PersistedStateSlice<TaskLayout> = {

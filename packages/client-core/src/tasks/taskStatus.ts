@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js'
 import { taskBridge } from './taskBridge'
 import { wsOnStatus } from '../wsClient'
 import type { TaskStatus } from '@acorn/protocol/terminal.ts'
-import type { PollerContribution } from '../registries/pollers'
+import type { ClientScheduleContribution } from '../registries/schedules'
 import { latestOnly } from '../lib/latestOnly'
 
 const [statuses, setStatuses] = createSignal<Record<string, TaskStatus>>({})
@@ -35,7 +35,7 @@ export const refreshTaskStatuses = latestOnly(
 )
 
 // Start polling; returns an unsubscribe. No-op when the terminal bridge is absent (web build).
-export const taskStatusPollerContribution: PollerContribution = {
+export const taskStatusScheduleContribution: ClientScheduleContribution = {
   id: 'tasks.worktree-status',
   // Each refresh shells out to `git status` for every active worktree. Status broadcasts keep
   // in-app mutations immediate; ten seconds bounds background process churn as task count grows.

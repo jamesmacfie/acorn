@@ -35,7 +35,7 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
         if (!send) {
           if (!warned) {
             warned = true
-            ctx.log.warn('terminal.sendToAgent is unavailable; skipping agent-session injection')
+            console.warn('[memory] terminal.sendToAgent is unavailable; skipping agent-session injection')
           }
           return
         }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentProviderUsage, AgentUsageSnapshot } from '../shared/usage'
 import { usageHealth } from '../shared/usage'
-import { formatReset, providerUsageRows, usageTooltipSummary } from './usageModel'
+import { formatReset, providerUsageRows, usageSummaryEntries } from './usageModel'
 
 const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage => ({
   provider: id,
@@ -45,13 +45,18 @@ describe('agent usage health and tooltip', () => {
   // Reordering here would have to know the whole harness set, which is the thing that is now open.
   it('summarizes every harness the node reported, in the order it reported them', () => {
     const snapshot: AgentUsageSnapshot = { providers: [provider('codex', 34), provider('claude', 82)], refreshedAt: 1 }
-    expect(usageTooltipSummary(snapshot)).toBe('🟡 Codex 34% · 🟢 Claude Code 82%')
+    expect(usageSummaryEntries(snapshot)).toEqual([
+      { health: 'warning', label: 'Codex', value: '34%' },
+      { health: 'healthy', label: 'Claude Code', value: '82%' },
+    ])
   })
 
   it('names no harness it was not told about', () => {
-    expect(usageTooltipSummary(null)).toBe('reading usage…')
-    expect(usageTooltipSummary({ providers: [], refreshedAt: 1 })).toBe('reading usage…')
-    expect(usageTooltipSummary({ providers: [provider('codex', 0)], refreshedAt: 1 })).toBe('⚪ Codex 0%')
+    expect(usageSummaryEntries(null)).toEqual([])
+    expect(usageSummaryEntries({ providers: [], refreshedAt: 1 })).toEqual([])
+    expect(usageSummaryEntries({ providers: [provider('codex', 0)], refreshedAt: 1 })).toEqual([
+      { health: 'depleted', label: 'Codex', value: '0%' },
+    ])
   })
 })
 

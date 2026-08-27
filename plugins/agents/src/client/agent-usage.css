@@ -8,10 +8,15 @@
   font-size: var(--fs-xs);
   white-space: nowrap;
 }
-.managed-agent-usage-trigger span {
+.managed-agent-usage-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.managed-agent-usage-entry { display: inline-flex; align-items: center; gap: var(--space-2); }
+.managed-agent-usage-entry + .managed-agent-usage-entry::before { content: '·'; color: var(--text-faint); }
 .managed-agent-usage-tooltip {
   position: absolute;
   top: calc(100% + var(--space-2));
@@ -66,5 +71,5 @@
 .agent-usage-loading { padding: var(--space-5); font-size: var(--fs-sm); }
 
 @container (max-width: 760px) {
-  .managed-agent-usage-trigger span { display: none; }
+  .managed-agent-usage-summary { display: none; }
 }

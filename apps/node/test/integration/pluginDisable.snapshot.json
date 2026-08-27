@@ -25,6 +25,7 @@
       "github/repos",
       "github/repos",
       "github/repos",
+      "github/tasks",
       "memory",
       "notes",
       "terminal",
@@ -38,6 +39,7 @@
       "browser_screenshot",
       "browser_snapshot",
       "git_log",
+      "github_pull_create",
       "local_changes",
       "local_diff",
       "memory_get",
@@ -175,7 +177,11 @@
         "github/repos",
         "github/repos",
         "github/repos",
-        "github/repos"
+        "github/repos",
+        "github/tasks"
+      ],
+      "tools": [
+        "github_pull_create"
       ],
       "sections": [
         "pr"

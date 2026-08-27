@@ -194,7 +194,7 @@ relocation of a results list plus a query box, against an unchanged route.
 | Component slot | `client/index.ts` | A `target: "overlay"` frame surface — see "The slot" below |
 | `editorFilesRoute` for @-mentions | `contract/api.ts` | Unchanged — a route string, not an import of behaviour |
 | Open-files / view-state / tree-open slices | `client/*State.ts` | Bridge `state.get`/`state.set`, or frame-local |
-| `ctx.persistedState.register(editorOpenFilesSlice)` | `client/index.ts` | No manifest form — see above |
+| `ctx.persistedStateSlices.register(editorOpenFilesSlice)` | `client/index.ts` | No manifest form — see above |
 
 ### The slot — DONE
 

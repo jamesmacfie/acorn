@@ -1,13 +1,16 @@
-// The two slot registries and their contribution types, split out of uiSlots.tsx, which re-exports
-// every name below so existing imports keep working. This module holds no JSX import
+// The slot registry and its contribution types, split out of uiSlots.tsx, which re-exports every name
+// below so existing imports keep working. This module holds no JSX import
 // (docs/frontend.md § Registries and plugins), which is what lets registries/plugin.ts have a unit
 // test.
 import type { Component } from 'solid-js'
-import type { ClientCapabilityRequirement } from '../capabilities'
+import type { HostCapabilityRequirement } from '../hostCapabilities'
 import type { Task } from '../queries'
 import { Registry } from './registry'
 
-export type UiSlotId = 'topbar.left' | 'topbar.right' | 'task.switcher.extra' | 'overlay' | 'drawer'
+export type TaskSlotId = 'task.footer'
+const TASK_SLOT_IDS: readonly TaskSlotId[] = ['task.footer']
+
+export type UiSlotId = 'topbar.left' | 'topbar.right' | 'task.switcher.extra' | 'overlay' | 'drawer' | TaskSlotId
 
 export type UiSlotContext = {
   taskActive: boolean
@@ -28,30 +31,35 @@ export type UiSlotContext = {
   activeTask: Task | null
 }
 
-export type UiSlotContribution = {
+// One slot registry. The id picks the context the component gets: a shell slot receives the whole
+// UiSlotContext, a task slot receives just the task it is drawn in. They were two registries with two
+// id types until 2026-08-27, which cost a context member, a `Registry` and a line in every document
+// listing contribution kinds, to express one difference (docs/reviews § Plugin surface consistency).
+type SlotBase = {
   id: string
-  slot: UiSlotId
   order: number
-  requires?: ClientCapabilityRequirement
+  requires?: HostCapabilityRequirement
+}
+
+export type ShellSlotContribution = SlotBase & {
+  slot: Exclude<UiSlotId, TaskSlotId>
   when?: (context: UiSlotContext) => boolean
   component: Component<{ context: UiSlotContext }>
 }
-
-export const uiSlotRegistry = new Registry<UiSlotContribution>('ui-slot')
 
 // Task-scoped slots, lighter than UiSlotContext: components get just the taskId, so hosts like the
 // worktree footer don't have to thread shell callbacks they don't own. Additive, so plugins contribute
 // badges without a core import of the plugin.
 // `tabrail.task-row` used to be here. It was the escape hatch that let a plugin draw arbitrary JSX
 // and position it in the rail's own pixel geography; markers replaced it (registries/railMarkers.ts).
-export type TaskSlotId = 'task.footer'
-
-export type TaskSlotContribution = {
-  id: string
+export type TaskSlotContribution = SlotBase & {
   slot: TaskSlotId
-  order: number
-  requires?: ClientCapabilityRequirement
   component: Component<{ taskId: string }>
 }
 
-export const taskSlotRegistry = new Registry<TaskSlotContribution>('task-slot')
+export type UiSlotContribution = ShellSlotContribution | TaskSlotContribution
+
+export const uiSlotRegistry = new Registry<UiSlotContribution>('ui-slot')
+
+export const isTaskSlot = (contribution: UiSlotContribution): contribution is TaskSlotContribution =>
+  TASK_SLOT_IDS.includes(contribution.slot as TaskSlotId)

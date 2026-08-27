@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createResource, For, Index, onCleanup, onMount, Show } from 'solid-js'
-import { capabilities, clientCapability, refreshSessions, requestTerminalFocus, sessions, setTerminalOpen, type Task, wsOnStatus } from '@acorn/plugin-api/client'
+import { clientCapability, hostCapabilities, refreshSessions, requestTerminalFocus, sessions, setTerminalOpen, type Task, wsOnStatus } from '@acorn/plugin-api/client'
 import { Badge, Button, Menu, Row, RowActions } from '@acorn/plugin-api/ui'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
@@ -39,7 +39,7 @@ export default function AgentTaskSidebar(props: {
 }) {
   // The desktop probe, on the capability rather than on a PTY accessor's null return. CommandPalette
   // already reads it this way.
-  const hasEngine = () => capabilities().terminal
+  const hasEngine = () => hostCapabilities().terminal
   const [workflowData, { refetch }] = createResource(
     () => props.task.id,
     async (taskId) => {

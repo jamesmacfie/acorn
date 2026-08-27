@@ -21,7 +21,8 @@ const { keybindingRegistry } = await import('../../registries/keybindings')
 const { contentLinkRegistry, parseInAppTarget } = await import('../../registries/contentLinks')
 const { refResolverRegistry } = await import('../../registries/refResolvers')
 const { sourceRegistry } = await import('../../registries/sources')
-const { taskSlotRegistry, uiSlotRegistry } = await import('../../registries/slots')
+const { isTaskSlot, uiSlotRegistry } = await import('../../registries/slots')
+type ShellSlot = import('../../registries/slots').ShellSlotContribution
 const { contextMenuItems, contextMenuRegistry } = await import('../../registries/contextMenus')
 const { orphanedPluginOverrideIds } = await import('../../settings/shortcutSettingsModel')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../distribution')
@@ -84,8 +85,8 @@ const CHROME: Partial<PluginContributions> = {
 
 const ids = () => ({
   sources: sourceRegistry.entries().map((entry) => entry.id),
-  slots: taskSlotRegistry.entries().map((entry) => entry.id),
-  shellSlots: uiSlotRegistry.entries().map((entry) => entry.id),
+  slots: uiSlotRegistry.entries().filter(isTaskSlot).map((entry) => entry.id),
+  shellSlots: uiSlotRegistry.entries().filter((entry) => !isTaskSlot(entry)).map((entry) => entry.id),
   contextMenus: contextMenuRegistry.entries().map((entry) => entry.id),
   commands: commandRegistry.entries().filter((entry) => entry.id.startsWith('plugin.')).map((entry) => entry.id),
   keybindings: keybindingRegistry.entries().filter((entry) => entry.id.startsWith('plugin.')).map((entry) => entry.id),
@@ -267,7 +268,7 @@ describe('syncChromeContributions', () => {
   it('gates a topbar chip on the plugin running on the node being looked at', () => {
     _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]], ['node-b', []]])
     syncChromeContributions()
-    const chip = uiSlotRegistry.get('board-status')!
+    const chip = uiSlotRegistry.get('board-status') as ShellSlot
     expect(chip.when!({} as never)).toBe(true)
     setActiveNode('node-b')
     expect(chip.when!({} as never)).toBe(false)

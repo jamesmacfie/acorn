@@ -98,9 +98,9 @@ panes) rather than re-explaining the feature.
 From `docs/plugin-authoring.md` § the node half, backed by
 `packages/node-core/src/server/plugin/types.ts`. The page documents the `NodePlugin` lifecycle
 (`init`, `ready`, `dispose`) and each `NodePluginContext` facet in reference style: `routes`,
-`tools`, `schedules`, `collections`, `nodeActions`, `taskChecks`, `contextSections`,
-`providers`, `capabilities`, `storage`, `core` (the confined filesystem, git, process broker,
-and secrets services), `events`, `log`.
+`tools`, `schedules`, `collections`, `taskChecks`, `contextSections`, `providers`, `capabilities`,
+`storage`, `core` (the confined filesystem, git, process broker, and secrets services), `events`.
+Node actions and harnesses are manifest-only and have no facet.
 
 It also carries the route-namespace story, because it is the addressing scheme everything else
 refers to: a plugin's HTTP surface lives at `/v2/p/<id>/*`, the id binds the namespace

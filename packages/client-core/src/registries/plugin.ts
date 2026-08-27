@@ -2,16 +2,18 @@ import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../persistence/persistedState'
 import { agentContextRegistry } from './agentContexts'
 import { agentToolRendererRegistry, type AgentToolRendererContribution } from './agentToolRenderers'
-import { contextSectionRegistry, type ContextSectionContribution } from './contextSections'
+import { contextSectionSlotRegistry, type ContextSectionSlotContribution } from './contextSectionSlots'
 import { paletteRowRegistry, type PaletteRowSource } from './paletteRows'
 import { attentionRegistry, type AttentionSourceContribution } from './attention'
 import { collectionKey, collectionRegistry, type CollectionRegistration } from './collections'
 import { nodeStatRegistry, type NodeStatContribution } from './nodeStats'
 import { paneRegistry, type PaneContribution } from './panes'
 import { refPanelRegistry, type RefPanelContribution } from './refPanels'
-import { pollerRegistry, type PollerContribution } from './pollers'
+import { clientScheduleRegistry, type ClientScheduleContribution } from './schedules'
+import { contentLinkRegistry, type ContentLinkContribution } from './contentLinks'
+import { brandMarkRegistry, type BrandMark } from '../ui/brandMarks'
 import { railMarkerRegistry, type RailMarkerContribution } from './railMarkers'
-import { provideClientCapability, type ClientCapabilityId } from '../clientCapabilities'
+import { clientCapability, clientCapabilityIds, provideClientCapability, requireClientCapability, type ClientCapabilityId } from '../clientCapabilities'
 import type { Disposable, Registry } from './registry'
 import { settingsRegistry, type SettingsContribution } from './settings'
 import { sourceRegistry, type SourceContribution } from './sources'
@@ -21,7 +23,7 @@ import { integrationFlowRegistry, type IntegrationFlowContribution } from './int
 import { projectImporterRegistry, type ProjectImporterContribution } from './projectImporters'
 // From ./slots, not ./uiSlots. The slot hosts contain JSX, which makes this file unimportable in a
 // bare-Node vitest run (docs/frontend.md § Registries and plugins).
-import { taskSlotRegistry, uiSlotRegistry, type TaskSlotContribution, type UiSlotContribution } from './slots'
+import { uiSlotRegistry, type UiSlotContribution } from './slots'
 
 // One contribution point. `register` returns nothing, because the host owns the disposable
 // (docs/plugins.md § Activation), so a re-init replaces a plugin's contributions instead of appending.
@@ -40,33 +42,62 @@ export type ClientPluginContext = {
   integrationFlows: ClientContributionPoint<IntegrationFlowContribution>
   projectImporters: ClientContributionPoint<ProjectImporterContribution>
   settingsPages: ClientContributionPoint<SettingsContribution>
+  // One registry for both shapes: the slot id picks whether the component is handed the shell context
+  // or just a task id (registries/slots.ts).
   slots: ClientContributionPoint<UiSlotContribution>
-  taskSlots: ClientContributionPoint<TaskSlotContribution>
-  contextSections: ClientContributionPoint<ContextSectionContribution>
+  // A component drawn inside a section the NODE assembled, keyed by that section's id. Not the node's
+  // `ctx.contextSections`, which declares a section and its prompt text; this is a slot in the pane
+  // that renders one (registries/contextSectionSlots.ts).
+  contextSectionSlots: ClientContributionPoint<ContextSectionSlotContribution>
   refPanels: ClientContributionPoint<RefPanelContribution>
   paletteRows: ClientContributionPoint<PaletteRowSource>
   agentContexts: ClientContributionPoint<AgentContextContribution>
   agentToolRenderers: ClientContributionPoint<AgentToolRendererContribution>
-  pollers: ClientContributionPoint<PollerContribution>
+  // The same word the node uses for the same idea, and deliberately not the same shape
+  // (registries/schedules.ts).
+  schedules: ClientContributionPoint<ClientScheduleContribution>
   // Status markers drawn on a rail control by the host, published from the state that owns them
   // (registries/railMarkers.ts). Data only; a marker has no click verb.
   railMarkers: ClientContributionPoint<RailMarkerContribution>
-  persistedState: ClientContributionPoint<PersistedStateSlice<unknown>>
+  persistedStateSlices: ClientContributionPoint<PersistedStateSlice<unknown>>
   // One number on a Fleet home node card (docs/frontend.md § Registries and plugins;
   // registries/nodeStats.ts).
   nodeStats: ClientContributionPoint<NodeStatContribution>
   // Rows for the attention inbox: states on a node that need the owner, fetched per node
   // (docs/frontend.md § Shell state; registries/attention.ts).
-  attention: ClientContributionPoint<AttentionSourceContribution>
+  attentionSources: ClientContributionPoint<AttentionSourceContribution>
   // A typed set of records a user can compose a panel over (docs/dashboards.md § Collections). The
   // compiled feeder. A loaded plugin declares `collections` in its manifest and the descriptor pass
   // builds the same contribution. `pluginId` and the registry id are bound here, not declared.
   collections: ClientContributionPoint<CollectionRegistration>
+  // A brand logo as one SVG path, looked up under the `brand:` glyph prefix (docs/ui-design.md §
+  // Icons).
+  brandMarks: ClientContributionPoint<BrandMark>
+  // A recogniser that turns an external URL into an in-app destination (registries/contentLinks.ts).
+  contentLinks: ClientContributionPoint<ContentLinkContribution>
+  // The escape hatch, and the line it sits on: a registry the HOST owns gets a named member above; a
+  // registry another PLUGIN published has no member to give it, and goes through here. Same ownership
+  // check and same recorded disposable either way, so the only difference is who declared the
+  // registry. Both of core's own targets got names on 2026-08-27; before that the line was drawn
+  // nowhere and every contribution count that read this file was two short.
   contribute<T extends { id: string }>(registry: Registry<T>, entry: T): void
-  // Publish a typed capability for another plugin to resolve at call time, mirroring the node's
-  // ctx.capabilities.provide. Disposal is the host's, so a second activation in one process does not
+  // Plugin-to-plugin functions, the same four methods as the node's `ctx.capabilities`
+  // (../clientCapabilities.ts). Disposal is the host's, so a second activation in one process does not
   // hit "already provided".
-  capability<T>(id: ClientCapabilityId<T>, impl: T): void
+  //
+  // Not the platform gate. That is `requires` on a contribution, answered by hostCapabilities.ts.
+  capabilities: ClientCapabilities
+}
+
+// The client half of the node's `Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>`. Same
+// four verbs, so an author who learned one half does not get the other backwards.
+export type ClientCapabilities = {
+  provide<T>(id: ClientCapabilityId<T>, impl: T): void
+  get<T>(id: ClientCapabilityId<T>): T | undefined
+  // For a capability whose provider cannot be disabled. Throws rather than returning undefined, so a
+  // missing one fails where it is missed.
+  require<T>(id: ClientCapabilityId<T>): T
+  ids(): string[]
 }
 
 export type ClientPlugin = {
@@ -142,22 +173,28 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     projectImporters: own(projectImporterRegistry),
     settingsPages: own(settingsRegistry),
     slots: own(uiSlotRegistry),
-    taskSlots: own(taskSlotRegistry),
-    contextSections: own(contextSectionRegistry),
+    contextSectionSlots: own(contextSectionSlotRegistry),
     refPanels: own(refPanelRegistry),
     paletteRows: own(paletteRowRegistry),
     agentContexts: own(agentContextRegistry),
     agentToolRenderers: own(agentToolRendererRegistry),
-    pollers: own(pollerRegistry),
+    schedules: own(clientScheduleRegistry),
     railMarkers: own(railMarkerRegistry),
-    persistedState: own(persistedStateRegistry),
+    persistedStateSlices: own(persistedStateRegistry),
     nodeStats: own(nodeStatRegistry),
-    attention: own(attentionRegistry),
+    attentionSources: own(attentionRegistry),
     collections: ownCollection,
+    brandMarks: own(brandMarkRegistry),
+    contentLinks: own(contentLinkRegistry),
     // Straight through `own`, so a plugin-published registry gets the same ownership check and the
     // same recorded disposable. Only the registry arrives as an argument.
     contribute: (registry, entry) => own(registry).register(entry),
-    capability: (id, impl) => record(provideClientCapability(id, impl)),
+    capabilities: {
+      provide: (id, impl) => record(provideClientCapability(id, impl)),
+      get: (id) => clientCapability(id),
+      require: (id) => requireClientCapability(id),
+      ids: () => clientCapabilityIds(),
+    },
   }
 }
 
