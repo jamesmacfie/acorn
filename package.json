@@ -22,7 +22,7 @@
     "pack:node": "node scripts/pack-node.mjs",
     "rebuild:node": "node scripts/rebuild-node-abi.mjs",
     "release": "pnpm dist",
-    "test": "node scripts/rebuild-node-abi.mjs && turbo run test --concurrency=6"
+    "test": "node scripts/rebuild-node-abi.mjs && turbo run test --continue --concurrency=6"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.10",

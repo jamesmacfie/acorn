@@ -19,5 +19,11 @@ export default defineConfig({
       GIT_CONFIG_GLOBAL: '/dev/null',
       GIT_CONFIG_SYSTEM: '/dev/null',
     },
+    // The integration suites build plugin bundles and spawn a node per plugin entrypoint. Under the
+    // whole repo's suite that ran past the 5-second default while passing in isolation.
+    testTimeout: 20_000,
+    // Hooks get the same budget. hookTimeout defaults to 10s independently of testTimeout, and the
+    // heavy setup (minting a certificate, building a bundle, seeding a git repo) lives in beforeAll.
+    hookTimeout: 20_000,
   },
 })

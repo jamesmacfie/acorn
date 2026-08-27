@@ -215,13 +215,16 @@ describe('generateTextForConnection', () => {
     })
     const sharedDependencies = dependencies()
     const first = generateTextForConnection(args(), sharedDependencies)
+    // Wait for the first call to reach the adapter before starting the second, so the second is
+    // genuinely queued behind it. Starting both and then waiting raced: each call does its own
+    // connection read before it asks for a slot, and under load the second one won that read and
+    // took the in-flight slot instead.
+    await vi.waitFor(() => expect(calls).toBe(1))
     const controller = new AbortController()
     const second = generateTextForConnection(
       { ...args(), input: { ...input, signal: controller.signal } },
       sharedDependencies,
     )
-
-    await vi.waitFor(() => expect(calls).toBe(1))
     controller.abort()
     await expect(second).rejects.toMatchObject({ code: 'provider_unavailable' })
     releaseFirst?.()

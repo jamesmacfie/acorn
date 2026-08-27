@@ -122,7 +122,13 @@ describe('frame key forwarding', () => {
     const bare = press({ code: 'KeyJ', key: 'j', metaKey: false })
     const modified = press()
     const claimed = press({ code: 'KeyF', key: 'f' })
-    await new Promise((resolve) => setTimeout(resolve, 5))
+    // Wait for the two chords that should arrive rather than sleeping a fixed 5ms. Posting is async,
+    // and on a loaded machine nothing had flushed by the time the assertions ran, so every one of
+    // them read an empty list. Once these two are in, the presses before them have had their turn.
+    await vi.waitFor(() => {
+      expect(sent).toContainEqual({ kind: 'keydown', chord: 'j' })
+      expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+k' })
+    })
 
     expect(space).not.toHaveBeenCalled()
     expect(tab).not.toHaveBeenCalled()
@@ -139,8 +145,7 @@ describe('frame key forwarding', () => {
 
     acorn.keys.claim([])
     press({ code: 'KeyF', key: 'f' })
-    await new Promise((resolve) => setTimeout(resolve, 5))
-    expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+f' })
+    await vi.waitFor(() => expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+f' }))
   })
 
   it('ignores undeclared runtime claims and leaves bare typing keys inside inputs', async () => {
@@ -150,9 +155,10 @@ describe('frame key forwarding', () => {
     acorn.keys.claim(['meta+j'])
     press({ code: 'KeyJ', key: 'j' })
     press({ code: 'KeyA', key: 'a', metaKey: false, target: { nodeName: 'INPUT' } } as unknown as Partial<KeyboardEvent>)
-    await new Promise((resolve) => setTimeout(resolve, 5))
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('meta+j'))
-    expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+j' })
+    await vi.waitFor(() => {
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('meta+j'))
+      expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+j' })
+    })
     expect(sent).not.toContainEqual({ kind: 'keydown', chord: 'a' })
   })
 
@@ -452,8 +458,9 @@ describe('webview controls', () => {
     const navigated = vi.fn()
     acorn.webview.onNavigated(navigated)
     push({ kind: 'event', channel: 'webview:navigated', payload: { url: 'https://docs.example.com/start', loading: false } })
-    await new Promise((resolve) => setTimeout(resolve, 5))
-    expect(navigated).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://docs.example.com/start' }))
+    await vi.waitFor(() =>
+      expect(navigated).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://docs.example.com/start' })),
+    )
     expect(sent.some((message) => message.kind === 'subscribe' && message.channel === 'webview:navigated')).toBe(false)
   })
 })

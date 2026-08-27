@@ -137,7 +137,11 @@ describe('capturePty', () => {
       args: ['/usage'],
       cwd: '/tmp',
       idleMs: 5,
-      killEscalationMs: 10,
+      // A second, not ten milliseconds. The "SIGHUP only, so far" assertion below has to run inside
+      // this window, and at 10ms a loaded machine spent the whole budget between the capture
+      // resolving and the assertion, so an early SIGKILL read as a product failure. Real timers
+      // throughout: capturePty renders its output through xterm, which fake timers stall.
+      killEscalationMs: 1000,
       resolveCommand: () => '/bin/claude',
       spawnPty,
     })
@@ -145,6 +149,6 @@ describe('capturePty', () => {
     // Never calls emitExit(): this is the ignored-SIGHUP case.
     await capture
     expect(pty.signals).toEqual([undefined]) // SIGHUP only, so far
-    await vi.waitFor(() => expect(pty.signals).toEqual([undefined, 'SIGKILL']))
+    await vi.waitFor(() => expect(pty.signals).toEqual([undefined, 'SIGKILL']), { timeout: 5000 })
   })
 })
