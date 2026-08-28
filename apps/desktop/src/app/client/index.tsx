@@ -18,6 +18,7 @@ import { syncPluginDistribution } from '@acorn/client-core/plugins/distribution.
 import { syncPluginContributions } from '@acorn/client-core/plugins/syncContributions.ts'
 import { watchPluginChanges } from '@acorn/client-core/plugins/reload.ts'
 import { watchTaskChanges } from '@acorn/client-core/tasks/watchTaskChanges.ts'
+import { watchConnectionChanges } from '@acorn/client-core/integrations/watchConnectionChanges.ts'
 
 const noop = () => null
 
@@ -61,6 +62,11 @@ watchPluginChanges()
 // window invalidates its cached list whether or not it was the one that wrote
 // (docs/future/events/delivery.md).
 watchTaskChanges()
+
+// …and for connected accounts. A credential that stops working demotes itself on the node mid-request,
+// so Settings → Integrations and the Sources rail hear about it here rather than at the next 401
+// (docs/future/events/delivery.md).
+watchConnectionChanges()
 
 render(
   () => (

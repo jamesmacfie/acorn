@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../db'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { connectionProviderRegistry } from './connectionRegistry'
@@ -13,6 +13,14 @@ import {
 import { publicConnectionProvider } from './providers/shared'
 import { ProviderOperationError } from './types'
 import { SecretService } from '../../main/core/secrets'
+
+// The socket is the boundary worth stubbing: everything above it is the code under test, and a real hub
+// has no connections in a unit test, so a broadcast would be a silent no-op and prove nothing.
+const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
+vi.mock('../../main/wsHub', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
+}))
 
 const ENCRYPTION_KEY = '11'.repeat(32)
 const SECRETS = new SecretService(ENCRYPTION_KEY)
@@ -65,6 +73,7 @@ describe('connection-only provider lifecycle', () => {
 
   beforeEach(() => {
     testDb = makeTestDb()
+    broadcasts.length = 0
   })
 
   afterEach(() => {
@@ -121,6 +130,37 @@ describe('connection-only provider lifecycle', () => {
 
     await disconnectConnection(testDb.db, 'alice', connected.id)
     expect(await testDb.db.select().from(schema.integrations)).toEqual([])
+  })
+
+  // Every status write announces itself, which is what defect 4 in docs/future/events/delivery.md was
+  // about: four writers flipped a connection to `needs-auth` and none of them said so, so a second
+  // client and every integration plugin found out from the next 401.
+  it('broadcasts connection:changed on every status write', async () => {
+    const connected = await connectProvider(testDb.db, 'alice', { providerId: PROVIDER_ID, credentials: { apiKey: 'first-key' } }, SECRETS)
+    await rotateConnection(testDb.db, 'alice', connected.id, { credentials: { apiKey: 'rotated-key' } }, SECRETS)
+    await testConnection(testDb.db, 'alice', connected.id, SECRETS)
+    await setConnectionDisabled(testDb.db, 'alice', connected.id, true)
+    await setConnectionDisabled(testDb.db, 'alice', connected.id, false)
+
+    expect(broadcasts).toEqual(
+      ['connected', 'connected', 'connected', 'disabled', 'connected'].map((status) => ({
+        channel: 'connection:changed',
+        integrationId: connected.id,
+        providerId: PROVIDER_ID,
+        status,
+      })),
+    )
+  })
+
+  it('broadcasts the demotion nobody asked for', async () => {
+    // `rejected` is what this provider's `test` treats as a revoked credential, so this is the shape of
+    // the failure a client currently discovers by getting a 401 back.
+    const connected = await connectProvider(testDb.db, 'alice', { providerId: PROVIDER_ID, credentials: { apiKey: 'rejected' } }, SECRETS)
+    broadcasts.length = 0
+
+    await expect(testConnection(testDb.db, 'alice', connected.id, SECRETS)).resolves.toMatchObject({ status: 'needs-auth' })
+
+    expect(broadcasts).toEqual([{ channel: 'connection:changed', integrationId: connected.id, providerId: PROVIDER_ID, status: 'needs-auth' }])
   })
 
   it('serializes concurrent creates when a provider limits connection count', async () => {

@@ -1,3 +1,5 @@
+import type { IntegrationConnectionStatus } from './integrations'
+
 // Core events a plugin's node half may subscribe to with `ctx.events.on`
 // (node-core/server/plugin/types.ts, docs/future/events/subscriptions.md item 1).
 //
@@ -23,9 +25,18 @@
 //
 // A node-emitted fact reaches a frame too, so both lists name it; the split is about what the name
 // promises, not about which array it sits in.
-export const NODE_EVENT_CHANNELS = ['plugins:changed', 'tasks:changed'] as const
+export const NODE_EVENT_CHANNELS = ['plugins:changed', 'tasks:changed', 'connection:changed'] as const
 
 export type NodeEventChannel = (typeof NODE_EVENT_CHANNELS)[number]
 
 export const isNodeEventChannel = (channel: string): channel is NodeEventChannel =>
   (NODE_EVENT_CHANNELS as readonly string[]).includes(channel)
+
+// The one node event that carries a payload, and the shape both sides read it through
+// (node-core/main/notify.ts § broadcastConnectionChanged says why it is not content-free). `status` is
+// what the row now says, so a listener that missed an earlier frame still ends up correct.
+export type ConnectionChangedEvent = {
+  integrationId: string
+  providerId: string
+  status: IntegrationConnectionStatus
+}

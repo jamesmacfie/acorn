@@ -12,6 +12,7 @@ import { createExternalItemStore } from './itemStore'
 import { providerRequestScheduler } from './budgetRuntime'
 import { integrationProviderRegistry } from './registry'
 import type { MirroredResourceContribution, ProviderResourceContext } from './types'
+import { broadcastConnectionChanged } from '../../main/notify'
 
 const failure = (error: ProviderErrorCode, status: RouteFailure['status']): RouteResult<never> => ({
   ok: false,
@@ -85,6 +86,7 @@ export async function runProviderResource<TInput, TOutput>(args: {
           .update(schema.integrations)
           .set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: Date.now() })
           .where(eq(schema.integrations.id, connection.id))
+        broadcastConnectionChanged({ integrationId: connection.id, providerId: connection.provider, status: 'needs-auth' })
         return { ok: false, failure: { error: 'provider_secret_unreadable', status: 401 } }
       }
     },

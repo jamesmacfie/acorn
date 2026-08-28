@@ -9,6 +9,7 @@
 // Dispatch is a prefix registry (wsChannels.ts). This file owns `term:` and `workflow:`, because
 // `term:` is core transport on both ends and `workflow:notice` feeds core's notification pipeline.
 // `docker:` and `agent:` are registered by the plugins that own them.
+import type { ConnectionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from './platform'
@@ -31,6 +32,7 @@ const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subsc
 const statusSubs = new Set<() => void>()
 const pluginsSubs = new Set<() => void>()
 const tasksSubs = new Set<() => void>()
+const connectionSubs = new Set<(event: ConnectionChangedEvent) => void>()
 const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
 const reconnectSubs = new Set<() => void>()
@@ -135,6 +137,17 @@ registerWsChannel('tasks', (frame) => {
   if (frame.channel === 'tasks:changed') tasksSubs.forEach((cb) => cb())
 })
 
+// And its fifth. A connection was made, rotated, tested, disabled, or demoted to `needs-auth` because
+// its credential stopped working (node-core/main/notify.ts). The only core frame with a payload, so it
+// is the only one that reads its own fields — narrowed here rather than at each subscriber, because a
+// frame off the wire is `Record<string, unknown>` and every consumer would otherwise repeat the check.
+registerWsChannel('connection', (frame) => {
+  if (frame.channel !== 'connection:changed') return
+  const { integrationId, providerId, status } = frame as Partial<ConnectionChangedEvent>
+  if (typeof integrationId !== 'string' || typeof providerId !== 'string' || typeof status !== 'string') return
+  connectionSubs.forEach((cb) => cb({ integrationId, providerId, status }))
+})
+
 
 // Fires when the node's socket comes back after a drop. The app shell uses it to mark that node's
 // queries stale so whatever is on screen refetches.
@@ -158,6 +171,7 @@ export function _resetWsClient(): void {
   statusSubs.clear()
   pluginsSubs.clear()
   tasksSubs.clear()
+  connectionSubs.clear()
   noticeSubs.clear()
   stepEventSubs.clear()
   reconnectSubs.clear()
@@ -211,6 +225,13 @@ export function wsOnTasksChanged(cb: () => void): () => void {
   tasksSubs.add(cb)
   connect()
   return () => void tasksSubs.delete(cb)
+}
+
+// A connection's status moved on the node. Same subscriber shape as the two above.
+export function wsOnConnectionChanged(cb: (event: ConnectionChangedEvent) => void): () => void {
+  connectionSubs.add(cb)
+  connect()
+  return () => void connectionSubs.delete(cb)
 }
 
 export function wsOnNotice(cb: NoticeCb): () => void {

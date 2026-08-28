@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import type { ConnectIntegrationRequest, Integration, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
 import type { ExternalRef, ProviderErrorCode } from '@acorn/protocol/integrations.ts'
+import { broadcastConnectionChanged } from '../../main/notify'
 import type { AppDatabase } from '../db'
 import { getDb, schema } from '../db'
 import { cascadeDeleteIntegration } from '../db/cascade'
@@ -124,6 +125,7 @@ export async function connectProvider(
         updatedAt: now,
       }
       await db.insert(schema.integrations).values(row)
+      broadcastConnectionChanged({ integrationId: row.id, providerId: row.provider, status: 'connected' })
       return connectionSummary(row)
     }
   )
@@ -159,6 +161,7 @@ export async function rotateConnection(
       updatedAt: now,
     })
     .where(eq(schema.integrations.id, id))
+  broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status: 'connected' })
   return connectionSummary({
     ...row,
     authRef: '',
@@ -189,6 +192,7 @@ export async function testConnection(db: AppDatabase, userId: string, id: string
       if (!(error instanceof SecretUnavailableError)) throw error
       const now = Date.now()
       await db.update(schema.integrations).set({ status: 'needs-auth', lastValidatedAt: now, lastError: 'provider_secret_unreadable', updatedAt: now }).where(eq(schema.integrations.id, id))
+      broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status: 'needs-auth' })
       throw new ProviderOperationError('provider_secret_unreadable', 400)
     })
   const now = Date.now()
@@ -197,6 +201,7 @@ export async function testConnection(db: AppDatabase, userId: string, id: string
     .update(schema.integrations)
     .set({ status, lastValidatedAt: now, lastError: health.ok ? null : health.error, updatedAt: now })
     .where(eq(schema.integrations.id, id))
+  broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status })
   return connectionSummary({ ...row, status, lastValidatedAt: now, lastError: health.ok ? null : health.error, updatedAt: now })
 }
 
@@ -206,6 +211,7 @@ export async function setConnectionDisabled(db: AppDatabase, userId: string, id:
   const status = disabled ? 'disabled' : 'connected'
   const now = Date.now()
   await db.update(schema.integrations).set({ status, updatedAt: now }).where(eq(schema.integrations.id, id))
+  broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status })
   return connectionSummary({ ...row, status, updatedAt: now })
 }
 
@@ -237,6 +243,9 @@ export async function forEachConnection<T>(
       if (!(error instanceof SecretUnavailableError)) throw error
       const now = Date.now()
       await db.update(schema.integrations).set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: now }).where(eq(schema.integrations.id, row.id))
+      // The demotion the owner never asked for, so it is the one that most needs announcing: nothing on
+      // screen and no plugin knows this credential stopped working until something says so.
+      broadcastConnectionChanged({ integrationId: row.id, providerId: row.provider, status: 'needs-auth' })
       continue
     }
     if (value !== undefined) out.push(value)

@@ -14,6 +14,7 @@ import {
 import { ProviderOperationError } from '../integrations/types'
 import { ModelProviderRegistry, modelProviderRegistry } from './registry'
 import type { GenerateTextInput, GenerateTextResult } from './types'
+import { broadcastConnectionChanged } from '../../main/notify'
 
 const DEFAULT_TIMEOUT_MS = 60_000
 const MAX_SYSTEM_CHARS = 100_000
@@ -82,14 +83,15 @@ const raceWithAbort = <T>(operation: Promise<T>, signal: AbortSignal): Promise<T
 
 const markNeedsAuth = async (
   db: AppDatabase,
-  connectionId: string,
+  connection: { id: string; provider: string },
   error: 'provider_needs_auth' | 'provider_secret_unreadable',
 ): Promise<void> => {
   const now = Date.now()
   await db
     .update(schema.integrations)
     .set({ status: 'needs-auth', lastValidatedAt: now, lastError: error, updatedAt: now })
-    .where(eq(schema.integrations.id, connectionId))
+    .where(eq(schema.integrations.id, connection.id))
+  broadcastConnectionChanged({ integrationId: connection.id, providerId: connection.provider, status: 'needs-auth' })
 }
 
 export async function generateTextForConnection(
@@ -123,7 +125,7 @@ export async function generateTextForConnection(
     throw error
   })
   if (!secret) {
-    await markNeedsAuth(args.db, connection.id, 'provider_secret_unreadable')
+    await markNeedsAuth(args.db, connection, 'provider_secret_unreadable')
     throw new ProviderOperationError('provider_secret_unreadable', 400)
   }
 
@@ -162,7 +164,7 @@ export async function generateTextForConnection(
   } catch (error) {
     if (error instanceof ProviderOperationError) {
       if (error.code === 'provider_needs_auth') {
-        await markNeedsAuth(args.db, connection.id, 'provider_needs_auth')
+        await markNeedsAuth(args.db, connection, 'provider_needs_auth')
       }
       // An adapter builds this message from the provider's response, which can echo the API key back.
       // Everything else is collapsed to a generic failure below, so this is the one escaping path.

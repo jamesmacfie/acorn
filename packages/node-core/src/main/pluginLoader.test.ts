@@ -365,3 +365,68 @@ describe('re-importing a package for a reload', () => {
     expect(await markerOf({ builtins: [], reimport: ['acme'] })).toBe('dep-v1')
   })
 })
+
+// `requires.plugins` in the manifest. Before it, a package that consumed another plugin's capability
+// failed at whichever route reached for it first, with a message naming a missing capability and
+// nothing naming the package that should have provided it.
+describe('declared plugin dependencies', () => {
+  it('refuses a package whose dependency is not installed, and names it', async () => {
+    install('needy', manifest('needy', { requires: { plugins: [{ id: 'absent' }] } }), BUNDLE('needy'))
+
+    const result = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(result.loaded).toEqual([])
+    expect(result.installed).toEqual([])
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0]).toMatchObject({ id: 'needy', reason: expect.stringContaining("'absent'") })
+  })
+
+  it('accepts a built-in as a provider, since it ships with the binary', async () => {
+    install('needy', manifest('needy', { requires: { plugins: [{ id: 'agents' }] } }), BUNDLE('needy'))
+
+    const result = await loadExternalPlugins(root, { builtins: ['agents'] })
+
+    expect(result.failures).toEqual([])
+    expect(result.loaded.map((entry) => entry.manifest.id)).toEqual(['needy'])
+  })
+
+  it('holds a dependency to the major range the manifest asked for', async () => {
+    install('provider', manifest('provider', { version: '1.4.0' }), BUNDLE('provider'))
+    install('needy', manifest('needy', { requires: { plugins: [{ id: 'provider', version: '2' }] } }), BUNDLE('needy'))
+
+    const result = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(result.loaded.map((entry) => entry.manifest.id)).toEqual(['provider'])
+    expect(result.failures[0]).toMatchObject({ id: 'needy', reason: expect.stringContaining('this node has 1.4.0') })
+  })
+
+  it('drops a package whose dependency was itself dropped', async () => {
+    install('middle', manifest('middle', { requires: { plugins: [{ id: 'absent' }] } }), BUNDLE('middle'))
+    install('outer', manifest('outer', { requires: { plugins: [{ id: 'middle' }] } }), BUNDLE('outer'))
+
+    const result = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(result.loaded).toEqual([])
+    expect(result.failures.map((failure) => failure.id).sort()).toEqual(['middle', 'outer'])
+  })
+
+  // Directories load in name order, so `alpha` would otherwise initialize before the plugin it
+  // depends on and reach for a capability that does not exist yet.
+  it('initializes a package after the ones it named', async () => {
+    install('alpha', manifest('alpha', { requires: { plugins: [{ id: 'zulu' }] } }), BUNDLE('alpha'))
+    install('zulu', manifest('zulu'), BUNDLE('zulu'))
+
+    const result = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(result.loaded.map((entry) => entry.manifest.id)).toEqual(['zulu', 'alpha'])
+  })
+
+  it('leaves a package that declares nothing where the directory sort put it', async () => {
+    install('alpha', manifest('alpha'), BUNDLE('alpha'))
+    install('zulu', manifest('zulu'), BUNDLE('zulu'))
+
+    const result = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(result.loaded.map((entry) => entry.manifest.id)).toEqual(['alpha', 'zulu'])
+  })
+})

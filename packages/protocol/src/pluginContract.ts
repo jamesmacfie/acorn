@@ -701,6 +701,22 @@ const manifestShape = z.object({
   // A range over plugin API majors, not a single number: '3', '2 || 3', '2-4'. Held to the shape
   // here so a typo fails the manifest with a reason instead of loading nowhere (./pluginApiVersion.ts).
   apiVersion: z.string().min(1).max(16).regex(PLUGIN_API_RANGE_RE, 'apiVersion must be a major or a range of majors, such as "3" or "2 || 3"'),
+  // What this package needs from the rest of the node before it can work.
+  //
+  // Without it a plugin that consumes another plugin's capability has no way to say so, and the failure
+  // is a missing capability at runtime, in whichever route happened to reach for it first. The owner
+  // reads that as "this plugin is broken". With it the loader can say "it needs the agents plugin,
+  // which is not installed", before anything runs.
+  //
+  // `version` is a range over the required plugin's major, the same grammar and the same matcher as
+  // `apiVersion` above. A plugin's version is its own, so majors are all a dependant can reason about
+  // without the two packages sharing a release process.
+  requires: z.object({
+    plugins: z.array(z.object({
+      id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
+      version: z.string().min(1).max(16).regex(PLUGIN_API_RANGE_RE, 'version must be a major or a range of majors, such as "3" or "2 || 3"').optional(),
+    })).max(16).default([]),
+  }).prefault({}),
   node: entry.optional(),
   client: entry.optional(),
   // Loaded-plugin storage is host-opened and host-migrated. The same confinement rule as the code
