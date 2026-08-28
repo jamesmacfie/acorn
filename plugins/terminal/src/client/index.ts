@@ -14,7 +14,7 @@ export const terminalClientPlugin: ClientPlugin = {
     ctx.paletteRows.register(terminalPaletteRowSource)
     ctx.agentContexts.register(terminalAgentContextContribution)
     ctx.settingsPages.register({
-      id: 'terminal', label: 'Terminal', group: 'general', order: 60, requires: 'desktop',
+      id: 'terminal', label: 'Terminal', group: 'general', order: 60, requires: { plugin: 'terminal' },
       component: TerminalSettings,
     })
   },

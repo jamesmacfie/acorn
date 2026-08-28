@@ -1,12 +1,14 @@
 import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { nodes, nodeStatus } from '../node/fleet'
+import { attachmentOf, createAttachments, detachNode } from '../node/attachment'
+import ProvidedNodes from './ProvidedNodes'
 import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, renameNode } from '../node/fleetActions'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../node/NodeChip'
 import '../node/nodes.css'
-import { Alert, Button } from '../ui/primitives'
+import { Alert, Button, ConfirmButton } from '../ui/primitives'
 
 // Settings → Nodes (docs/ui-design.md § Node management): add, rename, reconnect, unpair, revoke.
 //
@@ -31,6 +33,9 @@ export default function NodesSettings() {
   const [error, setError] = createSignal('')
   const [renaming, setRenaming] = createSignal<string | null>(null)
   const [renameValue, setRenameValue] = createSignal('')
+  // Who each node is attached to, if anyone (docs/node-enrollment.md). Fanned out, so the row for a
+  // node that cannot answer simply has no attachment line.
+  const [attachments, { refetch: refetchAttachments }] = createAttachments()
 
   const fail = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause))
   const run = async (work: () => Promise<void>) => {
@@ -87,6 +92,11 @@ export default function NodesSettings() {
                         <span class="node-title">
                           {node.label}
                           <Show when={node.local}><span class="node-badge">This computer</span></Show>
+                          {/* Provenance: this row was adopted through a plugin's node provider rather
+                              than paired by hand, so it is a row that goes away if that plugin does. */}
+                          <Show when={node.provider}>
+                            {(provider) => <span class="node-badge">via {provider().providerId}</span>}
+                          </Show>
                         </span>
                       }
                     >
@@ -137,6 +147,47 @@ export default function NodesSettings() {
                         </Show>
                       </dl>
                     </div>
+                  </Show>
+
+                  {/* The attachment record: what a control plane left behind, and the button that
+                      takes it back (docs/node-enrollment.md § Detaching). Absent on every node nobody
+                      provisioned, which is the default and almost always the answer. */}
+                  <Show when={attachmentOf(attachments(), node.nodeId)?.attachment}>
+                    {(record) => (
+                      <div class="node-attachment">
+                        <span>
+                          Attached to <strong>{record().controlPlaneName ?? new URL(record().controlPlaneUrl).host}</strong>
+                          {' '}since {new Date(record().attachedAt).toLocaleDateString()}
+                        </span>
+                        {/* Says the quiet part out loud, where the owner is deciding: whoever runs that
+                            control plane holds a credential for this node until this button is used. */}
+                        <p class="muted">
+                          That control plane holds a device credential for this node. Detaching revokes it. The node keeps
+                          working exactly as it does now.
+                        </p>
+                        <ConfirmButton
+                          class="node-danger"
+                          disabled={busy()}
+                          confirmLabel="Detach it?"
+                          onConfirm={() => void run(async () => {
+                            await detachNode(node.nodeId)
+                            await refetchAttachments()
+                          })}
+                        >
+                          Detach…
+                        </ConfirmButton>
+                      </div>
+                    )}
+                  </Show>
+
+                  {/* A provisioned node that could not reach its control plane boots normally, so
+                      without this line it looks like an ordinary node that simply never enrolled. */}
+                  <Show when={attachmentOf(attachments(), node.nodeId)?.error}>
+                    {(failure) => (
+                      <Alert tone="warn">
+                        This node could not enroll with its control plane on {new Date(failure().at).toLocaleString()}: {failure().reason}
+                      </Alert>
+                    )}
                   </Show>
 
                   <div class="node-actions">
@@ -276,6 +327,10 @@ export default function NodesSettings() {
         </Switch>
 
         <Show when={error()}><Alert>{error()}</Alert></Show>
+
+        {/* The fleet's other half (./ProvidedNodes.tsx). Draws nothing at all unless some node reports
+            a node provider. */}
+        <ProvidedNodes />
       </Show>
     </div>
   )

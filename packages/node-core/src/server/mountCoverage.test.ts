@@ -37,6 +37,11 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   // Read-only panel data, argued at the route itself (routes/dashboards.ts). An agent rendering a
   // dashboard is a legitimate reader, and there is no write route to reach.
   'GET /v2/core/dashboards/history': 'read-only measure series; see the comment on the route',
+
+  // Filtered rather than gated, like the two task reads above and for the same reason: "what is
+  // running for me" is a fair question for an agent about its own task, and the unfiltered answer
+  // enumerates every task on the machine. A run with no task is never shown to a confined caller.
+  'GET /v2/core/runs': 'routes/runs.ts filters the merged list by mayActOnTask',
 }
 
 const GATES = new Map<unknown, string>([

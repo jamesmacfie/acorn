@@ -31,7 +31,7 @@ const post = <T>(url: string, body?: unknown) =>
 // Always available: every verb here is an HTTP route or a WebSocket frame against the node. It used to
 // return null unless Electron's preload exposed a native folder picker, which is neither a PTY nor
 // anything this file has an opinion about (git history: docs/future/node-first/platform-seam.md). Whether the node
-// runs terminals at all is `hostCapabilities().terminal`, read from the node's plugin roster.
+// runs terminals at all is `hasHostCapability({ plugin: 'terminal' })`, read from the node's plugin roster.
 export const terminalApi = (): TerminalApi => {
   return {
     list: () => readJson<TerminalSession[]>(terminalSessionsRoute),

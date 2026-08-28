@@ -1,0 +1,6 @@
+{
+  // Declarations only, so this package needs nothing from either runtime's type environment. The
+  // contract test does — it imports node-core — and vitest resolves that through the workspace.
+  "extends": "../../tsconfig.base.json",
+  "include": ["src"]
+}

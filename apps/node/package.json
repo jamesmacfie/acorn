@@ -40,6 +40,7 @@
     "@acorn/plugin-http": "workspace:*",
     "@acorn/plugin-linear": "workspace:*",
     "@acorn/plugin-model-providers": "workspace:*",
+    "@acorn/plugin-nodes-file": "workspace:*",
     "@acorn/plugin-rollbar": "workspace:*",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",

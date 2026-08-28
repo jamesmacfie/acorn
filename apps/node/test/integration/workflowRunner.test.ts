@@ -7,7 +7,7 @@ import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@a
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/main/headless.ts'
 import { NotesStore } from '@acorn/plugin-notes/testkit'
 import { workflowRuns, workflowSteps } from '@acorn/plugin-workflows/testkit'
-import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/testkit'
+import { WorkflowRunner, WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER, type Extension, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/testkit'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 
 registerBuiltInProfiles() // profiles come from the agents plugin
@@ -509,22 +509,28 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(cancelledTasks.sort()).toEqual(['cancel-child-1', 'cancel-child-2'])
   })
 
-  it('registered step kinds, policies, and triggers execute without core ladders and persist trigger ids', async () => {
-    const runner = new WorkflowRunner(wf.db, deps())
-    runner.contributions.registerStepKind('custom', async () => ({ status: 'done', result: { custom: true } }))
-    runner.contributions.registerPolicy('always', async () => ({ pass: true }))
-    runner.registerTrigger({
-      id: 'source.pr-opened',
-      evaluate: async () => [
-        {
-          taskId: 'task1',
-          workflow: { name: 'triggered', steps: [{ name: 'custom', kind: 'custom' }, { name: 'policy', kind: 'gate-policy', policy: 'always' }] },
+  it('contributed step kinds, policies, and triggers execute without core ladders and persist trigger ids', async () => {
+    // What `ctx.extensionPoints` hands the runner: entry ids already qualified by the host, which is
+    // also the name a workflow file writes for a contributed kind (plugins/workflows/contract/extensions.ts).
+    const contributed: Record<string, Extension<unknown>[]> = {
+      [WORKFLOW_STEP_KIND]: [{ id: 'src:custom', pluginId: 'src', order: 0, value: { handler: async () => ({ status: 'done', result: { custom: true } }) } }],
+      [WORKFLOW_POLICY]: [{ id: 'src:always', pluginId: 'src', order: 0, value: async () => ({ pass: true }) }],
+      [WORKFLOW_TRIGGER]: [{
+        id: 'src:pr-opened',
+        pluginId: 'src',
+        order: 0,
+        value: {
+          evaluate: async () => [{
+            taskId: 'task1',
+            workflow: { name: 'triggered', steps: [{ name: 'custom', kind: 'src:custom' }, { name: 'policy', kind: 'gate-policy', policy: 'src:always' }] },
+          }],
         },
-      ],
-    })
+      }],
+    }
+    const runner = new WorkflowRunner(wf.db, deps(), { entries: (point) => (contributed[point] ?? []) as never })
     expect(await runner.pollTriggers()).toEqual({ started: 1, errors: [] })
     const [run] = await wf.db.select().from(workflowRuns)
-    expect(run.trigger).toBe('source.pr-opened')
+    expect(run.trigger).toBe('src:pr-opened')
     expect((await waitDone(runner, run.id)).status).toBe('done')
   })
 

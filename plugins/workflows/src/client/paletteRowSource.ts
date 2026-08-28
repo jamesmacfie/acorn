@@ -10,7 +10,7 @@ export const workflowsPaletteRowSource: PaletteRowSource = {
   // itself (run, layout, workflow).
   order: 20,
   // Desktop-only: the runner is a main-process engine, so these routes 503 under dev:node.
-  requires: 'terminal',
+  requires: { plugin: 'terminal' },
   rows: async (taskId) => {
     if (!taskId) return { rows: [] }
     const defs = await workflowApi.defs(taskId)

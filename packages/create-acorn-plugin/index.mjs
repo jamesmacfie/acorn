@@ -11,7 +11,13 @@ import { pathToFileURL } from 'node:url'
  * published standalone and can't import the constant; see docs/plugin-authoring.md § Start from the
  * scaffold for how index.test.ts keeps the copy honest.
  */
-export const API_VERSION = '3'
+export const API_VERSION = '4'
+
+/**
+ * Where the manifest JSON Schema is published. Same reason as the constant above: this package is
+ * published standalone. index.test.ts holds the copy against the generated artifact.
+ */
+export const SCHEMA_URL = 'https://acorn.sh/schemas/acorn-plugin.schema.json'
 
 /** Manifest ids: `/^[a-z][a-z0-9-]{1,31}$/`. See docs/plugin-authoring.md § The manifest for the
  * dot-ban rule. Returns null when nothing usable survives. */
@@ -47,6 +53,10 @@ function manifest(id, name) {
   return (
     JSON.stringify(
       {
+        // Editor completion and inline errors for every field below, from the schema generated out of
+        // the host's own Zod contract (packages/protocol/src/pluginSchema.test.ts). Nothing reads it at
+        // load time; it is there so a typo is a red squiggle rather than a failed boot.
+        $schema: SCHEMA_URL,
         id,
         name,
         version: '0.1.0',
@@ -82,6 +92,12 @@ export default {
   // package that disagrees with itself and the load fails.
   name: '${id}',
 
+  /**
+   * Typed \`ctx\` with no build step: \`npm i -D acorn-plugin-types\` and your editor reads this
+   * annotation. The package is declarations only, so nothing is added to what you ship.
+   *
+   * @param {import('acorn-plugin-types').NodePluginContext} ctx
+   */
   init(ctx) {
     // The portable carrier. A Hono instance cannot cross a process boundary; a
     // (Request, PluginRequestContext) => Response function can. The host strips the mount, so
@@ -97,7 +113,15 @@ export default {
 }
 
 function nodeRoutes() {
-  return `export async function handle(request, context, core) {
+  return `/**
+ * One route handler. The three annotations are what carry the types across the file boundary from
+ * index.js, so the whole node half checks with \`checkJs\` and nothing here has to be TypeScript.
+ *
+ * @param {Request} request
+ * @param {import('acorn-plugin-types').PluginRequestContext} context
+ * @param {import('acorn-plugin-types').CoreServices} core
+ */
+export async function handle(request, context, core) {
   const { pathname, searchParams } = new URL(request.url)
 
   if (request.method === 'GET' && pathname === '/greeting') {
@@ -264,6 +288,16 @@ node/index.js       default-exports the NodePlugin
 node/routes.js      imported with a relative specifier
 client.js           one file, plain JS, no imports
 \`\`\`
+
+## Types, if you want them
+
+\`\`\`sh
+npm i -D acorn-plugin-types
+\`\`\`
+
+Declarations only, no runtime, nothing to bundle. \`node/index.js\` already carries the JSDoc
+annotation that picks it up, so \`ctx\` and everything under it is typed in your editor the moment the
+package is installed. There is no build step either way: these files are still what runs.
 
 ## Install it
 

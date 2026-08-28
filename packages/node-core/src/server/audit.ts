@@ -9,7 +9,7 @@ import { schema } from './db'
 // union rather than free-form strings, because the settings surface groups and filters on it, and an
 // action nobody can enumerate is one nobody reviews. Same argument as the error-code set in
 // docs/api-reference.md § Errors.
-export type AuditAction =
+export type CoreAuditAction =
   // Pairing and devices. The window open/close pair matters as much as the grant: a pairing window is
   // the one moment this node will hand full owner authority to a stranger who knows a code.
   | 'pairing.window.opened'
@@ -26,6 +26,12 @@ export type AuditAction =
   | 'config.trusted'
   // Node administration: which plugins run decides which routes exist and which databases open.
   | 'plugins.disabled.changed'
+  // Attachment to a control plane, both directions (docs/node-enrollment.md). On the same trail as
+  // pairing and for the same reason: enrolling hands a stranger a durable credential for this node,
+  // and detaching takes it back. `node.enrolled` also records the enrollments that failed, because a
+  // provisioned node that never reached its control plane is the failure nobody notices.
+  | 'node.enrolled'
+  | 'node.detached'
   // Third-party code arriving on, changing on, or leaving this node. The versions and the archive hash
   // ride along in `details` so "what exactly was running in March" is answerable from the trail alone
   // (docs/security.md § Supply chain).
@@ -41,6 +47,65 @@ export type AuditAction =
   | 'plugins.request.decided'
   // Data leaving or entering the node.
   | 'backup.created'
+
+// ── The plugin half of the vocabulary ─────────────────────────────────────────────────────────────
+//
+// The closed-set argument above survives intact, and this is what keeps it true rather than weakening
+// it: a plugin's verbs come from its parsed manifest (or, for a built-in, from a `ctx.audit.declare`
+// call), the host qualifies each with the plugin id, and `recordAudit` refuses an action nobody
+// declared. So the vocabulary is still enumerable — `auditVocabulary()` below is the enumeration — and
+// the settings surface can name every verb it might draw. It is the same trade the harness registry
+// already makes.
+//
+// Why it had to open at all: nothing a plugin does was on the trail, and for an agent-driven product
+// the interesting events (a run cost money, a workflow pushed a branch, a schedule made an outbound
+// request with the owner's credentials) are exactly the ones the one surface built for review could
+// not see (2026-08-27 extensibility review, finding 9).
+//
+// `<pluginId>:<actionId>`. No core action contains a colon, so a plugin can never take a core verb's
+// place, and the id is minted here rather than read off a descriptor — the same rule a plugin theme's
+// id, a qualified harness id and an extension point's id follow.
+export type PluginAuditAction = `${string}:${string}`
+
+export const qualifiedAuditAction = (pluginId: string, actionId: string): PluginAuditAction =>
+  `${pluginId}:${actionId}`
+
+export type AuditAction = CoreAuditAction | PluginAuditAction
+
+/** One declared plugin verb, as the registry holds it. */
+export type DeclaredAuditAction = { action: PluginAuditAction; pluginId: string; label: string }
+
+// A module singleton, like the route, collection, node-action and task-check registries beside it, with
+// the same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
+// (server/plugin/host.ts § clearRegistrations).
+const declared = new Map<string, DeclaredAuditAction>()
+
+/** Declare one verb for a plugin. The host binds `pluginId`; a plugin never passes it. */
+export function declareAuditAction(pluginId: string, action: { id: string; label: string }): void {
+  const qualified = qualifiedAuditAction(pluginId, action.id)
+  const clash = declared.get(qualified)
+  if (clash && clash.label !== action.label) {
+    throw new Error(`Duplicate audit action '${qualified}': already declared as '${clash.label}'.`)
+  }
+  declared.set(qualified, { action: qualified, pluginId, label: action.label })
+}
+
+export function clearAuditActions(pluginId: string): void {
+  for (const [id, entry] of declared) if (entry.pluginId === pluginId) declared.delete(id)
+}
+
+/** Every verb this node can write, core's and every running plugin's. What the settings surface reads
+ *  so it can label a row it has never seen, and the reason opening the set to plugins did not make the
+ *  trail unreviewable. */
+export const auditVocabulary = (): DeclaredAuditAction[] =>
+  [...declared.values()].sort((a, b) => a.action.localeCompare(b.action))
+
+/** Is this action one the node is willing to write? A core verb is trusted by construction — it is a
+ *  literal in this binary — and a qualified one has to have been declared. Fail closed: an undeclared
+ *  action writes nothing, because a trail that accepts arbitrary verbs is one nobody can enumerate,
+ *  and enumerability is the whole point of the closed set. */
+export const isKnownAuditAction = (action: string): boolean =>
+  action.includes(':') ? declared.has(action) : true
 
 export type AuditActor = { actor: 'device' | 'internal' | 'system'; actorId?: string | null }
 
@@ -60,6 +125,13 @@ export const AUDIT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 // that protects them. Same reasoning as `lastSeenAt` in auth/deviceTokens.ts, which is best-effort
 // for the same reason.
 export function recordAudit(db: AppDatabase, entry: AuditEntry): void {
+  // Checked here rather than at the plugin seam, so it holds for every feeder including a built-in that
+  // reached for a verb it never declared. A warning and no row: this is fire-and-forget, and throwing
+  // would fail the action being described.
+  if (!isKnownAuditAction(entry.action)) {
+    console.warn('[audit] refusing an undeclared action', entry.action)
+    return
+  }
   void (async () => {
     try {
       await db.insert(schema.audit).values({

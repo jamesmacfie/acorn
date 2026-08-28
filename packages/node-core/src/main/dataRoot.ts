@@ -119,6 +119,46 @@ function readIdentity(path: string): NodeIdentity | null {
   }
 }
 
+const identityPathOf = (dir: string): string => join(dir, IDENTITY_FILE)
+
+// Read-modify-write against the file, not against a field captured in memory. Two owners write
+// node.json now — this process's DataRoot, and the attachment functions below, which a route calls
+// long after the root was opened — so a writer that serialised its own cached copy would silently
+// drop whatever the other one had recorded.
+function updateIdentity(path: string, patch: Partial<NodeIdentity>): NodeIdentity {
+  const current = readIdentity(path)
+  if (!current) throw new Error(`${path} is unreadable or malformed; refusing to overwrite this node's identity.`)
+  const next = { ...current, ...patch }
+  // Undefined in a patch means "remove this field", which is what detaching does. JSON.stringify
+  // drops it, so the merge above is enough and no delete is needed.
+  writePrivateAtomic(path, `${JSON.stringify(next, null, 2)}\n`)
+  return next
+}
+
+/** Who this node is attached to, and why the last enrollment failed. Read straight off disk rather
+ *  than from an open DataRoot, because the reader is a route and the writer was a boot-time
+ *  enrollment in a process that has since restarted (docs/node-enrollment.md). */
+export function readNodeAttachment(dir: string): Pick<NodeIdentity, 'attachment' | 'enrollmentError'> {
+  const identity = readIdentity(identityPathOf(dir))
+  return {
+    ...(identity?.attachment ? { attachment: identity.attachment } : {}),
+    ...(identity?.enrollmentError ? { enrollmentError: identity.enrollmentError } : {}),
+  }
+}
+
+/** Record an attachment, or drop it. Recording clears any previous failure, and dropping clears both:
+ *  a detached node is a node with nothing to say about a control plane. */
+export function recordNodeAttachment(dir: string, attachment: NodeIdentity['attachment']): void {
+  updateIdentity(identityPathOf(dir), { attachment, enrollmentError: undefined })
+}
+
+/** Record that enrollment was attempted and failed. Visible at GET /v2/core/attachment, because the
+ *  alternative — a provisioned node that boots normally and is attached to nothing — is the failure
+ *  nobody notices. */
+export function recordEnrollmentFailure(dir: string, reason: string): void {
+  updateIdentity(identityPathOf(dir), { enrollmentError: { at: Date.now(), reason } })
+}
+
 // Open the data root at `dir`, initialising it if needed (docs/data-layer.md § Data root). Throws
 // rather than falling back to a fresh identity when the directory holds a source database, another
 // node holds it, or the identity file is unreadable.
@@ -157,8 +197,7 @@ export function openDataRoot(dir: string): DataRoot {
       },
       recordPort(port) {
         if (port === identity.port || !Number.isInteger(port) || port < 1) return
-        identity = { ...identity, port }
-        writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
+        identity = updateIdentity(identityPath, { port })
       },
       get advertiseHost() {
         return identity.advertiseHost
@@ -168,8 +207,7 @@ export function openDataRoot(dir: string): DataRoot {
         // the change that stops the first-boot prompt, and `'' === undefined` is false, so this
         // guard lets it through.
         if (host === identity.advertiseHost) return
-        identity = { ...identity, advertiseHost: host }
-        writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
+        identity = updateIdentity(identityPath, { advertiseHost: host })
       },
       release,
     }

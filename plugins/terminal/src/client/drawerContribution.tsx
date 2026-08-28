@@ -9,7 +9,7 @@ export const terminalDrawerContribution: UiSlotContribution = {
   order: 10,
   // Desktop-only, declared rather than probed: the drawer is a PTY surface and there is no engine in a
   // browser (dev:node). The slot host filters on this, so the component never mounts to discover it.
-  requires: 'terminal',
+  requires: { plugin: 'terminal' },
   when: (context) => context.terminalOpen,
   // `closeTerminal`, not `toggleTerminal`. TerminalPanel.closeTab decides to close the drawer after two
   // awaits, so closing the last two tabs in quick succession fires `onClose` twice. A toggle would

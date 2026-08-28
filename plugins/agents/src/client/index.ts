@@ -46,15 +46,15 @@ export const agentsClientPlugin: ClientPlugin = {
     // declared here and the key is listed as device-owned in persistence/devicePrefs.ts.
     ctx.persistedStateSlices.register(agentToolFoldSlice)
     ctx.settingsPages.register({
-      id: 'agent-concurrency', label: 'Agent concurrency', group: 'general', order: 44, requires: 'desktop',
+      id: 'agent-concurrency', label: 'Agent concurrency', group: 'general', order: 44, requires: { plugin: 'agents' },
       component: AgentConcurrencySettings,
     })
     ctx.settingsPages.register({
-      id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: 'desktop',
+      id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: { plugin: 'agents' },
       component: AgentPricingSettings,
     })
     ctx.settingsPages.register({
-      id: 'agent-defaults', label: 'Agent defaults', group: 'general', order: 43, requires: 'desktop',
+      id: 'agent-defaults', label: 'Agent defaults', group: 'general', order: 43, requires: { plugin: 'agents' },
       component: AgentSessionDefaultsSettings,
     })
     // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one,

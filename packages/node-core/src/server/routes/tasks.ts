@@ -4,6 +4,7 @@ import { and, eq, inArray, max } from 'drizzle-orm'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
+import { broadcastTasksChanged } from '../../main/notify'
 import { Hono } from 'hono'
 import { ICON_NAME_RE, type Task, type TaskLink, type TaskLinkSeed } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
@@ -183,6 +184,10 @@ export const tasks = new Hono<AppEnv>()
         .values(links.map((l) => ({ taskId: id, integrationId: l.connectionId, provider: l.providerId, identifier: l.identifier, refJson: l.ref ? JSON.stringify(l.ref) : null, createdAt: now })))
         .onConflictDoNothing()
     }
+    // Every write on this router announces itself (main/notify.ts § broadcastTasksChanged). The task
+    // list is what the rail draws, so a second window that missed a create used to sit on a stale list
+    // until it reconnected (docs/future/events/delivery.md defect 1).
+    broadcastTasksChanged()
     return c.json(
       rowToTask(
         { id, title, icon, origin: seed.origin, projectId: project.id, branch, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
@@ -216,6 +221,7 @@ export const tasks = new Hono<AppEnv>()
     if (typeof body.pullNumber === 'number') patch.pullNumber = body.pullNumber
     else if (body.pullNumber === null) patch.pullNumber = null
     await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id))
+    broadcastTasksChanged()
     return c.json({ id, ...patch })
   })
   // Links grow/shrink after creation (docs/workspaces-and-tasks.md): the write path that turns "a task frozen
@@ -238,6 +244,7 @@ export const tasks = new Hono<AppEnv>()
       .insert(schema.taskLinks)
       .values({ taskId: id, integrationId: link.connectionId, provider: link.providerId, identifier: link.identifier, refJson: link.ref ? JSON.stringify(link.ref) : null, createdAt: Date.now() })
       .onConflictDoNothing()
+    broadcastTasksChanged()
     return c.json({ ok: true })
   })
   .delete('/:id/links', async (c) => {
@@ -255,5 +262,6 @@ export const tasks = new Hono<AppEnv>()
           eq(schema.taskLinks.identifier, body.identifier),
         ),
       )
+    broadcastTasksChanged()
     return c.json({ ok: true })
   })

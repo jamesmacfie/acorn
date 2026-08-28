@@ -14,7 +14,7 @@ export const agentPaneContribution: PaneContribution = {
   description: 'Managed Claude Code and Codex sessions',
   order: 15,
   defaultChord: 'meta+shift+a',
-  requires: 'desktop',
+  requires: { plugin: 'agents' },
   component: AgentPane,
   minWidth: 640,
 }

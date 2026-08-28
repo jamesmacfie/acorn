@@ -1,4 +1,5 @@
 import type {
+  NodeAdoptRequest,
   NodeFetchRequest,
   NodeFetchResponse,
   NodePairRequest,
@@ -35,6 +36,11 @@ export type FleetBridge = {
   list(): Promise<{ nodes: NodeRecord[]; statuses: NodeStatus[] }>
   probe(endpoint: string): Promise<NodeProbeResult>
   pair(request: NodePairRequest): Promise<NodeRecord>
+  // The fleet's second door, for a node a plugin's node provider produced
+  // (@acorn/protocol/broker.ts § nodeAdoptRequestSchema). No probe step and no fingerprint here on
+  // purpose: the host fetches the connection material from the node that listed the record and checks
+  // the fingerprint itself, so there is nothing for a caller to confirm or to get wrong.
+  adopt(request: NodeAdoptRequest): Promise<NodeRecord>
   rename(nodeId: string, label: string): Promise<NodeRecord | null>
   forget(nodeId: string, revoke: boolean): Promise<void>
   reconnect(nodeId: string): void
@@ -164,6 +170,7 @@ type AcornPreload = {
   fleetList?: FleetBridge['list']
   nodeProbe?: FleetBridge['probe']
   nodePair?: FleetBridge['pair']
+  nodeAdopt?: FleetBridge['adopt']
   nodeRename?: FleetBridge['rename']
   nodeForget?: FleetBridge['forget']
   nodeReconnect?: FleetBridge['reconnect']
@@ -238,6 +245,11 @@ export const fleetBridge = (): FleetBridge | null => {
       const pair = acorn.nodePair
       if (!pair) throw new Error('This build cannot pair nodes.')
       return pair(request)
+    },
+    adopt: (request) => {
+      const adopt = acorn.nodeAdopt
+      if (!adopt) throw new Error('This build cannot adopt provided nodes.')
+      return adopt(request)
     },
     rename: async (nodeId, label) => (await acorn.nodeRename?.(nodeId, label)) ?? null,
     forget: async (nodeId, revoke) => { await acorn.nodeForget?.(nodeId, revoke) },

@@ -59,7 +59,9 @@ export type PluginsBridge = {
   // the owner; the handlers turn that into one 400.
   install(source: PluginInstallSource, options: { allowDowngrade?: boolean }): Promise<PluginInstallResult>
   update(id: string, options: { allowDowngrade?: boolean }): Promise<PluginUpdateResult>
-  uninstall(id: string, options: { purgeData?: boolean }): PluginUninstallResult
+  // Async because a purge reaches the core database as well as the disk (server/db/cascade.ts). The
+  // route already awaits it.
+  uninstall(id: string, options: { purgeData?: boolean }): PluginUninstallResult | Promise<PluginUninstallResult>
   // The one mutation that changes what is running without a restart, and only for a loaded plugin
   // (main/pluginReload.ts). It throws for a name this node did not load from disk; a plugin whose new
   // code fails to start resolves with `state: 'failed'`, because that is not an error in the request. The

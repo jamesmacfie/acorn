@@ -4,14 +4,17 @@ import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExe
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import { buildHeadlessArgv, buildSessionEnv, DEFAULT_PROFILE_ID, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
-import { eq } from 'drizzle-orm'
+import { desc, eq, inArray, sum } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../main/workflowFiles'
 import { WorkflowRunner, type WorkflowDef } from '../main/workflowRunner'
+import type { RunStatus } from '@acorn/protocol/runs.ts'
+import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
+import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import { encodeToolCeiling } from '../main/workflowTools'
 import { WorkflowValidationError } from '../main/workflowValidation'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
-import { workflowRuns } from './schema'
+import { workflowRuns, workflowSteps } from './schema'
 
 export type WorkflowsPluginDeps = {
   internalEnv: InternalEnvFactory
@@ -28,10 +31,38 @@ export type WorkflowsPluginDeps = {
   failingChecks: (taskId: string) => Promise<string | null>
 }
 
+// How many runs this plugin offers the merged list. It is a "what is happening on this node" surface,
+// not an archive: the owner's own workflow pane is where a full history is read, addressed by task.
+const RUN_LIST_LIMIT = 100
+
+// A workflow run has eight states and the merged list has five (@acorn/protocol/runs.ts). Both
+// `gated` and `cancelling` are waits — one on a person, one on a child process — and `safety-rail` is
+// a failure with a specific cause, which the row's `detail` carries.
+const TERMINAL_WORKFLOW_STATUSES = new Set(['done', 'failed', 'cancelled', 'safety-rail'])
+
+const toRunStatus = (status: string): RunStatus => {
+  if (status === 'done') return 'done'
+  if (status === 'cancelled') return 'cancelled'
+  if (status === 'failed' || status === 'safety-rail') return 'failed'
+  if (status === 'gated' || status === 'cancelling') return 'waiting'
+  return 'running'
+}
+
 export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   // Held so dispose can abort in-flight steps before the database closes (see dispose below).
   let live: WorkflowRunner | null = null
   let routeCapability: { dispose(): void } | null = null
+  // The bell and the step stream, this plugin's own vocabulary rather than a member of the broadcast
+  // surface every plugin receives (../contract/notices.ts). Both go out on core's `workflow:` channels,
+  // which is why they are written as frames here rather than reaching for a core helper: `ctx.events`
+  // is the seam, and a plugin does not deep-import main/notify.ts.
+  const buildNotices = (ctx: Parameters<NonNullable<NodePlugin['init']>>[0]): WorkflowNotices => ({
+    notice: (taskId, kind, title) => {
+      ctx.events.send({ channel: 'workflow:notice', notice: { taskId, kind, title } })
+      ctx.events.status()
+    },
+    stepEvent: (runId, stepId, event) => ctx.events.send({ channel: 'workflow:step:event', runId, stepId, event }),
+  })
   return {
     name: 'workflows',
     // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
@@ -42,6 +73,14 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // close over the handle, so no request can reach an unmigrated database.
       const store = ctx.storage.open()
       const core = ctx.core
+      const notices = buildNotices(ctx)
+
+      // The three seams another plugin adds work through (../contract/extensions.ts). Opened before the
+      // runner is built so a contribution filed during someone else's init is visible on the first
+      // sweep; `entries` is resolved per call, so init order still does not matter.
+      ctx.extensionPoints.open(WORKFLOW_STEP_KIND, 'Workflow step kinds')
+      ctx.extensionPoints.open(WORKFLOW_POLICY, 'Workflow gate policies')
+      ctx.extensionPoints.open(WORKFLOW_TRIGGER, 'Workflow triggers')
 
       const runner = new WorkflowRunner(store, {
         runStep: async (taskId, def, opts) => {
@@ -132,9 +171,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           return { pass: false, detail: `Unknown policy '${policy}' — failing closed.` }
         },
         failingChecks: deps.failingChecks,
-        notify: ctx.events.notice,
+        notify: notices.notice,
         statusChanged: ctx.events.status,
-        emitStepEvent: ctx.events.stepEvent,
+        emitStepEvent: notices.stepEvent,
         onRunTerminal: async (taskId, runId) => {
           if (!deps.memoryReviewTrigger) return
           const handoff = await ctx.capabilities
@@ -158,7 +197,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         createChildTask: (parentTaskId, seed) => core.tasks.createChild(parentTaskId, seed),
         cancelChildTask: (taskId) => core.tasks.cancel(taskId),
         authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
-      })
+      }, ctx.extensionPoints)
       // Kept so dispose can abort in-flight steps before the database closes.
       live = runner
 
@@ -193,6 +232,34 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const rows = await store.select().from(workflowRuns).where(eq(workflowRuns.taskId, taskId))
           return rows.sort((a, b) => b.createdAt - a.createdAt)
         },
+        // This plugin's contribution to the merged run list (@acorn/protocol/runs.ts). A projection,
+        // not the rows: the merged list is display-shaped and deliberately narrow, and a caller that
+        // wants a run's steps comes back to this plugin addressing it by id.
+        allRuns: async () => {
+          const rows = await store.select().from(workflowRuns).orderBy(desc(workflowRuns.createdAt)).limit(RUN_LIST_LIMIT)
+          // One grouped read rather than a join per row: cost lives on the steps and the merged list
+          // shows it per run, which is the only reason this plugin has to add anything up here.
+          const costRows = rows.length
+            ? await store
+              .select({ runId: workflowSteps.runId, costUsd: sum(workflowSteps.costUsd) })
+              .from(workflowSteps)
+              .where(inArray(workflowSteps.runId, rows.map((row) => row.id)))
+              .groupBy(workflowSteps.runId)
+            : []
+          const costs = new Map(costRows.map((row) => [row.runId, Number(row.costUsd ?? 0)]))
+          return {
+            runs: rows.map((row) => ({
+              id: row.id,
+              title: row.name,
+              status: toRunStatus(row.status),
+              startedAt: row.createdAt,
+              endedAt: TERMINAL_WORKFLOW_STATUSES.has(row.status) ? row.updatedAt : null,
+              taskId: row.taskId,
+              costUsd: costs.get(row.id) ?? null,
+              ...(row.error ? { detail: row.error.slice(0, 200) } : {}),
+            })),
+          }
+        },
         steps: async (runId) =>
           (await runner.steps(runId)).map((step) => {
             if (!step.sessionId || !step.profileId || /[^A-Za-z0-9_-]/.test(step.sessionId)) return step
@@ -216,7 +283,6 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           await runner.killStep(runId, stepId)
           return { ok: true }
         },
-        pollTriggers: () => runner.pollTriggers(),
       })
 
       // Namespace-root router: it owns both task-scoped (/tasks/:id/workflows) and run-scoped
@@ -224,10 +290,34 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // client route builders and the server surface share one contract.
       ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
 
+      // This plugin's runs, for the merged list core assembles (@acorn/protocol/runs.ts). A pointer at
+      // the route above, so nothing here knows what else is on that list.
+      ctx.runs.register({ runs: '/v2/p/workflows/runs' })
+
       // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability
       // (main/workflowRunner.ts explains the ordering).
       ctx.capabilities.provide(WORKFLOWS_RUNNER, { reconcile: () => runner.reconcile() })
+      ctx.capabilities.provide(WORKFLOWS_NOTICES, notices)
+
+      // The trigger clock, and the reason it is here rather than in the client half: a schedule is a
+      // promise to run when nobody is looking (docs/schedules.md). The old poller was a client
+      // schedule that skipped ticks while the window was hidden, so a headless node — every cloud node
+      // — never fired a trigger at all. `POST .../triggers/poll` stays as the explicit "check now" for
+      // a person who is looking.
+      //
+      // 300s because that is the plugin cadence floor the host clamps to anyway, and a trigger sweep
+      // is a poll of external state, not a deadline.
+      ctx.schedules.register({
+        scheduleId: 'triggers',
+        name: 'Workflow triggers',
+        cadence: { every: 300 },
+        run: async () => {
+          const { started, errors } = await runner.pollTriggers()
+          if (errors.length) throw new Error(errors.join('; '))
+          return started ? `started ${started}` : undefined
+        },
+      })
     },
     // The bridge slot is cleared explicitly rather than trusting teardown order: a second
     // startServiceRuntime in one process would otherwise serve workflow requests through the first

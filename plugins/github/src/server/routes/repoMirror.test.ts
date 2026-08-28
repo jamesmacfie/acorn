@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/plugin-api/testkit'
 import { Hono } from 'hono'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
 import { gh } from '..'

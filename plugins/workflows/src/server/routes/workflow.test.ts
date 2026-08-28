@@ -38,7 +38,7 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
   gate: async () => ({ ok: true }),
   cancel: async () => ({ ok: true }),
   kill: async () => ({ ok: true }),
-  pollTriggers: async () => ({ started: 0, errors: [] }),
+  allRuns: async () => ({ runs: [] }),
   ...over,
 })
 
@@ -64,19 +64,17 @@ describe('workflow routes', () => {
     expect(gated).toEqual({ runId: 'run1', stepId: 'step1', approved: true })
   })
 
-  it('cancels runs, kills steps, and polls app-open triggers', async () => {
+  it('cancels runs and kills steps', async () => {
     const calls: string[] = []
     setWorkflowBridge(
       fake({
         cancel: async (runId) => (calls.push(`cancel:${runId}`), { ok: true }),
         kill: async (runId, stepId) => (calls.push(`kill:${runId}:${stepId}`), { ok: true }),
-        pollTriggers: async () => ({ started: 2, errors: [] }),
       }),
     )
     const app = authed()
     expect((await app.fetch(req('/api/workflows/runs/run1/cancel', 'POST'), {} as Env)).status).toBe(200)
     expect((await app.fetch(req('/api/workflows/runs/run1/kill', 'POST', { stepId: 'step1' }), {} as Env)).status).toBe(200)
-    expect(await (await app.fetch(req('/api/workflows/triggers/poll', 'POST'), {} as Env)).json()).toEqual({ started: 2, errors: [] })
     expect(calls).toEqual(['cancel:run1', 'kill:run1:step1'])
   })
 
@@ -121,17 +119,6 @@ describe('a task-scoped credential is confined to its own runs', () => {
     // Its own run still works.
     expect((await app.fetch(req('/api/workflows/runs/run1/cancel', 'POST'), {} as Env)).status).toBe(200)
     expect(calls).toEqual(['cancel:run1'])
-  })
-
-  it('cannot fire the node-wide trigger poll', async () => {
-    let polled = 0
-    setWorkflowBridge(fake({ pollTriggers: async () => (polled++, { started: 0, errors: [] }) }))
-    // No taskId to confine a sweep to, and it starts runs across every task, so it is refused
-    // rather than narrowed.
-    expect((await asTask1().fetch(req('/api/workflows/triggers/poll', 'POST'), {} as Env)).status).toBe(403)
-    expect(polled).toBe(0)
-    expect((await authed().fetch(req('/api/workflows/triggers/poll', 'POST'), {} as Env)).status).toBe(200)
-    expect(polled).toBe(1)
   })
 
   it('still answers 503 rather than 404 when the runner is not wired', async () => {

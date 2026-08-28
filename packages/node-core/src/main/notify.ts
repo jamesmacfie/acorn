@@ -46,3 +46,16 @@ export function broadcastWorkflowStepEvent(runId: string, stepId: string, event:
 export function broadcastPluginsChanged(): void {
   wsBroadcast({ channel: 'plugins:changed' })
 }
+
+// A task was created, patched, archived, cancelled or had its links change. Content-free for the same
+// reason as the two above: the task list is a fetchable route, and a payload would be a second
+// projection to keep in step.
+//
+// It is `tasks:changed` rather than another `term:status` ping because a client has to be able to tell
+// "the task list moved" from "a terminal's status moved" — the first invalidates a query, the second
+// re-pulls a session list — and because a plugin's node half can subscribe to this one by name
+// (@acorn/protocol/nodeEvents.ts). Without it a second client kept a stale task list until it
+// reconnected (docs/future/events/delivery.md defect 1).
+export function broadcastTasksChanged(): void {
+  wsBroadcast({ channel: 'tasks:changed' })
+}

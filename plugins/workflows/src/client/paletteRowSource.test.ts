@@ -23,8 +23,8 @@ describe('workflow palette rows', () => {
 
   it('declares its place after terminal rows, and its desktop requirement', () => {
     // 20, behind terminal's 10, which reproduces the run → layout → workflow order the palette had when it built
-    // all three itself. `requires: 'terminal'` because the runner is a main-process engine.
-    expect(source).toMatchObject({ id: 'workflows.defs', order: 20, requires: 'terminal' })
+    // all three itself. `requires: { plugin: 'terminal' }` because the runner is a main-process engine.
+    expect(source).toMatchObject({ id: 'workflows.defs', order: 20, requires: { plugin: 'terminal' } })
   })
 
   it('maps committed defs into rows with a step count, and carries config errors alongside', async () => {

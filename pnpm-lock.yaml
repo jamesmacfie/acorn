@@ -300,6 +300,9 @@ importers:
       '@acorn/plugin-model-providers':
         specifier: workspace:*
         version: link:../../plugins/model-providers
+      '@acorn/plugin-nodes-file':
+        specifier: workspace:*
+        version: link:../../plugins/nodes-file
       '@acorn/plugin-rollbar':
         specifier: workspace:*
         version: link:../../plugins/rollbar
@@ -533,6 +536,28 @@ importers:
       vitest:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@26.0.0)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+
+  packages/plugin-types:
+    dependencies:
+      '@types/node':
+        specifier: '*'
+        version: 26.0.0
+    devDependencies:
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../node-core
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
 
   packages/protocol:
     dependencies:
@@ -953,6 +978,9 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
+      '@acorn/plugin-workflows':
+        specifier: workspace:*
+        version: link:../workflows
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -1045,6 +1073,9 @@ importers:
       '@acorn/plugin-terminal':
         specifier: workspace:*
         version: link:../terminal
+      '@acorn/plugin-workflows':
+        specifier: workspace:*
+        version: link:../workflows
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -1098,6 +1129,28 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+
+  plugins/nodes-file:
+    dependencies:
+      '@acorn/plugin-api':
+        specifier: workspace:*
+        version: link:../../packages/plugin-api
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0

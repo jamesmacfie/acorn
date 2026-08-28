@@ -32,6 +32,9 @@ export const toNodeRecord = (node: FleetNode): NodeRecord => ({
   endpoint: node.endpoint,
   local: node.local,
   ...(node.fingerprint ? { fingerprint: node.fingerprint } : {}),
+  // Provenance travels to the renderer; the certificate and the device row still do not. A fleet
+  // surface has to be able to say which rows came from a provider and which plugin vouched for them.
+  ...(node.provider ? { provider: node.provider } : {}),
 })
 
 // The bundled local node's token predates its nodeId. See docs/shell.md, "Fleet membership".

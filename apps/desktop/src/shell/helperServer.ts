@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { z } from 'zod'
 import {
+  nodeAdoptRequestSchema,
   nodeFetchRequestSchema,
   nodeForgetRequestSchema,
   nodePairRequestSchema,
@@ -12,6 +13,8 @@ import {
   type NodeProbeResult,
   type NodeRecord,
 } from '@acorn/protocol/broker.ts'
+import { coreNodeAdoptRoute } from '@acorn/protocol/api.ts'
+import { nodeAdoptResultSchema } from '@acorn/protocol/nodeProviders.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 import type { Helper } from '@acorn/desktop-helper/main/index.ts'
 import { toNodeRecord } from '@acorn/desktop-helper/main/fleetStore.ts'
@@ -153,6 +156,51 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
           local: false,
         },
         result.deviceToken,
+      )
+      connect(node.nodeId)
+      return toNodeRecord(node)
+    },
+    // The fleet's second door (@acorn/protocol/broker.ts § nodeAdoptRequestSchema). Four steps, and
+    // the order is the security of it: ask the node that listed this record, probe the endpoint it
+    // named, refuse a certificate whose fingerprint is not the one the provider vouched for, and only
+    // then remember it.
+    //
+    // What the owner's eyes do in probe-then-pair, the provider's word does here. What nothing does is
+    // let the renderer name an endpoint or hold a token: it names a provider and a node id, and every
+    // piece of connection material is fetched here.
+    'node-adopt': async (raw): Promise<NodeRecord> => {
+      const request = nodeAdoptRequestSchema.parse(raw)
+      const response = await helper.broker.fetch(request.sourceNodeId, {
+        requestId: `adopt-${request.providerId}-${request.providerNodeId}`,
+        path: coreNodeAdoptRoute,
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify({ providerId: request.providerId, providerNodeId: request.providerNodeId })) },
+      })
+      const text = new TextDecoder().decode(response.body)
+      if (response.status !== 200) throw new Error(`That node could not be adopted (${response.status}). ${text.slice(0, 200)}`)
+      const adopted = nodeAdoptResultSchema.safeParse(JSON.parse(text) as unknown)
+      if (!adopted.success) throw new Error('The node returned an unusable adoption result.')
+      const record = adopted.data
+      // The provider vouched for a fingerprint; this is where that claim is checked against the
+      // certificate the endpoint actually presents. A provider that lied, or an endpoint that has been
+      // substituted since it was listed, fails here rather than becoming a pinned connection.
+      const probe = await probeNode(record.endpoint)
+      if (probe.fingerprint !== record.fingerprint) {
+        throw new Error(`${record.endpoint} presented a different identity than ${request.providerId} vouched for. Nothing was paired.`)
+      }
+      if (!probe.compatible) throw new Error('That node speaks a different protocol version.')
+      const node = helper.fleet.remember(
+        {
+          nodeId: record.nodeId,
+          label: request.label,
+          endpoint: probe.endpoint,
+          fingerprint: probe.fingerprint,
+          certPem: probe.certPem,
+          local: false,
+          provider: { providerId: request.providerId, providerNodeId: request.providerNodeId, sourceNodeId: request.sourceNodeId },
+        },
+        record.deviceToken,
       )
       connect(node.nodeId)
       return toNodeRecord(node)

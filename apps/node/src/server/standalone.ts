@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { closeListener, devDataDir, makeRuntime, startListener } from '@acorn/node-core/main/server.ts'
 import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/main/advertise.ts'
 import { openDataRoot } from '@acorn/node-core/main/dataRoot.ts'
+import { enrollNode } from '@acorn/node-core/main/enrollment.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
@@ -78,6 +79,7 @@ const pluginStateCapability = capabilities.provide(
   PLUGIN_STATE,
   buildPluginStateBridge({
     dataDir: root.dir,
+    db: runtime.DB,
     roster: () => plugins.roster,
     booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
     loadFailures: () => graph.failures,
@@ -104,6 +106,31 @@ await scheduler.start()
 // routes.
 const reconcileTask = reconcileNode({ db: runtime.DB, dataDir: root.dir, capabilities }).finally(() => finishReconcile())
 await reconcileTask
+
+// Unattended enrollment, if and only if the provisioner set both environment variables
+// (docs/node-enrollment.md). With neither set this returns before it reads a file, so a node nobody
+// provisioned behaves exactly as it did before this line existed.
+//
+// Here rather than earlier because it needs the endpoint and the fingerprint, which only exist once
+// the listener has bound. Before the device count below on purpose: a node that just handed its
+// control plane a credential is a paired node, and printing a pairing code for a machine nobody is
+// standing at would be an unrequested window left open.
+//
+// The endpoint it enrolls with is the advertised one, not `listener.endpoint.origin`. That value is
+// deliberately loopback whatever `advertiseHost` says, because every child process this node spawns
+// dials it (main/server.ts), and a control plane handed `https://127.0.0.1:<port>` would vouch for an
+// address no other machine can reach. With no advertised host the loopback origin is still what goes,
+// which is right for a control plane running on this same machine and useless for one that is not —
+// the operator's exposure decision either way (docs/node-distribution.md § Reaching a node from
+// another machine).
+await enrollNode({
+  dataDir: root.dir,
+  nodeId: root.nodeId,
+  endpoint: enrollmentEndpoint(),
+  fingerprint: listener.fingerprint,
+  devices: runtime.DEVICES,
+  db: runtime.DB,
+})
 
 // Counted before the handshake below, which issues a launcher device of its own when
 // ACORN_DEVICE_TOKEN is unset. After that, every node looks paired.
@@ -157,6 +184,13 @@ console.log(
     deviceToken: await resolveDeviceToken(runtime.DEVICES, process.env.ACORN_DEVICE_TOKEN, 'Standalone node launcher'),
   }),
 )
+
+// The first advertised host, or the loopback origin when there is none. One line, beside the banner
+// that makes the same choice for the same reason.
+function enrollmentEndpoint(): string {
+  const host = advertisedHosts(root)[0]
+  return host ? `https://${host}:${listener.endpoint.port}` : listener.endpoint.origin
+}
 
 // Prints the pairing banner the owner compares against the client's screen
 // (docs/node-distribution.md § Runtime). Opens automatically only while nothing is paired yet, so a

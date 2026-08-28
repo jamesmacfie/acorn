@@ -1,8 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import { makeTestDb, schema, type TestDb } from '@acorn/plugin-api/testkit'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { connectProvider, rotateConnection, testConnection } from '@acorn/node-core/server/integrations/connections.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import {
   ANTHROPIC_MODELS,

@@ -1,0 +1,2506 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "title": "acorn plugin manifest (plugin API major 4)",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,31}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "icon": {
+      "type": "object",
+      "properties": {
+        "d": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\\s+-]+$"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-f]{6}$"
+        }
+      },
+      "required": [
+        "d"
+      ]
+    },
+    "icons": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 32,
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "d": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\\s+-]+$"
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$"
+          }
+        },
+        "required": [
+          "d"
+        ]
+      }
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "apiVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16,
+      "pattern": "^\\d{1,4}(-\\d{1,4})?(\\s*\\|\\|\\s*\\d{1,4}(-\\d{1,4})?)*$"
+    },
+    "node": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "client": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "migrations": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "permissions": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "api": {
+          "default": [],
+          "maxItems": 64,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "events": {
+          "default": [],
+          "maxItems": 64,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9:._-]*$"
+          }
+        },
+        "node": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "core": {
+              "default": [],
+              "maxItems": 64,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "capabilities": {
+              "default": [],
+              "maxItems": 64,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "secrets": {
+              "default": false,
+              "type": "boolean"
+            },
+            "exec": {
+              "default": false,
+              "type": "boolean"
+            },
+            "net": {
+              "default": [],
+              "maxItems": 64,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "contributions": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "frames": {
+          "default": [],
+          "maxItems": 32,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string",
+                "enum": [
+                  "pane",
+                  "refPanel",
+                  "settings",
+                  "importer",
+                  "webview",
+                  "overlay",
+                  "coreSlot"
+                ]
+              },
+              "scope": {
+                "default": "task",
+                "type": "string",
+                "enum": [
+                  "task",
+                  "project"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "glyph": {
+                "default": "puzzle",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "order": {
+                "default": 500,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "formFactor": {
+                "default": [
+                  "desktop"
+                ],
+                "minItems": 1,
+                "maxItems": 2,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "desktop",
+                    "mobile"
+                  ]
+                }
+              },
+              "providerId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "group": {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "workspace"
+                ]
+              },
+              "coreSlot": {
+                "type": "string",
+                "enum": [
+                  "rail.taskList"
+                ]
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "urlSource": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "hosts": {
+                "minItems": 1,
+                "maxItems": 32,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                }
+              },
+              "layout": {
+                "type": "object",
+                "properties": {
+                  "template": {
+                    "type": "string",
+                    "enum": [
+                      "document",
+                      "document-over-frame"
+                    ]
+                  },
+                  "document": {
+                    "type": "object",
+                    "properties": {
+                      "languageId": {
+                        "default": "plaintext",
+                        "type": "string",
+                        "enum": [
+                          "plaintext",
+                          "typescript",
+                          "typescriptreact",
+                          "javascript",
+                          "javascriptreact",
+                          "json",
+                          "css",
+                          "scss",
+                          "less",
+                          "html",
+                          "xml",
+                          "markdown",
+                          "python",
+                          "ruby",
+                          "go",
+                          "rust",
+                          "java",
+                          "c",
+                          "cpp",
+                          "shellscript",
+                          "yaml",
+                          "sql",
+                          "ini",
+                          "toml"
+                        ]
+                      },
+                      "read": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "write": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "completions": {
+                        "type": "object",
+                        "properties": {
+                          "route": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "triggerCharacters": {
+                            "default": [],
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 2
+                            }
+                          }
+                        },
+                        "required": [
+                          "route"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "read"
+                    ]
+                  }
+                },
+                "required": [
+                  "template",
+                  "document"
+                ]
+              },
+              "claimsKeys": {
+                "default": [],
+                "maxItems": 32,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              }
+            },
+            "required": [
+              "target",
+              "id",
+              "label"
+            ]
+          }
+        },
+        "sources": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "glyph": {
+                "default": "puzzle",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "order": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "providerId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "projectScoped": {
+                "type": "boolean"
+              },
+              "onSelect": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openPane"
+                      },
+                      "pane": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "pane"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openTask"
+                      }
+                    },
+                    "required": [
+                      "verb"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "navigate"
+                      },
+                      "surface": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "surface"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "runNodeAction"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "path"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "createTask"
+                      }
+                    },
+                    "required": [
+                      "verb"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openUrl"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "url"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openOverlay"
+                      },
+                      "overlay": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "overlay"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "surfaceAction"
+                      },
+                      "surface": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "surface"
+                    ]
+                  }
+                ]
+              },
+              "emptyState": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openPane"
+                          },
+                          "pane": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "pane"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openTask"
+                          }
+                        },
+                        "required": [
+                          "verb"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "runNodeAction"
+                          },
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "path"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openUrl"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "url"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "openOverlay"
+                          },
+                          "overlay": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "overlay"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "surfaceAction"
+                          },
+                          "surface": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "surface"
+                        ]
+                      }
+                    ]
+                  },
+                  "actionLabel": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "message"
+                ]
+              },
+              "panels": {
+                "type": "object",
+                "properties": {
+                  "collections": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 130
+                    }
+                  },
+                  "fieldRole": {
+                    "type": "string",
+                    "enum": [
+                      "title",
+                      "status",
+                      "assignee",
+                      "url",
+                      "updated"
+                    ]
+                  },
+                  "views": {
+                    "minItems": 1,
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "stat",
+                        "list",
+                        "table",
+                        "board",
+                        "chart"
+                      ]
+                    }
+                  },
+                  "max": {
+                    "default": 4,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  }
+                }
+              },
+              "refresh": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 86400
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "order",
+              "items"
+            ]
+          }
+        },
+        "slots": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "slot": {
+                "type": "string",
+                "enum": [
+                  "footer",
+                  "topbar"
+                ]
+              },
+              "icon": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "data": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "onClick": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openPane"
+                      },
+                      "pane": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "pane"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openTask"
+                      }
+                    },
+                    "required": [
+                      "verb"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "runNodeAction"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "path"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openUrl"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "url"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openOverlay"
+                      },
+                      "overlay": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "overlay"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "surfaceAction"
+                      },
+                      "surface": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "surface"
+                    ]
+                  }
+                ]
+              },
+              "refresh": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 86400
+              }
+            },
+            "required": [
+              "id",
+              "slot",
+              "data"
+            ]
+          }
+        },
+        "palette": {
+          "default": [],
+          "maxItems": 32,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "action": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openPane"
+                      },
+                      "pane": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "pane"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openTask"
+                      }
+                    },
+                    "required": [
+                      "verb"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "navigate"
+                      },
+                      "surface": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "surface"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "runNodeAction"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "path"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "createTask"
+                      }
+                    },
+                    "required": [
+                      "verb"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openUrl"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "url"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openOverlay"
+                      },
+                      "overlay": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "overlay"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "surfaceAction"
+                      },
+                      "surface": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "surface"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "action"
+            ]
+          }
+        },
+        "commands": {
+          "default": [],
+          "maxItems": 32,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "category": {
+                "default": "action",
+                "type": "string",
+                "enum": [
+                  "action",
+                  "navigation",
+                  "pane",
+                  "task",
+                  "terminal",
+                  "workspace"
+                ]
+              },
+              "palette": {
+                "default": true,
+                "type": "boolean"
+              },
+              "action": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openPane"
+                      },
+                      "pane": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "pane"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openTask"
+                      }
+                    },
+                    "required": [
+                      "verb"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "runNodeAction"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "path"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openUrl"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "url"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openOverlay"
+                      },
+                      "overlay": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "overlay"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "surfaceAction"
+                      },
+                      "surface": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "surface"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "action"
+            ]
+          }
+        },
+        "keybindings": {
+          "default": [],
+          "maxItems": 32,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "defaultChord": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "when": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "task",
+                  "surface"
+                ]
+              },
+              "surface": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "command",
+              "defaultChord",
+              "when"
+            ]
+          }
+        },
+        "attention": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "order": {
+                "default": 500,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "refresh": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 86400
+              }
+            },
+            "required": [
+              "id",
+              "items"
+            ]
+          }
+        },
+        "nodeStats": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "order": {
+                "default": 500,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "label": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  }
+                ]
+              },
+              "data": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "refresh": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 86400
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "data"
+            ]
+          }
+        },
+        "contentLinks": {
+          "default": [],
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "match": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "openPane": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "item": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              }
+            },
+            "required": [
+              "id",
+              "match",
+              "item"
+            ]
+          }
+        },
+        "routes": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "surface": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "item": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              },
+              "order": {
+                "default": 500,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              }
+            },
+            "required": [
+              "id",
+              "path",
+              "surface",
+              "item"
+            ]
+          }
+        },
+        "agentContexts": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240
+              },
+              "options": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "capture": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "options",
+              "capture"
+            ]
+          }
+        },
+        "refResolvers": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "resolve": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "resolve"
+            ]
+          }
+        },
+        "themes": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "dark": {
+                "default": false,
+                "type": "boolean"
+              },
+              "tokens": {
+                "type": "object",
+                "properties": {
+                  "--bg": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--bg-subtle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--bg-hover": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--bg-selected": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--border": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--border-strong": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--text-muted": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--text-faint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--accent": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--focus": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--add-bg": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--add-marker": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--del-bg": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--del-marker": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--add-word-bg": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--del-word-bg": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--hunk-bg": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--hunk-text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--warn": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--badge-border": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "--shadow-popover": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "--bg",
+                  "--bg-subtle",
+                  "--bg-hover",
+                  "--bg-selected",
+                  "--border",
+                  "--border-strong",
+                  "--text",
+                  "--text-muted",
+                  "--text-faint",
+                  "--accent",
+                  "--focus",
+                  "--add-bg",
+                  "--add-marker",
+                  "--del-bg",
+                  "--del-marker",
+                  "--add-word-bg",
+                  "--del-word-bg",
+                  "--hunk-bg",
+                  "--hunk-text",
+                  "--warn",
+                  "--badge-border",
+                  "--shadow-popover"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "tokens"
+            ]
+          }
+        },
+        "contextMenus": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "location": {
+                "type": "string",
+                "enum": [
+                  "task.row"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              },
+              "icon": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "order": {
+                "default": 500,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "when": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                }
+              },
+              "action": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openPane"
+                      },
+                      "pane": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "pane"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openTask"
+                      }
+                    },
+                    "required": [
+                      "verb"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "runNodeAction"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "path"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openUrl"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "url"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openOverlay"
+                      },
+                      "overlay": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "overlay"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "surfaceAction"
+                      },
+                      "surface": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "surface"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "location",
+              "label",
+              "action"
+            ]
+          }
+        },
+        "extensionPoints": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "location": {
+                "type": "string",
+                "enum": [
+                  "pane.footer",
+                  "pane.aside"
+                ]
+              },
+              "surface": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "panels": {
+                "type": "object",
+                "properties": {
+                  "collections": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 130
+                    }
+                  },
+                  "fieldRole": {
+                    "type": "string",
+                    "enum": [
+                      "title",
+                      "status",
+                      "assignee",
+                      "url",
+                      "updated"
+                    ]
+                  },
+                  "views": {
+                    "minItems": 1,
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "stat",
+                        "list",
+                        "table",
+                        "board",
+                        "chart"
+                      ]
+                    }
+                  },
+                  "max": {
+                    "default": 4,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  }
+                }
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "location",
+              "surface"
+            ]
+          }
+        },
+        "extensions": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "point": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 130
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "order": {
+                "default": 500,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "onSelect": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openPane"
+                      },
+                      "pane": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "pane"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openTask"
+                      }
+                    },
+                    "required": [
+                      "verb"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "runNodeAction"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "path"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openUrl"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "url"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "openOverlay"
+                      },
+                      "overlay": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "overlay"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verb": {
+                        "type": "string",
+                        "const": "surfaceAction"
+                      },
+                      "surface": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "verb",
+                      "surface"
+                    ]
+                  }
+                ]
+              },
+              "refresh": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 86400
+              }
+            },
+            "required": [
+              "id",
+              "point",
+              "label",
+              "items"
+            ]
+          }
+        },
+        "collections": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "params": {
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "enum"
+                      ]
+                    },
+                    "values": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "multiple": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "type"
+                  ]
+                }
+              },
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fields": {
+                    "maxItems": 24,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "text",
+                            "number",
+                            "boolean",
+                            "datetime",
+                            "enum",
+                            "person",
+                            "link"
+                          ]
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "title",
+                            "status",
+                            "assignee",
+                            "url",
+                            "updated"
+                          ]
+                        },
+                        "unit": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 16
+                        },
+                        "values": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "label": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "tone": {
+                                "type": "string",
+                                "enum": [
+                                  "ok",
+                                  "warn",
+                                  "bad",
+                                  "muted",
+                                  "accent"
+                                ]
+                              },
+                              "icon": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "type"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "fields"
+                ]
+              },
+              "refresh": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 86400
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "items"
+            ]
+          }
+        },
+        "schedules": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "run": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "cadence": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "every": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "every"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string",
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                      }
+                    },
+                    "required": [
+                      "daily"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "weekly": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 6
+                          },
+                          "at": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          }
+                        },
+                        "required": [
+                          "day",
+                          "at"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "weekly"
+                    ]
+                  }
+                ]
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 300
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "run",
+              "cadence"
+            ]
+          }
+        },
+        "taskChecks": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "check": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "apply": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10
+              }
+            },
+            "required": [
+              "id",
+              "check"
+            ]
+          }
+        },
+        "auditActions": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9.-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          }
+        },
+        "harnesses": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "glyph": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "spawn": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "entry": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "args": {
+                    "default": [],
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    }
+                  },
+                  "requires": {
+                    "type": "object",
+                    "properties": {
+                      "command": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "env": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[A-Z][A-Z0-9_]*$"
+                      }
+                    },
+                    "required": [
+                      "command",
+                      "env"
+                    ]
+                  }
+                }
+              },
+              "envPassthrough": {
+                "default": [],
+                "maxItems": 32,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*\\*?$"
+                }
+              },
+              "quirks": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "manualCompaction": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "sessionPersistence": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                }
+              },
+              "probes": {
+                "type": "object",
+                "properties": {
+                  "usage": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "auth": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              },
+              "terminal": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "backendPreference": {
+                    "default": "tmux",
+                    "type": "string",
+                    "enum": [
+                      "node-pty",
+                      "tmux"
+                    ]
+                  },
+                  "launchArgs": {
+                    "default": [],
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    }
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "spawn"
+            ]
+          }
+        }
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "version",
+    "apiVersion"
+  ]
+}

@@ -203,6 +203,7 @@ describe('loading rollbar from disk', () => {
       // stuck Restart banner).
       const state = pluginState(buildPluginStateBridge({
         dataDir: broken,
+        db: core.db,
         roster: () => [],
         booted: () => [],
         loadFailures: () => failures,

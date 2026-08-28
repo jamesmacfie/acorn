@@ -6,7 +6,7 @@ import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { LayoutRecipe, RunTarget } from '../../runConfig'
 import type { AppDatabase } from '../../../server/db'
 import { schema } from '../../../server/db'
-import { broadcastStatus } from '../../notify'
+import { broadcastStatus, broadcastTasksChanged } from '../../notify'
 import { loadTask, projectForTask, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../../taskWorktree'
 import { normalizeGithubPart } from '../../projects'
 import type { CapabilityRegistry } from '../../../server/plugin/capabilities'
@@ -298,11 +298,13 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
         archivedAt: null,
       })
       broadcastStatus()
+      broadcastTasksChanged()
       return id
     },
     cancel: async (taskId) => {
       await db.update(schema.tasks).set({ status: 'cancelled', updatedAt: Date.now() }).where(eq(schema.tasks.id, taskId))
       broadcastStatus()
+      broadcastTasksChanged()
     },
   }
 }

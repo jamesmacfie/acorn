@@ -27,7 +27,7 @@ import type {
 import { writePrivateAtomic } from './dataRoot'
 import { runProcess } from './core/exec/proc'
 import { resolveInRoot } from './core/filesystem/confinement'
-import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifest, type PluginManifest } from './pluginManifest'
+import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifest, speaksApiVersion, type PluginManifest } from './pluginManifest'
 import { pluginDbPath, PLUGIN_DB_DIR } from './pluginStorage'
 import { markPluginRemoved, markPluginUserManaged } from './bundledPluginState'
 
@@ -275,7 +275,7 @@ function validate(root: string, expectId: string | null): PluginManifest {
   assertConfined(root)
   const manifest = readPluginManifest(root)
   if (!manifest) fail(`${MANIFEST_FILE} is missing or does not match the plugin manifest schema.`)
-  if (manifest!.apiVersion !== PLUGIN_API_MAJOR) {
+  if (!speaksApiVersion(manifest!.apiVersion)) {
     fail(`That package is built for acorn plugin API ${manifest!.apiVersion}; this node speaks ${PLUGIN_API_MAJOR}.`)
   }
   if (expectId && manifest!.id !== expectId) fail(`That package is '${manifest!.id}', not '${expectId}'.`)

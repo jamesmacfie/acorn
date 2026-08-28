@@ -21,7 +21,9 @@ export type WorkflowBridge = {
   gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
   cancel(runId: string): Promise<{ ok: boolean }>
   kill(runId: string, stepId: string): Promise<{ ok: boolean }>
-  pollTriggers(): Promise<{ started: number; errors: string[] }>
+  // Every run on this node, for the merged run list (@acorn/protocol/runs.ts). Node-wide by
+  // construction; core filters it for a confined caller, so this must not.
+  allRuns(): Promise<{ runs: unknown[] }>
 }
 
 export const WORKFLOW_ROUTE = routeCapability<WorkflowBridge>('workflows.route')
@@ -71,8 +73,10 @@ export const workflow = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, WORKFLOW_ROUTE, (b) => b.kill(c.req.param('runId'), parsed.data.stepId))
   })
-// Node-wide, not task-scoped: a poll evaluates every task's triggers and starts runs. There is no
-// taskId to confine it to, so a confined caller is refused rather than given a partial sweep. An
-// agent has no business firing other tasks' workflows. The renderer's poller is a device.
-  .post('/workflows/triggers/poll', (c) =>
-    isTaskConfined(c) ? respondError(c, 403, 'interactive_user_required') : viaBridge(c, WORKFLOW_ROUTE, (b) => b.pollTriggers()))
+  // The merged run list's source for this plugin (@acorn/protocol/runs.ts). Read by the node with no
+  // client and no request in sight, through the plugin dispatcher, so it takes no params and answers
+  // node-wide; `/v2/core/runs` applies the caller's confinement over the merged answer.
+  .get('/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.allRuns()))
+// No trigger-poll route. The sweep is a node schedule now (../../node/index.ts), and "check now" is
+// the scheduler's own run-now on the settings page, which every schedule already has. A second,
+// workflow-only door to the same sweep would need its own confinement rule for no extra reach.

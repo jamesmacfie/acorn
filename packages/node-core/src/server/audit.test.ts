@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { deviceService } from './auth/deviceTokens'
-import { AUDIT_RETENTION_MS, pruneAudit, readAudit, recordAudit } from './audit'
+import { AUDIT_RETENTION_MS, auditVocabulary, clearAuditActions, declareAuditAction, pruneAudit, readAudit, recordAudit } from './audit'
 import { makeTestDb, type TestDb } from '../testkit/db'
 import { schema } from './db'
 
@@ -139,5 +139,36 @@ describe('what gets recorded', () => {
     // but it is not a second decision anyone made.
     const revocations = (await readAudit(test.db)).filter((row) => row.action === 'device.revoked')
     expect(revocations).toHaveLength(1)
+  })
+})
+
+// ── The plugin half of the vocabulary (docs/security.md § The vocabulary is closed) ───────────────
+
+describe('plugin-declared audit actions', () => {
+  afterEach(() => clearAuditActions('demo'))
+
+  it("qualifies a declared verb, and enumerates it with the plugin's own label", () => {
+    declareAuditAction('demo', { id: 'run.finished', label: 'Demo run finished' })
+    expect(auditVocabulary()).toEqual([{ action: 'demo:run.finished', pluginId: 'demo', label: 'Demo run finished' }])
+  })
+
+  it('writes a declared verb and refuses one nobody declared', async () => {
+    declareAuditAction('demo', { id: 'run.finished', label: 'Demo run finished' })
+    recordAudit(test.db, { actor: 'system', actorId: 'demo', action: 'demo:run.finished', subject: 'run1' })
+    // Same shape, undeclared. Fail closed: no row, and no throw, because recordAudit must never fail
+    // the action it describes.
+    recordAudit(test.db, { actor: 'system', actorId: 'thief', action: 'thief:anything', subject: 'run1' })
+    await settled()
+    expect((await readAudit(test.db)).map((row) => row.action)).toEqual(['demo:run.finished'])
+  })
+
+  it('takes the declaration back with the plugin, and leaves the rows behind', async () => {
+    declareAuditAction('demo', { id: 'run.finished', label: 'Demo run finished' })
+    recordAudit(test.db, { actor: 'system', actorId: 'demo', action: 'demo:run.finished', subject: 'run1' })
+    await settled()
+    clearAuditActions('demo')
+    expect(auditVocabulary()).toEqual([])
+    // The row is evidence of something that happened; the settings surface draws it as its raw verb.
+    expect((await readAudit(test.db)).map((row) => row.action)).toEqual(['demo:run.finished'])
   })
 })

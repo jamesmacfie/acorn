@@ -6,8 +6,11 @@ import { requireDevice, requireProviderAccess, requireTaskScope, requireUser } f
 import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routeRegistry'
 import { audit } from './routes/audit'
+import { runs } from './routes/runs'
 import { backup } from './routes/backup'
 import { security } from './routes/security'
+import { attachment } from './routes/attachment'
+import { nodeProviderRoutes } from './routes/nodeProviders'
 import { integrations } from './routes/integrations'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
@@ -68,6 +71,15 @@ export function createApp() {
     // reconnaissance for anything running in a task.
     .use(`${CORE_NAMESPACE}/security`, requireDevice)
     .use(`${CORE_NAMESPACE}/security/*`, requireDevice)
+    // The attachment record, same class again: it names a control plane and the device row that
+    // vouches for it, and the delete revokes that credential (docs/node-enrollment.md).
+    .use(`${CORE_NAMESPACE}/attachment`, requireDevice)
+    .use(`${CORE_NAMESPACE}/attachment/*`, requireDevice)
+    // Node providers. The sharpest of this group: the list enumerates the owner's infrastructure,
+    // `adopt` hands over a durable credential for another machine, and `create` spends money. None of
+    // it is a question a task-scoped agent has any business asking (docs/plugins.md § Node providers).
+    .use(`${CORE_NAMESPACE}/nodes`, requireDevice)
+    .use(`${CORE_NAMESPACE}/nodes/*`, requireDevice)
     // Schedules, same class again: a schedule is code this node runs unattended, so creating one buys
     // persistence and pausing one silences the node's own housekeeping.
     .use(`${CORE_NAMESPACE}/schedules`, requireDevice)
@@ -107,7 +119,10 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security: this node's posture (security.md § On-disk)
+    .route(`${CORE_NAMESPACE}/attachment`, attachment) // Settings → Nodes: the control plane this node is attached to (docs/node-enrollment.md)
+    .route(`${CORE_NAMESPACE}/nodes`, nodeProviderRoutes) // plugin-provided nodes and their lifecycle (docs/plugins.md § Node providers)
     .route(`${CORE_NAMESPACE}/schedules`, schedules) // Settings → Schedules: periodic work owned by the node (docs/schedules.md)
+    .route(`${CORE_NAMESPACE}/runs`, runs) // Settings → Runs: every plugin's runs, merged (@acorn/protocol/runs.ts)
     .route(`${CORE_NAMESPACE}/backup`, backup) // docs/data-layer.md § Backup: core + plugin databases, minus credentials
     .route(`${CORE_NAMESPACE}/projects`, projects)
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)

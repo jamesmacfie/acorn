@@ -1,0 +1,9 @@
+{
+  // Node-only: a node provider is server-side by contract, so there is no client half here.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

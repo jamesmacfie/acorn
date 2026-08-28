@@ -48,6 +48,17 @@ export type ClientEventMap = {
   // agent sessions and notices under node B, keyed by ids that may collide across nodes by
   // construction.
   'runtime:node-switched': { from: string | null; to: string | null }
+  // ── Node-emitted facts ──────────────────────────────────────────────────────────────────────────
+  //
+  // The other family (plugins/frames/channels.ts explains the split). Everything above is emitted in
+  // the renderer that caused it and means "something you were displaying is gone or moved". These
+  // arrive over the socket from the node and mean "something happened there you may want to act on",
+  // so they reach every window, not just the one that acted.
+  //
+  // The payload is empty on purpose and the contract is "go re-read". The socket is an invalidation
+  // channel with no replay, so a delta would be wrong for a client that missed a frame
+  // (@acorn/protocol/ws.ts).
+  'tasks:changed': Record<string, never>
 }
 
 type Listener<T> = (payload: T) => void

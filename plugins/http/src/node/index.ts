@@ -1,5 +1,7 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
+import { WORKFLOW_STEP_KIND } from '@acorn/plugin-workflows/contract/extensions.ts'
 import { createHttpFetch } from '../server/routes/http'
+import { httpStepHandler, validateHttpStep } from './workflowStep'
 
 // http ships as a loaded plugin, so both host seams here are the manifest-bound ones
 // (docs/data-layer.md § Plugin databases; docs/http-client.md):
@@ -18,5 +20,14 @@ export const httpPlugin = (): NodePlugin => ({
   init: (ctx) => {
     const db = ctx.storage.open()
     ctx.routes.fetch(createHttpFetch(db, ctx.core), { prefix: '', note: '/projects/:projectId/*' })
+    // The `http:request` workflow step (./workflowStep.ts). Contributed rather than granted: workflows
+    // opens the point and any plugin may fill it, so this needs no special case in that package.
+    //
+    // Nothing happens on a node with workflows disabled — the point is never opened, so the entry is
+    // never read — and nothing here throws if workflows inits after this plugin does.
+    ctx.extensionPoints.contribute(WORKFLOW_STEP_KIND, {
+      id: 'request',
+      value: { handler: httpStepHandler(db, ctx.core, ctx.audit.record), validate: validateHttpStep },
+    })
   },
 })

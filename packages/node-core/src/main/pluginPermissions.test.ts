@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
 import { CapabilityRegistry, capabilityId } from '../server/plugin/capabilities'
+import { AGENTS_HARNESS_REGISTRY } from '../server/plugin/harnesses'
+import { WORKTREE_CREATED } from './taskWorktree'
 import type { CoreServices } from './core'
 import { pluginManifestSchema, type NodePermissions } from './pluginManifest'
-import { scopeCapabilities, scopeCore } from './pluginPermissions'
+import { HOST_OWNED_CAPABILITY_IDS, scopeCapabilities, scopeCore } from './pluginPermissions'
 
 // A stand-in CoreServices: this module only picks properties off the object, so identity is all the
 // assertions need and building a real one would drag a database in for nothing.
@@ -159,25 +161,51 @@ describe('scopeCapabilities', () => {
   }
 
   it('reads an undeclared capability as absent, exactly like a disabled provider', () => {
-    const scoped = scopeCapabilities(registry(), ['test.greet'])
+    const scoped = scopeCapabilities(registry(), ['test.greet'], 'test')
     expect(scoped.get(greet)?.()).toBe('hi')
     expect(scoped.get(other)).toBeUndefined()
   })
 
   it('throws from require for an undeclared id, because that is a bug in the plugin', () => {
-    const scoped = scopeCapabilities(registry(), ['test.greet'])
+    const scoped = scopeCapabilities(registry(), ['test.greet'], 'test')
     expect(() => scoped.require(greet)).not.toThrow()
     expect(() => scoped.require(other)).toThrow(/Required capability/)
   })
 
   it('enumerates only what was declared', () => {
-    expect(scopeCapabilities(registry(), ['test.greet']).ids()).toEqual(['test.greet'])
+    expect(scopeCapabilities(registry(), ['test.greet'], 'test').ids()).toEqual(['test.greet'])
   })
 
   it('still lets the plugin publish its own capability', () => {
     const real = registry()
     const mine = capabilityId<() => string>('test.mine')
-    scopeCapabilities(real, []).provide(mine, () => 'mine')
+    scopeCapabilities(real, [], 'test').provide(mine, () => 'mine')
     expect(real.get(mine)?.()).toBe('mine')
+  })
+
+  it('refuses a capability id outside the plugin\'s own namespace', () => {
+    // The squat this closes: a package called anything at all providing `github.mirror` while the real
+    // github plugin is disabled, and the composition root resolving the impostor.
+    const real = registry()
+    const squat = capabilityId<() => string>('github.mirror')
+    expect(() => scopeCapabilities(real, [], 'ntfy').provide(squat, () => 'stolen')).toThrow(/may only provide/)
+    expect(real.get(squat)).toBeUndefined()
+    // Prefix, not substring: 'github-mirror' must not pass for the 'github' namespace either.
+    expect(() => scopeCapabilities(real, [], 'git').provide(squat, () => 'stolen')).toThrow(/may only provide/)
+  })
+
+  it('lets any plugin fill the two host-declared hooks', () => {
+    // These are invitations rather than property: whichever plugin owns worktree side-effects or agent
+    // sessions on this node fills them (docs/plugins.md § Collaboration rules).
+    const real = registry()
+    for (const id of HOST_OWNED_CAPABILITY_IDS) {
+      expect(() => scopeCapabilities(real, [], 'ntfy').provide(capabilityId(id), () => 'ok')).not.toThrow()
+    }
+  })
+
+  it('names the same two host hooks the host actually declares', () => {
+    // A literal list is only safe if something checks it. Renaming either constant fails here rather
+    // than quietly turning an invitation into a refusal at the next boot.
+    expect([...HOST_OWNED_CAPABILITY_IDS].sort()).toEqual([AGENTS_HARNESS_REGISTRY, WORKTREE_CREATED].sort())
   })
 })

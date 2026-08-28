@@ -49,8 +49,7 @@
       "changes.agent-file-tool"
     ],
     "schedules": [
-      "docker.task-containers",
-      "workflows.triggers"
+      "docker.task-containers"
     ],
     "railMarkers": [
       "agents",
@@ -191,9 +190,6 @@
       ],
       "paletteRows": [
         "workflows.defs"
-      ],
-      "schedules": [
-        "workflows.triggers"
       ]
     }
   }

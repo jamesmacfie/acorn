@@ -288,14 +288,16 @@ describe('architecture boundaries', () => {
       '@acorn/node-core/main',
       '@acorn/node-core/main/core',
       '@acorn/node-core/server',
-      '@acorn/node-core/server/db',
       '@acorn/node-core/server/integrations',
       '@acorn/node-core/server/middleware',
       '@acorn/node-core/server/routes',
-      '@acorn/node-core/testkit',
     ]
-    // 167 across 48 files the day before the testkit landed; 147 across 37 once the first eleven moved.
-    const MAX_DEEP_IMPORTS = 147
+    // 167 across 48 files the day before the testkit landed; 147 across 37 once the first eleven moved;
+    // 110 across 36 once the three roots the facade already re-exported were swapped for it
+    // (docs/future/phased-review-steps/phase-3-plugin-api-integrity.md item 3.11). Two whole roots left
+    // the list in that batch, which is the shape the exit condition wants: a root disappears, it does
+    // not shrink.
+    const MAX_DEEP_IMPORTS = 110
     const rootOf = (spec: string): string => {
       const pkg = spec.startsWith('@acorn/node-core/') ? '@acorn/node-core/' : '@acorn/client-core/'
       const parts = spec.slice(pkg.length).split('/')

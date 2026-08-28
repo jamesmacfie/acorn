@@ -1,6 +1,8 @@
 import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/main/pluginInstaller.ts'
 import { installedPluginInfo, readClientBundle, scanInstalled } from '@acorn/node-core/main/pluginLoader.ts'
 import { createPluginReloader } from '@acorn/node-core/main/pluginReload.ts'
+import { cascadeDeletePluginData } from '@acorn/node-core/server/db/cascade.ts'
+import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { PluginsBridge } from '@acorn/node-core/server/plugin/pluginState.ts'
 import type { PluginHostResult, PluginRosterEntry } from '@acorn/node-core/server/plugin/host.ts'
 import type { PluginLoadFailure } from '@acorn/node-core/main/pluginLoader.ts'
@@ -24,6 +26,9 @@ export const effectiveDisabled =
 
 export type PluginStateInput = {
   dataDir: string
+  // For the purge half of an uninstall: the prefs rows a plugin's frames wrote and the schedule state
+  // its manifest declared both live in the core database, not in the plugin's own file.
+  db: AppDatabase
   // What the plugin host assembled in this process, and at which versions. The roster needs
   // closures, not snapshots, because a plugin's state can move after the roots capture it.
   roster(): readonly PluginRosterEntry[]
@@ -61,7 +66,14 @@ export function buildPluginStateBridge(input: PluginStateInput): PluginsBridge {
     setDisabled: input.setDisabled,
     install: (source, options) => installPlugin(dataDir, source, options),
     update: (id, options) => updatePlugin(dataDir, id, options),
-    uninstall: (id, options) => uninstallPlugin(dataDir, id, options),
+    // Two halves, in this order: the package leaves disk, then the core database drops what the plugin
+    // owned there. Disk first because a failure after it still leaves the plugin gone, where the reverse
+    // leaves a running plugin whose state has been deleted underneath it.
+    uninstall: async (id, options) => {
+      const result = uninstallPlugin(dataDir, id, options)
+      if (options.purgeData) await cascadeDeletePluginData(input.db, id)
+      return result
+    },
     reload: (id) => reloader.reload(id),
   }
 }

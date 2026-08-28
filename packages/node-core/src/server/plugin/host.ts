@@ -16,6 +16,10 @@ import type { CapabilityRegistry } from './capabilities'
 import { buildPluginContext, revokePluginContext, type LoadedPluginBinding } from './context'
 import { clearCollectionReads } from '../collections/registry'
 import { clearNodeActions } from '../nodeActions/registry'
+import { clearNodeProviders } from '../nodeProviders/registry'
+import { clearRunSources } from '../runs/registry'
+import { clearExtensionPoints } from './extensionPoints'
+import { clearAuditActions } from '../audit'
 import { resolveInRoot } from '../../main/core/filesystem/confinement'
 import { dispatchPluginRoute } from './dispatch'
 import type { ManifestHarnessSpawn } from './harnesses'
@@ -204,6 +208,12 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   }
 
+  // The same for audit verbs (../audit.ts). Nothing to dispatch and no env needed: the declaration is
+  // the whole contribution, and `ctx.audit.record` is refused for anything not in it.
+  const registerManifestAuditActions = (ctx: NodePluginContext, binding?: LoadedPluginBinding): void => {
+    for (const descriptor of binding?.auditActions ?? []) ctx.audit.declare(descriptor)
+  }
+
   // The same for collections (../collections/registry.ts): a manifest declares an `items` route per
   // collection, and the node-side read registry maps `(pluginId, collectionId)` to it. No env needed,
   // because registering a pointer costs nothing.
@@ -327,6 +337,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     registerManifestHarnesses(ctx, plugin.name, loaded)
     registerManifestCollections(ctx, loaded)
     registerManifestNodeActions(ctx, loaded)
+    registerManifestAuditActions(ctx, loaded)
     // A failing init fails the boot, because every plugin here is first-party code in the same binary.
     // The plugins that already initialized are torn down first: each holds a WAL-mode SQLite handle and
     // the composition root's catch releases the data-root lock. The caller cannot do it, because it
@@ -458,6 +469,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       registerManifestHarnesses(candidateCtx, name, next.binding)
       registerManifestCollections(candidateCtx, next.binding)
       registerManifestNodeActions(candidateCtx, next.binding)
+      registerManifestAuditActions(candidateCtx, next.binding)
       await next.plugin.init(candidateCtx)
     } catch (error) {
       // Nothing to roll back. The buffer was never replayed, so the previous instance is still serving,
@@ -564,6 +576,15 @@ export function clearRegistrations(name: string): void {
   // leaves the sampler dispatching at a namespace nothing serves.
   clearCollectionReads(name)
   clearNodeActions(name)
+  // A run source is a pointer at a route this call just removed, same as a collection read.
+  clearRunSources(name)
+  // The declarations go; the rows they describe stay. A verb whose plugin is gone renders as its raw
+  // qualified string in the settings list, which is the honest answer — the row is still evidence of
+  // something that happened.
+  clearAuditActions(name)
+  // Both halves of the node's many-to-many seam: the points this plugin opened and the entries it
+  // filed into other plugins' points (./extensionPoints.ts).
+  clearExtensionPoints(name)
   // A task check is a live closure over this plugin's context, asked at archive time, long after a
   // re-init has replaced the instance behind it.
   clearTaskChecks(name)
@@ -573,6 +594,9 @@ export function clearRegistrations(name: string): void {
   modelProviderRegistry.removeForPlugin(name)
   integrationProviderRegistry.removeForPlugin(name)
   connectionProviderRegistry.removeForPlugin(name)
+  // A node provider holds a closure over this plugin's context and, for a cloud one, its credential
+  // scope. A survivor would keep listing nodes through an instance whose dispose has already run.
+  clearNodeProviders(name)
 }
 
 // Reverse order, because a later plugin may depend on an earlier one's resources. Never rejects: one

@@ -1,6 +1,7 @@
 import { memorySection, type NodePlugin } from '@acorn/plugin-api/node'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_SEND_TO_AGENT } from '@acorn/plugin-terminal/contract/sendToAgent.ts'
+import { WORKFLOWS_NOTICES } from '@acorn/plugin-workflows/contract/notices.ts'
 import { memoryAgentTools } from '../main/agentTools'
 import { registerKnowledgeIpc, type KnowledgeDeps } from '../main/knowledgeIpc'
 import { MEMORY_KNOWLEDGE } from '../contract/knowledge'
@@ -45,7 +46,13 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
       // doesn't degrade: notes is a `required` plugin, and a notes pane that silently answered "no notes"
       // because a capability was missing would look exactly like data loss.
       const notes = () => ctx.capabilities.require(NOTES_STORE)
-      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { sendToAgent, notes, notice: ctx.events.notice })
+      // workflows.notices, resolved at call time like the two above. The bell used to be a member of
+      // `ctx.events`; it belongs to the plugin whose vocabulary it speaks (docs/plugins.md §
+      // Collaboration rules). Degrades to a drop: with workflows disabled there is no run panel to send
+      // a reviewer to, and proposals still wait in the memory pane.
+      const notice: KnowledgeDeps['notice'] = (taskId, kind, title) =>
+        ctx.capabilities.get(WORKFLOWS_NOTICES)?.notice(taskId, kind, title)
+      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { sendToAgent, notes, notice })
       // The SQLite table is a derived index. Rebuild it once after migration so a fresh node has a warm
       // index and the project checkout and task-worktree source set is exercised at startup.
       await runtime.reconciled()

@@ -21,7 +21,7 @@ import { ToastHost } from '@acorn/client-core/notifications/ToastHost.tsx'
 import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/tasks/tasks.ts'
 import { isTerminalTarget } from '@acorn/client-core/lib/isTypingTarget.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
-import { hostCapabilities } from '@acorn/client-core/hostCapabilities.ts'
+import { hasHostCapability } from '@acorn/client-core/hostCapabilities.ts'
 import { desktopExtras } from '@acorn/client-core/platform/index.ts'
 import NodeGate from '@acorn/client-core/node/NodeGate.tsx'
 import NodeChip from '@acorn/client-core/node/NodeChip.tsx'
@@ -168,9 +168,9 @@ export default function App() {
 
   // Track terminal sessions globally (independent of the drawer) so the tab rail and the topbar
   // badge can show agent-working activity. No-op when the node does not run the terminal plugin
-  // (hostCapabilities()); the surfaces are ordinary HTTP+WS, so the hosting shell has no say in it.
+  // (hasHostCapability); the surfaces are ordinary HTTP+WS, so the hosting shell has no say in it.
   onMount(() => {
-    if (!hostCapabilities().terminal) return
+    if (!hasHostCapability({ plugin: 'terminal' })) return
     onCleanup(initSessions())
     onCleanup(startClientSchedules())
     onCleanup(initWorkflowNotices())

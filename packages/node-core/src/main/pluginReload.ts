@@ -44,14 +44,16 @@ export function createPluginReloader(options: {
         plugin: entry.plugin,
         // The manifest contributions the host synthesises registrations from, alongside permissions
         // and storage. A reload that dropped them would take away the plugin's schedules, checks,
-        // collections, and harnesses until the next boot.
+        // collections, audit verbs, and harnesses until the next boot.
         binding: {
           permissions: entry.manifest.permissions.node,
+          events: entry.manifest.permissions.events,
           storage: entry.storage,
           schedules: entry.manifest.contributions.schedules,
           collections: entry.manifest.contributions.collections,
           commands: entry.manifest.contributions.commands,
           taskChecks: entry.manifest.contributions.taskChecks,
+        auditActions: entry.manifest.contributions.auditActions,
           harnesses: entry.manifest.contributions.harnesses,
           dir: entry.dir,
         },

@@ -3,7 +3,7 @@ import { cpSync, existsSync, lstatSync, readdirSync, readFileSync, renameSync, r
 import { join, relative } from 'node:path'
 import { resolveInRoot } from './core/filesystem/confinement'
 import { pluginDir, pluginInstallRoot, sweepDebris } from './pluginInstaller'
-import { PLUGIN_API_MAJOR, readPluginManifestResult, type PluginManifest } from './pluginManifest'
+import { PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type PluginManifest } from './pluginManifest'
 import {
   markBundledPluginInstalled,
   markPluginUserManaged,
@@ -48,7 +48,7 @@ const packageManifest = (dir: string, expectedId: string): PluginManifest => {
   if (!read.ok) throw new Error(read.reason)
   const manifest = read.manifest
   if (manifest.id !== expectedId) throw new Error(`manifest id '${manifest.id}' does not match directory '${expectedId}'`)
-  if (manifest.apiVersion !== PLUGIN_API_MAJOR) {
+  if (!speaksApiVersion(manifest.apiVersion)) {
     throw new Error(`built for plugin API ${manifest.apiVersion}; this app speaks ${PLUGIN_API_MAJOR}`)
   }
   // A harness's adapter entry is a package-relative path acorn runs (docs/managed-agents.md §

@@ -1,0 +1,23 @@
+{
+  "name": "@acorn/plugin-nodes-file",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./node/index.ts": "./src/node/index.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

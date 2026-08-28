@@ -129,6 +129,22 @@ const RULES: readonly RouteRule[] = [
   // that could POST this would be re-arming a confirmation on the owner's behalf, which is the exact
   // act the arming rule exists to keep in a human's hands.
   { path: shape(`/v2/core/schedules/${SEG}/confirm`), scopes: {} },
+  // The control plane this node is attached to (docs/node-enrollment.md). Unmappable in both
+  // directions: reading it names a control plane and the device row that vouches for it, and the DELETE
+  // would let a plugin frame cut a node off from whoever provisioned it.
+  { path: shape('/v2/core/attachment'), scopes: {}, note: 'Attachment is owner administration; the DELETE revokes a credential.' },
+  // Node providers (docs/plugins.md § Node providers). The sharpest entry added since the plugin-install
+  // routes below, and for the same reason: `adopt` hands over a durable credential for another machine,
+  // `create` spends the owner's money, and `destroy` is irreversible. The list is no better — it
+  // enumerates the owner's infrastructure. A plugin that wants to contribute nodes does it from its node
+  // half, where the owner accepted the package, never from a frame.
+  { path: shape('/v2/core/nodes'), scopes: {}, note: 'Enumerates the owner’s machines.' },
+  { path: shape('/v2/core/nodes/adopt'), scopes: {}, note: 'Hands over a durable credential for another machine.' },
+  { path: shape('/v2/core/nodes/create'), scopes: {}, note: 'Spends money and provisions a machine.' },
+  // The remaining verbs by shape rather than by name, so a fifth one added later is unmappable by
+  // default instead of unclassified. `destroy` is the sharpest: irreversible, on a machine that may
+  // hold the only copy of something.
+  { path: shape(`/v2/core/nodes/${SEG}`), scopes: {}, note: 'Every node lifecycle verb, including destroy.' },
   { path: shape('/v2/core/devices'), scopes: {}, note: 'Pairing administration.' },
   { path: shape(`/v2/core/devices/${SEG}`), scopes: {} },
   { path: shape('/v2/core/plugins'), scopes: {}, note: 'Which code a device runs is an owner decision, not a plugin one.' },

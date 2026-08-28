@@ -1,5 +1,6 @@
 import type { InstalledPluginRow, NodePluginRow, PluginContributions } from '@acorn/protocol/api.ts'
 import { isOverlaySurface, isProjectPaneSurface, isTaskPaneSurface } from '@acorn/protocol/pluginContract.ts'
+import { namespaceContributions } from './contributionIds'
 import { activeBundles, bundleAccepted, installedByNode } from './distribution'
 
 // Who may contribute, and what they declared: the shared identity-and-trust check both registration
@@ -42,10 +43,15 @@ export function eligiblePlugins(): EligiblePlugin[] {
     // No fallback to the row's own claimed hash (docs/plugins.md § One shared eligibility and trust
     // check explains why).
     const hash = winner && chosen.installed.client?.hash === winner.hash ? winner.hash : ''
+    // The one place a manifest's declared ids are bound to the plugin's own name (./contributionIds.ts).
+    // Here rather than at each registration site, so every consumer below reads one spelling: the
+    // registries, the `openPane` allowlist, the extension-point bindings and the content-link router all
+    // work off this object.
+    const installed = { ...chosen.installed, contributions: namespaceContributions(pluginId, chosen.installed.contributions) }
     eligible.push({
       pluginId,
-      row: chosen.row,
-      installed: chosen.installed,
+      row: { ...chosen.row, installed },
+      installed,
       hash,
       trusted: hash !== '' && bundleAccepted(pluginId, hash),
     })

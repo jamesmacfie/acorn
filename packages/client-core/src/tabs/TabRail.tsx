@@ -10,7 +10,7 @@ import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type 
 import { defaultSourceId } from '../registries/sources'
 import { projectPath } from '../registries/corePaths'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
-import { hostCapabilities } from '../hostCapabilities'
+import { hasHostCapability } from '../hostCapabilities'
 import { availableSources } from './sources'
 import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
@@ -301,7 +301,7 @@ export default function TabRail() {
   }
 
   async function archiveInner(w: Task, applyChecks: string[]) {
-    if (hostCapabilities().terminal) {
+    if (hasHostCapability({ plugin: 'terminal' })) {
       // `force`, matching the task pane's own archive. With no options, a dirty worktree came back
       // "uncommitted changes, confirm to discard" after the owner had already confirmed that on the
       // danger row.

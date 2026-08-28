@@ -168,6 +168,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       harnessRoute = ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, createHarnessRegistry())
 
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
+
+      // This plugin's sessions, for the merged run list core assembles (@acorn/protocol/runs.ts). A
+      // pointer at the route above; nothing here knows workflows is on the same list.
+      ctx.runs.register({ runs: '/v2/p/agents/runs' })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults — account-scoped provider usage, dispatch limits, and new-session defaults' })
 
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).

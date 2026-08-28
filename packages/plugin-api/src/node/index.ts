@@ -29,6 +29,12 @@ export type { TaskConcern } from '@acorn/node-core/server/plugin/taskChecks.ts'
 export { PLUGIN_API_MAJOR } from '@acorn/node-core/main/pluginManifest.ts'
 export { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
 export type { Disposable } from '@acorn/node-core/server/plugin/capabilities.ts'
+// The many-provider seam beside capabilities (docs/plugins.md § Cooperative extension points). Only
+// the id minter and the entry type: `open`, `contribute` and `entries` arrive on
+// `ctx.extensionPoints`, and a plugin that imported the registry directly would get its own copy of
+// the maps, since a loaded bundle inlines every @acorn/* import it makes.
+export { extensionPointId } from '@acorn/node-core/server/plugin/extensionPoints.ts'
+export type { Extension, ExtensionPointId } from '@acorn/node-core/server/plugin/extensionPoints.ts'
 // The managed agent harness seam (docs/managed-agents.md § Harnesses). The capability id and its
 // shape live in node-core rather than in the agents plugin, because the host delivers a
 // manifest-declared harness and neither package may import the other.
@@ -57,7 +63,7 @@ export type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
 // The type only; the object arrives on `ctx.core`, and a plugin never constructs one or deep-imports
 // the implementation. See docs/plugins.md § The plugin API for why `ProjectRef` and `TaskRef` are
 // projections rather than the drizzle row.
-export type { CoreServices, ProjectRef, TaskRef, GenerateTextRequest, ModelService } from '@acorn/node-core/main/core/index.ts'
+export type { CoreFsService, CoreGitService, CoreProcService, CoreServices, ProjectRef, TaskRef, GenerateTextRequest, ModelService } from '@acorn/node-core/main/core/index.ts'
 export { SecretUnavailableError } from '@acorn/node-core/main/core/secrets.ts'
 export type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 export type { PrefService } from '@acorn/node-core/main/core/prefs.ts'
@@ -128,3 +134,8 @@ export { providerError } from '@acorn/node-core/server/integrations/respondProvi
 export { providerRequestScheduler } from '@acorn/node-core/server/integrations/budgetRuntime.ts'
 export { defaultBudgets, externalIdsFor, publicConnectionProvider, publicProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
 export type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders/types.ts'
+// The node-provider contract (docs/plugins.md § Node providers). Types only: the provider arrives on
+// `ctx.providers.nodes`, and a plugin that imported the registry directly would get its own copy of
+// the map, since a loaded bundle inlines every @acorn/* import it makes. `ProvidedNode` and its state
+// enum live in @acorn/protocol, which a plugin already depends on.
+export type { NodeProviderContribution, NodeSpec, ProvidedNodeRecord } from '@acorn/node-core/server/nodeProviders/registry.ts'

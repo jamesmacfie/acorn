@@ -1,14 +1,28 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
 import { parsePluginManifest } from '@acorn/node-core/main/pluginManifest.ts'
 // @ts-expect-error: the scaffold is published standalone with zero dependencies, so it's plain
 // JavaScript with no declarations. This suite is the only thing in the repository that imports it.
-import { API_VERSION, scaffoldFiles, toPluginId } from './index.mjs'
+import { API_VERSION, SCHEMA_URL, scaffoldFiles, toPluginId } from './index.mjs'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+const PACKAGES = join(HERE, '..')
+const REPO = join(PACKAGES, '..')
+
+// tsc and @types/node, resolved out of the workspace store so the out-of-repo check below needs no
+// network. Both are pnpm-shaped paths, which is the one thing about this test that is not portable.
+const TSC = join(PACKAGES, 'protocol', 'node_modules', '.bin', 'tsc')
+const NODE_TYPES = (() => {
+  const store = join(REPO, 'node_modules', '.pnpm')
+  const entry = readdirSync(store).find((name) => /^@types\+node@/.test(name))
+  if (!entry) throw new Error('@types/node is not in the pnpm store')
+  return join(store, entry, 'node_modules')
+})()
 
 // The scaffold is a copy of the authoring contract living outside the repository's reach: nothing
 // a reader of packages/protocol would think to grep finds it, and a stranger's first plugin is
@@ -19,6 +33,13 @@ it('writes the api major this node actually demands', () => {
   // The one number a manifest must match by exact string comparison. A `failed` roster row on every
   // scaffolded plugin is the failure mode this prevents.
   expect(API_VERSION).toBe(PLUGIN_API_MAJOR)
+})
+
+it('points $schema at the schema this repository actually publishes', () => {
+  // The other hardcoded copy, for the same reason as API_VERSION. A stale URL is worse than none: the
+  // author's editor validates against a contract that is no longer the host's and says nothing.
+  const generated = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../plugin-types/acorn-plugin.schema.json'), 'utf8'))
+  expect(SCHEMA_URL).toBe(generated.$id)
 })
 
 it('emits a manifest the host parses, cross-field rules and all', () => {
@@ -63,4 +84,62 @@ it('refuses a name with no usable id in it', () => {
   // instead of writing a directory that can never install.
   expect(toPluginId('2fast')).toBe(null)
   expect(toPluginId('!!!')).toBe(null)
+})
+
+it("type-checks its node half against the published declarations, from outside this repository", () => {
+  // The acceptance test for `acorn-plugin-types`, and the only one that runs the way a stranger does:
+  // a scaffolded directory somewhere else on disk, resolving the package by name out of its own
+  // node_modules, with `checkJs` and `strict` on and library checking NOT skipped.
+  //
+  // Everything else about the types package is asserted from inside the workspace, where the
+  // declarations resolve by path and the repo's own compiler options apply. Neither of those is true
+  // for the person this package exists for. What this catches: a JSDoc annotation the scaffold writes
+  // that names a type the package does not export, and a declaration file that needs something the
+  // package never told anyone to install.
+  const dir = mkdtempSync(join(tmpdir(), 'scaffold-types-'))
+  try {
+    const files = scaffoldFiles('my-widget') as Record<string, string>
+    for (const [path, contents] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true })
+      writeFileSync(join(dir, path), contents)
+    }
+
+    // The published artifact, not the source: `dist/index.d.ts` is what npm would deliver, and the
+    // build that produces it is one `cp`.
+    const types = join(dir, 'node_modules', 'acorn-plugin-types')
+    mkdirSync(join(types, 'dist'), { recursive: true })
+    copyFileSync(join(PACKAGES, 'plugin-types', 'src', 'public.ts'), join(types, 'dist', 'index.d.ts'))
+    copyFileSync(join(PACKAGES, 'plugin-types', 'package.json'), join(types, 'package.json'))
+
+    writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        target: 'ES2023',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        lib: ['ES2023'],
+        // The declared peer, and the reason it is declared: without it the package's own
+        // `NodeJS.Signals` is an error in a file the author never wrote.
+        types: ['node'],
+        allowJs: true,
+        checkJs: true,
+        noEmit: true,
+        strict: true,
+        skipLibCheck: false,
+      },
+      include: ['node'],
+    }))
+    // Resolved out of the workspace store rather than installed, so this test needs no network. The
+    // whole directory, dereferenced, because @types/node has a dependency of its own and a copy of the
+    // symlink pnpm leaves behind would point outside the temp tree.
+    cpSync(NODE_TYPES, join(dir, 'node_modules'), { recursive: true, dereference: true })
+
+    try {
+      execFileSync(TSC, ['--noEmit'], { cwd: dir, stdio: 'pipe' })
+    } catch (error) {
+      // tsc reports on stdout, so the default message ("Command failed") says nothing at all.
+      throw new Error(String((error as { stdout?: Buffer }).stdout ?? error))
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

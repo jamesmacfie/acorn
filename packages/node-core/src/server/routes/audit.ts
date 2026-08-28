@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { readAudit } from '../audit'
+import { auditVocabulary, readAudit } from '../audit'
 import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
 
@@ -30,5 +30,11 @@ export const audit = new Hono<AppEnv>().get('/', async (c) => {
     // The cursor for the next page, or null at the end. Computed here so the client never has to know
     // that the cursor is a timestamp; it can stay an opaque token if paging ever changes shape.
     nextBefore: entries.length > 0 ? entries[entries.length - 1].at : null,
+    // Every verb the running plugins declared, with the label each chose (server/audit.ts). It rides
+    // along on the page rather than taking a route of its own because the only consumer is the list
+    // below it and the two are always read together; twenty label strings per page is cheaper than a
+    // second round trip. Core's own verbs are not here — they are a closed union compiled into the
+    // client too, so it already knows them.
+    vocabulary: auditVocabulary().map((entry) => ({ action: entry.action, label: entry.label })),
   })
 })

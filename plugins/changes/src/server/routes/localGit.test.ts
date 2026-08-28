@@ -7,12 +7,11 @@ import { Hono } from 'hono'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { localGitBridge } from '../../main/localGit'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
+import { makeTestDb, schema, type TestDb } from '@acorn/plugin-api/testkit'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { onServerError } from '@acorn/node-core/server/respond.ts'
 import { localGit, setLocalGitBridge } from './localGit'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 
 // Wiring test over a real git worktree: working-tree status, a stage mutation, auth, body validation,

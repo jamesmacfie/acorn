@@ -12,13 +12,44 @@ import { createTaskService, type TaskService } from './tasks/service'
 import { createProjectService, type ProjectService } from './projects'
 import type { CapabilityRegistry } from '../../server/plugin/capabilities'
 
+// The three module-shaped facets, named rather than left as `typeof <module>`.
+//
+// `typeof fs` meant the plugin API, and the `fs` permission grant, widened by whatever anyone happened
+// to export from the module next — with no line in the surface snapshot and no review. Named here, an
+// added export reaches plugins only when someone adds it below too. The declarations are held to the
+// modules by the `satisfies` assertions in createCoreServices.
+export type CoreFsService = {
+  isContainedPath: typeof fs.isContainedPath
+  isValidRepoIdent: typeof fs.isValidRepoIdent
+  resolveInRoot: typeof fs.resolveInRoot
+  confineExistingFile: typeof fs.confineExistingFile
+}
+
+export type CoreGitService = {
+  GIT_MAX_OUTPUT_BYTES: typeof git.GIT_MAX_OUTPUT_BYTES
+  GIT_TIMEOUT_MS: typeof git.GIT_TIMEOUT_MS
+  git: typeof git.git
+  gitOrThrow: typeof git.gitOrThrow
+  gitText: typeof git.gitText
+}
+
+export type CoreProcService = {
+  DEFAULT_MAX_OUTPUT_BYTES: typeof proc.DEFAULT_MAX_OUTPUT_BYTES
+  DEFAULT_TIMEOUT_MS: typeof proc.DEFAULT_TIMEOUT_MS
+  KILL_GRACE_MS: typeof proc.KILL_GRACE_MS
+  brokerEnv: typeof proc.brokerEnv
+  runProcess: typeof proc.runProcess
+  runProcessOrThrow: typeof proc.runProcessOrThrow
+  ProcessError: typeof proc.ProcessError
+}
+
 export type CoreServices = {
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
-  fs: typeof fs
+  fs: CoreFsService
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
-  git: typeof git
+  git: CoreGitService
   // Every child process: env allowlist, process-group kill, bounded capture.
-  proc: typeof proc
+  proc: CoreProcService
   // Use-scoped credential access; scrubs the plaintext out of anything thrown from its scope.
   secrets: SecretService
   // Resolve a taskId against core-owned task tables for callers that hold only a task reference. What
@@ -51,9 +82,11 @@ export function createCoreServices(options: {
   capabilities?: Pick<CapabilityRegistry, 'get'>
 }): CoreServices {
   return {
-    fs,
-    git,
-    proc,
+    // `satisfies`, not a bare reference: it is what makes the named facets above a projection of the
+    // real modules rather than a second declaration that can drift off them.
+    fs: fs satisfies CoreFsService,
+    git: git satisfies CoreGitService,
+    proc: proc satisfies CoreProcService,
     secrets: options.secrets,
     tasks: createTaskService(options.db, options.capabilities),
     context: createContextService(options.db),

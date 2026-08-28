@@ -2,7 +2,7 @@
 // class alone owns validation, ordering, persistence, branching, cancellation, and reconciliation.
 import { randomUUID } from 'node:crypto'
 import { asc, eq, inArray } from 'drizzle-orm'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID, type HeadlessOpts, type HeadlessResult, type PluginDatabase, type StreamEvent } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, DEFAULT_PROFILE_ID, type Extension, type ExtensionPointId, type HeadlessOpts, type HeadlessResult, type PluginDatabase, type StreamEvent } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type {
   StepHandlerContext,
@@ -13,15 +13,15 @@ import type {
   WorkflowRunRow,
   WorkflowStepDef,
   WorkflowStepRow,
-  WorkflowTriggerContribution,
-} from './workflowContracts'
-import { WorkflowContributionRegistry } from './workflowRegistry'
-import { MAX_FAN_OUT_TASKS, MAX_STEP_TURNS, registerBuiltinWorkflowContributions } from './workflowBuiltins'
+} from '../contract/workflowContracts'
+import type { PolicyEvaluator, StepKindContribution } from '../contract/workflowContracts'
+import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
+import { MAX_FAN_OUT_TASKS, MAX_STEP_TURNS, buildBuiltinWorkflowContributions } from './workflowBuiltins'
 import { Semaphore } from './workflowSemaphore'
 import { intersectToolCeilings } from './workflowTools'
 import { assertValidWorkflow, normalizePersistedWorkflow, renderWorkflowPrompt, type WorkflowValidationCatalog } from './workflowValidation'
 
-export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from './workflowContracts'
+export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from '../contract/workflowContracts'
 
 export type FanOutTaskSeed = { title: string; branch: string; prompt?: string }
 export type RunStepOptions = HeadlessOpts & {
@@ -114,8 +114,20 @@ const persistedUsage = (rows: WorkflowStepRow[]): {
   }
 }, { costUsd: 0, inputTokens: 0, outputTokens: 0 })
 
+// The half of `ctx.extensionPoints` the runner needs: what other plugins have delivered into this
+// plugin's three points. Structural rather than the context member itself, so a test can hand the
+// runner a literal and so nothing here reaches for a registry a loaded bundle would inline a copy of.
+export type WorkflowExtensions = {
+  entries<T>(point: ExtensionPointId<T>): readonly Extension<T>[]
+}
+
+const NO_EXTENSIONS: WorkflowExtensions = { entries: () => [] }
+
 export class WorkflowRunner {
-  readonly contributions = new WorkflowContributionRegistry()
+  // This plugin's own kinds and policies, addressed as bare words. Everything another plugin adds is
+  // qualified and comes from the extension points (../contract/extensions.ts).
+  readonly #builtins: { stepKinds: Map<string, StepKindContribution>; policies: Map<string, PolicyEvaluator> }
+  readonly #extensions: WorkflowExtensions
   readonly #activeRuns = new Set<string>()
   readonly #activeHandlers = new Map<string, Map<string, AbortController>>()
 
@@ -138,8 +150,10 @@ export class WorkflowRunner {
   constructor(
     private readonly db: PluginDatabase,
     private readonly deps: RunnerDeps,
+    extensions: WorkflowExtensions = NO_EXTENSIONS,
   ) {
-    registerBuiltinWorkflowContributions(this.contributions, {
+    this.#extensions = extensions
+    this.#builtins = buildBuiltinWorkflowContributions({
       db: this.db,
       deps: this.deps,
       runHeadless: (taskId, def, opts, ctx) => this.runHeadless(taskId, def, opts, ctx),
@@ -149,16 +163,30 @@ export class WorkflowRunner {
       registerActive: (runId, stepId, controller) => this.registerActive(runId, stepId, controller),
       unregisterActive: (runId, stepId) => this.unregisterActive(runId, stepId),
       changed: () => this.changed(),
+      policy: (id) => this.#policy(id),
     })
+  }
+
+  /** A step kind or policy by the name a workflow file writes: a bare word for a built-in, the
+   *  host-minted `<pluginId>:<entryId>` for anything contributed. Resolved per call, never cached,
+   *  because the plugin that fills the point may init after this one does. */
+  #stepKind(kind: string): StepKindContribution | undefined {
+    return this.#builtins.stepKinds.get(kind)
+      ?? this.#extensions.entries(WORKFLOW_STEP_KIND).find((entry) => entry.id === kind)?.value
+  }
+
+  #policy(policy: string): PolicyEvaluator | undefined {
+    return this.#builtins.policies.get(policy)
+      ?? this.#extensions.entries(WORKFLOW_POLICY).find((entry) => entry.id === policy)?.value
   }
 
   validationCatalog(): WorkflowValidationCatalog {
     return {
-      stepKinds: new Set(this.contributions.stepKinds.ids()),
-      policies: new Set(this.contributions.policies.ids()),
+      stepKinds: new Set([...this.#builtins.stepKinds.keys(), ...this.#extensions.entries(WORKFLOW_STEP_KIND).map((entry) => entry.id)]),
+      policies: new Set([...this.#builtins.policies.keys(), ...this.#extensions.entries(WORKFLOW_POLICY).map((entry) => entry.id)]),
       profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
       structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
-      validateStepKind: (kind, step, context) => this.contributions.stepKinds.get(kind)?.validate?.(step, context) ?? [],
+      validateStepKind: (kind, step, context) => this.#stepKind(kind)?.validate?.(step, context) ?? [],
     }
   }
 
@@ -166,16 +194,14 @@ export class WorkflowRunner {
     assertValidWorkflow(def, this.validationCatalog())
   }
 
-  registerTrigger(trigger: WorkflowTriggerContribution): () => void {
-    return this.contributions.registerTrigger(trigger)
-  }
-
+  /** One sweep of every registered trigger. Clocked by the node's scheduler, not by a client
+   *  (plugins/workflows/src/node/index.ts), so a due trigger fires on a node nobody is looking at. */
   async pollTriggers(): Promise<{ started: number; errors: string[] }> {
     let started = 0
     const errors: string[] = []
-    for (const trigger of this.contributions.triggers.values()) {
+    for (const trigger of this.#extensions.entries(WORKFLOW_TRIGGER)) {
       try {
-        for (const match of await trigger.evaluate()) {
+        for (const match of await trigger.value.evaluate()) {
           await this.start(match.taskId, match.workflow, { trigger: trigger.id })
           started += 1
         }
@@ -326,7 +352,7 @@ export class WorkflowRunner {
     workflow: WorkflowDef,
     rows: WorkflowStepRow[],
   ): Promise<'continue' | 'stop'> {
-    const handler = this.contributions.stepKinds.get(def.kind ?? 'agent')?.handler
+    const handler = this.#stepKind(def.kind ?? 'agent')?.handler
     if (!handler) {
       await this.finishRun(run, 'failed', `Step '${def.name}' has unknown kind '${def.kind}'.`)
       return 'stop'

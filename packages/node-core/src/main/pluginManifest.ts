@@ -20,11 +20,13 @@ import type { z } from 'zod'
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
+import { NODE_CORE_FACETS } from './pluginPermissions'
 import {
   isOverlaySurface,
   isProjectPaneSurface,
   isTaskPaneSurface,
   pluginManifestShape,
+  CONTRIBUTION_KINDS,
   type PluginChromeAction,
 } from '@acorn/protocol/pluginContract.ts'
 
@@ -32,10 +34,11 @@ import {
 // themselves live in @acorn/protocol: the node uses them to decide what to load, the client to decide
 // which of a fleet's bundles it can run (client-core/plugins/resolveBundles.ts), and one compatibility
 // contract cannot live on one side.
-export { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
+export { PLUGIN_API_MAJOR, speaksApiVersion } from '@acorn/protocol/pluginApiVersion.ts'
 export type {
   NodePermissions,
   PluginAgentContextDescriptor,
+  PluginAuditActionDescriptor,
   PluginChromeAction,
   PluginClientRouteDescriptor,
   PluginCollectionDescriptor,
@@ -461,7 +464,48 @@ export const MANIFEST_FILE = 'acorn-plugin.json'
 // paragraph through the roster row and the attention bell.
 const MAX_REPORTED_ISSUES = 3
 
-export type PluginManifestResult = { ok: true; manifest: PluginManifest } | { ok: false; reason: string }
+// What the manifest declared that this build has no meaning for: an unknown top-level key, an unknown
+// contribution kind, an unknown `permissions.node.core` facet.
+//
+// The forward-compatibility rule, written once in docs/plugins.md § Forward compatibility: **unknown is
+// retained and reported, never dropped silently.** Zod strips an unknown key and scopeCore skips an
+// unknown facet, both correctly — refusing them would make a manifest written for the next acorn fail to
+// load on this one, which is exactly the trap `apiVersion` used to be. What was wrong is that neither
+// said so, so an author whose key never took effect had nothing to read.
+//
+// Collected by comparing the raw JSON with what came back out, rather than by introspecting the schema.
+// One line, no key list to keep in step, and it stays correct as the contract grows.
+export type ManifestUnknown = readonly string[]
+
+export type PluginManifestResult =
+  | { ok: true; manifest: PluginManifest; unknown: ManifestUnknown }
+  | { ok: false; reason: string }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const droppedKeys = (raw: unknown, kept: object, prefix: string): string[] =>
+  isRecord(raw) ? Object.keys(raw).filter((key) => !(key in kept)).map((key) => `${prefix}${key}`) : []
+
+function unknownIn(json: unknown, manifest: PluginManifest): string[] {
+  if (!isRecord(json)) return []
+  const contributions = isRecord(json.contributions) ? json.contributions : {}
+  const permissions = isRecord(json.permissions) ? json.permissions : {}
+  const node = isRecord(permissions.node) ? permissions.node : {}
+  return [
+    ...droppedKeys(json, manifest, ''),
+    // `contributions` is a loose object, so an unknown kind is retained rather than stripped and a key
+    // comparison against the parsed value would find nothing. The known list is the schema's own.
+    ...Object.keys(contributions).filter((kind) => !CONTRIBUTION_KINDS.includes(kind)).map((kind) => `contributions.${kind}`),
+    ...droppedKeys(permissions, manifest.permissions, 'permissions.'),
+    ...droppedKeys(node, manifest.permissions.node, 'permissions.node.'),
+    // The one case a key comparison cannot see: a facet is a string in an array, not a key, and
+    // scopeCore drops it on the way past.
+    ...manifest.permissions.node.core
+      .filter((facet) => !(NODE_CORE_FACETS as readonly string[]).includes(facet))
+      .map((facet) => `permissions.node.core: ${facet}`),
+  ]
+}
 
 /** The schema, run against an already-parsed object, with the issue paths kept.
  *
@@ -473,7 +517,7 @@ export type PluginManifestResult = { ok: true; manifest: PluginManifest } | { ok
  * `source` only names the file in the message; the rules are the same wherever the bytes came from. */
 export function parsePluginManifest(json: unknown, source: string = MANIFEST_FILE): PluginManifestResult {
   const parsed = pluginManifestSchema.safeParse(json)
-  if (parsed.success) return { ok: true, manifest: parsed.data }
+  if (parsed.success) return { ok: true, manifest: parsed.data, unknown: unknownIn(json, parsed.data) }
   // `path + message`, which is the whole point: `contributions.commands[2].run: ...` tells an author which
   // line to open. A path-less issue (the schema's own cross-field refinements sometimes are) reads as the
   // bare message rather than as an empty prefix.

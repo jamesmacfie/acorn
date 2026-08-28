@@ -17,7 +17,7 @@ export const editorClientPlugin: ClientPlugin = {
     // opens over whatever is on screen and closes on pick. Its own keybinding registers when it
     // mounts.
     ctx.slots.register({
-      id: 'palette.files', slot: 'overlay', order: 20, requires: 'desktop', component: FilePalette,
+      id: 'palette.files', slot: 'overlay', order: 20, requires: { plugin: 'editor' }, component: FilePalette,
     })
     // The entry point that keeps searching from starting with "open the editor first"
     // (docs/panes.md § Contributions).
@@ -26,7 +26,7 @@ export const editorClientPlugin: ClientPlugin = {
       title: 'Find in files…',
       category: 'navigation',
       palette: true,
-      requires: 'desktop',
+      requires: { plugin: 'editor' },
       when: () => !!activeTaskId(),
       run: () => {
         const taskId = activeTaskId()
