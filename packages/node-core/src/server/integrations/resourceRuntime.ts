@@ -13,6 +13,8 @@ import { providerRequestScheduler } from './budgetRuntime'
 import { integrationProviderRegistry } from './registry'
 import type { MirroredResourceContribution, ProviderResourceContext } from './types'
 import { broadcastConnectionChanged } from '../../main/notify'
+import { wsBroadcast } from '../../main/wsHub'
+import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 
 const failure = (error: ProviderErrorCode, status: RouteFailure['status']): RouteResult<never> => ({
   ok: false,
@@ -75,11 +77,17 @@ export async function runProviderResource<TInput, TOutput>(args: {
         // The provider call runs inside the secret scope (docs/integrations.md § Provider
         // boundaries), so a credential echoed back in an error body is scrubbed before this failure
         // is logged or surfaced.
-        return await args.secrets.use(connection.authRef, `${connection.provider}: read ${resource.id}`, (secret) =>
+        const refreshed = await args.secrets.use(connection.authRef, `${connection.provider}: read ${resource.id}`, (secret) =>
           providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
             resource.refresh({ ...context(), secret }, args.input),
           ),
         )
+        // The provider's own `items-changed` verb (docs/future/events/plugin-events.md), sent from here
+        // because core owns the mirror write every provider converges on: one site instead of one per
+        // plugin, and a loaded provider never has to reach for `ctx.events` from inside a refresh.
+        // Once per refresh, not per row, so a list of two hundred items is one frame.
+        if (refreshed.ok) wsBroadcast({ channel: pluginChannel(provider.id, 'items-changed'), connectionId: connection.id })
+        return refreshed
       } catch (error) {
         if (!(error instanceof SecretUnavailableError)) throw error
         await args.db

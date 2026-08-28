@@ -1,6 +1,7 @@
 // Memory proposals (docs/notes-and-memory.md § Memory): agent memory_write never lands silently.
 // The human gate is the only path that writes a memory .md. Proposals are JSON files under
 // <dataDir>/memory-proposals/, visible, greppable, crash-safe, no schema.
+import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
@@ -46,7 +47,7 @@ const memoryProposalSchema = z
   .transform(({ repo: _repo, projectId, ...proposal }) => ({ ...proposal, projectId: projectId ?? null }))
 
 export class MemoryProposalStore {
-  constructor(private root: string) {
+  constructor(private root: string, private emit?: (frame: { channel: string } & Record<string, unknown>) => void) {
     mkdirSync(root, { recursive: true })
   }
 
@@ -72,6 +73,7 @@ export class MemoryProposalStore {
     if (!input.description.trim()) throw new Error('Description required.')
     const proposal: MemoryProposal = { ...input, flags: input.flags ?? [], id: randomUUID(), status: 'pending', createdAt: Date.now() }
     await this.atomicWrite(this.fileFor(proposal.id), proposal)
+    this.changed(proposal.taskId)
     return proposal
   }
 
@@ -107,6 +109,12 @@ export class MemoryProposalStore {
     if (!p) return null
     const next: MemoryProposal = { ...p, ...edited, status }
     await this.atomicWrite(this.fileFor(id), next)
+    this.changed(next.taskId)
     return next
+  }
+
+  /** `plugin:memory:proposals-changed`: a proposal was created or resolved; re-list. */
+  private changed(taskId: string): void {
+    this.emit?.({ channel: pluginChannel('memory', 'proposals-changed'), taskId })
   }
 }

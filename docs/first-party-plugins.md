@@ -2,7 +2,7 @@
 
 acorn has two plugin tiers. This document is about the first: the packages under `plugins/` that are
 registered in the Node or desktop composition, ship inside the binary, run in the shell's own realm,
-and are trusted like the rest of the app. Linear, rollbar and model-providers remain in the workspace as
+and are trusted like the rest of the app. Linear, rollbar, model-providers and nodes-file remain in the workspace as
 source for loaded packages and are not first-party at runtime. [plugins.md](./plugins.md) describes both tiers as they work, and `docs/security.md` holds the
 trust model behind the second one.
 
@@ -14,7 +14,7 @@ plugin genuinely first-party is using something a loaded plugin cannot be given.
 
 ## What a loaded plugin cannot have
 
-Five things, and every entry in the table below cites one of them.
+Six things, and every entry in the table below cites one of them.
 
 **A. WS stream and channel ownership** — `ctx.events.streams()` and `ctx.events.channel()`.
 Exactly one plugin may own the PTY stream handlers, and the WS hub's slots are module singletons.
@@ -90,6 +90,20 @@ component slots, and the generic `ctx.contribute(registry, entry)` escape hatch.
 functions or components. Some are inherently first-party (B); others simply have no declarative
 equivalent yet, which is a gap rather than a law — noted per row where that is the case.
 
+**F. Constructor arguments from the composition root** — the `NodePluginDeps` bag in
+`apps/node/src/server/plugins.ts`. A loaded plugin is activated by the loader from its manifest and
+is handed one thing, its `NodePluginContext`. It is never called with arguments, so anything the
+root passes positionally pins the plugin to the compiled tier no matter what else it uses. Four
+plugins take a dependency bag — **agents**, **notes**, **terminal**, and **workflows** — and three
+take the data root as a first argument — **agents**, **memory**, and **notes** — for the files they
+write outside SQLite.
+
+None of those five plugins is here *only* for reason F; every one of them already has an A, B, D or
+E beside its name. The reason is listed anyway so that this page, `docs/future/compiled-tier.md`'s
+census, and the composition root agree on the same set. If a row ever loses its other reasons, F is
+what is left to answer, and the answer is the same one `pluginDeps.ts` already names in a comment:
+invert the dependency the way agents and workflows did, or publish it as a capability.
+
 Two entries have come off this list, and both by the same route — the registry took functions, but
 its contract was already data-in/data-out, so a descriptor could carry it.
 
@@ -134,12 +148,12 @@ Ordered by how strong the first-party claim is.
 
 | Plugin | Why | Reason |
 | --- | --- | --- |
-| **terminal** | Owns the PTY stream handlers and a WS channel prefix — the transport itself. Also `required`, publishes seven capabilities (`TERMINAL_SESSIONS`, `RUN_TARGETS`, `WORKTREE_CREATED`, `TASK_CREATED`, …) that four other plugins consume, and contributes two component slots. It is the most privileged plugin in the tree. | A, B, D |
-| **agents** | `required`. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`, `AGENTS_HARNESS_REGISTRY`; owns the managed-agent session model that core's context assembler and the shell's transcript both read, and the harness seam that lets a loaded plugin add an agent as data (docs/managed-agents.md § Harnesses). `managedAgents.ts` is still in protocol because client-core's agent-tool renderer registry names it. | D, E |
+| **terminal** | Owns the PTY stream handlers and a WS channel prefix — the transport itself. Also `required`, publishes seven capabilities (`TERMINAL_SESSIONS`, `RUN_TARGETS`, `WORKTREE_CREATED`, `TASK_CREATED`, …) that four other plugins consume, and contributes two component slots. It is the most privileged plugin in the tree. | A, B, D, F |
+| **agents** | `required`. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`, `AGENTS_HARNESS_REGISTRY`; owns the managed-agent session model that core's context assembler and the shell's transcript both read, and the harness seam that lets a loaded plugin add an agent as data (docs/managed-agents.md § Harnesses). `managedAgents.ts` is still in protocol because client-core's agent-tool renderer registry names it. | D, E, F |
 | **docker** | Owns a WS channel prefix for container log and event streams. Its footer badge and rail slot are component contributions. | A, B |
 | **preview** | Its display lifecycle calls the host-owned webview service any plugin surface can use, and its node half owns the preview page rules the shell enforces, delivered over the service protocol. The browser agent tools left for `plugins/browser`, which drives a browser of the node's own. Supplying shell-enforced policy—not merely showing a page—is why preview remains first-party. | C |
-| **memory** | `required`. Publishes `KNOWLEDGE`/`MEMORY_KNOWLEDGE` and contributes two task-context sections that core's assembler depends on existing. | D |
-| **notes** | `required`. Publishes `NOTES_STORE` and `NOTES_SEED_TASK`, consumed by two other plugins; contributes a context section. `notes.ts` remains in protocol because `NoteLocation` is core's own task/workspace/global addressing scheme. | D |
+| **memory** | `required`. Publishes `KNOWLEDGE`/`MEMORY_KNOWLEDGE` and contributes two task-context sections that core's assembler depends on existing. | D, F |
+| **notes** | `required`. Publishes `NOTES_STORE` and `NOTES_SEED_TASK`, consumed by two other plugins; contributes a context section. `notes.ts` remains in protocol because `NoteLocation` is core's own task/workspace/global addressing scheme. | D, F |
 | **onboarding** | A component in the `overlay` slot: a full-screen first-run wizard, opened when the node is ready and has zero projects. Sandboxing the first-run experience behind a trust prompt for a plugin the user never installed is circular. | B, D |
 
 ### First-party for one specific reason
@@ -148,7 +162,7 @@ Ordered by how strong the first-party claim is.
 | --- | --- | --- |
 | **changes** | Contributes an **agent-tool renderer** — the component that draws its tool's calls inline in the agents transcript, dozens per screen, sharing the list's scroll and selection. Everything else about it (its SQLite file, its pane, its agent tool, `LOCAL_GIT`) is available to loaded plugins. | B |
 | **github** | Publishes `GITHUB_MIRROR`, and uses `ctx.contentLinks` for its content-link recognisers — which now have a manifest form, so this is a carrier difference rather than a privilege. Notably **not** `required` any more. The most-privileged-looking plugin in the tree is now among the closest to portable; what actually keeps it here is `GITHUB_MIRROR` having a consumer. | D |
-| **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability rather than UI. | D, E |
+| **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability rather than UI. | D, E, F |
 | **context** | Contributes a `persistedState` slice, which has no manifest form. Its `agentContexts` entry no longer counts — that has a descriptor now — but its `revision()` does: the composer reads it synchronously to key the automatic task-context snapshot, and a descriptor cannot answer synchronously. Small plugin, narrow reason. | E |
 
 ### First-party only by history
@@ -253,6 +267,17 @@ model adapters through `ctx.providers`, no client half, no tables, no capabiliti
 Build it with `pnpm --filter @acorn/node build:plugin model-providers`. Start here to see how small a
 plugin can be: a manifest with two egress hosts and an empty `contributions`, and 33 lines of node
 half.
+
+**nodes-file** — smaller than model-providers, and the only plugin here that contributes nodes rather
+than data. One registration through `ctx.providers.nodes`, a manifest that grants it nothing at all
+(`core: []`, `secrets: false`, `exec: false`, `net: []`), no routes, no tables, no client half. It reads
+nodes out of a JSON file named by `ACORN_NODES_FILE` and does nothing when that is unset. Build it with
+`pnpm --filter @acorn/node build:plugin nodes-file`.
+
+Read it for the acceptance argument rather than the feature: a first-party control-plane plugin gets no
+host privilege a third party lacks ([plugins.md](./plugins.md) § Node providers), and this is what
+"no privilege" looks like written down. It is not in the bundled roster, so a shipped install has no
+node providers at all.
 
 **rollbar** — the loaded reference integration. Its node half chooses the portable fetch carrier,
 and its client half is a sandbox bundle rather than a `ClientPlugin`. Build it with

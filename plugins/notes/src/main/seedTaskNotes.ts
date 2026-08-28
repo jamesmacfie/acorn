@@ -57,16 +57,21 @@ async function fetchJson<T>(url: string, token: string): Promise<T | null> {
 
 // Seed the PR + ticket notes for a freshly created task. Silent no-op when there's no PR/links or
 // the task was already seeded.
-export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesStoreCapability, internalApiEnv: Record<string, string>, task: SeedTask): Promise<void> {
+/** Resolves to whether anything was written, so the caller can announce the seeding once. */
+export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesStoreCapability, internalApiEnv: Record<string, string>, task: SeedTask): Promise<boolean> {
   const base = internalApiEnv.ACORN_API_URL
   const token = internalApiEnv.ACORN_API_TOKEN ?? ''
-  if (!base) return
+  if (!base) return false
   const location = { scope: 'task' as const, taskId: task.id }
   const existing = await notesStore.list(location)
-  if (existing.some((n) => n.originTaskId === task.id)) return
+  if (existing.some((n) => n.originTaskId === task.id)) return false
 
   // See docs/notes-and-memory.md § Notes for why these are stamped author 'workflow' kind 'scratch'.
-  const seed = (title: string, body: string) => notesStore.create(location, title, { author: 'workflow', kind: 'scratch', originTaskId: task.id, included: true, body })
+  let seeded = 0
+  const seed = async (title: string, body: string) => {
+    await notesStore.create(location, title, { author: 'workflow', kind: 'scratch', originTaskId: task.id, included: true, body })
+    seeded++
+  }
 
   const project = await core.projects.byId(task.projectId)
   if (task.pullNumber != null && project?.github) {
@@ -85,4 +90,5 @@ export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesSto
     const issue = await fetchJson<LinearDetail>(linearIssueSeedUrl(base, link), token)
     if (issue) await seed(`${issue.identifier}: ${issue.title ?? ''}`.trim(), issue.description?.trim() || '_(no description)_')
   }
+  return seeded > 0
 }

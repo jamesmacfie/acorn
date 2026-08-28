@@ -47,6 +47,8 @@ export type RunnerDeps = {
   failingChecks(taskId: string): Promise<string | null>
   notify(taskId: string, kind: 'gate' | 'run-done', title: string): void
   statusChanged?(): void
+  /** A run began or reached a terminal state. Per run, never per step (docs/future/events/refused.md). */
+  runChanged?(runId: string, status: string): void
   emitStepEvent?(runId: string, stepId: string, event: StreamEvent): void
   onRunTerminal?(taskId: string, runId: string): Promise<void>
   startRunTarget?(taskId: string, targetId: string): Promise<{ ok: boolean; url?: string }>
@@ -228,6 +230,7 @@ export class WorkflowRunner {
       createdAt: at,
       updatedAt: at,
     })
+    this.deps.runChanged?.(runId, 'running')
     for (const [idx, step] of def.steps.entries()) {
       await this.db.insert(schema.workflowSteps).values({
         id: randomUUID(),
@@ -531,6 +534,7 @@ export class WorkflowRunner {
     const current = await this.run(run.id)
     if (!current || TERMINAL_RUN.has(current.status)) return
     await this.setRun(run.id, { status, error: error ?? null })
+    this.deps.runChanged?.(run.id, status)
     await this.deps.finishHandoffs?.(run.taskId, run.id).catch(() => undefined)
     await this.deps.onRunTerminal?.(run.taskId, run.id).catch(() => undefined)
     if (status === 'done') this.deps.notify(run.taskId, 'run-done', `Workflow '${run.name}' finished`)

@@ -153,6 +153,12 @@ itself is broken, and marking it retryable would invite a client to hammer it.
 | `POST` | `/v2/core/plugins/requests/:requestId` | Answer an agent-raised install request (`approved`/`denied`) |
 | `GET` | `/v2/core/audit` | Read the retained audit trail |
 | `GET` | `/v2/core/security` | Read Node security posture |
+| `GET` | `/v2/core/attachment` | Which control plane this Node is attached to, if any |
+| `DELETE` | `/v2/core/attachment` | Detach: revoke the control plane's device row and forget it |
+| `GET` | `/v2/core/nodes` | Nodes this Node's plugins know about, plus which verbs each provider declared |
+| `POST` | `/v2/core/nodes/adopt` | Connection material and credential for one provided Node (host-only in practice) |
+| `POST` | `/v2/core/nodes/create` | Ask a provider for a new Node |
+| `POST` | `/v2/core/nodes/{destroy,start,stop}` | The three lifecycle verbs that name an existing Node |
 | `GET` | `/v2/core/backup` | Suggest a destination path for a backup |
 | `POST` | `/v2/core/backup` | Create a credential-scrubbed database archive |
 | `GET` | `/v2/core/schedules` | List every schedule on this node, plus the global pause flag |
@@ -344,8 +350,23 @@ host other than loopback adds nothing to the allowlist, because the client can a
 directly.
 
 A frame's channel is `<owner>:<verb>`, and the token before the first `:` is the registered prefix on
-both ends. Core owns three: `term:` (transport on both ends), `workflow:` (the notification bell's
-notices and step events), and `plugins:`. The one `plugins:` frame, `plugins:changed`, is the
-content-free ping the Node sends when it reloads a plugin's node half in place, covered by the dev
-loop in [the plugins doc](./plugins.md). The client re-reads the roster route rather than trusting a
-payload. Every other prefix belongs to the plugin that registered it.
+both ends. Core owns five, and every other prefix belongs to the plugin that registered it.
+
+`term:` is transport on both ends and `workflow:` carries the notification bell's notices and step
+events. The other three are the Node saying that something it owns has moved, and each is one frame:
+
+- `plugins:changed`, when a Node reloads a plugin's node half in place. See the dev loop in
+  [the plugins doc](./plugins.md).
+- `tasks:changed`, on every task write: create, patch, links, archive, cancel, and a project delete
+  taking its tasks with it.
+- `connection:changed`, on every write to a connection's status, including the demotions to
+  `needs-auth` that happen mid-request when a credential stops being readable.
+
+The first two are content-free, because the list behind each is a fetchable route and a payload would
+be a second projection to keep in step. `connection:changed` carries `integrationId`, `providerId`,
+and the new `status`, because every integration plugin hears it and most of them are looking at a
+different provider. The three fields let a listener drop the frame without a round trip, and the
+client still re-reads the route.
+
+All three are invalidation, not replay: a client that missed a frame is not owed a delta, which is why
+`status` is what the connection now is rather than what changed about it.

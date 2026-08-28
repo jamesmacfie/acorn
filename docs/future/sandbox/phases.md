@@ -15,14 +15,16 @@ step, not for building the largest piece first.
 The detail is in [api-gates.md](./api-gates.md). One or two lines each in
 `packages/node-core/src/server/index.ts`, matching the seven `requireDevice` mounts already there.
 
-- [ ] Gate `prefs` behind `requireDevice`. Highest priority: it re-locks the tool ceiling a rogue
+**Shipped 2026-08-28** in the security burn-down; `docs/security.md` owns it.
+
+- [x] Gate `prefs` behind `requireDevice`. Highest priority: it re-locks the tool ceiling a rogue
       agent can otherwise self-unlock.
-- [ ] Gate `projects` behind `requireDevice`. Closes host code execution via the project row's
+- [x] Gate `projects` behind `requireDevice`. Closes host code execution via the project row's
       scripts.
-- [ ] Gate `workspaces` behind `requireDevice`. Destructive, lower stakes.
-- [ ] Add a boundaries test asserting every `CORE_NAMESPACE` mount is device-gated, provider-gated,
-      task-scoped, or on a named task-reachable allowlist with a reason, modeled on the
-      `child_process` allowlist at `tools/arch/boundaries.test.ts:217`.
+- [x] Gate `workspaces` behind `requireDevice`. Destructive, lower stakes.
+- [x] A test asserting every `CORE_NAMESPACE` mount is device-gated, provider-gated, task-scoped, or
+      on a named task-reachable allowlist with a reason:
+      `packages/node-core/src/server/mountCoverage.test.ts`.
 
 **Acceptance.** A task-scoped internal token receives 403 on `PUT /v2/core/prefs`,
 `PUT /v2/core/projects/:id/config`, and workspace create/delete. The renderer, on a device principal,
@@ -35,10 +37,12 @@ is unaffected. The new test fails if a `requireUser`-only core route is added.
 Detail in [enterprise-policy.md](./enterprise-policy.md) § Trust the row. The belt behind phase 1's
 projects gate.
 
-- [ ] Extend `readRepoConfigSnapshot` (`packages/node-core/src/main/repoConfigTrust.ts:30`) to include
-      the project row's `setupScript`, `devScript`, `devRestartScript`, `teardownScript`, and
-      `dbUrlScript` in the hashed snapshot.
-- [ ] Update `docs/security.md` to say the untrusted input is repo config **and** the project row.
+**Shipped 2026-08-28.** `PROJECT_ROW_FIELDS` in `packages/node-core/src/main/repoConfigTrust.ts`
+folds the row's executable fields (and `runTargets`) into the hashed snapshot.
+
+- [x] Extend `readRepoConfigSnapshot` to include the project row's `setupScript`, `devScript`,
+      `devRestartScript`, `teardownScript`, and `dbUrlScript` in the hashed snapshot.
+- [x] `docs/security.md` says the untrusted input is repo config **and** the project row.
 
 **Acceptance.** Changing a project's `devScript` produces a `needs-trust` review before the script
 runs, the same way a changed `.acorn/config.toml` does.
@@ -89,9 +93,12 @@ byte-for-byte the un-governed path. Audit rows reach the configured OTLP endpoin
 
 ## Phase 5 — Plugin containment rung 2
 
-Detail in [enterprise-policy.md](./enterprise-policy.md) § The plugin containment rung, and the design
-in `docs/security.md` § Rung 2. This is a launch requirement for the enterprise offering, not a
-follow-up, because it is the first question a security review asks.
+The design is owned by `docs/security.md § The containment ladder`, rung 2, and the same work is
+gate 1 in [ecosystem/blockers.md](../ecosystem/blockers.md) and phase 2 in
+[ecosystem/work-plan.md](../ecosystem/work-plan.md). It is listed here, not restated, because it is a
+launch requirement for the enterprise offering rather than a follow-up: it is the first question a
+security review asks. [enterprise-policy.md](./enterprise-policy.md) § The plugin containment rung
+says what the managed layer adds on top.
 
 - [ ] Run each loaded plugin's node half as a child process holding a plugin-scoped internal token
       whose scope is its manifest, enforced in the auth middleware
@@ -111,7 +118,7 @@ Phase 1 ──▶ Phase 2
 Phase 4 ──▶ Phase 5 ┘
 ```
 
-Phase 1 gates everything: without it, phases 3 through 5 build on a boundary an agent walks around.
-Phases 3 and 4 are independent of each other. Phase 5 depends on phase 4's managed layer for its
+Phases 1 and 2 are shipped, so phases 3 through 5 no longer build on a boundary an agent walks
+around. Phases 3 and 4 are independent of each other. Phase 5 depends on phase 4's managed layer for its
 enforcement switch. The enterprise offering needs 1, 4, and 5 at minimum; 3 is the security
 centerpiece but a policy-only deployment on the `host` target is a coherent first sale.

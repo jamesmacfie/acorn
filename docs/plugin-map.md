@@ -61,7 +61,7 @@ Your plugin exports a `NodePlugin`: a `name`, an `init`, and optionally `ready`,
 | `collections` | Where a collection can be read with no client attached, so the dashboard sampler can ask the same question |
 | `taskChecks` | What you have to say when the owner archives a task, and the cleanup you can offer |
 | `contextSections` | One section of the task context an agent gets at launch |
-| `providers` | `integration`, `connection`, and `model` descriptors, plus `withConnection` for credential access outside a request |
+| `providers` | `integration`, `connection`, `model` and `nodes` descriptors, plus `withConnection` for credential access outside a request |
 | `capabilities` | `provide`, `get`, `require`, `ids`. The only late-binding seam between two node halves |
 | `storage` | `open()` returns your own SQLite handle. Absent unless you declared migrations |
 | `core` | Core services: see the table below |
@@ -159,13 +159,15 @@ node-environment test.
 
 ## Events
 
-The honest version first. Acorn has no cross-plugin event bus. `ctx.events` is a one-way invalidation
-channel from a node to the clients attached to it, with no subscribe side, no durability, no replay, and
-no delivery guarantee. Nothing in the node listens. A client that misses a frame refetches after the gap,
-and that is the whole contract. Durable history belongs in your own tables.
+The honest version first. Acorn has no cross-plugin event bus. `ctx.events` is an invalidation channel
+between a node and the clients attached to it: no durability, no replay, no delivery guarantee. A client
+that misses a frame refetches after the gap, and that is the whole contract. Durable history belongs in
+your own tables.
 
-Design work for real core events lives in [docs/future/events/](./future/events/README.md). None of it
-is built. Until it is, the four mechanisms below are what you have.
+There is a receive side now, and it is narrow: `ctx.events.on` hears the core events in
+`NODE_EVENT_CHANNELS`, on this node, whether or not a client is attached. Hearing *another plugin* is
+not built — that needs a producer's `emits` declaration, item 3 of
+[docs/future/events/](./future/events/README.md). Until then the mechanisms below are what you have.
 
 ### Broadcast to clients, from the node
 
@@ -173,11 +175,15 @@ is built. Until it is, the four mechanisms below are what you have.
 | --- | --- |
 | `ctx.events.status()` | The content-free ping. Every client re-pulls what it is showing |
 | `ctx.events.send(frame)` | Push one frame to every connected client. The hub skips task-confined sockets |
-| `ctx.events.notice(taskId, kind, title)` | Raise a `gate` or `run-done` entry in the notification bell |
 | `ctx.events.repoConfigTrustNotice(taskId)` | The one notice carrying an action: this repo's committed config needs review |
-| `ctx.events.stepEvent(runId, stepId, event)` | A workflow step event |
+| `ctx.events.on(event, listener)` | Hear a core event on this node. The event must be one `permissions.events` named |
 | `ctx.events.channel(prefix, handler)` | Claim a websocket channel prefix and receive client frames on it. Compiled plugins only |
 | `ctx.events.streams(handlers)` | The PTY stream handlers. Exactly one plugin may own these |
+
+The notification bell and the workflow step stream used to sit here too, as `ctx.events.notice` and
+`ctx.events.stepEvent`. They were one plugin's domain vocabulary on the surface every plugin receives,
+and they moved to the `workflows.notices` capability, where the rest of that plugin's cross-plugin
+surface already was.
 
 Prefer `status()` to `send()`. A payload a client can trust is a payload you have to keep correct
 across every reconnect and version skew, and re-reading costs one request.
@@ -249,6 +255,12 @@ if (!execute) return  // that plugin is disabled. Degrade, do not throw
 Use `get` by default and treat `undefined` as "that plugin is disabled". Use `require` only for the four
 plugins that cannot be disabled: agents, memory, notes, and terminal.
 
+An id you provide has to start with your own plugin id. That is enforced for a loaded plugin and is the
+convention for a compiled one; the two exceptions are `core.taskWorktreeCreated` and
+`agents.harnessRegistry`, which the host declares as invitations for whichever plugin owns worktree side
+effects or agent sessions. Every id the first-party plugins publish is catalogued, with its signature,
+as `CapabilityCatalogue` in `acorn-plugin-types`.
+
 Resolve at call time. Resolving during `init`, or in a component body that runs once, can cache
 `undefined` for no reason other than registration order, and a dropped feature looks like a backend
 problem for a day.
@@ -280,7 +292,7 @@ Pick by how long the message should live.
 | Call | Lifetime | Use it for |
 | --- | --- | --- |
 | `toast(message, { tone, durationMs })` | Seconds | "That worked." No actions, no buttons |
-| `ctx.events.notice(taskId, kind, title)` | Until read | Something happened while the user was elsewhere |
+| `capabilities.get(WORKFLOWS_NOTICES)?.notice(taskId, kind, title)` | Until read | Something happened while the user was elsewhere. `workflows.notices`, from `plugins/workflows/src/contract/notices.ts` |
 | `pushManagedAgentNotice({ taskId, sessionId, kind, title })` | Until read, plus an OS notification | An agent finished, needs input, or failed |
 | `ctx.attentionSources.register(source)` | Until resolved | A state on the node that needs the owner to act |
 | `bridge.ui.toast(title, detail)` | Seconds | The same, from inside a sandboxed frame |

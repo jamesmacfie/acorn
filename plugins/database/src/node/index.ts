@@ -20,7 +20,7 @@ export const databasePlugin = (): NodePlugin => ({
     // Opened and migrated before the listener binds. The route factory closes over the handle, so
     // there is no moment where a request can reach an unmigrated database.
     const db = ctx.storage.open()
-    ctx.routes.fetch(createDatabaseFetch(db, ctx.core, databaseBridge(ctx.core)), { prefix: '', note: '/tasks/:taskId/*' })
+    ctx.routes.fetch(createDatabaseFetch(db, ctx.core, databaseBridge(ctx.core, ctx.events.send), ctx.events.send), { prefix: '', note: '/tasks/:taskId/*' })
   },
   // One resource to release: the pg pools opened per task. The host closes this plugin's SQLite file
   // itself, right after this resolves and before the data root's lock drops.

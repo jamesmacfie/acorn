@@ -1,3 +1,4 @@
+import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { homedir } from 'node:os'
 import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.ts'
 import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
@@ -173,6 +174,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         failingChecks: deps.failingChecks,
         notify: notices.notice,
         statusChanged: ctx.events.status,
+        // `plugin:workflows:run-changed` (docs/future/events/plugin-events.md § workflows).
+        runChanged: (runId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), runId, status }),
         emitStepEvent: notices.stepEvent,
         onRunTerminal: async (taskId, runId) => {
           if (!deps.memoryReviewTrigger) return

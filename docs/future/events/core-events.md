@@ -36,6 +36,9 @@ runs, it just does not carry enough to notice.
 
 ## Task changed
 
+**Shipped 2026-08-28** as `tasks:changed` (`broadcastTasksChanged` in `main/notify.ts`; see
+[delivery.md](./delivery.md) § Work items). The entry stays as the record of the argument.
+
 `{ taskId }`, deliberately payload-free, so a dropped frame self-heals by re-reading.
 
 Less an addition than finishing what is half-built. It closes the stale-list defect
@@ -109,6 +112,8 @@ Whether those fold into this event or stay plugin-local is a payload question to
 ships; the managed-agent case is the one with blocked consumers today.
 
 ## Connection changed
+
+**Shipped 2026-08-28** as `connection:changed` in `NODE_EVENT_CHANNELS`, closing delivery defect 4.
 
 `{ integrationId, providerId, status }`, on create, rotate, test, disable, revoke, and — the one
 that matters — demotion to `needs-auth`.

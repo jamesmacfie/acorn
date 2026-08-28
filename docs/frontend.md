@@ -39,13 +39,40 @@ the first, `TaskSlotHost` the second, both over `uiSlotRegistry`. They were two 
 types until 2026-08-27, which cost a `ctx` member and a line in every contribution-kind list to express
 one difference.
 
-**Three gates, three names, three answers.** `requires` on a contribution is the platform question —
-is a desktop shell hosting this renderer, does this node run terminals — and it is answered by
-`hostCapabilities()` in `client-core/src/hostCapabilities.ts`. `when` is a free predicate the
+**Three gates, three names, three answers.** `requires` on a contribution is the host question, and it
+has two forms: `'desktop'` asks whether a desktop shell is hosting this renderer, and `{ plugin: id }`
+asks whether the node runs that plugin. An array means all of them. Both are answered by
+`hasHostCapability()` in `client-core/src/hostCapabilities.ts`. `when` is a free predicate the
 contribution supplies. A rail source's `requiresProvider` is a third question: given the integration
 behind `providerId` is connected, does it grant this capability. None of those is `ctx.capabilities`,
 which is a plugin publishing a typed function for another plugin to call. Two of the four were spelled
 with the word "capability" until 2026-08-27 and the fourth still is; the rename split them.
+
+The plugin half carried one hardcoded name, `terminal`, until 2026-08-28. A contribution could not say
+"needs docker" or "needs workflows" and could not require two things, so core named one plugin in a
+closed union and every other surface had to reach for `'desktop'` instead — which is why the audit
+below found fifteen gates asking the wrong question. `disabledNodePlugins()` already answered it for
+any id; the requirement now carries the id and core names no plugin.
+
+### The desktop gate audit
+
+`requires: 'desktop'` means "a cloud or web client will not have this surface at all", so each one is
+a hole in the headless story (the 2026-08-27 review programme's follow-up item 8; the programme's
+files are retired to git history, `git log --follow -- docs/future/phased-review-steps`). Every site
+was reviewed on 2026-08-28. **One survives.**
+
+| Site | Decision |
+| --- | --- |
+| `plugins/preview` task pane | **Kept.** A `WebContentsView` the shell positions over the renderer. No HTTP route behind it, nothing for a browser client to draw. |
+| `plugins/agents` pane and three settings pages | → `{ plugin: 'agents' }`. Managed sessions are `/v2` plus the shared WebSocket. |
+| `plugins/editor` pane, file palette, find-in-files command | → `{ plugin: 'editor' }`. File reads and ripgrep are routes. |
+| `plugins/terminal` settings page, and the four terminal commands in `TaskView` | → `{ plugin: 'terminal' }`. The drawer is a WebSocket stream, not a shell feature. |
+| `plugins/changes` pane | → `{ plugin: 'changes' }`. |
+| `plugins/notes` task pane | → `{ plugin: 'notes' }`. |
+| `plugins/workflows` settings page | → `{ plugin: 'workflows' }`. |
+| `tasks/taskStatus.ts` schedule | **Gate dropped.** `/v2/core/task-statuses` is a core route. It stays a *client* clock deliberately: it refreshes what a window is drawing, and nothing needs it when no window is open. |
+
+Adding a new `'desktop'` gate means writing a row here saying what only a shell can do.
 
 Which registries carry which gate follows a rule now, rather than from history. **Every contribution the
 host filters before drawing takes `requires`**, because the question is the host's and the answer is the
@@ -91,11 +118,18 @@ rather than the host inventing a query observer per rail button. One throwing co
 the rest of the control still draws.
 
 Several client registries (`slots.ts`, `railMarkers.ts`, `contextMenus.ts`, `extensionPoints.ts`, and
-`exclusiveSlots.ts`) hold no JSX import. The vitest suite for this package runs in a bare Node
-environment with no Solid transform, so a module that imports a `.tsx` file cannot be loaded by a test
-at all. Each of these registries keeps its rules (ordering, gates, resolution) in a plain module for
-that reason, and pairs it with a small `.tsx` host that only draws what the registry already decided,
-kept as thin as the job allows because that half can only be checked by looking at the running app.
+`exclusiveSlots.ts`) hold no JSX import. The `logic` half of this package's vitest suite runs in a bare
+Node environment with no Solid transform, so a module that imports a `.tsx` file cannot be loaded by a
+test in it at all. Each of these registries keeps its rules (ordering, gates, resolution) in a plain
+module for that reason, and pairs it with a small `.tsx` host that only draws what the registry already
+decided, kept as thin as the job allows.
+
+The hosts are no longer unchecked. A second vitest project, `hosts`, runs `.test.tsx` under jsdom with
+the Solid transform and renders all seven of them
+([testing.md § Test layers](./testing.md)). It answers "did the host draw it, and in what order", not
+"did it look right"; the pixels are still the smoke checklist's job. Keeping the rules in a JSX-free
+module is still the right shape, because a rule with a plain unit test is cheaper to reason about than
+the same rule inferred from a rendered tree.
 
 The shell imports no feature UI directly. `App.tsx`, `TaskView.tsx`, and `CommandPalette.tsx` consume
 registry entries and client-core contracts. A feature that needs native behavior goes through the

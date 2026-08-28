@@ -97,8 +97,8 @@ slots, the winner and why. Reads the same registries; adds no bridge verb.
   for steps; context's snapshot assembler; editor's save route).
 - `packages/client-core/src/plugins/chrome/ExtensionPointHost.tsx`: annotations and the developer
   view read here.
-- New `packages/client-core/src/plugins/annotations/*`, `plugins/tree/Slot.tsx`,
-  `plugins/tree/arbitration.ts`.
+- New `packages/client-core/src/plugins/annotations/*`, and a new
+  `packages/client-core/src/plugins/tree/` holding `Slot.tsx` and `arbitration.ts`.
 - `packages/client-core/src/plugins/frames/register.ts`: rectangle slots as sibling regions.
 - `packages/client-core/src/registries/exclusiveSlots.ts`: the picker generalised to `replace` ties.
 - `packages/client-core/src/plugins/permissions.ts`: trust copy.

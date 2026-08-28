@@ -1,6 +1,13 @@
 # API gates: the cheap wins a sandbox cannot make
 
-Part of [docs/future/sandbox/](./README.md). These are confirmed holes in the loopback API, each
+**Status: all three gates closed 2026-08-28**, in the security burn-down. `prefs`, `projects`, and
+`workspaces` are mounted behind `requireDevice` in `packages/node-core/src/server/index.ts`, and
+`packages/node-core/src/server/mountCoverage.test.ts` is the test this file asked for: every core
+mount is device-gated, provider-gated, task-scoped, or on a named allowlist. `docs/security.md`
+owns the behaviour. The file stays as the record of what the holes were and why the fixes were safe,
+because the argument recurs whenever a new core route is added.
+
+Part of [docs/future/sandbox/](./README.md). These were confirmed holes in the loopback API, each
 reachable by a `task`-scoped agent token, each closed by one or two lines in the same file and the
 same style as the seven gates already there. They come first in [phases.md](./phases.md) because a
 sandbox runs these escalations straight through: they travel over the loopback API on the token that

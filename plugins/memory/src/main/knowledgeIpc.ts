@@ -16,6 +16,8 @@ export type KnowledgeDeps = {
   sendToAgent(sessionId: string, text: string, submit: 'after-ready'): void
   notes(): NotesStoreCapability
   notice(taskId: string, kind: 'gate' | 'run-done', title: string): void
+  /** This plugin's own channel; the proposal store announces create and resolve on it. */
+  emit?(frame: { channel: string } & Record<string, unknown>): void
 }
 
 export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity'>
@@ -57,7 +59,7 @@ export function memoryReviewProfile(): ProfileDef | null {
 }
 
 export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
-  const proposals = new MemoryProposalStore(join(dataRoot, 'memory-proposals'))
+  const proposals = new MemoryProposalStore(join(dataRoot, 'memory-proposals'), deps.emit)
 
   const guard = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
     try {

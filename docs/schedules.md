@@ -3,8 +3,9 @@
 Periodic work owned by the node. One scheduler in the node process, three parties allowed to put work
 on it (core, plugins, and the user), and a budgeted vocabulary for saying when.
 
-The design and the remaining phases are in [`docs/future/cron/`](./future/cron/README.md). This file
-describes what is built.
+The design record that this file replaced was `docs/future/cron/`, retired once phase 1 shipped and
+recoverable with `git log -- docs/future/cron`. This file describes what is built, and what
+is not is under "Not built yet" at the end.
 
 ## Why the node, and only the node
 

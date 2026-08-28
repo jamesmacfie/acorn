@@ -113,7 +113,10 @@ const childWhere = (t: { userId: SQLiteColumn; repoId: SQLiteColumn; number: SQL
 // Atomically re-mirror one PR's detail composite: upsert the pull row, replace all child rows,
 // bump sync_state. Rows per insert are capped by the bound-parameter budget in db/batch.ts.
 // Runs in one db.batch; callers can fan these out in parallel across PRs.
-export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => {
+//
+// Reports whether the checks rows differ from what was mirrored before, so the caller can announce
+// `checks-changed` only when a check actually flipped rather than on every sync.
+export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number): Promise<{ checksChanged: boolean }> => {
   const pullRow = {
     ...key,
     nodeId: pr.id,
@@ -187,6 +190,10 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
     return chunkRowsByColumnBudget(rows as object[]).map((part) => db.insert(table).values(part as never))
   }
 
+  const before = await db.select({ name: checksTable.name, status: checksTable.status }).from(checksTable).where(childWhere(checksTable, key))
+  const signature = (rows: { name: string; status: string | null }[]) => rows.map((r) => `${r.name}=${r.status ?? ''}`).sort().join('\n')
+  const checksChanged = signature(before) !== signature(checkRows)
+
   const resource = prResource(key.repoId, key.number)
   await db.batch([
     db
@@ -215,6 +222,7 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number) => 
       .values({ userId: key.userId, resource, etag: null, fetchedAt: now })
       .onConflictDoUpdate({ target: [syncStateTable.userId, syncStateTable.resource], set: { fetchedAt: now } }),
   ])
+  return { checksChanged }
 }
 
 const toThread = (row: typeof reviewThreadsTable.$inferSelect) =>

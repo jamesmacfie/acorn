@@ -25,7 +25,7 @@ helpers have no callers.
   and `webview`.
 - `registries/agentToolRenderers` (the slot replaced it), `contextSectionSlots`, the non-footer
   component `slots` that became layouts or slots; the `taskSlots` and `UiSlotId` two-spelling table
-  the consistency review flagged.
+  the 2026-08-27 consistency review flagged (finding 2; the review is in git history).
 - `ui/focus.ts`, `lib/isTypingTarget.ts`, and any `onKeyDown` handler in a plugin outside inputs.
 - Every `.css` under `plugins/*/src`. Confirm with `find plugins -name '*.css' -path '*/src/*'`.
 - `CollapsibleSection` alias, `ListDetail` and `DocumentTabs` as exported nodes (they are layouts).

@@ -49,7 +49,7 @@ but no plugin uses it until phase 5).
 
 **Protocol.** As [06-remote-tree.md](./06-remote-tree.md) § The wire format. Props schemas are Zod,
 one per kit node, generated from the node's exported props type where a build step can, and
-hand-written where it cannot. The boundary rule from the review programme (Zod at wire boundaries)
+hand-written where it cannot. The repo's Zod-at-wire-boundaries arch rule (`tools/arch/boundaries.test.ts`)
 applies.
 
 **Renderer.** A `Map<id, { component, setProps }>` over Solid components; `insert` creates, `patch`
@@ -138,5 +138,5 @@ otherwise today's built-in card. changes registers its renderer both ways in thi
   `frame-src app-plugin:`.
 - `packages/plugin-sdk/src/public.ts` declares `mountFrame` and `connect`; confirm how the published
   package is built so `mountTree` ships the same way.
-- The Zod-at-boundaries arch rule from the review programme's phase 2 exists and will apply to the
+- The Zod-at-boundaries arch rule in `tools/arch/boundaries.test.ts` exists and will apply to the
   new protocol module.

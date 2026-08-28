@@ -8,6 +8,7 @@
 // http ships as a loaded plugin, so these routes run behind `portableCarrier`. A loaded bundle sits
 // outside the host's Hono stack, so the identity comes off the request context rather than
 // `owner(c)` or `c.get('principal')`.
+import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { Hono, type Context } from 'hono'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
@@ -183,7 +184,10 @@ const protectedRequestFields = async (d: z.infer<typeof requestBody>, secrets: S
   return { url, headers, body, auth, vars }
 }
 
-export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
+type Emit = (frame: { channel: string } & Record<string, unknown>) => void
+const savedRequestsChanged = (emit: Emit, projectId: string) => emit({ channel: pluginChannel('http', 'saved-requests-changed'), projectId })
+
+export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emit = () => {}) => {
   const secrets = core.secrets
   return new Hono<AppEnv>()
     // Device-only gate (docs/http-client.md § Sending): this pane can resolve stored credentials and
@@ -292,6 +296,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
         updatedAt: now(),
       }
       await db.insert(httpRequests).values(row)
+      savedRequestsChanged(emit, project.id)
       return c.json(await toRequest(row, secrets, project.id), 201)
     })
 
@@ -325,6 +330,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
         .where(and(inProject(userId, project.id), eq(httpRequests.id, c.req.param('id'))))
         .returning()
       if (!updated.length) return respondError(c, 404, 'not_found')
+      savedRequestsChanged(emit, project.id)
       return c.json(await toRequest(updated[0], secrets, project.id))
     })
 
@@ -338,6 +344,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
         .where(and(inProject(userId, project.id), eq(httpRequests.id, c.req.param('id'))))
         .returning({ id: httpRequests.id })
       if (!deleted.length) return respondError(c, 404, 'not_found')
+      savedRequestsChanged(emit, project.id)
       return c.body(null, 204)
     })
 
@@ -449,5 +456,5 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices) => {
 // The Hono routes over the portable carrier, the only way in. The bundle keeps its own Hono
 // (build-plugin.mjs inlines every non-builtin dependency), so a router instance can never cross the
 // contract. Only `router.fetch` does.
-export const createHttpFetch = (db: PluginDatabase, core: SendCoreServices): PluginFetchHandler =>
-  portableFetch(httpRoutes(db, core))
+export const createHttpFetch = (db: PluginDatabase, core: SendCoreServices, emit?: Emit): PluginFetchHandler =>
+  portableFetch(httpRoutes(db, core, emit))

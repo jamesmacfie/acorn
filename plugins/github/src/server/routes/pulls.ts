@@ -6,6 +6,7 @@ import type { ClosedPullsPage, Pull } from '../../contract/api'
 import { type AppEnv, type Cached, type CoreServices, ownerId, type PluginDatabase, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../syncPolicy'
 import { refreshOpenPulls } from './pullRefresh'
+import { type GithubEmit, NO_EMIT } from '../events'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { pullRequests, syncState } from '../../node/schema'
@@ -31,7 +32,7 @@ type GitHubPull = {
 
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
-export const pulls = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>) => new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => {
+export const pulls = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
@@ -82,7 +83,7 @@ export const pulls = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>) => 
     return { data: await readPublicRows(), fetchedAt: sync.fetchedAt }
   }
 
-  const refresh = () => refreshOpenPulls(token, db, core, { userId, repoId, owner, repo })
+  const refresh = () => refreshOpenPulls(token, db, core, { userId, repoId, owner, repo }, undefined, emit)
 
   const result = await serveThenRevalidate({
     resource,

@@ -12,7 +12,7 @@ plugins the way they like.
 
 The recorded decision it walks into: `docs/extensibility.md § Two tiers, permanently` declares an
 enumerated set of contributions first-party-only, forever — WebSocket stream/channel ownership,
-components rendered inside the shell's own tree, Electron main-process code. And explicitly: "the
+components rendered inside the shell's own tree, code that runs in the desktop shell process. And explicitly: "the
 second tier will not grow until it can do everything the first can" is *not* the plan. When a
 third-party plugin needs one of those, the recorded answer is review and adoption into
 first-party, not a wider sandbox.
@@ -42,9 +42,15 @@ produces exactly the right shape:
   the document surface, the terminal, the dashboard renderer — that plugins borrow through
   vendor-neutral contracts.
 - **Plugins own**: everything integration-shaped (GitHub, Linear, Rollbar, model providers),
-  data-shaped (collections feeding dashboards), and workflow-shaped. Five first-party plugins
+  data-shaped (collections feeding dashboards), and workflow-shaped. Six first-party plugins
   already live on the loaded tier; the direction is that the rest follow as each move exercises
   a real seam — never for tidiness (`docs/extensibility.md § Unexercised seams rot`).
+
+One line of the tier list moved on 2026-08-28. "Components rendered inside the shell's own tree" was
+the reason changes, memory, docker's chrome, and onboarding could never leave. The
+[layout programme](../layout/README.md) replaces that component with a remote component tree the
+host mounts from a closed kit, so the reason dissolves without the sandbox widening: code still does
+not cross, a tree of kit node names does. Stream ownership and shell-process code stay on the list.
 
 Call it what it is: **a fat, opinionated core with a plugin ecosystem around it** — closer to
 VS Code's actual shape than to its "everything is an extension" folklore. Users still get the
@@ -84,5 +90,7 @@ ships.
 
 Revisit the thin-shell letter only if rung-3 containment (OS-level sandboxing of plugin node
 halves) ships *and* a frame-tier successor exists that can serve worker-hungry, multi-megabyte
-surfaces without widening the trust story — both at once. Short of that, the fat-core shape is
+surfaces without widening the trust story — both at once. The remote component tree is not that
+successor: it serves component-shaped UI, and Monaco, xterm, and the webview stay host-owned or
+rectangles. Short of that, the fat-core shape is
 the honest end state, and roadmap language should say "shell" only in the composability sense.

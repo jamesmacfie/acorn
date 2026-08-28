@@ -5,7 +5,7 @@ client becomes a trusted client for that Node by pairing and then presents a dev
 request.
 
 The implementation is in `packages/node-core/src/server/auth/`, the pairing routes, and the desktop
-broker files under `apps/desktop/src/app/main/`.
+broker in `apps/desktop/src/shell/` with its Rust half in `apps/desktop/src-tauri/src/`.
 
 ## Principals
 

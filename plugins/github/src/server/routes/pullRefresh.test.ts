@@ -4,8 +4,8 @@ import { patchBlobKey } from '@acorn/node-core/server/blobs.ts'
 import { filesResource, prResource, pullsResource } from '../resourceKeys'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
-import type { GqlPull } from './prMirror'
-import { refreshOpenPulls, refreshPullWithFiles } from './pullRefresh'
+import { mirrorPr, type GqlPull } from './prMirror'
+import { announcePrSynced, refreshOpenPulls, refreshPullWithFiles } from './pullRefresh'
 import { checks, comments, prFiles, pullRequests, syncState } from '../../node/schema'
 
 const USER = 'octocat'
@@ -126,6 +126,26 @@ describe('shared pull refresh operations', () => {
     // two SQLite files cannot. The ordering test below covers what replaced that guarantee.
     expect((await core.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1')))[0].pullNumber).toBe(5)
     expect((await plugin.db.select().from(syncState).where(eq(syncState.resource, pullsResource(REPO_ID, 'open'))))[0].etag).toBe('"open-v2"')
+  })
+
+  // `checks-changed` is the verb a consumer alerts on, so it must track the checks rows and not the
+  // sync itself: a re-mirror that changes nothing announces `pr-synced` alone.
+  it('reports a checks change only when the mirrored check rows differ', async () => {
+    const withCheck = (status: string): GqlPull => ({
+      ...gqlPull,
+      latestCommit: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [{ __typename: 'CheckRun', name: 'ci', status: 'COMPLETED', conclusion: status, detailsUrl: null, checkSuite: null }] } } } }] },
+    })
+    const prKey = { userId: USER, repoId: REPO_ID, number: 5 }
+    expect(await mirrorPr(plugin.db, prKey, withCheck('SUCCESS'), 1)).toEqual({ checksChanged: true })
+    expect(await mirrorPr(plugin.db, prKey, withCheck('SUCCESS'), 2)).toEqual({ checksChanged: false })
+    expect(await mirrorPr(plugin.db, prKey, withCheck('FAILURE'), 3)).toEqual({ checksChanged: true })
+
+    const emit = vi.fn()
+    announcePrSynced(emit, { ...key, number: 5 }, 'abc123', false)
+    expect(emit.mock.calls.map(([verb]) => verb)).toEqual(['pr-synced'])
+    announcePrSynced(emit, { ...key, number: 5 }, 'abc123', true)
+    expect(emit.mock.calls.map(([verb]) => verb)).toEqual(['pr-synced', 'pr-synced', 'checks-changed'])
+    expect(emit.mock.calls[2][1]).toEqual({ repoOwner: 'acme', repoName: 'web', pullNumber: 5, headSha: 'abc123' })
   })
 
   // The guarantee that replaced "it was all one transaction": adoption runs only after the mirror

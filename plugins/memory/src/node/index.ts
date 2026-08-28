@@ -52,7 +52,7 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
       // a reviewer to, and proposals still wait in the memory pane.
       const notice: KnowledgeDeps['notice'] = (taskId, kind, title) =>
         ctx.capabilities.get(WORKFLOWS_NOTICES)?.notice(taskId, kind, title)
-      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { sendToAgent, notes, notice })
+      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { sendToAgent, notes, notice, emit: ctx.events.send })
       // The SQLite table is a derived index. Rebuild it once after migration so a fresh node has a warm
       // index and the project checkout and task-worktree source set is exercised at startup.
       await runtime.reconciled()

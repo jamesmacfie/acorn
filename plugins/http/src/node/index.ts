@@ -19,7 +19,7 @@ export const httpPlugin = (): NodePlugin => ({
   name: 'http',
   init: (ctx) => {
     const db = ctx.storage.open()
-    ctx.routes.fetch(createHttpFetch(db, ctx.core), { prefix: '', note: '/projects/:projectId/*' })
+    ctx.routes.fetch(createHttpFetch(db, ctx.core, ctx.events.send), { prefix: '', note: '/projects/:projectId/*' })
     // The `http:request` workflow step (./workflowStep.ts). Contributed rather than granted: workflows
     // opens the point and any plugin may fill it, so this needs no special case in that package.
     //

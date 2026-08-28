@@ -13,9 +13,14 @@ export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalE
   name: 'notes',
   required: true,
   init: (ctx) => {
-    const store = new NotesStore(join(dataDir, 'notes'))
+    const store = new NotesStore(join(dataDir, 'notes'), ctx.events.send)
     ctx.capabilities.provide(NOTES_STORE, store)
-    ctx.capabilities.provide(NOTES_SEED_TASK, (task) => seedTaskNotes(ctx.core, store, deps.internalEnv({ scope: 'service' }), task))
+    // Seeding writes several notes in a row. It goes through a silent handle over the same directory
+    // and announces once at the end, so a consumer hears one `notes-changed`, not one per note.
+    const silent = new NotesStore(join(dataDir, 'notes'))
+    ctx.capabilities.provide(NOTES_SEED_TASK, async (task) => {
+      if (await seedTaskNotes(ctx.core, silent, deps.internalEnv({ scope: 'service' }), task)) store.changed({ scope: 'task', taskId: task.id })
+    })
     ctx.routes.register(notes, { prefix: '', note: 'notes CRUD' })
     // notes_list, notes_read, notes_write and notes_append, over the same store the pane and the context
     // assembler read. An agent appending a finding and the human reading it are looking at one file.

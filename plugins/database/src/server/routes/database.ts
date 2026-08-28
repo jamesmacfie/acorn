@@ -8,6 +8,7 @@
 // argument, so a fake is injectable without a global registry.
 //
 // SQL-injection posture is main/database.ts's: docs/data-layer.md § Database plugin: the Postgres pane.
+import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
@@ -79,7 +80,9 @@ const rowToQuery = (r: SavedRow): DbSavedQuery => ({ id: r.id, name: r.name, not
 
 export type DatabaseRouteServices = Pick<CoreServices, 'tasks' | 'models' | 'projects'>
 
-export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge) => {
+type Emit = (frame: { channel: string } & Record<string, unknown>) => void
+
+export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge, emit: Emit = () => {}) => {
   // Saved queries are project-scoped but addressed through the task, like everything else in this
   // pane. The frame holds the task and core resolves its project without a cross-file join.
   const taskOf = (taskId: string) => core.tasks.load(taskId)
@@ -216,6 +219,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
           set: { notes: row.notes, sql: row.sql, updatedAt: now },
         })
         .returning()
+      emit({ channel: pluginChannel('database', 'saved-queries-changed'), projectId: project.id })
       return c.json(rowToQuery(saved))
     })
     .delete('/tasks/:taskId/queries/:queryId', async (c) => {
@@ -224,6 +228,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       const project = t.projectId ? await projectOf(t) : null
       if (!project) return c.json({ ok: true })
       await db.delete(dbSavedQueries).where(and(eq(dbSavedQueries.id, c.req.param('queryId')), projectScope(project.id)))
+      emit({ channel: pluginChannel('database', 'saved-queries-changed'), projectId: project.id })
       return c.json({ ok: true })
     })
 
@@ -285,5 +290,5 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
 
 /** The portable carrier. A Hono instance cannot cross a process boundary and a (Request) → Response
  * function can, so this is what `ctx.routes.fetch` is handed. */
-export const createDatabaseFetch = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge): PluginFetchHandler =>
-  portableFetch(databaseRoutes(db, core, bridge))
+export const createDatabaseFetch = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge, emit?: Emit): PluginFetchHandler =>
+  portableFetch(databaseRoutes(db, core, bridge, emit))

@@ -84,6 +84,13 @@ and node-scoped caches already assume N.
 
 ## Mobile
 
+Decided 2026-08-28 while planning [docs/future/layout/](./layout/README.md): mobile is a PWA, not a
+native app, and the layout programme is what makes the subset shell cheap. Every pane declares one of
+six host-owned layouts, each with a narrow projection written before it lands, so responsiveness is
+paid once per layout rather than once per pane; `formFactor` stays on surfaces so a desktop-shaped
+rectangle is hidden rather than mangled. What this file says about auth, serving, TLS, and the relay
+is unchanged and is not the layout programme's business.
+
 The web client, responsive, PWA first. Home-screen install; iOS supports PWA push since 16.4.
 Wrap in Capacitor only if app-store presence or push reliability forces it; a native rewrite is
 not justified by the use case. Two mobile-specific facts that shape the design:

@@ -30,6 +30,16 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
 ## Test layers
 
 - protocol tests validate Zod contracts, route builders, query keys, errors, and service messages;
+- the client-core suite is two vitest projects, split by file extension so a host test sits beside the
+  host it renders. `logic` is `.test.ts` in bare Node with no Solid transform, which is what the whole
+  suite used to be, and a green run there still says nothing about the UI. `hosts` is `.test.tsx`
+  under jsdom with `vite-plugin-solid`, and it renders the seven contribution hosts: `SlotHost` and
+  `TaskSlotHost`, `RefPanelHost`, `ContextMenuHost`, `TaskPaneHost`, `ExtensionPointHost`, and
+  `ExclusiveSlotHost`. Hosts rather than individual panes, because ordering, capability gating,
+  arbitration and the error boundaries all live in the hosts and every plugin's UI rides on them. It
+  checks machinery, not pixels: a contribution under test renders a `<span>` carrying its own id. The
+  smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
+  any of these;
 - Node-core tests cover data roots, TLS, auth, pairing, idempotency, migrations, backups, audit,
   worktrees, process/filesystem guards, routes, and WebSocket behavior;
 - plugin tests cover schemas, providers, route behavior, reconciliation, and client models using
@@ -38,7 +48,19 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   testkit resolves a plugin's migration chain from its id — `makeTestPluginDb('github')` and
   `makeTestNodeContext({ plugin })` find `plugins/<id>/migrations` themselves;
 - architecture tests scan the package graph for forbidden imports, undeclared dependencies, cycles,
-  shell-binding leakage, protocol impurity, and non-contract plugin edges;
+  shell-binding leakage, protocol impurity, non-contract plugin edges, and route files that cast a
+  request body instead of parsing it;
+- the documentation checker (`tools/arch/docPaths.test.ts`) runs with the architecture tests and
+  reads `docs/` rather than the code. A repo-rooted path in backticks has to resolve, and so does
+  every relative link between two docs. It skips a path with no file extension, because a directory
+  moves for reasons that are not rot; it skipped `docs/reviews/` while that folder existed, because a
+  review is dated evidence and editing one to make a path resolve would falsify it (the reviews were
+  retired to git history on 2026-08-28 once every finding had an owner); and it skips a path whose own line says
+  the file is gone or not yet arrived, which is how the design and phase files already wrote them
+  ("deleted and `schedules.ts` added", "moved to …", "(new; exact placement may change)", "in git
+  history").
+  A path that names a live file and a line that admits a dead one both pass; a stale citation does
+  not;
 - loadability tests EXECUTE the two rules that keep the workspace bootable, because a rule about
   whether something loads is honestly checked only by loading it:
   `packages/plugin-api/src/entrypoints.test.ts` imports every node-safe facade entrypoint in a
@@ -106,6 +128,44 @@ build, and nothing ships to a person until it passes (docs/shell.md § Signing g
    command under `Enforced`, and after approving it the agent appears in the Agent Center and completes
    a turn. Nothing automated can cover this one: the suites can prove the descriptor reaches the driver
    registry, and only a real CLI can prove the transcript.
+10. Build the reference node provider into the running node's data root
+    (`pnpm --filter @acorn/node build:plugin nodes-file`, with `ACORN_NODES_FILE` set), write one
+    node into that file, and from Settings → Nodes adopt it, run a task on it, then create and destroy
+    one. Same reason as the item above: the route, provider and merge halves each have automated
+    coverage and the rendered surface has none ([plugins.md](./plugins.md) § Node providers).
+
+The next six items came from the user-extensions landing review (2026-08-15; they lived in a
+`live-qa` file under `docs/future` until 2026-08-28). Plugin suites run in a node environment with no Solid transform, so the
+chrome the extension work added has never been seen rendering by a test. Each names the behaviour to
+see, not the code to read:
+
+11. Right-click a surface with a plugin-declared context menu row; the menu appears at the pointer
+    and clamps to the viewport instead of overflowing at a screen edge.
+12. A plugin's declared `topbar` slot item renders at the topbar's right end, beside the node chip and
+    the bell, at a size that does not distort the bar.
+13. A contribution from plugin B renders inside plugin A's declared `pane.footer` point under a pane,
+    with sensible spacing, overflow, and empty state.
+14. Force a render throw in a plugin's `coreSlot` replacement; the surface falls back to core's own
+    implementation rather than going blank.
+15. Select a plugin-contributed theme; the terminal and Monaco pick up the right light or dark
+    self-description. Disable the plugin; the fallback to Light or Dark happens without the stored
+    preference being rewritten.
+16. Edit a dev-mode plugin's entry file; the swap lands without a restart or a trust prompt. Edit a
+    non-entry module; the one-module-deep limit surfaces as the restart hint, not silence.
+
+One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
+diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
+a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes
+`solarized-light` and `catppuccin-latte` tell xterm and Monaco they are dark while rendering light.
+The fix is two lines and changes shipped visual behaviour for users of those two themes; it belongs
+in its own change with its own note.
+
+The dashboards backlog keeps its own once-only verification pass in
+[docs/future/dashboards/README.md](./future/dashboards/README.md) § 0, because its items gate that
+folder's remaining work rather than a release.
+
+A worktree cannot run the app (no `.env`, and 4317 is the live instance), so run the whole checklist
+from the main checkout.
 
 ## Composition-root tests
 
@@ -153,6 +213,8 @@ Verified on a clean tree. If you see exactly these and nothing else, your change
   `pnpm rebuild:node` fixes the ABI class of failure; this one survives it.
 - `plugins/http/src/server/send.test.ts` fails one case comparing a temporary worktree path, a
   macOS `/var` against `/private/var` artefact of the test's own fixture.
+- `tools/arch`'s `docPaths` test reports broken citations in `docs/future/layout/`, which is an
+  untracked design folder in progress. Check `git status` before reading that one as your own.
 
 Also worth knowing before you read a red gate as your own: the root `lint` script is
 `oxlint && turbo run lint`, so an oxlint failure means `tsc --noEmit` never ran at all. Check
@@ -174,5 +236,9 @@ would otherwise pass. Regeneration is deliberate, behind an env flag, and the di
 The facade snapshot goes one step further, because its file is a published contract rather than an internal
 list: its first line records the `PLUGIN_API_MAJOR` it was written under, and `UPDATE_SURFACE=1` REFUSES to
 write a snapshot that has lost a name while that major is unchanged. Adding is free; removing has to move
-the number, which every plugin package pins by exact string match. It is the one regeneration in the repo
-that can say no.
+the number, which every plugin package's `apiVersion` range is checked against. It is the one regeneration
+in the repo that can say no.
+
+Two more regenerations joined it since: `UPDATE_PLUGIN_SCHEMA=1` rewrites the manifest JSON Schema from
+the Zod contract (`packages/plugin-types/src/pluginSchema.test.ts`), and the same file's assertion is what
+keeps the published schema and the contract one source of truth.

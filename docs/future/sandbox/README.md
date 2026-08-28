@@ -42,8 +42,8 @@ turned on. Every file in this folder holds to that.
 A wall you can walk around is worse than no wall, because you will trust it. So the cheap API gates
 that a sandbox cannot fix come first, then the sandbox, then the governance layer.
 
-1. Close the loopback-API gaps ([api-gates.md](./api-gates.md)). One-line mount fixes, no new
-   machinery. First because they re-lock controls a sandbox leaves open.
+1. Close the loopback-API gaps ([api-gates.md](./api-gates.md)). **Done, 2026-08-28.** They came
+   first because they re-lock controls a sandbox leaves open.
 2. Per-task OS isolation ([sandbox.md](./sandbox.md)). The biggest single reduction in host reach,
    and it delivers default-deny egress nearly free.
 3. Managed policy and audit export ([enterprise-policy.md](./enterprise-policy.md)). The layer a

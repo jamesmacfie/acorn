@@ -42,7 +42,7 @@ export const browserPlugin = (): NodePlugin => {
     // packaged app, and a standalone tarball.
     migrationsModule: import.meta.url,
     init: (ctx) => {
-      captures.current = captureStore(ctx.storage.open())
+      captures.current = captureStore(ctx.storage.open(), ctx.events.send)
       pool = new BrowserPool(captures.current)
       for (const tool of browserAgentTools(pool)) ctx.tools.register(tool)
       ctx.routes.fetch(serveCapture, { prefix: '/captures', note: '/captures/:captureId' })

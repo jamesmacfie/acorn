@@ -325,6 +325,26 @@ looking populated. The dropped row's credential is not forgotten along with it, 
 shares one token scope, so the write is what refreshes the live node's own token rather than
 discarding it.
 
+### The second door: adopting a provided node
+
+Probe-then-pair is not the only way into `fleet.json` any more. A node a plugin's node provider
+produced can be adopted, and the helper's `node-adopt` handler is the whole of it
+([plugins.md](./plugins.md) § Node providers).
+
+It is narrower than "a second door" sounds. The renderer names a source node, a provider id and a
+provider node id — nothing else. The helper then asks that node's `POST /v2/core/nodes/adopt` for the
+endpoint, the fingerprint and the device token, probes the endpoint itself, and refuses a certificate
+whose fingerprint is not the one the provider vouched for. So the renderer cannot introduce a node of
+its own invention, and no device token crosses the bridge in either direction, which is the same
+invariant pairing already holds.
+
+What replaces the owner comparing a fingerprint by eye is the provider's word, which is the trust the
+owner granted when they connected it. The stored record keeps `provider` provenance — which provider,
+which provider node id, and which node listed it — so the fleet can say where a row came from and which
+rows go away if that plugin does. An adopted row carries no `deviceId`, because the device row on the
+far node belongs to the control plane rather than to this client, so such a row can be unpaired but not
+revoked.
+
 ## Host-owned webviews
 
 `apps/desktop/src-tauri/src/webviews.rs` owns every child webview: the browser preview pane and

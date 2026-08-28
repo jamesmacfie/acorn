@@ -153,6 +153,22 @@ Three things about that are the design rather than the implementation:
   core is what draws whenever the chosen provider is missing, disabled or broken. bb's exclusive slot
   is the source of that shape and the one mechanic worth taking from it wholesale.
 
+The node has the same seam, and gained it later than the client did
+([plugins.md](./plugins.md) § Node-side extension points). Its absence had a shape worth naming: for a
+while the node's only plugin-to-plugin door was a capability, which is single-provider by construction,
+so every "many plugins each add one of these" case became a private registry inside whichever plugin
+needed it first. Workflows had one for step kinds, policies and triggers, with its own duplicate check
+and its own disposer convention, and the next such case would have got a fifth one slightly different
+again. The rule that fell out is short enough to keep: **a capability when there is one right answer,
+an extension point when there are many.**
+
+Two differences from the client's, both deliberate. Node contributions carry **functions, not
+descriptors**, because nothing crosses a realm boundary — both tiers of plugin run in the node's own
+process, and rung 1 is least privilege for cooperative code rather than a sandbox. And there is **no
+manifest half yet**: a point is opened and filled through `ctx`, which is enough while the contributions
+are functions. A manifest form would need a route-shaped contribution, which is a different design and
+waits for a case that wants it.
+
 ## Plugins get building blocks, not just a boundary
 
 A sandbox that isolates a plugin and then leaves it to rebuild a button is a sandbox nobody enjoys
@@ -321,12 +337,21 @@ Roughly in order of how much they matter:
    `docs/plugin-authoring.md`, and the scaffold as `packages/create-acorn-plugin` — both once the
    contract stopped moving, which was the whole reason for the ordering. Discovery and the written
    compatibility policy are still ahead (`docs/future/ecosystem/`).
-5. **Web and mobile**, analysed in `future/remote.md`. The plugin work quietly prepared for it —
+5. **The control plane, which is a plugin like any other.** A node can enroll with one at first boot
+   (`docs/node-enrollment.md`), and a plugin can contribute a node provider that puts nodes in the
+   fleet (`docs/plugins.md § Node providers`). Both seams exist and both are inert unless configured.
+   The rule they were built under is the one this document's "unexercised seams rot" section predicts:
+   a first-party control-plane plugin gets no host privilege a third party lacks, and the reference
+   provider (`plugins/nodes-file`) is deliberately a loaded plugin whose manifest grants it nothing, so
+   the seam has a consumer before it has a business behind it.
+6. **Web and mobile**, analysed in `future/remote.md`. The plugin work quietly prepared for it —
    the sandbox is standard web platform, and the client's platform-specific access sits behind one
    adapter — but the hard parts are auth and reachability, not plugins.
 
 ## Related
 
+- [contribution-kinds.md](./contribution-kinds.md) — every contribution kind, its tier, where it is
+  declared, and for each single-tier kind, whether it stays that way.
 - `plugins.md` — how both tiers work today.
 - `first-party-plugins.md` — which shipped plugins are first-party because they must be.
 - `security.md` — trust boundaries, the node-half threat model, and the containment ladder.

@@ -41,13 +41,15 @@ is the pointer version.
   `apps/desktop/test/client/wsChannelPrefixes.test.ts`: `term`, `workflow`, `plugins`, `plugin` are
   core's; `docker` and `agent` belong to their plugins. The envelope
   (`protocol/src/ws.ts`) commits to invalidation with no replay.
-- **The node side has no ears.** `PluginBroadcast` (`node-core/src/server/plugin/types.ts`) is all
-  send and no `on`. A plugin's node half cannot react to anything except its own routes, its
-  schedule ticks, and the five single-slot `routeCapability` hooks.
-- **The `plugin:<id>:<verb>` namespace is entirely unused.** All four loaded plugins declare
-  `permissions.events: []`, and no frame in the tree calls `acorn.on`. The cheapest publishing
-  mechanism acorn has is sitting idle, which is worth remembering whenever a new mechanism looks
-  necessary.
+- **The node side has ears for core events, and nothing else.** `ctx.events.on(event, listener)`
+  hears the channels in `NODE_EVENT_CHANNELS` (`protocol/src/nodeEvents.ts`: `plugins:changed`,
+  `tasks:changed`, `connection:changed` as of 2026-08-28), gated by the manifest's
+  `permissions.events`. Hearing another plugin's `plugin:<id>:<verb>` is still not built; it is item
+  3, [subscriptions.md](./subscriptions.md).
+- **The `plugin:<id>:<verb>` namespace is barely used.** No loaded plugin declares a
+  `permissions.events` entry for its own channel and no frame in the tree calls `acorn.on`. The
+  cheapest publishing mechanism acorn has is sitting idle, which is worth remembering whenever a new
+  mechanism looks necessary.
 - **Solid signals still cover the compiled-in tier.** `activeTaskId`, `focusedPane`, `taskStatus`
   and friends are signals on the plugin surface, so a `createEffect` is the change notification.
   That remains the right answer for that tier; the events here exist to cross boundaries signals
@@ -69,6 +71,25 @@ place only if all four hold:
 4. **One honest sentence describes it in the trust prompt,** and a person would knowingly accept
    that sentence.
 
+### Rule 2 is partly a transport limit, not only a principle
+
+Worth stating separately, because half of "human-scale, not machine-scale" is a property of the pipe
+rather than a judgement about taste, and the two read identically once the code is out of view
+(2026-08-27 extensibility review, finding 6).
+
+`wsBroadcast` (`node-core/src/main/wsHub.ts`) walks every open non-confined socket and writes the
+frame to each. There is no subscription filter, so a frame nobody wants still costs every connected
+client a write; there is no backpressure, so a fast producer queues without bound against a slow
+socket; and there is no fan-out budget, so cost is frames × clients. That is fine for an invalidation
+ping a few times a minute and wrong for container health, a cloud run's output tail, or per-agent-step
+progress — those are streams, and the stream path (`ctx.events.streams`) is terminal-plugin
+infrastructure exactly one plugin may own, permanently first-party.
+
+So a future monitoring or telemetry proposal starts from "the socket cannot carry this" and has to
+bring its own transport, rather than re-deriving the argument from rule 2 and losing to a plausible
+"but it's only every few seconds". Raising the ceiling means giving the hub per-socket subscriptions
+and backpressure first; until then rule 2 is enforced by the pipe.
+
 ## The order of work
 
 The files are readable in any order but buildable in only one:
@@ -78,9 +99,9 @@ The files are readable in any order but buildable in only one:
 2. **[core-events.md](./core-events.md)** second. The survey found that nearly every core event
    already has a single node-side choke point, so once delivery exists, most of these are one line
    at a place the code already funnels through.
-3. **[plugin-events.md](./plugin-events.md)** third, and partly in parallel: a plugin publishing on
-   its own channel to its own frames works today, so producers can start emitting before anyone else
-   can hear them, and the payloads get exercised.
+3. ~~**[plugin-events.md](./plugin-events.md)** third, and partly in parallel.~~ **Producers
+   shipped** (2026-08-28): every catalogued verb except preview's is emitted on its plugin's own
+   channel. Nobody outside the emitting plugin can hear them yet; that is item 4.
 4. **[subscriptions.md](./subscriptions.md)** last. Cross-plugin listening is the piece with real
    design risk (trust copy, discovery, absent producers), and it is worth nothing until there are
    events worth subscribing to.

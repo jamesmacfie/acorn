@@ -12,6 +12,6 @@ export const linearPlugin = (): NodePlugin => ({
   // Always the portable fetch carrier (docs/plugins.md § Loaded plugins): linear ships loaded, and a
   // bundled Hono instance cannot cross the contract.
   init: (ctx) => {
-    ctx.providers.integration(linearProvider, createLinearFetch(ctx.core.projects))
+    ctx.providers.integration(linearProvider, createLinearFetch(ctx.core.projects, ctx.events.send))
   },
 })

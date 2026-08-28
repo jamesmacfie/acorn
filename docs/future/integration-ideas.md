@@ -384,6 +384,16 @@ One pane with a searchable command list, not thirty plugins.
 - Reading queue for articles and videos, read in a pane.
 - Keyboard shortcut cheat sheet for the tools in the workspace.
 
+## What these want from other plugins
+
+Added 2026-08-28. Almost every entry above is a plugin's own surface: a rail source, a pane, a
+collection, a tool. What the entries want from *other* plugins is narrower and recurs: attach a fact
+to an item somebody else draws (coverage on a diff line, a flag on an editor line, CI on a PR, a pod
+on a container), or act before something happens (scan before push, inject secrets before a run
+target starts, gate a workflow step). Those are the **annotation** and **hook** kinds in
+[docs/future/layout/03-extension-kinds.md](./layout/03-extension-kinds.md), and they exist because
+this catalogue kept asking for them. Very few entries need a box inside another plugin's pane.
+
 ## Four shapes, not two hundred plugins
 
 Most of the catalogue collapses into four repeated shapes, which puts the leverage in the contracts

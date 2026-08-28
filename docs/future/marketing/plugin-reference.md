@@ -155,8 +155,8 @@ the repo (an `examples/plugins/` home, exact location decided at build time) and
 fixtures the docs snippets are excerpted from, so examples cannot rot silently.
 
 The real-world examples are the first-party packages already running as loaded plugins —
-rollbar, linear, http, database, model-providers — each of which ships a permission rationale
-in its `acorn-plugin.config.mjs`. The catalogue links them as "how a real one does it".
+rollbar, linear, http, database, model-providers, nodes-file — each of which ships a permission
+rationale in its `acorn-plugin.config.mjs`. The catalogue links them as "how a real one does it".
 
 ## Compatibility and versioning
 
