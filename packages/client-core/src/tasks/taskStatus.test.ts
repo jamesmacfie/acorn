@@ -7,6 +7,8 @@ const clean: TaskStatus = {
   worktreePath: '/tmp/acorn/task-1',
   dirty: false,
   dirtyCount: 0,
+  branch: null,
+  head: null,
   missing: false,
 }
 

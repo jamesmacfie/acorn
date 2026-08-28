@@ -437,12 +437,15 @@ and there are two kinds to name:
 - **Four of the shell's own**, listed in `client-core/plugins/frames/channels.ts`. They say that
   something a frame may be showing has gone or moved: `runtime:task-archived`,
   `runtime:workspace-removed`, `runtime:node-removed`, `runtime:node-switched`.
+- **Another plugin's live channel**, `plugin:<other-id>:<verb>`, when that plugin lists the verb in
+  its manifest's top-level `emits` array. If it is not installed you hear nothing and get no error, so
+  treat the frame as "go re-read" and never as the only way you learn something.
 - **Your own live channel**, `plugin:<your-id>:<verb>`, which your node half broadcasts on with
   `ctx.events.send({ channel, ...payload })` and which core routes to whichever of your frames
-  subscribed. Both halves are lowercase, start with a letter, and hold no colon. Another plugin's is
-  always refused, exactly as its routes are.
+  subscribed. Both halves are lowercase, start with a letter, and hold no colon. Another plugin's
+  undeclared verbs are refused, exactly as its routes are.
 
-That second one is how a frame gets live data without polling, and it also nudges your own descriptors
+That last one is how a frame gets live data without polling, and it also nudges your own descriptors
 — badges, rail rows — so they update faster than the 30-second floor a declared `refresh` allows. See
 [plugins.md § The live channel](./plugins.md) for the cadence rules and what a push does *not* reach.
 

@@ -73,7 +73,8 @@ export const nodePermissionLines = (permissions: NodePluginPermissions): Permiss
   ]
 }
 
-export const uiPermissionLines = (permissions: NodePluginPermissions): PermissionLine[] => {
+// `pluginId` tells a plugin channel apart from another plugin's; without it every one reads as its own.
+export const uiPermissionLines = (permissions: NodePluginPermissions, pluginId?: string): PermissionLine[] => {
   // Classify instead of echoing. These strings came from an untrusted manifest, and every sentence
   // under "Enforced" has to be copy the host owns. The key is the scope name, which is host-recognised
   // by this point.
@@ -87,7 +88,7 @@ export const uiPermissionLines = (permissions: NodePluginPermissions): Permissio
     // undefined, and it now covers the node-side catalogue as well as the frame one. A guard that knew
     // only about frames sent an enforced node grant to the "ignored" line, which is a lie about what the
     // owner is consenting to.
-    const description = describeChannel(channel)
+    const description = describeChannel(channel, pluginId)
     return description ? [line(channel, description)] : []
   })
   const ignored = permissions.api.length + permissions.events.length - scopes.length - events.length

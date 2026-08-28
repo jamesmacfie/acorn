@@ -67,6 +67,29 @@
       "minLength": 1,
       "maxLength": 64
     },
+    "emits": {
+      "default": [],
+      "maxItems": 32,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "verb": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "verb",
+          "description"
+        ]
+      }
+    },
     "apiVersion": {
       "type": "string",
       "minLength": 1,

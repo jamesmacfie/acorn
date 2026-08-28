@@ -473,6 +473,10 @@ export type InstalledPluginRow = {
   unknown?: readonly string[]
   permissions: import('./pluginContract.ts').NodePluginPermissions
   contributions: import('./pluginContract.ts').PluginContributions
+  // What the plugin declared other plugins may hear (docs/plugins.md § Hearing another plugin). Optional
+  // rather than defaulted for the same reason `reason` is: this row is persisted in the query cache
+  // and a required field would need a bumped key.
+  emits?: readonly import('./pluginContract.ts').PluginEmit[]
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
   // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
   // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't

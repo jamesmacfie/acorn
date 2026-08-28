@@ -9,7 +9,7 @@
 // Dispatch is a prefix registry (wsChannels.ts). This file owns `term:` and `workflow:`, because
 // `term:` is core transport on both ends and `workflow:notice` feeds core's notification pipeline.
 // `docker:` and `agent:` are registered by the plugins that own them.
-import type { ConnectionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from './platform'
@@ -33,6 +33,16 @@ const statusSubs = new Set<() => void>()
 const pluginsSubs = new Set<() => void>()
 const tasksSubs = new Set<() => void>()
 const connectionSubs = new Set<(event: ConnectionChangedEvent) => void>()
+// The node events after the first three, keyed by channel. One registry rather than one Set per event,
+// because they share a shape: a core-named frame whose fields are the payload
+// (@acorn/protocol/nodeEvents.ts).
+type NodeEventMap = {
+  'head:changed': HeadChangedEvent
+  'run:changed': RunTargetChangedEvent
+  'agent-session:changed': AgentSessionChangedEvent
+  'project:changed': ProjectChangedEvent
+}
+const nodeEventSubs = new Map<keyof NodeEventMap, Set<(event: never) => void>>()
 const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
 const reconnectSubs = new Set<() => void>()
@@ -148,6 +158,18 @@ registerWsChannel('connection', (frame) => {
   connectionSubs.forEach((cb) => cb({ integrationId, providerId, status }))
 })
 
+// Core's sixth through ninth: HEAD moved, a run target started or stopped, an agent session reached an
+// edge, a project row or its config moved (docs/plugins.md § Hearing a core event). Each prefix is the
+// noun before the colon, and the frame minus `channel` is the payload. Not narrowed field by field
+// like `connection` above: the frame came from this node over the authenticated socket, and a
+// subscriber that needs a field checked does it once at the point of use.
+for (const prefix of ['head', 'run', 'agent-session', 'project']) {
+  registerWsChannel(prefix, (frame) => {
+    const { channel, ...event } = frame
+    nodeEventSubs.get(channel as keyof NodeEventMap)?.forEach((cb) => cb(event as never))
+  })
+}
+
 
 // Fires when the node's socket comes back after a drop. The app shell uses it to mark that node's
 // queries stale so whatever is on screen refetches.
@@ -232,6 +254,16 @@ export function wsOnConnectionChanged(cb: (event: ConnectionChangedEvent) => voi
   connectionSubs.add(cb)
   connect()
   return () => void connectionSubs.delete(cb)
+}
+
+// Hear one of the payload-carrying node events (the registry above). Same subscriber shape as the
+// three named ones.
+export function wsOnNodeEvent<K extends keyof NodeEventMap>(channel: K, cb: (event: NodeEventMap[K]) => void): () => void {
+  const subs = nodeEventSubs.get(channel) ?? new Set()
+  subs.add(cb as (event: never) => void)
+  nodeEventSubs.set(channel, subs)
+  connect()
+  return () => void subs.delete(cb as (event: never) => void)
 }
 
 export function wsOnNotice(cb: NoticeCb): () => void {

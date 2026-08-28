@@ -2,7 +2,7 @@ import { dispatchLayout } from '../tasks/tasks'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { onScopeEvicted } from './scopeEviction'
-import type { ConnectionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
@@ -65,6 +65,12 @@ export type ClientEventMap = {
   // listener drop the frame without a round trip. Still state rather than a delta: `status` is what the
   // connection now is (node-core/main/notify.ts § broadcastConnectionChanged).
   'connection:changed': ConnectionChangedEvent
+  // The rest of the core catalogue (docs/plugins.md § Hearing a core event), each carrying the state it is
+  // about rather than a delta, for the same reason `connection:changed` does.
+  'head:changed': HeadChangedEvent
+  'run:changed': RunTargetChangedEvent
+  'agent-session:changed': AgentSessionChangedEvent
+  'project:changed': ProjectChangedEvent
 }
 
 type Listener<T> = (payload: T) => void

@@ -58,7 +58,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
     {
       key: 'enforced',
       now: [
-        ...uiPermissionLines(installed.permissions),
+        ...uiPermissionLines(installed.permissions, request.row.name),
         ...keyClaimPermissionLines(keyClaimGrants(installed.contributions)),
         // Both directions of the cooperative seam plus any core-surface offer. `request.row.name` is the
         // plugin id the host read the manifest under, the same value every other namespace is minted
@@ -71,7 +71,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       ],
       was: previous
         ? [
-          ...uiPermissionLines(previous.permissions),
+          ...uiPermissionLines(previous.permissions, request.row.name),
           ...keyClaimPermissionLines(previous.keyClaims ?? []),
           ...extensionPermissionLines(previous.extensions ?? []),
           ...harnessPermissionLines(previous.harnesses ?? []),

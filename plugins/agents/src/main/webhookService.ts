@@ -10,6 +10,15 @@ import type { AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
 
 export type AgentWebhookEventType = 'completion' | 'attention'
 
+// The one reduction of the session firehose to human-scale edges. Webhooks deliver these two kinds
+// externally, and `agent-session:changed` (@acorn/protocol/nodeEvents.ts) carries the same two
+// inward, so there is exactly one vocabulary for "the agent did something a person cares about".
+export const webhookEventKind = (frame: AgentWsFrame): AgentWebhookEventType | null => {
+  if (frame.channel !== 'agent:event') return null
+  const type = frame.event.event.type
+  return type === 'turn_completed' ? 'completion' : type === 'request' || type === 'error' ? 'attention' : null
+}
+
 export type AgentWebhook = {
   id: string
   taskId: string | null
@@ -248,11 +257,7 @@ export class AgentWebhookService {
 
   async accept(frame: AgentWsFrame): Promise<void> {
     if (frame.channel !== 'agent:event') return
-    const eventType = frame.event.event.type === 'turn_completed'
-      ? 'completion'
-      : frame.event.event.type === 'request' || frame.event.event.type === 'error'
-        ? 'attention'
-        : null
+    const eventType = webhookEventKind(frame)
     if (!eventType) return
     const [session] = await this.#db
       .select({ taskId: schema.agentSessions.taskId, attention: schema.agentSessions.attention })

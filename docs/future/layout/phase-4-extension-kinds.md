@@ -158,4 +158,4 @@ slots, the winner and why. Reads the same registries; adds no bridge verb.
   taskChecks.ts` exists; `server/bridge.ts` holds the `routeCapability` seams.
 - `docs/future/rail-tab.md` still has "Slice 3: loaded-plugin descriptors, NOT BUILT."
 - The owner code paths for the eight hooks exist at the files named; the events survey in
-  `docs/future/events/plugin-events.md` cites line numbers for several of them.
+  `docs/future/events.md` (the per-plugin survey is in git history under `docs/future/events/plugin-events.md`) cites line numbers for several of them.

@@ -13,6 +13,7 @@ import { loadRepoConfig, type LayoutRecipe, type RunTarget } from './runConfig'
 import { getProject, type ProjectRow } from './projects'
 import { getProjectConfig } from './projectConfig'
 import { copyWorktreeFiles, ensureWorktree, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
+import { broadcastHeadChanged, broadcastTasksChanged } from './notify'
 import { capabilityId, type CapabilityRegistry } from '../server/plugin/capabilities'
 import { BridgeError } from '../server/bridge'
 
@@ -112,7 +113,7 @@ export const contextInjectionEnabled = async (db: AppDatabase, userId: string): 
 // this would otherwise make the node do work for tasks it may not see.
 export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: string) => boolean): Promise<TaskStatus[]> {
   const all = await db
-    .select({ id: schema.tasks.id, worktreePath: schema.tasks.worktreePath })
+    .select({ id: schema.tasks.id, projectId: schema.tasks.projectId, worktreePath: schema.tasks.worktreePath })
     .from(schema.tasks)
     .where(and(eq(schema.tasks.status, 'active'), isNotNull(schema.tasks.worktreePath)))
   const rows = only ? all.filter((row) => only(row.id)) : all
@@ -127,15 +128,35 @@ export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: strin
       const row = rows[index]!
       const path = row.worktreePath!
       if (!isDir(path)) {
-        results[index] = { taskId: row.id, worktreePath: path, dirty: false, dirtyCount: 0, missing: true }
+        results[index] = { taskId: row.id, worktreePath: path, dirty: false, dirtyCount: 0, missing: true, branch: null, head: null }
         continue
       }
-      const { dirty, count } = await worktreePorcelain(path)
-      results[index] = { taskId: row.id, worktreePath: path, dirty, dirtyCount: count, missing: false }
+      const { dirty, count, branch, head } = await worktreePorcelain(path)
+      results[index] = { taskId: row.id, worktreePath: path, dirty, dirtyCount: count, missing: false, branch, head }
+      noticeHead(row.id, row.projectId, branch, head, dirty)
     }
   }
   await Promise.all(Array.from({ length: Math.min(4, rows.length) }, worker))
   return results
+}
+
+// The last HEAD this node saw per task, so the status poll doubles as the HEAD observer
+// (docs/plugins.md § Hearing a core event). Nothing in the tree hooks HEAD directly, and a
+// commit from a PTY, an agent, or an outside editor has no hook to catch, so the poll that already
+// runs `git status` on every active worktree is the one honest place to notice. The first sighting
+// of a task seeds the map without a frame: a fresh node has nothing to compare against, and
+// `reconcileWorktrees` seeds every task at boot for that reason.
+//
+// ponytail: the poll is the client's 10 s clock plus a re-pull on every `term:status` ping, so an
+// in-app commit (changes pane, which pings status) is noticed within one round trip and an
+// out-of-app one within ten seconds — but only while a client is attached. A node-side clock is the
+// upgrade if a headless node ever needs to hear its own commits.
+const lastHeads = new Map<string, string>()
+function noticeHead(taskId: string, projectId: string, branch: string | null, head: string | null, dirty: boolean): void {
+  if (!head) return
+  const previous = lastHeads.get(taskId)
+  lastHeads.set(taskId, head)
+  if (previous && previous !== head) broadcastHeadChanged({ projectId, taskId, branch, head, dirty })
 }
 
 // Startup reconciliation (docs/workspaces-and-tasks.md): flag any persisted worktree whose directory is gone
@@ -224,6 +245,10 @@ export async function resolveTaskCwd(
     if (!wt.ok) throw new BridgeError(409, 'worktree-unavailable', wt.reason)
     assertOnBranch(wt.path, branch)
     await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
+    // The task row just gained a worktree, and archive already announces losing one, so "worktree
+    // created / removed" folds into `tasks:changed`: a consumer re-reads `worktreePath`
+    // (docs/plugins.md § Hearing a core event).
+    broadcastTasksChanged()
     if (wt.created) {
       await copyConfiguredFiles(db, t, checkout, wt.path)
       await capabilities?.get(WORKTREE_CREATED)?.(t, wt.path).catch((e) => console.warn('[worktrees] created-hook failed:', e))

@@ -186,7 +186,7 @@ export const tasks = new Hono<AppEnv>()
     }
     // Every write on this router announces itself (main/notify.ts § broadcastTasksChanged). The task
     // list is what the rail draws, so a second window that missed a create used to sit on a stale list
-    // until it reconnected (docs/future/events/delivery.md defect 1).
+    // until it reconnected (docs/plugins.md § Hearing a core event).
     broadcastTasksChanged()
     return c.json(
       rowToTask(

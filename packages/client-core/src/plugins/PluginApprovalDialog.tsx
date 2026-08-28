@@ -59,14 +59,15 @@ export default function PluginApprovalDialog() {
     return id ? (state()?.plugins ?? []).find((row) => row.name === id) : undefined
   }
   const declared = () => {
-    const installed = reviewRow()?.installed
-    if (!installed) return []
+    const row = reviewRow()
+    const installed = row?.installed
+    if (!row || !installed) return []
     return [
       ...nodePermissionLines(installed.permissions),
       // The node half is what this screen exists for, and a schedule is the part of it that acts with
       // nobody here, so it belongs on the one disclosure a node-only package ever gets.
       ...schedulePermissionLines(scheduleGrants(installed.contributions)),
-      ...uiPermissionLines(installed.permissions),
+      ...uiPermissionLines(installed.permissions, row.name),
       ...webviewPermissionLines(webviewGrants(installed.contributions)),
     ]
   }

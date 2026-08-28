@@ -138,8 +138,10 @@ describe('subscribe', () => {
     }
   })
 
-  it('refuses another plugin\'s channel, the way it refuses another plugin\'s routes', () => {
-    expect(() => build().subscribe('plugin:other:sample', () => {})).toThrow(/belongs to 'other', not 'board'/)
+  it('accepts another plugin\'s channel; the manifest grant is the broker\'s check', () => {
+    // docs/plugins.md § Hearing another plugin. Routes stay plugin-private; a
+    // declared verb on the live channel does not.
+    expect(() => build().subscribe('plugin:other:sample', () => {})).not.toThrow()
   })
 })
 

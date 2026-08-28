@@ -174,7 +174,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         failingChecks: deps.failingChecks,
         notify: notices.notice,
         statusChanged: ctx.events.status,
-        // `plugin:workflows:run-changed` (docs/future/events/plugin-events.md § workflows).
+        // `plugin:workflows:run-changed` (docs/plugins.md § Hearing another plugin).
         runChanged: (runId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), runId, status }),
         emitStepEvent: notices.stepEvent,
         onRunTerminal: async (taskId, runId) => {
@@ -311,6 +311,13 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       //
       // 300s because that is the plugin cadence floor the host clamps to anyway, and a trigger sweep
       // is a poll of external state, not a deadline.
+      // The reactive half of the same sweep (docs/plugins.md § Hearing another plugin, the proving
+      // consumer). github announces `checks-changed` only when a check row actually flipped, so a
+      // green-to-red flip starts a trigger sweep within a round trip instead of at the next tick. The
+      // schedule below stays as the backstop for a node whose github half is absent.
+      ctx.events.on('plugin:github:checks-changed', () => {
+        void runner.pollTriggers().catch((error) => console.warn('[workflows] trigger sweep after checks-changed failed:', error))
+      })
       ctx.schedules.register({
         scheduleId: 'triggers',
         name: 'Workflow triggers',

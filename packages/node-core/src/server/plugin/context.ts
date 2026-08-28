@@ -28,8 +28,10 @@ import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { ExtensionPointId } from './extensionPoints'
 import type { HostPluginContext, NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
 import { parsePluginChannel, pluginChannel } from '@acorn/protocol/pluginState.ts'
+import type { PluginEmit } from '@acorn/protocol/pluginContract.ts'
 import { onWsBroadcast, registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
 import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
+import { assertSubscribableVerb } from './emits'
 import { broadcastRepoConfigTrustNotice, broadcastStatus } from '../../main/notify'
 import { buildPluginRequestContext } from './requestContext'
 
@@ -45,6 +47,8 @@ export type LoadedPluginBinding = {
   // One grant list covers both sides of the wire: the frames subscribe against it in the client broker,
   // and `ctx.events.on` is scoped by it here.
   events?: readonly string[]
+  // The manifest's top-level `emits`: the verbs other plugins may subscribe to (./emits.ts).
+  emits?: readonly PluginEmit[]
   storage: PluginStorage
   // What the manifest declared as periodic work. Carried on the binding rather than read back off disk,
   // for the same reason `permissions` is: the host binds a manifest's claims to a plugin id, and the
@@ -306,7 +310,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         : wsBroadcast,
       status: broadcastStatus,
       repoConfigTrustNotice: broadcastRepoConfigTrustNotice,
-      // The receive side (docs/future/events/subscriptions.md item 1). Scoped by the same
+      // The receive side (docs/plugins.md § Hearing another plugin). Scoped by the same
       // `permissions.events` grant the plugin's frames are scoped by, so there is one vocabulary and
       // one prompt sentence per grant rather than two of each. A built-in has no manifest and hears
       // whatever the catalogue names.
@@ -314,7 +318,11 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       // A throw rather than a silent no-op, for the same reason `send` throws: a subscription that
       // never fires is invisible, and the author debugs the producer.
       on: (event, listener) => {
-        if (!isNodeEventChannel(event)) throw new Error(`'${event}' is not a core event this node publishes`)
+        // Another plugin's verb, or a core event: same grant list, one prompt sentence each. The
+        // producer check is the emits registry's (./emits.ts), and it is silent for a producer that is
+        // not running.
+        if (parsePluginChannel(event)) assertSubscribableVerb(event, plugin)
+        else if (!isNodeEventChannel(event)) throw new Error(`'${event}' is not a core event this node publishes`)
         if (permissions && !(options.loaded?.events ?? []).includes(event)) {
           throw new Error(`plugin '${plugin}' did not declare '${event}' in permissions.events`)
         }

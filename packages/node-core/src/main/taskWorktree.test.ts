@@ -8,6 +8,12 @@ import { CapabilityRegistry } from '../server/plugin/capabilities'
 import { makeTestDb, type TestDb } from '../testkit/db'
 import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setWorktreesRoot, WORKTREE_CREATED } from './taskWorktree'
 
+const broadcasts: Record<string, unknown>[] = []
+vi.mock('./wsHub', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./wsHub')>()),
+  wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
+}))
+
 vi.setConfig({ testTimeout: 20_000 })
 
 const TASK = '88888888-8888-4888-8888-888888888888'
@@ -116,8 +122,32 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
         dirty: true,
         dirtyCount: 1,
         missing: false,
+        branch: expect.any(String),
+        head: expect.stringMatching(/^[0-9a-f]{40}$/),
       },
     ])
+  })
+
+  // The status poll is the HEAD observer (docs/plugins.md § Hearing a core event): the first
+  // sighting seeds silently, a moved tip on the next pass broadcasts, an unmoved one does not.
+  it('broadcasts head:changed when a worktree tip moves between polls', async () => {
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    broadcasts.length = 0
+    const [first] = await computeTaskStatuses(t.db)
+    expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([])
+
+    writeFileSync(join(res.cwd, 'g.txt'), 'new\n')
+    git(res.cwd, 'add', 'g.txt')
+    git(res.cwd, 'commit', '-m', 'move the tip')
+    const [second] = await computeTaskStatuses(t.db)
+    expect(second!.head).not.toBe(first!.head)
+    expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([
+      { channel: 'head:changed', projectId: expect.any(String), taskId: TASK, branch: second!.branch, head: second!.head, dirty: false },
+    ])
+
+    broadcasts.length = 0
+    await computeTaskStatuses(t.db)
+    expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([])
   })
 
   // The directory is keyed by owner/repo/branch and was trusted forever once persisted, so a worktree

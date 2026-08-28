@@ -17,7 +17,10 @@ import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventB
 import { readAgentConcurrency } from './concurrencyStore'
 import { AgentStore } from './store'
 import { decideAgentCommand } from './stateMachine'
-import { AgentWebhookService } from './webhookService'
+import { AgentWebhookService, webhookEventKind } from './webhookService'
+import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+
+type PublishedFrame = AgentWsFrame | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildCompletedTurnTranscript, buildForkContext } from './runtimeContext'
 import { defaultAgentConcurrency } from '../shared/concurrency'
@@ -49,7 +52,9 @@ export type AgentRuntimeOptions = {
   secrets: SecretService
   currentUserId(): string | null
   registry?: AgentDriverRegistry
-  publish?(frame: AgentWsFrame): void
+  // Any frame, not only the plugin's own: the core-named `agent-session:changed` goes out through the
+  // same door (docs/plugins.md § Hearing a core event).
+  publish?(frame: PublishedFrame): void
   startTerminalHandoff?(session: AgentSession): Promise<string>
   terminalHandoffRunning?(sessionId: string): Promise<boolean>
   onCompletedTurn?(taskId: string, transcriptTail: string): Promise<void>
@@ -77,7 +82,7 @@ export class ManagedAgentEngine {
   protected readonly mintedSecrets: string[] = []
   protected readonly currentUserId: () => string | null
   protected readonly registry: AgentDriverRegistry
-  protected readonly publish?: (frame: AgentWsFrame) => void
+  protected readonly publish?: (frame: PublishedFrame) => void
   protected readonly startTerminalHandoff?: (session: AgentSession) => Promise<string>
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
   protected readonly onCompletedTurn?: (taskId: string, transcriptTail: string) => Promise<void>
@@ -488,6 +493,19 @@ export class ManagedAgentEngine {
     void this.webhooks.accept(frame).catch((error) => {
       console.warn('[agents:webhook] failed to queue delivery:', error)
     })
+    void this.announce(frame).catch((error) => {
+      console.warn('[agents] failed to announce a session edge:', error)
+    })
+  }
+
+  // The webhook filter pointed inward: the same two edges, on a core channel every window and any
+  // plugin's node half can hear. Third parties are otherwise blind to agent execution, since the
+  // `agent:` prefix is the plugin's own.
+  protected async announce(frame: AgentWsFrame): Promise<void> {
+    const event = webhookEventKind(frame)
+    if (!event || frame.channel !== 'agent:event') return
+    const session = await this.store.requireSession(frame.event.sessionId)
+    this.publish?.({ channel: 'agent-session:changed', taskId: session.taskId, sessionId: session.id, event })
   }
 
   protected conditionMet(snapshot: AgentSessionSnapshot, until: WaitCondition): boolean {

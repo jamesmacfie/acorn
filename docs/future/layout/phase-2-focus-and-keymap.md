@@ -34,6 +34,12 @@ In:
   `KeyValueEditor` read and write it.
 - Layout regions as focus groups with `nextRegion` and `prevRegion`; `focusedPane` in `tasks.ts`
   becomes a view over the region store.
+- **The "focus changed" core event**, owed to `docs/future/events.md § Not built here` and
+  deliberately left out of the events programme so it has one implementation. The region store is the
+  emit point: `{ taskId, paneId, regionId }`, coarse, on the client bus first and, because focus is a
+  fact about a window rather than a node, never broadcast by the node. A frame or tree subscribes to
+  it through the same `SUBSCRIBABLE_CHANNELS` entry and host-owned sentence any core event costs.
+  Emitting it from `activeTaskId` before this phase would be a second implementation to delete.
 - `Modal` and `Menu` trap and restore focus through the kit, replacing `trapOverlayFocus`.
 - ARIA roles and `aria-activedescendant` from node roles.
 - The cheat-sheet: a command that lists active bindings from the keymap's catalog.

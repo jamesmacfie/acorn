@@ -18,6 +18,7 @@ const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): Install
   version: '1.0.0',
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
+  emits: [],
   contributions: NO_CONTRIBUTIONS,
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,

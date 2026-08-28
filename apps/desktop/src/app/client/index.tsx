@@ -19,6 +19,8 @@ import { syncPluginContributions } from '@acorn/client-core/plugins/syncContribu
 import { watchPluginChanges } from '@acorn/client-core/plugins/reload.ts'
 import { watchTaskChanges } from '@acorn/client-core/tasks/watchTaskChanges.ts'
 import { watchConnectionChanges } from '@acorn/client-core/integrations/watchConnectionChanges.ts'
+import { watchProjectChanges } from '@acorn/client-core/projects/watchProjectChanges.ts'
+import { watchNodeEvents } from '@acorn/client-core/watchNodeEvents.ts'
 
 const noop = () => null
 
@@ -60,13 +62,17 @@ watchPluginChanges()
 
 // The same shape for the task list: every task write on the node broadcasts `tasks:changed`, and this
 // window invalidates its cached list whether or not it was the one that wrote
-// (docs/future/events/delivery.md).
+// (docs/plugins.md § Hearing a core event).
 watchTaskChanges()
 
 // …and for connected accounts. A credential that stops working demotes itself on the node mid-request,
 // so Settings → Integrations and the Sources rail hear about it here rather than at the next 401
-// (docs/future/events/delivery.md).
+// (docs/plugins.md § Hearing a core event).
 watchConnectionChanges()
+// The rest of the core catalogue (docs/plugins.md § Hearing a core event): projects invalidate their query;
+// HEAD, run targets and agent sessions are re-emitted on the client bus for whoever listens.
+watchProjectChanges()
+watchNodeEvents()
 
 render(
   () => (

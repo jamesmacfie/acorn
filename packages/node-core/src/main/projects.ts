@@ -5,7 +5,7 @@ import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import { git } from './core/git'
-import { broadcastTasksChanged } from './notify'
+import { broadcastProjectChanged, broadcastTasksChanged } from './notify'
 
 // A project is a folder on this machine (server/db/schema.ts `projects`; docs/workspaces-and-tasks.md
 // § Workspace and project covers facets generally). Adding one needs only an absolute existing
@@ -145,6 +145,7 @@ export async function createProject(
     updatedAt: now,
   }
   await db.insert(schema.projects).values(project)
+  broadcastProjectChanged({ projectId: project.id })
   return { ok: true, project: (await getProject(db, project.id))! }
 }
 
@@ -194,6 +195,7 @@ export async function detectProject(db: AppDatabase, id: string): Promise<Projec
       updatedAt: Date.now(),
     })
     .where(eq(schema.projects.id, id))
+  broadcastProjectChanged({ projectId: id })
   return getProject(db, id)
 }
 
@@ -233,6 +235,7 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
     .update(schema.projects)
     .set({ ...set, updatedAt: Date.now() })
     .where(eq(schema.projects.id, id))
+  broadcastProjectChanged({ projectId: id })
   if (patch.path !== undefined) return { ok: true, project: (await detectProject(db, id))! }
   return { ok: true, project: (await getProject(db, id))! }
 }
@@ -251,6 +254,7 @@ export async function deleteProject(db: AppDatabase, id: string): Promise<void> 
   await db.delete(schema.projects).where(eq(schema.projects.id, id))
   // The rail's task list just lost every task in this project (./notify.ts § broadcastTasksChanged).
   broadcastTasksChanged()
+  broadcastProjectChanged({ projectId: id })
 }
 
 // Core-only write seam for importer plugins. The public project routes remain the richer UI/config
@@ -270,6 +274,7 @@ export async function createProjectRef(db: AppDatabase, input: ProjectCreateRefI
         githubRepoId: input.github.repoId ?? null,
         updatedAt: Date.now(),
       }).where(eq(schema.projects.id, result.project.id))
+      broadcastProjectChanged({ projectId: result.project.id })
     }
     return toProjectRef((await getProject(db, result.project.id))!)
   }
@@ -291,6 +296,7 @@ export async function createProjectRef(db: AppDatabase, input: ProjectCreateRefI
     createdAt: now,
     updatedAt: now,
   })
+  broadcastProjectChanged({ projectId: id })
   return toProjectRef((await getProject(db, id))!)
 }
 
@@ -315,5 +321,6 @@ export async function updateProjectRef(db: AppDatabase, id: string, patch: Proje
     await db.update(schema.projects).set({ githubRepoId: patch.githubRepoId, updatedAt: Date.now() }).where(eq(schema.projects.id, id))
   }
   const updated = await getProject(db, id)
+  if (updated) broadcastProjectChanged({ projectId: id })
   return updated ? toProjectRef(updated) : null
 }

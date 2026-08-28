@@ -29,6 +29,13 @@ export const githubPlugin = (): NodePlugin => {
   return {
     name: 'github',
     required: false,
+    // What other plugins may hear from this one (docs/plugins.md § Hearing another plugin,
+    // subscriptions.md § The cross-plugin grant). workflows hears `checks-changed`.
+    emits: [
+      { verb: 'checks-changed', description: 'A pull request’s checks changed state' },
+      { verb: 'pr-synced', description: 'A pull request’s mirror was refreshed' },
+      { verb: 'pulls-changed', description: 'A repository’s open pull request list was refreshed' },
+    ],
     // This module's own URL, so the host can walk from here for the migration chain (docs/plugins.md
     // § Data ownership).
     migrationsModule: import.meta.url,
@@ -36,7 +43,7 @@ export const githubPlugin = (): NodePlugin => {
       // Opens and migrates before init returns; every router below closes over this handle rather
       // than reading one off the request environment (docs/data-layer.md § Plugin databases).
       const store = ctx.storage.open()
-      // github's own `plugin:github:<verb>` channel (docs/future/events/plugin-events.md § github).
+      // github's own `plugin:github:<verb>` channel (docs/plugins.md § Hearing another plugin).
       // Only the routers that write the PR mirror take it.
       const emit = githubEmitter(ctx.events.send)
 

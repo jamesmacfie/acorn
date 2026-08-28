@@ -335,14 +335,22 @@ export type PluginBroadcast = {
   status(): void
   /** "This repo's committed config changed and needs the owner's review." */
   repoConfigTrustNotice(taskId: string): void
-  /** Hear a core event on this node, whether or not a client is attached. The event must be one your
-   *  manifest named in `permissions.events`. Disposal follows unload. */
-  on(event: NodeEventChannel, listener: (frame: { channel: string } & Record<string, unknown>) => void): Disposable
+  /** Hear a core event, or another plugin's declared verb, on this node, whether or not a client is
+   *  attached. The event must be one your manifest named in `permissions.events`. Another plugin's
+   *  `plugin:<id>:<verb>` works when that plugin lists the verb in its manifest's `emits`; if it is not
+   *  installed you hear nothing and no error. Disposal follows unload. */
+  on(event: NodeEventChannel | `plugin:${string}:${string}`, listener: (frame: { channel: string } & Record<string, unknown>) => void): Disposable
 }
 
-/** Core events a node half may subscribe to. Deliberately short: it holds what core broadcasts today.
- *  Hearing another plugin needs that plugin's `emits` declaration, which does not exist yet. */
-export type NodeEventChannel = 'plugins:changed'
+/** Core events a node half may subscribe to. Each frame's fields are in `@acorn/protocol/nodeEvents.ts`. */
+export type NodeEventChannel =
+  | 'plugins:changed'
+  | 'tasks:changed'
+  | 'connection:changed'
+  | 'head:changed'
+  | 'run:changed'
+  | 'agent-session:changed'
+  | 'project:changed'
 
 // ── Core services ─────────────────────────────────────────────────────────────────────────────────
 

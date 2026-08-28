@@ -471,7 +471,7 @@ describe('loaded plugins', () => {
   })
 
   it('delivers a granted core event to a loaded plugin, and stops on unload', async () => {
-    // The receive side of ctx.events (docs/future/events/subscriptions.md item 1). It fires whether or
+    // The receive side of ctx.events (docs/plugins.md § Hearing another plugin). It fires whether or
     // not a client is attached, which is the property that makes it useful on a node nobody is sitting
     // at.
     const heard: string[] = []
@@ -500,12 +500,45 @@ describe('loaded plugins', () => {
     const unknown = await host(
       // Cast: the point of the check is a manifest naming something outside the catalogue, which the
       // type would otherwise refuse first.
-      [plugin('ntfy', { init: (ctx) => void ctx.events.on('plugin:other:changed' as 'plugins:changed', noop) })],
+      [plugin('ntfy', { init: (ctx) => void ctx.events.on('nobody:changed' as 'plugins:changed', noop) })],
       { ntfy: {} },
-      { ntfy: ['plugin:other:changed'] },
+      { ntfy: ['nobody:changed'] },
     )
     expect(unknown.roster[0]).toMatchObject({ state: 'failed', reason: expect.stringContaining('not a core event') })
     error.mockRestore()
+  })
+
+  it('lets one plugin hear another\'s declared verb, and only a declared one', async () => {
+    // The cross-plugin grant (docs/plugins.md § Hearing another plugin). The producer is a built-in with an
+    // `emits` field; the consumer is loaded, so the manifest grant applies too.
+    const heard: string[] = []
+    const gh = plugin('gh', { emits: [{ verb: 'checks-changed', description: 'checks flipped' }] })
+    await host(
+      [gh, plugin('wf', { init: (ctx) => void ctx.events.on('plugin:gh:checks-changed', (frame) => heard.push(frame.channel)) })],
+      { wf: {} },
+      { wf: ['plugin:gh:checks-changed'] },
+    )
+    wsBroadcast({ channel: 'plugin:gh:checks-changed', pullNumber: 7 })
+    wsBroadcast({ channel: 'plugin:gh:pr-synced' })
+    expect(heard).toEqual(['plugin:gh:checks-changed'])
+
+    // A running producer that did not declare the verb has said no.
+    const error = vi.spyOn(console, 'error').mockImplementation(noop)
+    const undeclared = await host(
+      [gh, plugin('wf', { init: (ctx) => void ctx.events.on('plugin:gh:pr-synced', noop) })],
+      { wf: {} },
+      { wf: ['plugin:gh:pr-synced'] },
+    )
+    expect(undeclared.roster[1]).toMatchObject({ state: 'failed', reason: expect.stringContaining('does not declare') })
+    error.mockRestore()
+
+    // An absent producer delivers nothing and errors nothing.
+    const absent = await host(
+      [plugin('wf', { init: (ctx) => void ctx.events.on('plugin:nobody:anything', noop) })],
+      { wf: {} },
+      { wf: ['plugin:nobody:anything'] },
+    )
+    expect(absent.roster[0]).toMatchObject({ state: 'active' })
   })
 
   it('shapes core and capabilities from the manifest', async () => {

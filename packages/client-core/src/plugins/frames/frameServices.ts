@@ -88,9 +88,8 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       // Second half of the check the broker starts: it verifies the manifest declared the channel, this
       // verifies the shell has one. Subscribing never creates a channel.
       //
-      // The plugin's own live channel is checked first and separately, because ownership is the whole
-      // question there: `plugin:<id>:<verb>` reaches its own node half, and another plugin's namespace is
-      // refused for the same reason its routes are. `onPluginFrame` throws on both counts.
+      // A plugin channel first and separately: its own, or another plugin's when the manifest named it in
+      // `permissions.events`, which the broker has already checked (docs/plugins.md § Hearing another plugin).
       if (parsePluginChannel(channel)) return onPluginFrame(props.binding.pluginId, channel, listener)
       if (!isSubscribable(channel)) throw new Error(`${channel} is not a channel a plugin frame can subscribe to`)
       return clientEvents.on(channel, (payload) => listener(payload))

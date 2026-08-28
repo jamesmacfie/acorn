@@ -62,7 +62,11 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // the session map is. Two projections consume it: the harness RunBridge, behind the renderer's
       // run pane and preview home, and the capability, which is how the agent-tool and workflow
       // projections in apps/node/src/wiring/ reach it without a mutable global.
-      const runTargets = createRuntimeService(ctx.core, terminalRunGlue())
+      // `run:changed` is a core event (@acorn/protocol/nodeEvents.ts) sent from here because terminal
+      // holds the process, not because it owns the fact; the core-side spelling is
+      // node-core/main/notify.ts § broadcastRunTargetChanged.
+      const runTargets = createRuntimeService(ctx.core, terminalRunGlue(), (taskId, targetId, running) =>
+        ctx.events.send({ channel: 'run:changed', taskId, targetId, running }))
       routeDisposables.push(ctx.capabilities.provide(RUN_TARGETS, {
         targets: (taskId) => runTargets.targets(taskId),
         start: (taskId, targetId) => runTargets.start(taskId, targetId),

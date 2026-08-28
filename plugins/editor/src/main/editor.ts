@@ -70,9 +70,9 @@ export const editorBridge = (core: EditorCoreServices, changed: EditorChanged = 
     try {
       await writeFile(abs, content, 'utf8')
       // Deliberately the ordinary invalidation ping and NOT an event: "file saved" stays refused
-      // (docs/future/events/refused.md). A save from another client used to move nothing on this one —
+      // (docs/plugins.md § What is not an event). A save from another client used to move nothing on this one —
       // its tree, its dirty markers and its git status all went stale until something else pinged
-      // (docs/future/events/delivery.md defect 3).
+      // (docs/plugins.md § Hearing a core event).
       changed()
       return { ok: true }
     } catch (e) {

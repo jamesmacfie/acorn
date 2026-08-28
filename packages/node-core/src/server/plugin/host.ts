@@ -26,6 +26,7 @@ import type { ManifestHarnessSpawn } from './harnesses'
 import { runPluginScheduleRoute } from './scheduleRun'
 import { runPluginTaskApply, runPluginTaskCheck } from './taskCheckRun'
 import { clearTaskChecks } from './taskChecks'
+import { declareEmits } from './emits'
 import type { HostPluginContext, NodePlugin, NodePluginContext, PluginStorage } from './types'
 
 // Undos for what `clearRegistrations` can't reach on its own: the WS hub's two slots, which are module
@@ -173,6 +174,13 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   //
   // Registered before init: the runner resolves the plugin's route when the schedule fires, so ordering
   // against the plugin's own route registration does not matter.
+  // What other plugins may hear from this one (./emits.ts). The manifest's declaration for a loaded
+  // plugin, the `NodePlugin.emits` field for a built-in, and the undo goes where every other
+  // registration's does, so unload takes the declaration with it.
+  const registerEmits = (plugin: NodePlugin, binding: LoadedPluginBinding | undefined, onUndo: (undo: () => void) => void): void => {
+    onUndo(declareEmits(plugin.name, binding ? (binding.emits ?? []) : (plugin.emits ?? [])))
+  }
+
   const registerManifestSchedules = (ctx: NodePluginContext, name: string, binding?: LoadedPluginBinding): void => {
     const declared = binding?.schedules ?? []
     if (declared.length === 0) return
@@ -332,6 +340,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       ...(storage ? { storage } : {}),
       onUndo: (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]),
     })
+    registerEmits(plugin, loaded, (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]))
     registerManifestSchedules(ctx, plugin.name, loaded)
     registerManifestTaskChecks(ctx, plugin.name, loaded)
     registerManifestHarnesses(ctx, plugin.name, loaded)
@@ -466,6 +475,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // under the same keys, and registering now throws on the duplicate.
       registerManifestSchedules(candidateCtx, name, next.binding)
       registerManifestTaskChecks(candidateCtx, name, next.binding)
+      // Not buffered: the registry is keyed by plugin id, so the candidate's declaration overwrites the
+      // previous instance's, and a failed reload leaves the fresh manifest's verbs in place, which is
+      // what the settings page shows anyway.
+      registerEmits(next.plugin, next.binding, (undo) => void candidateUndos.push(undo))
       registerManifestHarnesses(candidateCtx, name, next.binding)
       registerManifestCollections(candidateCtx, next.binding)
       registerManifestNodeActions(candidateCtx, next.binding)

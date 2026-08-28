@@ -21,6 +21,10 @@ import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { StreamHandlers, WsChannelHandler } from '../../main/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
+import type { PluginEmit } from '@acorn/protocol/pluginContract.ts'
+
+// Another plugin's live channel, by shape. Validated at subscribe time against the producer's `emits`.
+export type PluginEventChannel = `plugin:${string}:${string}`
 import type { RouteResult } from '../sync/engine'
 import type { StoredConnection } from '../integrations/connections'
 import type { ExternalItemStore } from '../integrations/itemStore'
@@ -240,14 +244,19 @@ export type PluginBroadcast = {
   // action, because ignoring it silently disables a repo's scripts.
   repoConfigTrustNotice(taskId: string): void
   // Hear a core event on this node, whether or not a client is attached
-  // (docs/future/events/subscriptions.md item 1). `event` must be one of NODE_EVENT_CHANNELS, and for
+  // (docs/plugins.md § Hearing another plugin). `event` must be one of NODE_EVENT_CHANNELS, and for
   // a loaded plugin it must also be in its manifest's `permissions.events`. The frame is a hint: the
   // contract is "go re-read", not a payload schema.
   //
   // The send side is `send` above and it is not symmetric with this on purpose. A plugin announces on
-  // its own namespace and hears core's; hearing another plugin needs that plugin's `emits`
-  // declaration, which is item 3 of the events design and does not exist yet.
-  on(event: NodeEventChannel, listener: (frame: WsServerFrame) => void): Disposable
+  // its own namespace and hears core's and, through the producer's `emits` declaration, another
+  // plugin's.
+  //
+  // Since 2026-08-28 `event` may also be another plugin's `plugin:<id>:<verb>`, when that plugin
+  // declared the verb in its `emits` and, for a loaded subscriber, the channel is in its own
+  // `permissions.events`. An absent producer delivers nothing and errors nothing
+  // (docs/plugins.md § Hearing another plugin).
+  on(event: NodeEventChannel | PluginEventChannel, listener: (frame: WsServerFrame) => void): Disposable
   // Claim a WS channel prefix, the token before the first ':' in a channel name. The client mirror is
   // registerWsChannel (@acorn/client-core/wsChannels.ts). Disposal is the host's.
   channel(prefix: string, handler: WsChannelHandler): void
@@ -327,6 +336,10 @@ export type NodePlugin = {
   // Ignored for a plugin loaded from disk, whatever its bundle sets: its chain is the
   // manifest-declared, package-confined one the loader resolved.
   migrationsModule?: string
+  // The compiled tier's `emits` (docs/plugins.md § Hearing another plugin): which of this plugin's
+  // `plugin:<id>:<verb>` verbs another plugin may subscribe to, with a sentence each for the settings
+  // page. A loaded plugin declares the same thing in its manifest and this field is ignored for it.
+  emits?: readonly PluginEmit[]
   // Awaited before the listener binds. Init may open plugin storage, migrate rows, or prepare route
   // state that must be complete before requests are served.
   init(ctx: NodePluginContext): void | Promise<void>
