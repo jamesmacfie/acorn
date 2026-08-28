@@ -1,5 +1,6 @@
 // Renderer broadcasts shared by the main-process surfaces. They go over the authenticated WebSocket
 // hub and do nothing when no socket is connected.
+import type { ConnectionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import { wsBroadcast } from './wsHub'
 
 // Per-tab status is shown for sessions the renderer is not attached to, so a change broadcasts as a
@@ -58,4 +59,21 @@ export function broadcastPluginsChanged(): void {
 // reconnected (docs/future/events/delivery.md defect 1).
 export function broadcastTasksChanged(): void {
   wsBroadcast({ channel: 'tasks:changed' })
+}
+
+// A connection was made, rotated, tested, disabled, re-enabled, or demoted to `needs-auth` because its
+// credential could not be read. Nine writers spread over four files change that status, and until this
+// existed none of them said so: a client refetched on suspicion and an integration plugin found out
+// from the next 401 (docs/future/events/delivery.md defect 4).
+//
+// This one carries a payload where the other three are content-free, and the difference is who the
+// audience is. `tasks:changed` has one consumer that always re-reads the whole list. A revoked
+// credential is heard by every integration plugin on the node, and almost all of them are looking at a
+// different provider. Three fields let a listener drop the frame without a round trip.
+//
+// It is still state rather than a delta, which is what the envelope requires (@acorn/protocol/ws.ts):
+// `status` is what the row now says, not what changed about it, so a client that missed a frame is not
+// left holding a gap. Everything else about the connection stays a fetchable route.
+export function broadcastConnectionChanged(connection: ConnectionChangedEvent): void {
+  wsBroadcast({ channel: 'connection:changed', ...connection })
 }

@@ -274,6 +274,85 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
 // Bumped per re-import so two reloads inside one millisecond still get distinct URLs.
 let importGeneration = 0
 
+// ── Declared dependencies ─────────────────────────────────────────────────────────────────────────
+//
+// `requires.plugins` in the manifest (@acorn/protocol/pluginContract.ts). Two things come out of it, and
+// the first is the one worth having: a package that consumes another plugin's capability used to fail at
+// whichever route reached for it first, with a message about a missing capability and nothing naming the
+// package that was supposed to provide it.
+//
+// A requirement is met by anything present on this node under that id: a built-in, another loaded
+// package, or a client-only one, because a client-only package still contributes its manifest. Disabled
+// is not checked here. The loader does not know what the owner has switched off, and a plugin disabled
+// after install should read as disabled rather than as a package that will not load.
+
+const majorOf = (version: string): string => version.trim().split('.')[0] ?? ''
+
+type UnmetRequirement = { id: string; dir: string; reason: string }
+
+function resolveRequires(
+  loaded: readonly LoadedPlugin[],
+  installed: readonly InstalledPlugin[],
+  builtins: ReadonlySet<string>,
+): UnmetRequirement[] {
+  const versions = new Map<string, string>()
+  for (const entry of installed) versions.set(entry.manifest.id, entry.manifest.version)
+  const unmet: UnmetRequirement[] = []
+  for (const entry of installed) {
+    // One reason per package. A manifest missing three dependencies is one broken package, and three
+    // rows in Settings → Plugins would read as three.
+    for (const dependency of entry.manifest.requires.plugins) {
+      // A built-in ships with this binary, so its version is the app's and there is nothing to range
+      // over. Present is the whole answer.
+      if (builtins.has(dependency.id)) continue
+      const version = versions.get(dependency.id)
+      if (version === undefined) {
+        unmet.push({ id: entry.manifest.id, dir: entry.dir, reason: `requires the plugin '${dependency.id}', which is not installed on this node` })
+        break
+      }
+      if (dependency.version && !speaksApiVersion(dependency.version, majorOf(version))) {
+        unmet.push({ id: entry.manifest.id, dir: entry.dir, reason: `requires '${dependency.id}' version ${dependency.version}; this node has ${version}` })
+        break
+      }
+    }
+  }
+  return unmet
+}
+
+function dropPlugin(loaded: LoadedPlugin[], installed: InstalledPlugin[], id: string): void {
+  const loadedAt = loaded.findIndex((entry) => entry.manifest.id === id)
+  if (loadedAt >= 0) loaded.splice(loadedAt, 1)
+  const installedAt = installed.findIndex((entry) => entry.manifest.id === id)
+  if (installedAt >= 0) installed.splice(installedAt, 1)
+}
+
+/** The second thing `requires` buys: a plugin initializes after the ones it named.
+ *
+ * Stable, so a package that declares nothing keeps the position the directory sort gave it, and the
+ * built-ins the composition root puts in front of this list are untouched. A cycle is left in whatever
+ * order it arrived: refusing to load either half would punish both for one author's mistake, and
+ * `ready` is still there for the case init order cannot fix (server/plugin/host.ts). */
+function orderByRequires(loaded: readonly LoadedPlugin[]): LoadedPlugin[] {
+  const byId = new Map(loaded.map((entry) => [entry.manifest.id, entry]))
+  const ordered: LoadedPlugin[] = []
+  const placed = new Set<string>()
+  const visiting = new Set<string>()
+  const place = (entry: LoadedPlugin): void => {
+    const id = entry.manifest.id
+    if (placed.has(id) || visiting.has(id)) return
+    visiting.add(id)
+    for (const dependency of entry.manifest.requires.plugins) {
+      const provider = byId.get(dependency.id)
+      if (provider) place(provider)
+    }
+    visiting.delete(id)
+    placed.add(id)
+    ordered.push(entry)
+  }
+  for (const entry of loaded) place(entry)
+  return ordered
+}
+
 export async function loadExternalPlugins(
   dataRoot: string,
   options: {
@@ -401,6 +480,20 @@ export async function loadExternalPlugins(
     installed.push(entry)
   }
 
+  // Dependencies, once every package on disk has been seen. It cannot happen inside the loop above: a
+  // package is free to require one whose directory sorts after its own.
+  //
+  // To a fixpoint, because dropping a package can leave one that required it unmet. The list shrinks
+  // every round, so it terminates in at most as many rounds as there are packages.
+  for (;;) {
+    const unmet = resolveRequires(loaded, installed, builtins)
+    if (unmet.length === 0) break
+    for (const entry of unmet) {
+      failures.push({ id: entry.id, dir: entry.dir, reason: entry.reason })
+      dropPlugin(loaded, installed, entry.id)
+    }
+  }
+
   for (const failure of failures) console.error(`[plugins] ${failure.id}: ${failure.reason}`)
-  return { loaded, installed, failures: stamped(failures) }
+  return { loaded: orderByRequires(loaded), installed, failures: stamped(failures) }
 }

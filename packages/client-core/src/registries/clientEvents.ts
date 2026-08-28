@@ -2,6 +2,7 @@ import { dispatchLayout } from '../tasks/tasks'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { onScopeEvicted } from './scopeEviction'
+import type { ConnectionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
@@ -59,6 +60,11 @@ export type ClientEventMap = {
   // channel with no replay, so a delta would be wrong for a client that missed a frame
   // (@acorn/protocol/ws.ts).
   'tasks:changed': Record<string, never>
+  // The exception to the empty payload above, and the reason is the audience. Every integration plugin
+  // hears this one, and almost all of them are looking at a different provider, so three fields let a
+  // listener drop the frame without a round trip. Still state rather than a delta: `status` is what the
+  // connection now is (node-core/main/notify.ts § broadcastConnectionChanged).
+  'connection:changed': ConnectionChangedEvent
 }
 
 type Listener<T> = (payload: T) => void

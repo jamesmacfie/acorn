@@ -62,6 +62,18 @@ export type {
 // its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read core routes, or another
 // plugin's, on its behalf.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
+  // A package cannot depend on itself, and a duplicate id is a manifest that disagrees with itself
+  // about which range it needs. Both need `id`, so neither can live on the field.
+  const required = new Set<string>()
+  for (const [index, dependency] of manifest.requires.plugins.entries()) {
+    if (dependency.id === manifest.id) {
+      ctx.addIssue({ code: 'custom', path: ['requires', 'plugins', index, 'id'], message: 'a plugin cannot require itself' })
+    }
+    if (required.has(dependency.id)) {
+      ctx.addIssue({ code: 'custom', path: ['requires', 'plugins', index, 'id'], message: `'${dependency.id}' is required twice` })
+    }
+    required.add(dependency.id)
+  }
   const { frames, sources, slots, palette, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, collections, schedules, taskChecks, harnesses } = manifest.contributions
   const own = `/v2/p/${manifest.id}/`
   // The renderer twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells

@@ -11,6 +11,7 @@ import { providerRequestScheduler } from './budgetRuntime'
 import { connectionProviderRegistry } from './connectionRegistry'
 import { getConnection } from './connections'
 import { ProviderOperationError, type ProviderProject } from './types'
+import { broadcastConnectionChanged } from '../../main/notify'
 
 const failure = (error: ProviderErrorCode, status: RouteFailure['status']): RouteResult<never> => ({
   ok: false,
@@ -91,6 +92,7 @@ export async function listConnectionProjects(args: {
         .update(schema.integrations)
         .set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: Date.now() })
         .where(eq(schema.integrations.id, connection.id))
+      broadcastConnectionChanged({ integrationId: connection.id, providerId: connection.provider, status: 'needs-auth' })
       return failure('provider_secret_unreadable', 401)
     }
     // 400 does not survive as a client status. A provider rejecting its own request is this node's

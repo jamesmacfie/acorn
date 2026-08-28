@@ -1210,3 +1210,30 @@ describe('forward compatibility: unknown is retained and reported', () => {
     expect(parse({ contributions: { commands: [] } })).toMatchObject({ ok: true, unknown: [] })
   })
 })
+
+// The two cross-field rules on `requires`, here for the same reason as the three above: both need `id`,
+// so neither can live on the field.
+describe('declared dependencies', () => {
+  const requires = (plugins: unknown[]) =>
+    pluginManifestSchema.safeParse({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', requires: { plugins } })
+
+  it('refuses a package that requires itself', () => {
+    const result = requires([{ id: 'board' }])
+    expect(result.success).toBe(false)
+    expect(!result.success && result.error.issues[0].message).toBe('a plugin cannot require itself')
+  })
+
+  it('refuses the same dependency twice, since the two ranges could disagree', () => {
+    const result = requires([{ id: 'agents', version: '1' }, { id: 'agents', version: '2' }])
+    expect(result.success).toBe(false)
+    expect(!result.success && result.error.issues[0].message).toContain('required twice')
+  })
+
+  it('accepts a plain id and an id with a major range', () => {
+    expect(requires([{ id: 'agents' }, { id: 'workflows', version: '2 || 3' }]).success).toBe(true)
+  })
+
+  it('refuses a range that is not the majors-only grammar', () => {
+    expect(requires([{ id: 'agents', version: '^1.2.0' }]).success).toBe(false)
+  })
+})

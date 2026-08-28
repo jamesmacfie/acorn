@@ -30,6 +30,7 @@ export const SUBSCRIBABLE_CHANNELS = [
   'runtime:node-removed',
   'runtime:node-switched',
   'tasks:changed',
+  'connection:changed',
 ] as const
 
 export type SubscribableChannel = (typeof SUBSCRIBABLE_CHANNELS)[number]
@@ -42,6 +43,11 @@ const CHANNEL_DESCRIPTIONS = {
   'runtime:node-removed': { text: 'Receive node removal events', icon: 'radio' },
   'runtime:node-switched': { text: 'Receive active-node change events', icon: 'radio' },
   'tasks:changed': { text: 'Receive notice when this node’s tasks change', icon: 'radio' },
+  // Named for what the owner is consenting to rather than for the frame: the payload carries a provider
+  // id and a status, so a plugin granted this learns which of their accounts stopped working and when
+  // one is reconnected. That is worth a sentence of its own, because it is more than the other four
+  // give away.
+  'connection:changed': { text: 'See which of this node’s connected accounts change status', icon: 'radio' },
 } as const satisfies Record<SubscribableChannel, GrantDescription>
 
 /** One of the shell's own channels. Stays a narrow predicate, because its callers go on to index
@@ -53,10 +59,10 @@ export const isSubscribable = (channel: string): channel is SubscribableChannel 
 // the wire (node-core/server/plugin/context.ts § on), so a manifest naming one of these is asking for
 // its node half to hear a core event, not for its frame to subscribe to anything.
 //
-// `tasks:changed` is in both lists, which is what a node-emitted fact looks like: the same name, the
-// same sentence, one grant, and either half of the plugin may take it up. `plugins:changed` is not in
-// the frame list because a frame has no roster to reconcile — that is the shell's job, and it does it
-// whether or not a plugin asked.
+// `tasks:changed` and `connection:changed` are in both lists, which is what a node-emitted fact looks
+// like: the same name, the same sentence, one grant, and either half of the plugin may take it up.
+// `plugins:changed` is not in the frame list because a frame has no roster to reconcile. That is the
+// shell's job, and it does it whether or not a plugin asked.
 const NODE_EVENT_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   'plugins:changed': { text: 'Receive notice when this node’s plugin set changes', icon: 'radio' },
 }

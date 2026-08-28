@@ -372,6 +372,28 @@ describe('architecture boundaries', () => {
     expect(entrypoints.length).toBeGreaterThan(40)
   })
 
+  it('protocol declares an enumerated exports map, not a wildcard', () => {
+    // The first of the five library packages to close (docs/future/phased-review-steps/README.md item
+    // 5). `node-core`, `client-core`, `dashboards-core` and `desktop-helper` still declare
+    // `"./*": "./src/*"`, and until they close the rule above is what stands in for the module system.
+    //
+    // Enumerated rather than generated from the directory, because "should this be public" is the
+    // decision the map exists to record. So this checks the two things a human cannot: that no target
+    // has moved out from under its entry, and that no test file is reachable from another package.
+    const proto = byName.get('@acorn/protocol')!
+    const manifest = JSON.parse(readFileSync(join(proto.dir, 'package.json'), 'utf8')) as { exports?: Record<string, string> }
+    const exports = manifest.exports ?? {}
+    const problems: string[] = []
+    for (const [subpath, target] of Object.entries(exports)) {
+      if (subpath.includes('*')) problems.push(`${subpath} is a wildcard`)
+      if (subpath.includes('.test.')) problems.push(`${subpath} is a test file`)
+      if (!existsSync(join(proto.dir, target))) problems.push(`${subpath} -> ${target} does not exist`)
+    }
+    expect(problems.sort()).toEqual([])
+    // Anti-vacuity: an empty map would satisfy every check above, and the repo does import through this.
+    expect(Object.keys(exports).length).toBeGreaterThan(30)
+  })
+
   it('protocol declares no plugin route', () => {
     // docs/architecture-overview.md § Package boundaries: @acorn/protocol owns no plugin's wire
     // surface.
