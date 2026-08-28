@@ -1,4 +1,4 @@
-// The client half of `connection:changed` (docs/future/events/delivery.md defect 4).
+// The client half of `connection:changed` (docs/plugins.md § Hearing a core event).
 //
 // Nine writers on the node move a connection's status, and six of them are not the owner clicking
 // anything: a credential that stopped being readable demotes itself to `needs-auth` mid-request. Until

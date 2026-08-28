@@ -64,7 +64,7 @@ a section, things that number in the dozens on a screen.
 ## Hooks on streams or per-keystroke paths
 
 PTY output, editor keystrokes, the agent token stream, per-render and per-selection changes.
-`docs/future/events/refused.md` refuses these as events; a hook is more expensive than an event, so
+`docs/plugins.md § What is not an event` refuses these as events; a hook is more expensive than an event, so
 it is refused harder.
 
 ## A transform that changes the payload's shape

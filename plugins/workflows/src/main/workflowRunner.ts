@@ -47,7 +47,7 @@ export type RunnerDeps = {
   failingChecks(taskId: string): Promise<string | null>
   notify(taskId: string, kind: 'gate' | 'run-done', title: string): void
   statusChanged?(): void
-  /** A run began or reached a terminal state. Per run, never per step (docs/future/events/refused.md). */
+  /** A run began or reached a terminal state. Per run, never per step (docs/plugins.md § What is not an event). */
   runChanged?(runId: string, status: string): void
   emitStepEvent?(runId: string, stepId: string, event: StreamEvent): void
   onRunTerminal?(taskId: string, runId: string): Promise<void>

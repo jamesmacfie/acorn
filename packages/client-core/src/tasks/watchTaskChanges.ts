@@ -1,4 +1,4 @@
-// The client half of `tasks:changed` (docs/future/events/delivery.md defect 1).
+// The client half of `tasks:changed` (docs/plugins.md § Hearing a core event).
 //
 // Every task write on the node announces itself (node-core/main/notify.ts § broadcastTasksChanged) and
 // this turns that into one cache invalidation. The frame is content-free by design, so there is

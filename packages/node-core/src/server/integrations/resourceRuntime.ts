@@ -82,7 +82,7 @@ export async function runProviderResource<TInput, TOutput>(args: {
             resource.refresh({ ...context(), secret }, args.input),
           ),
         )
-        // The provider's own `items-changed` verb (docs/future/events/plugin-events.md), sent from here
+        // The provider's own `items-changed` verb (docs/plugins.md § Hearing another plugin), sent from here
         // because core owns the mirror write every provider converges on: one site instead of one per
         // plugin, and a loaded provider never has to reach for `ctx.events` from inside a refresh.
         // Once per refresh, not per row, so a list of two hundred items is one frame.

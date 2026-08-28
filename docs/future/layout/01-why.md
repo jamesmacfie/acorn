@@ -142,7 +142,7 @@ the DOM and, later, the terminal. The terminal is the strict one and it sets the
 
 The owner also wanted plugins that intercept events: forward them to analytics or an audit log, block
 them, or change them and use the changed data elsewhere in the plugin's UI. The first two are what
-[docs/future/events/](../events/README.md) already designs: node-side `ctx.events.on`, a cross-plugin
+[docs/future/events.md](../events.md) already designs: node-side `ctx.events.on`, a cross-plugin
 grant, fan-out, fire and forget. An audit plugin is a subscriber.
 
 Block and modify are not events. An event has already happened; "task archived" cannot be blocked

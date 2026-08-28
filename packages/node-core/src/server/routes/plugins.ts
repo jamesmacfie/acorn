@@ -117,7 +117,7 @@ export const plugins = new Hono<AppEnv>()
   // Every one of them broadcasts `plugins:changed`. Until 2026-08-28 only `/:id/reload` did
   // (main/pluginReload.ts), so a second window kept a stale roster and a stale restart banner until
   // someone refetched by hand — one desktop and one node makes that an edge case, and a fleet makes it
-  // the normal one (docs/future/events/delivery.md defect 2). The frame is content-free: the client
+  // the normal one (docs/plugins.md § Hearing a core event). The frame is content-free: the client
   // re-reads the roster it can already fetch.
   .post('/install', async (c) => {
     const missing = requireIdempotencyKey(c)

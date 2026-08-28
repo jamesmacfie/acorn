@@ -94,6 +94,11 @@ export type TaskStatus = {
   dirty: boolean
   dirtyCount: number
   missing: boolean
+  // Where the worktree's HEAD is. Both null when the directory is missing or git could not answer;
+  // `branch` alone is null on a detached HEAD. The node compares `head` between polls to emit
+  // `head:changed` (@acorn/protocol/nodeEvents.ts).
+  branch: string | null
+  head: string | null
 }
 
 // A launchable profile as the renderer sees it (docs/terminal-and-agents.md). `available` is false when the command

@@ -16,6 +16,8 @@ const sameTaskStatus = (left: TaskStatus, right: TaskStatus): boolean =>
   && left.dirty === right.dirty
   && left.dirtyCount === right.dirtyCount
   && left.missing === right.missing
+  && left.branch === right.branch
+  && left.head === right.head
 
 export function taskStatusesChanged(
   current: Readonly<Record<string, TaskStatus>>,

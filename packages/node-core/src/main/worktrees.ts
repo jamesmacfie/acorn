@@ -189,16 +189,23 @@ export async function worktreeDirty(path: string): Promise<boolean> {
 }
 
 // Dirty flag and changed-file count for the rail and footer markers (docs/workspaces-and-tasks.md).
-export async function worktreePorcelain(path: string): Promise<{ dirty: boolean; count: number }> {
+// `--porcelain=v2 --branch` adds `# branch.oid` and `# branch.head` header lines ahead of the entries,
+// so one process answers both "is it dirty" and "where is HEAD" (docs/plugins.md § Hearing a core event
+// § HEAD moved). `branch` is null on a detached HEAD, `head` null when git failed or the tree is
+// unborn.
+export async function worktreePorcelain(path: string): Promise<{ dirty: boolean; count: number; branch: string | null; head: string | null }> {
   try {
-    const { stdout } = await gitOrThrow(['status', '--porcelain'], { cwd: path, timeoutMs: 10_000 })
-    const count = stdout.split('\n').filter((l) => l.trim().length > 0).length
-    return { dirty: count > 0, count }
+    const { stdout } = await gitOrThrow(['status', '--porcelain=v2', '--branch'], { cwd: path, timeoutMs: 10_000 })
+    const lines = stdout.split('\n').filter((l) => l.trim().length > 0)
+    const header = (key: string) => lines.find((l) => l.startsWith(`# ${key} `))?.slice(key.length + 3).trim() ?? null
+    const count = lines.filter((l) => !l.startsWith('#')).length
+    const branch = header('branch.head')
+    const head = header('branch.oid')
+    return { dirty: count > 0, count, branch: branch === '(detached)' ? null : branch, head: head === '(initial)' ? null : head }
   } catch {
-    return { dirty: false, count: 0 }
+    return { dirty: false, count: 0, branch: null, head: null }
   }
 }
-
 
 // Remove a worktree through the main checkout. Refuses a dirty worktree unless force is set, which
 // discards uncommitted changes. The UI surfaces that, so removal is never quietly destructive.

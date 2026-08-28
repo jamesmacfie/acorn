@@ -13,6 +13,7 @@ import type { AppDatabase } from '../server/db'
 import { eq } from 'drizzle-orm'
 import { schema } from '../server/db'
 import { getProject } from './projects'
+import { broadcastProjectChanged } from './notify'
 
 const runTargetWireSchema = z.object({
   id: z.string().min(1),
@@ -100,6 +101,7 @@ export async function setProjectConfig(
 
   if (Object.keys(set).length) {
     await db.update(schema.projects).set({ ...set, updatedAt: Date.now() }).where(eq(schema.projects.id, projectId))
+    broadcastProjectChanged({ projectId })
   }
   const updated = await getProject(db, projectId)
   return updated ? { ok: true, response: projectConfigFromRow(updated) } : { ok: false, reason: 'No such project.' }
@@ -118,6 +120,7 @@ export async function setProjectRunTargets(db: AppDatabase, projectId: string, j
     }
   }
   await db.update(schema.projects).set({ runTargets: value, updatedAt: Date.now() }).where(eq(schema.projects.id, projectId))
+  broadcastProjectChanged({ projectId })
   const updated = await getProject(db, projectId)
   return updated ? { ok: true, response: projectConfigFromRow(updated) } : { ok: false, reason: 'No such project.' }
 }

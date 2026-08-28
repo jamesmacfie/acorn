@@ -43,7 +43,7 @@ Where a page and this folder disagree, this folder wins. Where this folder and a
    one engine with a DOM adapter now and a terminal adapter later.
 6. **Plugins as interceptors.** Observe, transform, or veto a decision before it happens. That is
    a hook, not an event, and it is a different contract from the one in
-   [docs/future/events/](../events/README.md), which stays as it is.
+   [docs/future/events.md](../events.md), which stays as it is.
 
 ## Decisions taken
 
@@ -142,7 +142,7 @@ conventions apply throughout:
 ## What this folder is not
 
 - It does not build the PWA or the terminal. It keeps them possible.
-- It does not redesign events. [docs/future/events/](../events/README.md) is untouched; hooks sit
+- It does not redesign events. [docs/future/events.md](../events.md) is untouched; hooks sit
   in front of a decision and events come after it.
 - It does not change the node side of plugins except to add `ctx.hooks` and to convert the five
   existing single-slot seams to it.

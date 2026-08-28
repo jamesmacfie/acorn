@@ -24,6 +24,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   version: '1.0.0',
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
+  emits: [],
   contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], collections: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [] },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,
@@ -220,6 +221,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
       version: '2.1.0',
       apiVersion: '1',
       permissions: NO_PERMISSIONS,
+      emits: [],
       // Passed through untouched for the device to register surfaces from (docs/plugins.md). The node
       // neither reads nor renders it.
       contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], collections: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [] },
@@ -248,6 +250,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
         version: '1.0.0',
         apiVersion: '1',
         permissions: NO_PERMISSIONS,
+        emits: [],
         contributions: { frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], collections: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [] },
         client: { hash: 'a'.repeat(64), bytes: 12 },
       },

@@ -3,7 +3,7 @@ import { railStatusMarkers, type RailStatusInputs } from './railStatus'
 import { resolveRailMarkers } from '../tabs/railMarkers'
 import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 
-const status = (p: Partial<TaskStatus>): TaskStatus => ({ taskId: 't', worktreePath: null, dirty: false, dirtyCount: 0, missing: false, ...p })
+const status = (p: Partial<TaskStatus>): TaskStatus => ({ taskId: 't', worktreePath: null, dirty: false, dirtyCount: 0, missing: false, branch: null, head: null, ...p })
 
 const inputs = (over: Partial<RailStatusInputs> = {}): RailStatusInputs => ({
   checks: null, unread: false, status: status({}), archiving: false, pinned: false, ...over,

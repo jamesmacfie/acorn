@@ -1,5 +1,5 @@
 import { createResource, onCleanup } from 'solid-js'
-import { closeTunnelsForTask, type PaneContribution, recipeBrowserUrl, runApi, type Task, taskBridge, tunnelUrl } from '@acorn/plugin-api/client'
+import { clientEvents, closeTunnelsForTask, type PaneContribution, recipeBrowserUrl, runApi, type Task, taskBridge, tunnelUrl } from '@acorn/plugin-api/client'
 import PreviewPane from './PreviewPane'
 
 export function PreviewTaskPane(props: { task: Task }) {
@@ -8,13 +8,18 @@ export function PreviewTaskPane(props: { task: Task }) {
     () => props.task.projectId,
     async () => (await api.project.get(props.task.projectId))?.config ?? null,
   )
-  const [targets] = createResource(
+  const [targets, { refetch: refetchTargets }] = createResource(
     () => props.task.id,
     async (taskId) => {
       const result = await runApi.targets(taskId)
       return 'targets' in result ? result.targets : []
     },
   )
+  // A run target starting or stopping is a node event now (docs/plugins.md § Hearing a core event
+  // target state), so the target list re-reads on the signal rather than only on mount.
+  onCleanup(clientEvents.on('run:changed', (event) => {
+    if (event.taskId === props.task.id) void refetchTargets()
+  }))
   const [runUrl] = createResource(
     () => ({ id: props.task.id, running: (targets() ?? []).map((target) => `${target.id}:${target.running}`).join(',') }),
     async ({ id }) => (await runApi.defaultUrl(id)) ?? null,

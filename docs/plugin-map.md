@@ -159,15 +159,18 @@ node-environment test.
 
 ## Events
 
-The honest version first. Acorn has no cross-plugin event bus. `ctx.events` is an invalidation channel
-between a node and the clients attached to it: no durability, no replay, no delivery guarantee. A client
-that misses a frame refetches after the gap, and that is the whole contract. Durable history belongs in
-your own tables.
+The honest version first. `ctx.events` is an invalidation channel, not a bus: no durability, no
+replay, no delivery guarantee. A client that misses a frame refetches after the gap, and that is the
+whole contract. Durable history belongs in your own tables.
 
-There is a receive side now, and it is narrow: `ctx.events.on` hears the core events in
-`NODE_EVENT_CHANNELS`, on this node, whether or not a client is attached. Hearing *another plugin* is
-not built — that needs a producer's `emits` declaration, item 3 of
-[docs/future/events/](./future/events/README.md). Until then the mechanisms below are what you have.
+The receive side is `ctx.events.on`. It hears the core events in `NODE_EVENT_CHANNELS`
+(`tasks`, `connection`, `head`, `run`, `agent-session`, `project`, and `plugins`, each `:changed`) on
+this node whether or not a client is attached, and it hears another plugin's `plugin:<id>:<verb>` when
+that plugin declared the verb in its `emits` and your manifest named the channel in
+`permissions.events`. A producer that is not running delivers nothing and errors nothing, so re-read on
+receipt and keep a poll only where "no events, ever" would be wrong. The rules for what may be an event
+and what never will be are in `docs/plugins.md § Hearing another plugin`; what is still unbuilt is in
+[docs/future/events.md](./future/events.md).
 
 ### Broadcast to clients, from the node
 
@@ -542,4 +545,4 @@ Collected from the gotchas that cost the most time.
   manifest and the install loop.
 - [extensibility.md](./extensibility.md) for why the two tiers exist and what each is allowed to become.
 - [panes.md](./panes.md) for panes and reference panels.
-- [docs/future/events/](./future/events/README.md) for the cross-plugin event design that is not built.
+- [docs/future/events.md](./future/events.md) for the three event items still unbuilt.

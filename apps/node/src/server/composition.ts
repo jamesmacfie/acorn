@@ -54,6 +54,7 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
       {
         permissions: entry.manifest.permissions.node,
         events: entry.manifest.permissions.events,
+        emits: entry.manifest.emits,
         storage: entry.storage,
         schedules: entry.manifest.contributions.schedules,
         collections: entry.manifest.contributions.collections,

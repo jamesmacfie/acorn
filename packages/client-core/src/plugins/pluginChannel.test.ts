@@ -51,8 +51,13 @@ describe('frame delivery', () => {
     expect(alerts).toEqual([{ level: 'warn' }])
   })
 
-  it('refuses a channel belonging to another plugin, and one that is not a channel', () => {
-    expect(() => onPluginFrame('board', 'plugin:other:sample', () => {})).toThrow(/belongs to 'other'/)
+  it('accepts another plugin\'s channel (the broker holds the grant), and refuses a non-channel', () => {
+    // Cross-plugin subscription (docs/plugins.md § Hearing another plugin). Whether the manifest named the
+    // channel is checked upstream in the broker; this layer only cares that it parses.
+    const seen: unknown[] = []
+    onPluginFrame('board', 'plugin:other:sample', (payload) => seen.push(payload))
+    routeWsFrame({ channel: 'plugin:other:sample', n: 1 })
+    expect(seen).toEqual([{ n: 1 }])
     expect(() => onPluginFrame('board', 'runtime:task-archived', () => {})).toThrow(/not a plugin channel/)
     // Three colons parse as neither: a verb cannot hold the delimiter.
     expect(() => onPluginFrame('board', 'plugin:board:a:b', () => {})).toThrow(/not a plugin channel/)

@@ -16,7 +16,7 @@ Multi-file designs with an order of work.
 | Folder | What it is | Status, 2026-08-28 |
 | --- | --- | --- |
 | [layout/](./layout/README.md) | Host-owned layouts, a closed component kit, remote component trees, five extension kinds, host-owned focus and keys. Ten phases, desktop only. | Proposal. Not started. |
-| [events/](./events/README.md) | Node-emitted core events, plugin events on `plugin:<id>:*`, and cross-plugin subscription. | Delivery done; `tasks:changed` and `connection:changed` shipped; the catalogue and cross-plugin grant remain. |
+| [events.md](./events.md) | Node-emitted core events, plugin events on `plugin:<id>:*`, and cross-plugin subscription. | Shipped 2026-08-28; three items open (preview URL, `emits` on the settings page, connection deletion). |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
@@ -47,5 +47,6 @@ doc owns it and the others point.
 
 ## Retired folders
 
-`phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, and the single files
-`events.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
+`phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` (replaced by
+the single `events.md` above on 2026-08-28 when all but three items shipped), and the single files
+`live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.

@@ -50,7 +50,7 @@ trail survives the deletion.
 | `docs/future/dashboards/refused.md` | done 2026-08-28 | § "No plugin-shipped panel components, no widget toolkit in the wire format" is restated: still no static schema; remote trees are a different object and are not dashboard panels. |
 | `docs/future/ecosystem/shell-vision.md`, `blockers.md` | done 2026-08-28 | § "The stance" and § "What is deliberately not on this list" updated for the tree. |
 | `docs/future/marketing/plugin-reference.md`, `site-map.md` | 9 (the README already warns to write against the tree) | The contribution catalogue and the client-half description. |
-| `docs/future/events/README.md`, `delivery.md`, `subscriptions.md`, `core-events.md` | 9 | Where they say "frame," say "frame or tree." § "Focus changed" in core-events notes focus is host-owned state. Nothing about the events design itself changes. |
+| `docs/future/events.md` | 9 | Where they say "frame," say "frame or tree." (The "focus changed" entry already moved out of core-events into phase 2 on 2026-08-28.) Nothing about the events design itself changes. |
 | `docs/future/README.md` | now, 9 | The folder index names this programme and, at phase 9, marks it shipped. |
 | `docs/next-review.md`, `docs/release-notes-vnext.md` | 9 | Retarget the pointer; add release notes entries. (`live-qa.md` was folded into `docs/testing.md § The smoke checklist` on 2026-08-28; its items 11 to 16 gain keyboard and remote-plugin entries in phase 9.) |
 

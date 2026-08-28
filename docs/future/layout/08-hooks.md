@@ -9,7 +9,7 @@ route, the host runs the chain and hands the owner a verdict.
 
 An event has already happened. "Task archived" cannot be blocked after the archive. Events fan out,
 fire and forget, carry state rather than deltas, and are designed in
-[docs/future/events/](../events/README.md), which this folder does not touch. An audit or analytics
+[docs/future/events.md](../events.md), which this folder does not touch. An audit or analytics
 plugin is an event subscriber.
 
 A hook runs *before*, in a chain, with a return value. It is request and response, ordered, timed
@@ -159,7 +159,7 @@ Two places hooks touch the drawing side, so one vocabulary covers both:
 - A transform that changes the payload's shape.
 - A hook the owner did not declare, or a mode the owner did not allow.
 - Hooks that run on the client. The chain is node-side; a client-only hook would fail the delivery
-  rule in `docs/future/events/delivery.md` for the same reason a client-only event does.
+  delivery rule (node-emitted, never renderer-local; `docs/plugins.md § Hearing a core event`) for the same reason a client-only event does.
 
 ## Tests
 

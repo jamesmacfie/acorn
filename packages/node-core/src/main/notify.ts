@@ -1,6 +1,6 @@
 // Renderer broadcasts shared by the main-process surfaces. They go over the authenticated WebSocket
 // hub and do nothing when no socket is connected.
-import type { ConnectionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import { wsBroadcast } from './wsHub'
 
 // Per-tab status is shown for sessions the renderer is not attached to, so a change broadcasts as a
@@ -56,7 +56,7 @@ export function broadcastPluginsChanged(): void {
 // "the task list moved" from "a terminal's status moved" — the first invalidates a query, the second
 // re-pulls a session list — and because a plugin's node half can subscribe to this one by name
 // (@acorn/protocol/nodeEvents.ts). Without it a second client kept a stale task list until it
-// reconnected (docs/future/events/delivery.md defect 1).
+// reconnected (docs/plugins.md § Hearing a core event).
 export function broadcastTasksChanged(): void {
   wsBroadcast({ channel: 'tasks:changed' })
 }
@@ -64,7 +64,7 @@ export function broadcastTasksChanged(): void {
 // A connection was made, rotated, tested, disabled, re-enabled, or demoted to `needs-auth` because its
 // credential could not be read. Nine writers spread over four files change that status, and until this
 // existed none of them said so: a client refetched on suspicion and an integration plugin found out
-// from the next 401 (docs/future/events/delivery.md defect 4).
+// from the next 401 (docs/plugins.md § Hearing a core event).
 //
 // This one carries a payload where the other three are content-free, and the difference is who the
 // audience is. `tasks:changed` has one consumer that always re-reads the whole list. A revoked
@@ -76,4 +76,34 @@ export function broadcastTasksChanged(): void {
 // left holding a gap. Everything else about the connection stays a fetchable route.
 export function broadcastConnectionChanged(connection: ConnectionChangedEvent): void {
   wsBroadcast({ channel: 'connection:changed', ...connection })
+}
+
+// A task worktree's HEAD moved (docs/plugins.md § Hearing a core event). Detected by
+// computeTaskStatuses (main/taskWorktree.ts), which already runs `git status` for every active worktree
+// and now reads the branch tip too, so a commit made from a terminal, an agent, or an outside editor is
+// noticed the same way one made from the changes pane is. Carries a payload because the audience is CI,
+// deploy and scan plugins that act on the SHA itself rather than re-reading a list.
+export function broadcastHeadChanged(event: HeadChangedEvent): void {
+  wsBroadcast({ channel: 'head:changed', ...event })
+}
+
+// A declared run target started or stopped (core-events.md § Run target state). Emitted by the terminal
+// plugin, which holds the process, through `ctx.events.send`; this helper is the core-side twin so the
+// two never spell the frame differently.
+export function broadcastRunTargetChanged(event: RunTargetChangedEvent): void {
+  wsBroadcast({ channel: 'run:changed', ...event })
+}
+
+// A managed agent session finished a turn or asked for attention (core-events.md § Agent session
+// state). Same two kinds as the agents webhook service, on purpose: there is one reduction of the
+// session stream to human-scale edges, and it is deployed.
+export function broadcastAgentSessionChanged(event: AgentSessionChangedEvent): void {
+  wsBroadcast({ channel: 'agent-session:changed', ...event })
+}
+
+// A project row or its config moved (core-events.md § Project changed). Preview reads browser rules
+// and the preview mode, terminal reads run targets, changes reads the branch prefix, and until this
+// existed none of them heard a write; onboarding hand-invalidated its own cache after creating one.
+export function broadcastProjectChanged(event: ProjectChangedEvent): void {
+  wsBroadcast({ channel: 'project:changed', ...event })
 }

@@ -69,12 +69,16 @@ export function onPluginPush(listener: (pluginId: string) => void): () => void {
   return () => void pushListeners.delete(listener)
 }
 
-/** One frame's subscription to one of its own plugin's channels. Another plugin's channel throws, the
- *  same answer its routes give, and the caller turns the throw into the bridge's refusal. */
-export function onPluginFrame(pluginId: string, channel: string, listener: FrameListener): () => void {
+/** One frame's subscription to a plugin channel: its own, or another plugin's that the manifest named
+ *  in `permissions.events` (docs/plugins.md § Hearing another plugin). The grant
+ *  check is the broker's, before this is reached; this only refuses a malformed channel.
+ *
+ *  Whether the producer declared the verb in its `emits` is enforced on the node for node halves and not
+ *  here: a frame's frames arrive over the socket whatever this does, so the check would be cosmetic. An
+ *  absent producer delivers nothing, which is the contract. */
+export function onPluginFrame(_pluginId: string, channel: string, listener: FrameListener): () => void {
   const parsed = parsePluginChannel(channel)
   if (!parsed) throw new Error(`${channel} is not a plugin channel`)
-  if (parsed.pluginId !== pluginId) throw new Error(`${channel} belongs to '${parsed.pluginId}', not '${pluginId}'`)
   ensurePluginChannel()
   wsConnect()
   let set = frameListeners.get(channel)

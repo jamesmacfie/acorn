@@ -1327,7 +1327,8 @@ The first-party plugins use it for one thing: announcing that state they own has
 (`plugin:github:pr-synced`, `plugin:notes:notes-changed`, `plugin:workflows:run-changed`, and so
 on). The catalogue, the payload rule (state to re-read, never a delta) and the one exception — core
 sends `plugin:<provider>:items-changed` itself after a mirrored-resource refresh, because the write is
-core's — are in [docs/future/events/plugin-events.md](./future/events/plugin-events.md).
+core's — are recorded per plugin in git history (`git log -- docs/future/events`); the rule
+itself is § Hearing another plugin below, and the emitted verbs are each plugin's `emits`.
 
 Four properties worth knowing before building on it:
 
@@ -2132,9 +2133,44 @@ not a client is attached, which is the point on a node nobody is sitting at. The
 publishes (`NODE_EVENT_CHANNELS` in `packages/protocol/src/nodeEvents.ts`) and, for a loaded plugin,
 one its manifest named in `permissions.events` — the same grant list its frames subscribe against, so
 there is one vocabulary and one trust sentence per grant rather than two of each. Disposal follows
-unload, exactly as a route registration does. The catalogue is deliberately short: it holds what core
-broadcasts today, and hearing *another plugin* needs that plugin's `emits` declaration, which is item 3
-of [the events design](./future/events/subscriptions.md) and does not exist.
+unload, exactly as a route registration does. The catalogue is in `nodeEvents.ts`.
+
+**Hearing another plugin.** The same `on` takes `plugin:<id>:<verb>` when the producer declared the
+verb: a loaded plugin under a top-level `emits` key in its manifest, a built-in through
+`NodePlugin.emits`. The subscriber names the channel in its own `permissions.events`, and the trust
+prompt draws one host-owned sentence per producer, "Receive live updates from the github plugin". A
+producer that is running and did not declare the verb makes the subscription throw; one that is not
+running delivers nothing and errors nothing, which is tolerable only because payloads carry state and
+the consumer re-reads on receipt. The frame side honours the same grant through the broker, and it does
+not consult the producer's `emits`: a producer's frames reach every socket regardless, so the check
+would be cosmetic, and the node-side check is the one that holds. One ceiling to know: init order is
+not a dependency contract, so a consumer that subscribes before its producer's init has run sees an
+"absent" producer and is admitted even for an undeclared verb. The frames never arrive, so the contract
+holds; only the error is lost. What remains unbuilt is in [docs/future/events.md](./future/events.md).
+
+**What earns a place in the catalogue.** An event is admitted only if all four hold: core (or the
+emitting plugin) is the only possible observer; it is human-scale, not machine-scale (per commit, yes;
+per keystroke, per agent step, per container health check, no); it carries state rather than a delta,
+so a missed frame self-heals on re-read, which is the promise the WS envelope already makes; and one
+honest host-owned sentence describes it in the trust prompt. Rule two is partly a property of the pipe:
+`wsBroadcast` walks every open socket with no subscription filter and no backpressure, so a frame every
+few seconds is a stream, and streams stay with the one plugin that owns `ctx.events.streams`. Every new
+channel costs one `SUBSCRIBABLE_CHANNELS` entry and one sentence, which is the brake on growth working
+as intended.
+
+**What is not an event.** Refused by name so the argument is had once. *File opened or saved*: a plugin
+that wants this wants a file watcher its node half can run; the post-save invalidation ping is not an
+event. *Terminal output and every other owned stream*: PTY, docker logs and stats, the agent token
+stream; the lifecycle reduction is the event, the stream stays with its owner. *Anything per-keystroke,
+per-selection, per-render, or per-agent-step*. *Machine-scale invalidation mechanics*: a cache talking
+to itself (docker's health-check ping, github's 304 bumps, per-step workflow writes); the event is the
+completed sync or the terminal state, emitted after the funnel, never inside the loop. *Generic process
+and port lifecycle*: a port manager can poll `lsof`; declared run targets changing state is the carve-out
+and is an event. *Raw user activity*: an idle or active signal is the most surveillance-shaped thing a
+third-party surface could carry; core keeps its own activity record and exposes a projection. *Request
+and query payloads*: http's request-sent and database's query-ran are the user's private data and can
+carry resolved secrets; the plugin-local record is the feature. *Compose up and down*: another plugin can
+ask `docker compose ps`; `task-teardown` made the cut instead because it is archive-coupled state.
 
 **Where a key lives.** With whichever side would otherwise have to import the other. On the node that is
 almost always the provider, and the registry says so: "the signature lives in the provider's

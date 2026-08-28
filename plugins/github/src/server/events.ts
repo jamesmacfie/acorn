@@ -1,7 +1,7 @@
 import type { PluginBroadcast } from '@acorn/plugin-api/node'
 import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 
-// What github announces on its own channel (docs/future/events/plugin-events.md § github). Three
+// What github announces on its own channel (docs/plugins.md § Hearing another plugin). Three
 // verbs, all "re-read this": the payload names what to re-read and nothing else.
 export type GithubVerb = 'pr-synced' | 'checks-changed' | 'pulls-changed'
 export type GithubEmit = (verb: GithubVerb, payload: Record<string, unknown>) => void

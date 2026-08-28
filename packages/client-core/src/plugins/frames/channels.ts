@@ -3,7 +3,7 @@
 // anyway: `presentation:*` are the shell's own intents.
 //
 // Two families live here, and the split is the point (settled 2026-08-28, before the first addition
-// made it unsettleable — docs/future/events/delivery.md § The naming problem):
+// made it unsettleable — docs/plugins.md § Hearing a core event):
 //
 //   `runtime:*`        the shell talking to itself. "Something you were displaying is gone or moved."
 //                      A deletion and invalidation list, emitted in the renderer that caused it, so a
@@ -31,6 +31,10 @@ export const SUBSCRIBABLE_CHANNELS = [
   'runtime:node-switched',
   'tasks:changed',
   'connection:changed',
+  'head:changed',
+  'run:changed',
+  'agent-session:changed',
+  'project:changed',
 ] as const
 
 export type SubscribableChannel = (typeof SUBSCRIBABLE_CHANNELS)[number]
@@ -48,6 +52,11 @@ const CHANNEL_DESCRIPTIONS = {
   // one is reconnected. That is worth a sentence of its own, because it is more than the other four
   // give away.
   'connection:changed': { text: 'See which of this node’s connected accounts change status', icon: 'radio' },
+  // Each sentence names what the payload gives away, since that is what the owner is consenting to.
+  'head:changed': { text: 'See when a task’s branch gets a new commit, and which commit', icon: 'radio' },
+  'run:changed': { text: 'See when a task’s dev processes start or stop', icon: 'radio' },
+  'agent-session:changed': { text: 'See when an agent in a task finishes a turn or needs attention', icon: 'radio' },
+  'project:changed': { text: 'Receive notice when a project or its settings change', icon: 'radio' },
 } as const satisfies Record<SubscribableChannel, GrantDescription>
 
 /** One of the shell's own channels. Stays a narrow predicate, because its callers go on to index
@@ -59,7 +68,7 @@ export const isSubscribable = (channel: string): channel is SubscribableChannel 
 // the wire (node-core/server/plugin/context.ts § on), so a manifest naming one of these is asking for
 // its node half to hear a core event, not for its frame to subscribe to anything.
 //
-// `tasks:changed` and `connection:changed` are in both lists, which is what a node-emitted fact looks
+// `tasks:changed`, `connection:changed` and the four after them are in both lists, which is what a node-emitted fact looks
 // like: the same name, the same sentence, one grant, and either half of the plugin may take it up.
 // `plugins:changed` is not in the frame list because a frame has no roster to reconcile. That is the
 // shell's job, and it does it whether or not a plugin asked.
@@ -67,13 +76,21 @@ const NODE_EVENT_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   'plugins:changed': { text: 'Receive notice when this node’s plugin set changes', icon: 'radio' },
 }
 
-export const describeChannel = (channel: string): GrantDescription | undefined => {
+// `ownerId` is the plugin whose manifest names the channel. Without it, every plugin channel reads as the
+// plugin's own, which is what the two callers that only have a permissions block get.
+export const describeChannel = (channel: string, ownerId?: string): GrantDescription | undefined => {
   if (isSubscribable(channel)) return CHANNEL_DESCRIPTIONS[channel]
   if (isNodeEventChannel(channel)) return NODE_EVENT_DESCRIPTIONS[channel]
   // One host-owned sentence rather than one per verb. The verb is manifest text, and every sentence the
   // trust prompt draws under "Enforced" has to be copy the host owns (plugins/permissions.ts says why),
   // so it does not get interpolated in however well-formed it parsed.
-  return parsePluginChannel(channel)
-    ? { text: 'Receive live updates from its own node half', icon: 'radio' }
-    : undefined
+  //
+  // Another plugin's channel gets the same treatment at the producer grain
+  // (docs/plugins.md § Hearing another plugin): the plugin *id* is interpolated, because an id is
+  // already rendered elsewhere and held to CHANNEL_PART by the parse, and the verb never is.
+  const parsed = parsePluginChannel(channel)
+  if (!parsed) return undefined
+  return ownerId && parsed.pluginId !== ownerId
+    ? { text: `Receive live updates from the ${parsed.pluginId} plugin`, icon: 'radio' }
+    : { text: 'Receive live updates from its own node half', icon: 'radio' }
 }

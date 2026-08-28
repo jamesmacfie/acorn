@@ -359,8 +359,8 @@ Roughly in order of how much they matter:
 - `third-party/` — the review record from the first migration out of the binary.
 - `future/remote.md` — web, mobile, and remote access.
 - `future/terminal.md` — a terminal client and how plugin UI would render there.
-- `future/events/` — what a plugin can listen to today, the event catalogue the ideas in
-  `future/integration-ideas.md` and the plugin survey need, and the rule for admitting more.
+- `future/events.md` — the three event items still unbuilt; the catalogue, the admission rule, and
+  the refusals shipped into `plugins.md § Hearing another plugin`.
 - `third-party/monaco.md` — a host-owned document surface: the concrete instance of terminal.md's
   "one host-owned template". Built through step 6 (database ships on it); editor's move is the step
   that remains.

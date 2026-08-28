@@ -8,7 +8,6 @@ import {
   patchProject,
   pickFolder,
   type Project,
-  projectsKey,
   projectsOptions,
   workspacesKey,
   workspacesOptions,
@@ -78,10 +77,8 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     setTrail(seen.slice(0, -1))
   }
 
-  const refresh = () => Promise.all([
-    queryClient.invalidateQueries({ queryKey: projectsKey }),
-    queryClient.invalidateQueries({ queryKey: workspacesKey }),
-  ])
+  // Projects refetch on the node's `project:changed` frame now; workspaces still have no event.
+  const refresh = () => queryClient.invalidateQueries({ queryKey: workspacesKey })
 
   // Both Finish and Skip land here. Skipping writes the same preference as finishing, so the wizard
   // does not ambush the user again on the next launch. Everything it offered is in Settings.

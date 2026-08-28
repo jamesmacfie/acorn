@@ -132,7 +132,7 @@ describe('connection-only provider lifecycle', () => {
     expect(await testDb.db.select().from(schema.integrations)).toEqual([])
   })
 
-  // Every status write announces itself, which is what defect 4 in docs/future/events/delivery.md was
+  // Every status write announces itself, which is what defect 4 in docs/plugins.md § Hearing a core event was
   // about: four writers flipped a connection to `needs-auth` and none of them said so, so a second
   // client and every integration plugin found out from the next 401.
   it('broadcasts connection:changed on every status write', async () => {

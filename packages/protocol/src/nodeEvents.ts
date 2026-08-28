@@ -1,7 +1,7 @@
 import type { IntegrationConnectionStatus } from './integrations'
 
 // Core events a plugin's node half may subscribe to with `ctx.events.on`
-// (node-core/server/plugin/types.ts, docs/future/events/subscriptions.md item 1).
+// (node-core/server/plugin/types.ts, docs/plugins.md § Hearing another plugin).
 //
 // A named list rather than "any channel", for the same reason the frame side has one
 // (client-core/plugins/frames/channels.ts): a grant the trust prompt cannot describe is a grant the
@@ -9,12 +9,12 @@ import type { IntegrationConnectionStatus } from './integrations'
 // across the two sides of the wire.
 //
 // Deliberately thin. It holds what core broadcasts today, and it is the send side of
-// docs/future/events/core-events.md that will grow it. Another plugin's `plugin:<id>:<verb>` is not
+// docs/plugins.md § Hearing a core event that will grow it. Another plugin's `plugin:<id>:<verb>` is not
 // here on purpose: cross-plugin subscription is item 3 of that design and needs the producer's
 // `emits` declaration first.
 //
 // The naming, settled 2026-08-28 before the first addition made it unsettleable
-// (docs/future/events/delivery.md § The naming problem). Two families, two contracts:
+// (docs/plugins.md § Hearing a core event). Two families, two contracts:
 //
 //   `<noun>:changed`   a node-emitted fact. "Something happened here that you may want to act on."
 //                      Emitted where the write happens, delivered over the socket, heard by every
@@ -25,18 +25,59 @@ import type { IntegrationConnectionStatus } from './integrations'
 //
 // A node-emitted fact reaches a frame too, so both lists name it; the split is about what the name
 // promises, not about which array it sits in.
-export const NODE_EVENT_CHANNELS = ['plugins:changed', 'tasks:changed', 'connection:changed'] as const
+export const NODE_EVENT_CHANNELS = [
+  'plugins:changed',
+  'tasks:changed',
+  'connection:changed',
+  'head:changed',
+  'run:changed',
+  'agent-session:changed',
+  'project:changed',
+] as const
 
 export type NodeEventChannel = (typeof NODE_EVENT_CHANNELS)[number]
 
 export const isNodeEventChannel = (channel: string): channel is NodeEventChannel =>
   (NODE_EVENT_CHANNELS as readonly string[]).includes(channel)
 
-// The one node event that carries a payload, and the shape both sides read it through
-// (node-core/main/notify.ts § broadcastConnectionChanged says why it is not content-free). `status` is
-// what the row now says, so a listener that missed an earlier frame still ends up correct.
+// The payload-carrying node events, and the shapes both sides read them through. Each one is state,
+// not a delta: the field says what the thing now is, so a listener that missed an earlier frame still
+// ends up correct (node-core/main/notify.ts says per event why it is not content-free).
 export type ConnectionChangedEvent = {
   integrationId: string
   providerId: string
   status: IntegrationConnectionStatus
 }
+
+// A task worktree's HEAD moved: a commit, a checkout, a pull or rebase (docs/plugins.md § Hearing a core event
+// § HEAD moved). `head` is the SHA the tip is at now, `dirty` whether the tree still has uncommitted
+// changes, so a CI or deploy plugin can decide to act from the frame alone.
+export type HeadChangedEvent = {
+  projectId: string
+  taskId: string
+  branch: string | null
+  head: string
+  dirty: boolean
+}
+
+// A declared run target was started or stopped (core-events.md § Run target state). Only the declared
+// targets: generic process and port lifecycle stays off the wire (refused.md).
+export type RunTargetChangedEvent = {
+  taskId: string
+  targetId: string
+  running: boolean
+}
+
+// A managed agent session reached one of the two edges anyone outside the agents plugin has ever
+// needed: it finished a turn, or it wants a person. The vocabulary is the webhook service's
+// (plugins/agents/src/main/webhookService.ts), which already reduces the session firehose to exactly
+// these two for external delivery; this is the same filter pointed inward.
+export type AgentSessionChangedEvent = {
+  taskId: string
+  sessionId: string
+  event: 'completion' | 'attention'
+}
+
+// A project row was created, patched, re-detected, deleted, or had its config written. The id is the
+// only field: which project moved is worth a round trip saved, what moved is not.
+export type ProjectChangedEvent = { projectId: string }

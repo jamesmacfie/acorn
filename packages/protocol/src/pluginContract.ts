@@ -681,6 +681,17 @@ const manifestPermissions = z.object({
   node: nodePermissions.prefault({}),
 })
 
+// What a plugin announces on its own `plugin:<id>:<verb>` channel that *other* plugins may subscribe
+// to (docs/plugins.md § Hearing another plugin). A verb works undeclared for the
+// plugin's own frames; declaring it is what lets another manifest name it in `permissions.events`, and
+// what gives the settings page a line to render. The description is the author's own words and is
+// shown as text, never as trust-prompt copy.
+export const pluginEmitSchema = z.object({
+  verb: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/, 'a verb is lowercase, starts with a letter, and holds no colon'),
+  description: z.string().min(1).max(200),
+})
+export type PluginEmit = z.infer<typeof pluginEmitSchema>
+
 const manifestShape = z.object({
   // The JSON Schema an editor validates this file against (./pluginSchema.test.ts generates it, and
   // create-acorn-plugin writes the key). Declared so it is a known key rather than one the
@@ -698,6 +709,7 @@ const manifestShape = z.object({
     .refine((marks) => Object.keys(marks).length <= 16, 'too many icons')
     .optional(),
   version: z.string().min(1).max(64),
+  emits: z.array(pluginEmitSchema).max(32).default([]),
   // A range over plugin API majors, not a single number: '3', '2 || 3', '2-4'. Held to the shape
   // here so a typo fails the manifest with a reason instead of loading nowhere (./pluginApiVersion.ts).
   apiVersion: z.string().min(1).max(16).regex(PLUGIN_API_RANGE_RE, 'apiVersion must be a major or a range of majors, such as "3" or "2 || 3"'),

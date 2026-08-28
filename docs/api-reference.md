@@ -350,10 +350,10 @@ host other than loopback adds nothing to the allowlist, because the client can a
 directly.
 
 A frame's channel is `<owner>:<verb>`, and the token before the first `:` is the registered prefix on
-both ends. Core owns five, and every other prefix belongs to the plugin that registered it.
+both ends. Core owns nine, and every other prefix belongs to the plugin that registered it.
 
 `term:` is transport on both ends and `workflow:` carries the notification bell's notices and step
-events. The other three are the Node saying that something it owns has moved, and each is one frame:
+events. The other seven are the Node saying that something it owns has moved, and each is one frame:
 
 - `plugins:changed`, when a Node reloads a plugin's node half in place. See the dev loop in
   [the plugins doc](./plugins.md).
@@ -361,12 +361,21 @@ events. The other three are the Node saying that something it owns has moved, an
   taking its tasks with it.
 - `connection:changed`, on every write to a connection's status, including the demotions to
   `needs-auth` that happen mid-request when a credential stops being readable.
+- `head:changed`, when a task worktree's tip moves. Detected by the task-status poll, so it fires
+  within one status round trip of an in-app commit and within ten seconds of one made from a
+  terminal, an agent, or an outside editor, while a client is attached.
+- `run:changed`, when a declared run target is started or stopped.
+- `agent-session:changed`, when a managed agent session finishes a turn or asks for attention. The
+  same two kinds the agent webhook delivers externally.
+- `project:changed`, on every project write: create, patch, re-detect, delete, and the config and
+  run-target writes.
 
 The first two are content-free, because the list behind each is a fetchable route and a payload would
 be a second projection to keep in step. `connection:changed` carries `integrationId`, `providerId`,
 and the new `status`, because every integration plugin hears it and most of them are looking at a
 different provider. The three fields let a listener drop the frame without a round trip, and the
-client still re-reads the route.
+client still re-reads the route. The last four carry a payload for the same reason; the shapes are in
+`@acorn/protocol/nodeEvents.ts`.
 
-All three are invalidation, not replay: a client that missed a frame is not owed a delta, which is why
-`status` is what the connection now is rather than what changed about it.
+All of them are invalidation, not replay: a client that missed a frame is not owed a delta, which is
+why each field is what the thing now is rather than what changed about it.
