@@ -20,7 +20,6 @@ export const workflowStepsRoute = (runId: string) => `/v2/p/workflows/workflows/
 export const workflowGateRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/gate`
 export const workflowCancelRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/cancel`
 export const workflowKillRoute = (runId: string) => `/v2/p/workflows/workflows/runs/${runId}/kill`
-export const workflowTriggerPollRoute = '/v2/p/workflows/workflows/triggers/poll'
 
 type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }
 
@@ -37,7 +36,6 @@ export const workflowApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ stepId }),
     }),
-  pollTriggers: () => writeJson<{ started: number; errors: string[] }>(workflowTriggerPollRoute, { method: 'POST' }),
   // Keeps the {runId?, error?} contract the palette expects. A thrown HTTP error becomes {error}.
   start: async (taskId: string, def: unknown): Promise<{ runId?: string; error?: string }> => {
     const execute = () => writeJson<{ runId?: string; error?: string }>(workflowStartRoute(taskId), {

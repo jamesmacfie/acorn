@@ -5,8 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
 import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
-import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { AgentAttachmentStore } from './attachmentStore'
 
 // Two databases, which is the point of the exercise: the attachment rows are in this plugin's file and

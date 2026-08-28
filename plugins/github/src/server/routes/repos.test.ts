@@ -1,4 +1,4 @@
-import { testSecretEnv } from '@acorn/node-core/testkit/db.ts'
+import { makeTestDb, makeTestPluginDb, testSecretEnv, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,7 +9,6 @@ import { gh } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { REPOS_STALE_AFTER_MS } from '../syncPolicy'
 import { repos } from './repos'
-import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { seedGithubIntegration } from '../../testkit/githubToken'
 import type { Env } from '@acorn/node-core/main/bindings.ts'
 // Aliased away from the `repos` router imported above because the table and route factory share a name.

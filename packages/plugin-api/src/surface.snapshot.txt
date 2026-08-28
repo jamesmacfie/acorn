@@ -1,4 +1,4 @@
-# plugin API major: 3
+# plugin API major: 4
 client: AgentToolRendererContribution
 client: AgentToolRendererProps
 client: CHECK_TONE
@@ -6,8 +6,8 @@ client: ClientPlugin
 client: ClientScheduleContribution
 client: ContentLinkContribution
 client: FAILED_STATUSES
-client: HostCapabilities
 client: HostCapabilityRequirement
+client: HostRequirement
 client: InAppTarget
 client: IntegrationFlowContribution
 client: PaletteItem
@@ -84,7 +84,7 @@ client: formatSize
 client: fuzzyScore
 client: getHighlighter
 client: handlePluginContentLinkClick
-client: hostCapabilities
+client: hasHostCapability
 client: integrationsOptions
 client: isAppDark
 client: isDarkColor
@@ -178,9 +178,14 @@ node: Cached
 node: CachedExternalItem
 node: CachedItemCodec
 node: CodecResult
+node: CoreFsService
+node: CoreGitService
+node: CoreProcService
 node: CoreServices
 node: DEFAULT_PROFILE_ID
 node: Disposable
+node: Extension
+node: ExtensionPointId
 node: GenerateTextRequest
 node: HEADLESS_TIMEOUT_MS
 node: HarnessProbe
@@ -196,6 +201,8 @@ node: MirroredResourceContribution
 node: ModelProviderAdapter
 node: ModelService
 node: NodePlugin
+node: NodeProviderContribution
+node: NodeSpec
 node: PLUGIN_API_MAJOR
 node: PluginBroadcast
 node: PluginDatabase
@@ -206,6 +213,7 @@ node: PrefService
 node: Principal
 node: ProfileDef
 node: ProjectRef
+node: ProvidedNodeRecord
 node: ProviderOperationError
 node: ProviderProjectSource
 node: ProviderResourceContext
@@ -242,6 +250,7 @@ node: connectProvider
 node: connectionHasCapability
 node: defaultBudgets
 node: encodeCached
+node: extensionPointId
 node: externalIdsFor
 node: fileBodyBlobKey
 node: getProfile

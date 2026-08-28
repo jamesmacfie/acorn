@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { confineExistingFile, resolveInRoot } from './core/filesystem/confinement'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './pluginInstaller'
-import { PLUGIN_API_MAJOR, readPluginManifestResult, type PluginManifest } from './pluginManifest'
+import { PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './pluginManifest'
 import { PluginMigrationsError, pluginMigrationsChain } from './pluginMigrations'
 import { openPluginDb } from './pluginStorage'
 import { readBundledPluginState } from './bundledPluginState'
@@ -42,6 +42,10 @@ export type LoadedPlugin = {
 export type InstalledPlugin = {
   manifest: PluginManifest
   dir: string
+  // What the manifest declared that this build has no meaning for (./pluginManifest.ts § ManifestUnknown).
+  // Retained and reported rather than dropped silently: it rides the roster row out to the device, which
+  // raises one attention row per entry.
+  unknown: ManifestUnknown
   // sha256 (lowercase hex) and byte length of the client entrypoint, read at boot. null when the
   // manifest declares none, or the file is missing or escapes the plugin directory.
   //
@@ -63,6 +67,9 @@ export type InstalledPlugin = {
 // a discipline each composition root has to remember.
 export type InstalledPluginInfo = {
   id: string
+  // See InstalledPlugin above. Absent on the wire when there is nothing to report, so the common case
+  // costs no bytes.
+  unknown?: ManifestUnknown
   version: string
   apiVersion: string
   permissions: PluginManifest['permissions']
@@ -161,6 +168,7 @@ export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo
   ...(entry.source === undefined ? {} : { source: entry.source }),
   ...(entry.installedAt === undefined ? {} : { installedAt: entry.installedAt }),
   ...(entry.bundled === undefined ? {} : { bundled: entry.bundled }),
+  ...(entry.unknown.length ? { unknown: entry.unknown } : {}),
 })
 
 // The bytes behind GET /v2/core/plugins/:id/client.js. Re-confines the path rather than trusting the
@@ -231,7 +239,7 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
       continue
     }
     const manifest = read.manifest
-    if (manifest.apiVersion !== PLUGIN_API_MAJOR) {
+    if (!speaksApiVersion(manifest.apiVersion)) {
       failures.push({
         id: manifest.id,
         dir,
@@ -251,6 +259,7 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
     installed.push({
       manifest,
       dir,
+      unknown: read.unknown,
       client: clientDigest(dir, manifest.client),
       ...(lock
         ? { source: describeSource(lock.source), installedAt: lock.installedAt }

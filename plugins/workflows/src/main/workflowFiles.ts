@@ -12,7 +12,7 @@ import type {
   WorkflowBudget,
   WorkflowDef,
   WorkflowStepDef,
-} from './workflowContracts'
+} from '../contract/workflowContracts'
 import { validateWorkflow, type WorkflowValidationCatalog } from './workflowValidation'
 
 export type WorkflowFileError = { source: string; message: string }
@@ -117,6 +117,8 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     childStep: child,
     joins: str(o.joins),
     branches: parseBranches(o.branches),
+    // Passed through unread: `[steps.with]` belongs to whichever plugin contributed the kind.
+    with: o.with && typeof o.with === 'object' && !Array.isArray(o.with) ? (o.with as Record<string, unknown>) : undefined,
     tools: parseTools(o.tools),
     budget: parseBudget(o.budget),
     workflowRef,

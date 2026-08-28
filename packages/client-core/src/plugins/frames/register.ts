@@ -449,8 +449,22 @@ export function syncFrameContributions(): void {
   // webview surfaces would otherwise mount external web content with no prompt ever firing, because the
   // trust queue only holds bundles.
   for (const entry of eligiblePlugins()) {
+    reportUnknownDeclarations(entry.pluginId, entry.row)
     const disposables = registerSurfaces(entry.pluginId, entry.hash, entry.row, entry.trusted)
     if (disposables.length) registered.set(entry.pluginId, disposables)
+  }
+}
+
+// The other half of the forward-compatibility rule (docs/plugins.md § Forward compatibility): the node
+// retained what it could not understand, and this is where it gets reported. One row per declaration, on
+// the same path a surface that failed to register takes, because the owner's question is the same either
+// way — "why is this part of the plugin not doing anything?"
+//
+// Not a failure of the plugin. A manifest written for a later acorn is the case this exists to make
+// legible, and the row says so.
+function reportUnknownDeclarations(pluginId: string, row: NodePluginRow): void {
+  for (const declaration of row.installed?.unknown ?? []) {
+    recordSurfaceFailure(pluginId, declaration, new Error('this version of acorn does not recognise it, so it was ignored'))
   }
 }
 

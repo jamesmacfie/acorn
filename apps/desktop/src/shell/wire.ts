@@ -17,6 +17,7 @@ export type HelperMethod =
   | 'fleet-list'
   | 'node-probe'
   | 'node-pair'
+  | 'node-adopt'
   | 'node-rename'
   | 'node-forget'
   | 'node-reconnect'

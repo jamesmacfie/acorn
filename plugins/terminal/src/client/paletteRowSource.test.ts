@@ -36,9 +36,9 @@ describe('terminal palette rows', () => {
 
   it('declares its place in the list and its desktop requirement', () => {
     // `order: 10` puts run/layout rows ahead of workflows' (20), which is the order the palette produced when it
-    // built all three itself. `requires: 'terminal'` is why these rows are absent rather than failing under
+    // built all three itself. `requires: { plugin: 'terminal' }` is why these rows are absent rather than failing under
     // dev:node, where there is no session engine.
-    expect(source).toMatchObject({ id: 'terminal.run', order: 10, requires: 'terminal' })
+    expect(source).toMatchObject({ id: 'terminal.run', order: 10, requires: { plugin: 'terminal' } })
   })
 
   it('maps targets and layouts into rows, carrying the running flag and config errors', async () => {

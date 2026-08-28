@@ -20,7 +20,11 @@ async function confine(core: EditorCoreServices, taskId: string, relPath: string
   return abs
 }
 
-export const editorBridge = (core: EditorCoreServices): EditorBridge => ({
+/** `ctx.events.status`, the content-free "go re-read" ping. Passed in rather than reached for, so this
+ *  module stays plain Node and testable without a host. */
+export type EditorChanged = () => void
+
+export const editorBridge = (core: EditorCoreServices, changed: EditorChanged = () => {}): EditorBridge => ({
   root: (taskId) => core.tasks.root(taskId),
 
   list: async (taskId, relPath) => {
@@ -65,6 +69,11 @@ export const editorBridge = (core: EditorCoreServices): EditorBridge => ({
     if (!abs) return { ok: false, reason: 'Path is outside the worktree.' }
     try {
       await writeFile(abs, content, 'utf8')
+      // Deliberately the ordinary invalidation ping and NOT an event: "file saved" stays refused
+      // (docs/future/events/refused.md). A save from another client used to move nothing on this one —
+      // its tree, its dirty markers and its git status all went stale until something else pinged
+      // (docs/future/events/delivery.md defect 3).
+      changed()
       return { ok: true }
     } catch (e) {
       return { ok: false, reason: e instanceof Error ? e.message : String(e) }

@@ -53,11 +53,13 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
       entry.manifest.id,
       {
         permissions: entry.manifest.permissions.node,
+        events: entry.manifest.permissions.events,
         storage: entry.storage,
         schedules: entry.manifest.contributions.schedules,
         collections: entry.manifest.contributions.collections,
         commands: entry.manifest.contributions.commands,
         taskChecks: entry.manifest.contributions.taskChecks,
+        auditActions: entry.manifest.contributions.auditActions,
         harnesses: entry.manifest.contributions.harnesses,
         // The package directory, for the one manifest path the host has to resolve on someone else's
         // behalf: a harness's ACP adapter entry (node-core/server/plugin/host.ts).

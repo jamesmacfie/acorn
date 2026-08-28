@@ -10,13 +10,17 @@ import type { ModelProviderAdapter } from '../modelProviders/types'
 import type { AgentToolContribution } from '../agentTools/registry'
 import type { CollectionReadRegistration } from '../collections/registry'
 import type { NodeActionRegistration } from '../nodeActions/registry'
+import type { NodeProviderContribution } from '../nodeProviders/registry'
+import type { RunSourceRegistration } from '../runs/registry'
+import type { Extension, ExtensionPointId } from './extensionPoints'
 import type { PluginContextSection } from '../agentTools/contextSections'
 import type { PluginHarnessRegistry } from './harnesses'
 import type { TaskCheck } from './taskChecks'
 import type { AppEnv, Principal } from '../middleware/auth'
-import type { CapabilityRegistry } from './capabilities'
+import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { StreamHandlers, WsChannelHandler } from '../../main/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
+import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import type { RouteResult } from '../sync/engine'
 import type { StoredConnection } from '../integrations/connections'
 import type { ExternalItemStore } from '../integrations/itemStore'
@@ -137,11 +141,53 @@ export type PluginCollectionRegistry = {
   register(collection: CollectionReadRegistration): void
 }
 
-// Which of this plugin's chrome actions a user may put on a schedule (docs/schedules.md § Targets).
-// Not a way to declare an action: this is the pointer plus the risk tier. Registering nothing means
-// none of this plugin's actions can be scheduled, which is the right default for most.
+// Where this plugin's runs can be read from the node (../runs/registry.ts). Not a second way to
+// declare a run: the plugin keeps its own table, its own lifecycle and its own surfaces, and this is
+// the pointer that lets the host list them beside another plugin's without either importing the other.
+//
+// Register one if your plugin owns work that starts, takes time, and ends. A plugin that owns no such
+// thing registers nothing, which is the right answer for most.
+export type PluginRunRegistry = {
+  register(source: RunSourceRegistration): void
+}
+
+// Work this plugin will do when something asks: a name, a route inside its own namespace, and how
+// dangerous it is (../nodeActions/registry.ts). Not a way to declare an action — it is the pointer
+// plus the risk tier — and not a schedule seam, though a user schedule is the one thing asking today
+// (docs/schedules.md § Targets). Registering nothing means nothing outside this plugin can make it
+// act, which is the right default for most.
 export type PluginNodeActionRegistry = {
   register(action: NodeActionRegistration): void
+}
+
+// The node's many-to-many seam between plugins (./extensionPoints.ts). A plugin opens a point in its
+// own namespace and any number of plugins deliver entries into it, ordered, each disposed with the
+// plugin that filed it. Capabilities are the single-provider seam beside this one; reach for a
+// capability when there is one right answer and for a point when there are many.
+export type PluginExtensionPointRegistry = {
+  // Declare a point this plugin hosts. The id must start with this plugin's own name.
+  open<T>(point: ExtensionPointId<T>, label: string): void
+  // Deliver one entry into a point, this plugin's own or another's. The host mints the entry id from
+  // the plugin, so two packages can use the same entry name without colliding.
+  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
+  // What is in a point right now, in declared order. Resolve at call time: the plugin that fills your
+  // point may init after you do.
+  entries<T>(point: ExtensionPointId<T>): Extension<T>[]
+}
+
+// What this plugin puts on the node's audit trail (docs/security.md § Audit). Both tiers: a loaded
+// plugin declares `auditActions` in its manifest and the host replays those declarations through
+// `declare` here, exactly as it does for schedules and task checks.
+//
+// The host qualifies every verb with the plugin id and refuses a `record` naming one this plugin did
+// not declare, so the trail stays enumerable: the settings surface can name every verb it might draw
+// because each one came from a parsed manifest.
+export type PluginAuditRegistry = {
+  declare(action: { id: string; label: string }): void
+  // Fire-and-forget, like core's own writes: an audit row is evidence, and a failed insert must never
+  // fail the thing it describes. `details` takes allowlisted scalars decided at the call site — never a
+  // request body, a credential, or a file's contents.
+  record(action: string, entry?: { subject?: string | null; details?: Record<string, string | number | boolean | null> }): void
 }
 
 export type PluginContextSectionRegistry = {
@@ -162,6 +208,13 @@ export type PluginProviderRegistry = {
   // A text-generation adapter for an already-registered connection provider. Register the connection
   // first; the registry refuses an adapter naming an unknown one.
   model(adapter: ModelProviderAdapter): void
+  // A provider that knows about nodes, and optionally can make and remove them
+  // (../nodeProviders/registry.ts, docs/plugins.md § Node providers). Host-qualified id, disposal on
+  // unload, and `create` obliging `destroy`, validated at registration.
+  //
+  // Read the contract before writing one: a node provider runs on some node, not necessarily the one
+  // the person is sitting at, with no client necessarily attached.
+  nodes(provider: NodeProviderContribution): void
   // Node-side work such as an agent tool has no HTTP request context, but may still need the
   // credential of a provider this plugin owns. The host lends the first usable connection for one
   // callback and keeps decryption/redaction inside the same scoped runtime used by routes.
@@ -183,12 +236,18 @@ export type PluginBroadcast = {
   send(frame: WsServerFrame): void
   // The content-free ping. The renderer re-pulls what it's showing rather than trusting a payload.
   status(): void
-  // The renderer's notification bell (docs/workflows.md). The memory-proposal gate reuses it.
-  notice(taskId: string, kind: 'gate' | 'run-done', title: string): void
   // "This repo's committed config changed and needs the owner's review". The one notice that carries an
   // action, because ignoring it silently disables a repo's scripts.
   repoConfigTrustNotice(taskId: string): void
-  stepEvent(runId: string, stepId: string, event: unknown): void
+  // Hear a core event on this node, whether or not a client is attached
+  // (docs/future/events/subscriptions.md item 1). `event` must be one of NODE_EVENT_CHANNELS, and for
+  // a loaded plugin it must also be in its manifest's `permissions.events`. The frame is a hint: the
+  // contract is "go re-read", not a payload schema.
+  //
+  // The send side is `send` above and it is not symmetric with this on purpose. A plugin announces on
+  // its own namespace and hears core's; hearing another plugin needs that plugin's `emits`
+  // declaration, which is item 3 of the events design and does not exist yet.
+  on(event: NodeEventChannel, listener: (frame: WsServerFrame) => void): Disposable
   // Claim a WS channel prefix, the token before the first ':' in a channel name. The client mirror is
   // registerWsChannel (@acorn/client-core/wsChannels.ts). Disposal is the host's.
   channel(prefix: string, handler: WsChannelHandler): void
@@ -227,6 +286,11 @@ export type NodePluginContext = {
   // registration through this seam.
   taskChecks: PluginTaskCheckRegistry
   contextSections: PluginContextSectionRegistry
+  // Both tiers. A route pointer, so a loaded plugin needs nothing more than the route it already has.
+  runs: PluginRunRegistry
+  // Both tiers, same two feeders as schedules and task checks.
+  audit: PluginAuditRegistry
+  extensionPoints: PluginExtensionPointRegistry
   providers: PluginProviderRegistry
   capabilities: PluginCapabilities
   // Present for a loaded plugin, and for a built-in that declared `migrationsModule`. A plugin that owns

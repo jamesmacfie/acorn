@@ -91,6 +91,27 @@ export function wsBroadcast(frame: WsServerFrame): void {
     if (isConfined(c)) continue
     sendFrame(c, frame)
   }
+  for (const listener of nodeListeners) {
+    // A plugin's listener throwing must not cost the other subscribers their frame, and must not
+    // unwind into whatever core call did the broadcast.
+    try {
+      listener(frame)
+    } catch (error) {
+      console.warn('[ws] a node-side event listener threw:', error)
+    }
+  }
+}
+
+// Node-side subscribers on the same frames the sockets get: `ctx.events.on`
+// (server/plugin/types.ts, docs/future/events/subscriptions.md). They receive whether or not a client
+// is connected, which is the point — a node with nobody attached still has to react to its own events.
+const nodeListeners = new Set<(frame: WsServerFrame) => void>()
+
+/** Subscribe to every broadcast frame. Filtering by channel, and the grant that decides which channels
+ *  a plugin may name, both belong to the caller (server/plugin/context.ts). */
+export function onWsBroadcast(listener: (frame: WsServerFrame) => void): () => void {
+  nodeListeners.add(listener)
+  return () => void nodeListeners.delete(listener)
 }
 
 // True when any socket is connected. notify.ts uses the same "no window layer means no-op" idea for WS.

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { openDataRoot, type DataRoot } from './dataRoot'
+import { openDataRoot, readNodeAttachment, recordEnrollmentFailure, recordNodeAttachment, type DataRoot } from './dataRoot'
 
 const dirs: string[] = []
 const open: DataRoot[] = []
@@ -139,5 +139,79 @@ describe('openDataRoot', () => {
     root.recordPort(0)
     root.release()
     expect(openTracked(dir).preferredPort).toBeUndefined()
+  })
+})
+
+// The attachment record (docs/node-enrollment.md). Written by enrollment at boot, read by a route in
+// a later process, and dropped by detach, so the three go through the file rather than a shared object.
+describe('the attachment record on node.json', () => {
+  it('is absent on a node nobody provisioned, and survives a reopen once written', () => {
+    const dir = freshDir()
+    const root = openTracked(dir)
+    expect(readNodeAttachment(dir).attachment).toBeUndefined()
+
+    recordNodeAttachment(dir, {
+      controlPlaneUrl: 'https://control.example/',
+      attachedAt: 1_700_000_000_000,
+      enrollmentTokenId: 'abc123abc123',
+      deviceId: 'device-1',
+    })
+    expect(readNodeAttachment(dir).attachment?.controlPlaneUrl).toBe('https://control.example/')
+
+    root.release()
+    // A second process reads the same node, identity intact: an attachment is one more optional field,
+    // not a second identity.
+    const reopened = openTracked(dir)
+    expect(reopened.nodeId).toBe(root.nodeId)
+    expect(readNodeAttachment(dir).attachment?.deviceId).toBe('device-1')
+  })
+
+  it('is dropped by detaching, leaving the rest of the identity alone', () => {
+    const dir = freshDir()
+    const root = openTracked(dir)
+    root.recordPort(4444)
+    recordNodeAttachment(dir, {
+      controlPlaneUrl: 'https://control.example/',
+      attachedAt: 1_700_000_000_000,
+      enrollmentTokenId: 'abc123abc123',
+      deviceId: 'device-1',
+    })
+
+    recordNodeAttachment(dir, undefined)
+    expect(readNodeAttachment(dir).attachment).toBeUndefined()
+    // The whole promise of detaching: nothing else about the node changed.
+    expect(JSON.parse(readFileSync(join(dir, 'node.json'), 'utf8'))).toMatchObject({ nodeId: root.nodeId, port: 4444 })
+  })
+
+  it('records a failed enrollment, and clears it when one later succeeds', () => {
+    const dir = freshDir()
+    openTracked(dir)
+    recordEnrollmentFailure(dir, 'control.example refused the token')
+    expect(readNodeAttachment(dir).enrollmentError?.reason).toContain('refused')
+
+    recordNodeAttachment(dir, {
+      controlPlaneUrl: 'https://control.example/',
+      attachedAt: 1_700_000_000_000,
+      enrollmentTokenId: 'abc123abc123',
+      deviceId: 'device-1',
+    })
+    // A stale failure beside a live attachment would read as a node in trouble when it is fine.
+    expect(readNodeAttachment(dir).enrollmentError).toBeUndefined()
+  })
+
+  it('does not let an in-process write clobber an attachment recorded after the root opened', () => {
+    // The reason recordPort re-reads the file instead of serialising its own cached copy. Two writers
+    // own node.json now, and the second one to write used to win everything.
+    const dir = freshDir()
+    const root = openTracked(dir)
+    recordNodeAttachment(dir, {
+      controlPlaneUrl: 'https://control.example/',
+      attachedAt: 1_700_000_000_000,
+      enrollmentTokenId: 'abc123abc123',
+      deviceId: 'device-1',
+    })
+    root.recordPort(5555)
+    expect(readNodeAttachment(dir).attachment?.deviceId).toBe('device-1')
+    expect(root.preferredPort).toBe(5555)
   })
 })

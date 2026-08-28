@@ -12,7 +12,7 @@ let lastTargets: { taskId: string; targets: { id: string; running: boolean }[]; 
 export const terminalPaletteRowSource: PaletteRowSource = {
   id: 'terminal.run',
   order: 10,
-  requires: 'terminal',
+  requires: { plugin: 'terminal' },
   rows: async (taskId) => {
     if (!taskId) return { rows: [] }
     const result = await runApi.targets(taskId)

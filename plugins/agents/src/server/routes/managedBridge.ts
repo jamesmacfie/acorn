@@ -4,6 +4,8 @@
 // runtime's thrown messages into the status codes managed.ts promises. node/index.ts owns composition,
 // not HTTP semantics.
 import { BridgeError } from '@acorn/plugin-api/node'
+import type { AgentRuntimeState } from '@acorn/protocol/managedAgents.ts'
+import type { RunStatus } from '@acorn/protocol/runs.ts'
 import type { ManagedAgentRuntime } from '../../main/runtime'
 import type { ManagedAgentsBridge } from './managed'
 
@@ -29,6 +31,21 @@ const guarded = async <T>(operation: () => Promise<T>): Promise<T> => {
   }
 }
 
+// How many sessions this plugin offers the merged list. Same reasoning as the workflows half: it is a
+// "what is happening now" surface, not an archive.
+const RUN_LIST_LIMIT = 100
+
+const TERMINAL_AGENT_STATES = new Set<AgentRuntimeState>(['stopped', 'failed', 'archived'])
+
+const toRunStatus = (state: AgentRuntimeState): RunStatus => {
+  if (state === 'failed') return 'failed'
+  if (state === 'stopped' || state === 'archived') return 'done'
+  // Connected and idle, or blocked on a permission or a question: both are "somebody has to do
+  // something before this moves".
+  if (state === 'ready' || state === 'waiting') return 'waiting'
+  return 'running'
+}
+
 export function managedAgentsBridge(runtime: ManagedAgentRuntime): ManagedAgentsBridge {
   // Not wrapped in `guarded`. These answer the router's authorization question, and bridgeFailure would
   // turn a "not found" into a thrown BridgeError(404), skipping the comparison the guard needs to make.
@@ -42,6 +59,30 @@ export function managedAgentsBridge(runtime: ManagedAgentRuntime): ManagedAgents
       return sessionId ? await taskIdForSession(sessionId) : null
     },
     providers: (force) => guarded(() => runtime.providers(force)),
+    // A session projected to the merged run list's shape (@acorn/protocol/runs.ts). Live sessions
+    // only: the list answers "what is happening on this node", and an archived session is history the
+    // Agents pane already shows in full.
+    //
+    // Eleven runtime states collapse to four here, and the join is the useful part: `ready` and
+    // `waiting` both mean blocked on a person, which is the state an owner scanning the list is
+    // looking for.
+    runs: async () => {
+      const { sessions } = await guarded(() => runtime.store.listSessions({ archived: false, limit: RUN_LIST_LIMIT }))
+      return {
+        runs: sessions.map((session) => ({
+          id: session.id,
+          title: session.title,
+          status: toRunStatus(session.runtimeState),
+          startedAt: session.createdAt,
+          endedAt: TERMINAL_AGENT_STATES.has(session.runtimeState) ? session.updatedAt : null,
+          taskId: session.taskId,
+          // No cost. It lives per turn inside `usage_json`, and parsing every turn to draw a list is
+          // the wrong trade (routes/managed.ts § /runs).
+          costUsd: null,
+          detail: session.model ? `${session.providerId} · ${session.model}` : session.providerId,
+        })),
+      }
+    },
     uploadAttachment: (taskId, filename, mediaType, bytes) =>
       guarded(() => runtime.attachments.upload(taskId, filename, mediaType, bytes)),
     attachment: (attachmentId) => guarded(() => runtime.attachments.get(attachmentId)),

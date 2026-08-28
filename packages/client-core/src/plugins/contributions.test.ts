@@ -102,7 +102,9 @@ describe('eligiblePlugins', () => {
     const entry = eligiblePlugins()[0]!
     expect(entry).toMatchObject({ hash: HASH_B, trusted: true })
     expect(entry.installed.version).toBe('2.0.0')
-    expect(entry.installed.contributions.frames.map((frame) => frame.id)).toEqual(['new'])
+    // 'board.new', not 'new': a declared id outside the plugin's own namespace is bound to it here
+    // (./contributionIds.ts).
+    expect(entry.installed.contributions.frames.map((frame) => frame.id)).toEqual(['board.new'])
   })
 
   it('withholds the winner when only the LOSING bundle was ever accepted', () => {

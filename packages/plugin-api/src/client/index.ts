@@ -153,10 +153,11 @@ export { canPickFolder, pickFolder, previewViews } from '@acorn/client-core/plat
 export type { PreviewState, PreviewViews } from '@acorn/client-core/platform/index.ts'
 
 // ── Capabilities, prefs, persisted state ──────────────────────────────────────────────────────
-// prune candidate: `hostCapabilities` is the node's capability read model. A plugin should be asking
-// ctx what it may do rather than reading the shared signal.
-export { hostCapabilities } from '@acorn/client-core/hostCapabilities.ts'
-export type { HostCapabilities, HostCapabilityRequirement } from '@acorn/client-core/hostCapabilities.ts'
+// The host-side gate: is a desktop shell hosting this renderer, and does the node run a given plugin.
+// `requires` on a contribution is the declarative form and is what almost everything should use; this
+// is for a component that has to branch mid-render.
+export { hasHostCapability } from '@acorn/client-core/hostCapabilities.ts'
+export type { HostCapabilityRequirement, HostRequirement } from '@acorn/client-core/hostCapabilities.ts'
 // The other capability: a typed function another plugin published. Register through
 // `ctx.capabilities`; these two are for reading one from a component, which has no ctx in hand.
 export { clientCapability, clientCapabilityId, requireClientCapability } from '@acorn/client-core/clientCapabilities.ts'

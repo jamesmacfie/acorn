@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
-import { pluginManifestSchema } from './pluginManifest'
+import { parsePluginManifest, pluginManifestSchema } from './pluginManifest'
 
 // The declarative-chrome half of the manifest (docs/plugins.md).
 //
@@ -1174,5 +1174,39 @@ describe('the exclusive slot', () => {
       frames: [coreSlot()],
       commands: [{ id: 'go', title: 'Go', action: { verb: 'openPane', pane: 'board-rail' } }],
     }).success).toBe(false)
+  })
+})
+
+describe('forward compatibility: unknown is retained and reported', () => {
+  // docs/plugins.md § Forward compatibility. A manifest written for a later acorn still loads on this
+  // one; what changed is that it no longer does so in silence.
+  const parse = (extra: Record<string, unknown>) =>
+    parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', apiVersion: '3', ...extra })
+
+  it('names an unknown top-level key, contribution kind and node facet', () => {
+    const result = parse({
+      widgets: [],
+      contributions: { panes: [], commands: [] },
+      permissions: { node: { core: ['git', 'holograms'], telepathy: true } },
+    })
+    expect(result.ok).toBe(true)
+    expect(result.ok && [...result.unknown].sort()).toEqual([
+      'contributions.panes',
+      'permissions.node.core: holograms',
+      'permissions.node.telepathy',
+      'widgets',
+    ])
+  })
+
+  it('still loads it, which is the half that must not change', () => {
+    const result = parse({ widgets: [], permissions: { node: { core: ['git'] } } })
+    // The known facet survives, the unknown key is gone from the parsed shape, and the manifest is
+    // usable. Refusing it here is what `apiVersion` used to do and what this rule exists to prevent.
+    expect(result.ok && result.manifest.permissions.node.core).toEqual(['git'])
+    expect(result.ok && 'widgets' in result.manifest).toBe(false)
+  })
+
+  it('reports nothing for a manifest this build understands completely', () => {
+    expect(parse({ contributions: { commands: [] } })).toMatchObject({ ok: true, unknown: [] })
   })
 })

@@ -4,6 +4,28 @@ import { z } from 'zod'
 // docs/api-reference.md § Versioning.
 export const NODE_PROTOCOL_VERSION = 2
 
+// The attachment record: who this node enrolled with, when, and under which enrollment token. One
+// optional object on `node.json`, and the only thing a control plane leaves behind on a node
+// (docs/node-enrollment.md).
+//
+// Not a table, and not a second identity. A detached node loses this record and nothing else, which
+// is what makes "a detached node keeps working" true by construction rather than by care.
+export const nodeAttachmentSchema = z.strictObject({
+  controlPlaneUrl: z.string().url(),
+  // What the control plane called itself in its acknowledgement, if it said.
+  controlPlaneName: z.string().optional(),
+  attachedAt: z.number().int().positive(),
+  // A non-secret handle for the enrollment token that authenticated the enrollment: the first 12 hex
+  // characters of its sha256. The token itself is single-use and never stored. Recording the handle
+  // is what lets an owner, or a support conversation, match this row against the provisioning record
+  // on the other side.
+  enrollmentTokenId: z.string().min(1),
+  // The device row the node issued for the control plane. Detaching revokes it, which is the whole
+  // reason it is remembered here.
+  deviceId: z.string().min(1),
+})
+export type NodeAttachment = z.infer<typeof nodeAttachmentSchema>
+
 // `node.json` in the data root: a Node's durable identity, written once on first start. See
 // docs/data-layer.md § Data root for why its schema tolerates unknown keys and no longer carries a
 // protocol version.
@@ -17,6 +39,14 @@ export const nodeIdentitySchema = z.object({
   // beyond 127.0.0.1, so it records an exposure decision rather than a cached lookup. The empty
   // string is a real answer meaning "loopback only, stop asking".
   advertiseHost: z.string().optional(),
+  // Who this node is attached to, if anyone. Absent on every install that never enrolled, which is
+  // all of them by default (docs/security.md § The control plane).
+  attachment: nodeAttachmentSchema.optional(),
+  // Why the last enrollment attempt failed. Kept apart from `attachment` because the two are
+  // different facts: an attached node with a stale error is normal, and a node that tried and failed
+  // has no attachment at all but must still be able to say so. A failed enrollment is a visible
+  // state, never a boot that hangs.
+  enrollmentError: z.strictObject({ at: z.number().int().positive(), reason: z.string() }).optional(),
 })
 
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>

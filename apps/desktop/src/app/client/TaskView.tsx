@@ -8,7 +8,7 @@ import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/registries/keybindings.ts'
 import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
 import { addSession, refreshSessions, requestTerminalFocus } from '@acorn/client-core/tasks/agentSessions.ts'
-import { hostCapabilities } from '@acorn/client-core/hostCapabilities.ts'
+import { hasHostCapability } from '@acorn/client-core/hostCapabilities.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
 import { runApi } from '@acorn/client-core/tasks/runClient.ts'
@@ -37,7 +37,7 @@ export default function TaskView(props: {
   // `terminalSessions` is terminal's contract surface (create + list), not its renderer client: the
   // shell has no business holding write/attach/kill/resize, which is what importing
   // client/terminalClient handed it.
-  const hasEngine = () => hostCapabilities().terminal
+  const hasEngine = () => hasHostCapability({ plugin: 'terminal' })
   const bridge = taskBridge()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -142,10 +142,10 @@ export default function TaskView(props: {
     ])
     const commands = registerCommands([
       ...paneCommands,
-      { id: 'task.terminal.toggle', title: () => props.terminalOpen ? 'Hide terminal drawer' : 'Show terminal drawer', category: 'terminal', palette: true, requires: 'desktop', run: props.onToggleTerminal },
-      { id: 'task.terminal.new-shell', title: 'New terminal', hint: 'open a shell in the task worktree', category: 'terminal', palette: true, requires: 'desktop', run: () => openProfile('shell') },
-      { id: 'task.terminal.new-claude', title: 'New Claude Code terminal', hint: 'run claude in the task worktree', category: 'terminal', palette: true, requires: 'desktop', run: () => openProfile('claude-code') },
-      { id: 'task.terminal.new-codex', title: 'New Codex terminal', hint: 'run codex in the task worktree', category: 'terminal', palette: true, requires: 'desktop', run: () => openProfile('codex') },
+      { id: 'task.terminal.toggle', title: () => props.terminalOpen ? 'Hide terminal drawer' : 'Show terminal drawer', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: props.onToggleTerminal },
+      { id: 'task.terminal.new-shell', title: 'New terminal', hint: 'open a shell in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('shell') },
+      { id: 'task.terminal.new-claude', title: 'New Claude Code terminal', hint: 'run claude in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('claude-code') },
+      { id: 'task.terminal.new-codex', title: 'New Codex terminal', hint: 'run codex in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('codex') },
       { id: 'task.archive', title: 'Archive task', hint: 'guarded teardown', category: 'task', palette: true, run: openClose },
       ...paneContributions().map((pane) => ({
         id: `pane.restore.${pane.id}`, title: `Restore ${pane.label} pane row`, category: 'pane' as const,

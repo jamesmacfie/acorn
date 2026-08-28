@@ -126,19 +126,41 @@ export function scopeCore(
   return granted as CoreServices
 }
 
+// The two ids the host declares itself, which are invitations rather than any plugin's property:
+// `core.taskWorktreeCreated` (main/taskWorktree.ts) and `agents.harnessRegistry`
+// (server/plugin/harnesses.ts). Whoever owns worktree side-effects or agent sessions on a given node
+// fills them, so they are exempt from the namespace rule below. Held to the real constants by
+// pluginPermissions.test.ts, because a literal list is only safe if something checks it.
+export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['core.taskWorktreeCreated', 'agents.harnessRegistry']
+
 // An undeclared capability id reads as absent, the same as the providing plugin being disabled,
 // which every consumer already degrades around (docs/plugins.md). `require` still throws, because a
 // loaded plugin calling `require` on something it never declared is a bug worth being loud about.
 //
-// `provide` is not filtered. Exporting a capability is a contribution, not an access grant, and the
-// host binds nothing to the plugin's name that the plugin could not already publish.
+// `provide` is bound to the plugin's own namespace, the same binding the host already applies to its
+// routes, schedules, collections, integration flows and extension points (docs/extensibility.md § The
+// host binds every namespace). Without it a package could publish `github.mirror` or `preview.rules`
+// while the real plugin is disabled, and the composition root would resolve the impostor: a
+// capability is a typed function another plugin calls, so squatting one is not a name clash, it is a
+// substitution nothing announces.
+//
+// A throw, contained by the host like any other init failure, so the roster row says which id was
+// refused instead of the plugin half-starting.
 export function scopeCapabilities(
   registry: CapabilityRegistry,
   declared: readonly string[],
+  pluginId: string,
 ): Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'> {
   const allowed = new Set(declared)
   return {
-    provide: (id, impl) => registry.provide(id, impl),
+    provide: (id, impl) => {
+      if (!id.startsWith(`${pluginId}.`) && !HOST_OWNED_CAPABILITY_IDS.includes(id)) {
+        throw new Error(
+          `plugin '${pluginId}' may only provide capabilities under '${pluginId}.', not '${id}'`,
+        )
+      }
+      return registry.provide(id, impl)
+    },
     get: <T>(id: CapabilityId<T>) => (allowed.has(id) ? registry.get(id) : undefined),
     require: <T>(id: CapabilityId<T>): T => {
       const impl = allowed.has(id) ? registry.get(id) : undefined

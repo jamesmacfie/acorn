@@ -7,13 +7,17 @@
 // set of plugins and this is one plugin's surface.
 import type { CoreServices } from '../../main/core'
 import type { Env } from '../../main/bindings'
-import type { NodePermissions, PluginCollectionDescriptor, PluginCommandDescriptor, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../../main/pluginManifest'
+import type { NodePermissions, PluginAuditActionDescriptor, PluginCollectionDescriptor, PluginCommandDescriptor, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../../main/pluginManifest'
 import { scopeCapabilities, scopeCore } from '../../main/pluginPermissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerCollectionRead } from '../collections/registry'
 import { registerNodeAction } from '../nodeActions/registry'
+import { registerNodeProvider } from '../nodeProviders/registry'
+import { registerRunSource } from '../runs/registry'
 import { AGENTS_HARNESS_REGISTRY, qualifiedHarnessId } from './harnesses'
 import { registerTaskCheck } from './taskChecks'
+import { declareAuditAction, qualifiedAuditAction, recordAudit } from '../audit'
+import { contributeExtension, extensionsFor, openExtensionPoint } from './extensionPoints'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
 import { registerRoute } from '../routeRegistry'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
@@ -21,10 +25,12 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
 import { SCHEDULER } from '../schedules'
 import type { CapabilityRegistry, Disposable } from './capabilities'
+import type { ExtensionPointId } from './extensionPoints'
 import type { HostPluginContext, NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
 import { parsePluginChannel, pluginChannel } from '@acorn/protocol/pluginState.ts'
-import { registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
-import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorkflowNotice, broadcastWorkflowStepEvent } from '../../main/notify'
+import { onWsBroadcast, registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../../main/wsHub'
+import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
+import { broadcastRepoConfigTrustNotice, broadcastStatus } from '../../main/notify'
 import { buildPluginRequestContext } from './requestContext'
 
 // What the loader learned about a plugin it took off disk, and the one flag that separates a loaded
@@ -35,6 +41,10 @@ import { buildPluginRequestContext } from './requestContext'
 // not read it. See the `storage` option below.
 export type LoadedPluginBinding = {
   permissions: NodePermissions
+  // The manifest's `permissions.events`, a sibling of the `node` block above rather than part of it.
+  // One grant list covers both sides of the wire: the frames subscribe against it in the client broker,
+  // and `ctx.events.on` is scoped by it here.
+  events?: readonly string[]
   storage: PluginStorage
   // What the manifest declared as periodic work. Carried on the binding rather than read back off disk,
   // for the same reason `permissions` is: the host binds a manifest's claims to a plugin id, and the
@@ -51,6 +61,9 @@ export type LoadedPluginBinding = {
   // And what it declared as archive checks, by the same route as schedules: the registration is
   // synthesised from these two paths so both feeders land through `ctx.taskChecks` (./taskChecks.ts).
   taskChecks?: readonly PluginTaskCheckDescriptor[]
+  // And the verbs it may write onto the audit trail, by the same route: the declaration is replayed
+  // through `ctx.audit.declare` so both feeders land in one registry (../audit.ts).
+  auditActions?: readonly PluginAuditActionDescriptor[]
   // And its managed agent harnesses, by the same route. The delivery seam also needs `dir` below, since
   // an adapter entry is a path inside the installed package.
   harnesses?: readonly PluginHarnessDescriptor[]
@@ -157,9 +170,10 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     collections: {
       register: (collection) => registerCollectionRead({ ...collection, pluginId: plugin }),
     },
-    // Owner-bound. This is the list a person picks a scheduled action from, and the tier beside each
-    // entry drives the confirmation they accept. Filing one under a stranger's name borrows that
-    // plugin's reputation for your own route.
+    // Owner-bound. This is the list anything unattended picks an action from — a person arming a
+    // schedule today, and whatever asks next — and the tier beside each entry drives the confirmation
+    // accepted at that moment. Filing one under a stranger's name borrows that plugin's reputation for
+    // your own route.
     nodeActions: {
       register: (action) => registerNodeAction({ ...action, pluginId: plugin }),
     },
@@ -167,6 +181,11 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // answers with renders beside the plugin's name.
     taskChecks: {
       register: (check) => registerTaskCheck({ ...check, pluginId: plugin }),
+    },
+    // Owner-bound like the rest: a plugin lists its own runs and cannot register a pointer at someone
+    // else's route (../runs/registry.ts). The route is re-confined on every read.
+    runs: {
+      register: (source) => registerRunSource({ ...source, pluginId: plugin }),
     },
     // Owner-bound like the four above, and here the binding is the id itself: a harness id is persisted
     // into session rows and workflow steps, so minting it from `plugin` keeps one package's sessions out
@@ -184,6 +203,35 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
           pluginId: plugin,
         })
         recordUndo(() => handle.dispose())
+      },
+    },
+    // Owner-bound on both halves: `open` refuses a point outside this plugin's namespace, and a
+    // contributed entry's id is minted from the plugin rather than taken from the entry. Both
+    // registrations record an undo, because the maps behind them are module singletons and a reload's
+    // candidate instance has to be able to take back what it filed.
+    extensionPoints: {
+      open: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
+      contribute: (point, entry) => recordUndo(contributeExtension(plugin, point, entry).dispose),
+      entries: (point) => extensionsFor(point),
+    },
+    // Owner-bound on both halves, like the extension points below: `declare` qualifies the verb with
+    // this plugin's id, and `record` refuses anything outside what this plugin declared. Writing goes
+    // straight to core's table because the trail is core's — a plugin owning its own audit rows would
+    // be a second trail nobody reviews.
+    //
+    // The actor is `system`, not `internal`: nothing asked for this over a request. `actorId` carries
+    // the plugin id so "which package wrote this" is answerable even though the qualified verb already
+    // says so.
+    audit: {
+      declare: (action) => declareAuditAction(plugin, action),
+      record: (action, entry) => {
+        if (!options.env) return // no host bindings — a context-shape unit test, with no table to write to
+        recordAudit(options.env.DB, {
+          actor: 'system',
+          actorId: plugin,
+          action: qualifiedAuditAction(plugin, action),
+          ...(entry ?? {}),
+        })
       },
     },
     // asContextSection drops core's database handle rather than leaving it unused: core's own `issues`
@@ -209,6 +257,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       },
       connection: (provider) => connectionProviderRegistry.register(provider, plugin),
       model: (adapter) => modelProviderRegistry.register(adapter, plugin),
+      nodes: (provider) => registerNodeProvider(plugin, provider),
       withConnection: async (userId, providerId, visit) => {
         if (!options.env) throw new Error(`Plugin '${plugin}' requested a provider credential without host bindings.`)
         let visited = false
@@ -230,7 +279,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // Rung 1 of the containment ladder for a loaded plugin: only the capability ids and CoreServices
     // facets its manifest declared. See main/pluginPermissions.ts. This is least privilege for
     // cooperative code, not a security boundary.
-    capabilities: permissions ? scopeCapabilities(options.capabilities, permissions.capabilities) : options.capabilities,
+    capabilities: permissions ? scopeCapabilities(options.capabilities, permissions.capabilities, plugin) : options.capabilities,
     // Both tiers, from the one option the caller derived. `undefined as never` for a plugin that owns no
     // tables, matching routes.register above.
     storage: options.storage ?? (undefined as never),
@@ -256,9 +305,25 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         }
         : wsBroadcast,
       status: broadcastStatus,
-      notice: broadcastWorkflowNotice,
       repoConfigTrustNotice: broadcastRepoConfigTrustNotice,
-      stepEvent: broadcastWorkflowStepEvent,
+      // The receive side (docs/future/events/subscriptions.md item 1). Scoped by the same
+      // `permissions.events` grant the plugin's frames are scoped by, so there is one vocabulary and
+      // one prompt sentence per grant rather than two of each. A built-in has no manifest and hears
+      // whatever the catalogue names.
+      //
+      // A throw rather than a silent no-op, for the same reason `send` throws: a subscription that
+      // never fires is invisible, and the author debugs the producer.
+      on: (event, listener) => {
+        if (!isNodeEventChannel(event)) throw new Error(`'${event}' is not a core event this node publishes`)
+        if (permissions && !(options.loaded?.events ?? []).includes(event)) {
+          throw new Error(`plugin '${plugin}' did not declare '${event}' in permissions.events`)
+        }
+        const off = onWsBroadcast((frame) => {
+          if (frame.channel === event) listener(frame)
+        })
+        recordUndo(off)
+        return { dispose: off }
+      },
       // Never present for a loaded plugin, whatever its manifest says. PTY stream ownership and WS
       // channel prefixes are infrastructure exactly one plugin may own, and neither survives a
       // message-passing boundary (README § Two tiers).
@@ -299,14 +364,19 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       return undefined as R
     }
 
-  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'taskChecks', 'harnesses', 'contextSections', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'runs', 'taskChecks', 'harnesses', 'contextSections', 'audit', 'extensionPoints', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof
     // check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined
     if (!members) continue
+    // `events` and `storage` are not registrations at all; `audit.record` is a write that has to land
+    // when it is called, while `audit.declare` beside it is an ordinary registration that buffers.
     const buffer = group !== 'events' && group !== 'storage'
     for (const [key, value] of Object.entries(members)) {
-      if (typeof value === 'function') members[key] = guard(value as (...args: unknown[]) => unknown, buffer)
+      // `extensionPoints.entries` reads and `audit.record` writes; a buffered call would return
+      // undefined and land on replay respectively. Both are guarded against a revoked context like the
+      // rest, and neither is ever deferred.
+      if (typeof value === 'function') members[key] = guard(value as (...args: unknown[]) => unknown, buffer && key !== 'entries' && key !== 'record')
     }
   }
 

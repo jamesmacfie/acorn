@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { DEFAULT_PROFILE_ID, type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
-import type { StepHandler, StepHandlerContext, StepHandlerOutcome, StepValidator, WorkflowStepDef, WorkflowStepRow } from './workflowContracts'
-import type { WorkflowContributionRegistry } from './workflowRegistry'
+import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator, WorkflowStepDef, WorkflowStepRow } from '../contract/workflowContracts'
 import type { RunnerDeps, RunStepOptions } from './workflowRunner'
 import { intersectToolCeilings } from './workflowTools'
 import { renderWorkflowPrompt } from './workflowValidation'
@@ -50,6 +49,10 @@ type BuiltinServices = {
   registerActive(runId: string, stepId: string, controller: AbortController): void
   unregisterActive(runId: string, stepId: string): void
   changed(): void
+  // `gate-policy` resolves its verdict source by the name the workflow file wrote, which may be a
+  // built-in or another plugin's contribution. The runner owns that lookup, so the built-in asks it
+  // rather than holding a registry of its own.
+  policy(id: string): PolicyEvaluator | undefined
 }
 
 const now = () => Date.now()
@@ -75,8 +78,17 @@ function headlessOutcome(result: HeadlessResult): StepHandlerOutcome {
   return { status: 'failed', error: `${result.status}${result.stderrTail ? `: ${result.stderrTail.slice(0, 300)}` : ''}`, ...data }
 }
 
-export function registerBuiltinWorkflowContributions(registry: WorkflowContributionRegistry, services: BuiltinServices): void {
-  registry.registerPolicy('checks-green', (taskId) => services.deps.evaluatePolicy(taskId, 'checks-green'))
+// What ships in the box. Built-ins are not contributions: they are this plugin's own implementation of
+// its own kinds, so they live in a plain object rather than going out through
+// `ctx.extensionPoints.contribute` and back in. That also keeps them addressable as bare words
+// (`agent`, `join`) while a contributed kind is qualified (../contract/extensions.ts).
+export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
+  stepKinds: Map<string, StepKindContribution>
+  policies: Map<string, PolicyEvaluator>
+} {
+  const policies = new Map<string, PolicyEvaluator>([
+    ['checks-green', (taskId: string) => services.deps.evaluatePolicy(taskId, 'checks-green')],
+  ])
   const stepKinds: Record<(typeof BUILTIN_STEP_KINDS)[number], StepHandler> = {
     agent: runAgent,
     'gate-human': async (ctx) =>
@@ -87,7 +99,12 @@ export function registerBuiltinWorkflowContributions(registry: WorkflowContribut
     join: runJoin,
     decide: runDecision,
   }
-  for (const kind of BUILTIN_STEP_KINDS) registry.registerStepKind(kind, stepKinds[kind], BUILTIN_STEP_VALIDATORS[kind])
+  const kinds = new Map<string, StepKindContribution>(
+    BUILTIN_STEP_KINDS.map((kind) => [kind, { handler: stepKinds[kind], validate: BUILTIN_STEP_VALIDATORS[kind] }]),
+  )
+  // Returned before the handlers below are written, which is fine and deliberate: they are function
+  // declarations, so they are hoisted and already bound by the time a step dispatches into one.
+  return { stepKinds: kinds, policies }
 
   async function runAgent(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
     let prompt = ctx.renderedPrompt
@@ -133,7 +150,7 @@ export function registerBuiltinWorkflowContributions(registry: WorkflowContribut
   }
 
   async function runPolicy(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
-    const policy = ctx.def.policy ? registry.policies.get(ctx.def.policy) : undefined
+    const policy = ctx.def.policy ? services.policy(ctx.def.policy) : undefined
     if (!policy) return { status: 'failed', error: `Unknown policy '${ctx.def.policy ?? ''}'.` }
     const verdict = await policy(ctx.run.taskId)
     return verdict.pass ? { status: 'done', result: verdict } : { status: 'failed', error: verdict.detail ?? `Policy '${ctx.def.policy}' failed.` }

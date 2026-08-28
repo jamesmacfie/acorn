@@ -12,6 +12,7 @@ const NodesSettings = lazy(() => import('@acorn/client-core/settings/NodesSettin
 const PluginsSettings = lazy(() => import('@acorn/client-core/settings/PluginsSettings.tsx'))
 const SecuritySettings = lazy(() => import('@acorn/client-core/settings/SecuritySettings.tsx'))
 const SchedulesSettings = lazy(() => import('@acorn/client-core/settings/SchedulesSettings.tsx'))
+const RunsSettings = lazy(() => import('@acorn/client-core/settings/RunsSettings.tsx'))
 const StyleGallery = lazy(() => import('@acorn/client-core/settings/StyleGallery.tsx'))
 
 export const settingsPageContributions: SettingsContribution[] = [
@@ -45,6 +46,10 @@ export const settingsPageContributions: SettingsContribution[] = [
   // With the other three per-node administration pages, and sharing their node picker: a schedule is a
   // promise one machine makes (docs/schedules.md).
   { id: 'schedules', label: 'Schedules', group: 'general', order: 95, component: () => <SchedulesSettings /> },
+  // Beside Schedules, and the same argument: a run happens on one machine. Core's rather than any
+  // plugin's, because the list is merged from every plugin that declared a run source and no one of
+  // them owns it (@acorn/protocol/runs.ts).
+  { id: 'runs', label: 'Runs', group: 'general', order: 96, component: () => <RunsSettings /> },
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV
     ? [{ id: 'gallery', label: 'Style gallery', group: 'general' as const, order: 999, component: () => <StyleGallery /> }]

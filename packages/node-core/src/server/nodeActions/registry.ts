@@ -2,8 +2,18 @@ import type { ToolRisk } from '@acorn/protocol/api.ts'
 import { dispatchPluginRoute } from '../plugin/dispatch'
 import type { Env } from '../../main/bindings'
 
-// What a user schedule may point at, and the node-side registry that makes it offerable
-// (docs/schedules.md § `node-action`).
+// Work a plugin will do when something asks, with no client attached and no request in sight, and the
+// registry that makes it askable.
+//
+// A schedule is the one thing asking today (docs/schedules.md § `node-action`) and it is not the
+// definition. An event, a monitor crossing a threshold, a webhook, a run finishing: each of those is a
+// different caller of the same actions, and the tier on the record below is what lets them ask for
+// different confirmations. Nothing here may grow a schedule-shaped assumption.
+//
+// The plainer primitive underneath is ../plugin/dispatch.ts, which schedules, collection reads, task
+// checks and harnesses all use directly. What this layer adds is the two things an unattended fire
+// needs and a dispatch does not have: a stable name a stored record can point at, and a declared risk
+// tier stamped onto that record when the owner consents.
 
 export type NodeAction = {
   pluginId: string
@@ -11,13 +21,13 @@ export type NodeAction = {
    *  which is why it must be stable across updates: renaming one makes every schedule pointing at it
    *  fail closed, which is the correct outcome but a rude one. */
   actionId: string
-  /** What the picker and the settings row call it. */
+  /** What a picker and a settings row call it. */
   name: string
   /** POST → whatever. Confined to the plugin's own namespace on every fire, not merely at
    *  registration (../plugin/dispatch.ts). */
   path: string
-  /** The tier the host's confirmation is drawn from, and what gets stamped onto the schedule row at
-   *  creation. Absent means `execute`, see `riskOf` below. */
+  /** The tier the host's confirmation is drawn from, and what gets stamped onto whatever record armed
+   *  this — a schedule row today. Absent means `execute`, see `riskOf` below. */
   risk?: ToolRisk
 }
 
@@ -55,16 +65,16 @@ export function clearNodeActions(pluginId: string): void {
 export const nodeAction = (pluginId: string, actionId: string): NodeAction | undefined =>
   actions.get(key(pluginId, actionId))
 
-/** What the creation flow may offer. The picker shows only what resolves now, so a schedule can
- *  never be created against something this node cannot run. */
+/** What an arming flow may offer. It lists only what resolves now, so nothing can be armed against
+ *  something this node cannot run. */
 export const nodeActions = (): NodeAction[] =>
   [...actions.values()].sort((a, b) => a.pluginId.localeCompare(b.pluginId) || a.name.localeCompare(b.name))
 
 /** How much of the plugin's answer reaches the run row. An action is not a data channel. */
 const DETAIL_MAX = 200
 
-/** Fire one action as this node. Throws on anything that is not a 2xx, because throwing is how the
- *  engine records a failure and starts backing off. */
+/** Fire one action as this node. Throws on anything that is not a 2xx: the caller decides what a
+ *  failure means, and the scheduler's answer is to record it and start backing off. */
 export async function runNodeAction(
   env: Env,
   action: NodeAction,
@@ -76,7 +86,8 @@ export async function runNodeAction(
     action.pluginId,
     action.path,
     // The params ride in the body, matching what the click site posts (docs/schedules.md
-    // § `node-action`): a scheduled fire and a clicked one are indistinguishable to the handler.
+    // § `node-action`): every way of firing an action looks the same to the handler, which is the
+    // property that keeps a second caller from needing a second route shape.
     { method: 'POST', body: JSON.stringify(params) },
     signal,
   )

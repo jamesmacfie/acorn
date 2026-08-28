@@ -80,6 +80,12 @@ export default function FleetHome() {
                 <div class="fleet-card-head">
                   <span class="fleet-card-label">{node.label}</span>
                   <Show when={node.local}><span class="fleet-card-badge">This computer</span></Show>
+                  {/* Provenance: adopted through a plugin's node provider rather than paired by hand,
+                      so this is a row that goes away if that plugin does (docs/plugins.md § Node
+                      providers). */}
+                  <Show when={node.provider}>
+                    {(provider) => <span class="fleet-card-badge">via {provider().providerId}</span>}
+                  </Show>
                   <Show when={active()}><span class="fleet-card-badge fleet-card-badge-active">Active</span></Show>
                 </div>
                 <NodeChip nodeId={node.nodeId} query={{}} />

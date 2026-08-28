@@ -47,7 +47,7 @@ const GROUPS = {
   },
   fleet: {
     resolve: fleetBridge,
-    members: members<FleetBridge>()(['list', 'probe', 'pair', 'rename', 'forget', 'reconnect', 'restartLocal', 'tunnelOpen', 'tunnelClose']),
+    members: members<FleetBridge>()(['list', 'probe', 'pair', 'adopt', 'rename', 'forget', 'reconnect', 'restartLocal', 'tunnelOpen', 'tunnelClose']),
   },
   // Reading the fleet and changing it are different capabilities (platform/index.ts).
   pairing: { resolve: () => (canPairNodes() ? {} : null), members: [] },

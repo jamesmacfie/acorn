@@ -5,5 +5,5 @@ const ChangesPane = lazy(() => import('./ChangesPane'))
 
 export const changesPaneContribution: PaneContribution = {
   id: 'changes', label: 'Changes', glyph: 'git-compare', description: 'Uncommitted working tree', order: 20,
-  defaultChord: 'meta+shift+g', requires: 'desktop', component: ChangesPane,
+  defaultChord: 'meta+shift+g', requires: { plugin: 'changes' }, component: ChangesPane,
 }

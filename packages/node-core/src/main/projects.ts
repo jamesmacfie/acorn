@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { AppDatabase } from '../server/db'
 import { schema } from '../server/db'
 import { git } from './core/git'
+import { broadcastTasksChanged } from './notify'
 
 // A project is a folder on this machine (server/db/schema.ts `projects`; docs/workspaces-and-tasks.md
 // § Workspace and project covers facets generally). Adding one needs only an absolute existing
@@ -248,6 +249,8 @@ export async function deleteProject(db: AppDatabase, id: string): Promise<void> 
     await db.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds))
   }
   await db.delete(schema.projects).where(eq(schema.projects.id, id))
+  // The rail's task list just lost every task in this project (./notify.ts § broadcastTasksChanged).
+  broadcastTasksChanged()
 }
 
 // Core-only write seam for importer plugins. The public project routes remain the richer UI/config

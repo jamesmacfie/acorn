@@ -1,4 +1,4 @@
-import { testSecretEnv } from '@acorn/node-core/testkit/db.ts'
+import { testSecretEnv } from '@acorn/plugin-api/testkit'
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'

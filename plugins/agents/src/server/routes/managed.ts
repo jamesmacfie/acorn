@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { createMiddleware } from 'hono/factory'
@@ -41,6 +42,8 @@ export type ManagedAgentsBridge = {
   taskIdForAttachment(attachmentId: string): Promise<string | null>
   taskIdForArtifact(artifactId: string): Promise<string | null>
   providers(force?: boolean): Promise<AgentProviderDescriptor[]>
+  // The merged run list's source for this plugin (@acorn/protocol/runs.ts). Node-wide by construction.
+  runs(): Promise<{ runs: RunRowInput[] }>
   uploadAttachment(taskId: string, filename: string, mediaType: string, bytes: Uint8Array): Promise<AgentAttachment>
   attachment(attachmentId: string): Promise<AgentAttachment | null>
   removeAttachment(attachmentId: string): Promise<boolean>
@@ -152,6 +155,14 @@ export const managedAgents = new Hono<AppEnv>()
   .use('/sessions/:sessionId/*', (c, next) => (c.req.param('sessionId') === 'search' ? next() : ownsSession(c, next)))
   .use('/attachments/:attachmentId/*', owns('attachmentId', (b, id) => b.taskIdForAttachment(id)))
   .use('/artifacts/:artifactId/*', owns('artifactId', (b, id) => b.taskIdForArtifact(id)))
+  // This plugin's contribution to core's merged run list (@acorn/protocol/runs.ts). Read by the node
+  // with no client and no request in sight, so it takes no params and answers node-wide; core filters
+  // the merged answer for a confined caller, which is why there is no `confineFilter` here.
+  //
+  // A session is a run: it starts, takes time, spends money, and ends. Cost is not on the row —
+  // it lives per turn inside `usage_json`, and parsing every turn's JSON to draw a list is the wrong
+  // trade. The field is optional in the run shape for exactly this case.
+  .get('/runs', (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runs()))
   .get('/providers', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.providers(c.req.query('force') === 'true')))
   .post('/attachments', async (c) => {

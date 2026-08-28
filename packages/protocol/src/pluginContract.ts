@@ -10,6 +10,7 @@ import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from './co
 import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from './contextMenus.ts'
 import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS, parseExtensionPointRef } from './extensionPoints.ts'
 import { isNormalizedChord, isPluginKeyClaim, isPluginShortcutChord, isReservedPluginKeyClaim } from './keybindings.ts'
+import { PLUGIN_API_RANGE_RE } from './pluginApiVersion.ts'
 import { LANGUAGE_IDS } from './languageIds.ts'
 import { cadenceSchema } from './schedules.ts'
 import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from './themeTokens.ts'
@@ -540,6 +541,22 @@ const taskCheckDescriptor = z.object({
   timeout: z.number().int().min(1).max(10).optional(),
 })
 
+// One verb this plugin will write onto the node's audit trail (docs/security.md § Audit). The host
+// qualifies it as `<pluginId>:<id>`, so a package cannot file a row under a core verb or another
+// plugin's, and the settings surface can still enumerate the whole vocabulary because every entry in it
+// came from a parsed manifest or from core's own closed union.
+//
+// Declaring is what makes the trail reviewable: an action nobody can enumerate is one nobody reviews,
+// which is the same argument the core union is built on. A plugin recording an action it did not
+// declare here is refused.
+const auditActionDescriptor = z.object({
+  // Dots, not colons: the colon is the host's separator. `run.finished`, not `workflows:run.finished`.
+  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9.-]*$/, 'audit action id must be lower-case alphanumeric with dots and dashes'),
+  // What the settings row calls it. The raw verb is honest but unreadable, and a plugin knows its own
+  // wording better than a lookup table in the shell does.
+  label: z.string().min(1).max(80),
+})
+
 // ── Managed agent harnesses (docs/managed-agents.md § Harnesses) ──────────────────────────────────
 //
 // A harness is data. The contributing plugin describes the spawn, and plugins/agents owns the child
@@ -617,7 +634,7 @@ const harnessDescriptor = z.object({
 //
 // The caps are product judgements, not storage limits. Eight is "as many as a plugin has rail sources"
 // and four is "a handful"; a package that wants more is describing an app rather than an integration.
-const contributions = z.looseObject({
+const contributionsShape = z.looseObject({
   frames: z.array(frameSurface).max(32).default([]),
   sources: z.array(sourceDescriptor).max(8).default([]),
   slots: z.array(slotDescriptor).max(8).default([]),
@@ -637,10 +654,22 @@ const contributions = z.looseObject({
   collections: z.array(collectionDescriptor).max(8).default([]),
   schedules: z.array(scheduleDescriptor).max(4).default([]),
   taskChecks: z.array(taskCheckDescriptor).max(4).default([]),
+  // Audit verbs. The ctx twin is `ctx.audit`, and both feeders land in the same registry.
+  auditActions: z.array(auditActionDescriptor).max(8).default([]),
   // Managed agent harnesses. The ctx twin is the `agents.harnessRegistry` capability. See
   // docs/managed-agents.md § Harnesses.
   harnesses: z.array(harnessDescriptor).max(4).default([]),
-}).prefault({})
+})
+
+// Every contribution kind a manifest may declare, as a runtime list.
+//
+// Derived from the schema rather than typed out beside it, so the two cannot drift. Two consumers: the
+// forward-compatibility report, which needs to know which of a loose object's keys this build actually
+// understands (node-core/main/pluginManifest.ts), and the contribution-kind table in
+// docs/contribution-kinds.md, which a test holds against this list.
+export const CONTRIBUTION_KINDS = Object.keys(contributionsShape.shape).sort() as readonly string[]
+
+const contributions = contributionsShape.prefault({})
 
 
 // The permissions block as a whole, named so the wire projection can be inferred from it. This is what
@@ -653,6 +682,10 @@ const manifestPermissions = z.object({
 })
 
 const manifestShape = z.object({
+  // The JSON Schema an editor validates this file against (./pluginSchema.test.ts generates it, and
+  // create-acorn-plugin writes the key). Declared so it is a known key rather than one the
+  // forward-compatibility report has to name on every scaffolded plugin. Nothing reads it at load time.
+  $schema: z.string().max(200).optional(),
   id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
   name: z.string().min(1).max(120),
   // The plugin's own logo, registered by the host under `brand:<id>` so every contribution in this
@@ -665,7 +698,9 @@ const manifestShape = z.object({
     .refine((marks) => Object.keys(marks).length <= 16, 'too many icons')
     .optional(),
   version: z.string().min(1).max(64),
-  apiVersion: z.string().min(1).max(16),
+  // A range over plugin API majors, not a single number: '3', '2 || 3', '2-4'. Held to the shape
+  // here so a typo fails the manifest with a reason instead of loading nowhere (./pluginApiVersion.ts).
+  apiVersion: z.string().min(1).max(16).regex(PLUGIN_API_RANGE_RE, 'apiVersion must be a major or a range of majors, such as "3" or "2 || 3"'),
   node: entry.optional(),
   client: entry.optional(),
   // Loaded-plugin storage is host-opened and host-migrated. The same confinement rule as the code
@@ -789,6 +824,7 @@ export type PluginExtensionDescriptor = z.infer<typeof extensionDescriptor>
 export type PluginCollectionDescriptor = z.infer<typeof collectionDescriptor>
 export type PluginScheduleDescriptor = z.infer<typeof scheduleDescriptor>
 export type PluginTaskCheckDescriptor = z.infer<typeof taskCheckDescriptor>
+export type PluginAuditActionDescriptor = z.infer<typeof auditActionDescriptor>
 export type PluginHarnessDescriptor = z.infer<typeof harnessDescriptor>
 
 // Loose on the wire as well as in the schema: a client that doesn't know a future sibling key should
@@ -814,5 +850,6 @@ export type PluginContributions = {
   collections?: PluginCollectionDescriptor[]
   schedules?: PluginScheduleDescriptor[]
   taskChecks?: PluginTaskCheckDescriptor[]
+  auditActions?: PluginAuditActionDescriptor[]
   harnesses?: PluginHarnessDescriptor[]
 } & Record<string, unknown>

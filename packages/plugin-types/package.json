@@ -1,0 +1,45 @@
+{
+  "name": "acorn-plugin-types",
+  "version": "0.1.0",
+  "description": "The node-side plugin API for acorn, as TypeScript declarations. No runtime, and @types/node is the only thing it assumes.",
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "acorn-plugin.schema.json",
+    "README.md"
+  ],
+  "keywords": [
+    "acorn",
+    "acorn-plugin"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "build": "mkdir -p dist && cp src/public.ts dist/index.d.ts",
+    "prepack": "pnpm build",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@types/node": "*"
+  },
+  "peerDependenciesMeta": {
+    "@types/node": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@acorn/node-core": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "typescript": "^6.0.3",
+    "zod": "catalog:",
+    "vitest": "^4.1.9"
+  }
+}

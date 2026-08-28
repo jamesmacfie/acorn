@@ -74,6 +74,13 @@ export const nodeRecordSchema = z.strictObject({
   // True for the node this client spawned and supervises. Exactly one, and it cannot be unpaired.
   // Only the app's own data root defines it.
   local: z.boolean(),
+  // Where this row came from, when it did not come from probe-then-pair. Present only for a node
+  // adopted through a node provider (see `nodeAdoptRequestSchema` below), so the fleet can say which
+  // rows vanish if a plugin is disabled and which provider vouched for the one in front of you.
+  //
+  // Provenance, not authority: the pinned fingerprint is still what the connection is checked
+  // against, and it was still confirmed against the certificate the endpoint presented.
+  provider: z.strictObject({ providerId: z.string().min(1), providerNodeId: z.string().min(1), sourceNodeId: z.string().min(1) }).optional(),
 })
 export type NodeRecord = z.infer<typeof nodeRecordSchema>
 
@@ -83,8 +90,29 @@ export type NodeRecord = z.infer<typeof nodeRecordSchema>
 // `helperServer.ts` exactly like nodeFetchRequest: cheap, and it removes a whole class of "what if a
 // compromised renderer asked for…" reasoning about the files that hold device tokens.
 //
-// There is no "add this node with this token" shape. The only route into the fleet is probe-then-pair,
-// which forces the fingerprint confirmation to happen.
+// There are two routes into the fleet, and this is the whole of what each requires.
+//
+// Probe-then-pair, below, is the human one: the owner reads a fingerprint off the node itself and
+// confirms it, and no shape here lets a caller skip that by supplying its own token.
+//
+// Adoption, `nodeAdoptRequestSchema`, is the unattended one, added for provisioned nodes
+// (docs/plugins.md § Node providers). It is narrower than it looks: the renderer names a provider and
+// a node id, and the host asks the node that listed it for the endpoint, the fingerprint and the
+// credential, then probes that endpoint and refuses a certificate whose fingerprint is not the one
+// the provider vouched for. So the renderer still cannot introduce a node of its own invention, and
+// still never sees a device token. What replaces the owner's eyes is the provider's word, which is
+// exactly the trust the owner granted when they connected it.
+export const nodeAdoptRequestSchema = z.strictObject({
+  // The node whose provider listed this record. Not necessarily the local node: a provider runs on
+  // some node, and the fleet read that produced this row fanned out over all of them.
+  sourceNodeId: z.string().min(1),
+  providerId: z.string().min(1),
+  providerNodeId: z.string().min(1),
+  // What to call it in this client's fleet. The provider's own label when the caller has nothing
+  // better.
+  label: z.string().min(1).max(120),
+})
+export type NodeAdoptRequest = z.infer<typeof nodeAdoptRequestSchema>
 
 export const nodeProbeRequestSchema = z.strictObject({ endpoint: z.string().url() })
 export type NodeProbeRequest = z.infer<typeof nodeProbeRequestSchema>

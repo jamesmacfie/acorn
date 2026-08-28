@@ -25,10 +25,13 @@
 //   secrets: true — unlike those two, this one really does call `ctx.core.secrets`, on every read and
 //     write. Saved URLs, headers, bodies, auth blocks and variables are encrypted at rest with the
 //     node's key, so the ciphertext cannot be opened without it.
-//   core: ['tasks', 'projects:read'] — `tasks.load` to check a task belongs to the project it claims and
-//     `tasks.root` to resolve `{{worktree}}`; `projects.byId` for the project and its checkout path. Not
-//     `projects:config` (this plugin's commands come from its own tables, not from repo config), not
-//     `projects:write`, no `prefs` (the brief listed it; nothing reads or writes one).
+//   core: ['tasks', 'projects:read', 'identity'] — `tasks.load` to check a task belongs to the project it
+//     claims and `tasks.root` to resolve `{{worktree}}`; `projects.byId` for the project and its checkout
+//     path. `identity` is the newest and the narrowest: the `http:request` workflow step (src/node/
+//     workflowStep.ts) runs with no HTTP request to take an owner from, and the project's saved
+//     variables are per-owner rows, so it asks core who this node is bound to. Not `projects:config`
+//     (this plugin's commands come from its own tables, not from repo config), not `projects:write`, no
+//     `prefs` (the brief listed it; nothing reads or writes one).
 //   net: [] — and this is the honest awkward one. The plugin's node half calls `fetch` on whatever URL
 //     the owner typed, which is the entire feature; there is no host list that describes "anywhere the
 //     user points it", and the field is a declaration of INTENDED egress rather than an enforced
@@ -53,9 +56,17 @@ export default {
   permissions: {
     api: ['core.projects:read'],
     events: [],
-    node: { core: ['tasks', 'projects:read'], capabilities: [], secrets: true, exec: true, net: [] },
+    node: { core: ['tasks', 'projects:read', 'identity'], capabilities: [], secrets: true, exec: true, net: [] },
   },
   contributions: {
+    // The one thing this plugin does that a person reviewing the node would want to know about, and
+    // could not otherwise see: a workflow step made an outbound request from this machine, unattended,
+    // with the owner's saved variables and secrets resolved into it (src/node/workflowStep.ts).
+    //
+    // Deliberately not every send. The API pane is a person typing a request and watching the answer;
+    // putting each of those on the trail would bury the unattended ones, which are the reviewable
+    // event. The host qualifies this as `http:request.sent`.
+    auditActions: [{ id: 'request.sent', label: 'Workflow sent an HTTP request' }],
     // THREE surfaces, one bundle: it decides what to draw from `bridge.context` (src/frame/app.tsx).
     //
     // `http` keeps its id because it is a persisted layout key — a task that has the API pane open has

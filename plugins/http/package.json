@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@acorn/plugin-api": "workspace:*",
+    "@acorn/plugin-workflows": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

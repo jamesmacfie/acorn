@@ -1,3 +1,4 @@
+import { speaksApiVersion } from '@acorn/protocol/pluginApiVersion.ts'
 // Which client bundle wins when a fleet disagrees (docs/plugins.md).
 //
 // Two nodes may carry different versions of one plugin. Contribution IDs are not namespaced (`pr`,
@@ -35,8 +36,8 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
-// Highest version whose apiVersion this client speaks. Candidates carrying an apiVersion we do not
-// support are dropped rather than deferred: a bundle built for a plugin API this shell does not have
+// Highest version whose apiVersion range covers this client's major. Candidates whose range does not
+// cover it are dropped rather than deferred: a bundle built for a plugin API this shell does not have
 // cannot be run, and pretending otherwise would fail at import time instead of here.
 //
 // Ties (the same version offered by several nodes, or two builds of one version) resolve on the hash,
@@ -47,7 +48,7 @@ export function resolveActiveBundles(
   options: { apiVersion: string },
 ): Map<string, ActiveBundle> {
   const winners = new Map<string, ActiveBundle>()
-  const supported = candidates.filter((candidate) => candidate.apiVersion === options.apiVersion)
+  const supported = candidates.filter((candidate) => speaksApiVersion(candidate.apiVersion, options.apiVersion))
   for (const candidate of supported) {
     const current = winners.get(candidate.pluginId)
     if (!current) {

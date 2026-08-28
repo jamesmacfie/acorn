@@ -65,6 +65,9 @@ export function PreviewTaskPane(props: { task: Task }) {
 
 export const previewPaneContribution: PaneContribution = {
   id: 'preview', label: 'Browser preview', glyph: 'globe', description: 'Live preview of the app', order: 80,
+  // The one surviving `desktop` gate outside a test (docs/frontend.md § The desktop gate audit). The
+  // pane is a WebContentsView the shell positions over the renderer; there is no HTTP route behind it
+  // and a browser client has nothing to draw here.
   defaultChord: 'meta+shift+b', requires: 'desktop', component: PreviewTaskPane,
   keepAlive: 'dom', minWidth: 320,
 }

@@ -17,9 +17,14 @@ import './settings.css'
 
 const PAGE = 50
 
-// Actions are a closed set on the node (server/audit.ts). Rendering the raw dotted verb would be honest
-// but unreadable; a lookup with a passthrough default is both, and a new action added on the node shows
-// up as itself rather than disappearing.
+// Core's actions are a closed set on the node (server/audit.ts). Rendering the raw dotted verb would be
+// honest but unreadable; a lookup with a passthrough default is both, and a new action added on the node
+// shows up as itself rather than disappearing.
+//
+// A plugin's verbs are not here. They are qualified `<pluginId>:<action>` and arrive with the page as
+// `vocabulary`, because they come from parsed manifests and a shell built before the plugin existed
+// cannot have a label for them. Same passthrough rule: an unknown verb draws as itself, which is what a
+// row written by a plugin that has since been removed should look like.
 const ACTION_LABELS: Record<string, string> = {
   'pairing.window.opened': 'Pairing window opened',
   'pairing.window.closed': 'Pairing window closed',
@@ -93,16 +98,25 @@ export default function SecuritySettings() {
     }
   }
 
+  // What the running plugins call their own verbs, read off the first page. Held apart from the rows so
+  // switching nodes re-reads it: two nodes can have different plugins installed, and labelling one
+  // node's rows with another's vocabulary is the kind of small lie this page exists to prevent.
+  const [pluginLabels, setPluginLabels] = createSignal<Record<string, string>>({})
+
   const [firstPage, { refetch }] = createResource<AuditEntry[], string>(
     () => nodeId() ?? '',
     async (id) => {
       setOlder([])
+      setPluginLabels({})
       if (!id) return []
       const page = await nodeAuditPage({ nodeId: id, limit: PAGE })
+      setPluginLabels(Object.fromEntries((page.vocabulary ?? []).map((entry) => [entry.action, entry.label])))
       return page.entries
     },
     { initialValue: [] },
   )
+
+  const label = (action: string): string => ACTION_LABELS[action] ?? pluginLabels()[action] ?? action
 
   const rows = () => [...firstPage(), ...older()]
 
@@ -196,7 +210,7 @@ export default function SecuritySettings() {
         <For each={rows()}>
           {(entry) => (
             <li class="audit-row">
-              <span class="audit-action">{ACTION_LABELS[entry.action] ?? entry.action}</span>
+              <span class="audit-action">{label(entry.action)}</span>
               <span class="audit-meta muted">
                 {new Date(entry.at).toLocaleString()} · by {describeActor(entry)}
                 <Show when={entry.subject}>{(subject) => <> · {subject()}</>}</Show>

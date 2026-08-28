@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { decidePluginRequest } from '../agentTools/pluginRequests'
 import { auditRequest } from '../auditRequest'
+import { broadcastPluginsChanged } from '../../main/notify'
 import { routeCapabilityFor, BridgeError, viaBridge } from '../bridge'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
@@ -102,6 +103,7 @@ export const plugins = new Hono<AppEnv>()
           // databases open, so the owner needs to see the state that was chosen.
           details: { disabled: after.join(', ') || '(none)' },
         })
+        broadcastPluginsChanged()
       }
       return pluginState(bridge)
     })
@@ -111,6 +113,12 @@ export const plugins = new Hono<AppEnv>()
   //
   // Nothing here starts a plugin. Each answers "the disk says this", and the roster above turns that
   // into the pending state and the restart banner.
+  //
+  // Every one of them broadcasts `plugins:changed`. Until 2026-08-28 only `/:id/reload` did
+  // (main/pluginReload.ts), so a second window kept a stale roster and a stale restart banner until
+  // someone refetched by hand — one desktop and one node makes that an edge case, and a fleet makes it
+  // the normal one (docs/future/events/delivery.md defect 2). The frame is content-free: the client
+  // re-reads the roster it can already fetch.
   .post('/install', async (c) => {
     const missing = requireIdempotencyKey(c)
     if (missing) return missing
@@ -125,6 +133,7 @@ export const plugins = new Hono<AppEnv>()
         // an audit row gets read to answer, and the resolved asset URL is in the node's lockfile.
         details: { version: result.version, source: JSON.stringify(parsed.data.source) },
       })
+      broadcastPluginsChanged()
       return result
     })
   })
@@ -141,6 +150,7 @@ export const plugins = new Hono<AppEnv>()
         subject: result.id,
         details: { fromVersion: result.fromVersion, toVersion: result.toVersion },
       })
+      broadcastPluginsChanged()
       return result
     })
   })
@@ -169,6 +179,7 @@ export const plugins = new Hono<AppEnv>()
       const result = await asBadRequest(() => bridge.uninstall(id, { purgeData: parsed.data.purgeData }))
       // Whether the data went with it is the part that cannot be undone, so the record has to carry it.
       auditRequest(c, { action: 'plugins.uninstalled', subject: id, details: { dataPurged: result.dataPurged } })
+      broadcastPluginsChanged()
       return result
     })
   })

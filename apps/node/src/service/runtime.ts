@@ -201,6 +201,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       PLUGIN_STATE,
       buildPluginStateBridge({
         dataDir: config.dataDir,
+        db,
         roster: () => plugins.roster,
         booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
         loadFailures: () => graph.failures,

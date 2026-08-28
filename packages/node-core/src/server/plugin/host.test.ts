@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { memoryIdentityStore } from '../../main/activeIdentity'
+import { wsBroadcast } from '../../main/wsHub'
 import { createCoreServices, SecretService } from '../../main/core'
 import { openPluginDb, type PluginDatabase } from '../../main/pluginStorage'
 import { makeTestDb } from '../../testkit/db'
@@ -382,7 +383,11 @@ describe('loaded plugins', () => {
 
   // Membership in `loaded` is the only thing that separates the two tiers: same plugin object,
   // different treatment.
-  const host = (plugins: readonly NodePlugin[], loaded: Record<string, Partial<NodePermissions>>) =>
+  const host = (
+    plugins: readonly NodePlugin[],
+    loaded: Record<string, Partial<NodePermissions>>,
+    events: Record<string, readonly string[]> = {},
+  ) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
       core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
@@ -392,6 +397,8 @@ describe('loaded plugins', () => {
           name,
           {
             permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], ...node },
+            // The manifest's `permissions.events`, a sibling of the `node` block rather than part of it.
+            events: events[name] ?? [],
             storage: { open: () => { throw new Error('test storage is not configured') } },
           },
         ]),
@@ -461,6 +468,44 @@ describe('loaded plugins', () => {
     // Everything else it did ask for is present.
     expect(ctx.events.status).toBeTypeOf('function')
     expect(ctx.core.git).toBeDefined()
+  })
+
+  it('delivers a granted core event to a loaded plugin, and stops on unload', async () => {
+    // The receive side of ctx.events (docs/future/events/subscriptions.md item 1). It fires whether or
+    // not a client is attached, which is the property that makes it useful on a node nobody is sitting
+    // at.
+    const heard: string[] = []
+    await host(
+      [plugin('ntfy', { init: (ctx) => void ctx.events.on('plugins:changed', (frame) => heard.push(frame.channel)) })],
+      { ntfy: {} },
+      { ntfy: ['plugins:changed'] },
+    )
+    wsBroadcast({ channel: 'plugins:changed' })
+    wsBroadcast({ channel: 'term:status' })
+    expect(heard).toEqual(['plugins:changed'])
+    // Unload takes the subscription with it, on the same path a route registration goes out on.
+    clearRegistrations('ntfy')
+    wsBroadcast({ channel: 'plugins:changed' })
+    expect(heard).toEqual(['plugins:changed'])
+  })
+
+  it('refuses an ungranted event, and one this node does not publish', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(noop)
+    const ungranted = await host(
+      [plugin('ntfy', { init: (ctx) => void ctx.events.on('plugins:changed', noop) })],
+      { ntfy: {} },
+    )
+    expect(ungranted.roster[0]).toMatchObject({ state: 'failed', reason: expect.stringContaining('permissions.events') })
+
+    const unknown = await host(
+      // Cast: the point of the check is a manifest naming something outside the catalogue, which the
+      // type would otherwise refuse first.
+      [plugin('ntfy', { init: (ctx) => void ctx.events.on('plugin:other:changed' as 'plugins:changed', noop) })],
+      { ntfy: {} },
+      { ntfy: ['plugin:other:changed'] },
+    )
+    expect(unknown.roster[0]).toMatchObject({ state: 'failed', reason: expect.stringContaining('not a core event') })
+    error.mockRestore()
   })
 
   it('shapes core and capabilities from the manifest', async () => {

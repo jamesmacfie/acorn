@@ -30,6 +30,7 @@ type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) =>
 const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers
 const statusSubs = new Set<() => void>()
 const pluginsSubs = new Set<() => void>()
+const tasksSubs = new Set<() => void>()
 const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
 const reconnectSubs = new Set<() => void>()
@@ -127,6 +128,13 @@ registerWsChannel('plugins', (frame) => {
   if (frame.channel === 'plugins:changed') pluginsSubs.forEach((cb) => cb())
 })
 
+// And its fourth. A task was created, patched, archived, cancelled, or had its links change on the
+// node — from this window, from another one, or from an agent (node-core/main/notify.ts). Content-free
+// again: the subscriber invalidates the task-list query and refetches.
+registerWsChannel('tasks', (frame) => {
+  if (frame.channel === 'tasks:changed') tasksSubs.forEach((cb) => cb())
+})
+
 
 // Fires when the node's socket comes back after a drop. The app shell uses it to mark that node's
 // queries stale so whatever is on screen refetches.
@@ -149,6 +157,7 @@ export function _resetWsClient(): void {
   outputSubs.clear()
   statusSubs.clear()
   pluginsSubs.clear()
+  tasksSubs.clear()
   noticeSubs.clear()
   stepEventSubs.clear()
   reconnectSubs.clear()
@@ -194,6 +203,14 @@ export function wsOnPluginsChanged(cb: () => void): () => void {
   pluginsSubs.add(cb)
   connect()
   return () => void pluginsSubs.delete(cb)
+}
+
+// The node's task list moved. Same subscriber shape and the same reason: tasks/mutations.ts would be a
+// cycle if this module reached into it.
+export function wsOnTasksChanged(cb: () => void): () => void {
+  tasksSubs.add(cb)
+  connect()
+  return () => void tasksSubs.delete(cb)
 }
 
 export function wsOnNotice(cb: NoticeCb): () => void {

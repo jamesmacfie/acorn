@@ -88,6 +88,33 @@
 .node-danger {
   color: var(--danger);
 }
+.provided-nodes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: var(--divider);
+}
+.provided-nodes h3 {
+  margin: 0;
+}
+.provided-nodes > p {
+  margin: 0;
+}
+.node-attachment {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--pane-pad);
+  border: var(--control-border);
+  border-radius: var(--radius-surface);
+}
+.node-attachment p {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
 .node-alarm {
   display: flex;
   flex-direction: column;

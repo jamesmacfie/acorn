@@ -17,6 +17,7 @@ import { projectSurfaceRoutes } from '@acorn/client-core/registries/projectSurfa
 import { syncPluginDistribution } from '@acorn/client-core/plugins/distribution.ts'
 import { syncPluginContributions } from '@acorn/client-core/plugins/syncContributions.ts'
 import { watchPluginChanges } from '@acorn/client-core/plugins/reload.ts'
+import { watchTaskChanges } from '@acorn/client-core/tasks/watchTaskChanges.ts'
 
 const noop = () => null
 
@@ -55,6 +56,11 @@ void syncPluginDistribution().then(syncPluginContributions)
 // …and stay reconciled: a node that reloads a plugin in place broadcasts `plugins:changed`, and the
 // shell re-runs the two passes above rather than waiting for a restart (docs/plugins.md § The dev loop).
 watchPluginChanges()
+
+// The same shape for the task list: every task write on the node broadcasts `tasks:changed`, and this
+// window invalidates its cached list whether or not it was the one that wrote
+// (docs/future/events/delivery.md).
+watchTaskChanges()
 
 render(
   () => (

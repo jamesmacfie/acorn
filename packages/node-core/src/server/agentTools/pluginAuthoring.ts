@@ -194,21 +194,31 @@ files by hand from the layout below.
     <dir>/client.js            one file, plain JS, no imports
     <dir>/migrations/          a Drizzle chain WITH meta/_journal.json, only if you own tables
 
-\`plugin.name\` must equal \`manifest.id\`, or the load fails. \`manifest.apiVersion\` must equal this
-node's plugin API major by exact string match. Ids are permanent: the id is the route namespace, the
-renderer route prefix and the SQLite filename, so renaming a plugin is a new plugin plus a data
-migration plus a tombstone.
+\`plugin.name\` must equal \`manifest.id\`, or the load fails. \`manifest.apiVersion\` is a range over
+plugin API majors and must cover this node's: \`"4"\`, \`"3 || 4"\` or \`"2-4"\`.
+Ids are permanent: the id is the route namespace, the renderer route prefix and the SQLite
+filename, so renaming a plugin is a new plugin plus a data migration plus a tombstone.
 
 A loaded plugin's \`ctx\` has no \`ctx.routes.register\` (Hono cannot cross a process boundary) and no
 \`ctx.events.channel\`/\`streams\`. The door is \`ctx.routes.fetch((request, context) => Response)\`; the host
 strips the mount, so \`/v2/p/<id>/greeting\` reaches you as \`/greeting\`. \`ctx.storage\`, \`ctx.core\`,
 \`ctx.tools\`, \`ctx.schedules\`, \`ctx.collections\`, \`ctx.taskChecks\`, \`ctx.contextSections\`,
-\`ctx.providers\`, \`ctx.capabilities\` and \`ctx.events.send\`/\`status\`/\`notice\` are there, shaped by the
-manifest. Those registries are owner-bound: the host stamps your plugin id on whatever you register, so
-you cannot file a schedule or a collection under another package's name. Declaring the same thing in the
-manifest goes through the same seam, so pick one — the manifest is what the owner reads at install.
+\`ctx.runs\`, \`ctx.audit\`, \`ctx.extensionPoints\`, \`ctx.providers\`, \`ctx.capabilities\` and
+\`ctx.events.send\`/\`status\`/\`on\` are there, shaped by the manifest. Those registries are owner-bound:
+the host stamps your plugin id on whatever you register, so you cannot file a schedule or a collection
+under another package's name. Declaring the same thing in the manifest goes through the same seam, so
+pick one — the manifest is what the owner reads at install.
 Node actions and managed-agent harnesses have no \`ctx\` member at all: declare them in the manifest,
 which is the only way in (a command with the \`runNodeAction\` verb, and \`contributions.harnesses\`).
+
+Three of those are newer than the rest, so do not assume an example you have seen uses them:
+\`ctx.runs.register({ runs })\` points at a GET on your own namespace answering \`{ runs }\`, and core
+merges every plugin's into one list — register it if you own work that starts, takes time and ends.
+\`ctx.audit.record(action)\` writes to the owner-readable trail, and only for verbs you declared in
+\`contributions.auditActions\`; record what a person reviewing this machine would want to see and could
+not otherwise, never every call you make. \`ctx.extensionPoints\` is the node's many-to-many seam —
+\`open\` a point in your own namespace, \`contribute\` into anyone's — and the rule is a capability when
+there is one right answer, a point when there are many.
 There is no \`ctx.log\`; use \`console\`, prefixed with your plugin id.
 
 ## The loop — you cannot install anything, so ask
@@ -272,7 +282,7 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '',
     `## This node's vocabulary (plugin API major ${vocabulary.apiMajor})`,
     '',
-    `Read from this node's own schemas, not from memory. \`apiVersion\` must be the string "${vocabulary.apiMajor}".`,
+    `Read from this node's own schemas, not from memory. \`apiVersion\` is a range over majors and must cover "${vocabulary.apiMajor}": write "${vocabulary.apiMajor}" unless you have tested against another major too.`,
     '',
     `**Manifest (\`${manifest.file}\`).** Required: ${manifest.required.map((key) => `\`${key}\``).join(', ')}.`,
     `Optional: ${manifest.optional.map((key) => `\`${key}\``).join(', ')}.`,

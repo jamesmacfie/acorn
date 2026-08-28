@@ -7,6 +7,7 @@ import type {
   PublicIntegrationProvider,
 } from './integrations'
 import type { Cadence } from './schedules.ts'
+import type { NodeAttachment } from './node.ts'
 
 // The one error envelope every route returns, defined in ./errors.ts and re-exported here because
 // `ApiError` is the name 250-odd call sites know. See docs/api-reference.md § Errors.
@@ -463,6 +464,13 @@ export type PluginNodeStatValue = { value: number }
 export type InstalledPluginRow = {
   version: string
   apiVersion: string
+  // What the manifest declared that the node has no meaning for: an unknown top-level key, an unknown
+  // contribution kind, an unknown `permissions.node.core` facet. Absent when there is nothing to report.
+  //
+  // The forward-compatibility rule is that unknown is retained and reported, never dropped silently
+  // (docs/plugins.md § Forward compatibility). This is the reporting half: the device raises one
+  // attention row per entry, on the same path a surface that failed to register takes.
+  unknown?: readonly string[]
   permissions: import('./pluginContract.ts').NodePluginPermissions
   contributions: import('./pluginContract.ts').PluginContributions
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
@@ -562,6 +570,30 @@ export const coreDeviceRoute = (deviceId: string) => `/v2/core/devices/${encodeU
 export type NodeSecurityPosture = { diskEncrypted: boolean | null; platform: string }
 export const coreSecurityRoute = '/v2/core/security'
 
+// Settings → Nodes: who this node is attached to, and the button that drops it
+// (docs/node-enrollment.md § Detaching). Device-only, like devices and plugins: an attachment is
+// node administration, and detaching revokes a credential.
+//
+// `attachment` is null on every node that never enrolled, which is the default and the majority.
+// `error` is the last failed enrollment, kept so a provisioned node that could not reach its control
+// plane says so instead of looking ordinary.
+export type NodeAttachmentState = {
+  attachment: NodeAttachment | null
+  error: { at: number; reason: string } | null
+}
+export const coreAttachmentRoute = '/v2/core/attachment'
+
+// Nodes this node's plugins know about (docs/plugins.md § Node providers). The client fans this out
+// over every reachable node and unions the answers, so a provider running on one node is visible from
+// a client sitting at another.
+//
+// `enrollment.deviceToken` is deliberately absent from this projection. The adopt route below is the
+// only way to get one, it answers the host rather than the renderer, and that keeps "a device token
+// never reaches the renderer" true for the second door as well as the first.
+export const coreNodeProvidersRoute = '/v2/core/nodes'
+export const coreNodeAdoptRoute = '/v2/core/nodes/adopt'
+export const coreNodeLifecycleRoute = (verb: 'create' | 'destroy' | 'start' | 'stop') => `/v2/core/nodes/${verb}`
+
 // The append-only audit trail. `details` is an allowlisted bag of scalars chosen per action: never a
 // request body, a credential, or a file's contents.
 export type AuditEntry = {
@@ -573,9 +605,17 @@ export type AuditEntry = {
   subject: string | null
   details: Record<string, unknown> | null
 }
+// One plugin-declared verb, qualified `<pluginId>:<actionId>` by the node. Core's own verbs are a
+// closed union the client already knows; this is the half that arrives from parsed manifests, which is
+// what keeps the vocabulary enumerable now that a plugin can write to the trail.
+export type AuditVocabularyEntry = { action: string; label: string }
 // `nextBefore` is a timestamp cursor, not an offset. Rows are only appended and pruned from the far
 // end, so an offset would skip or repeat entries whenever the 90-day prune ran under a paging reader.
-export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null }
+//
+// `vocabulary` rides on every page rather than taking a route of its own: its only reader is the list
+// beside it, the two are always fetched together, and it is a few dozen short strings. Optional on the
+// wire because an older node's page will not carry it.
+export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null; vocabulary?: AuditVocabularyEntry[] }
 export const coreAuditRoute = '/v2/core/audit'
 
 // `POST /v2/core/backup` (docs/data-layer.md § Backup). `destPath` is a path on the node's filesystem,

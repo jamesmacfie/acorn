@@ -126,7 +126,7 @@ describe('TaskPaneHost', () => {
   it('drops a pane this environment cannot host from the switcher too', () => {
     capabilities.terminal = false
     pane({ id: 'pr', order: 0 })
-    pane({ id: 'agent', order: 1, requires: 'terminal' })
+    pane({ id: 'agent', order: 1, requires: { plugin: 'terminal' } })
 
     mount()
 

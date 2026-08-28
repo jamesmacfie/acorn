@@ -12,5 +12,5 @@ export function NotesTaskPane(props: { task: Task }) {
 
 export const notesPaneContribution: PaneContribution = {
   id: 'notes', label: 'Notes', glyph: 'notepad-text', description: 'Workspace scratchpad', order: 30,
-  defaultChord: 'meta+shift+d', requires: 'desktop', component: NotesTaskPane,
+  defaultChord: 'meta+shift+d', requires: { plugin: 'notes' }, component: NotesTaskPane,
 }

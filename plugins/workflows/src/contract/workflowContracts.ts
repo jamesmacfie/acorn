@@ -38,6 +38,11 @@ export type WorkflowStepDef = {
   childStep?: WorkflowChildStepDef
   joins?: string
   branches?: Record<string, string>
+  // A contributed kind's own configuration, straight off the workflow file's `[steps.with]` table
+  // (../contract/extensions.ts). The runner never looks inside it: the plugin that contributed the
+  // kind validates it in its `validate` and reads it in its handler. Built-in kinds do not use it —
+  // their inputs are named fields above, which is what keeps them checkable by the host.
+  with?: Record<string, unknown>
   tools?: ToolCeiling
   budget?: WorkflowBudget
 }
@@ -106,7 +111,8 @@ export type WorkflowTriggerMatch = {
   workflow: WorkflowDef
 }
 
+// The id is the extension entry's, minted by the host (../contract/extensions.ts), so a trigger does
+// not carry one of its own.
 export type WorkflowTriggerContribution = {
-  id: string
   evaluate(): Promise<WorkflowTriggerMatch[]>
 }

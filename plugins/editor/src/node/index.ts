@@ -10,7 +10,7 @@ export const editorPlugin = (): NodePlugin => {
     name: 'editor',
     init: (ctx) => {
       routeDisposables = [
-        ctx.capabilities.provide(EDITOR, editorBridge(ctx.core)),
+        ctx.capabilities.provide(EDITOR, editorBridge(ctx.core, ctx.events.status)),
         ctx.capabilities.provide(SEARCH, searchBridge(ctx.core)),
       ]
       ctx.routes.register(search, { prefix: '/tasks', note: '/:id/search' })
