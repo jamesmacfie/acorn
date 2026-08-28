@@ -343,3 +343,6 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 - Review findings from moving Rollbar out of the binary onto the loaded-plugin path:
   [third-party](./third-party/).
 - Runtime and development: [shell](./shell.md) and [local development](./local-development.md).
+- The planned redesign of plugin UI into host-owned layouts, a closed component kit, remote component
+  trees, five extension kinds, and host-owned keyboard navigation: [layout](./future/layout/README.md).
+  A proposal; the owning docs above describe current behaviour until its phases ship.

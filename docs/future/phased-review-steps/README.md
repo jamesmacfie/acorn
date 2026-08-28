@@ -56,6 +56,11 @@ phase 4's autonomy items and on phase 3 for anything the cloud plugin itself wil
 runs partly in parallel (the bundle.md and split.md tracks have their own orderings) but its
 acceptance test, an out-of-tree control-plane plugin, needs phases 3 and 5.
 
+A sibling programme, not a numbered phase here: [docs/future/layout/](../layout/README.md) redesigns
+how plugin UI is drawn (host-owned layouts, a closed component kit, remote component trees, five
+extension kinds, host-owned focus and keys). It answers the consistency review's finding 2 and the
+plugin-surface review's findings 2, 4, and 5, and its own README sequences its ten phases.
+
 ## How to work a phase
 
 Each phase file lists work items with the review finding they close (review file plus finding
