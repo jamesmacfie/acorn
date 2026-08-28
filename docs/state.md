@@ -100,6 +100,21 @@ A module-level signal is the default for anything ephemeral, and the cost of tha
 the eviction question above — so a signal keyed by task, workspace or node owes an `onScopeEvicted`
 registration in the same file.
 
+**A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
+a second function that pulled the pre-scoped aggregate key the scoped keys replaced —
+`task_layouts` and `task_panes` for the layout slice, `editor_open_files`, `pr_filters`. Those went on
+2026-08-28. The migration was confirmed complete on the live data root first: none of the four
+aggregate keys was still in `prefs`, and the scoped `core:task-layouts:*`, `editor:open-files:*`,
+`github:pr-filters:*` and `context:section-selection:*` keys were all present. The four `app`-scoped
+shell slices (`core.last-path`, `core.last-task`, `core.last-source`, `core.left-collapsed`) had a
+`legacy` reader too, and for those it was always a no-op: `storageKeyFor` returns the declared key
+unchanged for an `app` slice, so the canonical read and the legacy read were the same key.
+
+The pre-scoped keys are still listed as *not* device-owned in `devicePrefs.ts`, and that is not
+leftovers. `mergePrefs` lets the device win, so a straggler in some device's `localStorage` under
+`task_layouts` must keep draining to the node rather than being classified as device state and
+shadowing the node's copy forever.
+
 ## Freshness
 
 Node-backed data is displayed with freshness derived from the query result and broker state. The

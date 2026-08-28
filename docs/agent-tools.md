@@ -41,9 +41,17 @@ permission preference before executing.
 
 Permissions have two layers, persisted together as one prefs slice under `agentTools.perms`: a
 **tier** default (`read` / `write` / `execute`) and a **per-tool** override. A per-tool toggle wins
-over its tier, and both default to on. Turning a tier off removes every tool at that risk level from
-`tools/list` and rejects a direct harness call for one of them. This applies before any workflow or
-profile ceiling, which can only narrow the tool list further.
+over its tier. Turning a tier off removes every tool at that risk level from `tools/list` and rejects a
+direct harness call for one of them. This applies before any workflow or profile ceiling, which can
+only narrow the tool list further.
+
+A tier the owner has never touched falls back to `TOOL_TIER_DEFAULTS`
+(`@acorn/protocol/toolPermissions.ts`): `read` and `write` allowed, **`execute` denied**. That is the
+state every installation is in for a tool that ships in a later release, which is why the fallback
+matters more than it looks. Adding an execute tool used to grant it to everyone on upgrade with nothing
+shown to the owner; now it is inert until someone turns the tier on in Settings → Agent tools. The
+node's `isToolPermitted` and the settings page read the same constant, so what the page draws is what
+the wire enforces.
 
 ## Context sections
 

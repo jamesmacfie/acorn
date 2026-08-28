@@ -1,5 +1,6 @@
 // Database pane backing: docs/data-layer.md § Database plugin: the Postgres pane. The DatabaseBridge
 // behind the HTTP routes in server/routes/database.ts. Pure Node, on pg.
+import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -192,7 +193,7 @@ export async function endDbPools(): Promise<void> {
   catalogs.clear()
 }
 
-export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
+export function databaseBridge(core: DatabaseCoreServices, emit?: (frame: { channel: string } & Record<string, unknown>) => void): DatabaseBridge {
   return {
     // Connect: resolve the URL on demand, (re)build the pool, confirm reachability. Never persists the URL.
     connect: async (taskId): Promise<DbConnectResult> => {
@@ -267,7 +268,11 @@ export function databaseBridge(core: DatabaseCoreServices): DatabaseBridge {
         // Anything that is neither a plain read nor a write may have changed the shape of the
         // database, and the completion popup would go on claiming otherwise. A multi-statement string
         // is judged on its last command, the same simplification the row report makes.
-        if (!DML_COMMANDS.has(set.command.toUpperCase())) catalogs.delete(taskId)
+        if (!DML_COMMANDS.has(set.command.toUpperCase())) {
+          catalogs.delete(taskId)
+          // The same inference, said out loud: a migration ran and the shape may have moved.
+          emit?.({ channel: pluginChannel('database', 'schema-changed'), taskId })
+        }
         return { ...set, ms: Math.round(ms) }
       } catch (e) {
         return { error: errText(e) }

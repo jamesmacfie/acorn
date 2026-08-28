@@ -6,6 +6,7 @@ import { type AppEnv, type Cached, ownerId, type PluginDatabase, respondError, s
 import { PULLS_STALE_AFTER_MS } from '../syncPolicy'
 import { readComposite } from './prMirror'
 import { refreshPullDetail } from './pullRefresh'
+import { type GithubEmit, NO_EMIT } from '../events'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { syncState } from '../../node/schema'
@@ -17,7 +18,7 @@ import { syncState } from '../../node/schema'
 // pr_files, owned by /files.
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
-export const pullDetail = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
+export const pullDetail = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
@@ -47,7 +48,7 @@ export const pullDetail = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owne
     return { data: composite, fetchedAt: sync.fetchedAt }
   }
 
-  const refresh = () => refreshPullDetail(token, db, { userId, repoId, owner, repo, number })
+  const refresh = () => refreshPullDetail(token, db, { userId, repoId, owner, repo, number }, emit)
 
   const result = await serveThenRevalidate({
     resource,

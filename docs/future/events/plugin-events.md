@@ -6,11 +6,30 @@ owns, published on the `plugin:<id>:<verb>` channel that already exists
 (`protocol/src/pluginState.ts`), so that other plugins can eventually listen
 ([subscriptions.md](./subscriptions.md)).
 
-Two facts frame everything below. First, the namespace is completely unused: all four loaded plugins
-declare `permissions.events: []`, no frame in the tree calls `acorn.on`, and no node half sends a
-verb. Second, a plugin publishing to *its own* frames works today with no new machinery — the
-broker, the allowlist-by-shape, and the coalesced client routing all exist
-(`client-core/src/plugins/pluginChannel.ts`). So producers can start emitting before cross-plugin
+**Status: the producers ship (2026-08-28).** Every verb below except preview's two is emitted from
+the site named, through the `ctx.events.send` each plugin already had; nothing new was built. The
+deviations from the text below, so nobody re-derives them:
+
+- **`items-changed` is sent by core, once per refresh, for every provider.** The write it announces
+  is core's (`node-core/src/server/integrations/resourceRuntime.ts`, after a successful
+  `resource.refresh`), so the emit lives there rather than once per plugin, and a future provider gets
+  the verb for free. linear's ref-resolution batch writes past that runtime and says so itself
+  (`plugins/linear/src/server/routes/linear.ts`).
+- **`checks-changed` fires only when a check row actually differs.** `mirrorPr` compares the checks
+  table before and after the replace and reports it; `pr-synced` goes out on every sync regardless.
+- **browser's `capture-created` carries no `url`.** The capture store never sees one.
+- **notes seeding announces once**, through a second silent `NotesStore` over the same directory.
+- **preview is not started.** Its prerequisite (moving the URL ladder to the node) is real work and
+  stands on its own.
+- **No consumer has moved yet.** The workflows→github checks poll is still a poll; replacing it is
+  [subscriptions.md](./subscriptions.md) work, since workflows would be hearing another plugin's
+  channel. The context plugin's block revision likewise still bumps by hand.
+
+Two facts framed the design. First, the namespace was completely unused: all four loaded plugins
+declared `permissions.events: []`, no frame in the tree called `acorn.on`, and no node half sent a
+verb. Second, a plugin publishing to *its own* frames works with no new machinery — the broker, the
+allowlist-by-shape, and the coalesced client routing all exist
+(`client-core/src/plugins/pluginChannel.ts`). So producers could start emitting before cross-plugin
 subscription is designed, and the payloads get real exercise.
 
 The admission rule from the [README](./README.md) applies per verb, with test 1 inverted: the

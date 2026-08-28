@@ -23,6 +23,7 @@ import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { githubClientId } from './config'
 import { githubAgentTools } from '../main/agentTools'
 import { taskPulls } from '../server/routes/taskPulls'
+import { githubEmitter } from '../server/events'
 
 export const githubPlugin = (): NodePlugin => {
   return {
@@ -35,6 +36,9 @@ export const githubPlugin = (): NodePlugin => {
       // Opens and migrates before init returns; every router below closes over this handle rather
       // than reading one off the request environment (docs/data-layer.md § Plugin databases).
       const store = ctx.storage.open()
+      // github's own `plugin:github:<verb>` channel (docs/future/events/plugin-events.md § github).
+      // Only the routers that write the PR mirror take it.
+      const emit = githubEmitter(ctx.events.send)
 
       // Bounded startup repair of parent-only mirror evictions (server/mirrorRetention.ts). Runs
       // before any route registers, matching where the composition root used to call it.
@@ -59,14 +63,14 @@ export const githubPlugin = (): NodePlugin => {
       // Takes `core` as well as the handle: refreshing the open-PR list also adopts a PR into any
       // local-first task on that branch (Flow B). `tasks` is core's table, so that write goes through
       // CoreServices.tasks.adoptPullNumbers instead of the mirror's transaction.
-      ctx.routes.register(pulls(store, ctx.core), { prefix: '/repos' })
-      ctx.routes.register(pullDetail(store), { prefix: '/repos' })
+      ctx.routes.register(pulls(store, ctx.core, emit), { prefix: '/repos' })
+      ctx.routes.register(pullDetail(store, emit), { prefix: '/repos' })
       // The one github router with no plugin database handle: it shells out to git in the mapped project
       // checkout, and the path comes from CoreServices.projects through the core git seam.
       ctx.routes.register(pullConflicts(ctx.core), { prefix: '/repos', note: '/:owner/:repo/pulls/:number/conflicts' })
       ctx.routes.register(pullFiles(store), { prefix: '/repos' })
       ctx.routes.register(pullBlob(store), { prefix: '/repos' })
-      ctx.routes.register(pullsBatch(store), { prefix: '/repos' })
+      ctx.routes.register(pullsBatch(store, emit), { prefix: '/repos' })
       ctx.routes.register(prActions(store), { prefix: '/repos' })
       // Workflow-run and job reads and re-runs. It resolves everything from the GitHub API and the
       // URL, so it holds no mirror state and takes no handle.

@@ -6,6 +6,8 @@ import { ghError, ghGraphQL } from '..'
 import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../syncPolicy'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, readComposite, readFiles, type GqlPull } from './prMirror'
+import { announcePrSynced } from './pullRefresh'
+import { type GithubEmit, NO_EMIT } from '../events'
 import { resolveRepoForUser } from './repoMirror'
 import { githubToken } from '../githubToken'
 import { syncState } from '../../node/schema'
@@ -24,7 +26,7 @@ const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
 
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
-export const pullsBatch = (db: PluginDatabase) => new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', async (c) => {
+export const pullsBatch = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', async (c) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
 
@@ -85,9 +87,11 @@ query Batch($owner: String!, $repo: String!, ${varDecls}) {
     const repository = json.data?.repository
     if (!repository) return respondError(c, 502, 'graphql', json.errors?.map((e) => e.message))
     await Promise.all(
-      staleDetail.map((n) => {
+      staleDetail.map(async (n) => {
         const pr = repository[`pr_${n}`]
-        return pr ? mirrorPr(db, { userId, repoId, number: n }, pr, now) : undefined
+        if (!pr) return
+        const { checksChanged } = await mirrorPr(db, { userId, repoId, number: n }, pr, now)
+        announcePrSynced(emit, { userId, repoId, owner, repo, number: n }, pr.headRefOid, checksChanged)
       }),
     )
   }

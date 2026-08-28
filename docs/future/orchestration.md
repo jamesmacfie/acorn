@@ -58,11 +58,12 @@ other task. A fan-out child is another task. So "spawn a sub-agent and read its 
 task scope for authority. The handler runs in the node with node authority, so it can reach across, but
 it has to model "the sub-agents I spawned" explicitly.
 
-**3. No API-call step, and step kinds are closed.** The builtins are `agent`, `gate-human`,
-`gate-policy`, `ci-loop`, `fan-out`, `join`, and `decide`. `WorkflowContributionRegistry` is private to
-the workflows plugin and the `WORKFLOWS_RUNNER` capability exposes only `reconcile()`, so no other
-plugin can add a kind. The HTTP plugin has no node capability at all, only a frame calling its own
-route, and `docs/security.md` denies that sender to the MCP principal.
+**3. ~~No API-call step, and step kinds are closed.~~ Closed 2026-08-28.** The builtins are still
+`agent`, `gate-human`, `gate-policy`, `ci-loop`, `fan-out`, `join`, and `decide`, but they are no
+longer all there can be. `WorkflowContributionRegistry` is deleted; workflows opens three node
+extension points (`workflows:step-kind`, `workflows:policy`, `workflows:trigger`) and any plugin may
+fill them. The HTTP plugin contributes `http:request`, where the scheme check after interpolation and
+the body cap already live. See "Opening the step-kind registry" below.
 
 **4. Visibility is half there.** A step on the parent task creates a managed session, so it shows in
 that task's Agents sidebar. A fan-out child runs on a child task, so its session lives in the child's
@@ -170,15 +171,34 @@ configuration, and the trust gate works by hashing the exact file snapshot
 own answer to trust, and "the owner typed it into this app" is that answer. Repo-authored and
 user-authored are different trust stories, which is the real reason they stay different stores.
 
-## Opening the step-kind registry
+## Opening the step-kind registry — done
 
 For the agent-driven path, an API-call step is unnecessary. The agent has bash and curl.
 
-For the declarative path it is worth one `http` step kind, and adding it is the moment to stop having
-eight builtins forever. Provide `registerStepKind` on `WORKFLOWS_RUNNER` and let the HTTP plugin
-contribute the step, where the scheme check after interpolation and the body cap already live
-(`docs/http-client.md`). A repo-authored HTTP step is executable configuration and the existing trust
-snapshot already covers it.
+For the declarative path it was worth one `http` step kind, and adding it was the moment to stop
+having eight builtins forever. **Shipped 2026-08-28**, and not as `registerStepKind` on
+`WORKFLOWS_RUNNER` as this file first proposed. A capability has one provider by construction, and
+"many plugins each add a step kind" is many-to-many, so granting it through the runner capability
+would have been the first of five private registries with slightly different lifecycles. The node
+grew the twin of the client's extension points instead
+(`docs/plugins.md § Node-side extension points`), and workflows was ported onto it. The
+[layout programme](./layout/08-hooks.md) generalises the same shape again as hooks, with observe,
+transform, and veto modes; `workflows:step-kind` stays a registry-shaped point and `before-step` is
+the hook.
+
+Three points, opened by workflows and fillable by anyone: `workflows:step-kind`, `workflows:policy`,
+`workflows:trigger`. The HTTP plugin contributes `http:request`, where the scheme check after
+interpolation and the body cap already live (`docs/http-client.md`). A repo-authored HTTP step is
+executable configuration and the existing trust snapshot already covers it.
+
+Two things fell out that this file did not anticipate:
+
+- **A contributed kind is addressed as `<pluginId>:<entryId>`.** Built-ins stay bare words, so a
+  `.acorn/workflows/*.toml` that says `kind = "http:request"` names the package that will run the
+  step, and two plugins can both call their entry `request` without either shadowing the other.
+- **`[steps.with]`.** A built-in kind's inputs are named fields the host can check; a contributed
+  kind needs somewhere to put its own, so a step carries an opaque `with` table that only the
+  contributing plugin reads and validates.
 
 ## What this does not build
 
@@ -203,7 +223,8 @@ turns out to need more than a roster.
 5. `agent_prompt` and `agent_wait`, wrapping the existing `runtime.wait`.
 6. `isolation: 'worktree'`, reusing `core.tasks.createChild()`.
 7. Surface `tasks.parentId` in the task list, so a spawned child stops looking unrelated.
-8. `registerStepKind` on `WORKFLOWS_RUNNER`, then the `http` step in the HTTP plugin.
+8. ~~`registerStepKind` on `WORKFLOWS_RUNNER`, then the `http` step in the HTTP plugin.~~ **Done**,
+   through node extension points rather than the capability — see above for why.
 9. `workflow_defs` as database truth, merged under the repo layer.
 
 Steps 1 through 5 are the herdr experience. Everything after is acorn keeping the durability it

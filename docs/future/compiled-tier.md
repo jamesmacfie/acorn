@@ -11,8 +11,8 @@ provides the UIs."
 
 ## Where this already stands (good news first)
 
-Five plugins are loaded (database, http, linear, model-providers, rollbar) with **zero production
-import edges** into them. A compiled plugin costs one roster line per side
+Six plugins are loaded (database, http, linear, model-providers, nodes-file, rollbar) with **zero
+production import edges** into them. A compiled plugin costs one roster line per side
 (`apps/desktop/src/app/client/plugins.ts`, `apps/node/src/server/plugins.ts`) and registers
 itself through `ctx`. A loaded plugin can shadow a built-in by id (`composition.ts`) — the
 migration hatch is already wired. The registration-point sprawl this review expected to find was
@@ -30,13 +30,20 @@ last consumer leaves.
 | changes | Renders inside the agents transcript via `agentToolRenderers` — an in-realm component on a core surface. | `agentToolRenderers` (sole consumer) | **Stays first-party** per the tier line (inline renderers). Named, not pending. |
 | context | Hosts the tray that memory renders into (receiving half of the same coupling). | — | Movable only together with memory, and coupling 1 below says why that is now a redesign, not a seam swap. |
 | preview | Drives a shell-owned child webview. | — | **Stays first-party** (desktop extra behind the platform seam). |
-| editor | Monaco in-realm; the host document surface already exists and `docs/third-party/editor.md` owns the remaining move. | — | **In flight** — the last planned migration of the original program. |
+| editor | Monaco in-realm; the host document surface already exists. The remaining move is the `frame-beside-document` layout, owned by `docs/future/layout/05-layouts.md` (phase 1) rather than by `docs/third-party/editor.md`. | — | Waits on the layout programme's phase 1. |
 | docker | Owns the `docker` WS channel + exec streams. Its rail-row marker is compiled-only: `ctx.railMarkers` has no manifest form yet (docs/future/rail-tab.md, slice 3). | rail markers | Closest to movable of the stream owners; its footer badge already has a descriptor twin. |
 | memory | Renders inside context's tray — editable inputs and accept/reject gates, a component in another plugin's surface; `MEMORY_KNOWLEDGE` capability named by the composition root. | client `contextSections` | **Stays first-party while the tray is a component** — the cooperative-seam conversion was attempted and correctly refused (coupling 1 below). |
 | workflows | Publishes `WORKFLOW_CONTROL`, an in-realm function capability consumed by agents' sidebar. | — | Movable once that capability becomes a descriptor/route seam (below). |
 | github | Core data-model coupling: `github_*` columns on the projects row, `Project.github`/`Task.pullNumber` on the wire, core draws PR affordances (`DEFAULT_PANE = 'pr'`, TabRail), `integrationFlows` has no manifest form. | `integrationFlows` | The big one. Gated on the project-row generalization, which is real work and not icon-sized. |
 | agents | Owns the `agent` WS channel; the transcript is a core surface other plugins render into; `AGENTS_RUNTIME` required by the composition root. | — | **Stays first-party** (stream + surface owner). |
 | terminal | Owns PTY streams ("exactly one plugin may own these"); the drawer is a core surface; folder-picker main code. | `drawer` slot (its topbar chip has since gained a manifest form — `slot: 'topbar'`) | **Stays first-party** (stream owner). |
+
+One blocker the table does not spell out per row, because it applies to five of them at once: the
+composition root calls `agents`, `notes`, `terminal`, and `workflows` with a `NodePluginDeps` bag,
+and `agents`, `memory`, and `notes` with the data root as a first argument
+(`apps/node/src/server/plugins.ts`). The loader activates a loaded plugin with its context and
+nothing else, so every one of those arguments has to become a capability, a route, or a
+`ctx.storage` path before the plugin can move. `docs/first-party-plugins.md` lists it as reason F.
 
 **The honest end state, then:** integrations and data features (github, docker, memory, notes,
 context, workflows, editor) end up loaded; the stream-and-surface owners (terminal, agents,
@@ -48,6 +55,16 @@ costume, and the costume is cheap enough to keep for uniformity. That end state 
 
 These, not the moves themselves, are the architecture in this file. Each is a place where two
 plugins share a realm today; each has a designed answer that is data-plus-messages.
+
+**Read with [docs/future/layout/](./layout/README.md), 2026-08-28.** Couplings 1 to 3 below were
+written when the only data-shaped answer was a descriptor, and each one concluded "component-shaped,
+so it stays first-party." The layout programme adds a third shape between descriptor and iframe: a
+remote component tree the host mounts from a closed kit. Under it, memory's tray section becomes a
+tree in a `context:section` slot (layout phase 6), changes' tool card becomes a tree in an
+`agents:tool-card` slot (phase 3), and `WORKFLOW_CONTROL`'s sidebar controls can be a tree too. The
+census table's "stays first-party" calls for changes and memory are therefore superseded; the
+arguments below are kept because they explain why the descriptor answer was refused, which is still
+true. Coupling 4, the projects row, is untouched by the layout programme.
 
 1. **memory → context's tray.** The seam this file first prescribed — convert the pair to the
    cooperative extension point — was attempted when that contract shipped (2026-08-15) and
@@ -80,7 +97,9 @@ plugins share a realm today; each has a designed answer that is data-plus-messag
 ## Delete now (no move required)
 
 - **Dead slot ids** `topbar.left` and `task.switcher.extra` — zero consumers anywhere (the
-  manifest slot enum grew to `footer | topbar` without them, which confirms nobody wants them).
+  manifest slot enum grew to `footer | topbar` without them, which confirms nobody wants them). Still
+  present in `client-core/src/registries/slots.ts` on 2026-08-28; the layout programme's phase 9
+  deletes the component slot table, so do this then or before.
 - ~~The `themes` registry~~ — resolved: manifest-declared token themes shipped
   (`docs/ui-design.md § Plugin themes`), so that registry now has its plugin feeder. `styles`
   stays core-only by decision (style packs are deliberately not contributable).

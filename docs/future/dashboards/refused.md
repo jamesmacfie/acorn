@@ -6,14 +6,19 @@ with the reasoning, not with silence. First recorded 2026-08-12; all of it still
 
 ## No plugin-shipped panel components, no widget toolkit in the wire format
 
-The master/detail refusal (`docs/plugins.md § Document surfaces`, which now carries the distinction
-below on the record) holds: the host will not render a plugin's
-bespoke UI from data, because that means eternally versioning a widget toolkit in the wire format.
-Dashboards clear the bar only because the host renders *its own* generic views over a record
-schema — the distinction is recorded beside the refusal itself in `docs/plugins.md`. When a plugin
-needs UI the field-type vocabulary can't express, the overflow path is a **frame pane** — the
-escape hatch is planned, not fought (the VS Code lesson). Revisit only if the descriptor-vs-frame
-doctrine itself changes.
+The refusal holds against what it was aimed at: a static schema the host renders from data, which
+would mean eternally versioning a widget toolkit in the wire format. Dashboards clear the bar because
+the host renders *its own* generic views over a record schema.
+
+The descriptor-versus-frame doctrine did change on 2026-08-28, and this refusal did not.
+[docs/future/layout/](../layout/README.md) adds a remote component tree: plugin code in a sandbox
+emits a tree of closed-kit node names and the host mounts its own components. That is not a widget
+toolkit in the wire format, because the vocabulary is the kit that already exists and the logic stays
+in the plugin ([layout/01-why.md](../layout/01-why.md) § One reversal). It is also **not a dashboard
+panel**: a panel is user-composed over a typed record contract and a plugin has zero say over its
+pixels; a remote tree is plugin-authored UI in a slot the owner opened. The two do not meet. When a
+plugin needs UI the field-type vocabulary cannot express, the overflow path is a remote tree in a
+pane the plugin owns, or a rectangle for pixels; never a panel type.
 
 ## No new field type without a fight
 

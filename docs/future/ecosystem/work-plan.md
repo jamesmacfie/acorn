@@ -45,7 +45,7 @@ stance without a design.
 
 **The one thing effort cannot route around.** macOS is stuck in two separate places on a single
 purchase. A downloaded node tarball containing `.node` binaries is quarantined by Gatekeeper
-(`bundle.md § Two snags`), and the desktop app still ships unsigned with no auto-update. Both clear
+(`bundle.md § The snags`), and the desktop app still ships unsigned with no auto-update. Both clear
 with one Apple Developer Program membership plus notarization, and notarization needs setup time
 before it works. Worth buying before it is on the critical path, because it is the only item here that
 waiting does not shrink.

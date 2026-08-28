@@ -7,6 +7,7 @@ import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '@acorn/protocol/notes.ts'
+import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 
 // Canonical wire shapes live in @acorn/protocol/notes.ts, imported by the client too. Re-exported
 // here so main-side callers keep one import point.
@@ -78,7 +79,14 @@ export function parseNote(text: string, slug: string): { meta: NoteMeta; body: s
 // --- The store ---
 
 export class NotesStore {
-  constructor(private root: string) {}
+  // Optional so a second, silent handle over the same directory is one constructor call: task seeding
+  // uses that to write N notes and announce once (node/index.ts).
+  constructor(private root: string, private emit?: (frame: { channel: string } & Record<string, unknown>) => void) {}
+
+  /** `plugin:notes:notes-changed`, the location and nothing else: a consumer re-lists. */
+  changed(location: NoteLocation): void {
+    this.emit?.({ channel: pluginChannel('notes', 'notes-changed'), ...location })
+  }
 
   private dirFor(location: NoteLocation): string {
     const key = location.scope === 'global' ? 'global' : location.scope === 'workspace' ? location.workspaceId : location.taskId
@@ -146,6 +154,7 @@ export class NotesStore {
       createdAt: Date.now(),
     }
     await this.atomicWrite(this.fileFor(location, slug), serializeNote(meta, opts?.body ?? ''))
+    this.changed(location)
     return { slug }
   }
 
@@ -165,6 +174,7 @@ export class NotesStore {
       meta.originTaskId = writer.originTaskId ?? (location.scope === 'task' ? location.taskId : meta.originTaskId)
     }
     await this.atomicWrite(file, serializeNote(meta, body))
+    this.changed(location)
   }
 
   // Toggle whether a note is fed to the agent as context (Notes-pane select/deselect). Preserves body.
@@ -173,6 +183,7 @@ export class NotesStore {
     const { meta, body } = parseNote(await readFile(file, 'utf8'), slug)
     meta.included = included
     await this.atomicWrite(file, serializeNote(meta, body))
+    this.changed(location)
   }
 
   // Rename the display title. The slug (filename) never changes, so deep links + seeded slugs stay stable.
@@ -181,6 +192,7 @@ export class NotesStore {
     const { meta, body } = parseNote(await readFile(file, 'utf8'), slug)
     meta.title = title
     await this.atomicWrite(file, serializeNote(meta, body))
+    this.changed(location)
   }
 
   // Append (agents logging findings). Missing note → created with the writer's identity.
@@ -198,6 +210,7 @@ export class NotesStore {
         createdAt: Date.now(),
       }
       await this.atomicWrite(file, serializeNote(meta, text.endsWith('\n') ? text : `${text}\n`))
+      this.changed(location)
       return
     }
     const parsed = parseNote(existing, slug)
@@ -209,9 +222,11 @@ export class NotesStore {
     const sep = parsed.body.endsWith('\n') || !parsed.body ? '' : '\n'
     const body = `${parsed.body}${sep}${text.endsWith('\n') ? text : `${text}\n`}`
     await this.atomicWrite(file, serializeNote(parsed.meta, body))
+    this.changed(location)
   }
 
   async remove(location: NoteLocation, slug: string): Promise<void> {
     await unlink(this.fileFor(location, slug)).catch(() => {})
+    this.changed(location)
   }
 }

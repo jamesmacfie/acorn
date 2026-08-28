@@ -82,5 +82,5 @@ read as the category's entry requirements. For each: where it should live in aco
 
 The projects winning users install in one line — brew, npx, a single binary — and herdr shows a
 small team can run a real marketplace. acorn's plugin breadth will not matter until installing
-acorn and installing a plugin are both that friction-free; that is `work-plan.md § Phase 5`, and
-it is last on purpose, not because it is unimportant.
+acorn and installing a plugin are both that friction-free; that is `work-plan.md § Phase 4`
+(distribution), and it is last on purpose, not because it is unimportant.

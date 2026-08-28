@@ -17,8 +17,8 @@ Hand-authored Astro pages, outside the Starlight tree:
 - **`/download`** — per-platform install. Ships when a signed macOS build exists; until then the
   page is not linked from the nav.
 - **`/plugins`** — the plugin directory. A static list of the bundled and
-  first-party-as-loaded plugins (rollbar, linear, http, database, model-providers) with each
-  one's permission rationale, plus "build your own" pointing at the docs. Registry-fed later,
+  first-party-as-loaded plugins (rollbar, linear, http, database, model-providers, nodes-file) with
+  each one's permission rationale, plus "build your own" pointing at the docs. Registry-fed later,
   if ever, per [../ecosystem/blockers.md](../ecosystem/blockers.md).
 - **`/blog`** — posts plus RSS. Empty at launch is fine; the route exists so the first post has
   a home.

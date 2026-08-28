@@ -41,8 +41,10 @@ Enough that a hand-installed node on the LAN is pleasant to set up:
 This is what decides how hard a downloadable artifact is, and it is in better shape than expected.
 
 **SQLite is no longer native.** `node:sqlite` is part of the runtime, so there is no ABI to match and
-no compiler to have installed. Electron 42 bundles Node 24.17 and has it, which is what lets the
-desktop-supervised and standalone hosts share one story. Drizzle publishes no `node:sqlite` driver
+no compiler to have installed. The desktop helper runs the node under the Node it bundles
+(`docs/shell.md § Node child`), so the desktop-supervised and standalone hosts share one story.
+(When this was written the desktop was Electron 42 with Node 24.17; the Tauri migration replaced the
+supervisor and kept the property.) Drizzle publishes no `node:sqlite` driver
 (0.45.2 ships better-sqlite3, bun, expo, op and proxy), so `main/sqlite.ts` presents the small
 surface Drizzle's better-sqlite3 session actually calls — `prepare`, `transaction`, and
 `run`/`all`/`get`/`raw` — over a `DatabaseSync`. Two behaviour differences are pinned there
@@ -57,7 +59,7 @@ subpaths instead. `@types/better-sqlite3` stays a devDependency — Drizzle's de
 it, and types do not need a compiler.
 
 **node-pty is the only native module left**, and it builds against node-addon-api (N-API), so its
-binaries are ABI-stable across Node versions *and* Electron. It ships prebuilds for `darwin-arm64`,
+binaries are ABI-stable across Node versions. It ships prebuilds for `darwin-arm64`,
 `darwin-x64`, `win32-arm64` and `win32-x64` — **not Linux**, which compiles from source today. So
 Linux is the one platform needing a prebuild produced in CI, once. That prebuild carries a libc
 decision: build against glibc and it loads on Debian, Ubuntu, Fedora and a `-slim` Docker base, but
@@ -136,20 +138,18 @@ node-pty means there is still one.
 
 `apps/node/src/server/composition.ts` already builds the same plugin graph for both hosts; the
 difference is supervision and native capability injection, not a second assembly. The remaining
-thing that made them different *artifacts* was ABI: desktop runs the node under Electron, standalone
-under plain Node. With SQLite no longer native and node-pty ABI-stable, that difference stops
-existing — which is what makes "the client ships a node, and you can also download one" a packaging
-decision rather than a fork.
+thing that made them different *artifacts* was ABI: the desktop used to run the node inside
+Electron, standalone under plain Node. With the desktop helper spawning the bundled Node, SQLite no
+longer native, and node-pty ABI-stable, that difference stops existing — which is what makes "the
+client ships a node, and you can also download one" a packaging decision rather than a fork.
 
-A related trap, found the hard way and worth stating as a rule: **the shared main-process barrel must
-not re-export an Electron-only module.** A barrel evaluates every module on it, so
-`registerFolderPickerIpc` (which statically imports `electron`) made
-`@acorn/plugin-terminal/main/index.ts` unloadable in a plain-Node process — and `apps/node`'s
-composition root imports `reconcileTmux` from that same barrel. The standalone node died at boot with
-`The requested module 'electron' does not provide an export named 'dialog'`. Desktop-only exports
-import from their module directly. Anything reachable from a node composition root has to stay
-loadable without Electron, and the integration tests that would have caught it were failing for the
-same reason.
+A related trap, found the hard way and worth keeping as a rule even though the module that caused it
+is gone: **a barrel reachable from a node composition root must not re-export a desktop-only
+module.** A barrel evaluates every module on it, so a folder-picker helper that statically imported
+the desktop shell made `@acorn/plugin-terminal/main/index.ts` unloadable in a plain-Node process, and
+the standalone node died at boot. Desktop-only exports import from their module directly; anything
+reachable from a node composition root stays loadable in bare Node. `boundaries.test.ts` enforces the
+shell-binding half of this today.
 
 ## Ordering
 

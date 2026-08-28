@@ -68,7 +68,7 @@ change (`font-src 'self'` does not allow `data:`).
 
 **The workers cannot be delivered at all**, which is architectural rather than budgetary. An
 `app-plugin://<hash>` origin serves exactly two things: `/client.js` and the host's own `/ui.css`
-(`apps/desktop/src/app/main/pluginScheme.ts` — "one bundle per plugin, one file per bundle"). There is
+(`apps/desktop/src-tauri/src/plugin_scheme.rs` — "one bundle per plugin, one file per bundle"). There is
 no `/assets/*`, so the four worker chunks have nowhere to be served from; and the frame CSP has no
 `worker-src` at all, so `default-src 'none'` denies workers including `blob:`. The shell's own CSP has
 `worker-src 'self' blob:` precisely because Monaco needs it. So a Monaco frame would run with no

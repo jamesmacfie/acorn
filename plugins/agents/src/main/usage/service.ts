@@ -27,6 +27,8 @@ export type AgentUsageServiceOptions = {
   // Read per refresh, never captured. Harnesses arrive and leave with the plugins that contribute them
   // (main/usage/collectors.ts), so resolving the list at construction would freeze the boot-time set.
   collectors?: AgentUsageCollectorRegistry
+  /** A fresh snapshot landed; a consumer re-reads the route rather than running its own poll. */
+  onRefreshed?: () => void
 }
 
 export type AgentUsageService = {
@@ -92,6 +94,7 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     })
     const snapshot = { providers, refreshedAt: now() }
     cached = { key, snapshot }
+    options.onRefreshed?.()
     return snapshot
   }
 

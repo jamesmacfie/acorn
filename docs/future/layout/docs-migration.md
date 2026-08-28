@@ -6,8 +6,10 @@ from the repo's own conventions applies: **update the owning doc in the same cha
 not done until the document that owns the behaviour says the new true thing. Phase 9 does the large
 rewrites; earlier phases do the sections they touch.
 
-Reviews under `docs/reviews/` are historical records. They are never edited beyond a one-line
-"superseded by" header, and they are the evidence this redesign answers.
+The 2026-08-27 reviews and the phased-review-steps programme that closed them were retired to git
+history on 2026-08-28 (`git log --follow -- docs/reviews`, `-- docs/future/phased-review-steps`).
+The findings this redesign answers are listed at the end of this file by review and number so the
+trail survives the deletion.
 
 ## Rewrite: the core subject changes
 
@@ -23,7 +25,7 @@ Reviews under `docs/reviews/` are historical records. They are never edited beyo
 | `docs/command-palette-and-shortcuts.md` | 2 | § "Focus and typing" is rewritten around intents, focus groups, and `@opentui/keymap` layers. § "Pane shortcuts" and § "Plugin shortcuts" describe bindings as layers. Rectangles keep the `claimsKeys` paragraph. |
 | `docs/first-party-plugins.md` | 6, 7, 8, 9 | Reason B ("in-realm components inside another surface's tree") dissolves for everything a remote tree can carry; changes, docker's slots, onboarding's overlay, and memory move off the "must be" and "one specific reason" tables. § "First-party only by history" loses editor's blocker. |
 | `docs/third-party/monaco.md` | 1, 9 | § "The template vocabulary", § "document-over-frame, concretely", § "Composed panes: decided", § "The manifest shape" fold into [05-layouts.md](./05-layouts.md) and then into `docs/panes.md`. The standing refusal "the answer stays no" on host-rendered lists is answered explicitly (see 01-why.md § One reversal). § "Language smarts" and the view-state note survive as an appendix. |
-| `docs/future/split.md` | 9 | `acorn-ui` as a publishable Solid kit no longer exists as described: the kit is closed and host-owned, and plugins import it through `@acorn/plugin-api/ui` as types and a remote adapter. Rewrite around `acorn-plugin-toolkit` and the SDK, or fold into `phased-review-steps/phase-6`. |
+| `docs/future/split.md` | 9 | `acorn-ui` as a publishable Solid kit no longer exists as described: the kit is closed and host-owned, and plugins import it through `@acorn/plugin-api/ui` as types and a remote adapter. **Done 2026-08-28**: rewritten around `acorn-plugin-toolkit` and the SDK, with the kit's types and remote adapter published through `acorn-plugin-api`. Phase 9 only re-verifies it. |
 
 ## Update: named sections
 
@@ -34,7 +36,7 @@ Reviews under `docs/reviews/` are historical records. They are never edited beyo
 | `docs/frontend.md` | 1, 2, 9 | § "Registries and plugins" notes layouts and slots; § "Composition" notes the two render paths; § "Shell state" notes the focus store. |
 | `docs/architecture-overview.md` | 0, 9 | § "Documentation map" gains this folder (done when the folder lands) and, at phase 9, the rewritten docs. § "Package boundaries" notes the kit is closed. |
 | `docs/dashboards.md` | 4 | § "Placements" reconciles `pane.aside` (user panels, unchanged) with rectangle and remote slots (other plugins). |
-| `docs/future/rail-tab.md` | 4 | § "Slice 3: loaded-plugin descriptors, NOT BUILT" is deleted; the `core:task` annotation point supersedes it. |
+| `docs/future/rail-tab.md` | done 2026-08-28 | § "Slice 3: loaded-plugin descriptors, NOT BUILT" is deleted; the `core:task` annotation point supersedes it. |
 | `docs/third-party/README.md` | 5, 9 | § "Monaco does not fit in a frame, and that ends two migrations": the premise is removed; database and editor now have a path. § "Pick up work here" points at this folder. |
 | `docs/agent-tools.md` | 6, 8 | § "Context sections" notes `contextSectionSlots` is a slot; the tool renderer paragraph points at `agents:tool-card`. |
 | `docs/testing.md` | 0, 9 | § "Test layers" gains the kit invariants (support matrix, role mapping, no-class), the tree protocol fuzz, and the keyboard traversal test. § "The smoke checklist" gains keyboard-only traversal of every pane and the trust flow for a remote plugin. |
@@ -42,18 +44,15 @@ Reviews under `docs/reviews/` are historical records. They are never edited beyo
 | `docs/diff-rendering.md` | 4, 7 | § "Row geometry" and § "Review threads and state" gain the annotation draw site. |
 | `docs/features.md` | 9 | The pane list reflects layouts. |
 | `docs/managed-agents.md` | 8 | § "Client surfaces": the tool card is a slot; the composer has slots. |
-| `docs/future/terminal.md` | 9 | § "The tier-2 rendering contract" and § "Decisions to carry forward" point at the tree, the kit's `tui` column, and the layouts' projections as the enabler. |
-| `docs/future/remote.md` | 9 | § "Mobile" points at layouts' narrow projections as what makes the subset shell cheap. |
-| `docs/future/compiled-tier.md` | 9 | § "The four couplings that need a designed seam": three of the four were component contributions and are now slots. Census updated. |
-| `docs/future/dashboards/refused.md` | 4 | § "No plugin-shipped panel components, no widget toolkit in the wire format" is restated: still no static schema; remote trees are a different object and are not dashboard panels. |
-| `docs/future/ecosystem/shell-vision.md`, `blockers.md` | 9 | § "The stance" and § "What is deliberately not on this list" updated for the tree. |
-| `docs/future/marketing/plugin-reference.md`, `site-map.md` | 9 | The contribution catalogue and the client-half description. |
+| `docs/future/terminal.md` | done 2026-08-28 | § "The tier-2 rendering contract" and § "Decisions to carry forward" point at the tree, the kit's `tui` column, and the layouts' projections as the enabler. |
+| `docs/future/remote.md` | done 2026-08-28 | § "Mobile" points at layouts' narrow projections as what makes the subset shell cheap. |
+| `docs/future/compiled-tier.md` | done 2026-08-28 | § "The four couplings that need a designed seam": three of the four were component contributions and are now slots. Census updated. |
+| `docs/future/dashboards/refused.md` | done 2026-08-28 | § "No plugin-shipped panel components, no widget toolkit in the wire format" is restated: still no static schema; remote trees are a different object and are not dashboard panels. |
+| `docs/future/ecosystem/shell-vision.md`, `blockers.md` | done 2026-08-28 | § "The stance" and § "What is deliberately not on this list" updated for the tree. |
+| `docs/future/marketing/plugin-reference.md`, `site-map.md` | 9 (the README already warns to write against the tree) | The contribution catalogue and the client-half description. |
 | `docs/future/events/README.md`, `delivery.md`, `subscriptions.md`, `core-events.md` | 9 | Where they say "frame," say "frame or tree." § "Focus changed" in core-events notes focus is host-owned state. Nothing about the events design itself changes. |
-| `docs/future/phased-review-steps/README.md` | now | A pointer row to this folder in the phases table's surroundings (not a numbered phase; a sibling programme). |
-| `docs/future/phased-review-steps/phase-6-distribution-and-third-party.md` | 9 | § 6.2 notes split.md's re-decision. |
-| `docs/future/phased-review-steps/phase-3-plugin-api-integrity.md` | 9 | A superseded-by line on § 3.5 (the contribution-kind table). |
-| `docs/smolforge/README.md`, `phase-4-smolforge-plugin.md` | 9 | § "What the loaded-plugin tier already covers" and the client registration summary mention trees. |
-| `docs/future/live-qa.md`, `docs/next-review.md`, `docs/release-notes-vnext.md` | 9 | Retarget the pointer; add release notes entries. |
+| `docs/future/README.md` | now, 9 | The folder index names this programme and, at phase 9, marks it shipped. |
+| `docs/next-review.md`, `docs/release-notes-vnext.md` | 9 | Retarget the pointer; add release notes entries. (`live-qa.md` was folded into `docs/testing.md § The smoke checklist` on 2026-08-28; its items 11 to 16 gain keyboard and remote-plugin entries in phase 9.) |
 
 ## Fold or delete
 
@@ -66,8 +65,9 @@ Reviews under `docs/reviews/` are historical records. They are never edited beyo
 
 ## Reviews: the evidence, not the plan
 
-Add one line under the title of each: "Superseded in part by `docs/future/layout/`; see
-docs-migration.md § Reviews." Then, so the trail is legible, the findings this programme answers:
+The review files are in git history, not the tree, so there is nothing to annotate. For the trail,
+these are the 2026-08-27 findings this programme answers, by file and number as the reviews
+numbered them:
 
 - `2026-08-27-plugin-surface-consistency.md` § 2 (two slot registries hold the same type): the five
   kinds replace the slot vocabulary.

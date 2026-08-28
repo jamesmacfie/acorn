@@ -1,3 +1,4 @@
+import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import {
@@ -169,7 +170,7 @@ async function mappedProjects(
 // locally (never shared). A bare identifier is resolved across all connected Linear integrations;
 // project/browse routes take an explicit ?integration=<id> since the caller already knows it.
 // Provider CRUD (connect/disconnect) lives in core's routes/integrations.ts.
-export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<AppEnv>()
+export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: { channel: string } & Record<string, unknown>) => void = () => {}) => new Hono<AppEnv>()
   // Active issues for the given project ids within one connection (?integration=<id>&ids=). No shell
   // caller left: the rail builds its mapped rows from the same query. Kept as the single-connection
   // form, and as the one place a test covers the active-only filter and the branch-suggestion
@@ -298,6 +299,9 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
           await items.write({ connectionId: row.id, identifier: node.identifier, data, fetchedAt: now })
         }
         stale = stale.filter((id) => !found.has(id))
+        // The resource runtime announces its own refreshes; this batch writes past it, so it says so
+        // itself. Once per connection that wrote, not per issue.
+        if (found.size) emit({ channel: pluginChannel('linear', 'items-changed'), connectionId: row.id })
       } catch {
         // try the next connection
       }
@@ -415,5 +419,5 @@ export const createLinearRoutes = (projects?: LinearProjectScope) => new Hono<Ap
 // request context supplies the identity-bound provider runtime without exposing host database or
 // secret-service handles to the bundle. `projects` is optional for suites that drive these routes
 // without a project scope; `/rail-items` then returns no rows.
-export const createLinearFetch = (projects?: LinearProjectScope): PluginFetchHandler =>
-  portableFetch(createLinearRoutes(projects))
+export const createLinearFetch = (projects?: LinearProjectScope, emit?: (frame: { channel: string } & Record<string, unknown>) => void): PluginFetchHandler =>
+  portableFetch(createLinearRoutes(projects, emit))

@@ -63,10 +63,22 @@ The service protocol is reserved for lifecycle messages.
 ## Package boundaries
 
 `tools/arch/boundaries.test.ts` enforces the rules below over the import graph of every package in
-`apps/`, `packages/`, `plugins/`, and `tools/`. `"exports": { "./*": "./src/*" }` gives the module
-system no encapsulation, so any package can reach any file in any other, and the boundaries have to
-be a test rather than a build error. Package kind comes from where a package lives, never from its
-name.
+`apps/`, `packages/`, `plugins/`, and `tools/`. Package kind comes from where a package lives, never
+from its name.
+
+The plugin packages are the exception to "the boundary is a test": each one declares an `exports` map
+naming at most six subpaths, so a deep import into a plugin is a `tsc` error at the import site
+rather than a boundary-test failure somewhere else in the repo.
+
+`@acorn/protocol` is closed too, and it closed differently: it has no entrypoint to funnel through, so
+its map enumerates its 40 modules one per line. That buys two things over the wildcard. A test file is
+not importable from another package, and a new module is public only when someone adds the line, which
+is the decision the map exists to record.
+
+The other four library packages, `client-core`, `node-core`, `dashboards-core`, and `desktop-helper`,
+still export `"./*": "./src/*"`, which gives the module system no encapsulation, and their boundaries
+stay tests. Closing them is a bigger job than closing the plugins was, because every production import
+into a plugin already went through an entrypoint and the same is not true one level up.
 
 Test files follow the same rules as production files unless a rule names an exception, and several
 rules carry a **shrinking baseline**: a list of survivors that may only get shorter. Adding to one is a
@@ -82,14 +94,41 @@ surface, and it may not re-export a package's internals even transitively. `cont
 shared/y.ts -> main/heavy.ts` would drag the implementation into every consumer. Types a contract needs
 live in `contract/` or `shared/`.
 
-**What an app may import.** A plugin's four public entrypoints (`node/`, `client/`, `main/index.ts`,
-`contract/`) and no internal module, so a composition root cannot come to depend on something never
-meant to be load-bearing. Tests are exempt.
+**What an app may import.** A plugin's public subpaths, and no internal module, so a composition root
+cannot come to depend on something never meant to be load-bearing. There are six kinds, and a plugin
+declares only the ones it has:
+
+| Subpath | For |
+| --- | --- |
+| `./node/index.ts` | the Node activation entrypoint |
+| `./client/index.ts` | the client activation entrypoint |
+| `./main/index.ts` | the shell-side half, where one exists |
+| `./contract/*` | the cross-plugin surface, open as a directory because that is what a contract is |
+| `./testkit` | what a node-side test outside this package needs |
+| `./testkit/client` | the same for a client-side test, split so DOM types stay out of a node program |
+
+Tests are no longer exempt, which is the change: 37 deep specifiers across 15 files under `apps/` now
+go through a `testkit` instead of reaching into a plugin's internals, and each testkit file
+names the tests it serves so an export can be traced to the reason it exists. Two plugins,
+`linear` and `rollbar`, also declare `./server/index.ts`, because a `vi.mock` has to name the module
+the code under test imports and both plugins' routes import their own `../index` relatively. The
+arch test holds that list at two.
+
+What the compiler cannot see is a map going back to `"./*": "./src/*"`, which would reopen every path
+and break no build, so `tools/arch/boundaries.test.ts` checks the maps themselves: the subpaths are
+from the set above, and every declared target exists. Protocol's map gets its own check, for the two
+things a reader cannot verify by eye: no wildcard, no test file, and nothing pointing at a module that
+has moved.
 
 **Test scaffolding stays out of production.** No production file imports any package's `testkit/`,
-which is how a temp-directory SQLite factory ends up shipped. Deep imports past
-`@acorn/plugin-api/testkit` are a shrinking baseline; migrate a test as you touch it, and widen the
-testkit rather than adding a root.
+which is how a temp-directory SQLite factory ends up shipped. That rule now covers fourteen plugin
+testkits rather than one. Deep imports past `@acorn/plugin-api/testkit` are a shrinking baseline;
+migrate a test as you touch it, and widen the testkit rather than adding a root. It was 167 across 48
+files before the testkit existed, 147 once the first eleven moved, and 110 once the three roots the
+facade already re-exported — `testkit/db.ts`, `testkit/auth.ts`, `server/db/index.ts` — were swapped for
+it. Two whole roots left the list in that batch, which is the shape the exit condition wants: a root
+disappears rather than shrinking. The exit is a plugin whose suite compiles against published surfaces
+only, which is also the condition for moving that plugin out of the repository.
 
 **The node stays bootable.** Nothing in the tree imports a shell binding it should not. Tauri's
 `invoke` and its event API are confined to `apps/desktop/src/shell/`, the bridge the window injects.
@@ -196,6 +235,15 @@ The rule exists because the alternative was drift. Roughly ten route files parse
 others hand-rolled `typeof` chains, and the chains were where the bugs hid: a positive-integer check
 spread over three conjuncts, a non-empty string check that only tested `typeof`. Neither is visible
 to `tsc`, because the body starts as `unknown`.
+
+Writing it here was not enough. The 2026-08-27 architecture review found ten route files back on
+casts, the worst of them passing a merge method straight to GitHub unchecked, so the rule is now an
+arch test: a file that calls `c.req.json()` and contains no `safeParse` fails
+`tools/arch/boundaries.test.ts`. The check is file-level, which is coarse on purpose. Matching each
+`safeParse` to the read it belongs to would mean parsing the file, and the failure worth catching is
+a route file with no schema in it at all. One allowlist entry survives, `plugins/agents`'s usage
+routes, whose hand-written validators live in `shared/` so the settings form can run them too and
+return per-field messages; the test names the reason and fails if that file stops reading a body.
 
 Deliberately not done: response schemas, full request and response codegen, or an OpenAPI pipeline.
 Every consumer is TypeScript in this repo, so Zod at the boundary is as far as this goes.
@@ -313,6 +361,31 @@ as a stale row rather than a failure. The banner that says a Node has never answ
 a Node whose cache is empty. Conflating the two would make an offline Node look unreachable and a
 never-reachable Node look stale.
 
+## The three parties, and what a control plane may hold
+
+There are two parties today and an optional third. The **client** coordinates across the Nodes it can
+see. A **Node** owns its data and drives its own work. A **control plane** holds metadata about Nodes
+and vouches for them, and it is never in the data path.
+
+The rule that keeps the third party honest: **a control plane stores what it takes to find a Node and
+vouch for it, and nothing about what the Node is doing.** Node inventory, endpoints, fingerprints,
+enrollment records, provider handles, accounts, billing: yes. Tasks, repository contents, agent
+transcripts, run history: no. Any design that syncs task-shaped rows to a service fails this by
+inspection.
+
+Holding that line is what keeps three things true. The control plane stays replaceable, because
+nothing depends on it having seen your work. The trust story stays one sentence
+([the security doc](./security.md) § The control plane). And every `/v2` route and the WebSocket are
+untouched, so a Node with no account and no control plane is the fully usable default rather than a
+degraded mode.
+
+Two seams connect the third party, and nothing else does. A Node can enroll with a control plane at
+first boot, which is [the enrollment doc](./node-enrollment.md). A plugin can contribute a node
+provider, which puts Nodes in the fleet ([the plugins doc](./plugins.md) § Node providers). Both are
+optional, both are inert when unconfigured, and there is no `nodes` table in core: the provider
+answers, the client merges, the desktop host stores what it adopts, and `node.json` gains one optional
+record.
+
 ## Agent execution
 
 Managed agent sessions live in the agents plugin and persist normalized events in a durable per-session
@@ -329,6 +402,8 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
 - Renderer behavior: [frontend](./frontend.md), [state](./state.md), [panes](./panes.md), and
   [dashboards](./dashboards.md).
 - Trust boundaries: [authentication](./authentication.md) and [security](./security.md).
+- How a provisioned Node introduces itself to a control plane, and the versioned protocol it speaks:
+  [node enrollment](./node-enrollment.md).
 - Node contracts: [API reference](./api-reference.md), [data layer](./data-layer.md), and
   [caching](./caching.md).
 - Why the plugin system is shaped this way, the decisions behind it, and where it is going:
@@ -342,7 +417,7 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
   written first: [first-party plugins](./first-party-plugins.md).
 - Review findings from moving Rollbar out of the binary onto the loaded-plugin path:
   [third-party](./third-party/).
-- Runtime and development: [shell](./shell.md) and [local development](./local-development.md).
 - The planned redesign of plugin UI into host-owned layouts, a closed component kit, remote component
   trees, five extension kinds, and host-owned keyboard navigation: [layout](./future/layout/README.md).
   A proposal; the owning docs above describe current behaviour until its phases ship.
+- Runtime and development: [shell](./shell.md) and [local development](./local-development.md).

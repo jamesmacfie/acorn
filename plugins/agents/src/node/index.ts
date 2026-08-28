@@ -1,3 +1,4 @@
+import { pluginChannel } from '@acorn/protocol/pluginState.ts'
 import { agentProfileRegistry, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
@@ -143,6 +144,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         ...createAgentUsageService({
           probeDir,
           pricingForUser: (userId) => readAgentPricingPreferences(core.prefs, userId),
+          onRefreshed: () => ctx.events.send({ channel: pluginChannel('agents', 'usage-refreshed') }),
         }),
         pricing: (userId) => readAgentPricingPreferences(core.prefs, userId),
         setPricing: (userId, preferences) => writeAgentPricingPreferences(core.prefs, userId, preferences),

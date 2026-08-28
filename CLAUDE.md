@@ -3,7 +3,7 @@
 Architecture and runtime contracts are in
 [docs/architecture-overview.md](./docs/architecture-overview.md) and the topic docs beneath `docs/`.
 Design and migration material lives under `docs/third-party/` (the loaded-plugin record and
-remaining work), `docs/future/`, and `docs/smolforge/`.
+remaining work) and `docs/future/` (its README indexes every programme and single file).
 
 Before changing code, identify the owning runtime and trace data from its source through the Node API,
 protocol, broker, client cache, and UI consumer. Preserve the Node/shell and plugin boundaries,

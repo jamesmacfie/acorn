@@ -5,6 +5,7 @@ import { gh, ghError, ghGraphQL, ghGraphQLResult } from '..'
 import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, type GqlPull, type PatchBlobStore } from './prMirror'
 import { deletePullMirrorStatements } from '../mirrorRetention'
 import { pullRequests, syncState } from '../../node/schema'
+import { type GithubEmit, NO_EMIT } from '../events'
 
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 
@@ -41,6 +42,7 @@ export async function refreshOpenPulls(
   core: Pick<CoreServices, 'tasks'>,
   key: PullRefreshKey,
   fetcher: GitHubFetcher = gh,
+  emit: GithubEmit = NO_EMIT,
 ): Promise<RefreshResult> {
   const { userId, repoId, owner, repo } = key
   const resource = pullsResource(repoId, 'open')
@@ -129,6 +131,7 @@ export async function refreshOpenPulls(
   ])
   // After the mirror commits, never inside it: two SQLite files cannot share a transaction.
   await core.tasks.adoptPullNumbers(owner, repo, branchToPull)
+  emit('pulls-changed', { repoOwner: owner, repoName: repo })
   return { ok: true }
 }
 
@@ -158,10 +161,12 @@ export async function refreshPullDetail(
   token: string,
   db: PluginDatabase,
   key: PullRefreshKey & { number: number },
+  emit: GithubEmit = NO_EMIT,
 ): Promise<RefreshResult> {
   const pull = await fetchPullComposite(token, key.owner, key.repo, key.number)
   if (!pull.ok) return pull
-  await mirrorPr(db, { userId: key.userId, repoId: key.repoId, number: key.number }, pull.value, Date.now())
+  const { checksChanged } = await mirrorPr(db, { userId: key.userId, repoId: key.repoId, number: key.number }, pull.value, Date.now())
+  announcePrSynced(emit, key, pull.value.headRefOid, checksChanged)
   return { ok: true }
 }
 
@@ -171,6 +176,7 @@ export async function refreshPullWithFiles(
   db: PluginDatabase,
   blobs: PatchBlobStore,
   key: PullRefreshKey & { number: number },
+  emit: GithubEmit = NO_EMIT,
 ): Promise<RefreshResult> {
   const [pull, files] = await Promise.all([
     fetchPullComposite(token, key.owner, key.repo, key.number),
@@ -180,7 +186,16 @@ export async function refreshPullWithFiles(
   if (!files.ok) return files
 
   const mirrorKey = { userId: key.userId, repoId: key.repoId, number: key.number }
-  await mirrorPr(db, mirrorKey, pull.value, Date.now())
+  const { checksChanged } = await mirrorPr(db, mirrorKey, pull.value, Date.now())
   await mirrorFiles(blobs, db, mirrorKey, files.value)
+  announcePrSynced(emit, key, pull.value.headRefOid, checksChanged)
   return { ok: true }
+}
+
+/** One PR's composite landed. `checks-changed` rides alongside only when a check flipped: it is the
+ *  verb a consumer keys a green-to-red alert on, so it must not fire on every sync. */
+export function announcePrSynced(emit: GithubEmit, key: PullRefreshKey & { number: number }, headSha: string | null, checksChanged: boolean): void {
+  const payload = { repoOwner: key.owner, repoName: key.repo, pullNumber: key.number, headSha }
+  emit('pr-synced', payload)
+  if (checksChanged) emit('checks-changed', payload)
 }

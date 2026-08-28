@@ -119,7 +119,7 @@ should be a deliberate act. The implementation still lives in
 **Adding a name is free. Removing one is a major bump.** The snapshot's first line records the
 `PLUGIN_API_MAJOR` it was written under, and regeneration REFUSES to drop a name while that major is
 unchanged — it prints the names that would vanish and tells you to bump or put them back. That is not a
-style rule: the major is compared by exact string match at plugin load, at install, and at client bundle
+style rule: a manifest's `apiVersion` range is checked at plugin load, at install, and at client bundle
 resolution, so a plugin built against a surface that has since lost a name does not degrade gracefully, it
 fails to resolve a symbol at run time in someone else's process with no version having said so. Bumping
 without regenerating fails the same test, so the pair cannot drift apart in either direction. Bumping
@@ -129,21 +129,35 @@ means editing `packages/protocol/src/pluginApiVersion.ts` and rebuilding every l
 loading. The major went to `2` on 2026-08-14, when the facade shed seventy-one names, and to `3` on
 2026-08-27, when four names moved to say what they mean: `capabilities` became `hostCapabilities`,
 `PollerContribution` became `ClientScheduleContribution`, and the two slot registries folded into one.
-Both bumps were batched deliberately — a rename is cheap while every plugin is in this repository and
-expensive the moment one is not.
+It went to `4` on 2026-08-28, when `ctx.events` lost `notice` and `stepEvent` to the `workflows.notices`
+capability, a loaded plugin's capability ids became bound to its own namespace, and its pane, source and
+slot ids did too. The same `4` batch then took `hostCapabilities` and the `HostCapabilities` type: a
+contribution's `requires` used to be a closed union with one plugin's name, `terminal`, compiled into
+core, and it is now `'desktop' | { plugin: id }` or an array of them, answered by `hasHostCapability`
+(2026-08-27 extensibility review, finding 8). Every bump was batched deliberately — a rename is cheap
+while every plugin is in this repository and expensive the moment one is not, and the `4` batch was the
+last window before the namespace rules would have had to grandfather an ecosystem.
+
+**Folding a removal into an open batch is a judgement, not a loophole.** The snapshot guard compares the
+committed major against the current one, so it cannot tell "this major already shipped" from "this major
+was bumped an hour ago in the same uncommitted change". Nothing had been released under `4` when the
+`requires` removal landed, so it joined the batch and is recorded in the paragraph above rather than
+buying a `5` nobody could have been running. Once a major is out, the guard's two remedies — put the
+name back, or bump — are the only two.
 
 ### What is published, and what acorn promises about it
 
-Two packages leave this repository. Both are unscoped, which is a decision and not a placeholder:
-`@acorn/*` would need an npm organisation that does not exist, and nothing about these two artifacts
-is improved by waiting for one.
+Three packages leave this repository. All are unscoped, which is a decision and not a placeholder:
+`@acorn/*` would need an npm organisation that does not exist, and nothing about these artifacts is
+improved by waiting for one.
 
 | Package | What it is |
 | --- | --- |
-| `create-acorn-plugin` | The scaffold (`packages/create-acorn-plugin`). Emits the whole no-bundler profile; depends on nothing, including this list's other entry. |
+| `create-acorn-plugin` | The scaffold (`packages/create-acorn-plugin`). Emits the whole no-bundler profile; depends on nothing, including this list's other entries. |
 | `acorn-plugin-sdk` | The frame bridge (`packages/plugin-sdk`) — `connect`, `mountFrame`, `openLinkOnClick`, `AcornBridgeError` and the `AcornBridge` type, re-exported from `@acorn/plugin-api/ui/sdk` so the two cannot drift. |
+| `acorn-plugin-types` | The node-side API as declarations (`packages/plugin-types`), plus the generated manifest schema. No runtime, and `@types/node` as its only peer. |
 
-**Only the frame bridge is published, and the other seven entrypoints never will be.** They re-export
+**Only the frame bridge and the declarations are published, and the eight entrypoints never will be.** They re-export
 node-core and client-core — Hono, drizzle, Solid, Monaco — and a plugin does not want a second copy of
 any of those. It wants the host's, which a compiled plugin gets from the builder and a loaded plugin
 gets through `ctx` and through the document its frame is served in. The bridge is the one thing an
@@ -154,10 +168,26 @@ rather than in a stranger's bundler.
 
 **The promise: a plugin that loads under `PLUGIN_API_MAJOR` keeps loading under it.** That is what
 publishing converts from an internal invariant into something owed to someone else, and it is the same
-invariant the snapshot already enforced — a removal requires the major to move, and the major is compared
-by exact string match at three places. What is *not* promised: that the major will never move, that a
-prior major keeps working, or that anything below carries a deprecation window. There is no deprecation
-program and none is planned; the ceiling stays "the number cannot lie about a removal".
+invariant the snapshot already enforced — a removal requires the major to move.
+
+A manifest's `apiVersion` is a **range over majors**, not a single number: `"3"`, `"2 || 3"`, or a span
+like `"2-4"`. `speaksApiVersion` in `packages/protocol/src/pluginApiVersion.ts` is the one comparison,
+used by both loader paths, the installer, and the client's bundle resolution. It was an exact string
+match until 2026-08-28, which meant a plugin could not support two majors and the day the number moved
+every out-of-tree package stopped loading with no version an author could ship that worked on both
+sides. Anything that is not a range reads as incompatible, so a typo fails at the manifest rather than
+matching nothing quietly.
+
+`requires.plugins` uses the same grammar for a different question. `apiVersion` says which acorn a
+package speaks; `requires` says which *other packages* it needs on the node, checked at load and used
+to order init ([plugin authoring](./plugin-authoring.md) § Requiring another plugin). It exists because
+a plugin consuming another plugin's capability used to fail at whichever route reached for it first,
+with a message about a missing capability and nothing naming the package that should have provided it.
+
+What is *not* promised: that the major will never move, that a prior major keeps working once acorn
+stops naming it, or that anything below carries a deprecation window. There is no deprecation program
+and none is planned; the ceiling stays "the number cannot lie about a removal". The range is what gives
+an author a way to cross a move, not a promise that they will not have to.
 
 `packages/plugin-sdk/src/public.ts` is the published declaration, **hand-written** and copied verbatim
 to `dist/sdk.d.ts`. Nothing here emits declarations — `noEmit` is global and every package is consumed as
@@ -167,6 +197,39 @@ appears on the surface. Hand-written is also the better artifact for a compatibi
 person wrote and a person reviewed. It is held to the implementation by mutual-assignability assertions in
 `packages/plugin-sdk/src/contract.test.ts`, which `tsc --noEmit` fails the moment an upstream shape moves
 underneath a stable name — the exact drift the name-level snapshot cannot see.
+
+`acorn-plugin-types` is the same arrangement one tier over, and it exists because the only kind of
+plugin a stranger could write was untyped JavaScript against prose. `packages/plugin-types/src/public.ts`
+is hand-written for the same reasons `public.ts` above is, copied verbatim to `index.d.ts`, and held to
+the implementation by mutual-assignability assertions in `contract.test.ts`. A plugin picks it up with a
+JSDoc annotation and no build step, which is what keeps the no-bundler profile intact:
+
+```js
+/** @param {import('acorn-plugin-types').NodePluginContext} ctx */
+init(ctx) { … }
+```
+
+It describes the **loaded** tier, so `routes.register`, `events.channel` and `events.streams` are
+absent: those are permanently first-party and a published declaration that named them would be
+advertising something no installed package can reach. A handful of members carry a type it declares as
+`HostOwned<…>` rather than describing — the drizzle handle behind `ctx.storage.open()`, the Zod schema
+on an agent-tool contribution — because describing either means adding the dependency this package
+promises not to have. Every one is a named line in `contract.test.ts`, and the count is asserted, so
+the list can only grow on purpose.
+
+### The manifest schema
+
+`packages/plugin-types/acorn-plugin.schema.json` is the JSON Schema for `acorn-plugin.json`,
+**generated** from `packages/protocol/src/pluginContract.ts` and committed beside the declarations.
+`pluginSchema.test.ts` regenerates it and fails when the committed bytes differ; regenerate with
+`UPDATE_PLUGIN_SCHEMA=1 pnpm test`.
+
+Generated is the whole argument. `docs/future/ecosystem/README.md` used to record a JSON Schema as
+deliberately not built, because a second schema is a second source of truth — correct for a
+hand-maintained copy, and not true of one a test rewrites from the contract. What it buys is the thing
+prose cannot: an author gets completion and inline errors on every contribution array before the file
+is ever loaded. The scaffold writes the `$schema` key, so a scaffolded plugin has it from the first
+line.
 
 `PLUGIN_BRIDGE_VERSION` (`packages/protocol/src/pluginBridge.ts`) is not part of that published
 surface. A frame never compares it itself: `connect()` does, and refuses a hello it does not
@@ -315,8 +378,9 @@ Three things differ, and all three follow from the code not being ours:
   A failed roster row carries `reason` and `stage` alongside `failedAt`. `stage` is `'init'` or
   `'ready'` for a plugin that ran and threw, and `'load'` for a package that never ran at all: a
   manifest that does not parse (the reason names the offending field paths, not just "does not match the
-  schema"), an `apiVersion` this node does not speak, an id a second directory already claims, a bundle
-  that throws on import, a wrong default export. Those load failures used to end at a `console.error`
+  schema"), an `apiVersion` this node does not speak, a `requires.plugins` entry naming a package this
+  node does not have, an id a second directory already claims, a bundle that throws on import, a wrong
+  default export. Those load failures used to end at a `console.error`
   in the node's stdout, which a packaged app shows to nobody — and a package whose bundle would not
   import read as `pending-restart`, with a Restart banner that restarting could never clear because
   restarting re-ran the same failing import. A load failure is now `state: 'failed'` with its reason,
@@ -671,9 +735,28 @@ kinds of contribution come out of one manifest:
   is what a bundle throwing at module scope used to render. Any message counts as the acknowledgement, so
   a bundle built before the ack existed clears the deadline as soon as it calls the bridge; a purely
   static frame from such a bundle needs rebuilding. A surface the device could not register at all —
-  usually a contribution id a first-party pane already owns, since ids are un-namespaced by design — is
-  skipped so the rest of the plugin still works, and reported in the attention inbox rather than only in
-  the console.
+  usually a contribution id something else already owns — is skipped so the rest of the plugin still
+  works, and reported in the attention inbox rather than only in the console.
+
+  **A loaded plugin's ids sit inside its own namespace.** Contribution ids are un-namespaced by design:
+  `pr`, `changes` and `palette.files` double as persisted layout keys and chord targets, so they cannot
+  carry an arbitrary prefix. Plugin-versus-plugin collisions fail loudly, which is fine. The one that
+  did not was a collision with a *future core id*: core adds a pane called `notes`, an installed plugin
+  already registered one, and core loses a first-come race against a package the owner installed.
+  Nothing announced it.
+
+  So a loaded plugin's pane, source and slot ids have to equal its plugin id or start with `<id>-` or
+  `<id>.`, and one that does not is bound to `<pluginId>.<id>`. What counts as inside is the shape the
+  first-party packages already use — `database`, `http-requests`, `linear-issue` — which is why this
+  cost nothing to introduce: every id that has ever shipped already passes, so no saved layout moves and
+  there is no alias map. Commands were already qualified as `plugin.<pluginId>.<commandId>`.
+
+  The binding happens once, where the device reads the roster row
+  (`packages/client-core/src/plugins/contributionIds.ts`), rewriting the declaration and every reference
+  to it — `action.pane`, `action.surface`, `action.overlay`, `routes[].surface`, `contentLinks[].pane`.
+  Doing it at each registration site would be the same change made in eleven places and wrong in
+  whichever one got missed. Compiled plugins are untouched: they are the app, and an id they collide
+  with core on is a duplicate registration that fails in `pnpm test`.
 
   The bridge's `api` surface is five verbs — `get`, `post`, `put`, `patch`, `del` — matching
   `PluginBridgeApiRequest.method` exactly. That last part is the rule rather than a coincidence: a method
@@ -1240,6 +1323,12 @@ What a plugin puts on the frame beside `channel` is the payload, delivered to it
 Core reads the channel and nothing else, which is the same promise the WS envelope makes everywhere
 (`@acorn/protocol/ws.ts`).
 
+The first-party plugins use it for one thing: announcing that state they own has changed
+(`plugin:github:pr-synced`, `plugin:notes:notes-changed`, `plugin:workflows:run-changed`, and so
+on). The catalogue, the payload rule (state to re-read, never a delta) and the one exception — core
+sends `plugin:<provider>:items-changed` itself after a mirrored-resource refresh, because the write is
+core's — are in [docs/future/events/plugin-events.md](./future/events/plugin-events.md).
+
 Four properties worth knowing before building on it:
 
 - **`send` is confined to that namespace, and the confinement is the definition.** A loaded plugin
@@ -1379,7 +1468,7 @@ checks it again on arrival, and the host mints every name.
 ```
 
 `location` is a closed list — `pane.footer`, a strip the host draws under a plugin pane's frame, and
-`pane.aside`, a column beside it — and it grows when a surface appears to draw it, never ahead of one.
+`	pane.aside`, a column beside it — and it grows when a surface appears to draw it, never ahead of one.
 Position is encoded in the *name*, the same rule the frame `layout` template family follows: an
 `orientation` field alongside would be the first knob of a layout language. `surface` must be a `pane`
 this same manifest declares; a settings page, importer, overlay, reference panel or webview is chrome
@@ -1443,6 +1532,128 @@ Both directions appear in the trust prompt under **Enforced**, and both are reco
 decision so a version that starts reaching into a *different* package reads as newly requested rather
 than sliding past unremarked.
 
+### Node-side extension points
+
+The same model, on the node, for the same problem: plugin A opens a named point and any number of
+plugins deliver into it. `ctx.extensionPoints` (`node-core/server/plugin/extensionPoints.ts`), with
+three calls — `open(point, label)`, `contribute(point, entry)`, `entries(point)`.
+
+It exists because capabilities are single-provider by construction. `ctx.capabilities.provide` throws
+on a second provider, and that is correct for what a capability is — a named typed function with one
+owner — but wrong for "many plugins each add a workflow step kind". Every such case was becoming a
+private registry inside the plugin that needed it, each with its own duplicate check and its own
+disposer convention (2026-08-27 extensibility review, finding 4).
+
+**Reach for a capability when there is one right answer, and for a point when there are many.**
+
+The rules are the client's, so there is one model to learn:
+
+| | |
+| --- | --- |
+| the point's name | `<ownerPluginId>:<pointId>`. Checked against the opening plugin, so a package cannot open a point in a stranger's name. |
+| the entry's id | `<contributorPluginId>:<entryId>`, minted by the host. Two plugins may use the same entry name without either shadowing the other. |
+| ordering | by `order`, ties broken on id, so two entries at the same order are stable rather than dependent on init sequence. |
+| duplicates | one plugin filing two entries under one id on one point throws. |
+| lifecycle | both halves — points opened and entries filed — go when the plugin does. |
+| resolution | `entries()` is resolved per call, never cached at init. Contributing to a point nobody has opened yet is fine and expected: init order is not a dependency contract, so the entry waits. An unopened point reads as empty. |
+
+The typed id lives in the owner's `contract/` and is the only thing a contributor imports, the same
+`capabilityId` trick and for the same reason:
+
+```ts
+// plugins/workflows/src/contract/extensions.ts
+export const WORKFLOW_STEP_KIND = extensionPointId<StepKindContribution>('workflows:step-kind')
+
+// the owner, once
+ctx.extensionPoints.open(WORKFLOW_STEP_KIND, 'Workflow step kinds')
+for (const entry of ctx.extensionPoints.entries(WORKFLOW_STEP_KIND)) { /* … */ }
+
+// anyone else
+ctx.extensionPoints.contribute(WORKFLOW_STEP_KIND, { id: 'request', value: { handler, validate } })
+```
+
+Unlike the client's, this one carries **functions, not descriptors**, and that is not an inconsistency:
+a client contribution crosses an iframe boundary into another realm, and a node contribution does not
+— both tiers of plugin run in the node's own process. The rung-1 argument applies unchanged
+([security.md](./security.md) § Rung 1): this is least privilege for cooperative code, not a sandbox.
+
+Reach it only through `ctx`. A loaded plugin's bundle inlines every `@acorn/*` import it makes, so a
+plugin that imported the registry module directly would get a private copy of the maps and contribute
+into nothing.
+
+The proving pair is workflows and http: workflows opens `workflows:step-kind`, `workflows:policy` and
+`workflows:trigger`, and the http plugin contributes the `http:request` step, with neither package
+importing the other's implementation ([workflows.md](./workflows.md) § Contributed step kinds).
+
+### Node providers
+
+A plugin can declare that it knows about Nodes, and optionally that it can make and remove them:
+`ctx.providers.nodes(provider)` (`node-core/server/nodeProviders/registry.ts`). This is the second
+door into the fleet, beside probe-then-pair, and it is what a control-plane plugin is built from.
+
+```ts
+ctx.providers.nodes({
+  id: 'machines',                                     // the host stamps `<pluginId>:machines`
+  label: 'Acme Cloud',
+  list: async (signal) => [/* ProvidedNode records */],
+  create: async (spec, signal) => {/* … */},          // declaring create makes destroy required
+  destroy: async (providerNodeId, signal) => {/* … */},
+  start: async (providerNodeId, signal) => {/* … */},
+  stop: async (providerNodeId, signal) => {/* … */},
+})
+```
+
+The rules follow every other registry on `ctx`, plus one borrowed from
+[DevPod](https://devpod.sh/docs/developing-providers/quickstart):
+
+| | |
+| --- | --- |
+| the id | `<pluginId>:<id>`, minted by the host. An id containing a colon is refused, so a package cannot qualify itself. |
+| `create` obliges `destroy` | validated at registration, so a provider that can make Nodes but not remove them is a load error rather than a support ticket. A person who cannot remove a machine has already been billed for it. |
+| lifecycle | providers go when the plugin does, like its routes and capabilities. |
+| where it runs | **node-side, on some Node, not necessarily the one the person is sitting at, and with no client necessarily attached.** Write nothing into a provider that assumes otherwise. |
+
+That last row is a contract term, not advice, and it has two halves. Node-side, because a
+renderer-side provider would put the cloud account credential in the renderer, the one place the
+architecture has always kept credentials out of. And *some* Node, because the client reads this by
+fanning out over every reachable Node and unioning the answers, deduped on `providerId` plus
+`providerNodeId` — so a provider on a headless Node is exactly as visible as one on the laptop.
+`providerNodeId` is the provider's own id for a machine, stable no matter which Node asked, which is
+what makes two Nodes signed into one account show one row instead of two.
+
+**`ProvidedNode.enrollment.deviceToken` never reaches a client.** `GET /v2/core/nodes` projects it
+out — as an explicit field list, so a new field cannot leak by omission — and
+`POST /v2/core/nodes/adopt` is the only way to get one. The desktop host is what calls it: the
+renderer names a provider and a node id, the host fetches the endpoint, fingerprint and credential
+from the Node that listed the record, then probes that endpoint and refuses a certificate whose
+fingerprint is not the one the provider vouched for. So the renderer cannot introduce a Node of its
+own invention, and still never sees a device token
+([security.md](./security.md) § The control plane).
+
+Confirmation for the four verbs is the client's, drawn from the `ToolRisk` tiers `nodeActions`
+already uses (`NODE_LIFECYCLE_RISK` in `packages/protocol/src/nodeProviders.ts`): `create`, `start`
+and `stop` are `write`, and `destroy` is `execute` and asks twice. Core decides those tiers, not the
+provider — a provider that could call its own destroy `read` would be choosing how loudly acorn warns
+about it.
+
+The reference implementation is `plugins/nodes-file`, which reads Nodes out of a JSON file named by
+`ACORN_NODES_FILE`. It is not a toy: it is the seam's only consumer until a cloud plugin exists, it is
+what the tests run against, and it is deliberately a loaded plugin whose manifest grants it nothing at
+all. Build it into a data root with `pnpm --filter @acorn/node build:plugin nodes-file`; it is not in
+the bundled roster, so a shipped install has no node providers and Settings → Nodes draws no
+provider section.
+
+#### The first-party rule
+
+**A first-party control-plane plugin gets no host privilege a third party lacks.** It is a loaded
+plugin, built only from the seams documented here, and if it ever needs one special host change then
+that change is a moat and the seam is not finished. The reason is not fairness, it is rot: a privilege
+nobody outside exercises is one nobody notices breaking.
+
+The way to check it is to diff what the plugin imports and what its manifest grants against what
+`create-acorn-plugin` scaffolds. `plugins/nodes-file` is the standing worked example — one
+registration, `core: []`, `secrets: false`, `exec: false`, `net: []`.
+
 ### Replacing a core surface
 
 The other half is bb's exclusive slot, and the important word is *offer*. A plugin may declare a
@@ -1487,7 +1698,7 @@ behaviour without A's declared consent.** Specifically refused, permanently:
 - **Patching another plugin's registrations.** A plugin's contributions are registered by the host from
   the manifest the host read. There is no runtime door onto anyone's, including its own.
 - **Reading another plugin's routes.** Refused at manifest parse, refused again on the device, and
-  refused a third time at the frame bridge (`plugins/frames/scopes.ts`).
+  refused a third time at the frame bridge (`packages/client-core/src/plugins/frames/scopes.ts`).
 
 If a real need surfaces that cooperative points cannot express, **the answer is to widen the descriptor
 vocabulary, not to open the realm.** Some things will not fit, and that is a real cost paid on purpose:
@@ -1705,7 +1916,7 @@ plugin could claim another plugin's integration rows, which is what `providerId`
 rail source on.
 
 **`persistedStateSlices` has no manifest form, and will not get one.** A slice is not a value — it is a
-`{ codec, empty, unknownIds, maxBytes, legacy, binding: { values, hydrate } }` record the host drives
+`{ codec, empty, unknownIds, maxBytes, binding: { values, hydrate } }` record the host drives
 through its own restore phases, reading and writing SHELL SIGNALS at boot before any frame exists, and
 clearing them on scope eviction. None of that survives a port: a descriptor cannot hand over a codec, and
 a frame is not mounted at the moment the phase it would belong to runs. A loaded plugin's answer is the
@@ -1840,6 +2051,28 @@ Four per plugin, the same ceiling as schedules and task checks.
 [managed-agents.md § Harnesses](./managed-agents.md) owns the behaviour and the two driver tiers;
 [plugin-authoring.md § Harnesses](./plugin-authoring.md) is the authoring contract.
 
+## Forward compatibility
+
+**Unknown is retained and reported, never dropped silently.** One rule, because there were four
+different answers to "the plugin knows something this build does not", and three of them were wrong in
+different directions.
+
+- A **schedule state row** whose declaration is gone is retained and shown. Right, and the model for
+  the rest: disabling a plugin must not delete the owner's pause or its run history.
+- An **unknown `apiVersion`** used to hard-refuse. Fixed by making it a range (§ What is published):
+  refusing meant a manifest written for the next acorn could not name this one.
+- An **unknown `permissions.node.core` facet** is skipped by `scopeCore`, and an **unknown manifest
+  key** is stripped by the schema. Both of those are correct — rejecting either would make a manifest
+  from a later build fail to load, which is the trap `apiVersion` used to be. What was wrong is that
+  neither said so, so an author whose key never took effect had nothing to read.
+
+So the manifest reader now collects them. `parsePluginManifest` returns an `unknown` list alongside the
+manifest — unknown top-level keys, unknown contribution kinds, unknown core facets — computed by
+comparing the raw JSON with what came back out, so there is no key list to keep in step. It rides the
+roster row to the device, which raises one attention row per entry on the same path a surface that
+failed to register takes. The wording says what it is: this version of acorn does not recognise it, so
+it was ignored. Not a failure of the plugin.
+
 ## Collaboration rules
 
 Plugins collaborate through four mechanisms:
@@ -1852,11 +2085,11 @@ Plugins collaborate through four mechanisms:
    optional providers produce a degraded feature, not a module import. The small helpers in
    `server/bridge.ts` are typed route adapters; their setter functions exist only for isolated route
    tests and are never used by production composition.
-3. **Broadcasts** (`ctx.events`) — tell connected CLIENTS that something changed. This is not a
-   plugin-to-plugin channel and there is no subscribe side: nothing in the node listens. It is an
-   invalidation channel over the authenticated WebSocket — no durability, no replay, no delivery
-   guarantee — and a client that misses one refetches after the gap. Durable history belongs in the
-   owning plugin's tables. Two plugins that need to talk use a capability (2).
+3. **Broadcasts** (`ctx.events`) — tell connected clients that something changed, and hear what core
+   says changed on this node. It is an invalidation channel over the authenticated WebSocket — no
+   durability, no replay, no delivery guarantee — and a client that misses one refetches after the
+   gap. Durable history belongs in the owning plugin's tables. Two plugins that need to talk use a
+   capability (2); the send side is deliberately not a plugin-to-plugin channel.
 4. **Client registries and slots** — register UI contributions without importing another plugin's
    implementation. The host records disposables so disabling/reloading a plugin removes its entries.
 
@@ -1874,6 +2107,34 @@ It carries the node registry's four verbs behind `ctx.capabilities` — `provide
 hand. What it is emphatically NOT is the platform gate: that is `requires` on a contribution, answered
 by `hostCapabilities()`. Both were spelled "capability" until 2026-08-27, in opposite senses on the two
 halves.
+
+**A capability id belongs to the plugin that publishes it.** A loaded plugin may only provide ids
+starting with `<its own id>.`, the same binding the host already applies to its routes, schedules,
+collections, integration flows and extension points. Providing anything else fails registration and the
+reason lands on the roster row. Without the rule, a package called anything at all could publish
+`github.mirror` or `preview.rules` while the real plugin was disabled, and the composition root would
+resolve the impostor — a capability is a typed function another plugin calls, so squatting one is not a
+name clash, it is a substitution nothing announces.
+
+Two ids are exempt, and both are host-declared invitations rather than any plugin's property:
+`core.taskWorktreeCreated` and `agents.harnessRegistry`. Whichever plugin owns worktree side effects or
+agent sessions on a given node fills them. `HOST_OWNED_CAPABILITY_IDS` in
+`packages/node-core/src/main/pluginPermissions.ts` is the list, and a test holds it against the real
+constants.
+
+The catalogue of every id the first-party plugins publish, with its signature, is
+`CapabilityCatalogue` in `acorn-plugin-types`. It lives there because eleven of the fourteen are
+declared in `plugins/*/src/contract/` modules a loaded plugin cannot import, so prose was the only way
+a stranger could learn one existed.
+
+**Hearing a core event.** `ctx.events.on(event, listener)` is the receive side, and it fires whether or
+not a client is attached, which is the point on a node nobody is sitting at. The event must be one core
+publishes (`NODE_EVENT_CHANNELS` in `packages/protocol/src/nodeEvents.ts`) and, for a loaded plugin,
+one its manifest named in `permissions.events` — the same grant list its frames subscribe against, so
+there is one vocabulary and one trust sentence per grant rather than two of each. Disposal follows
+unload, exactly as a route registration does. The catalogue is deliberately short: it holds what core
+broadcasts today, and hearing *another plugin* needs that plugin's `emits` declaration, which is item 3
+of [the events design](./future/events/subscriptions.md) and does not exist.
 
 **Where a key lives.** With whichever side would otherwise have to import the other. On the node that is
 almost always the provider, and the registry says so: "the signature lives in the provider's
@@ -1934,6 +2195,29 @@ is the one thing in a table-owning package that can never change: renaming it or
 There are no cross-file foreign keys, `ATTACH` queries, or transactions spanning plugin databases.
 Cross-plugin workflows use durable operation state and explicit IDs/capabilities.
 
+### Uninstalling, and what "purged" means
+
+Uninstall removes the package directory and its lockfile. With `purgeData`, it also removes the
+plugin's own SQLite file and its WAL sidecars, and then everything in the core database that is keyed
+by the plugin id: the `plugin:<id>:*` prefs rows, and the `schedule_state` and `schedule_runs` rows
+under `<id>:`. That last part is `cascadeDeletePluginData`
+(`packages/node-core/src/server/db/cascade.ts`); disk goes first and the database second, because a
+failure in that order still leaves the plugin gone, where the reverse leaves a running plugin whose
+state was deleted underneath it.
+
+The prefs rows are why this exists. Every sandboxed frame's state lives under `plugin:<id>:*`, nothing
+could enumerate or delete that namespace, and uninstall audited `dataPurged: true` over rows that were
+still there — so a reinstall inherited the old plugin's state with no way for anyone to look at it
+first.
+
+Two things a purge deliberately does not reach, and the audit row is still honest about both. A pane id
+sits inside a core-owned layout blob (`core:task-layouts`), and the layout normaliser already drops an
+id no registered pane answers to. Cached external items belong to the owner's *connection*, not to the
+plugin that reads it, and disconnecting the connection is what clears them.
+
+Without `purgeData` nothing is deleted, which mirrors what disabling has always done: reinstalling
+finds its data where it left it.
+
 ## Tool projection
 
 A plugin registers schema-validated agent tools with risk metadata. Core projects the registry into:
@@ -1947,6 +2231,10 @@ implementations run in the Node and use CoreServices; the renderer and MCP proce
 databases directly.
 
 ## Adding a plugin contribution
+
+Every kind that exists, with its tier and where it is declared, is one table in
+[contribution-kinds.md](./contribution-kinds.md). Read that first: the odds are good that a kind
+already draws what you want.
 
 1. Put the behavior in the owning plugin and choose the correct runtime directory.
 2. Use CoreServices rather than importing core implementation modules or another plugin's internals.

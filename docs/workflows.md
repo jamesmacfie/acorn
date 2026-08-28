@@ -35,6 +35,60 @@ and task ownership. Agent steps use the agents capability; run targets use termi
 GitHub checks are optional. A disabled provider leaves the corresponding step unavailable and visible
 as a problem rather than silently selecting another implementation.
 
+## Contributed step kinds
+
+The seven built-in kinds — `agent`, `gate-human`, `gate-policy`, `ci-loop`, `fan-out`, `join`,
+`decide` — are not all there can be. Workflows opens three node extension points
+([plugins.md](./plugins.md) § Node-side extension points) and any plugin may fill them:
+
+| Point | What it adds | Named in a file as |
+| --- | --- | --- |
+| `workflows:step-kind` | a kind the runner dispatches to | a step's `kind` |
+| `workflows:policy` | a verdict source for `gate-policy` | a step's `policy` |
+| `workflows:trigger` | something that decides which workflows should start | nothing; the sweep asks it |
+
+**A contributed kind is addressed by its qualified id, a built-in by a bare word.** `kind = "agent"`
+is the built-in; `kind = "http:request"` is the http plugin's. That is deliberate: the file says which
+package will run the step, and two plugins can both call their entry `request` without either
+shadowing the other.
+
+A contributed kind's inputs go in `[steps.with]`, an opaque table the runner passes through unread.
+The contributing plugin validates it — at load time, so a bad step is a red row in the workflow list
+rather than a run that starts and fails on its third step — and reads it in its handler. Built-in
+kinds do not use `with`; their inputs are named fields, which is what keeps them checkable by the
+host.
+
+The worked example is `http:request`, contributed by the http plugin, where the post-interpolation
+scheme check, the 5 MB response cap and the project's variable layers already live
+([http-client.md](./http-client.md)):
+
+```toml
+[[steps]]
+name = "notify"
+kind = "http:request"
+
+[steps.with]
+method = "POST"
+url = "{{deploy_hook}}"
+body = '{"ref": "{{branch}}"}'
+```
+
+4xx and 5xx are *answers*, not failures: the step succeeds so a later `decide` can branch on the
+status. Only a transport failure, a bad URL, or a smuggled scheme fails the step. An unattended send
+writes an audit row ([security.md](./security.md) § The vocabulary is closed) carrying the target's
+origin and not the URL, because a query string is where a token ends up when someone puts one there.
+
+## Triggers
+
+A trigger contributed to `workflows:trigger` is asked, on each sweep, which workflows should start.
+The sweep runs on **the node's** scheduler at the plugin cadence floor (300s), not on a client clock,
+so a trigger fires on a machine nobody is looking at — which was the whole point, and was not true
+until 2026-08-28: the sweep used to be a client schedule that skipped ticks while the window was
+hidden and never ran at all on a node with no client attached.
+
+There is no separate "check now" route. It is the scheduler's own run-now on Settings → Schedules,
+which every schedule already has.
+
 ## Routes and UI
 
 Node routes are under `/v2/p/workflows/` and core task run-target routes under
@@ -51,11 +105,11 @@ remain executable actions and are trust-checked.
 
 ## Gaps
 
-Authoring is file-based. The desktop must be open for app-open-triggered reconciliation and UI
-interaction, although the Node continues work while the renderer is closed. There is no general DAG
+Authoring is file-based. The desktop must be open for UI interaction, although the node continues
+work while the renderer is closed — including the trigger sweep, which moved onto the node's own
+scheduler. There is no general DAG
 editor, and no automatic retry of an operation whose external outcome is unknown.
 
 An agent cannot start or drive a run: no workflow or session tool is registered, so orchestration is
 declarative only. [`docs/future/orchestration.md`](./future/orchestration.md) analyses what an
-agent-driven path would cost, including database-truth definitions and an extensible step-kind
-registry.
+agent-driven path would cost, including database-truth definitions.

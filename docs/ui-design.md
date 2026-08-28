@@ -166,7 +166,7 @@ menu for how a chart mark uses them.
 
 Three tokens describe the theme rather than colour it: `--is-dark`, `--color-scheme`, and
 `--syntax-fg`. The host sets all three from the theme's one `dark` boolean. The previous approach
-derived dark/light from parsing `--bg` as a hex colour (`plugins/terminal/client/theme.ts`), which
+derived dark/light from parsing `--bg` as a hex colour (`plugins/terminal/src/client/theme.ts`), which
 required `--bg` to stay a literal 6-digit hex and silently classified every other colour syntax as
 light; `--syntax-fg` replaces two hardcoded lists of dark theme names that lived in `diff.css` and
 `checks-panel.css` and both needed editing by hand every time a dark theme shipped.

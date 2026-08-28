@@ -88,7 +88,7 @@ That last row matters more than it looks — see § Naming.
 
 ## The constraint that decides the shape
 
-**The plugin frame CSP has `frame-src 'none'`** (`apps/desktop/src/app/main/pluginScheme.ts`). A plugin
+**The plugin frame CSP has `frame-src 'none'`** (`apps/desktop/src-tauri/src/plugin_scheme.rs`). A plugin
 frame cannot embed a host editor iframe inside itself. So "host editor nested in a plugin's pane
 layout" is unavailable in any form the *plugin* composes. Composition has to be host-side.
 

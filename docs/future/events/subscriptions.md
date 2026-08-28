@@ -13,14 +13,19 @@ same answer routes give:
   (`client-core/src/plugins/pluginChannel.ts:94-97`), reached from the frame's `subscribe`
   (`frames/frameServices.ts:94`). The broker separately checks the manifest's `permissions.events`.
 - **Node, loaded tier.** `ctx.events.send` throws unless the channel is the plugin's own
-  (`node-core/src/server/plugin/context.ts:246-253`), and there is no receive side at all:
-  `PluginBroadcast` has `send` and friends, no `on`, no `subscribe`, no `once`.
-- **Node, both tiers.** Nothing in the node listens. A plugin's node half reacts only to its own
-  routes, its schedule ticks, and the five single-slot `routeCapability` hooks.
+  (`node-core/src/server/plugin/context.ts`). The receive side exists since 2026-08-28 but hears only
+  core: `ctx.events.on` accepts the channels in `NODE_EVENT_CHANNELS` and nothing under `plugin:`.
+- **Node, both tiers.** A plugin's node half reacts to its own routes, its schedule ticks, the core
+  events above, and the node-side extension points (`docs/plugins.md § Node-side extension points`,
+  which the [layout programme](../layout/08-hooks.md) grows into hooks).
 
-So "other plugins can listen" decomposes into two new contracts, one per side of the wire.
+So "other plugins can listen" is one new contract now, the cross-plugin grant below, applied to the
+`on` that already exists on the node and the `subscribe` that already exists in a frame.
 
 ## The node-side `on`
+
+**Shipped for core events, 2026-08-28**: `ctx.events.on` over `NODE_EVENT_CHANNELS`, disposed with
+the plugin. What follows is the argument that produced it and the shape the cross-plugin half reuses.
 
 A plugin's node half subscribing to core events is the half with the most leverage and the least
 design risk. The consumer that motivates the whole folder — a CI plugin reacting to HEAD moved by

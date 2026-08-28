@@ -107,8 +107,8 @@ Files: `plugins/onboarding/src/client/{OnboardingWizard.tsx,OnboardingOverlay.ts
 ## Code touched
 
 - The files above.
-- `packages/client-core/src/registries/*`: `contextSectionSlots` removed; the slot registry is
-  `plugins/tree/registry.ts`.
+- `packages/client-core/src/registries/*`: `contextSectionSlots` deleted; the slot registry moves
+  to the new `packages/client-core/src/plugins/tree/` as `registry.ts`.
 - `plugins/*/src/client/*.css` for these plugins: deleted.
 
 ## Tests

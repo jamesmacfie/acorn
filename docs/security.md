@@ -26,7 +26,7 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - Every protected HTTP route passes request-id, principal resolution, the auth gate, and then the
   idempotency middleware before reaching a router.
 - `/v2/node` and `/v2/pair` are the only pre-auth routes. Device management, plugin toggles, audit,
-  security, and backup are device-only.
+  security, backup, schedules, preferences, projects, and workspaces are device-only.
 - `/v2/events` authenticates the upgrade and rechecks device activity for long-lived streams.
 - Revoking a device (`DELETE /v2/core/devices/:id`) closes that device's live sockets immediately and
   fails its in-flight requests. A device can revoke its own row; that is the same effect as unpairing
@@ -43,6 +43,42 @@ could call `POST /v2/core/pair/start`, read the pairing code back out of the res
 itself a device, and walk away with a permanent owner-authority token. `requireDevice` answers 403
 rather than 401 for this case: the caller authenticated fine, it just is not the owner at a keyboard,
 and a 401 would invite a retry loop instead of stopping it.
+
+Preferences, projects and workspaces joined that list after a route review found each of them
+reachable by an agent's own token. The preference one mattered most: the agent-tool permission ceiling
+is a preference key, so a task-scoped token could raise its own ceiling and then call the tool it had
+just granted itself — the control designed to contain a rogue agent, liftable by the rogue agent. The
+project row holds `setup_script`, `dev_script`, `dev_restart_script`, `teardown_script`,
+`db_url_script` and `run_targets`, all commands this node runs later, so a write there is code
+execution with a delay on it. Workspaces are lower stakes and destructive: none of those routes is
+task-addressed, so nothing narrowed a delete to the caller's own work. If an agent tool ever needs to
+read its own project's configuration, that is a task-addressed route under `/v2/core/tasks/:id/...`,
+not a widening of this gate.
+
+`server/mountCoverage.test.ts` is what keeps the list from drifting again. It builds the app, reads
+every route under `/v2/core` off it the way a request does, and fails unless each one is covered by a
+gate mount or named in an allowlist with the reason it is open to a task token. Three route reviews in
+a row found the same shape of hole — a route that should have been device-only was mounted at
+`requireUser` because nobody wrote the line, and nothing failed when they didn't. Adding a route under
+an already-gated prefix is still free; adding one anywhere else is now a decision someone writes down.
+The test reads a trailing `/*` strictly, as not covering the bare path, which is why every gate below
+is written in both forms: the Hono this repo pins does match the bare path, that behaviour has moved
+between versions, and a gate that is correct only on today's version rots quietly.
+
+Two core lists are filtered rather than gated, the same answer terminal's session roster gives:
+`GET /v2/core/tasks` and `GET /v2/core/task-statuses`. A task-scoped caller has a legitimate reason to
+ask about its own task and no reason to be handed every other active task's title, branch, absolute
+worktree path and dirty count. `task-statuses` filters before it runs any Git, so a confined caller
+polling it cannot make the node do work for tasks it may not see. The `task-statuses` filter closes a
+second caller too, since plugin frames reach that path under `core.tasks:read`.
+
+Plugin routers registered with `prefix: ''` sit outside every core mount gate and have to carry their
+own. GitHub's OAuth device-flow pair (`/auth/device/start`, `/auth/device/poll`) did not, so a
+task-scoped token could open a device window, show the owner a code for an account the agent controls,
+and end up with that account's token stored as the owner's GitHub connection — a confused deputy, with
+every later GitHub call made on the attacker's behalf. Both are `requireDevice` now: connecting an
+account is always a person at a keyboard. Notes' workspace routes are the same shape and the same
+answer, in `plugins/notes` and in the compatibility alias `plugins/memory` keeps for the old paths.
 
 Both gates, and the task-scope and provider-access gates below them, are applied to a router's mount
 path in `server/index.ts` rather than inside each handler. A route added later under an already-gated
@@ -165,13 +201,49 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
 
   This paragraph used to claim every child process went through the broker. Nineteen production
   modules did not, and the claim being both untrue and unenforceable was worse than not making it.
-- Executable repository configuration (`.acorn/config.toml`, workflow files, and URL scripts) is
-  hash-gated. The exact snapshot must be acknowledged before execution; a changed snapshot fails
-  closed with `needs-trust`/`config-changed`.
+- Executable configuration is hash-gated: the repository's own files (`.acorn/config.toml`, workflow
+  files, and URL scripts) **and the project row's script columns**. The exact snapshot must be
+  acknowledged before execution; a changed snapshot fails closed with `needs-trust`/`config-changed`.
 - Docker matching configuration is declarative; Docker and run-target execution remains subject to
   the appropriate trust gate.
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to
   HTTP(S) URLs without userinfo.
+
+The untrusted input the trust gate hashes is the repo config **and the project row**
+(`main/repoConfigTrust.ts`). The gate started on the premise that the checkout is untrusted and the
+database is trusted, and that premise only holds while nothing but the owner can write the database.
+`PUT /v2/core/projects/:id/config` is device-only now, so it holds again; the row is in the snapshot as
+the belt behind that gate. A write the owner did not make changes the hash, and the next thing that
+asks for trust shows the owner the script instead of running it. `run_targets` is hashed with the five
+script columns: what that JSON holds is `command`, `stop` and `restart` strings the run pane executes,
+so leaving it out would put the same hole one column over.
+
+Widening the snapshot changes the hash, so a project that already has script columns set will ask for
+one re-acknowledgement the next time something gated runs. That is the correct answer rather than a
+migration: the owner is being shown a snapshot that now covers more than the one they approved.
+
+Which paths ask. The three call sites that assert trust are the ones where the *checkout* authored what
+runs: a run target whose winning layer was the repo's config file, a `db_url_script` from the same
+place, and a workflow defined in the repo. The setup and teardown scripts run from the project row
+without asking, because the owner typed them into the settings form. That is the honest scope of the
+gate: extending the snapshot makes a change to the row visible wherever trust is asked, and does not by
+itself put a prompt in front of a script the owner wrote.
+
+Two things `.acorn/config.toml` no longer does. `[scripts] setup` and `[scripts] archive` are parsed
+and reported as unread rather than merged: they were merged over the project row for a while and
+nothing consumed the result, so a repo could declare a setup script and watch it do nothing. They are
+not wired instead of dropped because wiring them would make a committed file run a command on worktree
+creation and on archive, and neither path asks this gate first — that is a new execution surface, not a
+fix. The `[docker]` table is still read without the gate; the comment on
+`plugins/docker/src/main/dockerConfig.ts` now names the two invariants that make that safe, which are
+that exec is ref-addressed rather than matcher-addressed and that the WebSocket hub refuses docker
+channels to a task-confined socket. If either changes, that table needs the gate.
+
+**A known limit.** `resolveInRoot` is check-then-use: nothing re-validates between the containment
+check and the open, so an agent that can write in its own worktree can swap a path component for a
+symlink in the window between them. Real, hard to hit, and the honest fix is an `O_NOFOLLOW`-style
+open rather than a tighter check, so it is recorded here rather than papered over. The per-task sandbox
+(`docs/future/sandbox/sandbox.md`) is the layer that eventually subsumes it.
 
 Before the broker (`packages/node-core/src/main/core/exec/proc.ts`) existed, about sixteen call sites
 spawned or exec'd children with their own ad hoc handling, and the inconsistency was not cosmetic.
@@ -185,6 +257,64 @@ child's grandchildren survived and kept the stdio pipes open. The broker fixes t
 caller's environment from an allowlist and never spreading `process.env`; a caller that needs more
 passes `passthrough: ['DOCKER_*']`, visible at the call site and additive rather than "everything
 except what we remembered."
+
+## The control plane, and the inversion it costs
+
+A Node can be provisioned by something other than a person: a control plane creates the machine,
+passes an enrollment token in through the environment, and the Node introduces itself on first boot.
+That path is off by default, inert when unconfigured, and fully described in
+[the enrollment doc](./node-enrollment.md). What belongs here is what it costs.
+
+**A control plane learns a device token for every Node it provisioned, so trusting your control plane
+is the whole game.** A device token is full owner authority on that Node ([authentication](./authentication.md)
+§ Device tokens): there are no per-token scopes, because this is single-owner software. So enrolling is
+not "registering an inventory record". It is handing a service the same credential a paired client of
+yours holds.
+
+That is the same inversion the web client already records as its sibling. When a Node serves the app,
+the Node is the origin, and per-bundle consent stops being the real consent surface because whoever
+controls the Node controls the page that asks. Both cases come down to one sentence: the thing you
+chose to trust is the thing you are trusting, and no mechanism further down rescues a bad choice
+there.
+
+Four buy-backs, because each is cheap and together they keep the cost bounded:
+
+- **Two tokens, not one.** The enrollment token is single-use and short-lived; the device token is
+  the durable credential. A leaked provisioning secret does not become a standing one.
+- **The attachment is visible where the owner already looks.** Settings → Nodes names the control
+  plane a Node is attached to, since when, and under which enrollment token, read from that Node's
+  own `node.json`.
+- **Detaching is one button, and it revokes.** It deletes the control plane's device row, so the
+  credential stops working immediately, and it changes nothing else about the Node. A detached Node
+  keeps working standalone, which is the open-source promise stated as a mechanism.
+- **`node.enrolled` and `node.detached` are on the audit trail**, with the failures recorded too: a
+  provisioned Node that could not reach its control plane says so rather than looking ordinary.
+
+Deliberately not bought: an allowlist of permitted control-plane URLs. Whoever set the environment
+variable made that decision, and a list acorn ships would be security theatre over a choice it cannot
+see. What is enforced is the scheme — plaintext http is refused for anything but loopback, because a
+durable credential must not cross a network in the clear.
+
+The second seam, a plugin-contributed node provider, has its own consequence and it is smaller: a
+provider vouches for a Node's fingerprint, and the desktop host then probes that endpoint and refuses
+a certificate whose fingerprint is not the one vouched for. So a provider substitutes for the owner's
+eyes at the pairing step and for nothing else. The device token still never reaches the renderer; the
+host fetches it from the Node that listed the record. See [plugins](./plugins.md) § Node providers.
+
+**Where the provider's own credential lives, and why that is a caveat rather than a bug.** A node
+provider is a plugin, its connection to the control plane is an ordinary connection, and a connection
+is held by the Node the plugin runs on. On a desktop install that is the local Node, so the cloud
+account credential sits on the owner's machine beside every other integration token. That is the
+right answer while every client has a local Node. It stops being one for the web client, which has
+no local Node to hold anything, and the credential has to move to a Node the owner picked. Three
+constraints already in the code keep that move additive rather than a redesign. Fleet-shaped reads
+fan out over every Node and union the results, so a provider answering from a different Node changes
+no caller. Node providers register node-side and have no client-side seam, so nothing on the client
+holds provider state that would have to follow. And `providerNodeId`, not the endpoint, is the
+control plane's identity for a Node, so the same record survives being reached from somewhere else.
+The work that moves the credential is [remote access](./future/remote.md). Until it lands, resist
+the shortcut of a client-side provider: it would put the credential in the renderer, which is the one
+design all three constraints exist to prevent.
 
 ## Third-party plugin bundles
 
@@ -597,6 +727,14 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
   **disabled or ask-every-time until the owner enables them**, regardless of the plugin being
   trusted for everything else. Trusting a plugin's code and trusting an agent to call its tools
   autonomously are different decisions; keep them separate in the UI.
+- **The `execute` tier denies by default.** A tier the owner has never expressed an opinion about
+  falls back to `TOOL_TIER_DEFAULTS` (`@acorn/protocol/toolPermissions.ts`), where `execute` is
+  `false`. The fallback used to be `true` for every tier, which meant shipping a new execute tool
+  granted it to every existing installation on upgrade, silently: the owner had approved a list that
+  no longer described what the agent could do. `read` and `write` stay allowed and are written out
+  rather than left implicit, so the next tier added has to say which it is. The node and the settings
+  page read the same constant, so an untouched tier draws as off in Settings → Agent tools and is
+  denied on the wire.
 - **Broadcast hygiene.** `ctx.events.status()` is content-free by design; keep every
   third-party-reachable broadcast content-free or plugin-self-scoped so one plugin's events can
   never carry another's data to a subscribed frame (phase-3 bridge filters by declared channel;
@@ -624,6 +762,12 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 
 ### Supply chain
 
+- npm's published `dist.integrity` is compared against the downloaded bytes, and a mismatch fails the
+  install with nothing written (`main/pluginInstaller.ts`). It used to be recorded into provenance and
+  never checked, which made it a note about the package rather than a statement about what ran. A
+  package the registry publishes no integrity string for still installs — refusing would break every
+  older package that only ever published a shasum — and the lockfile records the archive hash either
+  way.
 - The phase-5 lockfile hash-pins what was installed and records source + resolved version — for every
   source that was *fetched*. A `{ path }` folder install is outside this section entirely and always
   will be: it is symlinked, its bytes keep changing, and it pins nothing (§ Installing from a folder).
@@ -693,6 +837,38 @@ here as the checklist reviewers should hold PRs against:
 | Install on an agent's say-so | Prompt-injected agent asking for a hostile package | Request/decision split: the tool cannot install, the device does, the owner decides in shell chrome | Shipped |
 | A plugin in dev mode | Its node half runs unread on every reload | Bounded to one (plugin, node) the owner chose; badged, revocable, audited. Not closed until rung 2 | Shipped (disclosure) |
 
+## The renderer's policy and its dangerous sinks
+
+The privileged webview — the one that holds a capability, so `invoke` works — loads from `app://acorn`
+and gets its Content-Security-Policy as a response header from `apps/desktop/src-tauri/src/app_scheme.rs`.
+`docs/shell.md § Renderer origin and protocol handler` owns the directive list and the reason for each
+exception. A Rust test pins it, the same way `plugin_scheme.rs` pins the frame policy.
+
+`tauri.conf.json` sets `"csp": null`, and that is not a gap: the value there governs Tauri's built-in
+asset protocol, which this app does not use. A security review read the config and concluded the
+privileged webview had no policy. It has one; the config is simply not where it lives. Worth stating
+plainly, because the next reader will look in the same place.
+
+What the policy is a second layer behind. The renderer displays text this app did not author — agent
+transcripts, GitHub `bodyHTML`, Linear descriptions, Rollbar payloads, notes an agent wrote — and four
+bindings pass GitHub's `bodyHTML` to `innerHTML` verbatim, trusting GitHub's sanitizer:
+
+- `plugins/github/src/client/PullDetail.tsx`
+- `plugins/github/src/client/pullDetail/Conversation.tsx`, twice
+- `packages/client-core/src/ui/diff/DiffRows.tsx`
+
+None is a known bug. They are listed because each one is a place where a sanitizer being wrong once
+would put script in a webview that can call into Rust, and the policy is what stands behind them if
+that ever happens.
+
+The Markdown renderer (`packages/client-core/src/ui/markdown.ts`) is the other sink, and it is the app's
+own. It escapes first and builds tags afterwards, which holds. What did not hold was its sentinel: it
+reserved U+E000 to protect code spans and images across the escaping pass, on the stated grounds that
+real text never contains it. The input decides what is in it, so a source that spelled the sentinel
+forged an index into the token tables and crashed the render. `renderMarkdown` strips U+E000 on the way
+in now, at the one entry point, which kills the class rather than the two probes that found it: after
+the strip there is no way to write a sentinel the renderer did not write itself.
+
 ## Host-owned webviews and browser automation
 
 The desktop view service owns every `WebContentsView`, with an ephemeral session, no preload,
@@ -739,8 +915,40 @@ and can dominate archive size. Restore is a documented manual operation into a f
 The append-only core `audit` table retains security-relevant decisions for 90 days. Producers include
 pairing-window changes, device pair/revoke, config-trust acknowledgement, secret create/replace/delete,
 plugin toggles, plugin install/update/uninstall/reload, the owner's answer to an agent-raised plugin
-request, and backup. The Settings → Security surface reads it. The trail is
-not tamper-evident against someone who already controls the database file.
+request, backup, and attaching to or detaching from a control plane. The Settings → Security surface
+reads it. The trail is not tamper-evident against someone who already controls the database file.
+
+### The vocabulary is closed, and a plugin can add to it
+
+Core's seventeen verbs are a closed union in `server/audit.ts`. That set exists because the settings
+surface groups and filters on it and an action nobody can enumerate is one nobody reviews — the same
+argument as the error-code set in [api-reference.md](./api-reference.md) § Errors.
+
+Until 2026-08-28 that also meant nothing a plugin did reached the trail. For a product where the
+expensive, unattended work is a plugin's — a workflow run spending money, a schedule sending an
+outbound request with the owner's credentials — the events most worth reviewing were the ones the
+surface built for review could not see.
+
+A plugin now declares its verbs, in its manifest's `contributions.auditActions` or through
+`ctx.audit.declare`, and writes rows with `ctx.audit.record`. Four rules keep the closed-set argument
+intact:
+
+- **The host qualifies every verb as `<pluginId>:<actionId>`.** No core action contains a colon, so a
+  package can never take a core verb's place or file under another plugin's name. The id is minted
+  from the plugin, never read off the descriptor.
+- **An undeclared action writes nothing.** `recordAudit` refuses it and warns. Fail closed, because
+  a trail that accepts arbitrary strings is one nobody can enumerate.
+- **The vocabulary is still enumerable.** `auditVocabulary()` lists every declared verb with the label
+  its plugin chose, and it rides out on each audit page so Settings → Security can name a row it has
+  never seen. A row whose plugin has since been removed draws as its raw qualified verb, which is the
+  honest answer: the row is still evidence of something that happened.
+- **The actor is `system`, with the plugin id as `actorId`.** Nothing asked for a plugin's row over a
+  request, so it is the node acting, and the qualified verb already says which package.
+
+`details` stays what it was for core: allowlisted scalars decided at the call site, never a request
+body, a credential, or a file's contents. `plugins/http` is the worked example — it declares
+`request.sent` and records it only from its workflow step, with the target's origin and not the URL,
+because a query string is where a token ends up when someone puts one there.
 
 Secret *use* is not recorded, only creation, replacement and deletion. Every credential read goes
 through `SecretService.use` (`main/core/secrets.ts`), which holds only an encryption key and nothing

@@ -45,7 +45,10 @@ What remains is exactly three programs plus one map:
    a download, then discovery over signed packages. (`work-plan.md`)
 
 `docs/future/compiled-tier.md` is not a phase — it is the standing per-plugin map for shrinking
-the compiled tier, consulted whenever a move is considered.
+the compiled tier, consulted whenever a move is considered. Since 2026-08-28 that map defers to
+[docs/future/layout/](../layout/README.md) for the three couplings that were component-shaped: the
+remote component tree is what lets memory's tray section, changes' tool card, and docker's chrome
+leave the compiled tier without widening the sandbox.
 
 Before picking one up, read `work-plan.md § What is actually waiting on something`. The short version:
 all three are startable today except discovery, which is hard-gated on containment — and the only item
@@ -67,7 +70,8 @@ code rather than described in prose — the scaffold's drift lock
 (`packages/create-acorn-plugin/index.test.ts`), the published declaration's
 (`packages/plugin-sdk/src/contract.test.ts`), the testkit deep-import ceiling (`MAX_DEEP_IMPORTS` in
 `tools/arch/boundaries.test.ts`), the three `// prune candidate` markers in
-`packages/plugin-api/src/client/index.ts`, and the unverified-chrome list in `docs/future/live-qa.md`.
+`packages/plugin-api/src/client/index.ts`, and the unverified-chrome items in the smoke checklist
+(`docs/testing.md § The smoke checklist`, items 11 to 16).
 
 ## The bar for plugin DX
 
@@ -85,9 +89,14 @@ failures that name themselves (roster `reason`/`stage`, the attention inbox, lab
 placeholders); a real context from `@acorn/plugin-api/testkit`; a pinned API surface; and host-owned
 storage.
 
-Deliberately not built: a JSON Schema for `acorn-plugin.json`. The install error already names the
-offending field paths and `plugin_authoring` serves the live vocabulary from the Zod schema — a second
-schema would be a second source of truth for the one failure mode the first two already catch.
+Built after all, and here is why the earlier refusal was overturned. This paragraph used to read
+"deliberately not built: a JSON Schema for `acorn-plugin.json`", on the grounds that a second schema is
+a second source of truth. That was the right answer for a hand-maintained copy and the wrong one for a
+generated file. `packages/plugin-types/acorn-plugin.schema.json` is written out of the Zod contract by
+`packages/plugin-types/src/pluginSchema.test.ts`, which fails when the committed bytes and the contract disagree, so there is
+still exactly one source of truth. The install error and `plugin_authoring` do catch the failure they
+always caught; what neither can do is put completion and inline errors in the author's editor before
+the file is ever loaded. See docs/plugins.md § The manifest schema.
 
 ## Drift warning — read this before building
 

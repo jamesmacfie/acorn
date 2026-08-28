@@ -20,6 +20,11 @@ Neither is a new rule. Both are properties the loader and the frame scheme have 
 shipped; what is new is that they are a contract, so a change in the loader's tolerance is a
 deliberate edit here rather than a silent widening.
 
+Two things worth knowing before you start. [contribution-kinds.md](./contribution-kinds.md) is every
+kind of contribution that exists, in one table, with the tier each is available in — worth a minute
+before you design around one that a loaded plugin cannot make. And `acorn-plugin-types` gives you a
+typed `ctx` with no build step, through a JSDoc annotation the scaffold already writes.
+
 ## Start from the scaffold
 
 ```sh
@@ -31,11 +36,21 @@ npm create acorn-plugin my-widget
 build step. It is the same package as the worked example at the end of this file; the rest of this
 document is what to change and why.
 
-It is published standalone, which means it carries a **copy** of two things this repository owns: the
-API major it stamps into `apiVersion`, and the handshake. `packages/create-acorn-plugin/index.test.ts`
-is what keeps the copy honest — it asserts the major against `PLUGIN_API_MAJOR`, runs the emitted
-manifest through `parsePluginManifest`, and imports the emitted node half. A change here that the
-scaffold should have followed fails there rather than in a stranger's first install.
+It is published standalone, which means it carries a **copy** of three things this repository owns: the
+API major it stamps into `apiVersion`, the URL of the manifest schema, and the handshake.
+`packages/create-acorn-plugin/index.test.ts` is what keeps the copies honest — it asserts the major
+against `PLUGIN_API_MAJOR` and the URL against the generated schema's `$id`, runs the emitted manifest
+through `parsePluginManifest`, and imports the emitted node half. A change here that the scaffold should
+have followed fails there rather than in a stranger's first install.
+
+Its last case is the one that runs the way a stranger does. It writes the scaffold to a temp directory
+outside the repository, drops the published `dist/index.d.ts` into that directory's own
+`node_modules/acorn-plugin-types`, and runs `tsc` over the node half with `checkJs`, `strict`, and
+library checking on. Everything else about the types package is asserted from inside the workspace,
+where the declarations resolve by path and the repo's compiler options apply, and neither of those is
+true for the person the package exists for. It catches the two failures that would otherwise reach a
+stranger first: a JSDoc annotation naming a type the package does not export, and a declaration file
+needing something the package never told anyone to install.
 
 ## The package
 
@@ -69,13 +84,40 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `id` | yes | Matches `/^[a-z][a-z0-9-]{1,31}$/` — 2 to 32 characters, lowercase, no dots. The dot ban is what keeps `<dataRoot>/plugins/<id>/` and `<dataRoot>/plugins/<id>.sqlite` in one directory without colliding. |
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
-| `apiVersion` | yes | Must equal this node's `PLUGIN_API_MAJOR` by **exact string match** — `'3'` today (`packages/protocol/src/pluginApiVersion.ts`). Anything else is a `failed` roster row with the mismatch as its reason. |
+| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'4'` today (`packages/protocol/src/pluginApiVersion.ts`). Write `"4"` unless you have checked your plugin against another major too, in which case `"3 || 4"` or `"2-4"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
 | `migrations` | no | Relative path to the Drizzle chain. |
+| `requires` | defaulted | What this package needs from the rest of the node. One key, `plugins`: up to 16 entries of `{ id }`, each optionally with a `version` range. See below. |
 | `permissions` | defaulted | See below. Omitting it means an empty declaration, not a full one. |
 | `contributions` | defaulted | See below. |
+
+### Requiring another plugin
+
+If your plugin consumes another plugin's capability, say so:
+
+```json
+"requires": { "plugins": [{ "id": "agents" }, { "id": "workflows", "version": "2 || 3" }] }
+```
+
+The node checks the list once every package on disk has been read, so the order the directories sort
+in does not matter. A requirement is met by anything present under that id: a built-in, another
+installed package, or a client-only one. A package whose requirement is not met does not load, and its
+roster row says which id was missing rather than which capability was absent. A package that was
+dropped cannot satisfy anyone either, so a chain of dependants comes down with it.
+
+`version` is a range over the required plugin's **major**, in the same grammar as `apiVersion`: `"2"`,
+`"2 || 3"`, `"1-3"`. Majors are all a dependant can reason about unless the two packages share a
+release process, and a built-in has no version to range over at all, so a range against one is
+ignored.
+
+Two things the list also buys. A plugin initializes after the ones it names, so a capability
+registered in the provider's `init` is there by the time yours runs. And a package cannot require
+itself or name the same id twice, both of which fail the manifest with a reason.
+
+What it does not do is install anything. There is no resolver and no registry to fetch from, so the
+owner installs both packages and this checks their work.
 
 All three path fields go through the same `entry` refinement: no leading `/`, no `..` segment. The
 loader then re-resolves each one inside the package directory with lexical **and** symlink
@@ -92,7 +134,7 @@ yours:
 | --- | --- | --- |
 | `id` | the plugin's directory name in `plugins/` | write it, and make it match the plugin's `name` in code |
 | `version` | read from the plugin's `package.json` | write it |
-| `apiVersion` | imported from `PLUGIN_API_MAJOR` | write the current major as a string |
+| `apiVersion` | imported from `PLUGIN_API_MAJOR` | write the current major as a string, or a range covering it |
 | `node` | `'./dist/node.js'` | your own relative path, e.g. `'./node/index.js'` |
 | `client` | `'./dist/client.js'` when a client is declared | your own, e.g. `'./client.js'` |
 | `migrations` | always `'./migrations'` in the built package | wherever your chain actually is |
@@ -105,7 +147,7 @@ is the widest one that owns tables; `plugins/model-providers/` is the narrowest 
 ### Contributions
 
 `contributions` is a loose object — a manifest written for a newer acorn contributes less on an older
-one rather than failing to parse — with twenty named keys, each capped. The caps are not arbitrary:
+one rather than failing to parse — with twenty-one named keys, each capped. The caps are not arbitrary:
 each one is the point past which a contribution stops being an integration and starts being an app
 inside someone else's chrome.
 
@@ -136,6 +178,7 @@ because its data comes from a route on your always-running node half.
 | `schedules` | 4 | Work the node runs on a timer: `{ id, name, run, cadence, timeout? }`. `run` is a POST on your own namespace, called with `{ scheduleId }`, and its response is ignored beyond ok or error. `timeout` is seconds, defaulting to 60. The host mints the key from your plugin id, which is what opts the schedule into the 300-second plugin cadence floor. See `docs/schedules.md`. |
 | `taskChecks` | 4 | What you have to say when the owner archives a task, and the cleanup you offer to do: `{ id, check, apply?, timeout? }`. `check` is a GET answering `{ concern }`; `apply` is a POST the archive runs if the owner leaves your checkbox ticked. See below. |
 | `extensions` | 8 | Rows **you** put inside another plugin's point: `{ id, point, label, order?, items, onSelect?, refresh? }`. `point` is `<ownerPluginId>:<pointId>`, `items` is a GET on your own namespace, `onSelect` takes the narrow verb set. |
+| `auditActions` | 8 | A verb you write onto the node's audit trail: `{ id, label }`. The host qualifies it as `<yourId>:<id>` and refuses a `ctx.audit.record` naming one you did not declare, so the trail stays enumerable. Record what a person reviewing this machine would want to see, not every call you make. |
 | `harnesses` | 4 | A managed agent acorn starts, drives and draws a transcript for: `{ id, label, glyph?, spawn, envPassthrough?, quirks?, probes?, terminal? }`. The only contribution that names a program acorn will run, and the only node-side one that needs no bundle at all. See [§ Harnesses](#harnesses). |
 
 A theme is the one contribution with no route and no bundle behind it, so it is the cheapest thing a
@@ -239,7 +282,7 @@ This is the whole plugin that adds OpenCode:
   "id": "opencode",
   "name": "OpenCode",
   "version": "0.1.0",
-  "apiVersion": "3",
+  "apiVersion": "4",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [
@@ -443,14 +486,29 @@ boundary; a `(Request, PluginRequestContext) => Response` function can, so `ctx.
 is the door. The host strips the mount before calling you, so a request to
 `/v2/p/<id>/greeting` reaches your handler as `/greeting` — the same relative path a mounted router
 would see. `ctx.storage`, `ctx.core`, `ctx.tools`, `ctx.schedules`, `ctx.collections`,
-`ctx.taskChecks`, `ctx.contextSections`, `ctx.providers`, `ctx.capabilities` and
-`ctx.events.send`/`status`/`notice` are all present, shaped by the manifest.
+`ctx.taskChecks`, `ctx.contextSections`, `ctx.runs`, `ctx.audit`, `ctx.extensionPoints`,
+`ctx.providers`, `ctx.capabilities` and `ctx.events.send`/`status`/`on` are all present, shaped by the
+manifest.
 
-The four registries between `tools` and `contextSections` are owner-bound: the host stamps your plugin
-id onto whatever you register, so a schedule, collection or task check cannot be filed under another
-package's name. Three of them are also manifest keys, and the host synthesises those declarations
-through this same seam, so declare in the manifest by preference — that is the copy the owner reads at
-install.
+Those registries are owner-bound: the host stamps your plugin id onto whatever you register, so a
+schedule, collection, task check, run source or audit verb cannot be filed under another package's
+name. Several are also manifest keys, and the host synthesises those declarations through this same
+seam, so declare in the manifest by preference — that is the copy the owner reads at install.
+
+Three of them are newer than the rest and worth naming:
+
+- **`ctx.runs`** — one call, `register({ runs })`, pointing at a `GET` on your own namespace that
+  answers `{ runs }`. Register it if your plugin owns work that starts, takes time and ends; core
+  merges every plugin's answer into Settings → Runs. You keep your own table and your own surfaces.
+- **`ctx.audit`** — `declare({ id, label })` and `record(action, entry?)`. Declare your verbs in
+  `contributions.auditActions` by preference; the host qualifies each as `<yourId>:<action>` and
+  refuses a `record` naming one you did not declare. Record what a person reviewing this machine would
+  want to see and could not otherwise: work done unattended, money spent, something leaving the node.
+  Not every call your plugin makes.
+- **`ctx.extensionPoints`** — the node's many-to-many seam. `open` a point in your own namespace,
+  `contribute` into anyone's, `entries` to read your own. Reach for a capability when there is one
+  right answer and a point when there are many. See
+  [plugins.md](./plugins.md) § Node-side extension points.
 
 **Node actions and harnesses have no `ctx` member at all.** The manifest is the only way in — a command
 whose verb is `runNodeAction`, and `contributions.harnesses` — and the host registers them for you
@@ -640,7 +698,7 @@ contracts above.
   "id": "hello-acorn",
   "name": "Hello Acorn",
   "version": "0.1.0",
-  "apiVersion": "3",
+  "apiVersion": "4",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {

@@ -24,9 +24,10 @@ protected by an exclusive `node.lock`.
   active-identity
 ```
 
-`node.json` stores the stable Node ID, its creation time, the preferred last-bound port, and the
-operator's `advertiseHost` answer. No certificate material, which lives in `tls/`, and no protocol
-version. It used to carry one, written at first boot, read by nothing, and stale the moment the
+`node.json` stores the stable Node ID, its creation time, the preferred last-bound port, the
+operator's `advertiseHost` answer, and — only on a Node somebody provisioned — the attachment record
+naming the control plane it enrolled with ([node enrollment](./node-enrollment.md)). No certificate
+material, which lives in `tls/`, and no protocol version. It used to carry one, written at first boot, read by nothing, and stale the moment the
 binary serving the root moved on. See versioning in [the API reference](./api-reference.md). Its
 schema ignores unknown keys so a field can be retired without stranding roots that still have it.
 
@@ -38,6 +39,11 @@ the owning migration chain. Backups are explicit archives and never mutate their
 Files written once into the root, the node identity, the session key, and the active-identity file,
 use an atomic write: a temp file, an fsync, then a rename, so a crash mid-write cannot leave a
 truncated file behind.
+
+Every write to `node.json` is also a read-modify-write against the file rather than a serialisation of
+whatever the open `DataRoot` last held. Two owners write it now — this process's data root, and the
+detach route in a later process — and a writer that serialised its cached copy would silently drop the
+other's field.
 
 ## Core database
 
@@ -192,6 +198,39 @@ therefore switches the route to one GitHub search (`review-requested:@me`), fill
 It is allowed the request the mirror read is not, for the reason above inverted: the objection was
 one poll per repo, and a search is one call whatever the repo count. It also reaches repos that were
 never mirrored, which for "what is waiting on me" is the point rather than a side effect.
+
+## Runs: a merged read, and the trigger for ever making it a table
+
+Three parts of the system model "a thing that started, took time, cost money, and ended", in three
+files: `workflow_runs` and `workflow_steps` in `plugins/workflows.sqlite`, agent sessions and their
+turn ledger in `plugins/agents.sqlite`, and `schedule_runs` in core. One database file per plugin
+means no joins, so nothing could list them together, add up what a task cost, or answer "what is
+running on this machine".
+
+The answer is a registry, not a table, and it is the same shape collections use above. A plugin
+declares a `GET` route that lists its own runs (`ctx.runs.register({ runs })`); core calls each one
+with no client attached, parses the answer, stamps who answered, and merges
+(`node-core/server/runs/registry.ts`, `@acorn/protocol/runs.ts`). `GET /v2/core/runs` is the merged
+read and Settings → Runs draws it. No migration, no ownership move, and neither producer knows the
+other exists.
+
+What the shape costs, stated plainly: the row is display-shaped — id, title, one of five statuses,
+started, ended, task, cost, one line of detail — and an owner with a richer vocabulary maps into it
+and keeps its own for its own surfaces. Cost is optional, and agent sessions do not report one,
+because their cost lives per turn inside `usage_json` and parsing every turn to draw a list is the
+wrong trade. A source that cannot answer costs its own rows and nobody else's; the response names it,
+so a short list reads as short rather than as complete.
+
+**When to build the core table instead.** Written down here so it is recognized rather than re-argued
+when someone reaches for it: **when something outside the owning plugin must cancel a run, or charge
+it against a budget shared with another plugin's runs.** Both need a row a stranger can write to and a
+lock a stranger can take, and neither is expressible as a merged read. Nothing today needs either:
+cancelling happens on the owner's own surface, and every ceiling that exists (`MAX_CONCURRENT_HEADLESS`,
+`MAX_FAN_OUT_TASKS`) is one plugin's over its own work.
+
+The cross-plugin resource governor belongs beside that table when it arrives, modeled on
+`ProviderRequestScheduler`'s two-level shape — and never before this registry has proved the
+vocabulary, because a governor over a read model can only advise.
 
 ## Ownership rules
 
