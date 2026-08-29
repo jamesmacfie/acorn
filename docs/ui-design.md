@@ -329,6 +329,15 @@ by position, as in `.ui-code-wrap > .ui-btn`. Nothing exported accepts a class, 
 and a pane that wants a control to look different asks for that in the kit rather than in its own
 stylesheet.
 
+**One node is a box, and admits it.** `Rectangle kind="pty" | "webview" | "frame"` is what the kit
+offers a surface that owns its own pixels: a PTY, a webview, a plugin's iframe. The node owns the box
+and the keyboard contract, one tab stop from outside, Enter to hand the keys to whatever is inside and
+Escape to take them back. What draws inside it is not the kit's business. Three kinds and no fourth,
+because the name says what is in there and a kind a host does not know is a rectangle nobody can
+project: on a terminal `pty` is native and the other two draw their `<Fallback>` child. The two
+consumers are the terminal drawer and Docker's exec tab, and both used to hand-roll the box and neither
+had a way out with the keyboard.
+
 `Only` and `Fallback` are the two host wrappers. `Only hosts={['dom']}` draws its children on the
 named hosts and nowhere else. `Fallback forNode="Grid"` draws its children where the matrix says
 this host cannot draw that node. Both are here before there is a second host, so a plugin can be

@@ -207,8 +207,13 @@ docs' own example of a component that cannot be a descriptor. Notes is `list-det
 `Markdown` view toggling to a `Textarea`.
 
 **As a tree.** Context is `header-body-footer` whose body is a list of `Fold`s, one per section, and
-each section is a slot. Memory's form is a remote tree grafted into its slot: `Field`, `Input`,
-`Select`, `Textarea`, two `Button`s. Nothing in it is not kit, so memory becomes portable.
+each section is a slot. Memory's form is a tree grafted into its slot: `Field`, `Input`, `Select`,
+`Textarea`, two `Button`s. Nothing in it is not kit, so memory becomes portable.
+
+**Shipped (phase 6).** As described, with one thing the survey did not anticipate: memory stayed a
+compiled component rather than becoming a worker bundle. The point is the same `remote` point either
+way, and the carrier is `component` instead of a bundle hash. Making memory loadable is now a build
+change with no host change behind it, which is the state the survey was aiming for.
 
 ```tsx
 // context, the owner

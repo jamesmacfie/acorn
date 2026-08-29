@@ -2,7 +2,6 @@ import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../persistence/persistedState'
 import { agentContextRegistry } from './agentContexts'
 import { agentToolRendererRegistry, type AgentToolRendererContribution } from './agentToolRenderers'
-import { contextSectionSlotRegistry, type ContextSectionSlotContribution } from './contextSectionSlots'
 import { paletteRowRegistry, type PaletteRowSource } from './paletteRows'
 import { attentionRegistry, type AttentionSourceContribution } from './attention'
 import { collectionKey, collectionRegistry, type CollectionRegistration } from './collections'
@@ -11,6 +10,8 @@ import { paneRegistry, type PaneRegistration } from './panes'
 import { refPanelRegistry, type RefPanelContribution } from './refPanels'
 import { clientScheduleRegistry, type ClientScheduleContribution } from './schedules'
 import { contentLinkRegistry, type ContentLinkContribution } from './contentLinks'
+import { extensionPointRegistry, extensionRegistry, type ExtensionContribution, type ExtensionPointContribution } from './extensionPoints'
+import { qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { brandMarkRegistry, type BrandMark } from '../ui/brandMarks'
 import { railMarkerRegistry, type RailMarkerContribution } from './railMarkers'
 import { clientCapability, clientCapabilityIds, provideClientCapability, requireClientCapability, type ClientCapabilityId } from '../clientCapabilities'
@@ -31,6 +32,17 @@ export type ClientContributionPoint<T> = {
   register(entry: T): void
 }
 
+/** What a compiled plugin declares when it opens a point. The two fields the host owns are missing:
+ *  `id` here is the bare point id, and `ownerId` is stamped from the plugin doing the registering. */
+export type CompiledExtensionPoint =
+  Omit<ExtensionPointContribution, 'ownerId' | 'max'> & { max?: number }
+
+/** What a compiled plugin declares when it fills somebody else's point. `pluginId` and `carrier` are
+ *  the host's; `component` is the only carrier a plugin in this process can bring. */
+export type CompiledExtension =
+  Omit<ExtensionContribution, 'pluginId' | 'carrier' | 'component' | 'entry' | 'hash' | 'frame' | 'fetch' | 'marks' | 'run'>
+  & { component: NonNullable<ExtensionContribution['component']> }
+
 export type ClientPluginContext = {
   readonly name: string
   panes: ClientContributionPoint<PaneRegistration>
@@ -45,10 +57,14 @@ export type ClientPluginContext = {
   // One registry for both shapes: the slot id picks whether the component is handed the shell context
   // or just a task id (registries/slots.ts).
   slots: ClientContributionPoint<UiSlotContribution>
-  // A component drawn inside a section the NODE assembled, keyed by that section's id. Not the node's
-  // `ctx.contextSections`, which declares a section and its prompt text; this is a slot in the pane
-  // that renders one (registries/contextSectionSlots.ts).
-  contextSectionSlots: ClientContributionPoint<ContextSectionSlotContribution>
+  // A place in this plugin's own tree that another plugin may fill (docs/plugins.md § Cooperative
+  // extension points). The compiled half of the manifest's `extensionPoints`; the host mints
+  // `<pluginId>:<id>` and stamps the owner, so a plugin cannot open a point in somebody else's name.
+  extensionPoints: ClientContributionPoint<CompiledExtensionPoint>
+  // What this plugin brings to somebody else's point. The compiled half of the manifest's
+  // `extensions`, and the only carrier available here is a component: a loaded plugin ships bytes for a
+  // worker, and a compiled one is already in this process (registries/extensionPoints.ts).
+  extensions: ClientContributionPoint<CompiledExtension>
   refPanels: ClientContributionPoint<RefPanelContribution>
   paletteRows: ClientContributionPoint<PaletteRowSource>
   agentContexts: ClientContributionPoint<AgentContextContribution>
@@ -158,6 +174,24 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
   }
   // Not `own`. The entry arrives without the two fields the host binds, so the provider check has
   // nothing to look at until they are stamped. The id is the host's to mint.
+  // Neither goes through `own`. Both arrive without the field the host stamps, and the point's id is
+  // qualified here rather than declared, which is the same rule the manifest path follows
+  // (plugins/chrome/extensionPoints.ts).
+  const ownExtensionPoint: ClientContributionPoint<CompiledExtensionPoint> = {
+    register: (entry) => {
+      record(extensionPointRegistry.register({
+        ...entry,
+        id: qualifiedExtensionPointId(name, entry.id),
+        ownerId: name,
+        max: entry.max ?? 1,
+      }))
+    },
+  }
+  const ownExtension: ClientContributionPoint<CompiledExtension> = {
+    register: (entry) => {
+      record(extensionRegistry.register({ ...entry, pluginId: name, carrier: 'component' }))
+    },
+  }
   const ownCollection: ClientContributionPoint<CollectionRegistration> = {
     register: (entry) => {
       record(collectionRegistry.register({ ...entry, id: collectionKey(name, entry.collectionId), pluginId: name }))
@@ -175,7 +209,8 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     projectImporters: own(projectImporterRegistry),
     settingsPages: own(settingsRegistry),
     slots: own(uiSlotRegistry),
-    contextSectionSlots: own(contextSectionSlotRegistry),
+    extensionPoints: ownExtensionPoint,
+    extensions: ownExtension,
     refPanels: own(refPanelRegistry),
     paletteRows: own(paletteRowRegistry),
     agentContexts: own(agentContextRegistry),

@@ -7,6 +7,7 @@ import { Row } from '../ui/primitives'
 import { Rows } from '../ui/Rows'
 import { Tabs } from '../ui/Tabs'
 import { Modal } from '../ui/Modal'
+import { revealCollectionItem } from './collection'
 import { _resetCollectionState, collectionState } from './collectionState'
 import { registerCommands } from '../registries/commands'
 import type { ResolvedKeybinding } from '../registries/keybindings'
@@ -34,6 +35,9 @@ const install = () => {
 }
 
 beforeEach(() => {
+  // jsdom implements no layout, so it ships no `scrollIntoView`. Stubbed rather than guarded in the
+  // node: every real host has it, and an optional call there would hide a genuine break.
+  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
   host = document.createElement('div')
   document.body.append(host)
   _resetCollectionState()
@@ -113,6 +117,28 @@ describe('a run of rows is a collection', () => {
     mountRows(PULLS.map((item) => ({ ...item })))
     expect(collectionState('pulls').active).toBe('pr-2')
     expect(collectionState('pulls').selected).toBe('pr-2')
+  })
+})
+
+describe('something outside a collection can put an item in view', () => {
+  // Notes' "view in Context" hands context a section and an item id and nothing else. The kit gives a
+  // pane no class and no id to select a row on, which is the point, so the collection publishes the one
+  // operation and scroll stays the host's (./collection.ts).
+  it('makes the named item the roving stop', () => {
+    mountRows()
+    revealCollectionItem('pulls', 'pr-3')
+    expect(collectionState('pulls').active).toBe('pr-3')
+  })
+
+  it('does nothing for a key the collection does not hold, rather than clearing its place', () => {
+    mountRows()
+    revealCollectionItem('pulls', 'pr-2')
+    revealCollectionItem('pulls', 'pr-404')
+    expect(collectionState('pulls').active).toBe('pr-2')
+  })
+
+  it('does nothing for a collection that is not on screen', () => {
+    expect(() => revealCollectionItem('nothing-here', 'pr-1')).not.toThrow()
   })
 })
 

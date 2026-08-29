@@ -1,7 +1,7 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { PrefKeys, prefsOptions, savePref, termFontSize } from '@acorn/plugin-api/client'
 import { resolveTerminalFontSize, TERMINAL_FONT_SIZE_OPTIONS } from './preferences'
-import { Checkbox, Select } from '@acorn/plugin-api/ui'
+import { Checkbox, Field, Select, Stack } from '@acorn/plugin-api/ui'
 
 // Settings → Terminal: the rail-default profile, what the terminal button auto-launches when the
 // drawer opens empty (TerminalPanel reads `term_rail_default`).
@@ -14,15 +14,20 @@ export default function TerminalSettings() {
   const injectContext = () => (prefs.data?.[PrefKeys.startupContextInjection] ?? 'true') !== 'false'
 
   return (
-    <>
-      <label class="settings-field">
-        <span class="settings-label">When the terminal button is clicked, open</span>
+    <Stack gap="section">
+      <Field label="When the terminal button is clicked, open">
         <Select
           value={railDefault()}
-          onChange={(value) => void savePref(qc, PrefKeys.terminalRailDefault, value)} options={[{ value: 'empty', label: 'Empty (pick a profile with +)' }, { value: 'shell', label: 'Shell' }, { value: 'claude-code', label: 'Claude Code' }, { value: 'codex', label: 'Codex' }]} />
-      </label>
-      <label class="settings-field">
-        <span class="settings-label">Terminal text size</span>
+          onChange={(value) => void savePref(qc, PrefKeys.terminalRailDefault, value)}
+          options={[
+            { value: 'empty', label: 'Empty (pick a profile with +)' },
+            { value: 'shell', label: 'Shell' },
+            { value: 'claude-code', label: 'Claude Code' },
+            { value: 'codex', label: 'Codex' },
+          ]}
+        />
+      </Field>
+      <Field label="Terminal text size">
         <Select
           value={String(fontSize())}
           options={TERMINAL_FONT_SIZE_OPTIONS.map((size) => ({
@@ -31,12 +36,12 @@ export default function TerminalSettings() {
           }))}
           onChange={(value) => void savePref(qc, PrefKeys.terminalFontSize, value)}
         />
-      </label>
+      </Field>
       <Checkbox
         label="Send task context (PR, linked issues, notes) to new agent sessions at startup"
         checked={injectContext()}
         onChange={(checked) => void savePref(qc, PrefKeys.startupContextInjection, checked ? 'true' : 'false')}
       />
-    </>
+    </Stack>
   )
 }

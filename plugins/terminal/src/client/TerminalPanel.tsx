@@ -6,7 +6,7 @@ import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { Alert, Button, createSplitDrag, DocumentTabs, EmptyState, Icon, Menu, SplitHandle } from '@acorn/plugin-api/ui'
+import { Alert, Button, createSplitDrag, DocumentTabs, EmptyState, Icon, Menu, Rectangle, SplitHandle } from '@acorn/plugin-api/ui'
 import { resolveTerminalFontSize } from './preferences'
 import './terminal.css'
 
@@ -314,7 +314,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
         <Show when={error()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
 
-        <div class="terminal-body">
+        {/* A PTY is pixels, so it is a rectangle rather than a tree: the kit owns the box and the way
+            in and out of it with the keyboard, and xterm owns everything inside. */}
+        <Rectangle kind="pty" label="Terminal">
           <Show
             when={activeId()}
             fallback={
@@ -326,7 +328,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
           >
             {(id) => <TerminalSurface sessionId={id} fontSize={surfaceFontSize()} onExit={() => void refreshSessions()} />}
           </Show>
-        </div>
+        </Rectangle>
       </aside>
     </Portal>
   )

@@ -10,7 +10,7 @@
 import type { Component } from 'solid-js'
 import type { KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import {
-  Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, DescriptionList, EmptyState,
+  Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, ConfirmButton, DescriptionList, EmptyState,
   DetailColumn, Field, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
   SegmentedControl, Select, Spinner, SplitHandle, StatusDot, Table, Textarea, ToggleButton, Toolbar,
   TreeRow,
@@ -45,6 +45,7 @@ import { Grid } from '../../ui/Grid'
 import { Rows } from '../../ui/Rows'
 import { Only } from '../../ui/Only'
 import { Fallback } from '../../ui/Fallback'
+import { Rectangle } from '../../ui/Rectangle'
 import { DiffLine, FileHead, NonCodeRow, SplitCell } from '../../ui/diff/DiffRows'
 import { DiffPane } from '../../diff/DiffPane'
 import ModelConnectionPicker from '../../modelProviders/ModelConnectionPicker'
@@ -65,7 +66,8 @@ export const KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {
   DescriptionList, Table, Grid, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
   FileHead, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
-  PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, CopyButton,
+  PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,
   ModelConnectionPicker,
+  Rectangle,
   Only, Fallback,
 }

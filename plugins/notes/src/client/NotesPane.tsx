@@ -1,11 +1,13 @@
-import { For, Show } from 'solid-js'
+import { Show } from 'solid-js'
 import { bytesOf, formatSize, handlePluginContentLinkClick, openPane, type Task } from '@acorn/plugin-api/client'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
-import { Alert, Button, EmptyState, Input, Markdown, Row, Toolbar } from '@acorn/plugin-api/ui'
+import {
+  Alert, Button, Checkbox, EmptyState, Input, Markdown, Row, Rows, Section, Stack, Text, Textarea,
+  ToggleButton, Toolbar,
+} from '@acorn/plugin-api/ui'
 import { notesModel } from './notesModel'
 import type { NoteScope, NoteSummary } from './notesClient'
 import { libraryCollapsed, setLibraryCollapsed } from './notesPaneState'
-import './notes.css'
 
 // The three regions of the Notes pane (docs/notes-and-memory.md § Notes). The host draws the split,
 // the divider and the drag handle; these fill `list-header`, `list` and `detail`. Everything they
@@ -17,10 +19,10 @@ const authorBadge = (author: NoteSummary['author']): string => (author === 'agen
 export function NotesHeader(props: { task: Task }) {
   const model = () => notesModel(props.task.id, props.task.projectId)
   return (
-    <div class="section-header notes-header">
-      <span>{model().workspace()?.name ?? 'workspace'}</span>
-      <Input kind="filter" type="text" placeholder="filter…" value={model().filter()} onInput={(value) => model().setFilter(value)} />
-    </div>
+    <Toolbar size="sm" ariaLabel="Notes library">
+      <Text emphasis="muted">{model().workspace()?.name ?? 'workspace'}</Text>
+      <Input kind="filter" size="sm" label="Filter notes" placeholder="filter…" value={model().filter()} onInput={(value) => model().setFilter(value)} />
+    </Toolbar>
   )
 }
 
@@ -42,29 +44,30 @@ function LibraryToggle(props: { task: Task }) {
 
 export function NotesList(props: { task: Task }) {
   const model = () => notesModel(props.task.id, props.task.projectId)
-  let titleInput: HTMLInputElement | undefined
 
-  const IncludeDot = (dotProps: { scope: NoteScope; note: NoteSummary }) => (
-    <button
-      type="button"
-      class="notes-include-dot"
-      classList={{ on: dotProps.note.included }}
-      title={dotProps.note.included ? 'Included in agent context' : 'Excluded from agent context'}
-      onClick={() => void model().toggleIncluded(dotProps.scope, dotProps.note.slug, !dotProps.note.included)}
+  // "In the agent's context" as the checkbox it always was. It used to be a 10px round button with a
+  // stylesheet of its own; the state it reports and the state a Checkbox reports are the same state.
+  const IncludeBox = (boxProps: { scope: NoteScope; note: NoteSummary }) => (
+    <Checkbox
+      size="sm"
+      checked={boxProps.note.included}
+      ariaLabel={boxProps.note.included ? 'Included in agent context' : 'Excluded from agent context'}
+      title={boxProps.note.included ? 'Included in agent context' : 'Excluded from agent context'}
+      onChange={(checked) => void model().toggleIncluded(boxProps.scope, boxProps.note.slug, checked)}
     />
   )
 
-  // Dot, label and delete were three siblings in a wrapper because a <button> cannot nest one. Row is
-  // a div[role=button], so they are its leading and trailing slots and the wrapper is gone.
-  const NoteRow = (rowProps: { scope: NoteScope; note: NoteSummary }) => {
+  const NoteRow = (rowProps: { scope: NoteScope; note: NoteSummary; item?: Parameters<Parameters<typeof Rows>[0]['children']>[1] }) => {
     const armed = () => model().deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}`
     return (
       <Row
+        item={rowProps.item}
         density="compact"
         reveal
+        label={rowProps.note.title}
         selected={model().isActive(rowProps.scope, rowProps.note.slug)}
         onPress={() => void model().open(rowProps.scope, rowProps.note.slug)}
-        leading={<IncludeDot scope={rowProps.scope} note={rowProps.note} />}
+        leading={<IncludeBox scope={rowProps.scope} note={rowProps.note} />}
         meta={authorBadge(rowProps.note.author)}
         trailing={
           <Button
@@ -82,57 +85,68 @@ export function NotesList(props: { task: Task }) {
     )
   }
 
-  const GroupHeader = (headProps: { label: string; count: number; scope: NoteScope }) => (
-    <div class="notes-group-head">
-      <span class="notes-group-label">{headProps.label} ({headProps.count})</span>
-      <Button
-        variant="bare"
-        size="sm"
-        iconOnly
-        tone="accent"
-        title={`New ${headProps.label} note`}
-        label={`New ${headProps.label} note`}
-        disabled={!model().locationFor(headProps.scope)}
-        onPress={() => void model().createIn(headProps.scope).then((made) => {
-          if (!made) return
-          // Focus lands on the title after the create round-trip, so the first thing you type is the
-          // note's name.
-          queueMicrotask(() => {
-            titleInput = document.querySelector<HTMLInputElement>('.notes-title-input') ?? undefined
-            titleInput?.focus()
-            titleInput?.select()
-          })
-        })}
-      >+</Button>
-    </div>
+  const NewButton = (headProps: { label: string; scope: NoteScope }) => (
+    <Button
+      variant="bare"
+      size="sm"
+      iconOnly
+      tone="accent"
+      title={`New ${headProps.label} note`}
+      label={`New ${headProps.label} note`}
+      disabled={!model().locationFor(headProps.scope)}
+      onPress={() => void model().createIn(headProps.scope).then((made) => {
+        // Focus lands on the title after the create round-trip, so the first thing you type is the
+        // note's name. The kit gives a pane no handle on a control it did not place, so the model
+        // asks for the focus and the title field answers.
+        if (made) model().requestTitleFocus()
+      })}
+    >+</Button>
   )
 
   const virtualScratchpad = (): NoteSummary => ({
     slug: SCRATCHPAD_SLUG, title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0,
   })
 
+  // The task group is the scratchpad (real or offered) plus everything else, as one collection, so the
+  // arrows walk it in the order it is drawn.
+  const taskRows = () => {
+    const rows = model().scratchpad() ? [model().scratchpad()!] : model().matches(virtualScratchpad()) ? [virtualScratchpad()] : []
+    return [...rows, ...model().taskOther()]
+  }
+
+  const Group = (groupProps: { label: string; scope: NoteScope; notes: readonly NoteSummary[] }) => (
+    <Section
+      label={groupProps.label}
+      count={groupProps.notes.length}
+      actions={<NewButton label={groupProps.label} scope={groupProps.scope} />}
+    >
+      <Rows
+        id={`notes.${props.task.id}.${groupProps.scope}`}
+        ariaLabel={`${groupProps.label} notes`}
+        items={groupProps.notes.map((note) => ({ key: note.slug, label: note.title, note }))}
+      >
+        {(entry, item) => (
+          <Show
+            when={!(entry.note.slug === SCRATCHPAD_SLUG && !model().scratchpad())}
+            fallback={
+              <Row item={item} density="compact" selected={model().isActive('task', SCRATCHPAD_SLUG)} onPress={() => model().landScratchpad()}>
+                Scratchpad
+              </Row>
+            }
+          >
+            <NoteRow scope={groupProps.scope} note={entry.note} item={item} />
+          </Show>
+        )}
+      </Rows>
+    </Section>
+  )
+
   return (
-    <>
-      <GroupHeader label="Task" count={model().taskOther().length + 1} scope="task" />
-      <Show when={!model().scratchpad() && model().matches(virtualScratchpad())}>
-        <Row
-          density="compact"
-          selected={model().isActive('task', SCRATCHPAD_SLUG)}
-          onPress={() => model().landScratchpad()}
-          leading={<span class="notes-include-dot placeholder" />}
-        >
-          Scratchpad
-        </Row>
-      </Show>
-      <Show when={model().scratchpad()}>{(note) => <NoteRow scope="task" note={note()} />}</Show>
-      <For each={model().taskOther()}>{(note) => <NoteRow scope="task" note={note} />}</For>
-
-      <GroupHeader label="Workspace" count={model().wsNotes().length} scope="workspace" />
-      <For each={model().wsNotes()}>{(note) => <NoteRow scope="workspace" note={note} />}</For>
-
-      <GroupHeader label="Global" count={model().globalNotes().length} scope="global" />
-      <For each={model().globalNotes()}>{(note) => <NoteRow scope="global" note={note} />}</For>
-    </>
+    <Stack gap="none">
+      <Group label="Task" scope="task" notes={taskRows()} />
+      <Group label="Workspace" scope="workspace" notes={model().wsNotes()} />
+      <Group label="Global" scope="global" notes={model().globalNotes()} />
+    </Stack>
   )
 }
 
@@ -140,7 +154,7 @@ export function NoteBody(props: { task: Task }) {
   const model = () => notesModel(props.task.id, props.task.projectId)
   return (
     <>
-      <Show when={model().actionError()}><Alert>{model().actionError()}</Alert></Show>
+      <Show when={model().actionError()}>{(error) => <Alert>{error()}</Alert>}</Show>
       <Show when={model().api} fallback={<EmptyState>Notes need the desktop app.</EmptyState>}>
         <Show
           when={model().selected()}
@@ -155,27 +169,32 @@ export function NoteBody(props: { task: Task }) {
             <>
               <Toolbar size="sm" ariaLabel="Note actions">
                 <LibraryToggle task={props.task} />
-                <input
-                  class="notes-title-input"
-                  type="text"
-                  value={model().noteTitle()}
+                <Input
+                  kind="bare"
+                  size="sm"
+                  label="Note title"
                   placeholder="Untitled"
-                  onInput={(event) => model().onTitleInput(event.currentTarget.value)}
+                  value={model().noteTitle()}
+                  ref={model().titleRef}
+                  onInput={(value) => model().onTitleInput(value)}
                 />
-                <span class="notes-scope-pill" title={`${sel().scope} scope`}>{scopeGlyph(sel().scope)}</span>
-                <button
-                  type="button"
-                  class="notes-include-dot"
-                  classList={{ on: model().selectedIncluded() }}
-                  title={model().selectedIncluded() ? 'Included in agent context' : 'Excluded from agent context'}
+                <Text emphasis="muted">{scopeGlyph(sel().scope)}</Text>
+                <Checkbox
+                  size="sm"
+                  checked={model().selectedIncluded()}
                   disabled={sel().virtual}
-                  onClick={() => void model().toggleIncluded(sel().scope, sel().slug, !model().selectedIncluded())}
+                  ariaLabel={model().selectedIncluded() ? 'Included in agent context' : 'Excluded from agent context'}
+                  title={model().selectedIncluded() ? 'Included in agent context' : 'Excluded from agent context'}
+                  onChange={(checked) => void model().toggleIncluded(sel().scope, sel().slug, checked)}
                 />
-                <Button size="sm" onPress={() => { model().scheduleSave.flush(); model().setPreview(!model().preview()) }}>
-                  {model().preview() ? 'Edit' : 'Preview'}
-                </Button>
+                <ToggleButton
+                  size="sm"
+                  label={model().preview() ? 'Edit' : 'Preview'}
+                  pressed={model().preview()}
+                  onPressedChange={() => { model().scheduleSave.flush(); model().setPreview(!model().preview()) }}
+                />
                 {/* `saving…` is a live status and stays; the completed save is an event, so it toasts. */}
-                <span class="notes-save-state muted">{model().saving() ? 'saving…' : ''}</span>
+                <Text emphasis="muted">{model().saving() ? 'saving…' : ''}</Text>
               </Toolbar>
               <Show when={!model().preview()} fallback={
                 <Markdown
@@ -184,16 +203,19 @@ export function NoteBody(props: { task: Task }) {
                   onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
                 />
               }>
-                <textarea
-                  class="notes-editor"
-                  spellcheck={false}
+                <Textarea
+                  grow
+                  mono
+                  label="Note body"
+                  assist={false}
                   value={model().body()}
-                  onInput={(event) => model().onBodyInput(event.currentTarget.value)}
+                  onInput={(value) => model().onBodyInput(value)}
                   onBlur={() => model().scheduleSave.flush()}
                 />
               </Show>
-              <div class="notes-footer">
-                <span class="muted">{formatSize(bytesOf(model().body()))}</span>
+              <Toolbar size="sm" ariaLabel="Note status">
+                <Text emphasis="muted">{formatSize(bytesOf(model().body()))}</Text>
+                <Toolbar.Spacer />
                 <Button
                   variant="bare"
                   size="sm"
@@ -203,7 +225,7 @@ export function NoteBody(props: { task: Task }) {
                 >
                   view in Context →
                 </Button>
-              </div>
+              </Toolbar>
             </>
           )}
         </Show>

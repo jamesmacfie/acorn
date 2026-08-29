@@ -78,6 +78,7 @@ export const NODE_SUPPORT = {
 
   // Asking
   Button: { dom: 'full', tui: 'full' },
+  ConfirmButton: { dom: 'full', tui: 'full' },
   Input: { dom: 'full', tui: 'full' },
   Textarea: { dom: 'full', tui: 'full' },
   Select: { dom: 'full', tui: 'full' },
@@ -93,6 +94,10 @@ export const NODE_SUPPORT = {
   Field: { dom: 'full', tui: 'full' },
   CopyButton: { dom: 'full', tui: 'fallback' },
   ModelConnectionPicker: { dom: 'full', tui: 'full' },
+
+  // Pixels. `absent` on a host with no pixels, and `kind="pty"` is the exception the node handles
+  // itself: a terminal draws a PTY better than any of this does.
+  Rectangle: { dom: 'full', tui: 'absent' },
 
   // Host wrappers. Both are host questions by definition, so both answer on every host.
   Only: { dom: 'full', tui: 'full' },

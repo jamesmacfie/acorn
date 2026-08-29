@@ -21,8 +21,23 @@ export { default as RefPanelTaskLink } from '@acorn/client-core/registries/RefPa
 // underneath, exported for a host that has already resolved who draws.
 export { Slot } from '@acorn/client-core/plugins/tree/Slot.tsx'
 export type { SlotProps } from '@acorn/client-core/plugins/tree/Slot.tsx'
+// "Is anyone offering to fill this?", for an owner that decides whether to draw the box at all.
+export { slotFills } from '@acorn/client-core/plugins/tree/arbitration.ts'
 export { RemoteTree } from '@acorn/client-core/plugins/tree/RemoteTree.tsx'
 export type { RemoteTreeProps } from '@acorn/client-core/plugins/tree/RemoteTree.tsx'
+// Marks other plugins pinned to the items this surface draws (the `annotation` kind). Two calls: ask
+// about the keys on screen, and draw the answers at the site the owner chose. Host-only, like `Slot`:
+// the fetch, the batching, the provenance stamp and the drawing are all the host's, and a plugin only
+// says where its items are and what they are keyed by.
+export { AnnotationMarks } from '@acorn/client-core/plugins/annotations/AnnotationMarks.tsx'
+export { requestAnnotations, annotationsFor } from '@acorn/client-core/plugins/annotations/annotations.ts'
+
+// The `wizard` layout, for a surface that is a wizard but is not a pane. Host-only: a layout is the
+// host's arrangement, and a pane gets one by naming it on its contribution rather than by importing
+// it (docs/panes.md § Layout model). Onboarding is the one surface that needs the arrangement without
+// a pane to hang it on, because it lives in the `overlay` slot.
+export { Wizard } from '@acorn/client-core/layouts/Wizard.tsx'
+
 // Another plugin's rectangle, beside or below this one's pane (the `rectangle` kind). The iframe twin
 // of `Slot`, for the surfaces that own pixels.
 export { InlineSlot } from '@acorn/client-core/plugins/frames/InlineSlot.tsx'

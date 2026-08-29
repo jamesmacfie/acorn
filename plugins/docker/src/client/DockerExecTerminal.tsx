@@ -44,5 +44,7 @@ export default function DockerExecTerminal(props: { containerRef: string }) {
     })
   })
 
-  return <div class="docker-exec-terminal" ref={host} />
+  // A bare host element for xterm to attach to. Its box belongs to the `Rectangle` node above it,
+  // which is why there is no class and no stylesheet here any more.
+  return <div ref={host} />
 }

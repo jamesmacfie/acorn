@@ -1,69 +1,45 @@
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
-import { agentSessionsFor, bytesOf, clientEvents, consumePaneIntent, contextSectionSlots, formatSize, openPane, type PaneIntent, readJson, type Task, taskBridge, toast } from '@acorn/plugin-api/client'
-import { taskContextRoute, type ContextItem, type TaskContext } from '@acorn/protocol/api.ts'
-import { Alert, Button, Checkbox, CodeBlock, Meter, Picker, Toolbar } from '@acorn/plugin-api/ui'
+import { createEffect, For, onCleanup, onMount, Show } from 'solid-js'
+import { bytesOf, clientEvents, consumePaneIntent, formatSize, type PaneIntent, type Task } from '@acorn/plugin-api/client'
+import type { ContextItem, TaskContext } from '@acorn/protocol/api.ts'
+import {
+  Alert, Badge, Button, Checkbox, CodeBlock, EmptyState, Fold, Heading, Inline, Meter, Picker, Row, Rows,
+  Stack, Text, Toolbar,
+} from '@acorn/plugin-api/ui'
+import { Slot } from '@acorn/plugin-api/ui/host'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
-import { recordSync, rememberTarget, syncStatus, targetSessionFor, type SyncStatus } from './syncState'
-import { selectionFor, setSectionSelection } from './selectionState'
-import { assembleBlockFrom, sectionCap, selectionFromContext, traySummary, type TraySelection } from './model'
-import { bumpContextRevision } from './contextRevision'
-import './context-tray.css'
+import { collectionId, contextModel, pillText, sessionLabel } from './contextModel'
+import { CONTEXT_SECTION_POINT } from './sectionPoint'
 
-const originBadge = (author?: 'user' | 'agent' | 'workflow'): string => (author === 'agent' ? '🤖' : author === 'workflow' ? 'seed' : '')
-const scopePill = (scope?: string): string => (scope === 'task' ? '◆ task' : scope === 'workspace' ? 'ws' : scope === 'global' ? '🌐' : '')
+// The three regions of the Context pane (docs/agent-tools.md § Context sections). The host draws the
+// header, the scrolling body and the pinned footer; these fill them. Everything they share is in
+// ./contextModel.ts.
 
-export default function ContextPane(props: { task: Task }) {
-  const api = taskBridge()
-  const [msg, setMsg] = createSignal('')
-  const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
-  // Pending-item counts reported up by section contributions, keyed by section id. Keyed, because a
-  // single signal lets a second contributor overwrite the first's count in the header.
-  const [pending, setPending] = createSignal<Record<string, number>>({})
-  const pendingFor = (sectionId: string) => pending()[sectionId] ?? 0
-  const [previewOpen, setPreviewOpen] = createSignal(false)
+type Section = TaskContext['sections'][number]
 
-  // The pane needs the full inventory; contribution defaults only seed the initial selection.
-  const [ctx, { refetch }] = createResource(
-    () => props.task.id,
-    (id) => readJson<TaskContext>(taskContextRoute(id, 'all')),
+const originBadge = (author?: 'user' | 'agent' | 'workflow'): string =>
+  (author === 'agent' ? '🤖' : author === 'workflow' ? 'seed' : '')
+const scopePill = (scope?: string): string =>
+  (scope === 'task' ? '◆ task' : scope === 'workspace' ? 'ws' : scope === 'global' ? '🌐' : '')
+
+export function ContextHeader(props: { task: Task }) {
+  const model = () => contextModel(props.task)
+  return (
+    <Stack gap="row">
+      <Inline gap="row">
+        <Heading level={3}>context</Heading>
+        <Text emphasis="muted">{model().summary()}</Text>
+      </Inline>
+      <Show when={model().msg()}>{(text) => <Alert>{text()}</Alert>}</Show>
+    </Stack>
   )
+}
 
-  // Effective selection: the persisted per-task set, or the contribution defaults for an untouched
-  // task. A toggle writes the full effective map so a later defaultIncluded change can't flip it.
-  const effective = (): TraySelection => selectionFor(props.task.id) ?? (ctx() ? selectionFromContext(ctx()!) : {})
-  const toggleSection = (id: string) => setSectionSelection(props.task.id, { ...effective(), [id]: !effective()[id] })
-  const refreshContext = async (): Promise<void> => {
-    await refetch()
-    bumpContextRevision(props.task.id)
-  }
-
-  // The exact block a send would deliver, assembled locally from the include=* inventory.
-  const assembled = createMemo(() => (ctx() ? assembleBlockFrom(ctx()!, effective()) : null))
-
-  const visibleSections = createMemo(() =>
-    (ctx()?.sections ?? []).filter((s) => contextSectionSlots(s.id).length > 0 || s.items.length > 0 || !!s.absent),
-  )
-
-  const isOpen = (id: string) => expanded().has(id)
-  const toggleOpen = (id: string) =>
-    setExpanded((current) => {
-      const next = new Set(current)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+export function ContextBody(props: { task: Task }) {
+  const model = () => contextModel(props.task)
 
   // Pane intents: context:reveal scrolls to (and expands) a section/item row.
-  function applyIntent(intent: PaneIntent | undefined) {
-    if (intent?.kind === 'context:reveal') revealRow(intent.sectionId, intent.itemId)
-  }
-  function revealRow(sectionId: string, itemId?: string) {
-    const rowKey = itemId ? `${sectionId}:${itemId}` : sectionId
-    if (itemId) setExpanded((current) => new Set(current).add(rowKey))
-    queueMicrotask(() => {
-      const target = document.querySelector(`[data-context-row="${CSS.escape(rowKey)}"]`) ?? document.querySelector(`[data-context-row="${CSS.escape(sectionId)}"]`)
-      target?.scrollIntoView({ block: 'nearest' })
-    })
+  const applyIntent = (intent: PaneIntent | undefined) => {
+    if (intent?.kind === 'context:reveal') model().reveal(intent.sectionId, intent.itemId)
   }
   onMount(() => {
     const off = clientEvents.on('presentation:pane-intent', ({ taskId, paneId, intent }) => {
@@ -73,167 +49,146 @@ export default function ContextPane(props: { task: Task }) {
   })
   createEffect(() => applyIntent(consumePaneIntent(props.task.id, 'context')))
 
-  function followJump(item: ContextItem) {
-    if (!item.jump?.itemId) return
-    // The same call notes' own `requestNoteOpen` makes. Inlined rather than imported: `openPane` and
-    // the `notes:open` PaneIntent variant are both client-core's, so borrowing notes' wrapper would
-    // be the only context-to-notes coupling in the file.
-    if (item.jump.pane === 'notes' && item.jump.noteScope) {
-      openPane(props.task.id, 'notes', { kind: 'notes:open', slug: item.jump.itemId, scope: item.jump.noteScope })
-      return
-    }
-    if (item.jump.ref) {
-      openPane(props.task.id, item.jump.pane, { kind: 'integration:show-ref', ref: item.jump.ref })
-      return
-    }
-    const link = props.task.links.find((candidate) => candidate.providerId === item.jump!.pane && candidate.identifier === item.jump!.itemId)
-    if (!link) return
-    openPane(props.task.id, item.jump.pane, {
-      kind: 'integration:show-ref',
-      ref: link.ref ?? { providerId: link.providerId, connectionId: link.connectionId, displayId: link.identifier },
-    })
+  const ItemRow = (rowProps: { section: Section; item: ContextItem }) => {
+    const rowId = () => `${rowProps.section.id}:${rowProps.item.id}`
+    const open = () => model().isOpen(rowId())
+    return (
+      <Stack gap="none">
+        <Row
+          density="compact"
+          depth={1}
+          label={rowProps.item.label}
+          onPress={() => model().toggleOpen(rowId())}
+          leading={<Text emphasis="muted">{open() ? '▾' : '▸'}</Text>}
+          meta={
+            <Inline gap="inline">
+              <Show when={originBadge(rowProps.item.origin?.author)}>
+                {(badge) => <Badge size="xs">{badge()}</Badge>}
+              </Show>
+              <Show when={scopePill(rowProps.item.jump?.noteScope)}>
+                {(pill) => <Text emphasis="muted">{pill()}</Text>}
+              </Show>
+            </Inline>
+          }
+          trailing={
+            <Show when={rowProps.item.jump?.pane === 'notes'}>
+              <Button variant="bare" size="sm" iconOnly title="Edit in Notes" label="Edit in Notes" onPress={() => model().followJump(rowProps.item)}>✎</Button>
+            </Show>
+          }
+        >
+          <Inline gap="inline">
+            <Text emphasis="muted">{rowProps.item.kind}</Text>
+            <Text>{rowProps.item.label}</Text>
+          </Inline>
+        </Row>
+        <Show when={open()}>
+          <Stack gap="row">
+            <Show when={rowProps.item.body}>{(body) => <Text emphasis="muted" wrap>{body()}</Text>}</Show>
+            <Show when={rowProps.item.details?.length}>
+              <Stack gap="none">
+                <For each={rowProps.item.details}>{(detail) => <Text emphasis="mono" tone="muted">{detail}</Text>}</For>
+              </Stack>
+            </Show>
+          </Stack>
+        </Show>
+      </Stack>
+    )
   }
 
-  const target = createMemo(() => targetSessionFor(props.task.id))
-  const status = createMemo(() => {
-    const t = target()
-    return t ? syncStatus(t.id, assembled()?.sections ?? {}) : null
-  })
-  const sessionLabel = (session: TerminalSession | undefined): string =>
-    session ? `${session.title}${session.idle ? ' ●' : ''}` : 'agent session'
-  const agoText = (at: number): string => {
-    const minutes = Math.round((Date.now() - at) / 60_000)
-    return minutes < 1 ? 'now' : `${minutes}m`
-  }
-  const pillText = (s: SyncStatus): string =>
-    s.kind === 'never' ? 'not synced' : s.kind === 'synced' ? `synced · ${agoText(s.at)}` : `stale · ${s.changes} change${s.changes === 1 ? '' : 's'}`
-
-  async function syncContext() {
-    setMsg('')
-    const t = targetSessionFor(props.task.id)
-    if (!t) return setMsg('No running agent session.')
-    await refreshContext() // fresh inventory, one fetch
-    const current = ctx()
-    if (!current) return
-    const { block, sections } = assembleBlockFrom(current, effective())
-    if (!block.trim()) return setMsg('Nothing selected.')
-    const res = await api.sendToAgent(t.id, block, 'after-ready')
-    if (res.ok) recordSync(t.id, props.task.id, sections)
-    // Success is transient feedback; a failure needs to stay next to the button that failed.
-    if (res.ok) return toast(res.queued ? 'Queued — delivers when the agent is idle.' : 'Sent.', { tone: 'success' })
-    setMsg(res.reason ?? 'Send failed.')
+  const SectionFold = (foldProps: { section: Section }) => {
+    const section = () => foldProps.section
+    const ratio = () => model().sectionRatio(section().compact, section().budget)
+    const pending = () => model().pendingFor(section().id)
+    return (
+      <Fold
+        label={section().label}
+        open={model().sectionOpen(section().id)}
+        onOpenChange={(open) => model().setSectionOpen(section().id, open)}
+        meta={
+          <Inline gap="inline">
+            <Show when={pending()}>{(count) => <Text emphasis="muted">· {count()} pending</Text>}</Show>
+            <Show when={section().omitted}>{(omitted) => <Text emphasis="muted">+{omitted()} omitted</Text>}</Show>
+            <Text emphasis="muted">{formatSize(bytesOf(section().compact))}</Text>
+            {/* Meter's `auto` tone carries the 80% warn threshold. */}
+            <Show when={ratio() !== null}>
+              <Meter tone="auto" label={`${section().label} budget`} value={ratio()!} />
+            </Show>
+          </Inline>
+        }
+        actions={
+          <Checkbox
+            ariaLabel={`Include ${section().label}`}
+            checked={model().effective()[section().id] ?? false}
+            onChange={() => model().toggleSection(section().id)}
+          />
+        }
+      >
+        <Show when={section().absent}>
+          {(absent) => <Text emphasis="muted">⚠ {absent().detail}</Text>}
+        </Show>
+        {/* Extra UI a plugin draws under its own section: memory's add form and proposal queue today,
+            anybody's tree tomorrow. `stack`, so context's own rows stay and the contributor's tree
+            joins them. The pane asks the host and never learns who answered. */}
+        <Slot
+          point={CONTEXT_SECTION_POINT}
+          key={section().id}
+          props={() => ({
+            task: props.task,
+            onChanged: () => void model().refreshContext(),
+            onPendingChange: (count: number) => model().reportPending(section().id, count),
+          })}
+        >
+          <Rows
+            id={collectionId(section().id)}
+            ariaLabel={section().label}
+            items={section().items.map((item) => ({ key: item.id, label: item.label, item }))}
+          >
+            {(entry) => <ItemRow section={section()} item={entry.item} />}
+          </Rows>
+        </Slot>
+      </Fold>
+    )
   }
 
   return (
-    <section class="pane context-pane">
-      <div class="section-header context-tray-head">
-        <span>context</span>
-        <span class="muted">{traySummary(ctx() ? { ...ctx()!, sections: visibleSections() } : undefined)}</span>
-        <Show when={msg()}><Alert>{msg()}</Alert></Show>
-      </div>
-      <Show when={ctx()}>
-        <div class="context-tray-body">
-            <For each={visibleSections()}>
-              {(section) => {
-                const size = () => bytesOf(section.compact)
-                const cap = () => sectionCap(section.budget)
-                const ratio = () => {
-                  const c = cap()
-                  return c ? Math.min(1, size() / c) : 0
-                }
-                return (
-                  <div class="context-tray-section" data-context-row={section.id}>
-                    <div class="context-tray-row">
-                      <Checkbox ariaLabel={section.label} checked={effective()[section.id] ?? false} onChange={() => toggleSection(section.id)} />
-                      <span class="context-tray-kind">{section.label}</span>
-                      <Show when={pendingFor(section.id)}><span class="muted">· {pendingFor(section.id)} pending</span></Show>
-                      <Show when={section.omitted}><span class="muted">+{section.omitted} omitted</span></Show>
-                      <span class="context-size">{formatSize(size())}</span>
-                    </div>
-                    <Show when={cap()}>
-                      {/* Meter's `auto` tone carries the 80% warn threshold. */}
-                      <Meter tone="auto" label={`${section.label} budget`} value={ratio()} />
-                    </Show>
-                    <Show when={section.absent}><div class="context-tray-detail muted">⚠ {section.absent!.detail}</div></Show>
-                    <For each={section.items}>
-                      {(item) => {
-                        const rowId = `${section.id}:${item.id}`
-                        return (
-                          <div class="context-tray-item" data-context-row={rowId}>
-                            <div class="context-tray-row">
-                              <span class="context-tray-kind">{item.kind}</span>
-                              <Button variant="bare" onPress={() => toggleOpen(rowId)}>
-                                <span class="context-tray-twist">{isOpen(rowId) ? '▾' : '▸'}</span>
-                                <span class="context-tray-label">{item.label}</span>
-                              </Button>
-                              <Show when={originBadge(item.origin?.author)}><span class="context-origin-badge">{originBadge(item.origin?.author)}</span></Show>
-                              <Show when={scopePill(item.jump?.noteScope)}><span class="context-origin-badge muted">{scopePill(item.jump?.noteScope)}</span></Show>
-                              <Show when={item.jump?.pane === 'notes'}>
-                                <Button variant="bare" title="Edit in Notes" label="Edit in Notes" onPress={() => followJump(item)}>✎</Button>
-                              </Show>
-                            </div>
-                            <Show when={isOpen(rowId)}>
-                              <div class="context-tray-detail">
-                                <Show when={item.body}><div class="context-tray-detail-body">{item.body}</div></Show>
-                                <Show when={item.details?.length}>
-                                  <ul class="context-tray-files"><For each={item.details}>{(detail) => <li>{detail}</li>}</For></ul>
-                                </Show>
-                              </div>
-                            </Show>
-                          </div>
-                        )
-                      }}
-                    </For>
-                    {/* Extra controls a plugin renders under its own section, such as memory's add
-                        form and proposal queue. The pane asks the registry and does not know which
-                        plugins answer. */}
-                    <For each={contextSectionSlots(section.id)}>
-                      {(contribution) => (
-                        <Dynamic
-                          component={contribution.component}
-                          task={props.task}
-                          onChanged={() => void refreshContext()}
-                          onPendingChange={(count: number) => setPending((prev) => ({ ...prev, [section.id]: count }))}
-                        />
-                      )}
-                    </For>
-                  </div>
-                )
-              }}
-            </For>
+    <Show when={model().ctx()} fallback={<EmptyState busy>Assembling…</EmptyState>}>
+      <Stack gap="none">
+        <For each={model().visibleSections()}>{(section) => <SectionFold section={section} />}</For>
+      </Stack>
+    </Show>
+  )
+}
 
-            <div class="context-preview">
-              <Button variant="bare" onPress={() => setPreviewOpen(!previewOpen())}>
-                <span class="context-tray-twist">{previewOpen() ? '▾' : '▸'}</span>
-                <span>preview</span>
-                <span class="muted context-size">{formatSize(bytesOf(assembled()?.block ?? ''))}</span>
-              </Button>
-              <Show when={previewOpen()}>
-                <CodeBlock size="xs" maxHeight="block" wrap>{assembled()?.block}</CodeBlock>
-              </Show>
-            </div>
-
-            <Toolbar ariaLabel="Context sync">
-              <Picker<TerminalSession>
-                label={sessionLabel(target())}
-                placeholder="Filter sessions…"
-                emptyText="No running agent session."
-                results={(query) => agentSessionsFor(props.task.id).filter((s) => s.title.toLowerCase().includes(query.toLowerCase()))}
-                rowLabel={(s) => sessionLabel(s)}
-                isActive={(s) => s.id === target()?.id}
-                onSelect={(s) => rememberTarget(props.task.id, s.id)}
-              />
-              <Show when={status()}>
-                <span class="context-stale-pill" classList={{ warn: status()!.kind === 'stale', muted: status()!.kind !== 'stale' }} title="since last sync from this pane">
-                  {pillText(status()!)}
-                </span>
-              </Show>
-              <Button onPress={() => void syncContext()}>Sync context</Button>
-              <Toolbar.Spacer />
-              <Button variant="bare" iconOnly title="Refresh" label="Refresh" onPress={() => void refreshContext()}>↻</Button>
-            </Toolbar>
-          </div>
-      </Show>
-    </section>
+export function ContextFooter(props: { task: Task }) {
+  const model = () => contextModel(props.task)
+  return (
+    <Stack gap="none">
+      <Fold label="preview" persistKey="context.preview" meta={<Text emphasis="muted">{formatSize(bytesOf(model().assembled()?.block ?? ''))}</Text>}>
+        <CodeBlock size="xs" maxHeight="block" wrap>{model().assembled()?.block}</CodeBlock>
+      </Fold>
+      <Toolbar ariaLabel="Context sync">
+        <Picker<TerminalSession>
+          label={sessionLabel(model().target())}
+          placeholder="Filter sessions…"
+          emptyText="No running agent session."
+          results={(query) => model().sessions(query)}
+          rowLabel={(session) => sessionLabel(session)}
+          isActive={(session) => session.id === model().target()?.id}
+          onSelect={(session) => model().pickTarget(session)}
+        />
+        <Show when={model().status()}>
+          {(status) => (
+            <Badge
+              tone={status().kind === 'stale' ? 'warn' : 'neutral'}
+              shape="pill"
+              size="xs"
+            >{pillText(status())}</Badge>
+          )}
+        </Show>
+        <Button onPress={() => void model().syncContext()}>Sync context</Button>
+        <Toolbar.Spacer />
+        <Button variant="bare" iconOnly title="Refresh" label="Refresh" onPress={() => void model().refreshContext()}>↻</Button>
+      </Toolbar>
+    </Stack>
   )
 }

@@ -12,6 +12,26 @@ data.
 - Start/stop/restart/pause/unpause/remove, Compose lifecycle, and prune.
 - Task badges, summaries, and archive-time teardown prompts.
 
+## Client
+
+Both surfaces are host layouts filled with kit nodes, and the plugin ships no stylesheet. For more
+information, see the layout model in [the panes doc](./panes.md).
+
+The task pane is `header-body-footer` with no footer. The header is a `ChipRow`, one chip per linked
+container, and the body is the shared container detail. The Docker Source is a `list-detail`: a tab
+strip over containers, images, volumes, and networks in the list column, and the same container detail
+in the other.
+
+The container detail is a `Tabs` node. Info is a `Facts` list, Logs is a `Log` with a `FindBar`, Stats
+is a run of `Meter`s, and Terminal is a `Rectangle kind="pty"` wrapping the exec surface. A rectangle
+is the kit's admission that a PTY owns its own pixels: the node owns the box and the way in and out of
+it with the keyboard, and xterm owns everything inside.
+
+Two extension points sit on these surfaces. `docker:stats-beside` is a `remote` slot on the Stats tab,
+for a plugin with a graph or a cost estimate to put beside the numbers. `docker:container` is an
+`annotation` point keyed by container id, drawn under the rows of the Source list. For more
+information, see the cooperative extension points in [the plugins doc](./plugins.md).
+
 ## Matching
 
 Matching configuration is declarative: project names, labels, and name patterns are stored in the

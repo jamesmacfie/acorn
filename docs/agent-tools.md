@@ -82,6 +82,21 @@ compatibility projection for older task-context clients and agent tools. Both vi
 same contribution and are budgeted in one pass. A protocol-version migration can drop the projection
 once those consumers move to `sections`.
 
+### Drawing inside a section
+
+A section the node assembles is data. What the Context pane draws under it is a separate question, and
+the pane answers it with an extension point rather than a private registry: `context:section`, a
+`remote` point that stacks, keyed by the section id. For more information, see the cooperative
+extension points in [the plugins doc](./plugins.md).
+
+Memory is the one contributor. Its proposal queue and its add-memory form are a component registered
+against `context:section` with `matches: ['memory']`, so context draws its own rows for the section and
+memory's card joins them. Neither plugin imports the other. Disable memory and the section still draws
+its rows.
+
+A compiled plugin contributes a component and the host mounts it. A loaded plugin contributes a bundle
+entry and the host runs it in a worker. The owner writes one `Slot` and cannot tell which answered.
+
 `issues` and `task_links` are core tables. For more information, see the external-item read model in
 [the data layer doc](./data-layer.md). GitHub and Rollbar write them through the `ExternalItemStore`
 seam rather than owning them. The core-owned `issues` section is the only one that reads the database

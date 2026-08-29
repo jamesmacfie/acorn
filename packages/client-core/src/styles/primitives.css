@@ -81,6 +81,14 @@
 .ui-input[data-size='sm'] { padding: var(--space-2) var(--space-4); }
 .ui-input[data-invalid] { border-color: var(--danger); }
 textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
+/* Rectangle: the box something else fills with pixels (ui/Rectangle.tsx). Geometry and a focus ring,
+   and nothing about what is inside it — that is the whole point of the node. */
+.ui-rect { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.ui-rect:focus-visible { outline: var(--control-bw) solid var(--accent); outline-offset: calc(-1 * var(--control-bw)); }
+.ui-rect > * { flex: 1; min-height: 0; min-width: 0; }
+
+/* `grow`: the textarea IS the region. No drag handle, because the box is the region's to size. */
+textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 
 /* Select: the trigger wears .ui-input so it lines up with every other control, and the list is a
    .ui-popover borrowing the menu's item vocabulary. The native <select> is still in the DOM as the

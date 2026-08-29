@@ -21,8 +21,8 @@ export function sectionCap(budget: ContextBudget): number | null {
   return (budget.maxItems ?? 1) * budget.maxBytesPerItem
 }
 
-// Assemble the exact send block client-side from the include=* inventory (see the invariant comment
-// in contextSectionSlots.ts): filter to selected sections, reuse the server's per-section `compact`.
+// Assemble the exact send block client-side from the include=* inventory: filter to selected sections,
+// reuse the server's per-section `compact`.
 // `sections` is the { id: compact } map used for staleness recording.
 export function assembleBlockFrom(ctx: TaskContext, selection: TraySelection): { block: string; sections: Record<string, string> } {
   const picked = ctx.sections.filter((section) => selection[section.id])

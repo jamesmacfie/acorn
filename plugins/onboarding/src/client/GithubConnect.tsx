@@ -2,7 +2,7 @@ import { createMemo, For, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { createDeviceFlow, integrationsOptions, type Project, projectImporterRegistry } from '@acorn/plugin-api/client'
-import { Alert, Button, CopyButton } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, Card, ChipRow, Chip, CopyButton, Heading, Inline, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 // The GitHub branch of the wizard: the device grant, then whatever GitHub registered as a project
 // importer. Neither half is written here. The grant is core's shared createDeviceFlow, the same one
@@ -24,73 +24,80 @@ export default function GithubConnect(props: {
   const importer = createMemo(() => projectImporterRegistry.get('github'))
 
   return (
-    <div class="wizard-body">
+    <Stack gap="row">
       <Show
         when={connected()}
         fallback={
-          <>
-            <h2>Connect GitHub.</h2>
-            <p class="wizard-lede">Enter a code at GitHub to sign in. acorn never sees your password.</p>
+          <Stack gap="row">
+            <Heading level={2}>Connect GitHub.</Heading>
+            <Text emphasis="muted" wrap>Enter a code at GitHub to sign in. acorn never sees your password.</Text>
             <Show
               when={flow.device()}
               fallback={
-                <Button onPress={() => void flow.start()} disabled={flow.busy()}>
-                  {flow.busy() ? 'Starting…' : 'Get a code'}
-                </Button>
+                <Toolbar variant="actions" size="sm">
+                  <Button onPress={() => void flow.start()} disabled={flow.busy()}>
+                    {flow.busy() ? 'Starting…' : 'Get a code'}
+                  </Button>
+                </Toolbar>
               }
             >
               {(started) => (
-                <div class="wizard-device">
-                  <span class="wizard-device-url">{new URL(started().verificationUri).host}{new URL(started().verificationUri).pathname}</span>
-                  <div class="wizard-device-code">
-                    <code>{started().userCode}</code>
-                    <CopyButton text={() => started().userCode} title="Copy the code" />
-                  </div>
-                  {/* A real link, not a fetch: main's setWindowOpenHandler routes it through
-                      isAllowedExternalUrl → shell.openExternal, so it opens in the owner's browser. */}
-                  <Button href={started().verificationUri}>Open GitHub</Button>
-                  <p class="wizard-waiting">Waiting for approval…</p>
-                  <Button variant="bare" onPress={flow.cancel}>Cancel</Button>
-                </div>
+                <Card>
+                  <Stack gap="row">
+                    <Text emphasis="muted">{new URL(started().verificationUri).host}{new URL(started().verificationUri).pathname}</Text>
+                    {/* The code is the thing to read, so it gets the emphasis. */}
+                    <Inline gap="inline">
+                      <Text emphasis="mono">{started().userCode}</Text>
+                      <CopyButton text={() => started().userCode} title="Copy the code" />
+                    </Inline>
+                    <Toolbar variant="actions" size="sm">
+                      {/* A real link, not a fetch: the shell's external-URL gate routes it to the
+                          owner's browser. */}
+                      <Button href={started().verificationUri}>Open GitHub</Button>
+                      <Button variant="bare" onPress={flow.cancel}>Cancel</Button>
+                    </Toolbar>
+                    <Text emphasis="muted">Waiting for approval…</Text>
+                  </Stack>
+                </Card>
               )}
             </Show>
-            <Show when={flow.error()}><Alert>{flow.error()}</Alert></Show>
-            <p class="wizard-hint">
+            <Show when={flow.error()}>{(text) => <Alert>{text()}</Alert>}</Show>
+            <Text emphasis="muted" wrap>
               If you close this or deny the request, nothing breaks — you land in the app and can retry
               from Settings → Integrations.
-            </p>
-          </>
+            </Text>
+          </Stack>
         }
       >
-        <h2>Pick your repositories.</h2>
-        <p class="wizard-lede">
-          Clone them fresh, or map ones you already have on disk. Add as many as you like — anything you
-          skip stays in GitHub, and you can import it from Settings whenever you want it.
-        </p>
-        <Show when={importer()} fallback={<p class="muted">The GitHub importer is not available on this node.</p>}>
-          {(entry) => (
-            <section class="project-importer wizard-importer" aria-label={entry().label}>
-              {/* showClose: the wizard's footer already has back and skip. */}
+        <Stack gap="row">
+          <Heading level={2}>Pick your repositories.</Heading>
+          <Text emphasis="muted" wrap>
+            Clone them fresh, or map ones you already have on disk. Add as many as you like — anything you
+            skip stays in GitHub, and you can import it from Settings whenever you want it.
+          </Text>
+          <Show when={importer()} fallback={<Text emphasis="muted">The GitHub importer is not available on this node.</Text>}>
+            {(entry) => (
+              // showClose: the wizard's own chrome already has back and skip.
               <Dynamic component={entry().component} onClose={props.onBack} onImported={props.onImported} showClose={false} />
-            </section>
-          )}
-        </Show>
-        {/* The running tally is the whole reason this screen can stay put: without it, adding a third
-            repository is an act of faith. */}
-        <Show when={props.added.length}>
-          <div class="wizard-added">
-            <span class="wizard-added-count">
-              {props.added.length} project{props.added.length === 1 ? '' : 's'} added
-            </span>
-            <span class="wizard-added-names">
-              <For each={props.added}>{(project) => <span class="wizard-added-name">{project.name}</span>}</For>
-            </span>
-          </div>
-        </Show>
-        <Button variant="solid" tone="accent" disabled={!props.added.length} onPress={props.onContinue}>
-          {props.added.length ? 'Done adding' : 'Add a repository to continue'}
-        </Button>
+            )}
+          </Show>
+          {/* The running tally is the whole reason this screen can stay put: without it, adding a third
+              repository is an act of faith. */}
+          <Show when={props.added.length}>
+            <Inline gap="stack" wrap>
+              <Badge tone="ok">{props.added.length} project{props.added.length === 1 ? '' : 's'} added</Badge>
+              <ChipRow ariaLabel="Projects added">
+                <For each={props.added}>{(project) => <Chip>{project.name}</Chip>}</For>
+              </ChipRow>
+            </Inline>
+          </Show>
+          <Toolbar variant="actions" size="sm">
+            <Button variant="solid" tone="accent" disabled={!props.added.length} onPress={props.onContinue}>
+              {props.added.length ? 'Done adding' : 'Add a repository to continue'}
+            </Button>
+          </Toolbar>
+        </Stack>
       </Show>
-    </div>
+    </Stack>
   )
 }

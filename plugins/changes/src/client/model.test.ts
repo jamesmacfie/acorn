@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 import { changeKey, groupChanges, pickSelected, stackFor, toPullFile } from './model'
+import { DIFF_LINE_KEY, DIFF_LINE_POINT } from './extensionPoints'
 
 const c = (path: string, staged: boolean, status: LocalChange['status'] = 'modified'): LocalChange => ({
   path,
@@ -61,5 +62,24 @@ describe('toPullFile', () => {
       viewed: false,
       patch: '@@ -0,0 +1 @@\n+x',
     })
+  })
+})
+
+// The annotation point this pane opens on its diff lines (docs/plugins.md § Cooperative extension
+// points). The fields have to be the ones the shared viewer mints per row, in that order, or a
+// contributor's marks look up under a string nothing ever wrote and draw nothing — silently, because
+// an unmatched contribution is silent by design.
+//
+// Written out rather than compared against `DIFF_ANNOTATION_FIELDS`: that constant lives beside the
+// viewer in client-core, and importing across the plugin boundary to check a three-string list would be
+// the coupling this seam exists to avoid. The pairing is held from the other end too, in client-core's
+// annotationKey.test.ts.
+describe('the diff-line annotation point', () => {
+  it('is keyed by the three fields the viewer mints, in the viewer\'s order', () => {
+    expect(DIFF_LINE_KEY).toEqual(['file', 'line', 'side'])
+  })
+
+  it('is addressed under this plugin\'s own name, which the host mints', () => {
+    expect(DIFF_LINE_POINT).toBe('changes:diff-line')
   })
 })

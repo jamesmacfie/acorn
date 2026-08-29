@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Index, lazy, Show, Suspense } from 'solid-js'
+import { createMemo, createSignal, Index, lazy, Show, Suspense } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   canPickFolder,
@@ -12,18 +12,28 @@ import {
   workspacesKey,
   workspacesOptions,
 } from '@acorn/plugin-api/client'
-import { Acorn } from '@acorn/plugin-api/ui/host'
-import { Alert, Badge, Button, Card, DescriptionList, Input, Kbd, Select } from '@acorn/plugin-api/ui'
+import { Acorn, Wizard } from '@acorn/plugin-api/ui/host'
+import {
+  Alert, Badge, Button, Card, Field, Heading, Inline, Input, Kbd, Modal, Select, Stack, Text,
+  Toolbar,
+} from '@acorn/plugin-api/ui'
+
 import { saveOnboardingCompletion } from './onboardingCompletion'
-import './wizard.css'
 
 const GithubConnect = lazy(() => import('./GithubConnect'))
 
 type Step = 'welcome' | 'add' | 'github' | 'organize' | 'done'
 
-// Progress dots only count the screens a run passes through. `github` is a detour on the way to
-// `organize`, so it shares that screen's position rather than adding a fifth dot.
-const DOT_OF: Record<Step, number> = { welcome: 0, add: 1, github: 1, organize: 2, done: 3 }
+// The steps the host draws in its indicator. `github` is a detour on the way to `organize`, so it
+// shares `add`'s place in the strip rather than adding a fifth entry — which is what the hand-drawn
+// dot strip's `DOT_OF` map used to say.
+const STEPS = [
+  { id: 'add', label: 'Add a project' },
+  { id: 'organize', label: 'Name it' },
+  { id: 'done', label: 'Ready' },
+] as const
+
+const place = (step: Step): string => (step === 'github' ? 'add' : step)
 
 /** Sentinel option: "put this project in a workspace that does not exist yet". */
 const NEW_WORKSPACE = '__new__'
@@ -163,179 +173,216 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     }
   }
 
-  return (
-    // Deliberately not the shared Modal, and deliberately without createDismissable: this is a
-    // full-screen takeover, and Escape or a stray backdrop click must not silently skip setup.
-    <div class="wizard-backdrop">
-      <div class="wizard" role="dialog" aria-modal="true" aria-label="Set up acorn">
-        <div class="scroll">
-          <Show when={step() === 'welcome'}>
-            <div class="wizard-body">
-              <Acorn />
-              <h2>Welcome.</h2>
-              <p class="wizard-lede">
-                acorn is a workspace for running coding tasks — agents, terminals, editors — against your
-                projects. Setup takes about a minute.
-              </p>
-              <Button variant="solid" tone="accent" onPress={() => go('add')}>Get started</Button>
-            </div>
-          </Show>
+  // The host's Back and Next hand back the id of the step they landed on. Back is this wizard's own
+  // trail rather than the strip's previous entry, because `github` shares a place with `add` and the
+  // strip cannot tell which of the two you came from. Forward off `organize` is the save.
+  const onStep = (id: string) => {
+    const order = STEPS.map((entry) => entry.id) as string[]
+    if (order.indexOf(id) < order.indexOf(place(step()))) return back()
+    if (step() === 'organize') return void saveNames()
+    go(id as Step)
+  }
+  // A step whose only way forward is doing something on it says so, rather than offering a Next that
+  // lands on an empty screen.
+  const canAdvance = () => (step() === 'add' || step() === 'github' ? added().length > 0 : true)
 
-          <Show when={step() === 'add'}>
-            <div class="wizard-body">
-              <h2>Add your first project.</h2>
-              <p class="wizard-lede">
-                A project is just a folder on your machine. Git and GitHub are optional — features light
-                up as they're detected.
-              </p>
-              <div class="wizard-cards">
-                <Card interactive disabled={!canPickFolder() || busy()} onPress={() => void openFolder()}>
-                  <span class="wizard-card-title">Open a folder</span>
-                  <span class="wizard-card-desc">Point acorn at any folder. Plain folders work fine.</span>
-                  <span class="wizard-card-tag">recommended</span>
-                </Card>
-                <Card interactive onPress={() => go('github')}>
-                  <span class="wizard-card-title">Connect GitHub</span>
-                  <span class="wizard-card-desc">Import repositories — clone them, or map ones you already have locally.</span>
-                  <span class="wizard-card-tag">optional · anytime in settings</span>
-                </Card>
-              </div>
-              <Show when={!canPickFolder()}>
-                <p class="wizard-hint">Choosing a folder needs the desktop app.</p>
-              </Show>
-              <Show when={error()}><Alert>{error()}</Alert></Show>
-              <p class="wizard-hint">
-                Not sure? Open a folder. You can connect GitHub later and acorn will match it up
-                automatically.
-              </p>
-            </div>
-          </Show>
+  const StepBody = () => (
+    <Stack gap="section">
+      <Show when={step() === 'welcome'}>
+        <Stack gap="row">
+          <Acorn />
+          <Heading level={2}>Welcome.</Heading>
+          <Text emphasis="muted" wrap>
+            acorn is a workspace for running coding tasks — agents, terminals, editors — against your
+            projects. Setup takes about a minute.
+          </Text>
+          <Toolbar variant="actions" size="sm">
+            <Button variant="solid" tone="accent" onPress={() => go('add')}>Get started</Button>
+          </Toolbar>
+        </Stack>
+      </Show>
 
-          <Show when={step() === 'github'}>
-            <Suspense fallback={<div class="wizard-body"><p class="muted">Loading…</p></div>}>
-              <GithubConnect
-                onBack={back}
-                onImported={(ids) => void afterImport(ids)}
-                added={added()}
-                onContinue={() => go('organize')}
-              />
-            </Suspense>
+      <Show when={step() === 'add'}>
+        <Stack gap="row">
+          <Heading level={2}>Add your first project.</Heading>
+          <Text emphasis="muted" wrap>
+            A project is just a folder on your machine. Git and GitHub are optional — features light
+            up as they're detected.
+          </Text>
+          <Inline gap="stack" wrap>
+            <Card interactive disabled={!canPickFolder() || busy()} onPress={() => void openFolder()}>
+              <Stack gap="row">
+                <Text emphasis="strong">Open a folder</Text>
+                <Text emphasis="muted" wrap>Point acorn at any folder. Plain folders work fine.</Text>
+                <Text emphasis="eyebrow">recommended</Text>
+              </Stack>
+            </Card>
+            <Card interactive onPress={() => go('github')}>
+              <Stack gap="row">
+                <Text emphasis="strong">Connect GitHub</Text>
+                <Text emphasis="muted" wrap>Import repositories — clone them, or map ones you already have locally.</Text>
+                <Text emphasis="eyebrow">optional · anytime in settings</Text>
+              </Stack>
+            </Card>
+          </Inline>
+          <Show when={!canPickFolder()}>
+            <Text emphasis="muted">Choosing a folder needs the desktop app.</Text>
           </Show>
+          <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
+          <Text emphasis="muted" wrap>
+            Not sure? Open a folder. You can connect GitHub later and acorn will match it up
+            automatically.
+          </Text>
+        </Stack>
+      </Show>
 
-          <Show when={step() === 'organize'}>
-            <div class="wizard-body">
-              <h2>{added().length > 1 ? 'Name them your way.' : 'Name it your way.'}</h2>
-              <p class="wizard-lede">
-                Rename {added().length > 1 ? 'these projects' : 'the project'} and the workspace they live
-                in. Names are yours — they don't touch the folder or the repo.
-              </p>
-              <Show when={added().length} fallback={<p class="muted">No project yet — you can add one from Settings whenever you like.</p>}>
-                {/* Index, not For: these are editable inputs, and For keys by object identity, so a
-                    refetch would destroy the row mid-typing along with the caret. */}
-                <Index each={added()}>
-                  {(current) => (
-                    <div class="wizard-project">
-                      <Input
-                        width="auto"
-                        label={`Name of ${current().name}`}
-                        value={names()[current().id] ?? current().name}
-                        onInput={(value) => setNames((all) => ({ ...all, [current().id]: value }))}
-                      />
-                      <span class="wizard-facets">
+      <Show when={step() === 'github'}>
+        <Suspense fallback={<Text emphasis="muted">Loading…</Text>}>
+          <GithubConnect
+            onBack={back}
+            onImported={(ids) => void afterImport(ids)}
+            added={added()}
+            onContinue={() => go('organize')}
+          />
+        </Suspense>
+      </Show>
+
+      <Show when={step() === 'organize'}>
+        <Stack gap="row">
+          <Heading level={2}>{added().length > 1 ? 'Name them your way.' : 'Name it your way.'}</Heading>
+          <Text emphasis="muted" wrap>
+            Rename {added().length > 1 ? 'these projects' : 'the project'} and the workspace they live
+            in. Names are yours — they don't touch the folder or the repo.
+          </Text>
+          <Show when={added().length} fallback={<Text emphasis="muted">No project yet — you can add one from Settings whenever you like.</Text>}>
+            {/* Index, not For: these are editable inputs, and For keys by object identity, so a
+                refetch would destroy the row mid-typing along with the caret. */}
+            <Index each={added()}>
+              {(current) => (
+                <Card>
+                  <Stack gap="row">
+                    <Inline gap="stack" wrap>
+                      <Field label="Name">
+                        <Input
+                          width="auto"
+                          value={names()[current().id] ?? current().name}
+                          onInput={(value) => setNames((all) => ({ ...all, [current().id]: value }))}
+                        />
+                      </Field>
+                      <Inline gap="inline" wrap>
                         <Show when={current().path} fallback={<Badge>no folder yet</Badge>}><Badge tone="ok">Folder</Badge></Show>
                         <Show when={current().vcs === 'git'}><Badge tone="ok">Git</Badge></Show>
                         <Show when={current().github}><Badge tone="ok">GitHub</Badge></Show>
-                      </span>
-                      <span class="wizard-path">
-                        {current().path
-                          ? current().vcs === 'git'
-                            ? current().path
-                            : `${current().path} · plain folder — git features light up if you add git later`
-                          : 'no folder on disk yet — add one anytime from Settings'}
-                      </span>
-                      {/* Per project, not per batch. Adding four repositories at once is normal, and
-                          they do not all belong together — so each picks its workspace, and each can
-                          mint one the next row will find waiting in its list. */}
-                      <span class="wizard-home">
-                        <Show
-                          when={drafts()[current().id] === undefined}
-                          fallback={
-                            <>
-                              <Input
-                                width="auto"
-                                label={`New workspace for ${current().name}`}
-                                placeholder="Workspace name"
-                                value={drafts()[current().id] ?? ''}
-                                ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
-                                onInput={(value) => setDrafts((all) => ({ ...all, [current().id]: value }))}
-                                onKeyDown={(event) => {
-                                  if (event.key !== 'Enter') return
-                                  event.preventDefault()
-                                  const value = drafts()[current().id]?.trim()
-                                  if (value) void createHome(current(), value)
-                                }}
-                              />
-                              <Button
-                                size="sm"
-                                busy={busy()}
-                                disabled={!drafts()[current().id]?.trim()}
-                                onPress={() => void createHome(current(), drafts()[current().id]!.trim())}
-                              >
-                                Create
-                              </Button>
-                            </>
-                          }
-                        >
-                          <Select
-                            width="auto"
-                            label={`Workspace for ${current().name}`}
-                            value={homes()[current().id] ?? current().workspaceId}
-                            options={[
-                              ...(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name })),
-                              { value: NEW_WORKSPACE, label: 'New workspace…' },
-                            ]}
-                            onChange={(value) => {
-                              if (value === NEW_WORKSPACE) setDrafts((all) => ({ ...all, [current().id]: '' }))
-                              else setHomes((all) => ({ ...all, [current().id]: value }))
-                            }}
-                          />
-                        </Show>
-                      </span>
-                    </div>
-                  )}
-                </Index>
-              </Show>
-              <Show when={error()}><Alert>{error()}</Alert></Show>
-              <Button variant="solid" tone="accent" busy={busy()} onPress={() => void saveNames()}>Continue</Button>
-            </div>
+                      </Inline>
+                    </Inline>
+                    <Text emphasis="muted" wrap>
+                      {current().path
+                        ? current().vcs === 'git'
+                          ? current().path
+                          : `${current().path} · plain folder — git features light up if you add git later`
+                        : 'no folder on disk yet — add one anytime from Settings'}
+                    </Text>
+                    {/* Per project, not per batch. Adding four repositories at once is normal, and
+                        they do not all belong together — so each picks its workspace, and each can
+                        mint one the next row will find waiting in its list. */}
+                    <Show
+                      when={drafts()[current().id] === undefined}
+                      fallback={
+                        <Inline gap="inline" wrap>
+                          <Field label="New workspace">
+                            <Input
+                              width="auto"
+                              placeholder="Workspace name"
+                              value={drafts()[current().id] ?? ''}
+                              ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
+                              onInput={(value) => setDrafts((all) => ({ ...all, [current().id]: value }))}
+                              onSubmit={(value) => {
+                                if (value.trim()) void createHome(current(), value.trim())
+                              }}
+                            />
+                          </Field>
+                          <Button
+                            size="sm"
+                            busy={busy()}
+                            disabled={!drafts()[current().id]?.trim()}
+                            onPress={() => void createHome(current(), drafts()[current().id]!.trim())}
+                          >
+                            Create
+                          </Button>
+                        </Inline>
+                      }
+                    >
+                      <Field label="Workspace">
+                        <Select
+                          width="auto"
+                          value={homes()[current().id] ?? current().workspaceId}
+                          options={[
+                            ...(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name })),
+                            { value: NEW_WORKSPACE, label: 'New workspace…' },
+                          ]}
+                          onChange={(value) => {
+                            if (value === NEW_WORKSPACE) setDrafts((all) => ({ ...all, [current().id]: '' }))
+                            else setHomes((all) => ({ ...all, [current().id]: value }))
+                          }}
+                        />
+                      </Field>
+                    </Show>
+                  </Stack>
+                </Card>
+              )}
+            </Index>
           </Show>
+          <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
+          <Toolbar variant="actions" size="sm">
+            <Button variant="solid" tone="accent" busy={busy()} onPress={() => void saveNames()}>Continue</Button>
+          </Toolbar>
+        </Stack>
+      </Show>
 
-          <Show when={step() === 'done'}>
-            <div class="wizard-body">
-              <h2>You're set.</h2>
-              <p class="wizard-lede">Start a task whenever you're ready. A few keys worth knowing:</p>
-              <DescriptionList size="sm">
-                <For each={SHORTCUTS}>
-                  {([chord, label]) => <DescriptionList.Item label={<Kbd>{chord}</Kbd>}>{label}</DescriptionList.Item>}
-                </For>
-              </DescriptionList>
-              <Button variant="solid" tone="accent" busy={busy()} onPress={() => void finish()}>Open acorn</Button>
-            </div>
-          </Show>
-        </div>
+      <Show when={step() === 'done'}>
+        <Stack gap="row">
+          <Heading level={2}>You're set.</Heading>
+          <Text emphasis="muted" wrap>Start a task whenever you're ready. A few keys worth knowing:</Text>
+          {/* The chord is the label and the words are the value, so the key caps line up in one
+              column the way a shortcut sheet does. */}
+          <Stack gap="row">
+            <Index each={SHORTCUTS}>
+              {(entry) => (
+                <Inline gap="inline">
+                  <Kbd>{entry()[0]}</Kbd>
+                  <Text emphasis="muted">{entry()[1]}</Text>
+                </Inline>
+              )}
+            </Index>
+          </Stack>
+          <Toolbar variant="actions" size="sm">
+            <Button variant="solid" tone="accent" busy={busy()} onPress={() => void finish()}>Open acorn</Button>
+          </Toolbar>
+        </Stack>
+      </Show>
+    </Stack>
+  )
 
-        <div class="wizard-foot">
-          <span class="wizard-dots" aria-hidden="true">
-            <For each={[0, 1, 2, 3]}>{(index) => <i classList={{ on: index <= DOT_OF[step()] }} />}</For>
-          </span>
-          <Show when={trail().length}>
-            <Button variant="bare" onPress={back}>← back</Button>
-          </Show>
-          <Show when={step() !== 'done'}>
-            <Button variant="bare" busy={busy()} onPress={() => void finish()}>skip for now</Button>
-          </Show>
-        </div>
-      </div>
-    </div>
+  // `dismissOn={[]}`: a full-run setup must not vanish on a stray Escape or a backdrop click. The
+  // custom full-screen backdrop this used to draw is gone, and so is the hand-rolled dot strip — the
+  // `wizard` layout draws the step indicator and the back and next controls (docs/panes.md § Layout
+  // model). What is left for the plugin is the step body and "skip for now".
+  return (
+    <Modal onDismiss={() => {}} dismissOn={[]} size="wide" title="Set up acorn">
+      <Wizard
+        stateKey="onboarding"
+        label="Set up acorn"
+        steps={STEPS}
+        current={place(step())}
+        onStep={onStep}
+        canAdvance={canAdvance()}
+        regions={{ step: () => <StepBody /> }}
+      />
+      <Toolbar variant="actions" size="sm">
+        <Show when={step() !== 'done'}>
+          <Button variant="bare" busy={busy()} onPress={() => void finish()}>skip for now</Button>
+        </Show>
+      </Toolbar>
+    </Modal>
   )
 }

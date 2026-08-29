@@ -75,6 +75,8 @@ export const NODE_FOCUS = {
 
   // Asking
   Button: 'stop',
+  // A stop, and the second press is the confirmation: the armed button IS the prompt.
+  ConfirmButton: 'stop',
   Input: 'stop',
   Textarea: 'stop',
   Select: 'stop',
@@ -90,6 +92,10 @@ export const NODE_FOCUS = {
   Field: 'none',
   CopyButton: 'stop',
   ModelConnectionPicker: 'stop',
+
+  // Pixels. One stop from outside; Enter hands the keys to what is in the box and Escape takes them
+  // back, because whatever is in there will swallow Tab.
+  Rectangle: 'stop',
 
   // Host wrappers draw nothing of their own, so they inherit whatever they wrap.
   Only: 'none',

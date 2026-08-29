@@ -118,4 +118,15 @@ export function withSlotChoice(raw: string | undefined, slot: string, choice: st
   return JSON.stringify(next)
 }
 
+/**
+ * Is anybody at all offering to fill this slot right now?
+ *
+ * The question an owner asks before it draws the box, rather than after: context hides a section with
+ * no items of its own, and has to keep it when a plugin has something to put there. Deliberately not
+ * `resolveSlot(...).occupants.length`, which would answer "and who wins", a decision that depends on a
+ * user preference the owner has no business reading to make a visibility choice.
+ */
+export const slotFills = (pointId: string, key?: string): boolean =>
+  extensionDeliveries(pointId).some((entry) => matchesKey(entry.matches, key))
+
 export type ArbitrationModeValue = ArbitrationMode

@@ -84,6 +84,16 @@ reading posture rather than a preference.
 A pane may also hide a region, which drops it and gives the space to what is left. Notes uses this for
 its library column, and it is the same mechanism the narrow projections need.
 
+A region is a component, not an element, so a layout that draws one region at a time mounts only that
+one. Regions of the same pane are mounted independently, which means anything two of them share has to
+outlive either. Notes, Context and Changes each hold that shared state in a reactive root keyed by task,
+built on first ask and disposed when the task is evicted. Collapsing a library must not take the note
+being edited with it.
+
+A wizard is the one arrangement a non-pane surface can reach for. Onboarding is a component in the
+`overlay` slot rather than a pane, so it imports `Wizard` from `@acorn/plugin-api/ui/host` and fills its
+`step` region. Every other surface names a layout on its contribution and never imports one.
+
 ## Addressing a pane
 
 A task's URL is `/t/:taskId` and stays that way. The layout is a row with focus and maximise state,

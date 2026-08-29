@@ -91,7 +91,9 @@ export { allProjects } from '@acorn/client-core/projects/projectLookup.ts'
 // manifest row, never from client code.
 export { refResolutionsOptions } from '@acorn/client-core/registries/refResolvers.ts'
 export type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
-export { contextSectionSlots } from '@acorn/client-core/registries/contextSectionSlots.ts'
+// Put a named collection's item in view, for a pane answering "show me this one" from somewhere else.
+// The host owns scroll, the same way it owns selection, so a pane never selects a row out of the DOM.
+export { revealCollectionItem } from '@acorn/client-core/keys/collection.ts'
 export { agentContextContributions } from '@acorn/client-core/registries/agentContexts.ts'
 // prune candidate: agent-tool renderers are in-realm components drawn inside the transcript list, so
 // they cannot cross a sandbox boundary. First-party only, permanently (docs/extensibility.md § Two
