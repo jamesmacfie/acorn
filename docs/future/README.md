@@ -16,6 +16,7 @@ Multi-file designs with an order of work.
 | Folder | What it is | Status, 2026-08-28 |
 | --- | --- | --- |
 | [layout/](./layout/README.md) | Host-owned layouts, a closed component kit, remote component trees, five extension kinds, host-owned focus and keys. Ten phases, desktop only. | Proposal. Not started. |
+| [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases; all but the first wait on layout phase 4. | Proposal, 2026-08-29. Not started. |
 | [events.md](./events.md) | Node-emitted core events, plugin events on `plugin:<id>:*`, and cross-plugin subscription. | Shipped 2026-08-28; three items open (preview URL, `emits` on the settings page, connection deletion). |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
@@ -40,7 +41,9 @@ Multi-file designs with an order of work.
 The layout programme is the seam most of the others now lean on: the terminal client is a second
 host for its tree, the PWA is its layouts' narrow projections, compiled-tier's component couplings
 dissolve into its slots, rail-tab's slice 3 is one of its annotation points, and the marketing
-plugin docs should be written against it. Events and sandbox are independent of it and of each
+plugin docs should be written against it. Client-plugins consumes its remote root and its
+`replace` arbitration and adds device provenance beside them; its phase 0 is the one piece that
+does not wait. Events and sandbox are independent of it and of each
 other. Ecosystem's rung-2 containment is the one design restated in more than one place (its
 `blockers.md`, sandbox's `phases.md`, `docs/security.md § The containment ladder`); the security
 doc owns it and the others point.
