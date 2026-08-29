@@ -29,8 +29,9 @@ to decide.
 
 ## Client contributions
 
-Drawn by the shell. A loaded plugin's UI is an iframe (`frames`) or a descriptor the host renders;
-it never hands the shell a component.
+Drawn by the shell. A loaded plugin's UI is an iframe (`frames`), a tree of the host's own components
+emitted from a worker (`remote`), or a descriptor the host renders. It never hands the shell a
+component: a tree names one, and the host mounts its own.
 
 | Kind | Tier | Where | Host |
 | --- | --- | --- | --- |
@@ -59,7 +60,7 @@ it never hands the shell a component.
 | Brand marks | Both | `ctx.brandMarks` / manifest `icon` and `icons` | The `brand:` glyph namespace |
 | Client schedules | Compiled | `ctx.schedules` | The device-local scheduler. **Direction: stays compiled.** A loaded plugin's periodic work belongs on the node, which runs whether or not a client is open (docs/schedules.md § Why the node, and only the node). The client registry exists for work that has no meaning without a window. |
 | Integration flows | Compiled | `ctx.integrationFlows` | The connect-a-provider wizard. **Direction: gains a manifest twin.** Named as a blocker on moving `github` out of tree ([compiled-tier.md](./future/compiled-tier.md)); the flow is already a sequence of steps rather than a component, so the descriptor is a shape question, not a seam question. |
-| Agent tool renderers | Compiled | `ctx.agentToolRenderers` | The agent transcript. **Direction: stays compiled, permanently.** An inline renderer is a component on a core surface inside the host's realm; the tier line refuses those, and `changes` is named as staying first-party for exactly this ([compiled-tier.md](./future/compiled-tier.md)). |
+| Agent tool renderers | Both | `ctx.agentToolRenderers` / `contributions.remote` (`target: 'agentToolRenderer'`) | The agent transcript. The compiled tier hands the host a component; the loaded tier declares which tool names it draws and emits a tree of the host's own components from a worker ([06-remote-tree.md](./future/layout/06-remote-tree.md)). A compiled renderer still wins where both claim a call. |
 | Context section slots | Compiled | `ctx.contextSectionSlots` | The context tray. **Direction: stays compiled while the tray is a component.** The conversion to a cooperative seam was attempted and correctly refused; see coupling 1 in [compiled-tier.md](./future/compiled-tier.md). |
 | Rail markers | Compiled | `ctx.railMarkers` | A status dot on a rail control. **Direction: gains a manifest twin,** in rail-tab slice 3 ([rail-tab.md](./future/rail-tab.md)). Data only, no click verb, so the descriptor is a route plus a colour. Not landed as of 2026-08-28. |
 | Persisted state slices | Compiled | `ctx.persistedStateSlices` | Device-local persisted state. **Direction: stays compiled.** A loaded plugin has `plugin:<id>:*` prefs through `ctx.core.prefs` and its frame's own `state` verb, which is the same capability with the namespace bound by the host. A second mechanism would be a second namespace to police. |

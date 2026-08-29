@@ -39,17 +39,18 @@ export function toDisplayName(id) {
 
 /** The whole package, as a path → contents map. Exported so the repository's own suite can parse the
  * manifest with the host's parser instead of trusting this file. */
-export function scaffoldFiles(id, name = toDisplayName(id)) {
+export function scaffoldFiles(id, name = toDisplayName(id), options = {}) {
+  const remote = options.remote === true
   return {
-    'acorn-plugin.json': manifest(id, name),
+    'acorn-plugin.json': manifest(id, name, remote),
     'node/index.js': nodeIndex(id),
     'node/routes.js': nodeRoutes(),
-    'client.js': client(id, name),
+    'client.js': remote ? remoteClient(id, name) : client(id, name),
     'README.md': readme(id, name),
   }
 }
 
-function manifest(id, name) {
+function manifest(id, name, remote = false) {
   return (
     JSON.stringify(
       {
@@ -71,9 +72,16 @@ function manifest(id, name) {
           events: [],
           node: { core: ['tasks'], capabilities: [], secrets: false, exec: false, net: [] },
         },
-        contributions: {
-          frames: [{ target: 'pane', id, label: name, glyph: 'puzzle', order: 800 }],
-        },
+        contributions: remote
+          ? {
+            // A tree rather than a rectangle: your code runs in a worker and names acorn's own
+            // components, so what the reader gets has the shell's keyboard handling, focus and style
+            // pack. `entry` is the key you registered with `mountTree` in client.js.
+            remote: [{ target: 'agentToolRenderer', id: `${id}.tool-card`, entry: 'toolCard', tools: ['execute'] }],
+          }
+          : {
+            frames: [{ target: 'pane', id, label: name, glyph: 'puzzle', order: 800 }],
+          },
       },
       null,
       2,
@@ -289,6 +297,19 @@ node/routes.js      imported with a relative specifier
 client.js           one file, plain JS, no imports
 \`\`\`
 
+## Two ways to draw
+
+This scaffold's \`client.js\` is a **frame**: a sandboxed iframe whose pixels are yours. You write the
+markup and the CSS, and you get a rectangle.
+
+\`npm create acorn-plugin ${id} -- --remote\` emits the other one: a **tree**. Your code runs in a Web
+Worker with no DOM at all and names acorn's own components, which the host mounts. You give up drawing
+your own pixels and you get the shell's keyboard handling, focus, ARIA and the reader's chosen style
+pack, for free and forever.
+
+Pick the frame when the surface owns its pixels — a chart, an image editor, a canvas. Pick the tree
+for everything else.
+
 ## Types, if you want them
 
 \`\`\`sh
@@ -333,10 +354,119 @@ memory.
 `
 }
 
+function remoteClient(id, name) {
+  return `// The client half, drawing a tree instead of pixels.
+//
+// This bundle runs in a Web Worker: no DOM, no network, no \`importScripts\` after boot. Its only I/O
+// is the two MessagePorts the host transfers on the first message — the bridge on the first, the tree
+// on the second.
+//
+// What you build below is a description, not markup. You name one of acorn's own components and the
+// host mounts that component, so what the reader gets has the shell's keyboard handling, focus rings,
+// ARIA and whichever style pack they chose. Nothing here can spell a class, a colour or a pixel, and
+// that is the deal: you get the shell's UI for free and you give up drawing your own.
+//
+// Hand-written for the same reason the frame scaffold's bridge is: a single-file plugin has nothing to
+// import from. With a bundler, \`acorn-plugin-sdk\` and \`acorn-plugin-sdk/remote\` do all of this in
+// fifteen lines of JSX.
+
+const PLUGIN_BRIDGE_VERSION = 1
+
+let treePort = null
+let nodeSeq = 0
+const slots = new Map()
+
+addEventListener('message', (event) => {
+  if (!event.data || typeof event.data !== 'object') return
+  if (event.data.acornBridge !== PLUGIN_BRIDGE_VERSION) return
+  // The bridge is ports[0] — api, state, events, toasts. Take it when you need it; this template draws
+  // from its props alone. The tree channel is ports[1].
+  const bridge = event.ports[0]
+  if (bridge) {
+    bridge.onmessage = (message) => {
+      // The host arms a 10-second deadline on the bridge and shows a placeholder if nothing answers,
+      // which is what a bundle that throws at module scope looks like from outside.
+      if (message.data && message.data.kind === 'ready') bridge.postMessage({ kind: 'connected' })
+    }
+    bridge.start?.()
+  }
+  treePort = event.ports[1]
+  if (!treePort) return
+  treePort.onmessage = (message) => onTreeMessage(message.data)
+  treePort.start?.()
+  treePort.postMessage({ kind: 'tree:ready', version: 1, entries: ['toolCard'] })
+})
+
+function onTreeMessage(message) {
+  if (!message || typeof message !== 'object') return
+  switch (message.kind) {
+    // A second mount for the same slot is a props update, not a new tree.
+    case 'tree:mount':
+      return mount(message.slot, message.props)
+    case 'tree:unmount':
+      slots.delete(message.slot)
+      return
+    case 'tree:event': {
+      const slot = slots.get(message.slot)
+      if (slot) {
+        const handler = slot.handlers.get(message.handler)
+        if (handler) handler(message.payload)
+      }
+      return
+    }
+    // Miss two of these and the host terminates this worker and shows a placeholder in every tree it
+    // was serving.
+    case 'tree:ping':
+      treePort.postMessage({ kind: 'tree:pong' })
+      return
+  }
+}
+
+/** A node: the name of one of acorn's components, its props, and its children. */
+function el(type, props, children) {
+  return { id: 'n' + ++nodeSeq, type: type, props: props || {}, children: children || [] }
+}
+
+/** A run of text. Text is a node, never a prop. */
+function text(value) {
+  return el('#text', { value: String(value) })
+}
+
+function mount(slot, props) {
+  const handlers = new Map()
+  let handlerSeq = 0
+  // A function cannot cross a port, so it crosses as an id and the host quotes the id back. Only the
+  // kit's own event names carry one: onPress, onChange, onSelect and the rest. A raw key or pointer
+  // handler has no name here, by design.
+  const on = (fn) => {
+    const id = ++handlerSeq
+    handlers.set(id, fn)
+    return { $handler: id }
+  }
+
+  const tool = (props && props.tool) || {}
+  const tree = el('Card', {}, [
+    el('Stack', { gap: 'row' }, [
+      el('Badge', { tone: tool.status === 'failed' ? 'danger' : 'ok' }, [text(tool.status || 'running')]),
+      el('CodeBlock', { maxHeight: 'block' }, [text(tool.output || '')]),
+      el('Button', { variant: 'bare', onPress: on(() => console.log('${id}: pressed')) }, [text('${name}')]),
+    ]),
+  ])
+
+  slots.set(slot, { handlers: handlers })
+  // One batch, applied by the host atomically or not at all. Redrawing means sending patch, text,
+  // insert, move and remove for what changed, rather than the whole tree again.
+  treePort.postMessage({ kind: 'tree:batch', slot: slot, ops: [{ op: 'insert', parent: null, index: 0, node: tree }] })
+}
+`
+}
+
 // ── CLI ───────────────────────────────────────────────────────────────────────────────────────────
 
 async function main(argv) {
-  let requested = argv[0]
+  // One flag, and it picks the render path. See docs/plugin-authoring.md § Two ways to draw.
+  const remote = argv.includes('--remote')
+  let requested = argv.find((arg) => !arg.startsWith('--'))
   if (!requested) {
     const { createInterface } = await import('node:readline/promises')
     const rl = createInterface({ input: process.stdin, output: process.stdout })
@@ -359,7 +489,7 @@ async function main(argv) {
     return
   }
 
-  const files = scaffoldFiles(id)
+  const files = scaffoldFiles(id, toDisplayName(id), { remote })
   for (const [path, contents] of Object.entries(files)) {
     const target = join(dir, path)
     mkdirSync(dirname(target), { recursive: true })

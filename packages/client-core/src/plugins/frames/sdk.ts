@@ -26,6 +26,11 @@ import { eventChord, hasCommandModifier, isBrowserEditingChord, isNormalizedChor
 // ui/frameTips.ts is framework-free with no imports of its own, so it carries none of the shell into a
 // plugin's bundle. mountFrame() below needs it.
 import { mountFrameTips } from '../../ui/frameTips'
+// The tree path's two imports. `tree/nodes.ts` is plain constants and the root is framework-free, so
+// neither drags anything into a plugin's bundle — `tree/messages.ts`, which is the Zod half, is
+// deliberately not reached from here. See "The tree path" below.
+import { TREE_PROTOCOL_VERSION } from '@acorn/protocol/tree/nodes.ts'
+import { createRemoteRoot, type RemoteRoot } from './remoteRoot'
 
 /** The error a rejected bridge call throws. `code` is the API's own vocabulary, so a plugin branches on
  * the same strings whether the call was denied at the bridge or refused by the node. */
@@ -184,6 +189,10 @@ function handshake(): Promise<AcornBridge> {
       const port = event.ports?.[0]
       if (!port) return
       target.removeEventListener?.('message', onWindowMessage)
+      // A worker host transfers a second port beside the bridge's: the tree channel. A frame host
+      // transfers one, so this is undefined there and `mountTree` refuses, which is the honest answer
+      // for a bundle asking a rectangle to draw a tree.
+      acceptTreePort(event.ports?.[1] ?? null)
       resolve(attach(port))
     }
     target.addEventListener('message', onWindowMessage)
@@ -468,4 +477,143 @@ export function _resetConnection(): void {
   detachKeyForwarding?.()
   detachKeyForwarding = null
   connection = null
+  treePort = null
+  helloSeen = false
+}
+
+// ── The tree path ─────────────────────────────────────────────────────────────────────────────────
+//
+// The second render path (docs/future/layout/06-remote-tree.md). Same bundle, same bridge, same
+// sandbox rules; what differs is that the code emits a tree of kit node names instead of pixels, and
+// the host mounts its own components for them.
+//
+// Framework-free like the rest of this file. The Solid adapter is `acorn-plugin-sdk/remote`.
+
+/** What the host handed this slot, and how to hear about it changing. */
+export type TreeMount = {
+  /** Which renderer the host asked for, so one bundle can serve several. */
+  readonly entry: string
+  /** The remote root to draw into. */
+  readonly root: RemoteRoot
+  /** The props the host mounted with. A snapshot; `onProps` carries every later one. */
+  props(): unknown
+  /** The host re-mounted this slot with new props. Register before you render. */
+  onProps(listener: (props: unknown) => void): void
+  /** Your teardown, run when the host unmounts this slot. */
+  onUnmount(dispose: () => void): void
+}
+
+export type TreeRender = (bridge: AcornBridge, mount: TreeMount) => void
+
+let treePort: MessagePort | null = null
+// Whether the host's hello has landed. Load-bearing on its own: a frame's hello carries one port, so
+// `treePort` stays null forever there, and without this flag `mountTree` would wait on a message that
+// has already been and gone.
+let helloSeen = false
+
+function acceptTreePort(port: MessagePort | null): void {
+  treePort = port
+  helloSeen = true
+}
+
+/**
+ * Register this bundle's tree renderers and wait for the host to mount them.
+ *
+ * Keyed by entry name rather than the single callback the design sketched, because one worker serves
+ * every tree its bundle contributes (a tool card per call, a section per tray) and the host has to say
+ * which. The manifest's `contributions.remote[].entry` names a key here; a name with no key is a
+ * placeholder and a roster row, not a crash.
+ *
+ * ```ts
+ * mountTree({ toolCard: solidTree(ToolCard) })
+ * ```
+ */
+export function mountTree(renderers: Record<string, TreeRender>): void {
+  void connect().then((bridge) => {
+    // `connect()` resolving means the hello has landed, so the answer is already known either way.
+    // A surface with no tree channel is a rectangle, and saying so is more use than hanging.
+    if (!helloSeen || !treePort) throw new Error('acorn: mountTree needs a tree channel, and this surface has none')
+    runTreeChannel(treePort, bridge, renderers)
+  }).catch((error: unknown) => {
+    console.error('[acorn] mountTree failed:', error)
+  })
+}
+
+type MountedSlot = {
+  root: RemoteRoot
+  props: unknown
+  onProps: ((props: unknown) => void)[]
+  dispose: (() => void)[]
+}
+
+function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Record<string, TreeRender>): void {
+  const slots = new Map<string, MountedSlot>()
+
+  const drop = (id: string): void => {
+    const slot = slots.get(id)
+    if (!slot) return
+    slots.delete(id)
+    for (const dispose of slot.dispose) {
+      try { dispose() } catch (error) { console.error('[acorn] tree teardown threw:', error) }
+    }
+    slot.root.dispose()
+  }
+
+  const mount = (id: string, entry: string, props: unknown): void => {
+    const existing = slots.get(id)
+    if (existing) {
+      existing.props = props
+      for (const listener of existing.onProps) listener(props)
+      return
+    }
+    const render = renderers[entry]
+    if (!render) {
+      port.postMessage({ kind: 'tree:failed', slot: id, message: `no renderer named '${entry}'` })
+      return
+    }
+    const slot: MountedSlot = {
+      root: createRemoteRoot((ops) => port.postMessage({ kind: 'tree:batch', slot: id, ops })),
+      props,
+      onProps: [],
+      dispose: [],
+    }
+    slots.set(id, slot)
+    try {
+      render(bridge, {
+        entry,
+        root: slot.root,
+        props: () => slot.props,
+        onProps: (listener) => slot.onProps.push(listener),
+        onUnmount: (dispose) => slot.dispose.push(dispose),
+      })
+    } catch (error: unknown) {
+      drop(id)
+      port.postMessage({ kind: 'tree:failed', slot: id, message: error instanceof Error ? error.message : String(error) })
+    }
+  }
+
+  port.onmessage = (event: MessageEvent) => {
+    const message = event.data as { kind?: string; slot?: string; entry?: string; props?: unknown; handler?: number; payload?: unknown }
+    if (!message || typeof message !== 'object') return
+    switch (message.kind) {
+      case 'tree:mount':
+        if (typeof message.slot === 'string' && typeof message.entry === 'string') mount(message.slot, message.entry, message.props)
+        return
+      case 'tree:unmount':
+        if (typeof message.slot === 'string') drop(message.slot)
+        return
+      case 'tree:event': {
+        // The handler id is the sandbox's own; the host only ever quotes one back. An id the sandbox
+        // has forgotten is a stale click on a torn-down node, which is nothing.
+        const slot = typeof message.slot === 'string' ? slots.get(message.slot) : undefined
+        if (slot && typeof message.handler === 'number') slot.root.dispatch(message.handler, message.payload)
+        return
+      }
+      case 'tree:ping':
+        port.postMessage({ kind: 'tree:pong' })
+        return
+    }
+  }
+  port.start?.()
+  port.postMessage({ kind: 'tree:ready', version: TREE_PROTOCOL_VERSION, entries: Object.keys(renderers) })
 }

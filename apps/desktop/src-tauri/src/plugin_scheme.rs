@@ -53,6 +53,17 @@ pub struct Frames {
 }
 
 impl Frames {
+    /// Where one bundle's bytes are, for a reader outside this module.
+    ///
+    /// The plugin worker is the reader: a worker script has to be same-origin with the document that
+    /// starts it, so the shell serves the identical bytes at `app://acorn/plugin-worker/<hash>.js`
+    /// under its own policy (`app_scheme.rs`). The cache is content-addressed either way, so both
+    /// paths name the same file and neither can name anything else.
+    pub fn bundle_path(&self, hash: &str) -> Option<PathBuf> {
+        if !is_hash(hash) { return None; }
+        Some(self.cache_dir.join(format!("{hash}.js")))
+    }
+
     /// Read the staged stylesheet once. A missing one is not fatal. Frames still run, undressed,
     /// which reads better than a scheme that refuses to serve.
     pub fn new(user_data_dir: &Path, styles_path: &Path) -> Self {

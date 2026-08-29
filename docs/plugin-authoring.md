@@ -36,6 +36,19 @@ npm create acorn-plugin my-widget
 build step. It is the same package as the worked example at the end of this file; the rest of this
 document is what to change and why.
 
+```sh
+npm create acorn-plugin my-widget -- --remote
+```
+
+The same package, drawing the other way. The default `client.js` is a **frame**: a sandboxed iframe
+whose pixels are yours, which is what the rest of this document describes. `--remote` emits a **tree**
+instead: your code runs in a Web Worker with no DOM and names acorn's own components, and the host
+mounts them. You give up drawing your own pixels; you get the shell's keyboard handling, focus, ARIA
+and the reader's chosen style pack, and you keep them through every appearance change acorn ever
+ships. Reach for the frame when the surface owns its pixels — a chart, an image editor, a canvas —
+and for the tree otherwise. `docs/plugins.md` section Loaded plugins: the client half has both
+contracts.
+
 It is published standalone, which means it carries a **copy** of three things this repository owns: the
 API major it stamps into `apiVersion`, the URL of the manifest schema, and the handshake.
 `packages/create-acorn-plugin/index.test.ts` is what keeps the copies honest — it asserts the major

@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { collectionParamsSchema, collectionSchema, COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS } from './collections.ts'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from './contentLinkPattern.ts'
 import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from './contextMenus.ts'
-import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS, parseExtensionPointRef } from './extensionPoints.ts'
+import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS, REMOTE_TARGETS, parseExtensionPointRef } from './extensionPoints.ts'
 import { isNormalizedChord, isPluginKeyClaim, isPluginShortcutChord, isReservedPluginKeyClaim } from './keybindings.ts'
 import { PANE_LAYOUTS, regionProblem } from './paneLayouts.ts'
 import { PLUGIN_API_RANGE_RE } from './pluginApiVersion.ts'
@@ -651,8 +651,38 @@ const harnessDescriptor = z.object({
 //
 // The caps are product judgements, not storage limits. Eight is "as many as a plugin has rail sources"
 // and four is "a handful"; a package that wants more is describing an app rather than an integration.
+/**
+ * A tree this plugin's sandbox draws into somebody else's surface
+ * (docs/future/layout/06-remote-tree.md).
+ *
+ * The second render path, beside `frames`. A frame is a rectangle whose pixels the plugin owns; a
+ * remote entry is a tree of the host's own kit nodes, so it inherits focus, keys, ARIA and the reader's
+ * style pack, and it costs a worker rather than an iframe.
+ *
+ * `target` is which host asks for it, `entry` is the key the bundle registered with `mountTree`, and
+ * the target decides what else the row may carry. One target this phase.
+ */
+const remoteContribution = z.object({
+  target: z.enum(REMOTE_TARGETS),
+  // Namespaced by the client the way every other contribution id is (client-core/plugins/contributionIds.ts).
+  id: z.string().min(1).max(64),
+  // A key of the object the bundle passed to `mountTree`. A name with no key behind it draws the
+  // placeholder and records a roster row; it is not a parse error, because the bundle and the manifest
+  // are updated together and the manifest is what a node reads first.
+  entry: z.string().min(1).max(64),
+  // `agentToolRenderer` only, and required there: which tool names this draws. Keyed rather than a
+  // predicate because a predicate is code, and the arbitration in phase 4 has to be decidable by the
+  // host without running any.
+  tools: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
+}).superRefine((entry, ctx) => {
+  if (entry.target === 'agentToolRenderer' && !entry.tools?.length) {
+    ctx.addIssue({ code: 'custom', path: ['tools'], message: 'an agentToolRenderer names the tools it draws' })
+  }
+})
+
 const contributionsShape = z.looseObject({
   frames: z.array(frameSurface).max(32).default([]),
+  remote: z.array(remoteContribution).max(32).default([]),
   sources: z.array(sourceDescriptor).max(8).default([]),
   slots: z.array(slotDescriptor).max(8).default([]),
   palette: z.array(paletteDescriptor).max(32).default([]),
@@ -880,6 +910,7 @@ export type PluginExtensionPointDescriptor = Omit<z.infer<typeof extensionPointD
   location: string
   panels?: PluginPanelRegion
 }
+export type PluginRemoteContribution = z.infer<typeof remoteContribution>
 export type PluginExtensionDescriptor = z.infer<typeof extensionDescriptor>
 export type PluginCollectionDescriptor = z.infer<typeof collectionDescriptor>
 export type PluginScheduleDescriptor = z.infer<typeof scheduleDescriptor>
@@ -892,6 +923,7 @@ export type PluginHarnessDescriptor = z.infer<typeof harnessDescriptor>
 // roster row won't carry it, and every reader uses `?? []`.
 export type PluginContributions = {
   frames: PluginFrameSurface[]
+  remote?: PluginRemoteContribution[]
   sources?: PluginSourceDescriptor[]
   slots?: PluginSlotDescriptor[]
   palette?: PluginPaletteDescriptor[]

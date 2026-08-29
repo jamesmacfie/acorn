@@ -35,7 +35,11 @@ export type PluginFrameContext = {
   // `coreSlot` is a rectangle drawn where one of acorn's own surfaces normally is, and the frame is
   // told so for the same reason every other target is: it may want to lay out differently. It grants
   // nothing. The bridge's allowlist is keyed on scopes, never on this field.
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot'
+  //
+  // `remote` is the one value that is not a rectangle at all: the bundle is drawing a tree of the
+  // host's own components rather than pixels (docs/future/layout/06-remote-tree.md). It has no
+  // document, no webview and no modal to dismiss, so the verbs those gate on refuse it by default.
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote'
   nodeId: string
   taskId?: string
   projectId?: string

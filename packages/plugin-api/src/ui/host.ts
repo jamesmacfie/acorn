@@ -12,3 +12,9 @@ export { PaletteSurface } from '@acorn/client-core/palette/PaletteSurface.tsx'
 // panel to place in its own chrome. See docs/panes.md § Not a pane: the reference panel for why the
 // host draws it, and does the write, rather than the panel.
 export { default as RefPanelTaskLink } from '@acorn/client-core/registries/RefPanelTaskLink.tsx'
+// One sandboxed plugin's tree, drawn inside a first-party surface
+// (docs/future/layout/06-remote-tree.md). Host-only for the same reason the palette is: it acquires a
+// worker, wires a bridge and mounts the shell's own components. A plugin that owns a surface places
+// this where it wants a contributor's UI; it never sees the contributor's nodes.
+export { RemoteTree } from '@acorn/client-core/plugins/tree/RemoteTree.tsx'
+export type { RemoteTreeProps } from '@acorn/client-core/plugins/tree/RemoteTree.tsx'

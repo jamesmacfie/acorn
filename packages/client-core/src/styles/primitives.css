@@ -1042,6 +1042,12 @@ a.ui-row:hover { background: var(--bg-hover); }
    the flex or grid child its parent laid out. */
 .ui-confirm { display: contents; }
 
+/* A remote tree's container. It exists so the host has one element to ask "is focus inside this
+   plugin's UI?" of, which the broker's openUrl gate needs and the tree itself cannot answer. It must
+   not be a box: `contents` leaves the tree's own top-level nodes as the flex or grid children of
+   whatever surface placed the slot, so a contributed card lays out exactly like a compiled one. */
+.remote-tree { display: contents; }
+
 .ui-stack { display: flex; flex-direction: column; min-width: 0; gap: var(--kit-gap); }
 .ui-inline { display: flex; align-items: center; min-width: 0; gap: var(--kit-gap); }
 .ui-inline[data-wrap] { flex-wrap: wrap; }

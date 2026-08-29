@@ -437,6 +437,47 @@
             ]
           }
         },
+        "remote": {
+          "default": [],
+          "maxItems": 32,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string",
+                "enum": [
+                  "agentToolRenderer"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "entry": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "tools": {
+                "minItems": 1,
+                "maxItems": 64,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            },
+            "required": [
+              "target",
+              "id",
+              "entry"
+            ]
+          }
+        },
         "sources": {
           "default": [],
           "maxItems": 8,

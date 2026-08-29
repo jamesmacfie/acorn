@@ -31,19 +31,19 @@ trail survives the deletion.
 
 | Document | Phase | Sections |
 | --- | --- | --- |
-| `docs/shell.md` | 3, 9 | § "The plugin frame origin" stays for rectangles; a new § "The plugin worker" describes the tree sandbox. § "The renderer bridge" notes the worker transport. |
-| `docs/security.md` | 3, 4, 9 | § "The containment ladder" gains the worker as a rung between "descriptor" and "iframe." § "Third-party plugin bundles" states that a bundle's trust decision covers its worker. § "The vocabulary is closed, and a plugin can add to it" gains hooks and the five kinds. § "Summary table" gains rows. |
+| `docs/shell.md` | 3 done 2026-08-29, 9 | § "The plugin frame origin" stays for rectangles; a new § "The plugin worker" describes the tree sandbox. § "The renderer bridge" notes the worker transport. |
+| `docs/security.md` | 3 done 2026-08-29, 4, 9 | § "The containment ladder" gained the client sandbox as rung 0, covering both the iframe and the worker rather than a rung between them — the ladder's other rungs are the node half, and the client sandbox was never on it. § "Third-party plugin bundles" states that a bundle's trust decision covers its worker. § "The vocabulary is closed, and a plugin can add to it" gains hooks and the five kinds. § "Summary table" gains rows. |
 | `docs/frontend.md` | 1, 2, 9 | § "Registries and plugins" notes layouts and slots; § "Composition" notes the two render paths; § "Shell state" notes the focus store. |
 | `docs/architecture-overview.md` | 0, 9 | § "Documentation map" gains this folder (done when the folder lands) and, at phase 9, the rewritten docs. § "Package boundaries" notes the kit is closed. |
 | `docs/dashboards.md` | 4 | § "Placements" reconciles `pane.aside` (user panels, unchanged) with rectangle and remote slots (other plugins). |
 | `docs/future/rail-tab.md` | done 2026-08-28 | § "Slice 3: loaded-plugin descriptors, NOT BUILT" is deleted; the `core:task` annotation point supersedes it. |
 | `docs/third-party/README.md` | 5, 9 | § "Monaco does not fit in a frame, and that ends two migrations": the premise is removed; database and editor now have a path. § "Pick up work here" points at this folder. |
 | `docs/agent-tools.md` | 6, 8 | § "Context sections" notes `contextSectionSlots` is a slot; the tool renderer paragraph points at `agents:tool-card`. |
-| `docs/testing.md` | 0, 9 | § "Test layers" gains the kit invariants (support matrix, role mapping, no-class), the tree protocol fuzz, and the keyboard traversal test. § "The smoke checklist" gains keyboard-only traversal of every pane and the trust flow for a remote plugin. |
+| `docs/testing.md` | 0, 3 (partly, 2026-08-29), 9 | § "Test layers" gains the kit invariants (support matrix, role mapping, no-class), the tree protocol fuzz, and the keyboard traversal test. § "The smoke checklist" gained items 17 and 18 for a remote plugin's trust flow and its failure path; keyboard-only traversal of every pane is still owed. |
 | `docs/state.md` | 2 | § "Which mechanism holds a given fact" gains the focus and collection store (session-only). |
 | `docs/diff-rendering.md` | 4, 7 | § "Row geometry" and § "Review threads and state" gain the annotation draw site. |
 | `docs/features.md` | 9 | The pane list reflects layouts. |
-| `docs/managed-agents.md` | 8 | § "Client surfaces": the tool card is a slot; the composer has slots. |
+| `docs/managed-agents.md` | 3 (the tool card, 2026-08-29), 8 | § "Client surfaces": the tool card is a slot (done); the composer has slots. |
 | `docs/future/terminal.md` | done 2026-08-28 | § "The tier-2 rendering contract" and § "Decisions to carry forward" point at the tree, the kit's `tui` column, and the layouts' projections as the enabler. |
 | `docs/future/remote.md` | done 2026-08-28 | § "Mobile" points at layouts' narrow projections as what makes the subset shell cheap. |
 | `docs/future/compiled-tier.md` | done 2026-08-28 | § "The four couplings that need a designed seam": three of the four were component contributions and are now slots. Census updated. |

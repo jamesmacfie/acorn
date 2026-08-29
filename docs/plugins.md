@@ -692,7 +692,7 @@ seam is honest about the case where there is no agent session to draft into.
 
 A loaded plugin's UI is not registered by its own code. The Node hands each device the plugin's
 manifest and the hash of its client bundle in the roster (`GET /v2/core/plugins`); the device
-decides what to render from that, and the plugin's JavaScript never touches a shell registry. Two
+decides what to render from that, and the plugin's JavaScript never touches a shell registry. Five
 kinds of contribution come out of one manifest:
 
 - **Frames** — a pane, reference panel, settings page, project importer, or full-screen overlay picker
@@ -791,6 +791,32 @@ kinds of contribution come out of one manifest:
   `openLinkOnClick(bridge, event)` is the delegated anchor handler on top of it, so a frame does not
   hand-roll the plumbing; unlike the shell's equivalent it takes modified clicks too, because in a frame
   there is no browser default for cmd-click to preserve.
+- **Remote trees** — the second render path, and the one to reach for unless the surface genuinely owns
+  its pixels. A `contributions.remote` entry declares which host surface it fills, which renderer inside
+  the bundle draws it, and what it matches. The bundle runs in a Web Worker with no DOM and emits a
+  *tree*: names of the host's own components, with props, as a stream of mutations. The host mounts its
+  components for those names, so the result has the shell's focus handling, keyboard model, ARIA and the
+  reader's style pack, none of which an iframe can borrow. One target today, `agentToolRenderer`, keyed
+  by the tool name a harness reports.
+
+  An author writes the same code either way. `mountTree({ toolCard: … })` on `/ui/sdk` is the entry point
+  beside `mountFrame`, keyed by name because one worker serves every tree the bundle contributes and the
+  host has to say which; `contributions.remote[].entry` names a key. With a bundler,
+  `acorn-plugin-sdk/remote` is the Solid adapter and the components are ordinary JSX against
+  `@acorn/plugin-api/ui`; without one, `npm create acorn-plugin <name> -- --remote` emits a single file
+  that builds the same tree by hand.
+
+  What crosses is data, all the way down. A handler is an id the host mints a closure for, never a
+  function; text is a node, never a prop; `class`, `style` and every other door into the host's DOM are
+  dropped with a row on the plugin's page; a node name this build does not know draws a labelled
+  placeholder, which is the forward-compatibility rule above applied to drawing. A batch applies whole or
+  not at all, and a worker that stops answering is terminated with a placeholder in every tree it served.
+  The wire is `@acorn/protocol/tree/`, the host is `client-core/src/plugins/tree/`, and
+  `docs/shell.md § The plugin worker` has the sandbox.
+
+  Two things a tree is not for. Anything that must react per keystroke — a live filter over a large list,
+  a query editor with completions — is a message hop per key and should be a frame. And a surface whose
+  pixels are the product, an image editor or a charting library, is a frame by definition.
 - **Document surfaces** — a pane whose editor the **host** draws, with the plugin supplying only the
   document. A `pane` surface names a `layout` and fills its `regions`, and a region is either a
   host-drawn document or `"frame"`, the plugin's own bundle. `docs/panes.md` § Layout model lists

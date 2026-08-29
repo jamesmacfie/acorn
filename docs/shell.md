@@ -197,6 +197,42 @@ change renames the worker entry, the pattern stops matching, the worker falls ba
 policy, Oniguruma fails inside it, and `highlight/worker.ts` logs the failure and falls back to the
 main thread: degraded and loud, which is the failure mode this area was built to have.
 
+### The plugin worker
+
+A loaded plugin has a second way to draw. Instead of an iframe whose pixels it owns, its bundle can
+run in a dedicated Web Worker and emit a *tree*: names of the host's own components, with props, as a
+stream of mutations the renderer applies. The host mounts its components for those names, so what the
+reader gets has the shell's focus handling, keyboard model, ARIA and style pack, none of which an
+iframe can borrow. `docs/plugins.md` § Loaded plugins: the client half has the plugin-facing half;
+this section is the shell's.
+
+The worker script is the plugin's own bundle, served by `app_scheme.rs` at
+`app://acorn/plugin-worker/<sha256>.js` from the same content-addressed cache the plugin scheme reads.
+It is served from *this* origin rather than from `app-plugin://<hash>` because a worker script has to
+be same-origin with the document that starts it; there is no way to point `new Worker()` at another
+scheme. The hash in the path is validated as 64 lowercase hex digits before the read, so the path can
+name a bundle this device holds and nothing else, and a hash the cache does not hold is a 404 rather
+than a fall-through to the client root — a Worker handed the shell's `index.html` would be a strange
+failure to debug.
+
+The bytes are identical to what the frame origin serves as `/client.js`, and so is the trust decision:
+the owner accepted a bundle hash, and a worker is that hash with a different host. Nothing about the
+worker path asks a second question.
+
+Its policy is its own, for the reason the highlighter's is (above): a same-origin worker takes its CSP
+from its own script's response headers. `PLUGIN_WORKER_CSP` is
+`default-src 'none'; script-src 'self'; connect-src 'none'` — tighter than the highlighter's, with no
+`wasm-unsafe-eval`, because a plugin bundle is a stranger's code and nothing a tree draws needs one.
+`connect-src 'none'` is the load-bearing directive it shares with the frame origin: fetch, XHR,
+WebSocket and `sendBeacon` all fail inside the worker, so the transferred `MessagePort` is the only way
+out of it. The document's `worker-src` names `'self' blob:` and never the plugin scheme.
+
+The renderer's half is `packages/client-core/src/plugins/tree/`: `workerHost.ts` owns one worker per
+bundle hash, shared by every tree that bundle draws and stopped a grace period after the last one
+unmounts; `TreeHost.tsx` validates and applies each batch and is the only thing that turns a handler id
+into a function. A worker that misses two heartbeats is terminated and every tree it served shows a
+labelled placeholder.
+
 ### The renderer bridge
 
 `apps/desktop/src/shell/bridge.ts` is built as one IIFE and injected as the window's initialization
@@ -204,6 +240,12 @@ script, which runs before any page script. It assembles the narrow, validated `w
 the platform seam reads: broker request and response bytes, stream frames and status, fleet
 operations, lifecycle actions, folder selection, and the webview commands. It never exposes a node
 token, a certificate, a database handle, or a process object.
+
+The same bridge serves both render paths. `packages/client-core/src/plugins/frames/broker.ts` takes a `MessagePort` and knows
+nothing about where the other end is: an iframe gets one over `window.postMessage`, a plugin worker
+gets one in its first message, and `packages/client-core/src/plugins/frames/scopes.ts` decides every call the same way for both. A tree
+binding carries `target: 'remote'`, which grants nothing — it has no document, no webview and no modal
+to dismiss, so the verbs that gate on those refuse it.
 
 That surface is the implementation of the platform seam, and the renderer never reads it directly.
 `packages/client-core/src/platform/` is the only module allowed to touch the global, enforced by

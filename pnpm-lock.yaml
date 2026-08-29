@@ -530,6 +530,9 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../plugin-api
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

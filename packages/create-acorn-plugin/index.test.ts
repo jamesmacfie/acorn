@@ -50,6 +50,22 @@ it('emits a manifest the host parses, cross-field rules and all', () => {
   expect(result.ok ? null : result.reason).toBe(null)
 })
 
+it('emits a tree plugin the host parses too, under --remote', () => {
+  // The second render path (docs/future/layout/06-remote-tree.md). Same node half, same permissions,
+  // a different client half and a `remote` contribution instead of a frame.
+  const files = scaffoldFiles('my-widget', 'My widget', { remote: true }) as Record<string, string>
+  const manifest = JSON.parse(files['acorn-plugin.json']) as { contributions: Record<string, unknown> }
+  expect(manifest.contributions.frames).toBeUndefined()
+  expect(manifest.contributions.remote).toEqual([
+    { target: 'agentToolRenderer', id: 'my-widget.tool-card', entry: 'toolCard', tools: ['execute'] },
+  ])
+  const result = parsePluginManifest(manifest)
+  expect(result.ok ? null : result.reason).toBe(null)
+  // The entry the manifest names has to be one the bundle announces, or the host draws a placeholder
+  // and the author's first run is a mystery.
+  expect(files['client.js']).toContain("entries: ['toolCard']")
+})
+
 it('emits a node half that loads and satisfies the structural plugin check', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'scaffold-'))
   try {

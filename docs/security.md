@@ -345,8 +345,11 @@ rides beside the key as data, not something parsed back out of the copy.
 The threats this closes, and the ones it does not:
 
 - **A compromised or hostile paired Node serving malicious JavaScript** — hash-verified bytes, a
-  per-device acknowledgement that names the Node, and (phase 3) the sandboxed frame the bundle runs
-  in. Nothing a Node pushes runs unprompted.
+  per-device acknowledgement that names the Node, and (phase 3) the sandbox the bundle runs in.
+  Nothing a Node pushes runs unprompted. The sandbox is one of two, and the trust decision covers both
+  because both are the same bytes: the iframe at `app-plugin://<hash>` for a bundle that draws its own
+  pixels, and a Web Worker for one that draws a tree (`docs/shell.md § The plugin worker`). Neither
+  path asks a second question, and neither can start without an accepted hash.
 - **A Node lying in its listing** about hash, version or permissions — the hash is recomputed from the
   bytes. The permissions shown are the manifest as the Node's own loader read it; a Node that lies
   there also controls the bytes, so the containment rather than the disclosure is what bounds it.
@@ -568,9 +571,26 @@ permission check you can write around that.
 
 ### The containment ladder
 
-Each rung is real, additive, and independently shippable. The phases implement rung 1; rungs 2–3
-are the "Future work" node-sandbox entry, specified here so nothing in the shipped phases forecloses
-them.
+Each rung is real, additive, and independently shippable. Rung 0 is the client sandbox, already
+shipped; the phases implement rung 1; rungs 2–3 are the "Future work" node-sandbox entry, specified
+here so nothing in the shipped phases forecloses them.
+
+#### Rung 0 — The client sandbox (shipped)
+
+Before the node-side ladder starts, the client half of a loaded plugin is already contained, and there
+are two containers rather than one. A bundle that draws pixels runs in an iframe on its own
+hash-addressed origin under `plugin_scheme.rs`'s policy. A bundle that draws a tree runs in a Web
+Worker with no DOM at all, under `PLUGIN_WORKER_CSP` (`docs/shell.md § The plugin worker`). Both have
+`connect-src 'none'`, so the transferred `MessagePort` is the only way out, and both reach the host
+through the same broker, which decides every call from the manifest's scopes.
+
+The tree path is the stricter of the two, and worth stating as a security property rather than a UI
+one: the sandbox never produces markup. It produces names of the host's own components and props that
+are checked against the kit's role enums, so `class`, `style`, `innerHTML`, a raw URL and a function
+have nowhere to be. A prop that fails validation is dropped and the node still renders; a batch that
+fails is dropped whole and recorded; a node name this build does not know draws a labelled
+placeholder. What a worker that misbehaves can do to the surface around it is nothing — it is
+terminated and its trees show placeholders.
 
 #### Rung 1 — Permission-shaped context (phase 1, shipped with the loader)
 
