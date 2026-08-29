@@ -42,18 +42,6 @@
   --state-warn: var(--warn);
   --state-bad: var(--del-marker);
 
-  /* One colour per kind of composer token, each borrowed from the theme so Dracula's yellow and
-     Nord's cyan arrive for free rather than the composer naming hues no palette contains. Derived
-     rather than primitives because every primitive is required of a plugin-contributed theme
-     (pluginContract.ts), so growing that list would refuse every theme written before this line.
-     Red is left out: a skill nobody is worried about should not read as an error. A path takes the
-     accent, which is the palette's own identity colour — and in the two monochrome default themes
-     --accent is --text, so a file mention there reads as weight rather than colour, which is the
-     same thing every other accent-coloured surface does under those themes. */
-  --mention-file: var(--accent);
-  --mention-command: var(--warn);
-  --mention-skill: var(--add-marker);
-
   /* A brand's own colour, pulled toward the theme's foreground until it is readable on it. A brand hex
      is authored against white: OpenAI's #412991 sits at 1.7:1 on a dark pane, well under the 3:1 a
      glyph wants, and no single authored hex can clear both directions. 45% is the most brand that

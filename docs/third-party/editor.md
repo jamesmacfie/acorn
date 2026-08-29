@@ -130,7 +130,7 @@ plugin, and find-in-files stops being its own rail surface and becomes part of t
 `EDITOR` and `SEARCH` as "consumed elsewhere". **Checked: nothing outside `plugins/editor`
 consumes either.** They are internal route capabilities, the same shape as database's `DATABASE`.
 
-The only real cross-plugin edge is `plugins/agents/src/client/AgentMentionTextarea.tsx` importing
+The only real cross-plugin edge is `plugins/agents/src/client/worktreeFiles.ts` importing
 `editorFilesRoute` from `plugins/editor/src/contract/api.ts` to complete a path in an @-mention —
 which is `contract/`, the sanctioned mechanism, and survives the move untouched.
 

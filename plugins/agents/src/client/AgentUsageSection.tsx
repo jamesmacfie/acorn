@@ -1,23 +1,27 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
+import { Alert, Button, Facts, Icon, Inline, Section, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { agentUsageStore } from './usageStore'
 import { formatUpdated, providerUsageRows } from './usageModel'
-import { Button, DescriptionList, Icon, StatusDot } from '@acorn/plugin-api/ui'
 import { usageTone } from './stateTone'
-import './agent-usage.css'
 
+// What each harness's own plan has left, read off the provider's CLI rather than any acorn record
+// (docs/managed-agents.md § Plan usage). One block per provider: a health dot, whose account it is,
+// and the numbers as `Facts`.
 export default function AgentUsageSection(props: { showHeader?: boolean }) {
   onMount(() => onCleanup(agentUsageStore.init()))
 
+  const providers = () => agentUsageStore.snapshot()?.providers ?? []
+
   return (
-    <section class="agent-usage" aria-label="Agent provider usage">
+    <Stack gap="row">
       <Show when={props.showHeader !== false}>
-        <div class="agent-usage-head">
-          <span>Usage</span>
+        <Toolbar ariaLabel="Agent provider usage">
+          <Text emphasis="eyebrow">Usage</Text>
+          <Toolbar.Spacer />
           <Button
             variant="bare"
             size="sm"
             iconOnly
-            title="Refresh agent usage"
             label="Refresh agent usage"
             busy={agentUsageStore.refreshing()}
             disabled={agentUsageStore.refreshing()}
@@ -25,41 +29,33 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
           >
             <Icon name="refresh-cw" />
           </Button>
-        </div>
+        </Toolbar>
       </Show>
-      <Show when={agentUsageStore.error()}>
-        <div class="agent-usage-route-error" role="alert">{agentUsageStore.error()}</div>
-      </Show>
+      <Show when={agentUsageStore.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       <Show when={!agentUsageStore.snapshot() && agentUsageStore.loading()}>
-        <div class="agent-usage-loading muted">Reading local provider usage…</div>
+        <Text emphasis="muted">Reading local provider usage…</Text>
       </Show>
-      <For each={agentUsageStore.snapshot()?.providers ?? []}>
+      <For each={providers()}>
         {(provider) => (
-          <div class="agent-usage-provider">
-            <div class="agent-usage-provider-head">
-              <StatusDot tone={usageTone(provider.health)} />
-              <strong>{provider.label}</strong>
-              <Show when={provider.plan}><span class="agent-usage-plan">{provider.plan}</span></Show>
-              <span class="agent-usage-updated muted">
-                {provider.stale ? 'stale · ' : ''}{formatUpdated(provider.capturedAt)}
-              </span>
-            </div>
-            <Show when={provider.account?.email || provider.account?.organization}>
-              <div class="agent-usage-account muted">
-                {[provider.account?.email, provider.account?.organization].filter(Boolean).join(' · ')}
-              </div>
-            </Show>
-            <Show when={provider.error}>
-              {(error) => <div class="agent-usage-error" role="status">{error().message}</div>}
-            </Show>
-            <DescriptionList size="sm">
-              <For each={providerUsageRows(provider)}>
-                {(row) => <DescriptionList.Item label={row.label}>{row.value}</DescriptionList.Item>}
-              </For>
-            </DescriptionList>
-          </div>
+          <Section label={provider.label}>
+            <Stack gap="row">
+              <Inline wrap>
+                <StatusDot tone={usageTone(provider.health)} label={provider.health} />
+                <Text emphasis="strong">{provider.label}</Text>
+                <Show when={provider.plan}>{(plan) => <Text emphasis="muted">{plan()}</Text>}</Show>
+                <Text emphasis="muted">{provider.stale ? 'stale · ' : ''}{formatUpdated(provider.capturedAt)}</Text>
+              </Inline>
+              <Show when={provider.account?.email || provider.account?.organization}>
+                <Text emphasis="muted">
+                  {[provider.account?.email, provider.account?.organization].filter(Boolean).join(' · ')}
+                </Text>
+              </Show>
+              <Show when={provider.error}>{(error) => <Alert tone="warn">{error().message}</Alert>}</Show>
+              <Facts size="sm" items={providerUsageRows(provider).map((row) => ({ label: row.label, value: row.value }))} />
+            </Stack>
+          </Section>
         )}
       </For>
-    </section>
+    </Stack>
   )
 }

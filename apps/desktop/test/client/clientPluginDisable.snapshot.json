@@ -31,6 +31,9 @@
       "drawer/terminal.drawer"
     ],
     "extensionPoints": [
+      "agents:tool-card",
+      "agents:attachment",
+      "agents:composer-actions",
       "changes:diff-line",
       "context:section",
       "docker:stats-beside",

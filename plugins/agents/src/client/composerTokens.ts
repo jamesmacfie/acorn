@@ -80,24 +80,6 @@ export function composerSegments(
 }
 
 /**
- * How far to scroll a suggestion list so the row the keyboard is on is fully inside it. Zero when
- * the row already fits, negative to reveal a row above, positive for one below.
- *
- * Edges rather than indexes and row heights, because a row is one or two lines depending on whether
- * the thing it names has a description, so the nth row is not at n times anything. Its own scrollTop
- * rather than `scrollIntoView`, which is free to scroll every ancestor as well and would drag the
- * transcript behind the composer.
- */
-export function scrollDeltaFor(
-  list: { top: number; bottom: number },
-  row: { top: number; bottom: number },
-): number {
-  if (row.top < list.top) return row.top - list.top
-  if (row.bottom > list.bottom) return row.bottom - list.bottom
-  return 0
-}
-
-/**
  * Commands or skills worth offering for what has been typed after `/` or `$`. Ranked by the name,
  * because that is what is being typed, but a description match still qualifies: someone reaching for
  * the review command may type `/diff` before remembering what it is called.

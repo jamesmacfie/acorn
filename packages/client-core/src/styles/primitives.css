@@ -160,6 +160,24 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 }
 .ui-spinner[data-size='md'] { font-size: var(--fs-md); }
 
+/* ── Icon ───────────────────────────────────────────────────────────────────────────────────
+   Two things a mark says beyond its shape, and neither is expressible at a call site that may not
+   write a class: what it means, and whether it is moving. See ui/Icon.tsx. */
+.ui-icon { flex: none; }
+.ui-icon[data-tone='neutral'] { color: var(--text); }
+.ui-icon[data-tone='muted'] { color: var(--text-muted); }
+.ui-icon[data-tone='accent'] { color: var(--accent); }
+.ui-icon[data-tone='ok'] { color: var(--state-ok); }
+.ui-icon[data-tone='warn'] { color: var(--state-warn); }
+.ui-icon[data-tone='danger'] { color: var(--state-bad); }
+/* A brand's own colour, pulled toward the theme's foreground until it is readable on it. `--brand`
+   is set per element by Icon from the mark's registered colour, because core cannot know a third
+   party's hex (docs/ui-design.md § Brand colour). */
+.ui-icon[data-tone='brand'] { color: var(--brand-legible); }
+/* No reduced-motion guard, unlike `.spin`: on a state icon the turn is the whole signal that
+   something is running, and a 12px rotation is not the motion that setting exists to stop. */
+.ui-icon[data-spin] { animation: spin 1s linear infinite; }
+
 /* ── SectionHeader ──────────────────────────────────────────────────────────────────────────
    See docs/ui-design.md § How the kit is built for why the base rule lives here rather
    than in shell.css (plugins/http/src/frame/http.css says the same about .settings-hint). */
@@ -973,6 +991,77 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-composer .ui-input { width: 100%; resize: vertical; }
 .ui-composer-hint { font-size: var(--fs-2xs); }
 
+/* ── MentionTextarea ────────────────────────────────────────────────────────────────────────
+   A field that completes what is typed after a sigil, and colours what it has completed.
+
+   The mirror and the field are the same box drawn twice: one paints colour, the other takes the
+   typing. Every property that decides where a glyph lands is declared for both, because the two
+   drifting apart is the only way this technique fails. `display: block` is one of them: left
+   inline, the field leaves a descender gap under itself, the mirror inherits that gap through
+   `inset: 0`, and the taller box runs out of scroll a few pixels early — scrolled to the bottom the
+   mirror then sits below the caret. */
+.ui-mentionfield {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--input-bg);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+}
+.ui-mentionfield:focus-within { border-color: var(--accent); }
+.ui-mentionfield > .ui-input,
+.ui-mentionfield-mirror {
+  display: block;
+  width: 100%;
+  padding: var(--space-5);
+  font: inherit;
+  line-height: var(--lh);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.ui-mentionfield > .ui-input { color: var(--text); background: transparent; border: 0; outline: 0; }
+.ui-mentionfield-mirror {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--text);
+}
+.ui-mentionfield[data-mirrored] > .ui-input { color: transparent; caret-color: var(--text); }
+/* Left at the browser default, a selection paints an opaque band over the mirror and the coloured
+   text vanishes while it is selected. */
+.ui-mentionfield[data-mirrored] > .ui-input::selection {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+/* The mirror is inert apart from its tokens, which take the pointer so one can be hovered for its
+   description. The span's own mousedown hands the caret back to the field. */
+.ui-mentionfield-token { font-weight: var(--fw-medium); pointer-events: auto; cursor: default; }
+.ui-mentionfield-token[data-tone='accent'] { color: var(--accent); }
+.ui-mentionfield-token[data-tone='ok'] { color: var(--state-ok); }
+.ui-mentionfield-token[data-tone='warn'] { color: var(--state-warn); }
+.ui-mentionfield-token[data-tone='danger'] { color: var(--state-bad); }
+.ui-mentionfield-token[data-tone='muted'] { color: var(--text-muted); }
+/* Anything drawn inside the box rather than above it, on the code block's rule: an expand toggle
+   belongs over the text it grows, not on a line of its own that the mirror would then be offset by. */
+.ui-mentionfield > .ui-btn { position: absolute; top: var(--space-2); right: var(--space-2); z-index: var(--z-base); }
+/* The surface only: the rows inside are PickerRow, so this list and a Picker's are the same list.
+   Anchored above the box rather than portalled, because it follows a caret in a field that is
+   already the right width. */
+.ui-mentionfield-list {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: var(--space-3);
+  z-index: var(--z-picker);
+  width: min(520px, calc(100% - var(--space-6)));
+  background: var(--bg);
+  border: var(--control-border);
+  box-shadow: var(--shadow-popover);
+}
+.ui-mentionfield-list .repo-picker-list { max-height: 280px; }
+.ui-mentionfield-list > p { margin: 0; }
+
 /* ── DocumentTabs ───────────────────────────────────────────────────────────────────────────
    The closable tab strip. Overflow scrolls rather than squishing, which is the terminal strip's
    behaviour and the right one: a squished tab shows no filename at all. */
@@ -1117,6 +1206,10 @@ a.ui-row:hover { background: var(--bg-hover); }
 /* Beside the label, before the actions: a fact about the fold rather than a control on it. */
 .ui-fold-meta { flex: none; display: flex; align-items: center; min-width: 0; }
 
+/* `follow`: the timeline owns the scroll and stays on the newest turn. The scroller is a box of
+   its own rather than the list, because the follow machinery watches the list grow and a scroller
+   observing itself never resizes (ui/Timeline.tsx). */
+.ui-timeline-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .ui-timeline { display: flex; flex-direction: column; gap: var(--gap-stack); min-width: 0; }
 .ui-timeline-turn { display: block; min-width: 0; }
 /* The rule between turns, not around them: a border on the turn itself would draw one under the

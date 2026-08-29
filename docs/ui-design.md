@@ -143,16 +143,14 @@ adding one is a one-line change rather than a 12-block edit. A theme block, incl
 plugin-contributed one, is refused if it restates a derived token: the refusal is only correct while
 these stay one-place references.
 
-`--mention-file`, `--mention-command` and `--mention-skill` are the colours the agent composer draws
-its three kinds of token in: `var(--accent)`, `var(--warn)` and `var(--add-marker)`. They are derived
-for a second reason: a palette primitive is required of every plugin theme, so adding three there
-would refuse every theme written before them. Each borrows a palette colour rather than naming a hue
-of its own, so a theme lends its own — Dracula's yellow, Nord's cyan. `--del-marker` is deliberately
-unused: a skill nobody is worried about should not read as an error. A file mention takes the accent,
-which means it reads as weight rather than colour under the two monochrome default themes, where
-`--accent` is `--text`; that is what every other accent-coloured surface does there too. Promote them
-to primitives when a theme wants mention colours separate from its accent and status colours, and
-expect that to be a breaking manifest change.
+`--brand-legible` is the same idea for a mark's own colour: derived, because a palette primitive is
+required of every plugin theme and adding one there would refuse every theme written before it.
+
+The agent composer used to have three derived tokens of its own for the colours it draws `@file`,
+`/command` and `$skill` in. It has none now: the field is `MentionTextarea`, a caller hands it
+`segments` with a role token per run, and the kit maps `accent`, `warn` and `ok` to the theme the same
+way it does everywhere else. That is the closed kit's rule arriving where a plugin's stylesheet used
+to be — a plugin names a meaning, never a colour.
 
 Three more tokens are colour but fit neither category: `--viz-series-1`, `--viz-series-2`, and
 `--viz-series-3` identify "which one" on a chart rather than describing status, so they are real
@@ -354,6 +352,16 @@ rather than `onSelectRow`. A name outside the eleven — `onInput`, `onKeyDown`,
 in the shell and is dropped on the way to a sandbox, which is the honest answer: a terminal host has
 no paste event to deliver.
 
+**Behaviour a pane keeps redoing becomes a node's prop.** Three arrived with the agents pane, and each
+replaced a copy of the same machinery in a plugin. `Timeline follow` makes the timeline the scroller
+and keeps it on the newest turn until the reader scrolls away, with the place they left held per
+`viewKey`; the transcript had 80 lines of that and github's conversation will want it too. `Card focus`
+puts the reader on one card, which is the same argument that made collection state the host's: a pane
+told "show this item" holds a key and nothing else, and the kit gives it no class and no id to select
+on. `Rows` hands back the same item object for an unchanged key, so a list rebuilt from a live store
+reconciles instead of remounting, which is what used to replace a row several times a second while an
+agent was fanning out.
+
 **A prop that has to hold an element has a data form beside it.** `ListDetail`'s `list` prop cannot
 cross, so `ListColumn` and `DetailColumn` are children; `Picker`'s `results(query)` callback cannot, so
 `items` is a list it filters itself; `DescriptionList.Item` children cannot, so `Facts` takes
@@ -397,6 +405,14 @@ layout programme inverts them; see [layout](./future/layout/README.md).
 3. An **unmatched name renders as text** in a `span.glyph`. That fallback is load-bearing rather
    than a nicety — the remaining inline literals (◆/◇ pin state, ⊘/◉ hidden) ride it, which is also
    why `--font-glyph` survives the brand marks leaving.
+
+`Icon` takes two more props, and both are things a call site could not say without a class. `tone`
+is a role token, so a state mark is coloured the way every other kit node is coloured;
+`tone="brand"` asks the registry for the mark's own colour and holds it to the theme's contrast
+through `--brand-legible`, which is how a provider's mark is drawn wherever a surface names the
+provider. `spin` turns the mark, for a state that is in flight. It carries no reduced-motion guard,
+unlike `.spin`: on a state icon the turn is the whole signal that something is running, and a 12px
+rotation is not the motion that setting exists to stop.
 
 The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
 names before and will again) and so brand marks stay out of `ICON_NAMES`, which `ui/IconPicker.tsx`

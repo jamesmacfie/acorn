@@ -43,7 +43,11 @@ export { tip } from '@acorn/client-core/ui/tips.tsx'
 // Arm-to-confirm exists because a sandboxed frame's `window.confirm` silently returns false.
 export { createArmedConfirm } from '@acorn/client-core/ui/confirm.ts'
 export { default as CopyButton } from '@acorn/client-core/ui/CopyButton.tsx'
+// The field that completes what is typed after a sigil and colours what it has completed. `mentions`
+// is the short form (one list of logins after `@`); `sources` and `segments` are the general one, and
+// what the agents composer's `@file` / `/command` / `$skill` draft is written against.
 export { default as MentionTextarea } from '@acorn/client-core/ui/MentionTextarea.tsx'
+export type { MentionSegment, MentionSource, MentionSuggestion } from '@acorn/client-core/ui/MentionTextarea.tsx'
 export { Modal, ModalActions, ModalBody } from '@acorn/client-core/ui/Modal.tsx'
 export { Tabs, TabPanel } from '@acorn/client-core/ui/Tabs.tsx'
 export type { TabDef } from '@acorn/client-core/ui/Tabs.tsx'

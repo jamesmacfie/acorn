@@ -1,4 +1,4 @@
-// Whether the transcript should still be glued to the bottom after a scroll event.
+// Whether a followed Timeline should still be glued to the bottom after a scroll event.
 //
 // Position alone cannot answer that. When the list shrinks, because a card collapsed or re-rendered
 // shorter, the browser clamps scrollTop and fires a scroll event that by position is indistinguishable

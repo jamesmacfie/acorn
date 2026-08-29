@@ -92,10 +92,12 @@ should still land first-party.
 core (or the shell in front of it) with a hole it cannot degrade around. These are the `required`
 plugins: they cannot be disabled, so they cannot be optional, so they cannot be third-party.
 
-**E. Registries with no manifest form** — `persistedStateSlices`, `agentToolRenderers`, non-`footer`
-component slots, and the generic `ctx.contribute(registry, entry)` escape hatch. These take
-functions or components. Some are inherently first-party (B); others simply have no declarative
-equivalent yet, which is a gap rather than a law — noted per row where that is the case.
+**E. Registries with no manifest form** — `persistedStateSlices`, non-`footer` component slots, and
+the generic `ctx.contribute(registry, entry)` escape hatch. These take functions or components. Some
+are inherently first-party (B); others simply have no declarative equivalent yet, which is a gap
+rather than a law — noted per row where that is the case. `agentToolRenderers` was on this list and
+is not: a tool card is `agents:tool-card`, an ordinary `remote` point, so a loaded plugin declares
+one in its manifest like any other extension (docs/contribution-kinds.md).
 
 **F. Constructor arguments from the composition root** — the `NodePluginDeps` bag in
 `apps/node/src/server/plugins.ts`. A loaded plugin is activated by the loader from its manifest and

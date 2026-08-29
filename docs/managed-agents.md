@@ -145,6 +145,30 @@ be tested against what the harness actually sent.
 
 ## Client surfaces
 
+The Agent pane is a `list-detail` layout (docs/panes.md § Layout model). The list column is the task's
+roster, with a header region of its own so the count stays put while the list scrolls; the detail
+column is the open session. Nothing in the plugin lays anything out and nothing in it ships a
+stylesheet: every surface here is a tree of kit nodes, so the same source draws in the shell today and
+through the remote root when a harness plugin is loaded rather than compiled
+(docs/ui-design.md § The closed kit).
+
+The detail column has a header, a transcript and a composer without a second set of regions. The
+transcript is a `Timeline` with `follow` set, which means the kit owns the scroll: it stays on the
+newest turn until the reader scrolls away from it, picks the bottom up again when they scroll back,
+and gives a reader the place they left when they come back to a session. The bar above it and the
+composer below it are pinned by being that scroller's siblings.
+
+The timeline is not virtualised, and that is the kit's rule rather than this pane's. The virtualizer
+this transcript used to run called `measure()` on every new event, which clears the item size cache,
+so every row fell back to the estimate, the canvas height jumped, and the rows re-measured, on every
+event. It also rebuilt its rows from `getVirtualItems()`, which hands back fresh objects on each
+scroll, replacing the DOM under any text selection. If a session ever feels slow to open, render the
+last N behind a "show earlier" control: a fixed window has no measurement feedback loop. Two more
+guardrails hold in the same place. A card seeds its fold state at mount and then leaves it alone, so
+a call finishing does not slam its card shut, and the sidebar's rows are keyed by session id rather
+than by object identity, so the roster rebuilding on every socket frame does not replace the row
+somebody is reading.
+
 - Agent Center aggregates sessions, search, provider health, attention, transcript import, and launch.
 - A provider draws as its own mark wherever it is named: the onboarding cards, the New picker, each
   block in Settings -> Agent defaults, and the session icon in Agent Center. The name comes off the
@@ -231,14 +255,14 @@ be tested against what the harness actually sent.
   out. The composer is hidden while a subagent's run is showing: it only ever addresses the session, so
   leaving it there would read as a way to reply to the subagent, which neither harness offers. The draft
   is held per session outside the component, so stepping in and back does not lose typed text.
-- The composer draws `@file`, `/command` and `$skill` each in its own theme colour
-  (`--mention-file`, `--mention-command`, `--mention-skill`). A textarea cannot colour part of
-  its own value, so a `<pre>` mirrors the draft over it and the textarea's own text is transparent;
-  the two share every property that decides where a glyph lands, and above 20,000 characters the
-  mirror is dropped and the textarea paints itself. A command or skill is coloured only when the
-  session advertises that name, so `9/11` stays prose and a misspelled `/reviw` stays visibly plain.
-  File mentions come from the same walk that builds the turn's file parts, so what is coloured is what
-  is sent.
+- The composer's field is the kit's `MentionTextarea`. It draws `@file`, `/command` and `$skill` in
+  three role tones, `accent`, `warn` and `ok`, which the theme maps the same way it maps every other
+  tone; the composer names a meaning per run of text and never a colour. A textarea cannot colour part
+  of its own value, so a `<pre>` mirrors the draft over it and the field's own text is transparent. The
+  two share every property that decides where a glyph lands, and above 20,000 characters the mirror is
+  dropped and the field paints itself. A command or skill is coloured only when the session advertises
+  that name, so `9/11` stays prose and a misspelled `/reviw` stays visibly plain. File mentions come
+  from the same walk that builds the turn's file parts, so what is coloured is what is sent.
 - Typing any of the three sigils opens the same dropdown: `@` lists worktree files, `/` the commands
   and `$` the skills the session advertises. Rows are `PickerRow`, the row the context picker draws,
   so a name sits over its description rather than sharing a line with it. The list scrolls once it
@@ -249,12 +273,19 @@ be tested against what the harness actually sent.
 - Hovering a coloured command or skill shows its description, through the app's `data-tip` tooltip.
   The mirror is inert except for those spans, which take the pointer and hand the caret straight back
   to the textarea on mousedown, so clicking a token still puts the cursor where it was clicked.
-- ⌘⇧↩, or the expand button in the corner of the box, lays the composer over the detail column at full
-  height, which is the same chord the shell uses to maximise a pane and the nearest meaning it has
-  while the caret is in a textarea. It is not a registered keybinding, because a task-scoped binding
-  never fires from inside a typing target and a rebindable row that did nothing would be a lie. The
-  transcript is covered rather than collapsed, so it keeps its scroll position, and the state is
-  session-only and per composer.
+- ⌘⇧↩, or the expand button in the corner of the box, grows the field from three rows to eighteen. It
+  is the same chord the shell uses to maximise a pane and the nearest meaning it has while the caret is
+  in a textarea. It is not a registered keybinding, because a task-scoped binding never fires from
+  inside a typing target and a rebindable row that did nothing would be a lie. The transcript yields
+  the height and keeps its place, because the timeline is the scroller and shrinking it does not move
+  what it is following. The state is session-only and per composer.
+- **The composer has two more slots.** `agents:attachment` decides how one attachment on an unsent
+  turn is drawn, keyed by its media type and in `replace` mode, so a plugin that knows more about a
+  `.png` than a chip can say draws it instead and one attachment is still exactly one chip.
+  `agents:composer-actions` is room in the action bar beside Attach and the two pickers, in `stack`
+  mode with a ceiling of four, because several plugins with something to offer a draft is a real
+  answer for a toolbar. Both follow the same four rules as every other point
+  (docs/plugins.md § Cooperative extension points).
 - Changing a provider config option — the model, the reasoning level, the permission profile — writes
   a row into the transcript, so reading back a session shows where the switch happened rather than
   leaving every later turn to be read under whatever the setting is now. The switch also becomes the
