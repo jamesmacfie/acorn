@@ -42,7 +42,7 @@ const row = (name: string, declared: Partial<PluginContributions> = {}, over: Pa
 // The host: a plugin with a pane and a point drawn under it.
 const HOST_PLUGIN: Partial<PluginContributions> = {
   frames: [{ target: 'pane', id: 'board', label: 'Board', glyph: 'kanban', order: 500, formFactor: ['desktop'] }],
-  extensionPoints: [{ id: 'card-links', label: 'Linked items', location: 'pane.footer', surface: 'board' }],
+  extensionPoints: [{ id: 'card-links', label: 'Linked items', kind: 'rows', location: 'pane.footer', surface: 'board', max: 4 }],
 }
 
 // The guest: a plugin that fills the host's point from a route of its own.
@@ -101,7 +101,7 @@ describe('cooperative extension points', () => {
       ],
     })
 
-    const items = await extensionDeliveries('board:card-links')[0]!.fetch(new AbortController().signal)
+    const items = await extensionDeliveries('board:card-links')[0]!.fetch!(new AbortController().signal)
     expect(readJson).toHaveBeenCalledWith('/v2/p/tracker/board-issues', expect.objectContaining({ nodeId: 'node-a' }))
     expect(items).toEqual([{ id: 'ACO-1', title: 'Fix the thing', subtitle: 'in review', badge: '3' }])
   })
@@ -186,7 +186,7 @@ describe('cooperative extension points', () => {
   it('refuses a point hung off a surface its own manifest does not declare', () => {
     _seedPluginDistribution([['node-a', [row('board', {
       frames: HOST_PLUGIN.frames!,
-      extensionPoints: [{ id: 'ghost', label: 'Ghost', location: 'pane.footer', surface: 'not-a-surface' }],
+      extensionPoints: [{ id: 'ghost', label: 'Ghost', kind: 'rows', location: 'pane.footer', surface: 'not-a-surface', max: 4 }],
     })]]])
     syncChromeContributions()
     expect(pointIds()).toEqual([])
@@ -197,7 +197,7 @@ describe('cooperative extension points', () => {
     // enough for an author to see, rather than coerced into the one location that does exist.
     _seedPluginDistribution([['node-a', [row('board', {
       frames: HOST_PLUGIN.frames!,
-      extensionPoints: [{ id: 'future', label: 'Future', location: 'pane.header', surface: 'board' }],
+      extensionPoints: [{ id: 'future', label: 'Future', kind: 'rows', location: 'pane.header', surface: 'board', max: 4 }],
     })]]])
     syncChromeContributions()
     expect(pointIds()).toEqual([])

@@ -521,7 +521,7 @@ function acceptTreePort(port: MessagePort | null): void {
  *
  * Keyed by entry name rather than the single callback the design sketched, because one worker serves
  * every tree its bundle contributes (a tool card per call, a section per tray) and the host has to say
- * which. The manifest's `contributions.remote[].entry` names a key here; a name with no key is a
+ * which. The manifest's `contributions.extensions[].remote` names a key here; a name with no key is a
  * placeholder and a roster row, not a crash.
  *
  * ```ts

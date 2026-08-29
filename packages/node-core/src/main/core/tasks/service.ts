@@ -9,7 +9,6 @@ import { schema } from '../../../server/db'
 import { broadcastStatus, broadcastTasksChanged } from '../../notify'
 import { loadTask, projectForTask, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../../taskWorktree'
 import { normalizeGithubPart } from '../../projects'
-import type { CapabilityRegistry } from '../../../server/plugin/capabilities'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
 // because it is a CoreServices return value rather than an internal helper's.
@@ -119,7 +118,7 @@ export type TaskService = {
   cancel(taskId: string): Promise<void>
 }
 
-export function createTaskService(db: AppDatabase, capabilities?: Pick<CapabilityRegistry, 'get'>): TaskService {
+export function createTaskService(db: AppDatabase): TaskService {
   return {
     adoptPullNumbers: async (repoOwner, repoName, branchToPull) => {
       if (!branchToPull.size) return 0
@@ -155,9 +154,9 @@ export function createTaskService(db: AppDatabase, capabilities?: Pick<Capabilit
       const row = await loadTask(db, taskId)
       return row && toTaskRef(row)
     },
-    root: (taskId, userId = null) => taskRoot(db, taskId, userId, capabilities),
-    resolveCwd: (task, baseCheckout, userId = null) => resolveTaskCwd(db, task, baseCheckout, userId, capabilities),
-    runConfig: (taskId) => taskRunConfig(db, taskId, capabilities),
+    root: (taskId, userId = null) => taskRoot(db, taskId, userId),
+    resolveCwd: (task, baseCheckout, userId = null) => resolveTaskCwd(db, task, baseCheckout, userId),
+    runConfig: (taskId) => taskRunConfig(db, taskId),
     active: () => db.select(TASK_REF_COLUMNS).from(schema.tasks).where(eq(schema.tasks.status, 'active')),
     workspaceId: (taskId) => workspaceIdFor(db, taskId),
     // Built from the same two queries as `workspaceIdFor` rather than by catching its throw, because

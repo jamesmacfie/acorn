@@ -11,6 +11,9 @@ import { savePref } from '../settings/savePref'
 import { EmptyState } from '../ui/primitives'
 import { DiffCanvas } from './DiffCanvas'
 import { FileHead, type LineComposerController, type ThreadCollapseController } from '../ui/diff/DiffRows'
+import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
+import { AnnotationMarks } from '../plugins/annotations/AnnotationMarks'
+import { annotationSignature, annotationsFor, requestAnnotations } from '../plugins/annotations/annotations'
 import { DiffToolbar } from './DiffToolbar'
 import { createDiffFindController } from './findController'
 import { createDiffHydrator } from '../ui/diff/hydration'
@@ -55,14 +58,56 @@ import { createDiffMeasureSchedulers, createDiffVirtualizer } from '../ui/diff/v
 const HIGHLIGHT_MAX_PATCH_CHARS = 120_000
 const HIGHLIGHT_MAX_PATCH_LINES = 2_000
 
+/**
+ * One code row, as an annotation key.
+ *
+ * The three fields the two diff owners declare (`{ file, line, side }`) and the one string the host
+ * mints its lookup from. `side` is the row's own kind rather than the view mode: a contributor marking
+ * "line 42 as it will be" means the new side whether the reader is in split or unified.
+ */
+const annotationKey = (row: CodeRow): PluginAnnotationKey => ({
+  file: row.path,
+  line: (row.kind === 'delete' ? row.oldNo : row.newNo) ?? 0,
+  side: row.kind === 'delete' ? 'old' : 'new',
+})
+
 const rejectUnsupported = async () => {
   throw new Error('Not supported here.')
 }
 
-export function DiffPane(props: { source: DiffSource }) {
+export function DiffPane(props: {
+  source: DiffSource
+  /**
+   * The qualified id of an `annotation` extension point this pane draws marks for, when its owner
+   * declared one (docs/plugins.md § Cooperative extension points).
+   *
+   * A prop rather than something the source supplies, because the marks are drawn inside the
+   * virtualized row and their height has to be measured with the row's — that is this component's
+   * business, not a source's. The two owners are the changes pane and the GitHub pane, and each names
+   * its own point.
+   */
+  annotations?: string
+}) {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
-  const source = () => props.source
+  // Marks compose with whatever the source already draws under a row: the changes pane's review notes
+  // and a coverage plugin's marks appear together, in that order, because the source's own annotation
+  // is the one the person using the pane wrote.
+  const annotatedSource = createMemo<DiffSource>(() => {
+    const point = props.annotations
+    const base = props.source
+    if (!point) return base
+    return {
+      ...base,
+      lineExtra: (row) => [
+        base.lineExtra?.(row),
+        <AnnotationMarks point={point} itemKey={annotationKey(row)} />,
+      ],
+      hasLineExtra: (row) => (base.hasLineExtra?.(row) ?? false) || annotationsFor(point, annotationKey(row)).length > 0,
+      lineExtraSignature: () => `${base.lineExtraSignature?.() ?? ''}\u0000${annotationSignature(point)}`,
+    }
+  })
+  const source = () => annotatedSource()
   const files = () => source().files() ?? []
   const filesSignature = createMemo(() => source().signature())
   const contentSignature = createMemo(() => source().contentSignature?.() ?? filesSignature())
@@ -163,6 +208,16 @@ export function DiffPane(props: { source: DiffSource }) {
   ))
 
   const rows = createMemo<Row[]>(() => buildRenderableRows(parsed(), source().threads?.(), expanded(), collapsedFiles()))
+
+  // Every code row on screen, asked about in one request per contributor rather than one per line. The
+  // effect re-runs when the rows do; `requestAnnotations` compares the key set and does nothing when it
+  // has already asked, so a scroll or a thread toggle costs a string compare (plugins/annotations).
+  createEffect(() => {
+    const point = props.annotations
+    if (!point) return
+    requestAnnotations(point, rows().flatMap((row) => (isCodeRow(row) ? [annotationKey(row)] : [])))
+  })
+
   const rowKeys = createMemo(() => rowIdentityKeys(rows()))
   const maxCols = createMemo(() => maxLineCols(rows()))
 

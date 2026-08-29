@@ -31,9 +31,10 @@ import { allowApi, isApiMethod, type ApiMethod } from './scopes'
 export type FrameBinding = {
   pluginId: string
   // The contribution id this frame renders, and which registry it landed in. `remote` is the tree
-  // path: the same bridge, over a worker port instead of a frame’s.
+  // path: the same bridge, over a worker port instead of a frame’s. `inline` is a rectangle standing
+  // in another plugin's pane, which grants it nothing of that plugin's (@acorn/protocol/pluginBridge.ts).
   surface: string
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote' | 'inline'
   nodeId: string
   taskId?: string
   projectId?: string

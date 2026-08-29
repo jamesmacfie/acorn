@@ -170,6 +170,13 @@ export async function commitStaged(worktree: string, message: string): Promise<G
   return run(worktree, ['commit', '-m', msg])
 }
 
+/** The branch a hook payload names. Empty on a detached head, which is a real answer: a handler
+ *  keyed on branch names has nothing to say about one that has none. */
+export async function branchOf(worktree: string): Promise<string> {
+  const branch = await gitText(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: worktree, timeoutMs: 15_000 }).catch(() => '')
+  return branch === 'HEAD' ? '' : branch
+}
+
 export async function pushBranch(worktree: string): Promise<GitActionResult> {
   return run(worktree, ['push', '--set-upstream', 'origin', 'HEAD'])
 }

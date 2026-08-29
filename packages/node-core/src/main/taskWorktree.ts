@@ -14,7 +14,7 @@ import { getProject, type ProjectRow } from './projects'
 import { getProjectConfig } from './projectConfig'
 import { copyWorktreeFiles, ensureWorktree, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
 import { broadcastHeadChanged, broadcastTasksChanged } from './notify'
-import { capabilityId, type CapabilityRegistry } from '../server/plugin/capabilities'
+import { runHook } from '../server/plugin/hooks'
 import { BridgeError } from '../server/bridge'
 
 // Set once by registerTerminalIpc, where workspace worktrees are created (docs/workspaces-and-tasks.md).
@@ -185,12 +185,12 @@ export async function projectForTask(db: AppDatabase, t: Pick<TaskRef, 'projectI
 }
 
 // Fired once per task, right after its worktree is first created and configured files are copied.
-// The terminal plugin owns the implementation; core owns this choke point and resolves the hook from
-// the per-runtime registry passed by the caller. This avoids a process-global callback surviving one
-// runtime into the next.
-export type WorktreeCreatedHook = (task: TaskRef, cwd: string) => Promise<void>
-export const WORKTREE_CREATED = capabilityId<WorktreeCreatedHook>('core.taskWorktreeCreated')
-type CapabilityReader = Pick<CapabilityRegistry, 'get'>
+//
+// A hook rather than a capability since phase 4 of the layout programme (server/plugin/hooks.ts,
+// docs/plugins.md § Hooks). It used to be one typed slot the terminal plugin filled, which meant one
+// plugin could run setup and a second had nowhere to say so. The choke point is still core's; what
+// changed is that any number of packages may take a turn here, in the owner's order, each bounded and
+// each recorded on its own roster row when it fails.
 
 // The task's worktree must still be a live worktree ON the task's branch. Throws rather than
 // degrading: every path that resolves a cwd is about to run something in it.
@@ -205,7 +205,6 @@ export async function resolveTaskCwd(
   t: TaskRef | undefined,
   baseCheckout: string | undefined,
   userId: string | null = null,
-  capabilities?: CapabilityReader,
 ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }> {
   const project = t ? await projectForTask(db, t) : null
   const projectRoot = project?.path && isDir(project.path) ? project.path : undefined
@@ -251,7 +250,10 @@ export async function resolveTaskCwd(
     broadcastTasksChanged()
     if (wt.created) {
       await copyConfiguredFiles(db, t, checkout, wt.path)
-      await capabilities?.get(WORKTREE_CREATED)?.(t, wt.path).catch((e) => console.warn('[worktrees] created-hook failed:', e))
+      // Awaited, not fired and forgotten: setup runs real commands in this worktree and the terminal
+      // that opens next expects to find them done. The chain runner bounds each handler, so an
+      // interceptor that hangs delays this by its own timeout and no longer.
+      await runHook('core:worktree-created', { taskId: t.id, path: wt.path })
     }
     return { cwd: wt.path, isWorktree: true, created: wt.created }
   })()
@@ -266,7 +268,7 @@ export async function resolveTaskCwd(
 // The on-disk root the editor/local-git panes operate on: the task's worktree (created lazily,
 // like the terminal), or null if the repo has no mapped checkout yet. Re-derived per IPC call so
 // the task id, not a renderer-supplied absolute path, is the capability.
-export async function taskRoot(db: AppDatabase, taskId: string, userId: string | null = null, capabilities?: CapabilityReader): Promise<string | null> {
+export async function taskRoot(db: AppDatabase, taskId: string, userId: string | null = null): Promise<string | null> {
   const t = await loadTask(db, taskId)
   if (!t) return null
   const project = await projectForTask(db, t)
@@ -276,7 +278,7 @@ export async function taskRoot(db: AppDatabase, taskId: string, userId: string |
   // worktree becomes null here rather than an exception through every editor/changes/db read. The
   // loud path is the one that spawns a session in it.
   try {
-    const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId, capabilities)
+    const { cwd } = await resolveTaskCwd(db, t, baseCheckout, userId)
     return resolve(cwd)
   } catch (e) {
     console.warn('[worktrees] no usable worktree for task', taskId, '-', e instanceof Error ? e.message : e)
@@ -335,7 +337,6 @@ export async function repoFor(db: AppDatabase, taskId: string): Promise<string> 
 export async function taskRunConfig(
   db: AppDatabase,
   taskId: string,
-  capabilities?: CapabilityReader,
 ): Promise<{ targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] } | { error: string }> {
   const t = await loadTask(db, taskId)
   if (!t) return { error: 'Task not found.' }
@@ -344,7 +345,7 @@ export async function taskRunConfig(
   if (!baseCheckout) return { error: 'No checkout mapped for this repo yet.' }
   let cwd: string
   try {
-    ({ cwd } = await resolveTaskCwd(db, t, baseCheckout, null, capabilities))
+    ({ cwd } = await resolveTaskCwd(db, t, baseCheckout, null))
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'No usable worktree for this task.' }
   }

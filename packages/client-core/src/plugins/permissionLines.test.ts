@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
-import { harnessGrants, harnessPermissionLines, keyClaimGrants, keyClaimPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
+import { extensionPermissionLine, harnessGrants, harnessPermissionLines, keyClaimGrants, keyClaimPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
+import { EXTENSION_POINT_KINDS, HOOK_MODES } from '@acorn/protocol/extensionPoints.ts'
 
 // The update prompt diffs grant keys, not wording, so the key is what has to stay stable. This is a
 // contract test on the keys and a readability check on the sentences.
@@ -232,5 +233,57 @@ describe('the harness grant', () => {
     // The node rejected this at parse, so it can never run. A consent line for it would be noise in the
     // one list that must not have any.
     expect(harnessGrants(contributions([{ id: 'h', label: 'H', spawn: { args: [] }, envPassthrough: [] }]))).toEqual([])
+  })
+})
+
+describe('the cross-plugin grants', () => {
+  // Every kind, both directions. A kind added to the protocol with no sentence here is a hole a person
+  // would consent through, which is why this is a loop over the vocabulary rather than a list of cases.
+  it('has a host-owned sentence for every kind, in both directions', () => {
+    for (const pointKind of EXTENSION_POINT_KINDS) {
+      for (const kind of ['hosts', 'extends'] as const) {
+        const line = extensionPermissionLine({ kind, pointKind, target: 'changes:before-push', label: 'push' })
+        expect(line.text.length).toBeGreaterThan(10)
+        // The label is manifest text and reaches the sentence quoted, the way a webview surface's does.
+        expect(line.text).toContain('“push”')
+        // The kind is in the key, so a package that starts bringing something else reads as newly
+        // requested rather than sliding past the update prompt.
+        expect(line.key).toContain(`:${pointKind}:`)
+      }
+    }
+  })
+
+  it('names the package being reached into on the contributor’s side, and not on the owner’s', () => {
+    const extend = extensionPermissionLine({ kind: 'extends', pointKind: 'rows', target: 'changes:card-links', label: 'Linked items' })
+    expect(extend.text).toBe('Add its own rows to changes’s “Linked items” list')
+    const host = extensionPermissionLine({ kind: 'hosts', pointKind: 'rows', target: 'board:card-links', label: 'Linked items' })
+    expect(host.text).toBe('Let other plugins add rows to its “Linked items” list')
+  })
+
+  it('says what a hook handler asks to do, and marks the two that change what another plugin does', () => {
+    const modes = HOOK_MODES.map((mode) =>
+      extensionPermissionLine({ kind: 'extends', pointKind: 'hook', mode, target: 'changes:before-push', label: 'push' }))
+    expect(texts(modes)).toEqual([
+      'Watch changes’s “push” decision as it happens',
+      'Change what changes does when it “push”s',
+      'Stop changes from doing “push”',
+    ])
+    expect(modes.map((line) => line.high)).toEqual([false, true, true])
+    // Mode is in the key too: a package that starts vetoing where it used to observe has grown its
+    // reach, and the update prompt has to say so.
+    expect(new Set(modes.map((line) => line.key)).size).toBe(3)
+  })
+
+  it('still discloses a kind this build cannot name, rather than saying nothing', () => {
+    // The version-skew case. A shell that cannot describe the kind must not therefore drop the line:
+    // "this package reaches into that one" is the disclosure.
+    const line = extensionPermissionLine({ kind: 'extends', pointKind: 'sculpture' as never, target: 'changes:thing', label: 'Thing' })
+    expect(line.text).toBe('Reach into changes’s “Thing”')
+  })
+
+  it('says the exclusive slot is a choice, with no point kind to name', () => {
+    const line = extensionPermissionLine({ kind: 'replaces', target: 'rail.taskList', label: 'Board task list' })
+    expect(line.text).toBe('Offer to replace acorn’s own rail.taskList — you choose in Settings')
+    expect(line.key).toBe('extension:replaces:rail.taskList')
   })
 })

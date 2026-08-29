@@ -23,6 +23,7 @@ import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
 import { prefsOptions } from '../queries'
 import { PrefKeys } from '../persistence/prefKeys'
 import { savePref } from './savePref'
+import ExtensionPointsDev from './ExtensionPointsDev'
 import {
   CORE_SLOT_PROVIDER,
   exclusiveSlotChoices,
@@ -379,6 +380,7 @@ export default function PluginsSettings() {
       </ul>
 
       <ReplacedSurfaces />
+      <ExtensionPointsDev />
     </div>
   )
 }

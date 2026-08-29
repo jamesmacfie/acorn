@@ -1,4 +1,4 @@
-import { type NodePlugin, RUN_TARGETS, TASK_CREATED, TASK_SESSIONS, WORKTREE_CREATED } from '@acorn/plugin-api/node'
+import { type NodePlugin, RUN_TARGETS, TASK_CREATED, TASK_SESSIONS } from '@acorn/plugin-api/node'
 import { NOTES_SEED_TASK } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
@@ -39,8 +39,20 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         ctx.capabilities.provide(TERMINAL_ROUTE, registrations.terminal),
         ctx.capabilities.provide(TASK_SESSIONS, registrations.taskSessions),
         ctx.capabilities.provide(TASK_CREATED, registrations.taskCreated),
-        ctx.capabilities.provide(WORKTREE_CREATED, registrations.worktreeCreated),
       ]
+      // The repo's setup script, as a handler on core's `core:worktree-created` hook rather than the
+      // single slot it used to fill (docs/plugins.md § Hooks). `transform` and not `observe` because
+      // core awaits the chain: the terminal that opens next expects the setup to have finished, and an
+      // observer runs alongside by design. The payload comes back untouched — there is nothing here to
+      // change, only work to do before the caller carries on.
+      ctx.hooks.handle('core:worktree-created', {
+        id: 'setup-script',
+        mode: 'transform',
+        run: async (payload) => {
+          await registrations.worktreeCreated(payload.taskId as string, payload.path as string)
+          return { payload }
+        },
+      })
       // Archiving stops a task's live sessions (the guard and the kill both go through the bridge
       // above), so this is disclosure rather than an offer: no `apply`, because core already does it.
       ctx.taskChecks.register({
@@ -65,8 +77,20 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // `run:changed` is a core event (@acorn/protocol/nodeEvents.ts) sent from here because terminal
       // holds the process, not because it owns the fact; the core-side spelling is
       // node-core/main/notify.ts § broadcastRunTargetChanged.
-      const runTargets = createRuntimeService(ctx.core, terminalRunGlue(), (taskId, targetId, running) =>
-        ctx.events.send({ channel: 'run:changed', taskId, targetId, running }))
+      // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks): a turn before a
+      // process starts in a task's worktree.
+      ctx.hooks.declare({
+        id: 'before-run-target',
+        label: 'start a run target',
+        payload: { taskId: 'string', targetId: 'string', command: 'string', cwd: 'string' },
+        allows: ['observe', 'veto'],
+      })
+      const runTargets = createRuntimeService(
+        ctx.core,
+        terminalRunGlue(),
+        (taskId, targetId, running) => ctx.events.send({ channel: 'run:changed', taskId, targetId, running }),
+        ctx.hooks,
+      )
       routeDisposables.push(ctx.capabilities.provide(RUN_TARGETS, {
         targets: (taskId) => runTargets.targets(taskId),
         start: (taskId, targetId) => runTargets.start(taskId, targetId),

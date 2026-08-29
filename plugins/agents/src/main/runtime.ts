@@ -33,6 +33,27 @@ import {
  * Product-facing managed-agent commands. Provider process supervision, ordered event durability,
  * and scheduling live in ManagedAgentEngine; this class owns lifecycle policy and user commands.
  */
+/**
+ * The turn's input with its text replaced by what the `before-send` chain left.
+ *
+ * The first text part carries the whole rewritten prompt and the rest are dropped, because the chain
+ * saw one string and returned one string: putting it back into several parts would mean inventing a
+ * split the handler never described. Every non-text part — attachments, file references, captured
+ * context — is preserved in place, since none of it was offered to the chain.
+ */
+const withPromptText = (parts: EnqueueAgentTurnInput['input'], text: string): EnqueueAgentTurnInput['input'] => {
+  let used = false
+  const next: EnqueueAgentTurnInput['input'] = []
+  for (const part of parts) {
+    if (part.type !== 'text') next.push(part)
+    else if (!used) {
+      used = true
+      next.push({ ...part, text })
+    }
+  }
+  return next
+}
+
 export class ManagedAgentRuntime extends ManagedAgentEngine {
   private readonly sessionInitializations = new Map<string, Promise<AgentSession>>()
 
@@ -274,6 +295,19 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (!cwd) throw new Error('The task has no mapped checkout.')
     await validateAgentInputFiles(cwd, input.input)
     assertBoundedJson('Effective agent policy', input.effectivePolicy, MAX_AGENT_POLICY_BYTES)
+    // Every turn this node accepts passes here, whichever surface enqueued it, so this is where another
+    // plugin gets its turn at the prompt (docs/plugins.md § Hooks). Only the text is offered: a
+    // transform rewrites what the agent is asked, and a redaction or a policy plugin needs nothing more.
+    // Attachments and the effective policy stay the owner's.
+    const prompt = await this.hooks?.run('before-send', {
+      sessionId,
+      taskId: session.taskId,
+      text: input.input.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('\n'),
+    })
+    if (prompt && !prompt.ok) throw new Error(`${prompt.by}: ${prompt.reason}`)
+    const enqueued = prompt && prompt.payload.text !== undefined
+      ? { ...input, input: withPromptText(input.input, prompt.payload.text) }
+      : input
     const advertisedOptions = Array.isArray(session.config.configOptions)
       ? session.config.configOptions as Array<{
           id?: unknown
@@ -294,9 +328,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
           }]
         : [])
     const turn = await this.store.enqueueTurn(sessionId, {
-      ...input,
+      ...enqueued,
       effectivePolicy: {
-        ...input.effectivePolicy,
+        ...enqueued.effectivePolicy,
         providerAdvertisedPolicy: providerPolicy,
         providerStatusAuthority: session.statusAuthority,
         capturedAt: Date.now(),

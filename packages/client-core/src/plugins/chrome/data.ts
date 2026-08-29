@@ -5,7 +5,7 @@ import type {
   PluginRailItem,
   PluginSlotBadge,
 } from '@acorn/protocol/api.ts'
-import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
+import { isAnnotationSeverity, type PluginAnnotationKey, type PluginAnnotationMark, type PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import {
   agentContextBudget,
   MAX_AGENT_CONTEXT_BYTES,
@@ -273,6 +273,64 @@ export async function readExtensionItems(
     drop(pluginId, 'extension item', row)
     return []
   })
+}
+
+/**
+ * A contribution's marks for the keys the owner is drawing, in one request
+ * (docs/plugins.md § Cooperative extension points, the `annotation` kind).
+ *
+ * A POST rather than a GET, alone among the descriptor reads, because the question is "what do you
+ * know about these two thousand items" and two thousand items do not fit in a query string. It is
+ * still a read: the host sends the owner's keys, the contributor answers facts, and nothing is
+ * created.
+ *
+ * Per-mark sanitising rather than all-or-nothing, like the rows above and the rail list: these draw
+ * inside somebody else's surface, and one malformed mark must not blank the rest.
+ */
+export async function readAnnotationMarks(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  keys: readonly PluginAnnotationKey[],
+  signal: AbortSignal,
+): Promise<PluginAnnotationMark[]> {
+  if (!ownsRoute(pluginId, path)) throw new Error(`${pluginId} may not read ${path}`)
+  const body = await writeJson<{ items?: unknown }>(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ keys }),
+    nodeId,
+    signal,
+  })
+  const rows = Array.isArray(body?.items) ? body.items : []
+  return rows.flatMap((row) => {
+    const mark = sanitizeAnnotationMark(row)
+    if (mark) return [mark]
+    drop(pluginId, 'annotation mark', row)
+    return []
+  })
+}
+
+/** One mark, reduced to what the host is willing to draw: a key of scalars, one of three severities, a
+ *  line of text and an optional icon name. No colour, no markup, no verb. */
+function sanitizeAnnotationMark(row: unknown): PluginAnnotationMark | null {
+  if (!row || typeof row !== 'object') return null
+  const mark = row as Record<string, unknown>
+  if (!str(mark.text) || !isAnnotationSeverity(mark.severity)) return null
+  if (!mark.key || typeof mark.key !== 'object' || Array.isArray(mark.key)) return null
+  const key: PluginAnnotationKey = {}
+  for (const [field, value] of Object.entries(mark.key as Record<string, unknown>)) {
+    if (typeof value !== 'string' && typeof value !== 'number') return null
+    key[field] = value
+  }
+  return {
+    key,
+    severity: mark.severity,
+    // Capped like every other display string a plugin sends: this lands under a diff row, not in a
+    // pane of its own.
+    text: mark.text.slice(0, 200),
+    ...(str(mark.icon) ? { icon: mark.icon } : {}),
+  }
 }
 
 // ── Agent context ─────────────────────────────────────────────────────────────────────────────────

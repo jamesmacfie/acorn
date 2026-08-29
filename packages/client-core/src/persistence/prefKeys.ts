@@ -55,6 +55,11 @@ export const PrefKeys = {
   // The device's, like `theme` and `style`. The plugin behind the choice may not be installed on the
   // other machine paired with the same node.
   exclusiveSlots: 'exclusive_slots',
+  // Which plugin, if any, the owner picked to fill each `replace` slot when two matched the same key
+  // (plugins/tree/arbitration.ts). The same one-key-holds-all shape as `exclusive_slots` above and for
+  // the same reason, and the device's for the same reason too: the plugin behind a pick may not be
+  // installed on the other machine paired with this node.
+  remoteSlots: 'remote_slots',
   // User-composed panel definitions and where they are placed (docs/state.md § Scope rules,
   // dashboards/persist.ts). The node's, because a panel describes that node's resources, so every
   // client paired with the node renders the board its owner built.

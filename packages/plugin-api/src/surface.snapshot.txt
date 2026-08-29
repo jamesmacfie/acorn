@@ -1,4 +1,4 @@
-# plugin API major: 4
+# plugin API major: 5
 client: AgentToolRendererContribution
 client: AgentToolRendererProps
 client: CHECK_TONE
@@ -132,7 +132,6 @@ client: registerCommands
 client: registerNoticeTargetHandler
 client: registerWsChannel
 client: rememberActiveTerminal
-client: remoteToolRendererFor
 client: renderMarkdown
 client: requestTerminalFocus
 client: requestTerminalFocusIntent
@@ -198,6 +197,10 @@ node: HarnessProbe
 node: HarnessRegistry
 node: HeadlessOpts
 node: HeadlessResult
+node: HookMode
+node: HookPayload
+node: HookPayloadShape
+node: HookVerdict
 node: InternalEnvFactory
 node: Launcher
 node: LayoutRecipe
@@ -213,6 +216,9 @@ node: PLUGIN_API_MAJOR
 node: PluginBroadcast
 node: PluginDatabase
 node: PluginFetchHandler
+node: PluginHookHandler
+node: PluginHookPoint
+node: PluginHookRegistry
 node: PluginProviderResourceRequest
 node: PluginRequestContext
 node: PrefService
@@ -243,7 +249,6 @@ node: TaskRef
 node: TaskSessionsBridge
 node: ToolContext
 node: ToolError
-node: WORKTREE_CREATED
 node: agentProfileRegistry
 node: brokerEnv
 node: buildHeadlessArgv
@@ -363,10 +368,13 @@ ui/editor: monacoLanguageForPath
 ui/editor: watchMonacoTheme
 ui/host: Acorn
 ui/host: Concern
+ui/host: InlineSlot
 ui/host: PaletteSurface
 ui/host: RefPanelTaskLink
 ui/host: RemoteTree
 ui/host: RemoteTreeProps
+ui/host: Slot
+ui/host: SlotProps
 ui/host: registerKeybindings
 ui/host: registerWillHandler
 ui/sdk: AcornBridge

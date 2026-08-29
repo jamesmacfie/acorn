@@ -95,10 +95,21 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       const store = ctx.storage.open()
       const core = ctx.core
 
+      // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks). A prompt policy,
+      // a redactor or a context injector registers a handler here; the point exists whether or not
+      // anybody does, because declaring it is the consent.
+      ctx.hooks.declare({
+        id: 'before-send',
+        label: 'send a prompt',
+        payload: { sessionId: 'string', taskId: 'string', text: 'string' },
+        allows: ['observe', 'transform', 'veto'],
+      })
+
       runtime = new ManagedAgentRuntime({
         db: store,
         dataDir,
         core,
+        hooks: ctx.hooks,
         internalEnv: deps.internalEnv,
         secrets: core.secrets,
         // Read per call, never captured. Creating a task's worktree consults that owner's per-repo

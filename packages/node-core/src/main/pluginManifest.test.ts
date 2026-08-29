@@ -1154,9 +1154,101 @@ describe('extensions', () => {
   })
 
   it('caps the list and counts its ids in the one-id-per-contribution rule', () => {
-    expect(manifest({ extensions: Array.from({ length: 8 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(true)
-    expect(manifest({ extensions: Array.from({ length: 9 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(false)
+    // Sixteen since the one key grew from rows to five kinds: a plugin that opens a pane, a slot in it,
+    // a hook before it acts and an annotation on its rows is describing one integration, not four.
+    expect(manifest({ extensions: Array.from({ length: 16 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(true)
+    expect(manifest({ extensions: Array.from({ length: 17 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(false)
     expect(messages(manifest({ extensions: [extension(), extension()] }))).toContain("duplicate contribution id 'board-issues'")
+  })
+})
+
+describe('the five kinds', () => {
+  // `kind` decides which of two lists a point's fields fall into: what it must name, and what naming
+  // would parse and never be read. Both halves matter, because the failure this whole file exists to
+  // refuse is a declaration that installs, looks fine, and can never do anything.
+  const kindPoint = (over: Record<string, unknown>) =>
+    manifest({ frames: [PANE], extensionPoints: [{ id: 'p', label: 'P', ...over }] })
+
+  it('reads a manifest with no kind as rows, so everything written before this parses unchanged', () => {
+    const parsed = manifest({ frames: [PANE], extensionPoints: [{ id: 'p', label: 'P', location: 'pane.footer', surface: 'board' }] })
+    expect(parsed.success && parsed.data.contributions.extensionPoints[0]!.kind).toBe('rows')
+  })
+
+  it('makes an annotation say what its items are keyed by, and refuses a location on one', () => {
+    expect(kindPoint({ kind: 'annotation', key: { file: 'string', line: 'number' } }).success).toBe(true)
+    expect(messages(kindPoint({ kind: 'annotation' }))).toContain("a 'annotation' extension point declares key")
+    expect(messages(kindPoint({ kind: 'annotation', key: { file: 'string' }, location: 'pane.footer', surface: 'board' })))
+      .toContain("location is not read on a 'annotation' extension point")
+  })
+
+  it('makes a remote point say how it arbitrates, and gives it no location to draw at', () => {
+    expect(kindPoint({ kind: 'remote', mode: 'replace', selector: 'mime' }).success).toBe(true)
+    expect(messages(kindPoint({ kind: 'remote' }))).toContain("a 'remote' extension point declares mode")
+  })
+
+  it('makes a rectangle take an inline location and nothing else', () => {
+    expect(kindPoint({ kind: 'rectangle', mode: 'replace', location: 'pane.inline-beside', surface: 'board' }).success).toBe(true)
+    // The location is what the host reads to decide which host draws the point at all, so a rows point
+    // and a rectangle point may not take each other's names.
+    expect(messages(kindPoint({ kind: 'rectangle', mode: 'replace', location: 'pane.footer', surface: 'board' })))
+      .toContain("'pane.footer' is not a location a 'rectangle' extension point can take")
+    expect(messages(kindPoint({ kind: 'rows', location: 'pane.inline-below', surface: 'board' })))
+      .toContain("'pane.inline-below' is not a location a 'rows' extension point can take")
+  })
+
+  it('makes a hook declare its payload and what is allowed at it', () => {
+    expect(kindPoint({ kind: 'hook', payload: { branch: 'string' }, allows: ['veto'] }).success).toBe(true)
+    expect(messages(kindPoint({ kind: 'hook', allows: ['veto'] }))).toContain("a 'hook' extension point declares payload")
+    expect(messages(kindPoint({ kind: 'hook', payload: { branch: 'string' } }))).toContain("a 'hook' extension point declares allows")
+    // A payload type this build has no vocabulary for. The tree's prop vocabulary and nothing else.
+    expect(kindPoint({ kind: 'hook', payload: { branch: 'blob' }, allows: ['veto'] }).success).toBe(false)
+  })
+
+  it('makes a contribution name exactly one way in', () => {
+    const extension = (over: Record<string, unknown>) =>
+      manifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
+    expect(extension({ items: '/v2/p/board/rows' }).success).toBe(true)
+    expect(messages(extension({}))).toContain('an extension names exactly one of items, remote, frame or route')
+    expect(messages(extension({ items: '/v2/p/board/rows', route: '/v2/p/board/hook', mode: 'veto' })))
+      .toContain('an extension names exactly one of items, remote, frame or route, not items and route')
+  })
+
+  it('makes a hook handler say what it asks to do, and refuses a mode on anything else', () => {
+    const extension = (over: Record<string, unknown>) =>
+      manifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
+    expect(extension({ route: '/v2/p/board/scan', mode: 'veto' }).success).toBe(true)
+    expect(messages(extension({ route: '/v2/p/board/scan' })))
+      .toContain('a hook handler says what it asks to do: observe, transform or veto')
+    expect(messages(extension({ items: '/v2/p/board/rows', mode: 'veto' })))
+      .toContain('mode is only valid on a hook handler, which names a route')
+    // Confined to this plugin's own namespace, for the reason every other declared route is.
+    expect(messages(extension({ route: '/v2/p/other/scan', mode: 'veto' })))
+      .toContain('route must be inside /v2/p/board/')
+  })
+
+  it('makes an inline frame and the extension that places it name each other', () => {
+    const withBundle = (contributions: Record<string, unknown>) =>
+      pluginManifestSchema.safeParse({
+        id: 'board', name: 'Board', version: '1.0.0', apiVersion: '1', client: './dist/client.js', contributions,
+      })
+    expect(withBundle({
+      frames: [PANE, { target: 'inline', id: 'preview', label: 'Markdown preview' }],
+      extensions: [{ id: 'md', point: 'editor:beside', label: 'Preview', frame: 'preview', matches: ['*.md'] }],
+    }).success).toBe(true)
+    // A rectangle nothing places is a box with nowhere to be drawn.
+    expect(messages(withBundle({ frames: [PANE, { target: 'inline', id: 'preview', label: 'P' }] })))
+      .toContain("inline frame 'preview' needs an extension placing it in another plugin's rectangle point")
+    expect(messages(withBundle({
+      frames: [PANE],
+      extensions: [{ id: 'md', point: 'editor:beside', label: 'Preview', frame: 'ghost' }],
+    }))).toContain("extension names frame 'ghost', which this manifest does not declare with target 'inline'")
+  })
+
+  it('makes a remote contribution declare the bundle it draws from', () => {
+    expect(messages(manifest({
+      frames: [PANE],
+      extensions: [{ id: 'card', point: 'agents:tool-card', label: 'Card', remote: 'toolCard', matches: ['bash'] }],
+    }))).toContain('a remote contribution runs this plugin\u2019s client bundle; declare `client` in the manifest')
   })
 })
 

@@ -1,4 +1,4 @@
-import type { CoreServices, InternalEnvFactory, PluginDatabase, SecretService } from '@acorn/plugin-api/node'
+import type { CoreServices, InternalEnvFactory, PluginDatabase, PluginHookRegistry, SecretService } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
   AgentNormalizedEvent,
@@ -58,6 +58,10 @@ export type AgentRuntimeOptions = {
   startTerminalHandoff?(session: AgentSession): Promise<string>
   terminalHandoffRunning?(sessionId: string): Promise<boolean>
   onCompletedTurn?(taskId: string, transcriptTail: string): Promise<void>
+  // The owner's half of this plugin's hooks (docs/plugins.md § Hooks). Optional so a test can build an
+  // engine with no host around it, and absent means nobody objects, which is also what an empty chain
+  // means.
+  hooks?: Pick<PluginHookRegistry, 'run'>
 }
 
 export type WaitCondition = 'ready' | 'attention' | 'turn_completed' | 'stopped'
@@ -86,6 +90,7 @@ export class ManagedAgentEngine {
   protected readonly startTerminalHandoff?: (session: AgentSession) => Promise<string>
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
   protected readonly onCompletedTurn?: (taskId: string, transcriptTail: string) => Promise<void>
+  protected readonly hooks?: Pick<PluginHookRegistry, 'run'>
   protected readonly live = new Map<string, LiveSession>()
   // A newly persisted session is visible to the client before its provider finishes starting. Hold
   // the driver's early `ready` fact until product initialization (including saved defaults) is done,
@@ -119,6 +124,7 @@ export class ManagedAgentEngine {
     this.startTerminalHandoff = options.startTerminalHandoff
     this.terminalHandoffRunning = options.terminalHandoffRunning
     this.onCompletedTurn = options.onCompletedTurn
+    this.hooks = options.hooks
     this.store = new AgentStore(options.db, options.core)
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)

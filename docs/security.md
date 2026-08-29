@@ -970,6 +970,31 @@ body, a credential, or a file's contents. `plugins/http` is the worked example �
 `request.sent` and records it only from its workflow step, with the target's origin and not the URL,
 because a query string is where a token ends up when someone puts one there.
 
+#### The same rule for what a plugin can reach into
+
+Cross-plugin extension has the same closed-vocabulary shape, and for the same reason: a grant nobody
+can enumerate is a grant nobody reviews. `extensionPoints[].kind` is a closed union of five
+([plugins.md](./plugins.md) § Cooperative extension points), and both directions of every one of them
+appear in the trust prompt under **Enforced** with copy the host owns. A kind this build cannot name is
+still disclosed — "reach into X's Y" — because the disclosure is that this package reaches into that
+one, and a shell that cannot describe the kind must not therefore say nothing.
+
+Three things are minted by the host and cannot be stated by a manifest: the point's public name, the
+provenance stamped on everything delivered, and the confinement of every route a contribution reads or
+answers on. A contribution that runs the contributor's own code — a `remote` tree in a worker, an
+`inline` rectangle in an iframe — additionally needs this device to have accepted that bundle, exactly
+as a pane does. Standing inside another plugin's pane grants a frame none of that plugin's reach: its
+bridge is bound from its own manifest.
+
+Hooks are the one kind that changes what another plugin *does* rather than what it shows, so their
+grants read differently and two of the three modes are marked **high**: "can change a prompt before the
+agents plugin sends it" and "can stop a push in the changes plugin" are recorded against the trust
+decision with the mode in the key, so a package that starts vetoing where it used to observe reads as
+newly requested. The chain itself fails open — a handler that throws or stalls is skipped — because a
+plugin that stops answering must not be able to brick a push. The exception is `core:before-tool-call`,
+which is an approval gate and denies on timeout: a gate that opens when its keeper goes quiet is not
+one.
+
 Secret *use* is not recorded, only creation, replacement and deletion. Every credential read goes
 through `SecretService.use` (`main/core/secrets.ts`), which holds only an encryption key and nothing
 else, no database, no request, no connection id, so a row written from there could only name the

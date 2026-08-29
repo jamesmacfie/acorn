@@ -18,6 +18,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
+import { isInlineLocation, type ExtensionPointKind } from '@acorn/protocol/extensionPoints.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
 import { NODE_CORE_FACETS } from './pluginPermissions'
@@ -46,6 +47,8 @@ export type {
   PluginCollectionDescriptor,
   PluginCommandDescriptor,
   PluginDocumentRegion,
+  PluginExtensionDescriptor,
+  PluginExtensionPointDescriptor,
   PluginFrameSurface,
   PluginHarnessDescriptor,
   PluginKeybindingDescriptor,
@@ -341,32 +344,91 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // of its own. The surface list grows when a host for one appears, not before.
   const pointSurfaces = new Set(frames.filter((frame) => frame.target === 'pane').map((frame) => frame.id))
   const claimedPoints = new Set<string>()
+  // Every kind's fields, in one table: what it must name, and what naming would parse and never be read.
+  // A table rather than a branch per kind, because the failure this whole function exists to prevent is a
+  // declaration that installs and does nothing, and the way that gets in is a kind added below with one
+  // of its two lists forgotten.
+  const kindFields: Record<ExtensionPointKind, { required: readonly string[]; refused: readonly string[] }> = {
+    rows: { required: ['location', 'surface'], refused: ['key', 'mode', 'selector', 'accepts', 'payload', 'allows'] },
+    annotation: { required: ['key'], refused: ['location', 'surface', 'panels', 'mode', 'selector', 'accepts', 'payload', 'allows'] },
+    remote: { required: ['mode'], refused: ['location', 'surface', 'panels', 'key', 'payload', 'allows'] },
+    rectangle: { required: ['location', 'surface', 'mode'], refused: ['panels', 'key', 'payload', 'allows'] },
+    hook: { required: ['payload', 'allows'], refused: ['location', 'surface', 'panels', 'key', 'mode', 'selector', 'accepts'] },
+  }
   extensionPoints.forEach((entry, i) => {
     const at = ['contributions', 'extensionPoints', i] as (string | number)[]
+    const fields = kindFields[entry.kind]
+    const declared = entry as unknown as Record<string, unknown>
+    for (const field of fields.required) {
+      if (declared[field] === undefined) {
+        ctx.addIssue({ code: 'custom', path: [...at, field], message: `a '${entry.kind}' extension point declares ${field}` })
+      }
+    }
+    for (const field of fields.refused) {
+      if (declared[field] !== undefined) {
+        ctx.addIssue({ code: 'custom', path: [...at, field], message: `${field} is not read on a '${entry.kind}' extension point` })
+      }
+    }
+    if (entry.location === undefined || entry.surface === undefined) return
     if (!pointSurfaces.has(entry.surface)) {
       ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `extension point names '${entry.surface}', which this manifest does not declare as a pane surface` })
     }
     // One point per (surface, location). A second would be a strip the host has no second place to draw,
     // so it would parse and never appear, the failure this file spends its length refusing.
-    const claim = `${entry.surface} ${entry.location}`
+    const claim = `${entry.surface}\0${entry.location}`
     if (claimedPoints.has(claim)) {
       ctx.addIssue({ code: 'custom', path: at, message: `'${entry.surface}' already has an extension point at '${entry.location}'` })
     }
     claimedPoints.add(claim)
-    // The two locations take two different contributors, so their keys are not interchangeable. A footer
-    // is filled by other plugins' `extensions` and has no composition to constrain; an aside is filled by
-    // the user, and `panels` is the whole of what the owner gets to say about it. A `panels` block on a
-    // footer would parse and never be read.
+    // A rows point draws under the pane and a rectangle point draws beside or below it. Neither may take
+    // the other's name: the location is what the host reads to decide which host draws the point at all.
+    if (isInlineLocation(entry.location) !== (entry.kind === 'rectangle')) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'location'], message: `'${entry.location}' is not a location a '${entry.kind}' extension point can take` })
+    }
+    // The two non-inline locations take two different contributors, so their keys are not interchangeable.
+    // A footer is filled by other plugins' `extensions` and has no composition to constrain; an aside is
+    // filled by the user, and `panels` is the whole of what the owner gets to say about it. A `panels`
+    // block on a footer would parse and never be read.
     if (entry.panels && entry.location !== 'pane.aside') {
       ctx.addIssue({ code: 'custom', path: [...at, 'panels'], message: "panels is only valid on a 'pane.aside' extension point" })
     }
   })
+  // A rectangle this manifest offers into somebody else's point. Not one of this plugin's own panes: an
+  // `inline` frame has no registry of its own, and the only thing that ever draws it is an owner's point.
+  const inlineFrames = new Set(frames.filter((frame) => frame.target === 'inline').map((frame) => frame.id))
+  const placedInlineFrames = new Set<string>()
   extensions.forEach((entry, i) => {
     const at = ['contributions', 'extensions', i] as (string | number)[]
-    route(entry.items, [...at, 'items'])
+    // Both carriers that are routes are confined to this plugin's own namespace, for the reason every
+    // other declared route is: a plugin must not be able to make the host call core's routes, or another
+    // plugin's, on its behalf.
+    if (entry.items !== undefined) route(entry.items, [...at, 'items'])
+    if (entry.route !== undefined) route(entry.route, [...at, 'route'])
     if (entry.onSelect) action(entry.onSelect, [...at, 'onSelect'])
+    // A remote entry is a key of the object this plugin's own bundle passed to `mountTree`, so there has
+    // to be a bundle. Without one the contribution parses and can never draw anything.
+    if (entry.remote !== undefined && !manifest.client) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'remote'], message: 'a remote contribution runs this plugin\u2019s client bundle; declare `client` in the manifest' })
+    }
+    if (entry.frame !== undefined) {
+      if (!inlineFrames.has(entry.frame)) {
+        ctx.addIssue({ code: 'custom', path: [...at, 'frame'], message: `extension names frame '${entry.frame}', which this manifest does not declare with target 'inline'` })
+      }
+      placedInlineFrames.add(entry.frame)
+    }
     // A plugin extending its own point is legal and pointless: it can put the rows there itself. It is not
     // refused, because refusing it would mean a rule whose only effect is on a plugin harming nobody.
+  })
+  // The inverse, and the same failure in the other direction: an `inline` frame nothing places is a
+  // rectangle with nowhere to be drawn, the overlay-with-no-opener case in a second spelling.
+  frames.forEach((frame, i) => {
+    if (frame.target === 'inline' && !placedInlineFrames.has(frame.id)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'frames', i],
+        message: `inline frame '${frame.id}' needs an extension placing it in another plugin's rectangle point`,
+      })
+    }
   })
   // A `coreSlot` surface is the exclusive-slot half. Two rules, both of which turn a surface that would
   // silently never appear into an error the author sees at install time.

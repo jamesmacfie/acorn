@@ -179,7 +179,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     // The plugin composition seam (docs/plugins.md § Collaboration rules). Owned by this runtime
     // rather than by the module, so a process that starts the service more than once (the tests do)
     // gets a clean graph each time instead of "capability already provided".
-    const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY, capabilities })
+    const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/plugin/host.ts).
     const graph = await assembleNodeGraph(config.dataDir, buildPluginDeps({ capabilities, core, internalEnv, reconciled }))

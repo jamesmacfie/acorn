@@ -2,7 +2,7 @@
 // class alone owns validation, ordering, persistence, branching, cancellation, and reconciliation.
 import { randomUUID } from 'node:crypto'
 import { asc, eq, inArray } from 'drizzle-orm'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID, type Extension, type ExtensionPointId, type HeadlessOpts, type HeadlessResult, type PluginDatabase, type StreamEvent } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, DEFAULT_PROFILE_ID, type Extension, type ExtensionPointId, type HeadlessOpts, type HeadlessResult, type PluginDatabase, type PluginHookRegistry, type StreamEvent } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type {
   StepHandlerContext,
@@ -52,6 +52,9 @@ export type RunnerDeps = {
   emitStepEvent?(runId: string, stepId: string, event: StreamEvent): void
   onRunTerminal?(taskId: string, runId: string): Promise<void>
   startRunTarget?(taskId: string, targetId: string): Promise<{ ok: boolean; url?: string }>
+  /** The owner's half of `workflows:before-step` (docs/plugins.md § Hooks). Absent means nobody
+   *  objects, which is also what an empty chain means. */
+  hooks?: Pick<PluginHookRegistry, 'run'>
   createChildTask?(parentTaskId: string, seed: FanOutTaskSeed): Promise<string>
   cancelChildTask?(taskId: string): Promise<void>
   authorizeRepoConfig?(taskId: string): Promise<void>
@@ -366,6 +369,22 @@ export class WorkflowRunner {
     } catch (error) {
       await this.setStep(step.id, { status: 'failed', error: error instanceof Error ? error.message : 'Template rendering failed.' })
       await this.finishRun(run, 'failed', `Step '${def.name}' has an invalid template reference.`)
+      return 'stop'
+    }
+    // The step is about to run. This is the last moment another plugin can say not now — an incident
+    // tool refusing a deploy, a change-freeze calendar (docs/plugins.md § Hooks). A refusal is a
+    // safety-rail rather than a failure: nothing broke, something declined, and the two read differently
+    // in the run list.
+    const verdict = await this.deps.hooks?.run('before-step', {
+      taskId: run.taskId,
+      runId: run.id,
+      stepId: step.id,
+      step: def.name,
+      kind: def.kind ?? 'agent',
+    })
+    if (verdict && !verdict.ok) {
+      await this.setStep(step.id, { status: 'safety-rail', error: `${verdict.by}: ${verdict.reason}` })
+      await this.finishRun(run, 'safety-rail', `Step '${def.name}' was stopped by ${verdict.by}.`)
       return 'stop'
     }
     const controller = new AbortController()

@@ -22,6 +22,7 @@ import type { StreamHandlers, WsChannelHandler } from '../../main/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import type { PluginEmit } from '@acorn/protocol/pluginContract.ts'
+import type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 
 // Another plugin's live channel, by shape. Validated at subscribe time against the producer's `emits`.
 export type PluginEventChannel = `plugin:${string}:${string}`
@@ -135,6 +136,56 @@ export type PluginSchedule = {
 // binds the owner, qualifies every concern id, bounds the call and ties removal to teardown.
 export type PluginTaskCheckRegistry = {
   register(check: TaskCheck): void
+}
+
+/**
+ * A turn in one of this plugin's decisions, offered to other plugins (./hooks.ts, docs/plugins.md §
+ * Hooks).
+ *
+ * The owner's half is `declare` plus `run`: declare the moment and what is allowed at it, then call
+ * `run` at the moment and act on the verdict. The contributor's half is `handle`, which names somebody
+ * else's point out loud.
+ *
+ * Declaring one is the whole lifecycle: the host mints the point id from this plugin, bounds every
+ * handler, records failures on the roster row, and ties removal to teardown.
+ */
+export type PluginHookRegistry = {
+  /** A point this plugin owns. `id` is qualified with this plugin, so a package cannot declare a point
+   *  in a stranger's name any more than it can mount a route under one. */
+  declare(point: PluginHookPoint): void
+  /** A handler on a point, this plugin's or another's. `point` is the qualified `<owner>:<id>`. */
+  handle(point: string, handler: PluginHookHandler): void
+  /** Run one of this plugin's own points. `id` is the bare point id; the host qualifies it. Never
+   *  rejects: every failure inside the chain resolves to a verdict (./hooks.ts). */
+  run<T extends HookPayload>(id: string, payload: T): Promise<HookVerdict<T>>
+}
+
+export type PluginHookPoint = {
+  /** Unique within this plugin, and the half of the public name a contributor writes down. */
+  id: string
+  /** What the owner is opening, in the owner's words. The trust prompt quotes it. */
+  label: string
+  /** The declared shape, in the tree's prop vocabulary. A transform's answer is checked against it. */
+  payload: HookPayloadShape
+  allows: readonly HookMode[]
+  /** Per handler. Defaults to five seconds. */
+  timeoutMs?: number
+  /** Veto handlers only. `allow` unless the owner says otherwise, because a plugin that stalls must
+   *  not brick whatever this hook guards. */
+  onTimeout?: 'allow' | 'deny'
+  order?: 'priority' | 'install'
+  /** Run every veto rather than stopping at the first, so the owner can show all the reasons. */
+  collect?: boolean
+}
+
+export type PluginHookHandler = {
+  /** Unique within this plugin. The host qualifies it before it leaves. */
+  id: string
+  mode: HookMode
+  priority?: number
+  /** The answer the mode asks for: `{ payload }` for a transform, `{ ok, reason? }` for a veto,
+   *  anything at all for an observer, whose answer is dropped unread. */
+  run(payload: HookPayload, signal: AbortSignal): Promise<unknown>
 }
 
 // Where this plugin's collections can be read from the node, with no client attached
@@ -300,6 +351,10 @@ export type NodePluginContext = {
   // Both tiers, same two feeders as schedules and task checks.
   audit: PluginAuditRegistry
   extensionPoints: PluginExtensionPointRegistry
+  // Both tiers, both halves. A loaded plugin declares its points and handlers in its manifest and the
+  // host synthesises the registrations through this seam; a built-in calls `declare` and `handle`
+  // directly. `run` is the owner's side and is bound to this plugin's own points.
+  hooks: PluginHookRegistry
   providers: PluginProviderRegistry
   capabilities: PluginCapabilities
   // Present for a loaded plugin, and for a built-in that declared `migrationsModule`. A plugin that owns

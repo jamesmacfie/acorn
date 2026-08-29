@@ -1,4 +1,5 @@
 import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import { isExtensionPointKind, isHookMode, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
 import { pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../tasks/paneShortcuts'
@@ -195,19 +196,81 @@ const EXTENSION_KIND_ICON: Record<PluginExtensionGrant['kind'], string> = {
   replaces: 'replace',
 }
 
-export const extensionPermissionLines = (grants: readonly PluginExtensionGrant[]): PermissionLine[] =>
-  grants.map((grant) => {
-    const text = grant.kind === 'hosts'
-      ? `Let other plugins add rows to its “${grant.label}” list`
-      : grant.kind === 'extends'
-        // The owner half of the reference is the point of this line. It names the package this one
-        // reaches into, so "this plugin extends that plugin" is on screen before anything runs.
-        ? `Add its own rows to ${grant.target.split(':')[0]}’s “${grant.label}” list`
-        : `Offer to replace acorn’s own ${grant.target} — you choose in Settings`
-    // Kind and target together, so a package that starts extending a different plugin's point reads as
-    // newly requested.
-    return line(`extension:${grant.kind}:${grant.target}`, { text, icon: EXTENSION_KIND_ICON[grant.kind] })
+/**
+ * What the owner's half of each kind reads as, and what the contributor's does.
+ *
+ * Two tables rather than one sentence with a noun slot, because the verbs differ: rows are added,
+ * marks are put on things, UI is drawn, a box is placed, and a decision is taken part in. A generated
+ * sentence would have read as one in four cases and as machine output in the rest.
+ *
+ * `%s` is the owner plugin's id on the contributor side, minted by the host from the point reference.
+ * The label is manifest text and is quoted, the way a webview surface's label is.
+ */
+const HOSTS_COPY: Record<ExtensionPointKind, string> = {
+  rows: 'Let other plugins add rows to its “%l” list',
+  annotation: 'Let other plugins put marks on the items in its “%l”',
+  remote: 'Reserve part of its “%l” for other plugins’ own UI',
+  rectangle: 'Reserve a box beside its “%l” for another plugin’s own page',
+  hook: 'Let other plugins act before it does “%l”',
+}
+
+const EXTENDS_COPY: Record<ExtensionPointKind, string> = {
+  rows: 'Add its own rows to %s’s “%l” list',
+  annotation: 'Put its own marks on the items in %s’s “%l”',
+  remote: 'Draw its own UI inside %s’s “%l”',
+  rectangle: 'Place its own page beside %s’s “%l”',
+  hook: 'Take part in %s’s “%l” decision',
+}
+
+// A handler's mode is the difference between watching and stopping, so it replaces the generic hook
+// sentence above rather than qualifying it.
+const HOOK_MODE_COPY: Record<HookMode, string> = {
+  observe: 'Watch %s’s “%l” decision as it happens',
+  transform: 'Change what %s does when it “%l”s',
+  veto: 'Stop %s from doing “%l”',
+}
+
+// A grant this build has no sentence for. It still gets a line, and the line still carries the target
+// in its key, because "this package reaches into that one" is the disclosure and a shell that cannot
+// name the kind must not therefore say nothing (docs/security.md § Design rules, rule 6).
+const UNKNOWN_KIND_COPY = { hosts: 'Open part of its own “%l” to other plugins', extends: 'Reach into %s’s “%l”' }
+
+const fill = (template: string, grant: PluginExtensionGrant): string =>
+  template.replaceAll('%s', grant.target.split(':')[0] ?? '').replaceAll('%l', grant.label)
+
+/** The sentence for one cross-plugin grant, and the key the update diff compares it under. Exported so
+ *  the copy can be held against the kind list without rendering a dialog: every kind and both
+ *  directions must have a sentence, and a kind added to the protocol with no line here is a hole a
+ *  person would consent through. */
+export function extensionPermissionLine(grant: PluginExtensionGrant): PermissionLine {
+  const kind = isExtensionPointKind(grant.pointKind) ? grant.pointKind : null
+  const mode = grant.kind === 'extends' && kind === 'hook' && isHookMode(grant.mode) ? grant.mode : null
+  const template = grant.kind === 'replaces'
+    ? 'Offer to replace acorn’s own %t — you choose in Settings'
+    : mode
+      ? HOOK_MODE_COPY[mode]
+      : kind
+        // The owner half of the reference is the point of the `extends` line. It names the package this
+        // one reaches into, so "this plugin extends that plugin" is on screen before anything runs.
+        ? (grant.kind === 'hosts' ? HOSTS_COPY : EXTENDS_COPY)[kind]
+        : UNKNOWN_KIND_COPY[grant.kind]
+  // Kind, point kind, mode and target together, so a package that starts vetoing where it used to
+  // observe, or reaches into a different plugin's point, reads as newly requested. The point kind and
+  // the mode are omitted when there is none rather than spelled as a placeholder: `replaces` is the
+  // exclusive slot and never has either, and a segment that is always the same carries nothing.
+  const parts = ['extension', grant.kind, ...(kind ? [kind] : []), ...(mode ? [mode] : []), grant.target]
+  const key = parts.join(':')
+  return line(key, {
+    text: fill(template, grant).replace('%t', grant.target),
+    icon: EXTENSION_KIND_ICON[grant.kind],
+    // Stopping or rewriting somebody else's decision is the one cross-plugin grant that changes what
+    // another package does rather than what it shows.
+    high: mode === 'veto' || mode === 'transform',
   })
+}
+
+export const extensionPermissionLines = (grants: readonly PluginExtensionGrant[]): PermissionLine[] =>
+  grants.map(extensionPermissionLine)
 
 export const keyClaimPermissionLines = (grants: readonly PluginKeyClaimGrant[]): PermissionLine[] =>
   [...grants]

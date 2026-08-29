@@ -567,7 +567,7 @@ export type TerminalIpcRegistrations = {
   terminal: TerminalBridge
   taskSessions: TaskSessionsBridge
   taskCreated: TaskCreatedHook
-  worktreeCreated: (task: TaskRef, cwd: string) => Promise<void>
+  worktreeCreated: (taskId: string, cwd: string) => Promise<void>
 }
 
 export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalIpcDeps): TerminalIpcRegistrations {
@@ -580,9 +580,16 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
   bootReconciled = deps.reconciled
   statusBroadcast = deps.status ?? (() => {})
 
-  // Every worktree creation funnels through core's resolveTaskCwd, so this hook makes the setup script
-  // run whichever surface created the worktree.
-  const worktreeCreated = (t: TaskRef, cwd: string): Promise<void> => maybeRunSetup(t, cwd)
+  // Every worktree creation funnels through core's resolveTaskCwd, so this handler makes the setup
+  // script run whichever surface created the worktree.
+  //
+  // It takes the task id rather than the row, because it is reached through core's `core:worktree-created`
+  // hook now and a hook payload is scalars (docs/plugins.md § Hooks). Loading the row here costs one
+  // read on a path that is about to spawn a shell.
+  const worktreeCreated = async (taskId: string, cwd: string): Promise<void> => {
+    const task = await services().tasks.load(taskId)
+    if (task) await maybeRunSetup(task, cwd)
+  }
 
   // The request/response half of the terminal engine, exposed as the TerminalBridge behind the HTTP
   // routes (server/routes/terminal.ts). The stream half is the WebSocket hub (setStreamHandlers below).

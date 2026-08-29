@@ -1,5 +1,12 @@
 import type { PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from './api'
-import { isCoreExclusiveSlot, parseExtensionPointRef, qualifiedExtensionPointId } from './extensionPoints'
+import {
+  isCoreExclusiveSlot,
+  isExtensionPointKind,
+  isHookMode,
+  parseExtensionPointRef,
+  qualifiedExtensionPointId,
+  type ExtensionPointKind,
+} from './extensionPoints'
 import { isPluginKeyClaim } from './keybindings'
 import { normalizeWebviewHost } from './webview'
 
@@ -23,6 +30,22 @@ export const pluginWebviewGrants = (contributions: PluginContributions): PluginW
     .sort((a, b) => a.surface.localeCompare(b.surface))
 
 /**
+ * Which kind a contribution brings, read off the carrier it named rather than off the owner's
+ * declaration, because a contributor's manifest cannot see the owner's.
+ *
+ * `items` is the one ambiguity: rows and annotations are both descriptors on a route, and only the
+ * owner's point says which. The grant says `rows`, and the sentence written from it stays true either
+ * way, because what a person is consenting to is "this package's records appear inside that one's
+ * surface". The host resolves the real kind at delivery.
+ */
+const contributedPointKind = (entry: { remote?: string; frame?: string; route?: string }): ExtensionPointKind => {
+  if (entry.remote !== undefined) return 'remote'
+  if (entry.frame !== undefined) return 'rectangle'
+  if (entry.route !== undefined) return 'hook'
+  return 'rows'
+}
+
+/**
  * Everything this manifest says about surfaces that are not its own, in both directions. See
  * docs/plugins.md § Cooperative extension points for why both directions matter and appear in the
  * trust prompt.
@@ -32,17 +55,31 @@ export const pluginWebviewGrants = (contributions: PluginContributions): PluginW
  * point in another package's name.
  */
 export const pluginExtensionGrants = (pluginId: string, contributions: PluginContributions): PluginExtensionGrant[] => [
-  ...(contributions.extensionPoints ?? []).map((point): PluginExtensionGrant => ({
-    kind: 'hosts',
-    target: qualifiedExtensionPointId(pluginId, point.id),
-    label: point.label,
-  })),
+  ...(contributions.extensionPoints ?? []).flatMap((point): PluginExtensionGrant[] =>
+    // A kind this build has no sentence for is dropped rather than disclosed with a guess. Same rule
+    // as the unparseable reference below: better a missing line than one that describes the wrong
+    // thing, and the roster row already records what this shell could not read.
+    isExtensionPointKind(point.kind)
+      ? [{
+        kind: 'hosts',
+        pointKind: point.kind,
+        target: qualifiedExtensionPointId(pluginId, point.id),
+        label: point.label,
+      }]
+      : []),
   ...(contributions.extensions ?? []).flatMap((entry): PluginExtensionGrant[] => {
     // An unparseable reference is dropped rather than disclosed. The node refused it at parse and the
     // client refuses it again, so it will never deliver anything. A consent line about a grant that
     // cannot exist is noise in the one list that must not have any.
     const ref = parseExtensionPointRef(entry.point)
-    return ref ? [{ kind: 'extends', target: entry.point, label: entry.label }] : []
+    if (!ref) return []
+    return [{
+      kind: 'extends',
+      pointKind: contributedPointKind(entry),
+      ...(isHookMode(entry.mode) ? { mode: entry.mode } : {}),
+      target: entry.point,
+      label: entry.label,
+    }]
   }),
   ...(contributions.frames ?? []).flatMap((frame): PluginExtensionGrant[] =>
     frame.target === 'coreSlot' && isCoreExclusiveSlot(frame.coreSlot)

@@ -1,6 +1,9 @@
 # Phase 4: the five extension kinds, hooks, and the developer view
 
-Status: not started.
+Status: shipped 2026-08-29. What behaviour looks like now is owned by
+[docs/plugins.md](../../plugins.md) §§ Cooperative extension points and Hooks, and by
+[docs/contribution-kinds.md](../../contribution-kinds.md); where this file and those disagree, they win.
+The deviations are at the bottom.
 
 ## Goal
 
@@ -159,3 +162,75 @@ slots, the winner and why. Reads the same registries; adds no bridge verb.
 - `docs/future/rail-tab.md` still has "Slice 3: loaded-plugin descriptors, NOT BUILT."
 - The owner code paths for the eight hooks exist at the files named; the events survey in
   `docs/future/events.md` (the per-plugin survey is in git history under `docs/future/events/plugin-events.md`) cites line numbers for several of them.
+
+
+## What shipped, and where it deviates
+
+Everything in scope landed except the draw sites listed below. The parts worth checking against this
+file before reading the code:
+
+**The remote target list is gone.** Phase 3's `contributions.remote[]` with `target: 'agentToolRenderer'`
+is deleted. A remote contribution is an ordinary `extensions` entry naming a point, and the agents
+transcript's tool card is `agents:tool-card`, a `remote` point in `replace` mode keyed by tool name. The
+compiled `agentToolRendererRegistry` still wins where both claim a call, unchanged.
+
+**The plugin API major went from 4 to 5.** Two published names went away — `WORKTREE_CREATED` and
+`remoteToolRendererFor` — and the surface snapshot refuses a shrunken surface under an unchanged major.
+Seven hook types and three slot exports arrived with the bump.
+
+### Five deviations
+
+1. **Only three of the five "existing seams" converted, and one of the three is a rename.**
+   `WORKTREE_CREATED` became `core:worktree-created` as designed: a single-slot capability the terminal
+   plugin filled becomes a chain any number of packages can join, terminal registers a `transform`
+   handler, and the `capabilities` parameter that existed only to carry it is gone from
+   `resolveTaskCwd`, `taskRoot`, `taskRunConfig`, `createTaskService` and `createCoreServices`.
+
+   `taskChecks` did **not** convert. It is a richer contract than a hook: a check answers with a concern
+   *and* an opt-in cleanup plan, and `{ ok, reason }` cannot express the checkbox. Converting it would
+   have deleted user-visible behaviour to reach a uniformity nobody asked for. It is `core:before-archive`
+   in all but name and it stays where it is.
+
+   The `routeCapability` seams did **not** convert. Four of the five (`PLUGIN_STATE`, `SCHEDULER`,
+   `RUN_TARGETS`, `TASK_SESSIONS`) are single-provider service bridges — `scheduler.list()`,
+   `sessions.archive()` — which is RPC, not a decision, and a chain in front of one would answer a
+   question nobody asked. The fifth, `TASK_CREATED`, is an *after* callback, which is an event's shape
+   rather than a hook's. Generalising `pane.footer` into five kinds was right because `pane.footer` was
+   one instance of a general thing; these are not.
+
+2. **Three of the eight first hooks are core's, not the plugin's the design named.** `before-tool-call`
+   and `before-snapshot` are `core:` points, because the choke points are core's: every agent tool call
+   lands on one core route whatever asked for it, and the context assembler lives in core while the
+   context plugin is client-only. `before-run-target` allows `observe` and `veto` and not the
+   `transform (env)` the design sketched: a payload is scalars and arrays of scalars, so an environment
+   map is not expressible in the declared vocabulary, and making it expressible would mean a second
+   payload vocabulary for one hook.
+
+3. **"Node-side extension points" was not replaced by hooks; hooks were added beside it.** The typed
+   in-process registry (`ctx.extensionPoints`) carries *values* — workflow step kinds, gate policies —
+   and workflows and http still use it. A chain with a verdict is a different question from a list of
+   contributions, and collapsing the two would have cost workflows its step-kind seam. `docs/plugins.md`
+   now cross-links them with one sentence on which to reach for.
+
+4. **The `Slot` nesting guard was built and then deleted.** A runtime "you are inside a grafted subtree"
+   context turned out to be unreachable: a contributor's tree is a stream of kit node names and `Slot`
+   is not one of them, so a grafted subtree has no way to open a slot. The wire vocabulary is the
+   enforcement, and a guard that can never fire is a guard nobody maintains. The rule is stated in
+   `Slot.tsx` and held by a test.
+
+5. **Four annotation draw sites are not built.** The mechanism is complete — the manifest key, the
+   batched POST, the sanitiser, the provenance stamp, the store — and one draw site ships:
+   `DiffPane`, which covers `changes:diff-line` and `github:diff-line`. The editor gutter, the editor
+   file tree, the docker container row and the rail task row (`core:task`, superseding rail-tab Slice 3)
+   are not. Each is a `<AnnotationMarks>` placement in a pane that phases 6 to 8 are rewriting anyway,
+   and putting one in `DockerBrowse.tsx` today would be work phase 6 does again. Nothing about the
+   mechanism changes when they land.
+
+### Owed before this is finished
+
+The **Done when** list's first bullet is not met: no test plugin declares all five kinds and exercises
+them in the running app. The mechanism is covered by unit and jsdom tests — the hook chain's thirteen
+rules, arbitration, annotation batching and failure isolation, the trust copy for every kind and
+direction, and the developer view — and no first-party plugin *fills* any of the new points yet, which
+is what phase 5 onwards is for. A hand-written test plugin is the honest way to close it and it is not
+written.

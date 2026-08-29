@@ -9,8 +9,19 @@ export const editorPlugin = (): NodePlugin => {
   return {
     name: 'editor',
     init: (ctx) => {
+      // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks): a formatter's
+      // turn at the text on its way to disk. A veto is allowed too, so a lint-on-save can refuse.
+      ctx.hooks.declare({
+        id: 'before-save',
+        label: 'save a file',
+        payload: { taskId: 'string', path: 'string', text: 'string' },
+        allows: ['observe', 'transform', 'veto'],
+        // A save is on the typing path. Two seconds is the archive dialog's budget, and this has less
+        // patience than a dialog does.
+        timeoutMs: 2_000,
+      })
       routeDisposables = [
-        ctx.capabilities.provide(EDITOR, editorBridge(ctx.core, ctx.events.status)),
+        ctx.capabilities.provide(EDITOR, editorBridge(ctx.core, ctx.events.status, ctx.hooks)),
         ctx.capabilities.provide(SEARCH, searchBridge(ctx.core)),
       ]
       ctx.routes.register(search, { prefix: '/tasks', note: '/:id/search' })

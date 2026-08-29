@@ -24,6 +24,15 @@
 .extended-pane-frame { flex: 1 1 auto; min-height: 0; display: flex; }
 .extended-pane-frame > * { flex: 1 1 auto; min-width: 0; }
 
+/* Another plugin's rectangle, beside or below the owner's (plugins/frames/InlineSlot.tsx). A sibling
+   of the owner's frame, never an overlay on it: the host draws both and sits between them, and the
+   rule is what makes the seam visible to a person looking at two plugins' UI at once. Half the width
+   in the beside case and a third of the height in the below one, both capped, because the owner
+   reserved a box and did not offer the pane. */
+.extended-pane-frame > .inline-slot { flex: 0 1 50%; max-width: 50%; border-left: var(--divider); }
+.extended-pane-main > .inline-slot { flex: 0 1 33%; max-height: 33%; min-height: 0; display: flex; border-top: var(--divider); }
+.inline-slot > * { flex: 1 1 auto; min-width: 0; }
+
 /* A third of the pane, capped, and it may not squeeze the owner's frame to nothing however many panels
    somebody composes. Below twelve usable cells the grid collapses to one column on its own, which is
    what makes a column this narrow work rather than something this file has to arrange. */

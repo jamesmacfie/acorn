@@ -66,7 +66,7 @@ const internalEnv: InternalEnvFactory = (claims) => ({
 })
 let finishReconcile!: () => void
 const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
-const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY, capabilities })
+const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
 
 // Same plugin list, through the same builder, as the desktop-supervised root
 // (docs/node-distribution.md § Runtime). Nothing in the bag differs between the two.

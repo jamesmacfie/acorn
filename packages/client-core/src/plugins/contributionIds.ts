@@ -35,14 +35,21 @@ export const qualifiedContributionId = (pluginId: string, id: string): string =>
  *  `extensionPoints[].surface`. Matching on the key name rather than on a list of paths, so a
  *  descriptor that gains a reference is covered without anyone remembering to come back here.
  *
+ *  `frame` belongs here too: an `extensions` entry places one of this plugin's own `inline` surfaces in
+ *  another plugin's rectangle point, so a surface id rewritten below has to be rewritten in the
+ *  reference with it.
+ *
  *  Deliberately not `slot`, which names one of the host's own slots, and not `point`, which names
  *  another plugin's extension point. */
-const REFERENCE_KEYS = new Set(['pane', 'surface', 'overlay'])
+const REFERENCE_KEYS = new Set(['pane', 'surface', 'overlay', 'frame'])
 
-/** The contribution lists whose `id` is a name this device registers, and so a name core could one day
- *  collide with. `remote` joined them when the tree path landed: a remote entry's id is what a roster
- *  row and a failure row name it by. */
-const NAMESPACED_KINDS = ['frames', 'sources', 'slots', 'remote'] as const
+/** The contribution lists whose `id` is a name this device registers bare, and so a name core could one
+ *  day collide with.
+ *
+ *  Not `extensions`: a contribution's id reaches the registry as `plugin:<pluginId>:<id>` already
+ *  (chrome/extensionPoints.ts), so it cannot collide with core's or another package's, and prefixing it
+ *  here would namespace it twice. */
+const NAMESPACED_KINDS = ['frames', 'sources', 'slots'] as const
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)

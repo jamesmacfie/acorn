@@ -78,7 +78,6 @@
       "agents.usageRoute",
       "changes.localGit",
       "core.scheduler",
-      "core.taskWorktreeCreated",
       "docker.route",
       "editor.route",
       "editor.searchRoute",

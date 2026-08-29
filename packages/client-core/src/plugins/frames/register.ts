@@ -5,7 +5,7 @@ import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { panelRegion } from '../../dashboards/region'
 import { activeNodeId } from '../../node/activeNode'
-import { registerRemote } from '../tree/registry'
+import { registerPluginExtension } from '../chrome/extensionPoints'
 import { commandRegistry } from '../../registries/commands'
 import { pluginProjectRoutePrefix } from '../../registries/corePaths'
 import { keybindingRegistry } from '../../registries/keybindings'
@@ -121,6 +121,11 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
     // A surface a future mobile shell would have to render unusably in a phone viewport
     // (docs/future/remote.md).
     if (!surface.formFactor.includes('desktop')) continue
+    // An `inline` surface registers nothing of its own: it is a rectangle offered into another plugin's
+    // `rectangle` point, and the only thing that ever draws it is that plugin's pane (./InlineSlot.tsx).
+    // Registering it as a pane here would put it in this plugin's own switcher, which is the opposite
+    // of what "somebody else's pane reserved a box" means.
+    if (surface.target === 'inline') continue
     // A host-owned document surface runs no plugin code on this device: the host draws the editor and
     // the plugin's contribution is two routes on a node. So it's gated like a descriptor rather than
     // like a frame. No bytes execute, so there's nothing for a bytes-hash prompt to be about, and a
@@ -140,15 +145,22 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
       recordSurfaceFailure(pluginId, surface.id, error)
     }
   }
-  // Remote trees, gated on trust for the same reason a frame is and with no second question asked: a
-  // tree runs the plugin's bytes, in a worker rather than an iframe, and the prompt the owner answered
-  // was about those bytes (docs/future/layout/06-remote-tree.md § The sandbox: one worker per bundle).
-  for (const entry of row.installed?.contributions.remote ?? []) {
+  // The two extension carriers that run the plugin's own bytes: a remote tree in a worker, and an
+  // `inline` rectangle in an iframe. Both ride this pass rather than the chrome one, and both are gated
+  // on trust for the same reason a pane is and with no second question asked — the prompt the owner
+  // answered was about these bytes (docs/future/layout/06-remote-tree.md § The sandbox). The other two
+  // carriers, `items` and `route`, are descriptors and register in the chrome pass.
+  for (const entry of row.installed?.contributions.extensions ?? []) {
+    if (entry.remote === undefined && entry.frame === undefined) continue
     if (!trusted) continue
     try {
-      disposables.push(registerRemote(pluginId, hash, entry))
+      disposables.push(registerPluginExtension(pluginId, entry, {
+        nodeId: frameNode,
+        enabled: () => pluginEnabledOnNode(frameNode(), pluginId),
+        hash,
+      }))
     } catch (error) {
-      console.warn(`[plugins] ${pluginId} could not contribute remote '${entry.id}':`, error)
+      console.warn(`[plugins] ${pluginId} could not contribute extension '${entry.id}':`, error)
       recordSurfaceFailure(pluginId, entry.id, error)
     }
   }
@@ -157,6 +169,11 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
 
 function registerSurface(pluginId: string, hash: string, row: NodePluginRow, surface: PluginFrameSurface): Disposable {
   switch (surface.target) {
+    // Unreachable: the loop above skips these before they get here, because an `inline` rectangle has
+    // no registry of its own. Spelled rather than left to the exhaustiveness check, so the reason is at
+    // the switch a reader is looking at rather than forty lines above it.
+    case 'inline':
+      throw new Error(`inline surface '${surface.id}' is placed by another plugin's point, not registered here`)
     case 'webview':
       return paneRegistry.register({
         id: surface.id,
@@ -270,6 +287,14 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           .filter((entry) => entry.surface === surface.id)
         const point = points.find((entry) => entry.location === 'pane.footer')
         const pointId = point ? qualifiedExtensionPointId(pluginId, point.id) : null
+        // The two rectangle locations, each holding another plugin's iframe beside this one's
+        // (docs/plugins.md § Cooperative extension points, the `rectangle` kind).
+        const inlineId = (location: string): string | null => {
+          const entry = points.find((candidate) => candidate.location === location)
+          return entry ? qualifiedExtensionPointId(pluginId, entry.id) : null
+        }
+        const inlineBelow = inlineId('pane.inline-below')
+        const inlineBeside = inlineId('pane.inline-beside')
         const asidePoint = points.find((entry) => entry.location === 'pane.aside')
         // The point id doubles as the placement's owner id. It's already `<pluginId>:<pointId>`, minted
         // by the host, so a plugin can't address another package's stored composition.
@@ -300,10 +325,14 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
               binding: frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId }),
               hash,
             })
-            if (!pointId && !aside) return frame
+            if (!pointId && !aside && !inlineBelow && !inlineBeside) return frame
             return createComponent(ExtendedPane, {
               ...(pointId ? { footerPointId: pointId } : {}),
               ...(aside ? { aside } : {}),
+              ...(inlineBelow ? { inlineBelowPointId: inlineBelow } : {}),
+              ...(inlineBeside ? { inlineBesidePointId: inlineBeside } : {}),
+              taskId: props.task.id,
+              projectId: props.task.projectId,
               children: frame,
             })
           },

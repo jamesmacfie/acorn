@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
-  "title": "acorn plugin manifest (plugin API major 4)",
+  "title": "acorn plugin manifest (plugin API major 5)",
   "type": "object",
   "properties": {
     "$schema": {
@@ -228,7 +228,8 @@
                   "importer",
                   "webview",
                   "overlay",
-                  "coreSlot"
+                  "coreSlot",
+                  "inline"
                 ]
               },
               "scope": {
@@ -434,47 +435,6 @@
               "target",
               "id",
               "label"
-            ]
-          }
-        },
-        "remote": {
-          "default": [],
-          "maxItems": 32,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "target": {
-                "type": "string",
-                "enum": [
-                  "agentToolRenderer"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 64
-              },
-              "entry": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 64
-              },
-              "tools": {
-                "minItems": 1,
-                "maxItems": 64,
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 128
-                }
-              }
-            },
-            "required": [
-              "target",
-              "id",
-              "entry"
             ]
           }
         },
@@ -1900,7 +1860,7 @@
         },
         "extensionPoints": {
           "default": [],
-          "maxItems": 4,
+          "maxItems": 16,
           "type": "array",
           "items": {
             "type": "object",
@@ -1916,11 +1876,24 @@
                 "minLength": 1,
                 "maxLength": 80
               },
+              "kind": {
+                "default": "rows",
+                "type": "string",
+                "enum": [
+                  "rows",
+                  "annotation",
+                  "remote",
+                  "rectangle",
+                  "hook"
+                ]
+              },
               "location": {
                 "type": "string",
                 "enum": [
                   "pane.footer",
-                  "pane.aside"
+                  "pane.aside",
+                  "pane.inline-below",
+                  "pane.inline-beside"
                 ]
               },
               "surface": {
@@ -1972,19 +1945,118 @@
                     "maximum": 12
                   }
                 }
+              },
+              "key": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "string",
+                    "number"
+                  ]
+                }
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "stack",
+                  "replace"
+                ]
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "max": {
+                "default": 4,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "accepts": {
+                "maxItems": 32,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "payload": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "string[]",
+                    "number[]",
+                    "boolean[]"
+                  ]
+                }
+              },
+              "allows": {
+                "minItems": 1,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "observe",
+                    "transform",
+                    "veto"
+                  ]
+                }
+              },
+              "timeoutMs": {
+                "default": 5000,
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 30000
+              },
+              "onTimeout": {
+                "default": "allow",
+                "type": "string",
+                "enum": [
+                  "allow",
+                  "deny"
+                ]
+              },
+              "order": {
+                "default": "priority",
+                "type": "string",
+                "enum": [
+                  "priority",
+                  "install"
+                ]
+              },
+              "collect": {
+                "default": false,
+                "type": "boolean"
               }
             },
             "required": [
               "id",
-              "label",
-              "location",
-              "surface"
+              "label"
             ]
           }
         },
         "extensions": {
           "default": [],
-          "maxItems": 8,
+          "maxItems": 16,
           "type": "array",
           "items": {
             "type": "object",
@@ -2014,6 +2086,45 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
+              },
+              "remote": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "frame": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "route": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "matches": {
+                "minItems": 1,
+                "maxItems": 64,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "observe",
+                  "transform",
+                  "veto"
+                ]
+              },
+              "priority": {
+                "default": 500,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
               },
               "onSelect": {
                 "oneOf": [
@@ -2129,8 +2240,7 @@
             "required": [
               "id",
               "point",
-              "label",
-              "items"
+              "label"
             ]
           }
         },
