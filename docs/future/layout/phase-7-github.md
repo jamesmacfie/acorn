@@ -1,6 +1,6 @@
 # Phase 7: github
 
-Status: not started.
+Status: shipped 2026-08-30.
 
 ## Goal
 
@@ -112,3 +112,95 @@ Every hand-registered keybinding becomes a layer binding on the pane or a region
 - `plugins/github/src/client/PullList.tsx` has its own virtualised list with `RowActions`.
 - `plugins/github/src/client/{importer.css}` and `styles/` exist.
 - `Shortcuts.tsx` calls `registerKeybindings` from `@acorn/plugin-api/ui/host`.
+
+## What shipped, and where it differs
+
+Eleven deviations from the plan above. Each was a decision made while building, and each is recorded
+here rather than in the owning doc, because the owning doc says what is true and this says what
+changed.
+
+**1. The pull strip lives in the panels, not beside the tab bar.** A task can be about several pull
+requests, and the strip that switches between them used to sit above the whole pane. The `tabs`
+layout's bar is the host's and has no room in it, so the strip opens every panel instead, drawn from
+one per-task model (`pullDetail/prTabs.ts`). On the Files tab it sits at the top of the navigator
+column rather than over the split, because a scroller between the layout and the two columns it sizes
+would take their height away. It is a `ChipRow` rather than a tab strip: a chip carries its kind icon
+and the button that opens the linked task or the creating agent, which a tab does not have a slot for.
+
+**2. Conversation is not `header-body-footer` with a pinned composer.** The plan asked for the
+composer as a footer region. That would mean nesting a layout inside a tab panel, which means two
+region-focus registrations for one pane, and the composer is above the timeline today. It stayed
+there. Nothing about the tree makes pinning it hard later; there was just no reason to pay for it in
+the same change that moved everything else.
+
+**3. The file list is flat.** The plan listed a `TreeRow` navigator as an accepted difference, so it
+wanted a directory tree. A tree is a change in what the navigator says rather than a move to the kit,
+this list is the file order the finder and `[` and `]` cycling already agree on, and nothing asked for
+it. It is a `Rows` collection of `Row`s, virtualised on the Files tab and flat inside the browse
+navigator's fold.
+
+**4. `Rows` learned to virtualise, and the collection learned to reach a row it cannot see.** The
+plan said the pull list should be "virtualised by the kit's collection host rather than the plugin's
+own scroller", and no such thing existed. `Rows virtual` is it: the scroller, the row placement and
+the density number are the kit's, and the body is called for the rows in view with each one's
+placement. Roving focus still walks the whole list, because `createCollection` gained `scrollToKey` —
+when the row it wants to focus has no element, it asks the scroller to reach it and focuses on the
+next frame. github's list lost a virtualizer, a scroll element, two animation frames and a pair of
+hand-registered `j` and `k` bindings.
+
+**5. `j` and `k` are the collection's now, not a global chord.** They used to move the pull selection
+from anywhere in the app through a `typing-exempt` binding. They are intents on the focused
+collection, so they move whichever list has focus, and they do nothing when nothing does. That is
+what phase 2 was for, and it is a real behaviour change on this pane.
+
+**6. Two host components came out of the move.** `ProviderHtml` draws HTML a provider already
+rendered, in the host's markdown skin, with the bare-reference pass and the link handling; it replaced
+three hand-written `.ui-markdown` bindings in github and is why `docs/security.md`'s `bodyHTML` list
+went from four entries to two. It is not a kit node, because the reference pass is a registry function
+and `ui/` may not import one. `RefPanelBox` is the backdrop, drawer, title and dismiss affordance a
+reference panel is drawn in, which every first-party panel used to redraw. A loaded plugin's panel
+keeps its own copy in `PluginRefPanel.tsx`: an iframe takes the drawer's height directly rather than
+sitting in the scrolling body, which is a different arrangement rather than the same one with a flag.
+
+**7. `ListDetail` gained a third column genre and a scrolling column.** browse is two splits, one
+inside the other, and its middle column is a pull request rather than a picker. `listWidth="wide"`
+(`--listdetail-w-wide`, the width the old middle pane had) and `ListColumn scroll` are what that
+needed: a column that scrolls as one region and takes the pane's inline padding, the same rule
+`single` and `header-body-footer` apply to their bodies. `.layout-tabs-panel` got the same treatment,
+for the same reason `.layout-hbf-body` did in phase 6.
+
+**8. `selectPaneTab` is the door between panels.** "View in diff" in the conversation has to show the
+Files tab. The selection is the host's, held under the pane id, so the pane asks rather than keeping a
+second copy. It is exported from `@acorn/plugin-api/ui/host` and it is the only way in.
+
+**9. The checks drawer is a modal.** The plan did not mention it. It was a hand-drawn right-hand
+drawer with its own stylesheet; it is a `Modal` of `Fold`s over the kit's `Log`, portalled because the
+pane that opens it sets `contain: layout paint`. Accepted difference: the step logs lost their ANSI
+colour, because a log is text and the kit draws text in one place.
+
+**10. The compare preview is a `DiffPane`.** The plan asked for it and it was worth saying twice: the
+preview used to hydrate and lay out its own rows, because the shared viewer was not something a second
+surface could drive. It is now, given a source with nothing to write to, and eighty lines of parse
+bookkeeping went with the move.
+
+**11. The importer is not a wizard, and the navigator kept no scroll memory.** The importer is one
+screen, and the one place it appears in a wizard is first-run onboarding, where it is already a step
+inside onboarding's own. Wrapping it would nest one wizard in another. Separately,
+`reviewScrollRestoration.ts` and `reviewViewState.ts` are deleted rather than reduced: the navigator
+is a region of a host layout now, and there is no `.pane-mid` for the controller to bind. The diff
+column's own position and collapsed files are unaffected, in `diff/viewState.ts` where they always
+were.
+
+## Owed after this phase
+
+- The tests the plan asked for in the jsdom tier are host tests instead. A plugin package runs
+  `.test.ts` in bare Node with no Solid transform, so github cannot render a component in its own
+  suite; `Rows virtual` is covered in `client-core/src/keys/keys.test.tsx`, the annotation mechanism
+  by phase 6's `changes:diff-line` tests, and github's own suite holds the two point declarations.
+  Rendering the PR pane through each tab needs a jsdom project in the plugin, which is phase 9's
+  question, not this one's.
+- The smoke checklist in `docs/testing.md` covers review, merge and comment by hand. Nothing here
+  ran it.
+- `_resetCollectionState` does not clear the store: `setStates(() => ({}))` merges rather than
+  replaces, so a suite inherits the previous test's place. The new test works around it with a
+  distinct collection id. One line to fix, and nothing in this phase depended on it.

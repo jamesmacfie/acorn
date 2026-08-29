@@ -199,7 +199,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
         </Show>
 
         {/* `.pane-left` is an overflow:hidden flex column, so the list needs its own scroller or it is
-            clipped at the pane edge. Same shape as github's `.pr-list-scroll` and docker's
+            clipped at the pane edge. Same shape as the kit's `.ui-rows-scroll` and docker's
             `.docker-list`. */}
         <div class="scroll">
           <Show

@@ -106,15 +106,15 @@ read, so retargeting a stack or editing out a link removes it without a cleanup 
 task destination wins over agent, mention, and stack destinations; an agent destination opens the
 recorded managed session through the existing notice-target seam.
 
-Selecting a related PR with no task shows `+ TASK` in the Navigator header. Promotion reuses the
+Selecting a related PR with no task offers `+ Task` in the strip. Promotion reuses the
 repository-list workflow: the new task takes the matching core project, the PR head branch and pull
 number, and any unambiguous Linear references from the PR body. If exactly one other active task
-already owns that PR, the tab opens it instead; several owners keep the explicit task chooser.
+already owns that PR, the chip opens it instead; several owners keep the explicit task chooser.
 
 Within a task PR body, another GitHub PR link is a `plugin:select` intent for the existing PR pane,
-not a route change or reference-panel overlay. The selected tab changes what `PullDetail` and
-`DiffView` read but never changes the current task's scalar primary, branch, or worktree. All GitHub writes,
-including diff comments and thread actions, are omitted on a non-primary tab.
+not a route change or reference-panel overlay. Which pull is selected changes what all three panels
+read but never changes the current task's scalar primary, branch, or worktree. All GitHub writes,
+including diff comments and thread actions, are omitted on a non-primary pull.
 
 Linear reference panels are contributed through a provider contract, so the GitHub plugin does not
 import Linear's implementation. Linear is a loaded plugin, so the panel it renders there is a
@@ -128,3 +128,31 @@ UI.
 Checks expose Actions run/job data. Job logs follow GitHub's signed redirect without forwarding the
 GitHub bearer to the blob host. Rerun-failed-jobs is an explicit mutation and requires the provider
 permission GitHub reports.
+
+A check row with a run behind it opens that run's steps in a modal: failed steps start open, and the
+first one opened fetches the whole job log once and slices every step out of it.
+
+## Surfaces
+
+Every GitHub surface is a host layout filled with kit components; the plugin ships no stylesheet
+([panes.md](./panes.md) § Layout model, [ui-design.md](./ui-design.md) § The closed kit).
+
+| Surface | Arrangement |
+| --- | --- |
+| The PR pane | The `tabs` layout: Overview, Conversation, Files. Every panel opens with the strip of pull requests this task is about, because which one is showing is shared between them. |
+| Overview | The pull's heading and facts, the actions toolbar, the conflict alert, description, linked tickets, labels, checks, reviewers, and the `github:summary-badges` slot. |
+| Conversation | The comment and review composers over a timeline of cards: comments, review summaries, commits, and file threads. |
+| Files | A split: the changed-file list beside the diff. |
+| Browse | Two splits, one inside the other: the pull list, then the pull request beside its diff, or the create form beside its compare preview. |
+| The reference panel | A heading, facts, and the host's task-link control, in the box the host draws. |
+| The importer | One row per repository with Clone and Map beside it. |
+
+Two places let another plugin in. `github:diff-line` takes marks on a line of a pull request's diff,
+keyed by file, line and side, the same shape the changes pane opens over the working tree.
+`github:summary-badges` is a `stack` slot on the overview, so github's own facts stay and up to four
+contributors are added beside them ([plugins.md](./plugins.md) § Cooperative extension points).
+
+Keyboard navigation comes from the tree rather than from this plugin: the pull list, the file list,
+the check list and the pull strip are kit collections, so the arrows, `j` and `k`, Home, End and
+type-ahead all work without a binding of github's own. What is left in `Shortcuts.tsx` is the file
+finder, `[` and `]` cycling, and "create pull request" — commands that are not a list.

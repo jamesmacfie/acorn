@@ -1,12 +1,16 @@
-// The GitHub browse surface: the three-pane review layout behind the `github` rail Source
-// (docs/github-integration.md § Reads and writes covers why its layout is pinned by e2e).
+// The GitHub browse surface behind the `github` rail Source (docs/github-integration.md § Reads and
+// writes).
+//
+// Two splits, one inside the other: the pull list beside everything else, and inside that the
+// navigator beside the diff. The host draws both, and the three hand-drawn `.pane-left` /
+// `.pane-mid` / `.pane-right` sections that used to be here are gone with them.
 //
 // Params-driven, like the components it hosts: PullList reads `useParams()` itself, and the routes
-// exist only to populate params. That is why this component takes no props for three panes.
+// exist only to populate params. That is why this component takes no props for three columns.
 //
 // The routed project is all this surface needs to render, the same gate every other Source applies
 // (plugins/http HttpBrowse). None of this plugin's own routes has to match (docs/plugins.md § Frame
-// authoring and the UI kit): the routes address a PR, they do not decide whether the surface
+// authoring and the UI kit): the routes address a pull, they do not decide whether the surface
 // renders.
 import { createSignal, lazy, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
@@ -17,9 +21,9 @@ import { projectsOptions, readJson } from '@acorn/plugin-api/client'
 import { Acorn } from '@acorn/plugin-api/ui/host'
 import PullList from './PullList'
 import { githubCreateRoute } from './routes'
-import { Button, EmptyState, SectionHeader } from '@acorn/plugin-api/ui'
+import { Button, DetailColumn, EmptyState, ListColumn, ListDetail, SectionHeader } from '@acorn/plugin-api/ui'
 
-// Heavy surfaces stay behind their navigation intent so Shiki, diff rendering, and the create-PR
+// Heavy surfaces stay behind their navigation intent so Shiki, diff rendering and the create-pull
 // form do not compete with the first interactive paint. PullList is the startup path, so it loads
 // eagerly.
 const PullDetail = lazy(() => import('./PullDetail'))
@@ -36,10 +40,10 @@ export default function GithubBrowse() {
   const owner = () => project()?.github?.owner ?? ''
   const repo = () => project()?.github?.name ?? ''
   // Pull requests need the GitHub facet, not only a project. A project with no github.com remote has
-  // no PRs to list, and without this gate PullList sits on "Loading…" forever, because its queries
+  // no pulls to list, and without this gate PullList sits on "Loading…" forever, because its queries
   // never enable.
   const linked = () => !!project()?.github
-  // Create-PR mode: the static route is contributed ahead of the parameter route.
+  // Create mode: the static route is contributed ahead of the parameter route.
   const newMatch = useMatch(() => githubCreateRoute)
   const isNew = () => !!newMatch()
 
@@ -76,7 +80,7 @@ export default function GithubBrowse() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: pullsPrefixKey(owner(), repo()) }),
         // Linked tickets, both list enrichment and any open detail, refetch too. Keyed by string
-        // rather than by importing the plugin that supplies them, so a force-refresh of a PR does
+        // rather than by importing the plugin that supplies them, so a force-refresh of a pull does
         // not make this plugin depend on whichever providers enrich it. The host's one prefix covers
         // every provider (client-core/registries/refResolvers.ts).
         queryClient.invalidateQueries({ queryKey: ['plugin-ref-resolutions'] }),
@@ -90,21 +94,20 @@ export default function GithubBrowse() {
     <Show
       when={linked()}
       fallback={
-        <main class="panes panes-empty">
-          <Show when={emptyMessage()} fallback={<Acorn />}>
-            {(message) => <EmptyState align="start">{message()}</EmptyState>}
-          </Show>
-        </main>
+        <Show when={emptyMessage()} fallback={<Acorn />}>
+          {(message) => <EmptyState align="start">{message()}</EmptyState>}
+        </Show>
       }
     >
-      <main class="panes">
-        <section class="pane pane-left">
+      <ListDetail split>
+        <ListColumn label="Reviews">
           <SectionHeader
             actions={
               <>
-                <Button tip="New pull request" onPress={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? '')))}>
-                  + New PR
-                </Button>
+                <Button
+                  tip="New pull request"
+                  onPress={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? '')))}
+                >+ New PR</Button>
                 <Button variant="bare" iconOnly tip="Refresh reviews" label="Refresh reviews" busy={refreshingPulls()} onPress={refreshAllPulls}>↻</Button>
               </>
             }
@@ -112,45 +115,45 @@ export default function GithubBrowse() {
             Reviews
           </SectionHeader>
           <PullList />
-        </section>
-        <Show
-          when={isNew()}
-          fallback={
-            <Show
-              when={params.number}
-              fallback={
-                <section class="pane pane-mid pane-empty" style={{ 'grid-column': '2 / -1' }}>
-                  <Acorn />
-                </section>
-              }
-            >
-              <section class="pane pane-mid">
-                <SectionHeader>Navigator</SectionHeader>
-                <PullDetail />
-              </section>
-              <section class="pane pane-right">
-                <SectionHeader
-                  actions={
-                    <Button variant="bare" iconOnly title="Refresh diff" label="Refresh diff" busy={refreshingPull()} onPress={refreshCurrentPull}>↻</Button>
-                  }
-                >
-                  Diff
-                </SectionHeader>
-                <DiffView />
-              </section>
-            </Show>
-          }
-        >
-          <section class="pane pane-mid">
-            <div class="section-header">New pull request</div>
-            <CreatePullForm />
-          </section>
-          <section class="pane pane-right">
-            <div class="section-header">Compare</div>
-            <ComparePreview />
-          </section>
-        </Show>
-      </main>
+        </ListColumn>
+        <DetailColumn>
+          <Show
+            when={isNew()}
+            fallback={
+              <Show when={params.number} fallback={<Acorn />}>
+                <ListDetail split listWidth="wide">
+                  {/* No "Navigator" header: the tree under it opens with the pull's own heading,
+                      which names the column better than a label ever did. */}
+                  <ListColumn scroll label="Pull request">
+                    <PullDetail />
+                  </ListColumn>
+                  <DetailColumn>
+                    <SectionHeader
+                      actions={
+                        <Button variant="bare" iconOnly tip="Refresh diff" label="Refresh diff" busy={refreshingPull()} onPress={refreshCurrentPull}>↻</Button>
+                      }
+                    >
+                      Diff
+                    </SectionHeader>
+                    <DiffView />
+                  </DetailColumn>
+                </ListDetail>
+              </Show>
+            }
+          >
+            <ListDetail split listWidth="wide">
+              <ListColumn scroll label="New pull request">
+                <SectionHeader>New pull request</SectionHeader>
+                <CreatePullForm />
+              </ListColumn>
+              <DetailColumn>
+                <SectionHeader>Compare</SectionHeader>
+                <ComparePreview />
+              </DetailColumn>
+            </ListDetail>
+          </Show>
+        </DetailColumn>
+      </ListDetail>
     </Show>
   )
 }

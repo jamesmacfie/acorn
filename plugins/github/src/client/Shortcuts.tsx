@@ -3,8 +3,8 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
 import { createOverlayPalette, fuzzyScore, projectsOptions, registerCommands } from '@acorn/plugin-api/client'
 import type { PullFile } from '../contract/api'
-import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { PaletteSurface } from '@acorn/plugin-api/ui/host'
+import { PaletteSurface, registerKeybindings } from '@acorn/plugin-api/ui/host'
+import { Inline, Text } from '@acorn/plugin-api/ui'
 import { createQuery } from '@tanstack/solid-query'
 import { githubCreateRoute } from './routes'
 
@@ -106,11 +106,11 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
       row={(file) => {
         const parts = splitPath(file.path)
         return (
-          <>
+          <Inline gap="none">
             {/* Directory first and dimmed, filename emphasised. */}
-            <span class="palette-hint muted">{parts.dir}</span>
-            <span class="palette-label">{parts.name}</span>
-          </>
+            <Text emphasis="muted">{parts.dir}</Text>
+            <Text>{parts.name}</Text>
+          </Inline>
         )
       }}
     />

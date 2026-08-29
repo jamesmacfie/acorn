@@ -179,9 +179,9 @@ They move inward. Today a plugin writes `<div class="agent-composer-actions">` a
 layout. After this, only kit components have classes, they are internal to the DOM host, and they read
 the same CSS variables they read now. A plugin never sees a class. The 700 raw tags in the survey
 become kit nodes with role props, and per-plugin stylesheets are deleted rather than ported. The
-loaded four went first and their four are gone (phase 5); `plugins/github/src/client/importer.css`, the
-agents CSS, and every other `.css` under `plugins/*/src` are what is left. **A plugin with a `.css`
-file has not moved yet.**
+loaded four went first and their four are gone (phase 5), the small compiled panes took theirs with
+them (phase 6), and github's four went in phase 7. The agents CSS and the terminal drawer's outer box
+are what is left. **A plugin with a `.css` file has not moved yet.**
 
 The `ui/` purity rule stays: nothing under `client-core/src/ui/` may import state. Some focus
 machinery that lives in `/ui/host` today (the palette surface, focus trapping) moves into the kit in

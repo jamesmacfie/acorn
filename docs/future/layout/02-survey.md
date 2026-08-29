@@ -139,16 +139,16 @@ pays for the whole exercise and the hardest to move; it goes last.
 
 ### github
 
-**Today.** The PR pane is a large custom detail: `PullSummary` (title, meta line, action buttons,
-conflict alert), a label picker, reviewers, checks, a conversation of custom entries with two
-`Composer`s, and `DiffForPull` (a `DiffPane` with a file navigator). `GithubBrowse` is a hand-drawn
-three-column layout. `PullList` is tabs over a virtualised `Row` list with `RowActions`. The ref panel
-is a compact summary. The importer is a wizard step.
+**Moved in phase 7.** The PR pane was a large custom detail: `PullSummary` (title, meta line, action
+buttons, conflict alert), a label picker, reviewers, checks, a conversation of custom entries with two
+`Composer`s, and `DiffForPull`. `GithubBrowse` was a hand-drawn three-column layout and `PullList`
+owned its own virtualizer.
 
-**As a tree.** The PR pane is `tabs` with Overview, Conversation, and Files. Overview is `Heading`,
-`Facts`, a `Toolbar` of actions, checks as `Row`s, and a `summary-badges` slot. Conversation is a
-`Timeline` with a `Composer` footer. Files is `list-detail` with `TreeRow`s and `DiffPane`. Browse is
-`list-detail` whose detail is another `list-detail`, which is what its three columns are.
+**As a tree.** The PR pane is `tabs` with Overview, Conversation and Files. Overview is `Heading`,
+`Facts`, a `Toolbar` of actions, checks as `Row`s, and the `github:summary-badges` slot. Conversation
+is a `Timeline` of `Card`s over two `Composer`s. Files is a split of the file list and `DiffPane`.
+Browse is `ListDetail` whose detail is another `ListDetail`, which is what its three columns were. The
+four stylesheets are gone.
 
 **Rectangle left.** None. `DiffPane` is kit, implemented per host.
 

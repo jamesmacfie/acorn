@@ -1,5 +1,8 @@
-import { For, type JSX } from 'solid-js'
+import { createEffect, For, on, onCleanup, Show, createSignal, type JSX } from 'solid-js'
+import { createVirtualizer } from '@tanstack/solid-virtual'
 import { createCollection, type CollectionItem, type ItemProps } from '../keys/collection'
+import { watchAppearance } from './appearance'
+import { rowHeight } from './metrics'
 
 // Rows: the run of `Row`s or `TreeRow`s, as a node.
 //
@@ -14,6 +17,12 @@ import { createCollection, type CollectionItem, type ItemProps } from '../keys/c
 // its position. See ../keys/collection.ts.
 //
 // At 80×24: the rows on successive lines, the active one marked.
+
+/** Where a virtualised row sits, in pixels. A measurement rather than a design decision: only the
+ *  virtualizer knows both numbers, and `Row` takes them as `offset` and `height`. Both are absent
+ *  outside a virtual list, where the rows sit in normal flow. */
+export type RowPlacement = { offset?: number; height?: number }
+
 export function Rows<T extends CollectionItem>(props: {
   /** Keys the host's stored `active` and `selected`. Stable across a rebuild of `items`. */
   id: string
@@ -21,6 +30,15 @@ export function Rows<T extends CollectionItem>(props: {
   items: readonly T[]
   /** Draws as a tree rather than a list, for a run of `TreeRow`s. */
   tree?: boolean
+  /**
+   * Draw only the rows on screen, in a scroller of this node's own.
+   *
+   * The list a pane writes does not change: the same `items`, the same body. What changes is that the
+   * body is called for the rows in view and is handed each one's placement to pass to `Row`. Roving
+   * focus still walks the whole list, because the keys are the collection's and the scroller is asked
+   * to reach a row before it is focused (../keys/collection.ts § scrollToKey).
+   */
+  virtual?: boolean
   /** Controlled selection, and all of it: supplying this hands `selected` to the caller. */
   selected?: string | null
   onSelect?: (key: string) => void
@@ -29,12 +47,25 @@ export function Rows<T extends CollectionItem>(props: {
   onMenu?: (key: string) => void
   /** `selected` is an accessor, not a boolean: a `<For>` body runs once per row, so a value read
    *  there would never change again. Read it inside the JSX prop. */
-  children: (item: T, itemProps: ItemProps, selected: () => boolean) => JSX.Element
+  children: (item: T, itemProps: ItemProps, selected: () => boolean, place: RowPlacement) => JSX.Element
 }) {
+  // Read once. Whether a list is virtualised is a fact about the pane that wrote it, not a signal, and
+  // the two paths below build different machinery.
+  const virtual = props.virtual === true
+  let virt: ReturnType<typeof createVirtualizer<HTMLDivElement, Element>> | undefined
+
   const collection = createCollection({
     id: () => props.id,
     items: () => props.items,
     role: props.tree ? 'tree' : 'listbox',
+    ...(virtual
+      ? {
+        scrollToKey: (key: string) => {
+          const index = props.items.findIndex((item) => item.key === key)
+          if (index >= 0) virt?.scrollToIndex(index)
+        },
+      }
+      : {}),
     ...(props.selected !== undefined ? { selected: () => props.selected } : {}),
     ...(props.onSelect ? { onSelect: props.onSelect } : {}),
     ...(props.onActivate ? { onActivate: props.onActivate } : {}),
@@ -42,14 +73,78 @@ export function Rows<T extends CollectionItem>(props: {
     ...(props.onMenu ? { onMenu: props.onMenu } : {}),
   })
 
+  const NO_PLACE: RowPlacement = {}
+
+  if (!virtual) {
+    return (
+      <div class="ui-rows" aria-label={props.ariaLabel} {...collection.containerProps}>
+        {/* `<For>`, and safely: the rows are keyed by object here, but nothing focus-related lives in
+            them. `active` and `selected` are in the host's store keyed by `item.key`, which is the whole
+            point of holding them outside the rows. */}
+        <For each={props.items}>
+          {(item) => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)}
+        </For>
+      </div>
+    )
+  }
+
+  const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
+  // Row height comes from --row-h-virt so a style pack's density reaches the list. The virtualizer
+  // writes its answer back as an inline height, which beats any stylesheet rule, so a number read from
+  // the token is the only way density is real here (./metrics.ts).
+  const [rowH, setRowH] = createSignal(rowHeight())
+  virt = createVirtualizer({
+    get count() { return props.items.length },
+    getScrollElement: () => scrollEl() ?? null,
+    estimateSize: () => rowH(),
+    overscan: 12,
+  })
+  onCleanup(watchAppearance(() => {
+    setRowH(rowHeight())
+    virt?.measure()
+  }))
+
+  let frame = 0
+  onCleanup(() => cancelAnimationFrame(frame))
+  const measureSoon = () => {
+    cancelAnimationFrame(frame)
+    frame = requestAnimationFrame(() => virt?.measure())
+  }
+  // Published after layout rather than in the ref, so the first rect the virtualizer observes is the
+  // one the layout gave the scroller rather than a zero-height box.
+  const publish = (element: HTMLDivElement) => {
+    cancelAnimationFrame(frame)
+    frame = requestAnimationFrame(() => {
+      setScrollEl(element)
+      virt?.measure()
+    })
+  }
+  createEffect(on(() => props.items.length, measureSoon, { defer: true }))
+
   return (
-    <div class="ui-rows" aria-label={props.ariaLabel} {...collection.containerProps}>
-      {/* `<For>`, and safely: the rows are keyed by object here, but nothing focus-related lives in
-          them. `active` and `selected` are in the host's store keyed by `item.key`, which is the whole
-          point of holding them outside the rows. */}
-      <For each={props.items}>
-        {(item) => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key)}
-      </For>
+    <div class="ui-rows-scroll" ref={publish}>
+      <div
+        class="ui-rows"
+        aria-label={props.ariaLabel}
+        {...collection.containerProps}
+        style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}
+      >
+        <For each={virt.getVirtualItems()}>
+          {(slot) => {
+            const item = () => props.items[slot.index] as T | undefined
+            return (
+              <Show when={item()}>
+                {(row) => props.children(
+                  row(),
+                  collection.itemProps(row().key),
+                  () => collection.selected() === row().key,
+                  { offset: slot.start, height: slot.size },
+                )}
+              </Show>
+            )
+          }}
+        </For>
+      </div>
     </div>
   )
 }

@@ -845,6 +845,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 }
 .ui-listdetail[data-list] { grid-template-columns: var(--listdetail-w) minmax(0, 1fr); }
 .ui-listdetail[data-list='narrow'] { grid-template-columns: var(--listdetail-w-narrow) minmax(0, 1fr); }
+.ui-listdetail[data-list='wide'] { grid-template-columns: var(--listdetail-w-wide) minmax(0, 1fr); }
 /* A flex column so a caller can stack a header, a scrolling list and a footer link in it, the
    arrangement http's sidebar already had and the other three grew towards. */
 .ui-listdetail-list {
@@ -855,6 +856,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   overflow: hidden;
   border-right: var(--chrome-divider);
 }
+/* A list column that is a document: it scrolls as one region and takes the pane's inline padding,
+   the same rule `single` and `header-body-footer` apply to their bodies. */
+.ui-listdetail-list[data-scroll] { overflow-y: auto; padding-inline: var(--pane-pad); }
 .ui-listdetail-detail { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .ui-listdetail-detail[data-scroll] { display: block; overflow: auto; }
 
@@ -1174,3 +1178,8 @@ a.ui-row:hover { background: var(--bg-hover); }
 }
 .ui-grid-row:hover { background: var(--bg-hover); }
 .ui-grid-row[data-selected] { background: var(--bg-selected); }
+
+/* A virtualised `Rows`. The scroller is the node's, so a pane that virtualises a list writes no
+   scroll container of its own; the inner box carries the total height as an inline style and its
+   rows are absolutely placed, which is the only geometry a virtualiser can produce. */
+.ui-rows-scroll { flex: 1; min-height: 0; overflow: auto; }

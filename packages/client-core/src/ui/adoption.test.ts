@@ -261,6 +261,20 @@ describe('primitive adoption', () => {
     'plugins/memory/src/client/MemorySection.tsx',
     'plugins/notes/src/client/NotesPane.tsx',
     'plugins/onboarding/src/client/OnboardingWizard.tsx',
+    // Phase 7: github's five surfaces, as layouts and kit trees. Its four stylesheets went in the
+    // same change (docs/future/layout/phase-7-github.md).
+    'packages/client-core/src/registries/ProviderHtml.tsx',
+    'packages/client-core/src/registries/RefPanelBox.tsx',
+    'packages/client-core/src/ui/Rows.tsx',
+    'plugins/github/src/client/GithubBrowse.tsx',
+    'plugins/github/src/client/PullDetail.tsx',
+    'plugins/github/src/client/PullList.tsx',
+    'plugins/github/src/client/PullRefPanel.tsx',
+    'plugins/github/src/client/checks/ChecksPanel.tsx',
+    'plugins/github/src/client/pullDetail/Conversation.tsx',
+    'plugins/github/src/client/pullDetail/PrFiles.tsx',
+    'plugins/github/src/client/pullDetail/PrOverview.tsx',
+    'plugins/github/src/client/pullDetail/PrPane.tsx',
   ]
 
   it.each(CONVERTED)('%s uses primitives, not raw controls', (file) => {

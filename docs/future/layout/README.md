@@ -102,7 +102,7 @@ Supporting documents, readable in any order:
 | 4 ✅ | [phase-4-extension-kinds.md](./phase-4-extension-kinds.md) | `kind` on extension points; annotations, remote slots, rectangle slots, hooks; the trust copy; the developer view | Plugins extending plugins, the original goal |
 | 5 ✅ | [phase-5-loaded-four.md](./phase-5-loaded-four.md) | http, database, linear, rollbar move from iframe to remote root | The first proof on real plugins, with their CSS deleted |
 | 6 ✅ | [phase-6-small-compiled-panes.md](./phase-6-small-compiled-panes.md) | context, memory, notes, changes, docker, workflows settings, onboarding as layouts and trees | Memory and changes stop being first-party-only |
-| 7 | [phase-7-github.md](./phase-7-github.md) | The PR pane, browse, list, ref panel, and importer as layouts and trees | The largest regular pane proves the layouts hold |
+| 7 ✅ | [phase-7-github.md](./phase-7-github.md) | The PR pane, browse, list, ref panel, and importer as layouts and trees | The largest regular pane proves the layouts hold |
 | 8 | [phase-8-agents.md](./phase-8-agents.md) | The transcript as a timeline of slots, the composer with slots, the sidebar, Agent Center | The pane the whole exercise pays for |
 | 9 | [phase-9-cleanup-and-docs.md](./phase-9-cleanup-and-docs.md) | Deleting the old paths, executing the docs migration, the full test pass | Done |
 

@@ -1,17 +1,20 @@
 import { createMemo, Show } from 'solid-js'
-import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
-import { CHECK_TONE, railDotProps, checksState, formatRelativeTime, openInAppUrl, type RefPanelProps } from '@acorn/plugin-api/client'
-import { Button, EmptyState, StatusDot, Toolbar } from '@acorn/plugin-api/ui'
-import { RefPanelTaskLink } from '@acorn/plugin-api/ui/host'
+import {
+  CHECK_TONE, checksState, formatRelativeTime, openInAppUrl, railDotProps, type RefPanelProps,
+} from '@acorn/plugin-api/client'
+import { Button, EmptyState, Facts, Heading, Inline, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { RefPanelBox, RefPanelTaskLink } from '@acorn/plugin-api/ui/host'
 import { parsePullRef } from '../contract/pullRef'
 import { pullDetailOptions } from './queries'
-import './styles/ref-panel.css'
 
 // GitHub's reference panel: one pull request, glance-sized, over whatever the reader was looking at
 // (docs/github-integration.md § Content links). It shows less than the full pane and offers the pane
 // as the next step, rather than being a smaller copy of a whole review.
+//
+// A tree in the box the host draws. The backdrop, the drawer, the title and the dismiss affordance
+// are `RefPanelBox`, the same box a loaded plugin's panel is wrapped in.
 
 export default function PullRefPanel(props: RefPanelProps) {
   const navigate = useNavigate()
@@ -37,57 +40,65 @@ export default function PullRefPanel(props: RefPanelProps) {
   }
 
   return (
-    <Portal>
-      <div class="integrations-panel-backdrop" onClick={props.onClose} />
-      <aside class="integrations-panel">
-        <header class="integrations-panel-head">
-          <span class="integrations-panel-title">{props.target.displayId}</span>
-          <Toolbar.Spacer />
-          <Button onPress={props.onClose} label="Close">✕</Button>
-        </header>
-        <div class="integrations-panel-body">
-          <Show
-            when={pull()}
-            fallback={(
-              <EmptyState align="start" size="sm" busy={detail.isLoading}>
-                {/* A displayId this panel cannot parse means the recogniser and the panel disagree,
-                    which is a bug, not a missing pull request. Say so instead of spinning. */}
-                {!parts() ? 'Not a pull request reference.' : detail.isLoading ? 'Loading…' : 'Could not load this pull request.'}
-              </EmptyState>
-            )}
-          >
-            {(loaded) => (
-              <>
-                <h3 class="gh-ref-title">{loaded().title}</h3>
-                <div class="gh-ref-meta">
-                  <StatusDot tone={loaded().draft ? 'muted' : loaded().state === 'open' ? 'ok' : 'accent'} />
-                  <span>{loaded().draft ? 'Draft' : loaded().state}</span>
-                  <Show when={loaded().author}>{(author) => <span class="muted">· {author()}</span>}</Show>
-                  <Show when={loaded().updatedAt}>
-                    {(at) => <span class="muted">· {formatRelativeTime(at())}</span>}
-                  </Show>
-                </div>
-                <Show when={loaded().headRef}>
-                  {(head) => <div class="gh-ref-branch muted">{head()} → {loaded().baseRef ?? ''}</div>}
-                </Show>
-                {/* Checks as one word, not a list. The list is the pane's job. */}
-                <Show when={checks().length}>
-                  <div class="gh-ref-meta">
-                    <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} />
-                    <span>{checks().length} check{checks().length === 1 ? '' : 's'}</span>
-                  </div>
-                </Show>
-                <Toolbar>
-                  <Button onPress={openFull}>Open pull request</Button>
-                </Toolbar>
-                {/* Host-drawn and provider-agnostic: whether a task tracks this PR, and how to start
-                    one. github never touches core's task routes to offer it. */}
-                <RefPanelTaskLink target={props.target} />
-              </>
-            )}
-          </Show>
-        </div>
-      </aside>
-    </Portal>
+    <RefPanelBox
+      title={props.target.displayId}
+      onClose={props.onClose}
+      // Host-drawn and provider-agnostic: whether a task tracks this pull, and how to start one.
+      // github never touches core's task routes to offer it.
+      footer={<RefPanelTaskLink target={props.target} />}
+    >
+      <Show
+        when={pull()}
+        fallback={
+          <EmptyState align="start" size="sm" busy={detail.isLoading}>
+            {/* A displayId this panel cannot parse means the recogniser and the panel disagree,
+                which is a bug, not a missing pull request. Say so instead of spinning. */}
+            {!parts() ? 'Not a pull request reference.' : detail.isLoading ? 'Loading…' : 'Could not load this pull request.'}
+          </EmptyState>
+        }
+      >
+        {(loaded) => (
+          <Stack gap="section">
+            <Heading level={3}>{loaded().title}</Heading>
+            <Facts
+              size="sm"
+              items={[
+                {
+                  label: 'State',
+                  value: (
+                    <Inline>
+                      <StatusDot tone={loaded().draft ? 'muted' : loaded().state === 'open' ? 'ok' : 'accent'} />
+                      <Text>{loaded().draft ? 'Draft' : loaded().state}</Text>
+                    </Inline>
+                  ),
+                },
+                ...(loaded().author ? [{ label: 'Author', value: <Text>{loaded().author}</Text> }] : []),
+                ...(formatRelativeTime(loaded().updatedAt)
+                  ? [{ label: 'Updated', value: <Text>{formatRelativeTime(loaded().updatedAt)}</Text> }]
+                  : []),
+                ...(loaded().headRef
+                  ? [{ label: 'Branch', value: <Text>{loaded().headRef} → {loaded().baseRef ?? ''}</Text> }]
+                  : []),
+                // Checks as one word, not a list. The list is the pane's job.
+                ...(checks().length
+                  ? [{
+                    label: 'Checks',
+                    value: (
+                      <Inline>
+                        <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} />
+                        <Text>{checks().length} check{checks().length === 1 ? '' : 's'}</Text>
+                      </Inline>
+                    ),
+                  }]
+                  : []),
+              ]}
+            />
+            <Toolbar variant="actions">
+              <Button onPress={openFull}>Open pull request</Button>
+            </Toolbar>
+          </Stack>
+        )}
+      </Show>
+    </RefPanelBox>
   )
 }

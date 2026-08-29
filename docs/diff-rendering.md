@@ -193,7 +193,12 @@ Every code row in the diff is asked about at once, in one request per contributo
 a two-thousand-line diff answers once. The host compares the key set before asking, so the effect
 re-running on every scroll and every thread toggle costs a string compare.
 
-The pull-request navigator, the summary column beside the diff, keeps its own scroll entry in
-`plugins/github/src/client/reviewViewState.ts`. It is the GitHub pane's own surface, so it stays with
-that plugin, but it keys by the same scope through the exported `diffScopeKey` rather than spelling
-the key a second time.
+Two owners open a line point: `changes:diff-line` over the working tree, and `github:diff-line` over a
+pull request. Both declare the same three fields in the same order, both hand the point's name to
+`DiffPane`, and a contributor that answers one can answer the other without knowing which pane it is
+drawing in.
+
+The pull-request navigator keeps no scroll entry of its own any more. It used to, in a
+`reviewViewState.ts` beside the pane; the navigator is a region of a host layout now, and the diff
+column's own position and collapsed files are still the viewer's, in `diff/viewState.ts`, keyed by the
+same scope.

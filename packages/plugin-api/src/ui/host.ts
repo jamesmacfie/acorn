@@ -8,6 +8,13 @@ export { default as Acorn } from '@acorn/client-core/Acorn.tsx'
 // The palette chrome, deduped ×4. Host-only: palettes use the shell's focus machinery, and a
 // sandboxed frame cannot open one.
 export { PaletteSurface } from '@acorn/client-core/palette/PaletteSurface.tsx'
+// The box a reference panel is drawn in: backdrop, drawer, title, dismiss. Host-only, and the host's
+// on purpose — a panel is a tree and the overlay around it is chrome every provider was redrawing.
+export { default as RefPanelBox } from '@acorn/client-core/registries/RefPanelBox.tsx'
+// HTML a provider already rendered (GitHub's `bodyHTML`), in the host's markdown skin, with the
+// bare-reference pass and link handling the host owns. Not a kit node: the pass is a registry
+// function, and `ui/` may not import one.
+export { default as ProviderHtml } from '@acorn/client-core/registries/ProviderHtml.tsx'
 // The host's own "find or create a task for this reference" control, for a first-party reference
 // panel to place in its own chrome. See docs/panes.md § Not a pane: the reference panel for why the
 // host draws it, and does the write, rather than the panel.
@@ -37,6 +44,9 @@ export { requestAnnotations, annotationsFor } from '@acorn/client-core/plugins/a
 // it (docs/panes.md § Layout model). Onboarding is the one surface that needs the arrangement without
 // a pane to hang it on, because it lives in the `overlay` slot.
 export { Wizard } from '@acorn/client-core/layouts/Wizard.tsx'
+// Show one tab of a `tabs` pane. The selection is the host's, held under the pane id, so a pane whose
+// panels point at each other asks rather than keeping a second copy (docs/panes.md § Layout model).
+export { selectPaneTab } from '@acorn/client-core/layouts/state.ts'
 
 // Another plugin's rectangle, beside or below this one's pane (the `rectangle` kind). The iframe twin
 // of `Slot`, for the surfaces that own pixels.

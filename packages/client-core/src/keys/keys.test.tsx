@@ -120,6 +120,30 @@ describe('a run of rows is a collection', () => {
   })
 })
 
+describe('a virtualised run of rows is the same collection', () => {
+  // github's pull list draws thousands of rows and used to own a virtualizer, a scroll element and a
+  // pair of animation frames to do it. `Rows virtual` is that, in the kit, and the point of the test
+  // is that nothing about the collection changes: the keys, the roles and the stored place are still
+  // the whole list's, not the drawn window's. jsdom measures nothing, so the window here is empty,
+  // which is exactly the case that has to keep working.
+  it('keeps the whole list in the collection while its own scroller draws the window', () => {
+    dispose = render(() => (
+      <Rows virtual id="virtual-pulls" ariaLabel="Pull requests" items={PULLS}>
+        {(item, itemProps, selected, place) => (
+          <Row item={itemProps} selected={selected()} offset={place.offset} height={place.height}>{item.label}</Row>
+        )}
+      </Rows>
+    ), host)
+    const list = host.querySelector<HTMLElement>('.ui-rows')!
+    expect(host.querySelector('.ui-rows-scroll')).not.toBeNull()
+    expect(list.getAttribute('role')).toBe('listbox')
+    // The roving stop is the first item of the data, not of whatever happens to be on screen.
+    expect(list.getAttribute('aria-activedescendant')).toBe('virtual-pulls-item-0')
+    revealCollectionItem('virtual-pulls', 'pr-3')
+    expect(collectionState('virtual-pulls').active).toBe('pr-3')
+  })
+})
+
 describe('something outside a collection can put an item in view', () => {
   // Notes' "view in Context" hands context a section and an item id and nothing else. The kit gives a
   // pane no class and no id to select a row on, which is the point, so the collection publishes the one
