@@ -21,7 +21,7 @@ import { syncPluginContributions } from './syncContributions'
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
 //
-// A plain module rather than two memos inside the dialog, for the reason documentSurfaces.ts gives:
+// A plain module rather than two memos inside the dialog, for the reason frames/layouts.ts gives:
 // the repo's client suites run in bare Node with no Solid transform, so anything in a `.tsx` file is
 // structurally untestable, and the two things here are the ones worth pinning. The tier split is a
 // security claim (docs/security.md § Design rules, rule 6): `Enforced` is a fence the UI bridge holds,

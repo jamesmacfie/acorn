@@ -27,10 +27,11 @@ pane whose manifest also names a `providerId` (`linear` and `rollbar` do) is a l
 the host hides it on tasks with no link from that provider. `database` and `http` are useful with
 nothing linked and stay unconditional.
 
-`database` is the one composed pane. Its manifest declares a `document-over-frame` layout, so the
-host draws the SQL editor and the drag handle and the plugin's frame draws everything below them. To
-the layout model it is one pane with one id, which is the point: the reader has one rectangle, and a
-task layout knows nothing about the split inside it (`docs/plugins.md` § Document surfaces).
+`database` is the one composed pane. Its manifest declares a `document-over-frame` layout with a
+`document` region and a `frame` region, so the host draws the SQL editor and the drag handle and the
+plugin's frame draws everything below them. To the task layout row it is one pane with one id, which
+is the point: the reader has one rectangle, and the row knows nothing about the split inside it
+(`docs/plugins.md` § Document surfaces).
 
 Two of those plugins also declare a project-scoped pane, which is not in this table because it is not
 part of a task's layout. `http-project` and `linear-issue` are drawn beside their plugin's rail list
@@ -39,14 +40,44 @@ because a rail row click often has no task, and `openPane` needs one.
 
 ## Layout model
 
-The persisted task layout contains pane IDs, optional relative weights, and pinned IDs. The layout
-reducer owns show/add, close/unpin, pin, move, resize, equalize, maximize, and recipe replacement.
-Pinned panes survive a switcher selection; a normal selection focuses the target. Closing the last
-unpinned pane falls back to the PR pane when one is available.
+There are two layers of layout, and they answer different questions.
+
+**The task layout row** is the persisted list of pane IDs, optional relative weights, and pinned IDs.
+The layout reducer owns show/add, close/unpin, pin, move, resize, equalize, maximize, and recipe
+replacement. Pinned panes survive a switcher selection; a normal selection focuses the target. Closing
+the last unpinned pane falls back to the PR pane when one is available.
 
 Widths are clamped to pane minimums and normalized on load. Unknown IDs become placeholders so a
 disabled plugin or a stale layout cannot crash the task view. Maximize/focus is session UI state and
 does not rewrite the durable row.
+
+**Inside a pane** the host owns the arrangement. A pane names one of the layouts below and supplies a
+component per region; it never draws the split, the divider, or the drag handle itself. The names and
+each layout's region set are in
+[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts), the components are in
+`client-core/src/layouts`, and the desktop rendering plus the narrow and terminal projections are in
+[docs/future/layout/05-layouts.md](./future/layout/05-layouts.md).
+
+| Layout | Regions |
+| --- | --- |
+| `single` | `body` |
+| `list-detail` | `list`, `detail`, and optionally `list-header` and `list-footer` |
+| `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer |
+| `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar |
+| `document-over-frame` | `document`, `frame` |
+| `frame-beside-document` | the same two, with the axis flipped by the name rather than by a prop |
+| `stack-split` | `top`, `bottom` |
+| `wizard` | `step`; the host draws the indicator and the back and next controls |
+
+Position is in the name, never in a knob. A surface that needs an arrangement none of these expresses
+gets a new named layout, and it has to state its regions and both projections before it lands.
+
+The host keeps the per-pane state a layout needs, under the pane ID: which tab a `tabs` pane is
+showing, where a `list-detail` or `stack-split` handle sits. It is session-only, because it is a
+reading posture rather than a preference.
+
+A pane may also hide a region, which drops it and gives the space to what is left. Notes uses this for
+its library column, and it is the same mechanism the narrow projections need.
 
 ## Addressing a pane
 
@@ -108,9 +139,40 @@ see `docs/plugins.md` § "Loaded plugins: the client half".
 
 ## Contributions
 
-Each pane contributes its ID, label, order, default chord, minimum width, component, and optional
-availability predicate through `paneRegistry`. A pane may also register context sections, task slots,
-palette rows, commands/keybindings, agent-tool renderers, and persisted state through its plugin.
+Each pane contributes its ID, label, order, default chord, minimum width, and optional availability
+predicate through `paneRegistry`. It then draws itself one of two ways: with a `component`, or with a
+`layout` and a `regions` record, in which case the registry builds the component. A pane may also
+register context sections, task slots, palette rows, commands/keybindings, agent-tool renderers, and
+persisted state through its plugin.
+
+```ts
+ctx.panes.register({
+  id: 'notes', label: 'Notes', glyph: 'notepad-text', order: 30,
+  layout: 'list-detail',
+  regions: { 'list-header': NotesHeader, list: NotesList, detail: NoteBody },
+  hidden: (task) => (libraryCollapsed(task.id) ? ['list'] : []),
+})
+```
+
+A loaded plugin declares the same two keys on a `frames` entry, and a region there is either `'frame'`,
+the plugin's own bundle in a sandboxed iframe, or a host-drawn document
+(`{ "kind": "document", "read": "/v2/p/<id>/…" }`). A pane with no `frame` region runs none of the
+plugin's code, so it is gated like a descriptor rather than behind the bytes-hash prompt.
+
+```json
+"frames": [{
+  "target": "pane", "id": "database", "label": "Database",
+  "layout": "document-over-frame",
+  "regions": {
+    "document": { "kind": "document", "languageId": "sql", "read": "/v2/p/database/tasks/:taskId/scratch" },
+    "frame": "frame"
+  }
+}]
+```
+
+A layout naming a region it does not have, or missing one it requires, throws at registration rather
+than at render. The manifest parser refuses the same thing on the node, and the client repeats the
+check over the roster row, because a manifest reaches a device as bytes a node sent.
 
 Shared diff rendering, Monaco setup, markdown, grid, xterm, form, and wizard primitives live in
 client-core. Feature panes use those primitives without importing another plugin's implementation.

@@ -78,9 +78,10 @@ export default {
       // `monaco.editor.create` and all its options, the theme application and its appearance
       // subscription, the `addCommand(⌘Enter)` binding, the `editorH` signal and the splitter's pointer
       // handlers — and the `monaco-editor` dependency itself.
-      layout: {
-        template: 'document-over-frame',
+      layout: 'document-over-frame',
+      regions: {
         document: {
+          kind: 'document',
           languageId: 'sql',
           read: '/v2/p/database/tasks/:taskId/scratch',
           write: '/v2/p/database/tasks/:taskId/scratch',
@@ -91,6 +92,8 @@ export default {
             triggerCharacters: ['.'],
           },
         },
+        // This plugin's own bundle, in the sandboxed frame below the editor.
+        frame: 'frame',
       },
     }],
     agentContexts: [{

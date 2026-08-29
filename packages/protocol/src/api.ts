@@ -331,7 +331,7 @@ export type {
   PluginKeybindingDescriptor,
   PluginNodeStatDescriptor,
   PluginPaletteDescriptor,
-  PluginPaneLayout,
+  PluginPaneRegion,
   PluginRefResolverDescriptor,
   PluginSlotDescriptor,
   PluginSourceDescriptor,

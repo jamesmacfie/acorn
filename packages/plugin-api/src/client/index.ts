@@ -35,7 +35,7 @@ export { registerWsChannel } from '@acorn/client-core/wsChannels.ts'
 
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
 export { paneContribution } from '@acorn/client-core/registries/panes.ts'
-export type { PaneContribution } from '@acorn/client-core/registries/panes.ts'
+export type { PaneContribution, PaneLayoutContribution, PaneRegistration } from '@acorn/client-core/registries/panes.ts'
 export { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 export type { SourceContribution, SourceRouteContribution } from '@acorn/client-core/registries/sources.ts'
 // Brand-mark registration. See docs/ui-design.md § Icons for the two feeders and the `brand:<id>`

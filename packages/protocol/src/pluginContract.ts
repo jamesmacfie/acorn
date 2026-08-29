@@ -10,6 +10,7 @@ import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from './co
 import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from './contextMenus.ts'
 import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS, parseExtensionPointRef } from './extensionPoints.ts'
 import { isNormalizedChord, isPluginKeyClaim, isPluginShortcutChord, isReservedPluginKeyClaim } from './keybindings.ts'
+import { PANE_LAYOUTS, regionProblem } from './paneLayouts.ts'
 import { PLUGIN_API_RANGE_RE } from './pluginApiVersion.ts'
 import { LANGUAGE_IDS } from './languageIds.ts'
 import { cadenceSchema } from './schedules.ts'
@@ -100,13 +101,15 @@ const documentRegion = z.object({
   completions: documentCompletions.optional(),
 })
 
-// Which arrangement of regions the host draws for this pane, and what goes in each. Region-addressed
-// from the start because it is the one-way door, and orientation lives in the template name rather than
-// in a field. See docs/plugins.md § Loaded plugins: the client half.
-const paneLayout = z.object({
-  template: z.enum(['document', 'document-over-frame']),
-  document: documentRegion,
-})
+// What fills one region of a layout.
+//
+// `'frame'` is this plugin's own bundle in a sandboxed iframe, which is the only thing a loaded plugin
+// can put in a region until the remote tree lands (docs/future/layout/phase-3-remote-root-and-worker.md).
+// A document region is host-drawn: the plugin contributes routes and a language id, no code.
+const paneRegionSource = z.union([
+  z.literal('frame'),
+  z.object({ kind: z.literal('document') }).extend(documentRegion.shape),
+])
 
 const frameSurface = z.object({
   // Which registry this lands in. The shell renders them all the same way; the surrounding chrome it
@@ -143,9 +146,12 @@ const frameSurface = z.object({
   url: z.string().min(1).max(2_048).optional(),
   urlSource: z.string().min(1).max(256).optional(),
   hosts: z.array(webviewHost).min(1).max(WEBVIEW_HOST_MAX_COUNT).optional(),
-  // `pane` only. Absent means a plain frame fills the pane. Present, the host draws some or all of
-  // the rectangle from the regions below.
-  layout: paneLayout.optional(),
+  // `pane` only. Absent means a plain frame fills the whole pane. Present, the host draws the
+  // arrangement and fills each region from `regions` below (@acorn/protocol/paneLayouts.ts).
+  layout: z.enum(PANE_LAYOUTS).optional(),
+  // `pane` only, and only alongside `layout`. Keys are region names the layout has; the cross-check
+  // is in the refinement below, where both fields are visible.
+  regions: z.record(z.string().min(1).max(64), paneRegionSource).optional(),
   // Chords the frame may keep instead of forwarding to the shell. Runtime code may narrow this list,
   // never widen it; declaring the upper bound makes the capture visible before code runs.
   claimsKeys: z.array(z.string().min(1).max(64).superRefine((value, ctx) => {
@@ -155,6 +161,17 @@ const frameSurface = z.object({
       ctx.addIssue({ code: 'custom', message: 'claimed keys must be canonical chords with meta, ctrl, or alt' })
     }
   })).max(32).default([]),
+}).superRefine((surface, ctx) => {
+  // The one cross-field rule a surface can check on its own: a layout has the regions it has. The
+  // client repeats it over a roster row, because a manifest reaches a device as bytes a node sent
+  // (client-core/plugins/frames/layouts.ts).
+  if (surface.regions && !surface.layout) {
+    ctx.addIssue({ code: 'custom', path: ['regions'], message: 'regions need a layout to name them' })
+    return
+  }
+  if (!surface.layout) return
+  const problem = regionProblem(surface.layout, Object.keys(surface.regions ?? {}))
+  if (problem) ctx.addIssue({ code: 'custom', path: ['regions'], message: problem })
 })
 
 // ── Declarative chrome ────────────────────────────────────────────────────────────────────────────
@@ -768,6 +785,17 @@ export const isProjectPaneSurface = (frame: { target: string; scope?: string }):
 /** A full-screen picker the host places. Not a pane: it belongs to no task's layout. */
 export const isOverlaySurface = (frame: { target: string }): boolean => frame.target === 'overlay'
 
+/** Does this pane run any of the plugin's own bundle? A `frame` region is the only thing that does,
+ *  which makes it the question behind the trust gate, the key claims, and `surfaceAction`. */
+export const hasFrameRegion = (frame: { regions?: Record<string, unknown> }): boolean =>
+  Object.values(frame.regions ?? {}).some((region) => region === 'frame')
+
+/** Does this pane have a host-drawn editor in it? */
+export const hasDocumentRegion = (frame: { regions?: Record<string, unknown> }): boolean =>
+  Object.values(frame.regions ?? {}).some(
+    (region) => typeof region === 'object' && region !== null && (region as { kind?: unknown }).kind === 'document',
+  )
+
 /** A replacement for a designated core surface. Not a pane and not an overlay: it has no layout key,
  *  no click site of its own and no verb that opens it. The user's arbitration is the only thing that
  *  ever puts one on screen (@acorn/protocol/extensionPoints.ts). */
@@ -800,12 +828,16 @@ export type PluginDocumentRegion = Omit<z.infer<typeof documentRegion>, 'languag
   languageId: string
   completions?: PluginDocumentCompletions
 }
-export type PluginPaneLayout = Omit<z.infer<typeof paneLayout>, 'document'> & { document: PluginDocumentRegion }
-export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'layout' | 'coreSlot'> & {
+/** What one region holds. A document region carries the `kind` tag so the union stays discriminated
+ *  once a remote entry joins it in phase 3 of the layout programme. */
+export type PluginPaneRegion = 'frame' | ({ kind: 'document' } & PluginDocumentRegion)
+export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'layout' | 'regions' | 'coreSlot'> & {
   scope?: 'task' | 'project'
   claimsKeys?: string[]
-  layout?: PluginPaneLayout
-  // Wider than the parse: the client re-checks the slot name before registering a provider.
+  // Wider than the parse on both: a roster row is bytes a node sent, and the client re-checks the
+  // layout name, the region set and every route before it registers anything.
+  layout?: string
+  regions?: Record<string, PluginPaneRegion>
   coreSlot?: string
 }
 export type PluginChromeAction = z.infer<typeof chromeAction>

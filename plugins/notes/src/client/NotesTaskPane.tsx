@@ -1,16 +1,19 @@
 import { lazy } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
-import { type PaneContribution, type Task, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import { libraryCollapsed } from './notesPaneState'
+import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
 
-const NotesPane = lazy(() => import('./NotesPane'))
+// Notes as a `list-detail` pane: the host draws the split, the divider and the drag handle, and these
+// three components fill the regions (docs/panes.md § Layout model).
+const NotesHeader = lazy(async () => ({ default: (await import('./NotesPane')).NotesHeader }))
+const NotesList = lazy(async () => ({ default: (await import('./NotesPane')).NotesList }))
+const NoteBody = lazy(async () => ({ default: (await import('./NotesPane')).NoteBody }))
 
-export function NotesTaskPane(props: { task: Task }) {
-  const workspaces = createQuery(() => workspacesOptions(true))
-  const workspace = () => workspaceForProject(workspaces.data, props.task.projectId)
-  return <NotesPane task={props.task} workspace={workspace()} />
-}
-
-export const notesPaneContribution: PaneContribution = {
+export const notesPaneContribution: PaneLayoutContribution = {
   id: 'notes', label: 'Notes', glyph: 'notepad-text', description: 'Workspace scratchpad', order: 30,
-  defaultChord: 'meta+shift+d', requires: { plugin: 'notes' }, component: NotesTaskPane,
+  defaultChord: 'meta+shift+d', requires: { plugin: 'notes' },
+  layout: 'list-detail',
+  regions: { 'list-header': NotesHeader, list: NotesList, detail: NoteBody },
+  // Collapsing the library drops the column rather than narrowing it, which is what the ◀ in the note
+  // toolbar has always meant.
+  hidden: (task) => (libraryCollapsed(task.id) ? ['list'] : []),
 }

@@ -1,230 +1,48 @@
-import { createEffect, createSignal, createResource, For, onCleanup, onMount, Show } from 'solid-js'
-import { bytesOf, clientEvents, consumePaneIntent, debounce, formatSize, handlePluginContentLinkClick, openPane, type Task, type Workspace } from '@acorn/plugin-api/client'
-import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
+import { For, Show } from 'solid-js'
+import { bytesOf, formatSize, handlePluginContentLinkClick, openPane, type Task } from '@acorn/plugin-api/client'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
-import { libraryCollapsed, notesSelectionFor, rememberNotesSelection, setLibraryCollapsed } from './notesPaneState'
+import { Alert, Button, EmptyState, Input, Markdown, Row, Toolbar } from '@acorn/plugin-api/ui'
+import { notesModel } from './notesModel'
+import type { NoteScope, NoteSummary } from './notesClient'
+import { libraryCollapsed, setLibraryCollapsed } from './notesPaneState'
 import './notes.css'
-import { Alert, Button, createArmedConfirm, EmptyState, Input, ListDetail, Markdown, Row, Toolbar } from '@acorn/plugin-api/ui'
-import { toast } from '@acorn/plugin-api/client'
 
-// The Notes pane (docs/notes-and-memory.md § Notes). Autosave: debounce(save, 1500), flush on
-// blur/switch/cleanup, cancel on delete.
-type Selected = { scope: NoteScope; slug: string; virtual?: boolean }
+// The three regions of the Notes pane (docs/notes-and-memory.md § Notes). The host draws the split,
+// the divider and the drag handle; these fill `list-header`, `list` and `detail`. Everything they
+// share is in ./notesModel.ts.
 
 const scopeGlyph = (scope: NoteScope): string => (scope === 'task' ? '◆ task' : scope === 'workspace' ? 'ws' : '🌐')
 const authorBadge = (author: NoteSummary['author']): string => (author === 'agent' ? '🤖' : author === 'workflow' ? 'seed' : '')
 
-export default function NotesPane(props: { task: Task; workspace: Workspace | null }) {
-  const api = notesApi()
-  const wsId = () => props.workspace?.id ?? null
-  const locationFor = (scope: NoteScope): NoteLocation | null =>
-    scope === 'task' ? { scope, taskId: props.task.id } : scope === 'global' ? { scope } : wsId() ? { scope, workspaceId: wsId()! } : null
-
-  const [selected, setSelected] = createSignal<Selected | null>(null)
-  const [body, setBody] = createSignal('')
-  const [noteTitle, setNoteTitle] = createSignal('')
-  const [preview, setPreview] = createSignal(false)
-  const [filter, setFilter] = createSignal('')
-  const [saving, setSaving] = createSignal(false)
-  const [actionError, setActionError] = createSignal('')
-  // The armed button is the prompt; this used to be written into the error banner.
-  const deleteArmed = createArmedConfirm()
-  const [landedTask, setLandedTask] = createSignal('')
-  let titleInputRef: HTMLInputElement | undefined
-  let scratchCreate: Promise<void> | null = null
-
-  const [taskList, { refetch: refetchTask }] = createResource(
-    () => props.task.id,
-    async (taskId) => {
-      const res = await api.list({ scope: 'task', taskId })
-      return 'error' in res ? [] : res
-    },
-    { initialValue: [] },
+export function NotesHeader(props: { task: Task }) {
+  const model = () => notesModel(props.task.id, props.task.projectId)
+  return (
+    <div class="section-header notes-header">
+      <span>{model().workspace()?.name ?? 'workspace'}</span>
+      <Input kind="filter" type="text" placeholder="filter…" value={model().filter()} onInput={(value) => model().setFilter(value)} />
+    </div>
   )
-  const [wsList, { refetch: refetchWs }] = createResource(
-    () => wsId(),
-    async (id) => {
-      if (!api || !id) return [] as NoteSummary[]
-      const res = await api.list({ scope: 'workspace', workspaceId: id })
-      return 'error' in res ? [] : res
-    },
-    { initialValue: [] },
-  )
-  const [globalList, { refetch: refetchGlobal }] = createResource(
-    () => (api ? true : null),
-    async () => {
-      const res = await api!.list({ scope: 'global' })
-      return 'error' in res ? [] : res
-    },
-    { initialValue: [] },
-  )
+}
 
-  const matches = (n: NoteSummary) => {
-    const f = filter().trim().toLowerCase()
-    return !f || n.title.toLowerCase().includes(f) || n.slug.toLowerCase().includes(f)
-  }
-  // docs/notes-and-memory.md § Notes explains why this checks kind, not just author.
-  const notSeed = (n: NoteSummary) => !(n.author === 'workflow' && n.kind === 'scratch')
-  const taskNotes = () => taskList() ?? []
-  const scratchpad = () => taskNotes().find((n) => n.slug === SCRATCHPAD_SLUG)
-  const taskOther = () => taskNotes().filter((n) => n.slug !== SCRATCHPAD_SLUG && notSeed(n) && matches(n))
-  const wsNotes = () => (wsList() ?? []).filter((n) => notSeed(n) && matches(n))
-  const globalNotes = () => (globalList() ?? []).filter((n) => notSeed(n) && matches(n))
-
-  const isActive = (scope: NoteScope, slug: string) => selected()?.scope === scope && selected()?.slug === slug
-  const refetchScope = (scope: NoteScope) => (scope === 'task' ? refetchTask() : scope === 'global' ? refetchGlobal() : refetchWs())
+// Collapsing the library hides the whole list column, header and all, so the toggle cannot live in it.
+// It sits at the left of the note's own toolbar, which is where the boundary is.
+function LibraryToggle(props: { task: Task }) {
   const collapsed = () => libraryCollapsed(props.task.id)
+  return (
+    <Button
+      variant="bare"
+      size="sm"
+      iconOnly
+      title={collapsed() ? 'Show library' : 'Hide library'}
+      label={collapsed() ? 'Show library' : 'Hide library'}
+      onPress={() => setLibraryCollapsed(props.task.id, !collapsed())}
+    >{collapsed() ? '▶' : '◀'}</Button>
+  )
+}
 
-  const selectedSummary = (): NoteSummary | undefined => {
-    const sel = selected()
-    if (!sel || sel.virtual) return undefined
-    const list = sel.scope === 'task' ? taskNotes() : sel.scope === 'workspace' ? (wsList() ?? []) : globalNotes()
-    return list.find((n) => n.slug === sel.slug)
-  }
-  const selectedIncluded = () => selectedSummary()?.included ?? true
-
-  // Autosave: debounce while typing, flush on blur and before we switch away. save() reads
-  // selected()+body() at fire time, so flush before mutating selected on a note switch.
-  const scheduleSave = debounce(() => void save(), 1500)
-  const scheduleTitle = debounce(() => void saveTitle(), 800)
-  onCleanup(() => scheduleSave.flush())
-
-  // Land the pane: retained notes:open intent wins, then the remembered note, else the scratchpad.
-  createEffect(() => {
-    const taskId = props.task.id
-    const ready = !taskList.loading
-    if (!api || !ready || landedTask() === taskId) return
-    setLandedTask(taskId)
-    scratchCreate = null
-    const intent = consumePaneIntent(taskId, 'notes')
-    if (intent && intent.kind === 'notes:open' && (intent.scope !== 'workspace' || wsId())) return void open(intent.scope, intent.slug)
-    const remembered = notesSelectionFor(taskId)
-    if (remembered) return void open(remembered.scope, remembered.slug)
-    landScratchpad()
-  })
-
-  // Live intents arriving while mounted (openPane after the pane is already up).
-  onMount(() => {
-    const off = clientEvents.on('presentation:pane-intent', ({ taskId, paneId, intent }) => {
-      if (taskId !== props.task.id || paneId !== 'notes' || intent.kind !== 'notes:open') return
-      if (intent.scope === 'workspace' && !wsId()) return
-      void open(intent.scope, intent.slug)
-    })
-    onCleanup(off)
-  })
-
-  function landScratchpad() {
-    setPreview(false)
-    const existing = scratchpad()
-    if (existing) return void open('task', existing.slug)
-    setSelected({ scope: 'task', slug: SCRATCHPAD_SLUG, virtual: true })
-    setNoteTitle('Scratchpad')
-    setBody('')
-  }
-
-  // First keystroke in a virtual scratchpad creates the file (single-flight). Adopt an existing
-  // scratchpad slug if the list already has one; adopt a deduped slug if create renamed it.
-  function ensureScratchpad(): Promise<void> {
-    if (scratchCreate) return scratchCreate
-    scratchCreate = (async () => {
-      const existing = scratchpad()
-      if (existing) {
-        setSelected({ scope: 'task', slug: existing.slug })
-        rememberNotesSelection(props.task.id, { scope: 'task', slug: existing.slug })
-        return
-      }
-      const res = await api.create({ scope: 'task', taskId: props.task.id }, 'Scratchpad', 'scratch')
-      if ('error' in res) {
-        setActionError(res.error)
-        scratchCreate = null
-        return
-      }
-      setSelected({ scope: 'task', slug: res.slug })
-      rememberNotesSelection(props.task.id, { scope: 'task', slug: res.slug })
-      await refetchTask()
-    })()
-    return scratchCreate
-  }
-
-  async function open(scope: NoteScope, slug: string) {
-    const location = locationFor(scope)
-    if (!api || !location) return
-    scheduleSave.flush() // persist the note we're leaving before loading the next
-    const res = await api.read(location, slug)
-    if ('error' in res) return setActionError(res.error)
-    setActionError('')
-    setPreview(false)
-    setSelected({ scope, slug })
-    setBody(res.body)
-    setNoteTitle(res.title)
-    setSaving(false)
-    rememberNotesSelection(props.task.id, { scope, slug })
-  }
-
-  async function save() {
-    const sel = selected()
-    const location = sel && locationFor(sel.scope)
-    if (!api || !sel || sel.virtual || !location) return
-    setSaving(true)
-    const res = await api.write(location, sel.slug, body())
-    setSaving(false)
-    if ('error' in res) return setActionError(res.error)
-    setActionError('')
-    toast('Note saved', { tone: 'success' })
-  }
-
-  async function saveTitle() {
-    const sel = selected()
-    const location = sel && locationFor(sel.scope)
-    if (!api || !sel || sel.virtual || !location || !noteTitle().trim()) return
-    const res = await api.setTitle(location, sel.slug, noteTitle().trim())
-    if ('error' in res) return setActionError(res.error)
-    setActionError('')
-    await refetchScope(sel.scope)
-  }
-
-  async function createIn(scope: NoteScope) {
-    const location = locationFor(scope)
-    if (!api || !location) return
-    const res = await api.create(location, 'Untitled')
-    if ('error' in res) return setActionError(res.error)
-    setActionError('')
-    await refetchScope(scope)
-    await open(scope, res.slug)
-    queueMicrotask(() => {
-      titleInputRef?.focus()
-      titleInputRef?.select()
-    })
-  }
-
-  async function toggleIncluded(scope: NoteScope, slug: string, included: boolean) {
-    const location = locationFor(scope)
-    if (!api || !location) return
-    const res = await api.setIncluded(location, slug, included)
-    if ('error' in res) return setActionError(res.error)
-    setActionError('')
-    await refetchScope(scope)
-  }
-
-  async function remove(scope: NoteScope, slug: string) {
-    const location = locationFor(scope)
-    if (!api || !location) return
-    if (!deleteArmed.request(`${scope}:${slug}`)) return
-    setActionError('')
-    if (isActive(scope, slug)) {
-      scheduleSave.cancel()
-      landScratchpad()
-    }
-    const result = await api.remove(location, slug)
-    if ('error' in result) return setActionError(result.error)
-    await refetchScope(scope)
-  }
-
-  function onBodyInput(value: string) {
-    setBody(value)
-    if (selected()?.virtual) void ensureScratchpad().then(() => scheduleSave())
-    else scheduleSave()
-  }
+export function NotesList(props: { task: Task }) {
+  const model = () => notesModel(props.task.id, props.task.projectId)
+  let titleInput: HTMLInputElement | undefined
 
   const IncludeDot = (dotProps: { scope: NoteScope; note: NoteSummary }) => (
     <button
@@ -232,141 +50,164 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
       class="notes-include-dot"
       classList={{ on: dotProps.note.included }}
       title={dotProps.note.included ? 'Included in agent context' : 'Excluded from agent context'}
-      onClick={() => void toggleIncluded(dotProps.scope, dotProps.note.slug, !dotProps.note.included)}
+      onClick={() => void model().toggleIncluded(dotProps.scope, dotProps.note.slug, !dotProps.note.included)}
     />
   )
 
   // Dot, label and delete were three siblings in a wrapper because a <button> cannot nest one. Row is
   // a div[role=button], so they are its leading and trailing slots and the wrapper is gone.
-  const NoteRow = (rowProps: { scope: NoteScope; note: NoteSummary; pinned?: boolean }) => (
-    <Row
-      density="compact"
-      reveal
-      selected={isActive(rowProps.scope, rowProps.note.slug)}
-      onPress={() => void open(rowProps.scope, rowProps.note.slug)}
-      leading={<IncludeDot scope={rowProps.scope} note={rowProps.note} />}
-      meta={authorBadge(rowProps.note.author)}
-      trailing={
-        <Button
-          variant="bare"
-          size="sm"
-          iconOnly
-          title={deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? `Click again to remove “${rowProps.note.slug}”` : 'Delete note'}
-          label="Delete note"
-          onPress={() => void remove(rowProps.scope, rowProps.note.slug)}
-        >{deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? '?' : '✕'}</Button>
-      }
-    >
-      {rowProps.note.title}
-    </Row>
-  )
+  const NoteRow = (rowProps: { scope: NoteScope; note: NoteSummary }) => {
+    const armed = () => model().deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}`
+    return (
+      <Row
+        density="compact"
+        reveal
+        selected={model().isActive(rowProps.scope, rowProps.note.slug)}
+        onPress={() => void model().open(rowProps.scope, rowProps.note.slug)}
+        leading={<IncludeDot scope={rowProps.scope} note={rowProps.note} />}
+        meta={authorBadge(rowProps.note.author)}
+        trailing={
+          <Button
+            variant="bare"
+            size="sm"
+            iconOnly
+            title={armed() ? `Click again to remove “${rowProps.note.slug}”` : 'Delete note'}
+            label="Delete note"
+            onPress={() => void model().remove(rowProps.scope, rowProps.note.slug)}
+          >{armed() ? '?' : '✕'}</Button>
+        }
+      >
+        {rowProps.note.title}
+      </Row>
+    )
+  }
 
   const GroupHeader = (headProps: { label: string; count: number; scope: NoteScope }) => (
     <div class="notes-group-head">
       <span class="notes-group-label">{headProps.label} ({headProps.count})</span>
-      <Button variant="bare" size="sm" iconOnly tone="accent" title={`New ${headProps.label} note`} label={`New ${headProps.label} note`} disabled={!locationFor(headProps.scope)} onPress={() => void createIn(headProps.scope)}>+</Button>
+      <Button
+        variant="bare"
+        size="sm"
+        iconOnly
+        tone="accent"
+        title={`New ${headProps.label} note`}
+        label={`New ${headProps.label} note`}
+        disabled={!model().locationFor(headProps.scope)}
+        onPress={() => void model().createIn(headProps.scope).then((made) => {
+          if (!made) return
+          // Focus lands on the title after the create round-trip, so the first thing you type is the
+          // note's name.
+          queueMicrotask(() => {
+            titleInput = document.querySelector<HTMLInputElement>('.notes-title-input') ?? undefined
+            titleInput?.focus()
+            titleInput?.select()
+          })
+        })}
+      >+</Button>
     </div>
   )
 
+  const virtualScratchpad = (): NoteSummary => ({
+    slug: SCRATCHPAD_SLUG, title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0,
+  })
+
   return (
-    <section class="pane notes-pane">
-      <div class="section-header notes-header">
-        <span>Notes — {props.workspace?.name ?? 'workspace'}</span>
-        <Input kind="filter" type="text" placeholder="filter…" value={filter()} onInput={(value) => setFilter(value)} />
-        <Button variant="bare" size="sm" iconOnly title={collapsed() ? 'Show library' : 'Hide library'} label={collapsed() ? 'Show library' : 'Hide library'} onPress={() => setLibraryCollapsed(props.task.id, !collapsed())}>{collapsed() ? '▶' : '◀'}</Button>
-      </div>
-      <Show when={actionError()}><Alert>{actionError()}</Alert></Show>
-      <Show when={api} fallback={<EmptyState>Notes need the desktop app.</EmptyState>}>
-        {/* Collapsing the library is `list` going undefined, not a rule that hides a column that
-            is still there: ListDetail then has one track rather than a zero-width first one. */}
-        <ListDetail
-          listLabel="Notes library"
-          list={collapsed() ? undefined : (
+    <>
+      <GroupHeader label="Task" count={model().taskOther().length + 1} scope="task" />
+      <Show when={!model().scratchpad() && model().matches(virtualScratchpad())}>
+        <Row
+          density="compact"
+          selected={model().isActive('task', SCRATCHPAD_SLUG)}
+          onPress={() => model().landScratchpad()}
+          leading={<span class="notes-include-dot placeholder" />}
+        >
+          Scratchpad
+        </Row>
+      </Show>
+      <Show when={model().scratchpad()}>{(note) => <NoteRow scope="task" note={note()} />}</Show>
+      <For each={model().taskOther()}>{(note) => <NoteRow scope="task" note={note} />}</For>
+
+      <GroupHeader label="Workspace" count={model().wsNotes().length} scope="workspace" />
+      <For each={model().wsNotes()}>{(note) => <NoteRow scope="workspace" note={note} />}</For>
+
+      <GroupHeader label="Global" count={model().globalNotes().length} scope="global" />
+      <For each={model().globalNotes()}>{(note) => <NoteRow scope="global" note={note} />}</For>
+    </>
+  )
+}
+
+export function NoteBody(props: { task: Task }) {
+  const model = () => notesModel(props.task.id, props.task.projectId)
+  return (
+    <>
+      <Show when={model().actionError()}><Alert>{model().actionError()}</Alert></Show>
+      <Show when={model().api} fallback={<EmptyState>Notes need the desktop app.</EmptyState>}>
+        <Show
+          when={model().selected()}
+          fallback={
             <>
-              <GroupHeader label="Task" count={taskOther().length + 1} scope="task" />
-              <Show when={!scratchpad() && matches({ slug: SCRATCHPAD_SLUG, title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0 })}>
-                <Row
-                  density="compact"
-                  selected={isActive('task', SCRATCHPAD_SLUG)}
-                  onPress={() => landScratchpad()}
-                  leading={<span class="notes-include-dot placeholder" />}
-                >
-                  Scratchpad
-                </Row>
+              <Toolbar size="sm" ariaLabel="Note actions"><LibraryToggle task={props.task} /></Toolbar>
+              <EmptyState>Select or create a note.</EmptyState>
+            </>
+          }
+        >
+          {(sel) => (
+            <>
+              <Toolbar size="sm" ariaLabel="Note actions">
+                <LibraryToggle task={props.task} />
+                <input
+                  class="notes-title-input"
+                  type="text"
+                  value={model().noteTitle()}
+                  placeholder="Untitled"
+                  onInput={(event) => model().onTitleInput(event.currentTarget.value)}
+                />
+                <span class="notes-scope-pill" title={`${sel().scope} scope`}>{scopeGlyph(sel().scope)}</span>
+                <button
+                  type="button"
+                  class="notes-include-dot"
+                  classList={{ on: model().selectedIncluded() }}
+                  title={model().selectedIncluded() ? 'Included in agent context' : 'Excluded from agent context'}
+                  disabled={sel().virtual}
+                  onClick={() => void model().toggleIncluded(sel().scope, sel().slug, !model().selectedIncluded())}
+                />
+                <Button size="sm" onPress={() => { model().scheduleSave.flush(); model().setPreview(!model().preview()) }}>
+                  {model().preview() ? 'Edit' : 'Preview'}
+                </Button>
+                {/* `saving…` is a live status and stays; the completed save is an event, so it toasts. */}
+                <span class="notes-save-state muted">{model().saving() ? 'saving…' : ''}</span>
+              </Toolbar>
+              <Show when={!model().preview()} fallback={
+                <Markdown
+                  text={model().body()}
+                  copy
+                  onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
+                />
+              }>
+                <textarea
+                  class="notes-editor"
+                  spellcheck={false}
+                  value={model().body()}
+                  onInput={(event) => model().onBodyInput(event.currentTarget.value)}
+                  onBlur={() => model().scheduleSave.flush()}
+                />
               </Show>
-              <Show when={scratchpad()}>{(n) => <NoteRow scope="task" note={n()} pinned />}</Show>
-              <For each={taskOther()}>{(n) => <NoteRow scope="task" note={n} />}</For>
-
-              <GroupHeader label="Workspace" count={wsNotes().length} scope="workspace" />
-              <For each={wsNotes()}>{(n) => <NoteRow scope="workspace" note={n} />}</For>
-
-              <GroupHeader label="Global" count={globalNotes().length} scope="global" />
-              <For each={globalNotes()}>{(n) => <NoteRow scope="global" note={n} />}</For>
+              <div class="notes-footer">
+                <span class="muted">{formatSize(bytesOf(model().body()))}</span>
+                <Button
+                  variant="bare"
+                  size="sm"
+                  tone="accent"
+                  disabled={sel().virtual}
+                  onPress={() => openPane(props.task.id, 'context', { kind: 'context:reveal', sectionId: 'notes', itemId: `${sel().scope}:${sel().slug}` })}
+                >
+                  view in Context →
+                </Button>
+              </div>
             </>
           )}
-        >
-
-          <Show when={selected()} fallback={<EmptyState>Select or create a note.</EmptyState>}>
-            {(sel) => (
-              <>
-                <Toolbar size="sm" ariaLabel="Note actions">
-                  <input
-                    ref={titleInputRef}
-                    class="notes-title-input"
-                    type="text"
-                    value={noteTitle()}
-                    placeholder="Untitled"
-                    onInput={(e) => {
-                      setNoteTitle(e.currentTarget.value)
-                      if (sel().virtual) void ensureScratchpad().then(() => scheduleTitle())
-                      else scheduleTitle()
-                    }}
-                  />
-                  <span class="notes-scope-pill" title={`${sel().scope} scope`}>{scopeGlyph(sel().scope)}</span>
-                  <button
-                    type="button"
-                    class="notes-include-dot"
-                    classList={{ on: selectedIncluded() }}
-                    title={selectedIncluded() ? 'Included in agent context' : 'Excluded from agent context'}
-                    disabled={sel().virtual}
-                    onClick={() => void toggleIncluded(sel().scope, sel().slug, !selectedIncluded())}
-                  />
-                  <Button size="sm" onPress={() => { scheduleSave.flush(); setPreview(!preview()) }}>{preview() ? 'Edit' : 'Preview'}</Button>
-                  {/* `saving…` is a live status and stays; the completed save is an event, so it toasts. */}
-                  <span class="notes-save-state muted">{saving() ? 'saving…' : ''}</span>
-                </Toolbar>
-                <Show when={!preview()} fallback={
-                  <Markdown
-                    text={body()}
-                    copy
-                    onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
-                  />
-                }>
-                  <textarea
-                    class="notes-editor"
-                    spellcheck={false}
-                    value={body()}
-                    onInput={(e) => onBodyInput(e.currentTarget.value)}
-                    onBlur={() => scheduleSave.flush()}
-                  />
-                </Show>
-                <div class="notes-footer">
-                  <span class="muted">{formatSize(bytesOf(body()))}</span>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    tone="accent"
-                    disabled={sel().virtual}
-                    onPress={() => openPane(props.task.id, 'context', { kind: 'context:reveal', sectionId: 'notes', itemId: `${sel().scope}:${sel().slug}` })}
-                  >
-                    view in Context →
-                  </Button>
-                </div>
-              </>
-            )}
-          </Show>
-        </ListDetail>
+        </Show>
       </Show>
-    </section>
+    </>
   )
 }

@@ -25,8 +25,8 @@ plugin's frame bundle is 156 KB against the 7.93 MiB a bundled Monaco measured.
 The contract lives in `docs/plugins.md § Document surfaces`; the code is
 `node-core/main/pluginManifest.ts` (the `layout` block and the `surfaceAction` verb),
 `client-core/src/editor/` (the surface, its theme, its language map, its view state, the chord
-resolution and the completion provider), `client-core/plugins/frames/DocumentOverFrame.tsx` (the
-composed template) and `client-core/plugins/frames/documentSurfaces.ts` (the trust and confinement
+resolution and the completion provider), `client-core/layouts/DocumentSplit.tsx` (the composed
+layout) and `client-core/plugins/frames/layouts.ts` (the trust and confinement
 gate). The wire shapes both ends read are `@acorn/protocol/documentSurface.ts`.
 
 **Step 7 — the editor plugin's own move — is all that remains**, and it still waits on its consumer in
@@ -271,88 +271,33 @@ Shipping the region-capable form from day one — even while the only template i
 costs almost nothing and keeps the door open. This is the one-way door in this design; everything
 else is reversible.
 
-## The template vocabulary
+## The template vocabulary, and document-over-frame concretely
 
-The litmus test, which is the whole guardrail in one sentence: **a region is host-owned only when the
-sandbox cannot serve its content. Common is not the bar; impossible is.**
+Both sections folded into
+[docs/future/layout/05-layouts.md](../future/layout/05-layouts.md), which owns the layout names, their
+regions, and each one's narrow and terminal projection. `docs/panes.md` § Layout model has the shipped
+list. What survives from here is the litmus test, because it is what keeps that list short:
 
-Master/detail — rollbar, linear, http, docker — is *common*. Every one of those plugins already draws
-its sidebar-plus-detail itself, inside its own frame, with ordinary CSS; an iframe can do flexbox, and
-a master/detail layout is a hundred lines of the plugin's own code. If those should look consistent
-across plugins, the delivery vehicle is a component in `@acorn/plugin-api/ui` that plugins bundle —
-the diff-toolkit precedent — not a host-drawn region. The moment the host renders a plugin's list
-*from data*, someone has to design and eternally version a descriptor vocabulary for rows, icons,
-badges, grouping, selection, empty states and context menus: a widget toolkit in the wire format,
-built to replace something plugins already do fine. That request will recur; the answer stays no.
+**A region is host-owned only when the sandbox cannot serve its content. Common is not the bar;
+impossible is.**
 
-A document with language-service workers is *impossible* in the sandbox (measured, top of this file).
-A live terminal would be too (`terminal.md`). Those earn host surfaces; nothing else does.
+Master/detail, which rollbar, linear, http and docker all draw, is *common*: an iframe can do flexbox,
+and each of those plugins already draws its own. The moment the host renders a plugin's list *from
+data*, someone has to design and eternally version a descriptor vocabulary for rows, icons, badges,
+grouping, selection, empty states and context menus. A document with language-service workers is
+*impossible* in the sandbox, measured at the top of this file, and a live terminal would be too
+(`terminal.md`). Those earn host surfaces; nothing else does.
 
-The names:
+The other thing worth keeping is why the button bar in a composed pane is the plugin's. Database's bar
+holds a searchable saved-queries picker with per-row delete chips, a Save button that opens a modal, a
+Generate button visible only when a model connection exists, and an Execute button disabled on
+connection status. A host-drawn action-bar descriptor sounds cheap until it needs all of that. The bar
+is common, not impossible, so it is the first row of the plugin's own region.
 
-- **`document`** — the whole pane is one document surface. The degenerate template: the simplest
-  possible exercise of the contract, and the shape of any single-document pane (a read-only viewer, a
-  scratch document).
-- **`document-over-frame`** — a document surface above the plugin's frame, host-owned splitter
-  between them. Database's shape.
-- **`frame-beside-document`** — the plugin's frame beside a document surface. The editor plugin's
-  likely shape (tree and tabs cannot wrap *around* a host surface — § Composed panes), pinned down
-  when that move is planned rather than now.
-- No `layout` block at all — a plain frame, exactly what http declares today. Existing plugins are
-  untouched.
-
-Why each word survives scrutiny: `document` is the LSP word, vendor-neutral, and does not promise
-Monaco (the shiki-backed read-only variant is still a document). `frame` looks like it leaks an
-implementation detail until you notice it is already the manifest's established word for "the region
-the plugin draws" — `frames:` is the contribution key in every `acorn-plugin.config.mjs`. The
-template names are composed entirely of words the manifest already defines. The alternatives are
-worse: `results` presumes query-shape (a markdown preview is not results); `content` and `panel` are
-mush.
-
-`over` encoding geometry in the name is a feature, *for a fixed enum*. Each name describes exactly one
-arrangement, bluntly. The trap would be orientation as a field (`template: 'document+frame',
-orientation: 'vertical'`) — a field implies the other values exist, and that is the first knob of the
-layout language. A name implies nothing beyond itself: when `document-beside-frame` earns its
-existence via a real consumer, it is a new enum entry, not a new axis. Role names (`console`,
-`playground`, `repl`) were considered and rejected — they invite interpretation ("my pane is also a
-console, can it have two inputs?"), while geometry names keep the contract blunt at a trust boundary:
-you get exactly this arrangement, or you draw your own frame.
-
-The generative rule, so future entries stay in the family: `<host surface>` optionally arranged
-`<over|beside>` `frame`, where host-surface names come from the surface vocabulary itself. If
-`terminal.md` ever proceeds, `terminal-over-frame` reuses the region addressing, the bridge flow and
-the manifest shape with a different surface in the host slot. `document-over-frame` is the first
-instance of the pattern, not its ceiling.
-
-## document-over-frame, concretely
-
-```
-┌──────────────────────────────────┐
-│ host document surface (sql)      │  host: Monaco, theme, workers, dirty state, ⌘S, view state
-├──────────────────────────────────┤  host: the drag handle
-│ [picker] [Save] [Generate] [Run] │  plugin frame starts here
-│ results grid                     │
-└──────────────────────────────────┘
-```
-
-**The buttons live in the plugin's frame, and the reason is instructive.** Look at what database's
-button bar actually contains today (`DatabasePane.tsx`, `.db-editor-bar`): a "⌘↵ to run" hint, a
-*searchable saved-queries picker* with per-row delete chips, a Save button that opens
-`SaveQueryModal`, a Generate button that is *conditionally visible* (only when a model connection
-exists) and opens `GenerateSqlModal`, and an Execute button with a disabled state tied to connection
-status. That is the layout-language trap in miniature: a host-rendered "action bar" descriptor
-sounds cheap until it needs "searchable picker with per-row delete affordances", "visible when the
-plugin has a model connection" and "opens this modal". The bar is common, not impossible, so it is
-the plugin's — the first row of its frame region. The visible delta from today is that the bar moves
-from above the splitter to below it.
-
-**Modals are the one honest compromise.** Today they overlay the whole pane; a frame confined to the
-bottom region can only overlay the bottom region. For database's two small prompts that is
-acceptable, and it is the recommendation. The escape hatch already exists if it ever grates: the
-`overlay` frame target (`docs/plugins.md` § Frame contribution kind — same bundle, another surface,
-opened by the `openOverlay` verb, host-drawn backdrop and dismiss). Moving a prompt there is heavier
-than an in-region modal — the overlay is a separate surface, so anything it decides travels through
-the plugin's state or its node half — so take it only when the cramped modal is a real problem, not
+Modals are the one honest compromise. A frame confined to one region can only overlay that region. For
+database's two small prompts that is acceptable. The escape hatch is the `overlay` frame target
+(`docs/plugins.md` § Frame contribution kind), which is heavier, because anything it decides travels
+through the plugin's state or its node half. Take it when a cramped modal is a real problem, not
 pre-emptively.
 
 ## Communication between regions
@@ -404,9 +349,10 @@ Extending the `frames` contribution that already exists. Database's declaration 
 ```js
 frames: [{
   target: 'pane', id: 'database', label: 'Database', glyph: 'database',
-  layout: {
-    template: 'document-over-frame',        // fixed host vocabulary
+  layout: 'document-over-frame',             // fixed host vocabulary
+  regions: {
     document: {
+      kind: 'document',
       languageId: 'sql',                     // host-published vocabulary
       read:  '/v2/p/database/tasks/:taskId/scratch',
       write: '/v2/p/database/tasks/:taskId/scratch',
@@ -415,6 +361,7 @@ frames: [{
         triggerCharacters: ['.'],
       },
     },
+    frame: 'frame',                          // this plugin's own bundle
   },
 }],
 commands: [{ id: 'execute', title: 'Database: run query', palette: false }],
@@ -524,8 +471,8 @@ grows without becoming Monaco's API in a trench coat.
    the union of the two extension maps, one fallback. The per-engine maps sit beside their engines —
    `client-core/editor/language.ts` for Monaco, `client-core/highlight/shiki.ts` for shiki, each total
    over the vocabulary so a new id fails `tsc` until someone says what that engine does with it.
-4. ~~Build the contract.~~ **Done.** `layout: { template: 'document', document: { languageId, read,
-   write? } }` on a `pane` surface, host-owned dirty state, autosave, ⌘S, flush-on-unmount and view
+4. ~~Build the contract.~~ **Done.** `layout` and `regions` on a `pane` surface, with a document
+   region carrying `{ languageId, read, write? }`, host-owned dirty state, autosave, ⌘S, flush-on-unmount and view
    state, with a missing `write` meaning read-only. Two things came out differently from the sketch
    above, and both are smaller: **surface actions needed no new manifest field** — `keybindings` with
    `when: 'surface'` already carries them, and their DELIVERY is step 5's — and a document surface

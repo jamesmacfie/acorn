@@ -256,7 +256,7 @@ The cross-field rules are worth knowing before you write a manifest that parses 
 an `openPane` must name a task-scoped pane this manifest declares; a `navigate` must name a
 project-scoped one; a project-scoped pane needs both a `routes` entry (its only address) and a source
 whose `onSelect` navigates to it (its only mount site); an `overlay` needs an action that opens it; a
-`surfaceAction` may name only a `document-over-frame` pane; a webview needs a client bundle; an
+`surfaceAction` may name only a pane that has both a document region and a `frame` region; a webview needs a client bundle; an
 extension point must hang off a `pane` this manifest declares and only one may sit at each location on
 it; an `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference and its `items` route
 must be your own; a `taskChecks` entry needs a `node` half, since only that serves the namespace its two
@@ -387,7 +387,7 @@ accepts it, which predates the split and should not be relied on.)
 | `createTask` | Host-owned promotion: the row supplies the task seed, the host owns the modal, the ownership check and the ordering. |
 | `openUrl` | `https` only, in the real browser. |
 | `openOverlay` | Open a full-screen picker this manifest declares. |
-| `surfaceAction` | Deliver this command's own id to the frame region of a `document-over-frame` pane. The only verb whose effect lands inside a plugin. |
+| `surfaceAction` | Deliver this command's own id to the `frame` region of a pane that also has a document region. The only verb whose effect lands inside a plugin. |
 
 Commands, slot badges and a source's `emptyState` take a **six-verb subset**: `openPane`, `openTask`,
 `runNodeAction`, `openUrl`, `openOverlay`, `surfaceAction`. `createTask` and `navigate` are absent
@@ -615,7 +615,7 @@ messages by hand:
 | `events.on` | Subscribe to a channel the manifest declared: one of the shell's four, or your own `plugin:<your-id>:<verb>`. The payload is whatever your node half put on the frame beside `channel`. |
 | `state.get` / `state.set` | Durable storage keyed `(pluginId, key)` by the host, capped at 1 MiB per value. The same `plugin:<id>:*` namespace your node half's `prefs` facet is projected into — this is the supported node-half↔frame state channel. Distinct from the frame's own `localStorage`, which works but is keyed by bundle hash and so rotates with every update. |
 | `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. |
-| `document.read` / `write` / `flush` | Only from a `document-over-frame` pane. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
+| `document.read` / `write` / `flush` | Only from a pane whose layout puts a document region beside this frame. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
 | `webview.*` | `navigate`, `back`, `forward`, `reload`, plus navigation and blocked events. Controller-only: you cannot read the page or type into it. |
 | `keys.claim` | Narrow the manifest's declared chord set at runtime. It can never widen it. |
 

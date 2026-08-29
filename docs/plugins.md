@@ -792,18 +792,21 @@ kinds of contribution come out of one manifest:
   hand-roll the plumbing; unlike the shell's equivalent it takes modified clicks too, because in a frame
   there is no browser default for cmd-click to preserve.
 - **Document surfaces** — a pane whose editor the **host** draws, with the plugin supplying only the
-  document. A `pane` surface may declare a `layout` block. Two templates exist: `document`, where the
-  whole pane is one text document, and `document-over-frame`, where that document sits above the
-  plugin's own frame with a host-owned drag handle between them.
+  document. A `pane` surface names a `layout` and fills its `regions`, and a region is either a
+  host-drawn document or `"frame"`, the plugin's own bundle. `docs/panes.md` § Layout model lists
+  every layout and its regions; the two that matter here are `single`, where the whole pane is one
+  text document, and `document-over-frame`, where that document sits above the plugin's own frame
+  with a host-owned drag handle between them.
 
   ```json
   {
     "contributions": {
       "frames": [{
         "target": "pane", "id": "scratch", "label": "Scratch", "glyph": "file-text",
-        "layout": {
-          "template": "document",
-          "document": {
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "document",
             "languageId": "sql",
             "read": "/v2/p/board/tasks/:taskId/scratch",
             "write": "/v2/p/board/tasks/:taskId/scratch"
@@ -846,7 +849,7 @@ kinds of contribution come out of one manifest:
   something, the answer is still a frame pane. The full argument is
   [dashboards.md](./dashboards.md); the refusals it keeps are in `docs/future/dashboards/refused.md`.
 
-  Because a document surface runs no plugin code on the device, it is gated like a **descriptor**
+  Because a pane with no `frame` region runs no plugin code on the device, it is gated like a **descriptor**
   rather than like a frame: no bytes execute, so there is nothing for a bytes-hash trust prompt to be
   about, and a plugin that ships only document surfaces needs no client bundle at all. The ceiling is
   the honest one — a declarative contract gives a plugin the editor's *features*, not its *API*. No
@@ -855,10 +858,10 @@ kinds of contribution come out of one manifest:
   inside the editor".
 
   `layout` is region-addressed rather than whole-pane-addressed, and that was decided before there were
-  templates to address: a whole-pane declaration would have meant something different once a second
-  template arrived, and changing that later would change what already-published manifests mean.
-  `frame-beside-document` is the next entry and lands with its consumer, the editor plugin. The design
-  record is `docs/third-party/monaco.md`.
+  layouts to address: a whole-pane declaration would have meant something different once a second
+  arrangement arrived, and changing that later would change what already-published manifests mean.
+  `frame-beside-document` exists and lands with its consumer, the editor plugin. The design record is
+  `docs/third-party/monaco.md`, and `docs/future/layout/05-layouts.md` owns the layout set.
 
   ### `document-over-frame`
 
@@ -876,7 +879,7 @@ kinds of contribution come out of one manifest:
   host, which is the whole shape of the design — the host places its editor and the plugin's iframe as
   siblings in its own DOM.
 
-  A composed pane runs plugin code in half its rectangle, so unlike the degenerate template it needs an
+  A composed pane runs plugin code in half its rectangle, so unlike a wholly host-drawn one it needs an
   accepted bytes hash and a client bundle exactly like any other frame. It is not a cheaper way to run
   untrusted code.
 

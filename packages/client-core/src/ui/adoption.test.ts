@@ -217,7 +217,10 @@ describe('primitive adoption', () => {
     // Tier 3 (see docs/ui-design.md § The three kit invariants).
     'apps/desktop/src/app/client/CommandPalette.tsx',
     'packages/client-core/src/palette/WorkspacePalette.tsx',
-    'packages/client-core/src/plugins/frames/DocumentOverFrame.tsx',
+    'packages/client-core/src/layouts/DocumentSplit.tsx',
+    'packages/client-core/src/layouts/ListDetail.tsx',
+    'packages/client-core/src/layouts/StackSplit.tsx',
+    'packages/client-core/src/layouts/Wizard.tsx',
     'packages/client-core/src/ui/Composer.tsx',
     'packages/client-core/src/ui/Drawer.tsx',
     'packages/client-core/src/ui/FindBar.tsx',

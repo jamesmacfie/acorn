@@ -315,91 +315,109 @@
                 }
               },
               "layout": {
+                "type": "string",
+                "enum": [
+                  "single",
+                  "list-detail",
+                  "header-body-footer",
+                  "tabs",
+                  "document-over-frame",
+                  "frame-beside-document",
+                  "stack-split",
+                  "wizard"
+                ]
+              },
+              "regions": {
                 "type": "object",
-                "properties": {
-                  "template": {
-                    "type": "string",
-                    "enum": [
-                      "document",
-                      "document-over-frame"
-                    ]
-                  },
-                  "document": {
-                    "type": "object",
-                    "properties": {
-                      "languageId": {
-                        "default": "plaintext",
-                        "type": "string",
-                        "enum": [
-                          "plaintext",
-                          "typescript",
-                          "typescriptreact",
-                          "javascript",
-                          "javascriptreact",
-                          "json",
-                          "css",
-                          "scss",
-                          "less",
-                          "html",
-                          "xml",
-                          "markdown",
-                          "python",
-                          "ruby",
-                          "go",
-                          "rust",
-                          "java",
-                          "c",
-                          "cpp",
-                          "shellscript",
-                          "yaml",
-                          "sql",
-                          "ini",
-                          "toml"
-                        ]
-                      },
-                      "read": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 256
-                      },
-                      "write": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 256
-                      },
-                      "completions": {
-                        "type": "object",
-                        "properties": {
-                          "route": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 256
-                          },
-                          "triggerCharacters": {
-                            "default": [],
-                            "maxItems": 8,
-                            "type": "array",
-                            "items": {
+                "propertyNames": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "frame"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "document"
+                        },
+                        "languageId": {
+                          "default": "plaintext",
+                          "type": "string",
+                          "enum": [
+                            "plaintext",
+                            "typescript",
+                            "typescriptreact",
+                            "javascript",
+                            "javascriptreact",
+                            "json",
+                            "css",
+                            "scss",
+                            "less",
+                            "html",
+                            "xml",
+                            "markdown",
+                            "python",
+                            "ruby",
+                            "go",
+                            "rust",
+                            "java",
+                            "c",
+                            "cpp",
+                            "shellscript",
+                            "yaml",
+                            "sql",
+                            "ini",
+                            "toml"
+                          ]
+                        },
+                        "read": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "write": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "completions": {
+                          "type": "object",
+                          "properties": {
+                            "route": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 2
+                              "maxLength": 256
+                            },
+                            "triggerCharacters": {
+                              "default": [],
+                              "maxItems": 8,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2
+                              }
                             }
-                          }
-                        },
-                        "required": [
-                          "route"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "read"
-                    ]
-                  }
-                },
-                "required": [
-                  "template",
-                  "document"
-                ]
+                          },
+                          "required": [
+                            "route"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "read"
+                      ]
+                    }
+                  ]
+                }
               },
               "claimsKeys": {
                 "default": [],

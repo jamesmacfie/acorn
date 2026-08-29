@@ -1,6 +1,6 @@
 # Phase 1: six host-owned layouts
 
-Status: not started.
+Status: shipped, 2026-08-29. `docs/panes.md` § Layout model owns the behaviour now.
 
 ## Goal
 
@@ -75,25 +75,30 @@ is one region, `single`), so no loaded plugin changes here.
 
 ## Code touched
 
-- New `packages/client-core/src/layouts/*.tsx`, one file per layout, plus `layouts/index.ts` and
-  `layouts/regions.ts`.
-- `packages/client-core/src/registries/panes.ts`: `PaneContribution.layout`, `regions`; the render
-  path.
+- New `packages/client-core/src/layouts/`: one file per layout, plus `index.ts`, `regions.ts` and
+  `state.ts`. `DocumentSplit.tsx` holds both `document-over-frame` and `frame-beside-document`,
+  because the axis is the only difference and the name carries it.
+- New `packages/protocol/src/paneLayouts.ts`: the layout names and each one's region set, read by the
+  manifest parser, the client's roster re-check, and the pane registry.
+- `packages/client-core/src/registries/panes.ts`: `PaneLayoutContribution`, and a `PaneRegistry`
+  subclass whose `register` turns a declared layout into a component.
 - `packages/client-core/src/plugins/frames/register.ts`: the `pane` branch reads `layout` and
-  `regions`; `documentRegionFor` generalises.
-- `packages/client-core/src/plugins/frames/documentSurfaces.ts`: becomes `layouts.ts` with the
-  six-name check.
-- `packages/protocol/src/pluginContract.ts`: `layout` enum, `regions` record.
-- `packages/client-core/src/ui/primitives.tsx` (`ListDetail`), `ui/split.ts`, `ui/DocumentTabs.tsx`,
-  `ui/Drawer.tsx`: moved or folded.
-- `plugins/notes/src/client/NotesPane.tsx`: the proof.
+  `regions` and builds a region per entry.
+- `documentSurfaces.ts` under `packages/client-core/src/plugins/frames/` became `layouts.ts`, and
+  `documentRegionFor` became `paneLayoutFor`.
+- `packages/client-core/src/plugins/frames/DocumentOverFrame.tsx`: deleted, replaced by the layout.
+- `packages/protocol/src/pluginContract.ts`: `layout` enum, `regions` record, and the cross-field
+  check that a layout has the regions it names.
+- `plugins/notes/`: `notesModel.ts` is new and holds what the three regions share;
+  `NotesPane.tsx` is three region components.
+- `plugins/database/acorn-plugin.config.mjs`: the one manifest that declared a layout.
 
 ## Tests
 
 - Each layout renders in the jsdom `hosts` project with placeholder regions; region order and
   presence are asserted.
 - A layout with a missing required region throws at registration.
-- The manifest parser rejects a `layout` outside the six and a `regions` key the layout lacks, on
+- The manifest parser rejects a `layout` outside the set and a `regions` key the layout lacks, on
   the node and again on the client.
 - Notes' existing tests pass against the layout version.
 
@@ -113,17 +118,30 @@ is one region, `single`), so no loaded plugin changes here.
 
 ## Done when
 
-- The six layouts exist, tested, and notes renders through `list-detail` with no visual change
-  beyond divider placement.
-- `frames[].layout` accepts the six names on the node and the client.
+- The layouts exist, tested, and notes renders through `list-detail`.
+- `frames[].layout` accepts the layout names on the node and the client.
 - `pnpm lint` and `pnpm test` are green.
 
-## Verify before building
+## What came out differently
 
-- `packages/client-core/src/plugins/frames/DocumentOverFrame.tsx` and `documentSurfaces.ts` exist and
-  `register.ts` calls `documentRegionFor` in the `pane` branch.
-- `packages/client-core/src/registries/panes.ts` holds `PaneContribution`.
-- `packages/protocol/src/pluginContract.ts` has the `layout` key on frame surfaces with
-  `document-over-frame` as its only value.
-- `plugins/notes/src/client/NotesPane.tsx` is a `ListDetail` with a `Toolbar` and a `Markdown` or
-  `textarea` toggle, as the survey saw.
+- **Eight names, seven components, not six layouts.** The prose said six and then listed seven
+  sections; `single`, `list-detail`, `header-body-footer`, `tabs`, `document-over-frame`,
+  `frame-beside-document`, `stack-split` and `wizard` is what shipped. `header-body` is
+  `header-body-footer` with no footer, which is why it is not a name.
+- **One props type for every layout**, not one per layout. The remote root in phase 3 and the
+  registry both build these props without knowing which layout they are building for, so a layout
+  reads the fields it has regions for and ignores the rest. Regions arrive as thunks, so `tabs`
+  mounts one panel and `wizard` mounts one step.
+- **A pane can hide a region.** Notes collapses its library, which the layout has to do rather than
+  the pane, and it is the same move every narrow projection makes on selection. Notes' collapse
+  toggle moved into the note toolbar, because hiding the list column takes its header with it.
+- **The manifest shape changed rather than widened.** `layout: { template, document }` became
+  `layout: "<name>"` plus `regions`, where a region is `"frame"` or
+  `{ "kind": "document", ... }`. One manifest declared the old shape and moved with it. The trust
+  gate, the key claims and `surfaceAction` all ask "does this pane have a `frame` region?" now
+  instead of naming a template.
+- **`ui/ListDetail`, `ui/DocumentTabs`, `ui/split.ts` and `ui/Drawer.tsx` stayed put.** The layouts
+  use them; ten plugins still use `ListDetail` directly, and moving those is phases 5 to 8's job.
+  Phase 9 deletes what is left over.
+- **`layouts/state.ts` is the per-pane state**, module-level and session-only, generalising the
+  height signal the composed database pane held. `list-detail` gained a drag handle it did not have.

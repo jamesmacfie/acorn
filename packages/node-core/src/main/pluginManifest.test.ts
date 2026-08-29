@@ -162,23 +162,31 @@ describe('webview surfaces', () => {
   })
 })
 
-describe('document surfaces', () => {
-  // The host draws the editor and the plugin supplies the document, because a Monaco frame cannot be
-  // served at all (docs/third-party/monaco.md). What is worth pinning is the same class of rule as every
-  // other cross-field check here: a plugin may not name a route outside its own namespace, and a surface
-  // that parses and can never do anything is refused rather than shipped.
-  const layout = (document: Record<string, unknown>) => ({ ...PANE, layout: { template: 'document', document } })
+describe('pane layouts', () => {
+  // A pane names one of the host's layouts and fills its regions (@acorn/protocol/paneLayouts.ts). The
+  // host draws the editor and the plugin supplies the document, because a Monaco frame cannot be served
+  // at all (docs/third-party/monaco.md). What is worth pinning is the same class of rule as every other
+  // cross-field check here: a plugin may not name a route outside its own namespace, a layout has the
+  // regions it has, and a surface that parses and can never do anything is refused rather than shipped.
+  const doc = (document: Record<string, unknown>) => ({ kind: 'document', ...document })
+  const layout = (document: Record<string, unknown>) =>
+    ({ ...PANE, layout: 'single', regions: { body: doc(document) } })
+  const region = (result: ReturnType<typeof manifest>, name: string) => {
+    if (!result.success) return undefined
+    const held = result.data.contributions.frames[0]?.regions?.[name]
+    return typeof held === 'object' ? held : undefined
+  }
 
   it('accepts a read/write document and defaults the language', () => {
     const result = manifest({ frames: [layout({ read: '/v2/p/board/doc', write: '/v2/p/board/doc' })] })
     expect(result.success).toBe(true)
-    expect(result.success && result.data.contributions.frames[0]?.layout?.document.languageId).toBe('plaintext')
+    expect(region(result, 'body')?.languageId).toBe('plaintext')
   })
 
   it('treats a missing write route as read-only rather than as an error', () => {
     const result = manifest({ frames: [layout({ read: '/v2/p/board/doc', languageId: 'sql' })] })
     expect(result.success).toBe(true)
-    expect(result.success && result.data.contributions.frames[0]?.layout?.document.write).toBeUndefined()
+    expect(region(result, 'body')?.write).toBeUndefined()
   })
 
   it('confines both routes to the plugin, so the host cannot be made to read core on its behalf', () => {
@@ -191,32 +199,43 @@ describe('document surfaces', () => {
     expect(manifest({ frames: [layout({ read: '/v2/p/board/doc', languageId: 'brainfuck' })] }).success).toBe(false)
   })
 
-  it('refuses a layout on a surface with no pane rectangle to split', () => {
+  it('refuses a layout on a surface with no pane rectangle to arrange', () => {
     expect(messages(manifest({
-      frames: [{ target: 'settings', id: 'board', label: 'Board', layout: { template: 'document', document: { read: '/v2/p/board/doc' } } }],
+      frames: [{ target: 'settings', id: 'board', label: 'Board', layout: 'single', regions: { body: doc({ read: '/v2/p/board/doc' }) } }],
     }))).toContain('layout is only valid on a pane surface')
   })
 
-  it('refuses key claims on the degenerate template, which draws no frame to claim them', () => {
+  it('refuses a layout name this build does not draw, and a region the layout does not have', () => {
+    expect(manifest({ frames: [{ ...PANE, layout: 'carousel', regions: { body: doc({ read: '/v2/p/board/doc' }) } }] }).success).toBe(false)
+    expect(messages(manifest({ frames: [{ ...PANE, layout: 'single', regions: { body: 'frame', sidebar: 'frame' } }] })))
+      .toContain("layout 'single' has no sidebar region")
+    expect(messages(manifest({ frames: [{ ...PANE, layout: 'list-detail', regions: { list: 'frame' } }] })))
+      .toContain("layout 'list-detail' needs a detail region")
+    expect(messages(manifest({ frames: [{ ...PANE, regions: { body: 'frame' } }] })))
+      .toContain('regions need a layout to name them')
+  })
+
+  it('refuses key claims on a pane with no frame region, which draws nothing to claim them', () => {
     expect(messages(manifest({ frames: [{ ...layout({ read: '/v2/p/board/doc' }), claimsKeys: ['meta+j'] }] })))
-      .toContain("the 'document' template draws no frame, so there is nothing here to claim keys")
+      .toContain('this pane draws no frame, so there is nothing here to claim keys')
   })
 
   // `document-over-frame`: a document above the plugin's own frame, host-owned splitter between them. The
-  // template that arrived with its consumer, the database pane, which is what shipping the region
+  // layout that arrived with its consumer, the database pane, which is what shipping the region
   // addressing on day one was for.
-  const composed = (document: Record<string, unknown>) => ({ ...PANE, layout: { template: 'document-over-frame', document } })
+  const composed = (document: Record<string, unknown>) =>
+    ({ ...PANE, layout: 'document-over-frame', regions: { document: doc(document), frame: 'frame' } })
 
-  it('accepts the composed template, and allows the key claims the degenerate one refuses', () => {
+  it('accepts a composed pane, and allows the key claims a host-drawn one refuses', () => {
     const result = manifest({ frames: [{ ...composed({ read: '/v2/p/board/doc', languageId: 'sql' }), claimsKeys: ['meta+j'] }] })
     expect(result.success).toBe(true)
-    expect(result.success && result.data.contributions.frames[0]?.layout?.template).toBe('document-over-frame')
+    expect(result.success && result.data.contributions.frames[0]?.layout).toBe('document-over-frame')
   })
 
   it('confines the completions route like any other, and defaults its trigger characters', () => {
     const ok = manifest({ frames: [layout({ read: '/v2/p/board/doc', completions: { route: '/v2/p/board/complete' } })] })
     expect(ok.success).toBe(true)
-    expect(ok.success && ok.data.contributions.frames[0]?.layout?.document.completions?.triggerCharacters).toEqual([])
+    expect(region(ok, 'body')?.completions?.triggerCharacters).toEqual([])
     expect(messages(manifest({ frames: [layout({ read: '/v2/p/board/doc', completions: { route: '/v2/p/other/complete' } })] })))
       .toContain('route must be inside /v2/p/board/')
   })
@@ -230,7 +249,11 @@ describe('surface actions', () => {
     target: 'pane',
     id: 'query',
     label: 'Query',
-    layout: { template: 'document-over-frame', document: { read: '/v2/p/board/doc', write: '/v2/p/board/doc' } },
+    layout: 'document-over-frame',
+    regions: {
+      document: { kind: 'document', read: '/v2/p/board/doc', write: '/v2/p/board/doc' },
+      frame: 'frame',
+    },
   }
   const execute = (surface: string) => ({ id: 'execute', title: 'Run', action: { verb: 'surfaceAction', surface } })
 
@@ -241,16 +264,17 @@ describe('surface actions', () => {
   it('refuses a surface with no frame region to receive it', () => {
     // A plain frame pane has no document to flush and no host chord to have resolved the command,
     expect(messages(manifest({ frames: [PANE], commands: [execute('board')] })))
-      .toContain("surfaceAction names 'board', which this manifest does not declare as a document-over-frame pane")
-    // and the degenerate template draws no frame at all, so there is nothing on the other side.
-    const wholePane = { ...PANE, layout: { template: 'document', document: { read: '/v2/p/board/doc' } } }
+      .toContain("surfaceAction names 'board', which this manifest does not declare as a pane with both a document region and a frame region")
+    // and a pane whose only region is host-drawn has no frame at all, so there is nothing on the
+    // other side.
+    const wholePane = { ...PANE, layout: 'single', regions: { body: { kind: 'document', read: '/v2/p/board/doc' } } }
     expect(messages(manifest({ frames: [wholePane], commands: [execute('board')] })))
-      .toContain("surfaceAction names 'board', which this manifest does not declare as a document-over-frame pane")
+      .toContain("surfaceAction names 'board', which this manifest does not declare as a pane with both a document region and a frame region")
   })
 
   it('refuses another plugin\'s surface, which is to say any it did not declare', () => {
     expect(messages(manifest({ frames: [composedPane], commands: [execute('someone-elses')] })))
-      .toContain("surfaceAction names 'someone-elses', which this manifest does not declare as a document-over-frame pane")
+      .toContain("surfaceAction names 'someone-elses', which this manifest does not declare as a pane with both a document region and a frame region")
   })
 })
 
