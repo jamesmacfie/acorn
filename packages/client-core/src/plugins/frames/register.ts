@@ -1,5 +1,6 @@
-import { createComponent, lazy } from 'solid-js'
+import { createComponent, createSignal, lazy, type JSX } from 'solid-js'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
+import type { DocumentHandle } from '../../editor/documentModel'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { panelRegion } from '../../dashboards/region'
@@ -25,7 +26,7 @@ import {
 import { eligiblePlugins, isTaskPane } from '../contributions'
 import { clearSurfaceFailures, recordSurfaceFailure } from '../surfaceFailures'
 import type { FrameBinding } from './broker'
-import { documentRegionFor, isHostOwnedSurface } from './documentSurfaces'
+import { isHostOwnedSurface, paneLayoutFor } from './layouts'
 import { closePluginOverlay, pluginOverlayOpen } from './overlays'
 
 // Turning accepted manifests into shell contributions (docs/plugins.md § Frame contribution kind).
@@ -65,9 +66,9 @@ const ExtendedPane = lazy(() => import('./ExtendedPane'))
 // the client-graph test suites, where `monaco-editor` reads `window.location` at module scope and there
 // is no real window.
 const DocumentSurface = lazy(() => import('../../editor/DocumentSurface'))
-// The composed template. Its own lazy boundary rather than a branch inside the one above, so a shell
-// that only opens whole-pane documents never pulls the frame half in.
-const DocumentOverFrame = lazy(() => import('./DocumentOverFrame'))
+// The host's layouts. Its own lazy boundary rather than a branch inside the one above, so a shell that
+// only opens whole-pane documents never pulls the splitters and the tab strip in.
+const paneLayouts = () => import('../../layouts')
 
 const registered = new Map<string, Disposable[]>()
 
@@ -158,19 +159,21 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         }),
       })
     case 'pane':
-      // A host-owned document surface: no iframe, no plugin code in this pane at all
-      // (docs/third-party/monaco.md). There's no bundle to mount and no bridge to open, which is why
-      // this branch comes before everything else the `pane` case does.
+      // A pane that declared one of the host's layouts. The host draws the arrangement and fills each
+      // region: a document region is the host's editor and runs no plugin code at all, a `frame`
+      // region is the plugin's own bundle in an iframe (docs/panes.md § Layout model). This branch
+      // comes before everything else the `pane` case does, because a pane with no `frame` region has
+      // no bundle to mount and no bridge to open.
       //
       // The routes were confined to `/v2/p/<id>/` when the node parsed the manifest and are confined
       // again here: the manifest reached this device as a roster row, and a node could have sent
       // something its own parser would have rejected.
       {
-        // Throws, and so is skipped and logged by registerSurfaces, when a roster row carried a route
-        // the node's own parser would have refused.
-        const region = documentRegionFor(pluginId, surface)
-        if (region) {
-          const composed = surface.layout?.template === 'document-over-frame'
+        // Throws, and so is skipped and logged by registerSurfaces, when a roster row carried a layout
+        // name, a region set or a route the node's own parser would have refused.
+        const declared = paneLayoutFor(pluginId, surface)
+        if (declared) {
+          const Draw = lazy(async () => ({ default: (await paneLayouts()).LAYOUTS[declared.layout] }))
           return paneRegistry.register({
             id: surface.id,
             label: surface.label,
@@ -179,24 +182,31 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
             when: () => pluginEnabledOnNode(frameNode(), pluginId),
             component: (props) => {
               const scope = { taskId: props.task.id, projectId: props.task.projectId ?? undefined }
-              // `document-over-frame` has a frame region, so half this rectangle is the plugin's own
-              // bundle in an iframe. That's why `isHostOwnedSurface` above excluded it from the trust
-              // bypass, and why there's a `hash` to hand over.
-              return composed
-                ? createComponent(DocumentOverFrame, {
-                  pluginId,
-                  binding: frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId }),
-                  hash,
-                  region,
-                  scope,
-                })
-                : createComponent(DocumentSurface, {
-                  pluginId,
-                  surfaceId: surface.id,
-                  nodeId: frameNode(),
-                  region,
-                  scope,
-                })
+              const binding = () => frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId })
+              // Held here rather than passed down, because the regions mount independently: an iframe
+              // can connect its bridge before the editor has finished fetching its document. PluginFrame
+              // reads through the accessor per call, so a frame that got there first still finds the
+              // document when it arrives.
+              const [document, setDocument] = createSignal<DocumentHandle | null>(null)
+              const regions: Record<string, () => JSX.Element> = {}
+              for (const [name, region] of Object.entries(declared.regions)) {
+                // A `frame` region is half this rectangle running the plugin's own bundle in an iframe.
+                // That is why `isHostOwnedSurface` excluded such a pane from the trust bypass, and why
+                // there is a `hash` to hand over.
+                regions[name] = region === 'frame'
+                  ? () => createComponent(PluginFrame, { binding: binding(), hash, document })
+                  : () => createComponent(DocumentSurface, {
+                    pluginId,
+                    surfaceId: surface.id,
+                    nodeId: frameNode(),
+                    region,
+                    scope,
+                    // The updater form, because a Solid setter given a bare value it can call would
+                    // call it, and a document handle is a bag of methods.
+                    onHandle: (next: DocumentHandle | null) => { setDocument(() => next) },
+                  })
+              }
+              return createComponent(Draw, { stateKey: surface.id, label: surface.label, regions })
             },
           })
         }

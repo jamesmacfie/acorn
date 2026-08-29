@@ -14,6 +14,8 @@ client: PaletteItem
 client: PaletteRowSource
 client: PaneContribution
 client: PaneIntent
+client: PaneLayoutContribution
+client: PaneRegistration
 client: PersistedSliceKeys
 client: PersistedStateSlice
 client: PluginRefResolution

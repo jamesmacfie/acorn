@@ -161,7 +161,8 @@ describe('syncFrameContributions', () => {
     const doc = surface({
       target: 'pane',
       id: 'board-doc',
-      layout: { template: 'document', document: { read: '/v2/p/board/doc', languageId: 'markdown' } },
+      layout: 'single',
+      regions: { body: { kind: 'document', read: '/v2/p/board/doc', languageId: 'markdown' } },
     })
     _seedPluginDistribution([['node-a', [row('board', { frames: [doc, surface({ target: 'pane', id: 'board-pane' })] })]]])
     syncFrameContributions()
@@ -175,7 +176,8 @@ describe('syncFrameContributions', () => {
     const composed = surface({
       target: 'pane',
       id: 'board-doc',
-      layout: { template: 'document-over-frame', document: { read: '/v2/p/board/doc', languageId: 'markdown' } },
+      layout: 'document-over-frame',
+      regions: { document: { kind: 'document', read: '/v2/p/board/doc', languageId: 'markdown' }, frame: 'frame' },
     })
     _seedPluginDistribution([['node-a', [row('board', { frames: [composed] })]]])
     syncFrameContributions()
@@ -321,7 +323,8 @@ describe('syncFrameContributions', () => {
     const docPane = (region: Omit<PluginDocumentRegion, 'languageId'>) => surface({
       target: 'pane',
       id: 'board-doc',
-      layout: { template: 'document', document: { languageId: 'markdown', ...region } },
+      layout: 'single',
+      regions: { body: { kind: 'document', languageId: 'markdown', ...region } },
     })
 
     it('refuses a document route outside the plugin’s own namespace', () => {

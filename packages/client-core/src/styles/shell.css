@@ -102,11 +102,78 @@
 .document-surface { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .document-surface-host { flex: 1; min-height: 0; }
 
-/* The `document-over-frame` template (docs/third-party/monaco.md § document-over-frame,
-   concretely): host editor, host drag handle, the plugin's frame below. All three rules are the
-   host's for the same reason the surface above is: the splitter is the boundary between two
-   realms, so neither side could style it alone. The document region takes an inline pixel height
-   from the drag; the frame region takes whatever is left. */
-.document-over-frame { display: flex; flex-direction: column; overflow: hidden; }
-.document-over-frame-document { flex: none; min-height: 0; display: flex; flex-direction: column; }
-.document-over-frame-frame { flex: 1; min-height: 0; }
+/* ── The host's pane layouts ────────────────────────────────────────────────────────────────
+   One block per layout in client-core/src/layouts (docs/panes.md § Layout model). These rules are
+   the host's, and in a composed pane that matters twice over: the splitter is the boundary between
+   two realms, so neither side could style it alone.
+
+   Every layout root also carries `.pane`, because the pane's background, border and radius are the
+   host's whichever way the pane draws itself. These rules follow `.pane` in this file so the
+   overflow below wins over its `auto`.
+
+   Nothing here reads the window width. Breakpoints are style tokens, so a narrower host can set
+   them differently without touching a layout (docs/future/layout/09-doors-left-open.md). */
+.layout-single,
+.layout-hbf,
+.layout-tabs,
+.layout-wizard,
+.layout-list-detail,
+.layout-stack-split,
+.layout-document-split {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.layout-single,
+.layout-hbf,
+.layout-tabs,
+.layout-wizard,
+.layout-stack-split { flex-direction: column; }
+.layout-document-split[data-axis='y'] { flex-direction: column; }
+
+.layout-hbf-body,
+.layout-tabs-panel,
+.layout-wizard-body,
+.layout-region-detail,
+.layout-region-frame,
+.layout-region-top { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* The regions a drag sizes take an inline pixel length; their sibling takes what is left. */
+.layout-region-document,
+.layout-region-bottom { flex: none; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* `list-detail`. The list column's width is a style token until someone drags the handle, which
+   writes a pixel value onto the container. The divider is the handle's, so the column carries no
+   border of its own. */
+.layout-region-list {
+  flex: none;
+  width: var(--listdetail-w);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.layout-list-scroll { flex: 1; min-height: 0; overflow: auto; }
+
+/* `wizard`. The host draws the indicator and the two controls; the step is the plugin's. */
+.layout-wizard-steps {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-3) var(--pane-pad);
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  border-bottom: var(--chrome-divider);
+}
+.layout-wizard-step[data-state='current'] { color: var(--text); font-weight: var(--fw-semibold); }
+.layout-wizard-step[data-state='done'] { color: var(--accent); }
+.layout-wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--pane-pad);
+  border-top: var(--chrome-divider);
+}

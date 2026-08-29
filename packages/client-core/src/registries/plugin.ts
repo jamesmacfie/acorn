@@ -7,7 +7,7 @@ import { paletteRowRegistry, type PaletteRowSource } from './paletteRows'
 import { attentionRegistry, type AttentionSourceContribution } from './attention'
 import { collectionKey, collectionRegistry, type CollectionRegistration } from './collections'
 import { nodeStatRegistry, type NodeStatContribution } from './nodeStats'
-import { paneRegistry, type PaneContribution } from './panes'
+import { paneRegistry, type PaneRegistration } from './panes'
 import { refPanelRegistry, type RefPanelContribution } from './refPanels'
 import { clientScheduleRegistry, type ClientScheduleContribution } from './schedules'
 import { contentLinkRegistry, type ContentLinkContribution } from './contentLinks'
@@ -33,7 +33,7 @@ export type ClientContributionPoint<T> = {
 
 export type ClientPluginContext = {
   readonly name: string
-  panes: ClientContributionPoint<PaneContribution>
+  panes: ClientContributionPoint<PaneRegistration>
   // Generic per call. A source's promotion is typed on the item it promotes, and the registry holds a
   // heterogeneous list, so a plugin declares its own item type here.
   sources: { register<Item>(entry: SourceContribution<Item>): void }
@@ -136,7 +136,9 @@ const declaredProvider = (entry: object): string | undefined =>
     : undefined
 
 function makeContext(name: string, record: (disposable: Disposable) => void): ClientPluginContext {
-  const own = <T extends { id: string }>(registry: Registry<T>): ClientContributionPoint<T> => ({
+  // Structural rather than `Registry<T>`, because the pane registry accepts a wider entry than it
+  // stores: a pane may declare a layout and regions, and the registry turns that into a component.
+  const own = <T extends { id: string }>(registry: { register: (entry: T) => Disposable }): ClientContributionPoint<T> => ({
     register: (entry: T) => {
       const provider = declaredProvider(entry)
       if (provider !== undefined && provider !== name) {
@@ -163,7 +165,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
   }
   return {
     name,
-    panes: own(paneRegistry),
+    panes: own<PaneRegistration>(paneRegistry),
     // The registry is heterogeneous by construction, so widening the item type here is the erasure
     // rather than a hole. Nothing downstream reads a promotion without selecting the source by id.
     sources: { register: <Item>(entry: SourceContribution<Item>) => sources.register(entry) },

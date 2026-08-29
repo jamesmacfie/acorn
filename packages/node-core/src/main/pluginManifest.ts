@@ -22,6 +22,8 @@ import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
 import { NODE_CORE_FACETS } from './pluginPermissions'
 import {
+  hasDocumentRegion,
+  hasFrameRegion,
   isOverlaySurface,
   isProjectPaneSurface,
   isTaskPaneSurface,
@@ -47,7 +49,7 @@ export type {
   PluginFrameSurface,
   PluginHarnessDescriptor,
   PluginKeybindingDescriptor,
-  PluginPaneLayout,
+  PluginPaneRegion,
   PluginRefResolverDescriptor,
   PluginScheduleDescriptor,
   PluginTaskCheckDescriptor,
@@ -97,11 +99,13 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   const taskPanes = new Set(frames.filter(isTaskPaneSurface).map((frame) => frame.id))
   const projectPanes = new Set(frames.filter(isProjectPaneSurface).map((frame) => frame.id))
   const overlays = new Set(frames.filter(isOverlaySurface).map((frame) => frame.id))
-  // Panes with both a host region and a frame region, which is the only place a surface action has to
-  // land. The degenerate `document` template is excluded: it draws no frame, so a command targeting it
-  // would parse and then post into nothing.
+  // Panes with both a host document region and a frame region, which is the only place a surface action
+  // has to land. A pane whose regions are all host-drawn is excluded: it draws no frame, so a command
+  // targeting it would parse and then post into nothing.
   const composedPanes = new Set(
-    frames.filter((frame) => frame.target === 'pane' && frame.layout?.template === 'document-over-frame').map((frame) => frame.id),
+    frames
+      .filter((frame) => frame.target === 'pane' && hasFrameRegion(frame) && hasDocumentRegion(frame))
+      .map((frame) => frame.id),
   )
 
   const confine = (path: string, prefix: string, at: (string | number)[]): void => {
@@ -145,7 +149,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({
         code: 'custom',
         path: [...at, 'surface'],
-        message: `surfaceAction names '${value.surface}', which this manifest does not declare as a document-over-frame pane`,
+        message: `surfaceAction names '${value.surface}', which this manifest does not declare as a pane with both a document region and a frame region`,
       })
     }
     if (value.verb === 'runNodeAction') route(value.path, [...at, 'path'])
@@ -166,27 +170,27 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: [...at, 'scope'], message: 'only a pane surface can be project-scoped' })
     }
     if (frame.layout) {
-      // A template splits a pane rectangle. A settings page, an importer, a reference panel and an
+      // A layout arranges a pane rectangle. A settings page, an importer, a reference panel and an
       // overlay are all chrome the host already draws around a frame, and a webview's pixels are not the
-      // renderer's at all. None of them has a rectangle to split.
+      // renderer's at all. None of them has a rectangle to arrange.
       if (frame.target !== 'pane') {
         ctx.addIssue({ code: 'custom', path: [...at, 'layout'], message: 'layout is only valid on a pane surface' })
       }
-      route(frame.layout.document.read, [...at, 'layout', 'document', 'read'])
-      if (frame.layout.document.write) route(frame.layout.document.write, [...at, 'layout', 'document', 'write'])
-      if (frame.layout.document.completions) {
-        route(frame.layout.document.completions.route, [...at, 'layout', 'document', 'completions', 'route'])
+      for (const [name, region] of Object.entries(frame.regions ?? {})) {
+        if (region === 'frame') continue
+        const where = [...at, 'regions', name]
+        route(region.read, [...where, 'read'])
+        if (region.write) route(region.write, [...where, 'write'])
+        if (region.completions) route(region.completions.route, [...where, 'completions', 'route'])
       }
-      // The degenerate template has no frame region, so this plugin's bundle draws nothing in this pane:
-      // there is no iframe to hold a chord and forward the rest. Declaring claims here would parse and
-      // then capture nothing, which is the failure this file spends its length refusing. The check is on
-      // the template rather than on `layout`, because `document-over-frame` does have a frame and its
-      // claims will be real.
-      if (frame.layout.template === 'document' && frame.claimsKeys.length) {
+      // A pane with no frame region runs none of this plugin's bundle: there is no iframe to hold a
+      // chord and forward the rest. Declaring claims here would parse and then capture nothing, which
+      // is the failure this file spends its length refusing.
+      if (!hasFrameRegion(frame) && frame.claimsKeys.length) {
         ctx.addIssue({
           code: 'custom',
           path: [...at, 'claimsKeys'],
-          message: "the 'document' template draws no frame, so there is nothing here to claim keys",
+          message: 'this pane draws no frame, so there is nothing here to claim keys',
         })
       }
     }

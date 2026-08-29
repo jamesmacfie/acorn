@@ -142,7 +142,7 @@ no-workers frame contract cannot express.
 (`docs/third-party/monaco.md`) — the app owns one editor and lends it to plugins through a vendor-neutral,
 LSP-vocabulary contract, so no plugin ships its own 7.9 MiB copy and the sandbox widens for no one.
 That document now carries the whole design: the composed-pane decision (region-addressed templates,
-`document` and `document-over-frame`), the bridge document API, the flush-before-action guarantee, the
+`single` and `document-over-frame`), the bridge document API, the flush-before-action guarantee, the
 completions capability and its growth rule, and a build sequence. It is the record to hand a developer.
 
 **That surface is now built, and database has moved over it** — see the section below. Editor is next

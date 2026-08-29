@@ -29,6 +29,7 @@
     "./nodeEvents.ts": "./src/nodeEvents.ts",
     "./nodeProviders.ts": "./src/nodeProviders.ts",
     "./notes.ts": "./src/notes.ts",
+    "./paneLayouts.ts": "./src/paneLayouts.ts",
     "./pluginApiVersion.ts": "./src/pluginApiVersion.ts",
     "./pluginBridge.ts": "./src/pluginBridge.ts",
     "./pluginContract.ts": "./src/pluginContract.ts",

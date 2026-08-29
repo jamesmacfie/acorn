@@ -13,7 +13,7 @@ delivery and the completions capability. Its frame bundle is 156 KB where a bund
 by a shipping plugin; what this plugin still waits on is only the part that is *its own*:
 
 - **its template** — `frame-beside-document`, or host-drawn tabs fed by a document-list route. Adding an
-  enum entry and a second composed component is now a known quantity, because `DocumentOverFrame.tsx`
+  enum entry and a second composed component is now a known quantity, because `layouts/DocumentSplit.tsx`
   exists to copy. What is NOT known is whether tabs belong to the host or the plugin, and that is the
   actual decision this move has to make.
 - **the open-document verb** ⌘P needs. `bridge.document` is deliberately single-document: nothing in

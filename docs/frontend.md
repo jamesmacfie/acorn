@@ -26,6 +26,11 @@ context-section slots, ref panels, agent contexts/renderers, schedules, persiste
 stats, attention sources, brand marks, and content links. The host owns the returned disposables so a plugin can be disabled and
 reactivated without duplicate entries.
 
+A pane registers either a `component` or a `layout` plus a `regions` record. The layouts are the
+host's, one per name in `client-core/src/layouts`, and the registry turns a declared one into the
+component every consumer already expects, throwing at registration if the regions do not match the
+layout (`docs/panes.md` § Layout model).
+
 Rail sources declare their `order` and may declare `isDefault`. `defaultSourceId()` resolves the
 explicit default lazily after plugin registration, with declared rail order as a bare-host fallback.
 The shell consumes that accessor for initial selection, persistence, workspace restoration, and task

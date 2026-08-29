@@ -41,7 +41,7 @@ import { Alert } from '../ui/primitives'
 // consumer, the database pane, and they are the parts worth knowing about:
 //
 //   - `onHandle` hands the composed pane's frame region a read, write and flush view of this document.
-//     The splitter itself is DocumentOverFrame's, not this component's; this one still just fills whatever
+//     The splitter itself is the layout's, not this component's; this one still just fills whatever
 //     rectangle it was given.
 //   - Surface actions. A chord like cmd+Enter is pressed with focus inside this editor, where the
 //     plugin's iframe has no keyboard at all, so the host resolves it and posts the command across. The
@@ -303,7 +303,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   })
 
   return (
-    // Not `.pane`: this section's only mount point is inside DocumentOverFrame, which is already a `.pane`,
+    // Not `.pane`: this section's only mount point is a host layout region, which is already inside a `.pane`,
     // so carrying the class too drew a second border, radius, shadow and background inside the first, and
     // a second `contain: layout paint` nobody needed. A region of a pane is not a pane.
     <section class="document-surface">
