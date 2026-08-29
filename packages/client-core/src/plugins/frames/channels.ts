@@ -5,10 +5,12 @@
 // Two families live here, and the split is the point (settled 2026-08-28, before the first addition
 // made it unsettleable — docs/plugins.md § Hearing a core event):
 //
-//   `runtime:*`        the shell talking to itself. "Something you were displaying is gone or moved."
-//                      A deletion and invalidation list, emitted in the renderer that caused it, so a
-//                      plugin in another window never sees it. That is correct for what these mean:
-//                      they are about this window's own state, not about the node's.
+//   `runtime:*`        the shell talking to itself, about this window. Mostly "something you were
+//                      displaying is gone or moved" — a deletion and invalidation list — plus
+//                      `focus-changed`, which is the other thing only this window can know. All of
+//                      them are emitted in the renderer that caused them, so a plugin in another
+//                      window never sees one. That is correct for what these mean: they are about
+//                      this window's own state, not about the node's.
 //   `<noun>:changed`   a node-emitted fact. "Something happened on this node that you may want to act
 //                      on." Emitted where the write happens and delivered over the socket, so every
 //                      window hears it. The same names are in NODE_EVENT_CHANNELS
@@ -29,6 +31,7 @@ export const SUBSCRIBABLE_CHANNELS = [
   'runtime:workspace-removed',
   'runtime:node-removed',
   'runtime:node-switched',
+  'runtime:focus-changed',
   'tasks:changed',
   'connection:changed',
   'head:changed',
@@ -46,6 +49,7 @@ const CHANNEL_DESCRIPTIONS = {
   'runtime:workspace-removed': { text: 'Receive workspace removal events', icon: 'radio' },
   'runtime:node-removed': { text: 'Receive node removal events', icon: 'radio' },
   'runtime:node-switched': { text: 'Receive active-node change events', icon: 'radio' },
+  'runtime:focus-changed': { text: 'See which pane and region of this window has keyboard focus', icon: 'radio' },
   'tasks:changed': { text: 'Receive notice when this node’s tasks change', icon: 'radio' },
   // Named for what the owner is consenting to rather than for the frame: the payload carries a provider
   // id and a status, so a plugin granted this learns which of their accounts stopped working and when

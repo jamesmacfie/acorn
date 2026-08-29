@@ -1,11 +1,15 @@
 import { For, Show, type JSX } from 'solid-js'
+import { createCollection } from '../keys/collection'
 
 export type TabDef = { id: string; label: string; count?: number }
 
-// Reusable tab strip (roles + arrow-key nav). Renders only the tablist and drives the active id;
-// the panels are the caller's. Panel ids are `${idPrefix}-panel-${id}` and tab ids
-// `${idPrefix}-tab-${id}` so callers can wire aria-labelledby back. Extracted from the Rollbar
-// item panel; also used by the create-task modal.
+// Reusable tab strip. Renders only the tablist and drives the active id; the panels are the
+// caller's. Panel ids are `${idPrefix}-panel-${id}` and tab ids `${idPrefix}-tab-${id}` so callers
+// can wire aria-labelledby back. Extracted from the Rollbar item panel; also used by the create-task
+// modal and by the `tabs` layout.
+//
+// A collection, so the arrows, Home, End and type-ahead come from ../keys/collection.ts rather than
+// from a key handler here. Selection follows focus, which is what a tab strip means.
 export function Tabs(props: {
   tabs: readonly TabDef[]
   active: string
@@ -15,26 +19,25 @@ export function Tabs(props: {
   /** Trailing controls beside the strip. Two consumers were overriding `.ui-tabs` to get this. */
   actions?: JSX.Element
 }) {
-  function onKeyDown(event: KeyboardEvent) {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-    event.preventDefault()
-    const current = props.tabs.findIndex((t) => t.id === props.active)
-    const offset = event.key === 'ArrowRight' ? 1 : -1
-    const next = props.tabs[(current + offset + props.tabs.length) % props.tabs.length]
-    props.onChange(next.id)
-    document.getElementById(`${props.idPrefix}-tab-${next.id}`)?.focus()
-  }
+  const collection = createCollection({
+    id: () => props.idPrefix,
+    items: () => props.tabs.map((tab) => ({ key: tab.id, label: tab.label })),
+    itemId: (key) => `${props.idPrefix}-tab-${key}`,
+    role: 'tablist',
+    orientation: 'horizontal',
+    selectOnMove: true,
+    selected: () => props.active,
+    onSelect: (id) => props.onChange(id),
+  })
 
   return (
-    <div class="ui-tabs" role="tablist" aria-label={props.ariaLabel} onKeyDown={onKeyDown}>
+    <div class="ui-tabs" aria-label={props.ariaLabel} {...collection.containerProps}>
       <For each={props.tabs}>{(t) => (
         <button
-          id={`${props.idPrefix}-tab-${t.id}`}
+          {...collection.itemProps(t.id)}
           type="button"
-          role="tab"
           aria-selected={props.active === t.id}
           aria-controls={`${props.idPrefix}-panel-${t.id}`}
-          tabindex={props.active === t.id ? 0 : -1}
           class="ui-tab"
           classList={{ active: props.active === t.id }}
           onClick={() => props.onChange(t.id)}

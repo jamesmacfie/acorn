@@ -49,6 +49,14 @@ export type ClientEventMap = {
   // agent sessions and notices under node B, keyed by ids that may collide across nodes by
   // construction.
   'runtime:node-switched': { from: string | null; to: string | null }
+  // Focus moved to another region of another pane. Renderer-local like the rest of this family, and
+  // for a stronger reason than the others: focus is a fact about one window, so the node has nothing
+  // to say about it and never broadcasts one. Coarse on purpose — the region, not the node inside it
+  // — because a per-keystroke feed is on the refused list (docs/plugins.md § What is not an event).
+  //
+  // The one emit point is the region focus store (keys/regions.ts), which is why
+  // docs/future/events.md parked this event in the layout programme instead of shipping a second one.
+  'runtime:focus-changed': { taskId: string | null; paneId: string; regionId: string }
   // ── Node-emitted facts ──────────────────────────────────────────────────────────────────────────
   //
   // The other family (plugins/frames/channels.ts explains the split). Everything above is emitted in

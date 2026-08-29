@@ -204,6 +204,14 @@ Overlays are shell-owned: command palette, settings, onboarding, notices, confir
 entry are not rendered by arbitrary pane content. The shell positions native preview views over a
 renderer pane host and hides them while overlays cover them.
 
+Focus is shell state too. `client-core/keys/regions.ts` holds which region of which pane the keyboard
+is in and what each region last had focused, and it is the one place `focusedPane` is written and the
+one place `runtime:focus-changed` is emitted from. Beside it, `keys/collectionState.ts` holds every
+list's `active`, `selected` and `offset` keyed by the item's own key. Both are module-level signals
+and neither is persisted; see [state.md](./state.md) for why, and
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) for the keymap that reads
+them.
+
 The top bar's bell renders two kinds of item, and the difference matters to whatever produces one. A
 notice is an event that already happened, such as a run finishing or a build failing. It is
 client-local, dismissible, and gone once the ring rolls over it. An attention item

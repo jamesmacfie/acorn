@@ -1,9 +1,14 @@
 import { Show, type JSX } from 'solid-js'
+import { restoreFocusOnCleanup } from '../keys/trap'
 import { createDismissable } from './dismissable'
 
 // Modal chrome. Behaviour comes from createDismissable. See docs/ui-design.md § Chrome and
 // overlays for why that split keeps this component purely cosmetic, and why the overlay palettes
 // don't use it.
+//
+// A trap: it holds Tab inside while it is open and hands focus back to whatever opened it when it
+// goes (../keys/trap.ts). Before that, dismissing left the body focused and the next Tab started
+// again from the top of the page.
 
 export function Modal(props: {
   onClose: () => void
@@ -30,6 +35,8 @@ export function Modal(props: {
     on: props.dismissOn,
   })
 
+  // Read before anything inside is focused, so the opener is still the active element.
+  restoreFocusOnCleanup()
   if (props.autoFocus) queueMicrotask(() => props.autoFocus?.()?.focus())
 
   return (

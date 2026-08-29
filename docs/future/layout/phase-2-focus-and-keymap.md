@@ -1,6 +1,7 @@
 # Phase 2: focus roles, intents, and the keymap
 
-Status: not started.
+Status: shipped 2026-08-29. Behaviour is owned by `docs/command-palette-and-shortcuts.md`
+§ "Focus and typing"; the deviations from this plan are at the foot of this file.
 
 ## Goal
 
@@ -139,3 +140,56 @@ propagates as a data attribute for styling.
   helpers; check the published package name and version on npm before adding it.
 - `docs/command-palette-and-shortcuts.md` § "Focus and typing" describes the frame keydown
   forwarding and `claimsKeys` as the survey saw.
+
+## What shipped, and where it differs
+
+Seven deviations, each taken for a reason worth writing down.
+
+**1. `Rows` is a new kit node.** The plan said "every `Row` list has arrows without the pane doing
+anything", and the kit had no container to hang that on: `Row` has always been "an item in a
+collection" and the collection was whatever `<div>` the pane wrapped it in. `Rows` is that container.
+A pane still writes no key handling; it names the collection and hands over the item keys. `Rows` is
+in the support matrix, the focus table and the plugin API barrel, and panes adopt it in phases 5
+through 8.
+
+**2. Two collection implementations, not one.** `createCollection` is the keyed one: `Rows`, `Tabs`,
+`SegmentedControl`. `createDomCollection` reads its items out of the DOM when a key arrives and is
+what `Menu`, `Select`'s list, `ChipRow` and `Timeline` use, because all four take opaque JSX from the
+caller and the host cannot key what it cannot see. They share the intent set, which is the part that
+matters. The DOM one keeps no stored place, and should not: all four are transient or unselected.
+
+**3. `Grid` moves the selection, not the focus.** Its rows are virtualised, so most of them have no
+element to focus. The arrows move `selected` and scroll it into view, with
+`aria-activedescendant` on the scroll container. That is the ratatui shape and the only one that
+survives virtualisation.
+
+**4. `Table` and `KeyValueEditor` are not collections.** `Table` takes children and has no selection
+model, and `KeyValueEditor`'s rows are text inputs where an arrow key is text navigation. Both are
+`none` and `collection` respectively in the focus table, and the editor's row roving is owed when
+something asks for it.
+
+**5. `scopesConflict` stays.** The plan had the engine's shadowing diagnostics replace it.
+`resolveKeybindings` does more than the engine can: user overrides, first-party-then-lockfile order,
+legacy pane chords, and a conflict verdict for rows Settings draws as unbound. Resolution happens
+first and the engine is handed one binding per resolved chord.
+
+**6. `focusedPane` is written by the region store rather than read from it.** The plan said
+`focusedPane` becomes a view. It stays a signal in `tasks/tasks.ts`, because the layout invariant in
+`dispatchLayout` and the scope eviction in `evictTaskState` both write it, and `keys/regions.ts` is
+its only other writer. The substance holds: the region store is where focus is decided and where
+`runtime:focus-changed` is emitted.
+
+**7. The focus event is `runtime:focus-changed`.** `channels.ts` splits its names by delivery:
+`<noun>:changed` is node-emitted and reaches every window, `runtime:*` is renderer-local. Focus is
+renderer-local by construction, so it takes the `runtime:` name and that family's comment widened to
+cover it.
+
+**8. Escape's dialog carve-out is a binding matcher.** The plan put it in a keymap intercept, and the
+engine cannot express it: `consume()` stops keymap dispatch only by calling `stopPropagation()` on the
+DOM event, which would also stop the overlay stack in `ui/dismissable.ts` from ever seeing the press.
+An `escape` binding goes inactive instead while focus is inside a dialog.
+
+`isTypingTarget` was not replaced by a node role. On the DOM host it already is one: `INPUT`,
+`TEXTAREA`, `SELECT` and contenteditable are exactly the nodes that own their keys, and the predicate
+is shared with the node-side manifest parser and the frame SDK, which have no kit to ask. The focus
+table records the same fact as `OWNS_KEYS`.

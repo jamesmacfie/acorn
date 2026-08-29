@@ -434,9 +434,12 @@ would install unsandboxed code and make every other line moot.
 `permissions.events` names channels the frame may subscribe to. Subscribing does not create a channel,
 and there are two kinds to name:
 
-- **Four of the shell's own**, listed in `client-core/plugins/frames/channels.ts`. They say that
+- **Five of the shell's own**, listed in `client-core/plugins/frames/channels.ts`. Four say that
   something a frame may be showing has gone or moved: `runtime:task-archived`,
-  `runtime:workspace-removed`, `runtime:node-removed`, `runtime:node-switched`.
+  `runtime:workspace-removed`, `runtime:node-removed`, `runtime:node-switched`. The fifth,
+  `runtime:focus-changed`, says which pane and region of this window the keyboard is in, as
+  `{ taskId, paneId, regionId }`. All five are about one window, so a node never broadcasts one and a
+  second window never sees yours.
 - **Another plugin's live channel**, `plugin:<other-id>:<verb>`, when that plugin lists the verb in
   its manifest's top-level `emits` array. If it is not installed you hear nothing and get no error, so
   treat the frame as "go re-read" and never as the only way you learn something.

@@ -1,5 +1,5 @@
 import { onCleanup } from 'solid-js'
-import { trapOverlayFocus } from './focus'
+import { trapTab } from '../keys/trap'
 
 // Dismissal plumbing for modal surfaces: Escape, backdrop click, and Tab focus containment. See
 // docs/ui-design.md § Chrome and overlays for why this exists and why the overlay palettes don't
@@ -61,7 +61,7 @@ export function createDismissable(opts: {
         return
       }
       const root = trap ? opts.container?.() : undefined
-      if (root) trapOverlayFocus(event, root)
+      if (root) trapTab(event, root)
     },
   }
 }

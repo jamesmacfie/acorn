@@ -566,19 +566,33 @@ of the session.
 
 ## Interaction rules
 
+Every one of these is a layer over the keymap rather than a handler somewhere: the engine, the intent
+set, and the layer priorities are in
+[command-palette-and-shortcuts.md § Focus and typing](./command-palette-and-shortcuts.md).
+
 - Command palette opens with `⌘K` and uses contributed actions and rows.
-- `⌘1`–`⌘9` activates the corresponding visible task.
-- `⌘⇧T` toggles the terminal drawer; `⌘⇧N` creates a task; `⌘P` opens the file finder.
+- `⌘1`–`⌘9` activates the corresponding visible task, unless a `tabs` pane has focus, where the same
+  chords pick that pane's tabs.
+- `⌘⇧T` toggles the terminal drawer; `⌘⇧N` creates a task; `⌘P` opens the file finder; `⌘/` shows what
+  the keyboard will do right here.
+- F6 and Shift+F6 move between the regions of a pane; Ctrl+Option+Left and Ctrl+Option+Right move
+  between panes.
 - Pane chords are contribution-owned and user-overridable through Settings → Shortcuts.
 - Typing fields, editors, terminals, and contenteditable elements stop global shortcuts unless the
-  action is explicitly text-safe.
+  action is explicitly text-safe. That exemption is a property of the intent now, not of whoever
+  remembered to declare it: `dismiss`, `commit`, and the four region and pane moves reach a focused
+  composer and nothing else does.
+- A node handles intents and never reads a key code. `Input`, `Textarea`, `Composer` and the inside of
+  a rectangle are the only places a plugin sees a key event at all.
 - Destructive actions and approvals use shell-owned confirmation chrome.
 
 ### Menus and right-click
 
-There is one menu. `ui/Menu.tsx` owns the surface — `role="menu"`/`menuitem`, arrow-key roving with
-Home/End, close-on-select, Escape, outside-click, and focus returning to where it came from — and both
-ways of opening it mount that same surface (`MenuSurface`) over the same hook (`ui/anchor.ts`). A
+There is one menu. `ui/Menu.tsx` owns the surface — `role="menu"`/`menuitem`, close-on-select, Escape,
+outside-click, and focus returning to where it came from — and both ways of opening it mount that same
+surface (`MenuSurface`) over the same hook (`ui/anchor.ts`). The roving focus is not its own: a menu is
+a collection, so the arrows, Home, End, the page keys and `j`/`k` arrive as intents from
+`keys/collection.ts`, the same ones a list of rows gets. A
 button anchors it to a rect; a right-click anchors it to a point, which is the only difference. A
 right-click menu with its own markup would be a second place for the accessibility to be wrong.
 
@@ -638,6 +652,12 @@ since a right-click menu belongs to whichever row was clicked; the surface remou
 
 ## States
 
+A node's interaction states are the host's too, and held outside the node: `focused` and `pressed` for
+every stop, `active`, `selected` and `offset` for every collection, and `hovered` on the DOM host only.
+`keys/collectionState.ts` keys them by the item's own key, which is what makes a list keep its place
+and its selection across a refetch. The data states below are a different question and are answered
+per surface.
+
 Every Node-backed surface can show live, refreshing, stale, offline, disabled, or error. Stale data
 retains its last value and names the Node. Offline mutations fail fast and keep typed input. Empty
 states explain whether a feature is unconfigured, provider-gated, disabled, or simply has no data.
@@ -657,3 +677,10 @@ not answered once this session.
 Focus rings, keyboard traversal, text labels, tooltip delays, and reduced-motion tokens are shared by
 client-core primitives. Dense layouts must preserve readable line height and a visible focus target;
 style packs may compress spacing but must not hide status or action affordances.
+
+Keyboard traversal comes from the tree rather than from each pane. Each kit node's focus role is fixed
+in `ui/kit/focusRoles.ts` and a plugin sets none of it, and the ARIA follows from the role: a `Rows`
+renders `listbox` or `tree` with `aria-activedescendant`, a tab strip renders `tablist`, a modal
+renders `dialog` with `aria-modal` and hands focus back to its opener. Hover is never load-bearing:
+anything a pointer can reach, focus can reach, so a `RowActions` that appears on hover appears on
+focus too.

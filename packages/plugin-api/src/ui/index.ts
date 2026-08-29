@@ -92,6 +92,10 @@ export { Facts } from '@acorn/client-core/ui/Facts.tsx'
 export { ChipRow } from '@acorn/client-core/ui/ChipRow.tsx'
 export { Log } from '@acorn/client-core/ui/Log.tsx'
 export { Grid } from '@acorn/client-core/ui/Grid.tsx'
+// The container a run of `Row`s or `TreeRow`s lives in. It is what makes a list keyboard-operable:
+// the arrows, Home, End, the page keys, type-ahead, `aria-activedescendant`, and a selection that
+// survives a refetch all come from it, and the pane writes no key handling at all.
+export { Rows } from '@acorn/client-core/ui/Rows.tsx'
 
 // The two host wrappers. Here before there is a second host, so a plugin can be written against one
 // before it arrives: `Only` is "this exists on these hosts", `Fallback` is "draw this instead where

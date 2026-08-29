@@ -206,7 +206,8 @@ API today and marked as prune candidates: reach for `registerWsChannel` or somet
 
 `clientEvents` is a typed emitter inside one renderer. It carries shell presentation intents and
 runtime lifecycle facts: `runtime:task-archived`, `runtime:node-switched`,
-`presentation:pane-intent`, and a fixed set of others declared in `ClientEventMap`. You can subscribe
+`runtime:focus-changed`, `presentation:pane-intent`, and a fixed set of others declared in
+`ClientEventMap`. You can subscribe
 with `clientEvents.on(kind, listener)`, and you can emit the kinds that already exist, but you cannot
 add your own key. It is renderer-local, so a second window or a paired device never sees your emission.
 That is exactly why it is not an event a third party can build on.

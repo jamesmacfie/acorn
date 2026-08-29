@@ -13,6 +13,7 @@
   "dependencies": {
     "@acorn/dashboards-core": "workspace:*",
     "@acorn/protocol": "workspace:*",
+    "@opentui/keymap": "^0.5.9",
     "@solidjs/router": "^0.16.1",
     "@tanstack/query-async-storage-persister": "^5.101.0",
     "@tanstack/solid-query": "^5.101.0",

@@ -1,3 +1,6 @@
+// What is left of the old focus helpers. The trap moved to `keys/trap.ts` when `Modal` and `Menu`
+// started trapping through the kit; the list navigation below has one caller left
+// (dashboards/DashboardTabs.tsx) and goes with this file in phase 9 of the layout programme.
 import { isTypingTarget } from '../lib/isTypingTarget'
 
 export const nextListIndex = (current: number, count: number, key: string): number => {
@@ -20,22 +23,5 @@ export function createListNavigation(options: {
     if (next === options.active()) return
     event.preventDefault()
     options.setActive(next)
-  }
-}
-
-export function trapOverlayFocus(event: KeyboardEvent, root: HTMLElement): void {
-  if (event.key !== 'Tab') return
-  const focusable = [...root.querySelectorAll<HTMLElement>(
-    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-  )].filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true')
-  if (!focusable.length) return
-  const first = focusable[0]
-  const last = focusable[focusable.length - 1]
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-    first.focus()
   }
 }

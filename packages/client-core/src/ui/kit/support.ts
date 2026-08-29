@@ -36,6 +36,7 @@ export const NODE_SUPPORT = {
 
   // Showing
   Heading: { dom: 'full', tui: 'full' },
+  Rows: { dom: 'full', tui: 'full' },
   Row: { dom: 'full', tui: 'full' },
   TreeRow: { dom: 'full', tui: 'full' },
   RowActions: { dom: 'full', tui: 'full' },

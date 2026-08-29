@@ -1,5 +1,9 @@
 import { createSplitDrag } from '../ui/split'
 import { layoutState } from './state'
+// Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
+// import has to be here even though nothing calls it.
+// eslint-disable-next-line no-unused-vars -- used by the `use:regionFocus` directive.
+import { regionFocus } from '../keys/regions'
 import type { LayoutProps } from './regions'
 
 // `document-over-frame` and `frame-beside-document`: a host-owned editor and a plugin's region, with a
@@ -54,11 +58,15 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
 
   return (
     <div class="pane layout-document-split" data-axis={axis}>
-      <div class="layout-region-document" style={axis === 'x' ? { width: `${size()}px` } : { height: `${size()}px` }}>
+      <div
+        class="layout-region-document"
+        style={axis === 'x' ? { width: `${size()}px` } : { height: `${size()}px` }}
+        use:regionFocus={{ paneId: props.stateKey, regionId: 'document' }}
+      >
         {props.regions.document?.()}
       </div>
       <div {...drag.handleProps} class="ui-split-handle" data-axis={axis} />
-      <div class="layout-region-frame">{props.regions.frame?.()}</div>
+      <div class="layout-region-frame" use:regionFocus={{ paneId: props.stateKey, regionId: 'frame' }}>{props.regions.frame?.()}</div>
     </div>
   )
 }

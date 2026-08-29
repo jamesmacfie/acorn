@@ -435,6 +435,7 @@ ui: PickerRow
 ui: Popover
 ui: Row
 ui: RowActions
+ui: Rows
 ui: Section
 ui: SectionHeader
 ui: SegmentedControl

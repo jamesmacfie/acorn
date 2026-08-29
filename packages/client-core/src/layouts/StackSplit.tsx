@@ -1,5 +1,9 @@
 import { createSplitDrag } from '../ui/split'
 import { layoutState } from './state'
+// Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
+// import has to be here even though nothing calls it.
+// eslint-disable-next-line no-unused-vars -- used by the `use:regionFocus` directive.
+import { regionFocus } from '../keys/regions'
 import type { LayoutProps } from './regions'
 
 // `stack-split`: `top` over `bottom`, with a host-owned handle between them. Two focus groups.
@@ -29,9 +33,9 @@ export function StackSplit(props: LayoutProps) {
 
   return (
     <div class="pane layout-stack-split">
-      <div class="layout-region-top">{props.regions.top?.()}</div>
+      <div class="layout-region-top" use:regionFocus={{ paneId: props.stateKey, regionId: 'top' }}>{props.regions.top?.()}</div>
       <div {...drag.handleProps} class="ui-split-handle" data-axis="y" />
-      <div class="layout-region-bottom" style={{ height: `${height()}px` }}>{props.regions.bottom?.()}</div>
+      <div class="layout-region-bottom" style={{ height: `${height()}px` }} use:regionFocus={{ paneId: props.stateKey, regionId: 'bottom' }}>{props.regions.bottom?.()}</div>
     </div>
   )
 }

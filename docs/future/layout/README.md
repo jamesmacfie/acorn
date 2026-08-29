@@ -97,7 +97,7 @@ Supporting documents, readable in any order:
 | --- | --- | --- | --- |
 | 0 ✅ | [phase-0-kit-and-tokens.md](./phase-0-kit-and-tokens.md) | The closed kit: node set frozen, nine gap nodes added, role tokens, support matrix, no `class` or `style` on any node | Everything. Layouts and trees are made of these nodes. |
 | 1 ✅ | [phase-1-layouts.md](./phase-1-layouts.md) | Six host-owned layouts; a pane declares one and fills regions | Focus groups, slots in regions, responsive and terminal projections |
-| 2 | [phase-2-focus-and-keymap.md](./phase-2-focus-and-keymap.md) | `@opentui/keymap` over the command registry, intents, host-owned collection state, focus roles on the kit | Keyboard navigation and ARIA for every pane at once |
+| 2 ✅ | [phase-2-focus-and-keymap.md](./phase-2-focus-and-keymap.md) | `@opentui/keymap` over the command registry, intents, host-owned collection state, focus roles on the kit | Keyboard navigation and ARIA for every pane at once |
 | 3 | [phase-3-remote-root-and-worker.md](./phase-3-remote-root-and-worker.md) | The tree protocol, the worker sandbox, the host renderer, `mountTree`, proven on the changes tool card | Third-party UI inside first-party surfaces |
 | 4 | [phase-4-extension-kinds.md](./phase-4-extension-kinds.md) | `kind` on extension points; annotations, remote slots, rectangle slots, hooks; the trust copy; the developer view | Plugins extending plugins, the original goal |
 | 5 | [phase-5-loaded-four.md](./phase-5-loaded-four.md) | http, database, linear, rollbar move from iframe to remote root | The first proof on real plugins, with their CSS deleted |

@@ -601,6 +601,9 @@ describe('architecture boundaries', () => {
     //   palette/model.ts  fuzzyScore, a module with zero imports of its own
     //   registries/registry.ts  the Registry class, importing only solid-js. The container, not any
     //     instance: `registries/sources.ts` and its siblings are still application state.
+    //   keys/           the keyboard engine's pure half: the intent set, the key table, the collection
+    //     store, the collection behaviour and the focus trap. `keys/install.ts` reads the command and
+    //     keybinding registries and `keys/regions.ts` reads the task state, so both stay out.
     //
     // Type-only imports pass: ui/WorkspacePicker.tsx imports the `FleetWorkspace` type, a shape it
     // renders rather than a store it reads. Known and deliberate: ui/diff/DiffRows.tsx reaches
@@ -609,7 +612,9 @@ describe('architecture boundaries', () => {
       const p = rel(file)
       if (!p.startsWith('packages/client-core/src/')) return false
       const inner = p.slice('packages/client-core/src/'.length)
+      if (inner === 'keys/install.ts' || inner === 'keys/regions.ts') return false
       return inner.startsWith('ui/') || inner.startsWith('lib/') || inner.startsWith('highlight/')
+        || inner.startsWith('keys/')
         || inner === 'palette/model.ts' || inner === 'registries/registry.ts'
     }
     // `[^'"]*?` for the clause, because a preceding import's specifier contains the quotes that bound
