@@ -39,6 +39,11 @@ export const qualifiedContributionId = (pluginId: string, id: string): string =>
  *  another plugin's extension point. */
 const REFERENCE_KEYS = new Set(['pane', 'surface', 'overlay'])
 
+/** The contribution lists whose `id` is a name this device registers, and so a name core could one day
+ *  collide with. `remote` joined them when the tree path landed: a remote entry's id is what a roster
+ *  row and a failure row name it by. */
+const NAMESPACED_KINDS = ['frames', 'sources', 'slots', 'remote'] as const
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -49,7 +54,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * that ship today. */
 export function namespaceContributions(pluginId: string, contributions: PluginContributions): PluginContributions {
   const declared = new Map<string, string>()
-  for (const kind of ['frames', 'sources', 'slots'] as const) {
+  for (const kind of NAMESPACED_KINDS) {
     for (const entry of contributions[kind] ?? []) {
       if (!isOwnNamespace(pluginId, entry.id)) declared.set(entry.id, `${pluginId}.${entry.id}`)
     }
@@ -64,7 +69,7 @@ export function namespaceContributions(pluginId: string, contributions: PluginCo
   }
 
   const next = rewrite(contributions) as PluginContributions
-  for (const kind of ['frames', 'sources', 'slots'] as const) {
+  for (const kind of NAMESPACED_KINDS) {
     for (const entry of next[kind] ?? []) {
       const qualified = declared.get(entry.id)
       if (qualified) entry.id = qualified

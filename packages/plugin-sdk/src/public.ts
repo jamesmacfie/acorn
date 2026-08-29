@@ -6,9 +6,10 @@
 export type PluginFrameContext = {
   /** The contribution id this frame is rendering, as declared in the manifest. */
   surface: string
-  /** Which kind of rectangle this is. It grants nothing (the bridge's allowlist is keyed on the
-   * manifest's scopes, never on this field), but a frame may want to lay out differently. */
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot'
+  /** Which kind of surface this is. It grants nothing (the bridge's allowlist is keyed on the
+   * manifest's scopes, never on this field), but a frame may want to lay out differently. `remote` is
+   * the tree path rather than a rectangle. */
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote'
   nodeId: string
   taskId?: string
   projectId?: string
@@ -137,3 +138,67 @@ export declare function mountFrame(options: { styles: string }, render: (bridge:
  * are taken too, for that reason. A non-`https` href is left alone.
  */
 export declare function openLinkOnClick(bridge: AcornBridge, event: MouseEvent): boolean
+
+// ── The tree path ─────────────────────────────────────────────────────────────────────────────────
+//
+// The second way a bundle draws: a tree of acorn's own components rather than pixels in an iframe.
+// Your code names components, acorn mounts them, and what the reader gets has the shell's focus
+// behaviour, keyboard handling, ARIA and style pack — none of which an iframe can borrow.
+//
+// You do not build these nodes by hand unless you want to. `acorn-plugin-sdk/remote` is the Solid
+// adapter, and it is fifteen lines because the JSX preset compiles straight onto the functions below.
+
+/** One node in a remote tree. Opaque: build it with the functions below, or with a framework adapter. */
+export type RemoteNode = {
+  readonly id: string
+  readonly type: string
+  props: Record<string, unknown>
+  parent: RemoteNode | null
+  children: RemoteNode[]
+}
+
+/** The root acorn handed this mount. Render into `node`. */
+export type RemoteRoot = {
+  readonly node: RemoteNode
+  dispatch(handler: number, payload: unknown): void
+  dispose(): void
+}
+
+/** What acorn handed one mounted tree, and how to hear about it changing. */
+export type TreeMount = {
+  /** Which of your renderers acorn asked for, so one bundle can serve several. */
+  readonly entry: string
+  readonly root: RemoteRoot
+  /** The props acorn mounted with. A snapshot; `onProps` carries every later one. */
+  props(): unknown
+  /** Acorn re-mounted this slot with new props. Register before you render. */
+  onProps(listener: (props: unknown) => void): void
+  /** Your teardown, run when acorn unmounts this slot. */
+  onUnmount(dispose: () => void): void
+}
+
+export type TreeRender = (bridge: AcornBridge, mount: TreeMount) => void
+
+/**
+ * Register this bundle's tree renderers and wait for acorn to mount them.
+ *
+ * Keyed by entry name because one worker serves every tree your bundle contributes, and acorn has to
+ * say which. Your manifest's `contributions.remote[].entry` names a key here; a name with no key
+ * behind it draws a labelled placeholder and records a row on your plugin's page. It is not a crash.
+ */
+export declare function mountTree(renderers: Record<string, TreeRender>): void
+
+/** Create a node named for one of acorn's components. The name is checked when it arrives; an unknown
+ *  one draws the placeholder rather than failing the tree around it. */
+export declare function createNode(type: string): RemoteNode
+export declare function createText(value: string): RemoteNode
+/** Set one prop. A function is only sendable under one of acorn's semantic event names (`onPress`,
+ *  `onChange`, `onSelect` and the rest); anything else is dropped, and so are `class` and `style`. */
+export declare function setProperty(node: RemoteNode, name: string, value: unknown): void
+export declare function setText(node: RemoteNode, value: string): void
+export declare function insertNode(parent: RemoteNode, node: RemoteNode, anchor?: RemoteNode | null): void
+export declare function removeNode(parent: RemoteNode, node: RemoteNode): void
+export declare function isTextNode(node: RemoteNode): boolean
+export declare function parentOf(node: RemoteNode): RemoteNode | null
+export declare function firstChild(node: RemoteNode): RemoteNode | null
+export declare function nextSibling(node: RemoteNode): RemoteNode | null

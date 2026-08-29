@@ -44,8 +44,11 @@ describe('a pane that declares a layout', () => {
     const Pane = paneRegistry.get('notes')!.component
     dispose = render(() => <Pane task={task} />, host)
     // `lazy` on the layout module, so the first paint is empty and the regions arrive once the
-    // dynamic import settles.
-    for (let tries = 0; tries < 50 && !host.querySelector('[data-region]'); tries++) {
+    // dynamic import settles. The budget is two seconds rather than a quarter of one: this used to
+    // fail intermittently in a full `pnpm test`, where a cold dynamic import competes with every other
+    // project's workers, and never on its own. A generous ceiling on a condition poll costs nothing
+    // when it is met on the first try.
+    for (let tries = 0; tries < 400 && !host.querySelector('[data-region]'); tries++) {
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
     expect([...host.querySelectorAll('[data-region]')].map((node) => node.getAttribute('data-region')))

@@ -161,6 +161,18 @@ see, not the code to read:
 16. Edit a dev-mode plugin's entry file; the swap lands without a restart or a trust prompt. Edit a
     non-entry module; the one-module-deep limit surfaces as the restart hint, not silence.
 
+The next two are the remote tree's, from layout phase 3 (2026-08-29). The suites cover the wire, the
+renderer, the worker lifecycle and the two render paths producing identical DOM; what nothing
+automated covers is a real worker started from a real bundle over the shell's own scheme.
+
+17. Install a plugin declaring `contributions.remote` with `target: 'agentToolRenderer'`, accept its
+    trust prompt, and run an agent turn that makes a matching tool call. The card draws from the
+    plugin's worker and is indistinguishable from a compiled one: same spacing, same disclosure
+    behaviour, same style pack. Reject the bundle instead and the built-in card draws.
+18. Break that bundle so it throws on mount. The card shows the labelled placeholder, a row appears on
+    the plugin's page, and the transcript around it keeps working — scrolling, selection, every other
+    card.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes

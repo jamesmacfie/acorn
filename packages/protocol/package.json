@@ -43,6 +43,9 @@
     "./terminal.ts": "./src/terminal.ts",
     "./themeTokens.ts": "./src/themeTokens.ts",
     "./toolPermissions.ts": "./src/toolPermissions.ts",
+    "./tree/messages.ts": "./src/tree/messages.ts",
+    "./tree/nodes.ts": "./src/tree/nodes.ts",
+    "./tree/props.ts": "./src/tree/props.ts",
     "./webview.ts": "./src/webview.ts",
     "./workflow.ts": "./src/workflow.ts",
     "./ws.ts": "./src/ws.ts"

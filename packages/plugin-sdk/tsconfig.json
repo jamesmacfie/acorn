@@ -1,9 +1,15 @@
 {
-  // No @types packages: the frame SDK runs in a sandboxed iframe, so DOM (from the base `lib`) is all
-  // it may assume. Pulling in node types here is how a `process.env` read reaches a published bundle.
+  // No @types packages: the frame SDK runs in a sandboxed iframe or a worker, so DOM (from the base
+  // `lib`) is all it may assume. Pulling in node types here is how a `process.env` read reaches a
+  // published bundle.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": []
+    "types": [],
+    // The remote adapter imports this package by its own name, because that is what has to survive
+    // into the built file: `remote.js` externalizes `acorn-plugin-sdk` so the two entrypoints share
+    // one remote root at runtime. Without this mapping the compiler would resolve the name to the
+    // last built `dist/sdk.d.ts` and type-check the source against a stale copy of itself.
+    "paths": { "acorn-plugin-sdk": ["./src/index.ts"] }
   },
   "include": ["src"]
 }

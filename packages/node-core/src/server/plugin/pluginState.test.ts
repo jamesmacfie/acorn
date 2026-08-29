@@ -8,7 +8,7 @@ import { pluginState, type PluginsBridge } from './pluginState'
 // banner, deserve a test that is only about them.
 const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } }
 const NO_CONTRIBUTIONS = {
-  frames: [], sources: [], slots: [], palette: [], commands: [], keybindings: [],
+  frames: [], remote: [], sources: [], slots: [], palette: [], commands: [], keybindings: [],
   attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [],
   contextMenus: [], extensionPoints: [], extensions: [], collections: [],
   schedules: [], taskChecks: [], auditActions: [], harnesses: [],

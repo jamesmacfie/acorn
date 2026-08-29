@@ -671,6 +671,59 @@ describe('architecture boundaries', () => {
     expect([...new Set(cycles)].sort()).toEqual([])
   })
 
+  it('the plugin SDK carries no dependency into a stranger\'s bundle', () => {
+    // `@acorn/plugin-api/ui/sdk` is the only runtime code a third-party client bundle imports, and a
+    // foreign bundler bundles whatever it reaches. So its value-import closure has to stay inside the
+    // repo and inside modules that import nothing themselves.
+    //
+    // The failure this catches happened on the first day of the tree path: `mountTree` wanted a
+    // protocol constant and took it from the module beside the Zod schemas, which put the whole of Zod
+    // into every plugin's bundle and grew the published file sixfold. The vite config says so in a
+    // comment; a comment is not a check.
+    //
+    // Value imports only. A `import type` is erased, which is what lets the SDK name protocol types
+    // freely.
+    const CLAUSE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
+    const BARE = /\bimport\s*['"]([^'"\n]+)['"]/g
+    const valueSpecs = (text: string): string[] => {
+      const out: string[] = []
+      CLAUSE.lastIndex = 0
+      let m: RegExpExecArray | null
+      while ((m = CLAUSE.exec(text))) {
+        // A named clause of only `type X` entries is type-only in substance.
+        const named = m[1].trim().match(/^\{([\s\S]*)\}$/)
+        if (named && named[1].split(',').every((part) => !part.trim() || /^type\s/.test(part.trim()))) continue
+        out.push(m[2])
+      }
+      BARE.lastIndex = 0
+      while ((m = BARE.exec(text))) out.push(m[1])
+      return out
+    }
+
+    const entry = join(ROOT, 'packages/client-core/src/plugins/frames/sdk.ts')
+    const seen = new Set<string>([entry])
+    const queue = [{ file: entry, path: 'sdk.ts' }]
+    const offenders: string[] = []
+    let reached = 0
+    while (queue.length) {
+      const step = queue.shift()!
+      reached++
+      for (const spec of valueSpecs(readFileSync(step.file, 'utf8'))) {
+        const target = resolveSpec(step.file, spec)
+        if (target.external) {
+          offenders.push(`${step.path} -> ${spec}`)
+          continue
+        }
+        if (!target.file || seen.has(target.file)) continue
+        seen.add(target.file)
+        queue.push({ file: target.file, path: `${step.path} -> ${spec}` })
+      }
+    }
+    // Anti-vacuity: the walk has to actually reach the modules the SDK is made of.
+    expect(reached).toBeGreaterThan(3)
+    expect(offenders.sort()).toEqual([])
+  })
+
   it('a plugin contract/ never re-exports its own internals', () => {
     // A contract file must not smuggle the internals back in. Transitively, not just the direct edge:
     // `contract/x.ts -> shared/y.ts -> main/heavy.ts` reaches the implementation in one extra hop, and

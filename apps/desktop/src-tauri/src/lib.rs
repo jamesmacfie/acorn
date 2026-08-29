@@ -55,6 +55,10 @@ pub fn run() {
     // Read before the app runs, because the scheme handler cannot ask for state it does not have.
     let frames: Arc<RwLock<Option<Frames>>> = Arc::new(RwLock::new(None));
     let scheme_frames = frames.clone();
+    // The app scheme needs the same handle: a loaded plugin's tree worker is that plugin's bundle,
+    // served from this origin because a worker script must be same-origin with the document that
+    // starts it. See src/app_scheme.rs, `plugin_worker_hash`.
+    let worker_frames = frames.clone();
 
     tauri::Builder::default()
         // The data root's exclusive lock in the node is the real mutual exclusion. This makes a second
@@ -72,7 +76,7 @@ pub fn run() {
                 Some(origin) => Source::DevServer(origin.clone()),
                 None => Source::Files(client_root(ctx.app_handle())),
             };
-            app_scheme::serve(&source, *scheme_port.read().unwrap(), &request)
+            app_scheme::serve(&source, worker_frames.read().unwrap().as_ref(), *scheme_port.read().unwrap(), &request)
         })
         // The origin every loaded plugin's UI runs on. Registered here rather than lazily, because a
         // privileged scheme has to exist before the webview that will ask for it does.

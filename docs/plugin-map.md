@@ -6,7 +6,7 @@ link: [plugins.md](./plugins.md) is the reference, [plugin-authoring.md](./plugi
 by-hand walkthrough for a package you install from disk, and
 [extensibility.md](./extensibility.md) holds the reasoning.
 
-## The three shapes a plugin can take
+## The four shapes a plugin can take
 
 A plugin has a node half, a client half, or both. Which one you write decides what you can reach.
 
@@ -15,6 +15,7 @@ A plugin has a node half, a client half, or both. Which one you write decides wh
 | Compiled | In the app binary, one roster line per side | The whole API, including Hono routers and websocket channel prefixes |
 | Loaded | A package on disk the node imports at boot | The same node API minus live-object seams, plus manifest descriptors |
 | Frame | A sandboxed iframe inside a pane the host draws | The bridge only: HTTP to its own routes, state, one channel, a few UI verbs |
+| Tree | A Web Worker with no DOM, drawing acorn's own components | The same bridge, and the kit instead of pixels: the shell's focus, keys, ARIA and style pack come with it |
 
 A compiled plugin registers by adding one line to each roster:
 `apps/node/src/server/plugins.ts` and `apps/desktop/src/app/client/plugins.ts`. Everything else it
@@ -149,7 +150,7 @@ test, and each entrypoint exists because of what it can and cannot be loaded int
 | `@acorn/plugin-api/ui/host` | Components that need the shell's focus machinery. Never safe inside a sandboxed frame |
 | `@acorn/plugin-api/ui/diff` | The diff toolkit's model, virtualizer, and find pass |
 | `@acorn/plugin-api/ui/editor` | The Monaco theme and language mapping. Compiled panes only, so 30 MB of editor stays out of other boot graphs |
-| `@acorn/plugin-api/ui/sdk` | The frame bridge: `connect`, `mountFrame`, `openLinkOnClick` |
+| `@acorn/plugin-api/ui/sdk` | The sandbox bridge and both render paths: `connect`, `mountFrame`, `mountTree`, the remote root, `openLinkOnClick` |
 | `@acorn/plugin-api/testkit` | Node-side test scaffolding: `makeTestNodeContext`, `validatePluginConfig` |
 | `@acorn/plugin-api/testkit/client` | The client-side half of the same |
 

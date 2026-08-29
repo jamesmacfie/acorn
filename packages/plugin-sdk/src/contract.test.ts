@@ -23,7 +23,14 @@ const _error: Mutual<InstanceType<typeof sdk.AcornBridgeError>, InstanceType<typ
 const _connect: Mutual<typeof sdk.connect, typeof Published.connect> = [true, true]
 const _mount: Mutual<typeof sdk.mountFrame, typeof Published.mountFrame> = [true, true]
 const _link: Mutual<typeof sdk.openLinkOnClick, typeof Published.openLinkOnClick> = [true, true]
-void [_bridge, _context, _error, _connect, _mount, _link]
+// The tree path. `RemoteNode` is compared structurally like the rest, which is what keeps the
+// published shape honest about `props` and `children` being readable: an adapter walks them.
+const _tree: Mutual<typeof sdk.mountTree, typeof Published.mountTree> = [true, true]
+const _mountShape: Mutual<sdk.TreeMount, Published.TreeMount> = [true, true]
+const _root: Mutual<sdk.RemoteRoot, Published.RemoteRoot> = [true, true]
+const _insert: Mutual<typeof sdk.insertNode, typeof Published.insertNode> = [true, true]
+const _setProp: Mutual<typeof sdk.setProperty, typeof Published.setProperty> = [true, true]
+void [_bridge, _context, _error, _connect, _mount, _link, _tree, _mountShape, _root, _insert, _setProp]
 
 it('evaluates in a bare node environment, with no DOM and no shell', () => {
   // The canary for the property that makes this package publishable at all: its import closure reaches
@@ -32,6 +39,10 @@ it('evaluates in a bare node environment, with no DOM and no shell', () => {
   // stranger's bundler.
   expect(typeof sdk.connect).toBe('function')
   expect(typeof sdk.mountFrame).toBe('function')
+  // The tree path is on this barrel precisely because it is framework-free. The day someone moves the
+  // Solid adapter onto it, this line is what fails.
+  expect(typeof sdk.mountTree).toBe('function')
+  expect(typeof sdk.createNode).toBe('function')
   expect(typeof sdk.openLinkOnClick).toBe('function')
   expect(typeof sdk.AcornBridgeError).toBe('function')
 })

@@ -89,3 +89,20 @@ export const isCoreExclusiveSlot = (value: unknown): value is CoreExclusiveSlot 
 /** What the user's arbitration means. `core` is not merely the default: it is the answer a slot falls
  *  back to whenever the chosen provider is absent, disabled, untrusted or has thrown. */
 export const CORE_SLOT_PROVIDER = 'core'
+
+// ── The remote half ───────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Which of the host's surfaces will ask a plugin's sandbox for a tree
+ * (docs/future/layout/06-remote-tree.md).
+ *
+ * One target, deliberately: the agents transcript's tool card is where the remote root is proven,
+ * because dozens render per screen and the card is the reason the changes plugin could not be a
+ * loaded plugin. The general slot, and the arbitration that goes with it, is the next phase.
+ */
+export const REMOTE_TARGETS = ['agentToolRenderer'] as const
+
+export type RemoteTarget = (typeof REMOTE_TARGETS)[number]
+
+export const isRemoteTarget = (value: unknown): value is RemoteTarget =>
+  typeof value === 'string' && (REMOTE_TARGETS as readonly string[]).includes(value)

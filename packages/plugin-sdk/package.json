@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/sdk.d.ts",
       "default": "./dist/sdk.js"
+    },
+    "./remote": {
+      "types": "./dist/remote.d.ts",
+      "default": "./dist/remote.js"
     }
   },
   "files": [
@@ -20,15 +24,24 @@
   ],
   "license": "MIT",
   "scripts": {
-    "build": "vite build && cp src/public.ts dist/sdk.d.ts",
+    "build": "vite build && cp src/public.ts dist/sdk.d.ts && cp src/remote/public.ts dist/remote.d.ts",
     "prepack": "pnpm build",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {
     "@acorn/plugin-api": "workspace:*",
+    "solid-js": "catalog:",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "solid-js": ">=1.9"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": true
+    }
   }
 }

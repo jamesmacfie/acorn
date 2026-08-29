@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 
 use tauri::http::{Request, Response, Uri};
 
-use crate::plugin_scheme::PLUGIN_SCHEME;
+use crate::plugin_scheme::{Frames, PLUGIN_SCHEME};
 
 // The renderer's own origin and its Content-Security-Policy. See docs/shell.md, "Renderer origin and
 // protocol handler", for every directive below and the dev-only widening.
@@ -22,6 +22,24 @@ fn is_highlight_worker(path: &str) -> bool {
 
 /// See docs/shell.md, "The syntax-highlighter worker's separate policy".
 const WORKER_CSP: &str = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'none'";
+
+/// A loaded plugin's bundle, run as a Web Worker instead of in a frame. See docs/shell.md, "The
+/// plugin worker", and docs/future/layout/06-remote-tree.md.
+///
+/// Tighter than the highlighter's: no `wasm-unsafe-eval`, because a plugin bundle is a stranger's
+/// code and nothing it draws needs one. `connect-src 'none'` is the same load-bearing directive the
+/// plugin frame origin has — fetch, XHR, WebSocket and sendBeacon all fail inside this worker, so
+/// the bridge port is the only way out of it.
+const PLUGIN_WORKER_CSP: &str = "default-src 'none'; script-src 'self'; connect-src 'none'";
+
+/// `/plugin-worker/<sha256>.js`, and nothing else. The hash is validated here so the read below
+/// cannot be pointed anywhere but the content-addressed cache.
+fn plugin_worker_hash(path: &str) -> Option<&str> {
+    let rest = path.strip_prefix("/plugin-worker/")?;
+    let hash = rest.strip_suffix(".js")?;
+    let lowercase_hex = hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase());
+    if lowercase_hex { Some(hash) } else { None }
+}
 
 /// `connect-src` names the helper's exact loopback WebSocket origin as well as `'self'`. No wildcard
 /// port: the handler knows the port because the helper reported it, so no other local service becomes
@@ -48,7 +66,9 @@ pub fn renderer_csp(helper_port: u16, dev_server: Option<&str>) -> String {
         "font-src 'self'",
         "img-src 'self' data: blob: https:",
         &connect,
-        // Monaco's five ?worker chunks; blob: covers a bundler that inlines one.
+        // Monaco's five ?worker chunks, and every loaded plugin's tree worker. `blob:` covers a
+        // bundler that inlines one. A plugin worker is `'self'` because it is served from this origin
+        // (`plugin_worker_hash` above), which is the only way a worker script may be loaded at all.
         "worker-src 'self' blob:",
         // frame-src names only the plugin scheme, served by `plugin_scheme.rs`.
         &format!("frame-src {PLUGIN_SCHEME}:"),
@@ -121,12 +141,32 @@ pub enum Source {
     DevServer(String),
 }
 
-pub fn serve(source: &Source, helper_port: u16, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
+pub fn serve(source: &Source, frames: Option<&Frames>, helper_port: u16, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     let pathname = request.uri().path().to_string();
     let dev = match source {
         Source::DevServer(origin) => Some(origin.as_str()),
         Source::Files(_) => None,
     };
+
+    // Ahead of everything, and identical under `pnpm dev`: a plugin worker is read from the cache,
+    // never from the client root and never from Vite. Its policy is its own.
+    if let Some(hash) = plugin_worker_hash(&pathname) {
+        let bytes = frames.and_then(|f| f.bundle_path(hash)).and_then(|path| fs::read(path).ok());
+        return match bytes {
+            // A hash the cache does not hold: a bundle the owner rejected, or one that was swept. The
+            // renderer draws the placeholder; nothing is fetched from the node that offered it.
+            None => refuse(404),
+            Some(body) => Response::builder()
+                .status(200)
+                .header("content-type", "text/javascript; charset=utf-8")
+                .header("content-security-policy", PLUGIN_WORKER_CSP)
+                .header("x-content-type-options", "nosniff")
+                .header("cache-control", "no-store")
+                .body(body)
+                .unwrap_or_else(|_| refuse(500)),
+        };
+    }
+
     let csp = if is_highlight_worker(&pathname) { WORKER_CSP.to_string() } else { renderer_csp(helper_port, dev) };
 
     // Checked ahead of the source, because it is true of both. Vite answers an unknown path with the
@@ -225,6 +265,46 @@ mod tests {
         assert!(!is_highlight_worker("/assets/worker-other.worker-abc.js"));
         assert!(!is_highlight_worker("/assets/index-abc.js"));
         assert!(WORKER_CSP.contains("'wasm-unsafe-eval'"));
+    }
+
+    #[test]
+    fn the_policy_lets_a_plugin_worker_start_without_widening_frame_src() {
+        let csp = renderer_csp(51234, None);
+        // The directive the tree path needs. `'self'` and not the plugin scheme: a worker script has
+        // to be same-origin with the document that starts it, which is why the shell serves the
+        // bundle itself rather than pointing at `app-plugin://`.
+        assert!(csp.contains("worker-src 'self' blob:"), "{csp}");
+        // And nothing about frames moved. A tree is not a rectangle.
+        assert!(csp.contains("frame-src app-plugin:"), "{csp}");
+        assert!(!csp.contains("worker-src app-plugin:"), "{csp}");
+    }
+
+    #[test]
+    fn only_a_content_addressed_bundle_is_a_plugin_worker() {
+        const HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        assert_eq!(plugin_worker_hash(&format!("/plugin-worker/{HASH}.js")), Some(HASH));
+        assert_eq!(plugin_worker_hash(&format!("/plugin-worker/{}.js", HASH.to_uppercase())), None);
+        assert_eq!(plugin_worker_hash("/plugin-worker/.js"), None);
+        assert_eq!(plugin_worker_hash("/plugin-worker/../../etc/passwd.js"), None);
+        assert_eq!(plugin_worker_hash(&format!("/plugin-worker/{HASH}")), None);
+        assert_eq!(plugin_worker_hash("/assets/index-abc.js"), None);
+        // The worker's own policy gives it nothing: no network, no `wasm-unsafe-eval`, no document.
+        assert!(PLUGIN_WORKER_CSP.contains("connect-src 'none'"));
+        assert!(PLUGIN_WORKER_CSP.contains("default-src 'none'"));
+        assert!(!PLUGIN_WORKER_CSP.contains("wasm-unsafe-eval"));
+    }
+
+    #[test]
+    fn a_plugin_worker_with_no_cache_behind_it_is_a_404_not_the_shell() {
+        const HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let request = Request::builder()
+            .uri(format!("app://acorn/plugin-worker/{HASH}.js"))
+            .body(Vec::new())
+            .unwrap();
+        // Before the setup hook has run there are no frames, and the answer must not fall through to
+        // the client root, which would hand a Worker the shell's index.html.
+        let response = serve(&Source::Files(PathBuf::from("/nowhere")), None, 51234, &request);
+        assert_eq!(response.status(), 404);
     }
 
     #[test]

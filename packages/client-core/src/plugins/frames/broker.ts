@@ -30,9 +30,10 @@ import { allowApi, isApiMethod, type ApiMethod } from './scopes'
 // What the frame is, as the host decided it. Nothing here is ever read from a message.
 export type FrameBinding = {
   pluginId: string
-  // The contribution id this frame renders, and which registry it landed in.
+  // The contribution id this frame renders, and which registry it landed in. `remote` is the tree
+  // path: the same bridge, over a worker port instead of a frame’s.
   surface: string
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote'
   nodeId: string
   taskId?: string
   projectId?: string

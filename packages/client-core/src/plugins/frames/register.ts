@@ -5,6 +5,7 @@ import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { panelRegion } from '../../dashboards/region'
 import { activeNodeId } from '../../node/activeNode'
+import { registerRemote } from '../tree/registry'
 import { commandRegistry } from '../../registries/commands'
 import { pluginProjectRoutePrefix } from '../../registries/corePaths'
 import { keybindingRegistry } from '../../registries/keybindings'
@@ -137,6 +138,18 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
       // node/pluginFailures.ts.
       console.warn(`[plugins] ${pluginId} could not contribute ${surface.target} '${surface.id}':`, error)
       recordSurfaceFailure(pluginId, surface.id, error)
+    }
+  }
+  // Remote trees, gated on trust for the same reason a frame is and with no second question asked: a
+  // tree runs the plugin's bytes, in a worker rather than an iframe, and the prompt the owner answered
+  // was about those bytes (docs/future/layout/06-remote-tree.md § The sandbox: one worker per bundle).
+  for (const entry of row.installed?.contributions.remote ?? []) {
+    if (!trusted) continue
+    try {
+      disposables.push(registerRemote(pluginId, hash, entry))
+    } catch (error) {
+      console.warn(`[plugins] ${pluginId} could not contribute remote '${entry.id}':`, error)
+      recordSurfaceFailure(pluginId, entry.id, error)
     }
   }
   return disposables

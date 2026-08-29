@@ -174,6 +174,15 @@ be tested against what the harness actually sent.
   `AgentToolCallCard` resolves the setting once and passes `defaultOpen` and `onOpenChange` to whichever
   renderer draws the call, so a contributed renderer honours the setting and trains the carry-forward
   mode without reading the preference itself.
+- **The card body is a slot.** Three things can draw it, in order: a compiled plugin's renderer that
+  matched the call, then a loaded plugin's remote tree that declared the call's tool name, then the
+  built-in card. A compiled renderer wins because it draws in the transcript's own realm and costs
+  nothing; a remote one runs in that plugin's worker and emits a tree of the host's own components,
+  which the transcript grafts in place of the card body
+  (`docs/plugins.md` section Loaded plugins: the client half). Either way the props are the same
+  `tool`, `defaultOpen` and `onOpenChange`, and a card that fails to draw shows a labelled placeholder
+  without disturbing the transcript around it. This is what stopped the tool card from being the reason
+  a plugin had to be first-party: `changes` is still compiled, but nothing about the card requires it.
 - A card seeds that state at mount and then leaves it alone. Read reactively it would shut the card the
   moment its call finished, which is when somebody is most likely to be reading it.
 - The setting, and not the call's reported status, is what decides this. Status was what used to make

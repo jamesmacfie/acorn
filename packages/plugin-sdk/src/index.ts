@@ -7,3 +7,11 @@
 // published, and what acorn promises about it.
 export { AcornBridgeError, connect, mountFrame, openLinkOnClick } from '@acorn/plugin-api/ui/sdk'
 export type { AcornBridge, PluginFrameContext } from '@acorn/plugin-api/ui/sdk'
+// The tree path, beside the frame path. Framework-free, so it belongs on this barrel; the Solid
+// adapter that binds to it is `acorn-plugin-sdk/remote`, which is a separate entrypoint because this
+// one has to stay loadable with no framework installed.
+export {
+  createNode, createText, firstChild, insertNode, isTextNode, mountTree, nextSibling, parentOf,
+  removeNode, setProperty, setText,
+} from '@acorn/plugin-api/ui/sdk'
+export type { RemoteNode, RemoteRoot, TreeMount, TreeRender } from '@acorn/plugin-api/ui/sdk'

@@ -1,6 +1,6 @@
 # Phase 3: the remote root and the worker sandbox
 
-Status: not started.
+Status: **shipped, 2026-08-29.** Deviations from the plan below are recorded at the end.
 
 ## Goal
 
@@ -125,6 +125,76 @@ otherwise today's built-in card. changes registers its renderer both ways in thi
   compiled card.
 - A deliberately broken test bundle yields the placeholder, a roster row, and an intact transcript.
 - `pnpm lint`, `pnpm test`, and the desktop boot test are green.
+
+## What was built, and where it differs from this plan
+
+Seven deviations, all deliberate.
+
+1. **`mountTree` takes a map, not a single render.** The plan wrote `mountTree(render)` and the
+   contribution wrote `entry`. One worker serves every tree its bundle contributes, so the host has to
+   say which renderer it wants; `mountTree({ toolCard: … })` makes `entry` a key lookup and a missing
+   one a legible failure. A single callback would have needed the entry name passed into it anyway.
+
+2. **One props schema for all 62 nodes, not 62.** `@acorn/protocol/tree/props.ts` holds one schema and
+   `KIT_NODE_SCHEMAS` maps every node onto it, so the per-node tightening still has a place to land.
+   The reason: the kit's components enumerate the props they read and never spread the leftovers onto
+   an element, so an unknown prop is inert. What is not inert — a function, a `class`, a `style`, a
+   role prop carrying a raw colour — is refused by the shared schema. 62 hand-written lists would have
+   been defence in depth that rots on every kit change. Marked `ponytail:` at the file head with the
+   upgrade path.
+
+3. **The Solid adapter is `solid-js/universal`, not a DOM shim.** The plan sized it against remote-dom's
+   Solid adapter. That was the wrong reference: `generate: 'universal'` compiles JSX straight into
+   renderer calls, so there is no `document`, no template cloning and no `innerHTML` parser to write.
+   `packages/plugin-sdk/src/remote/solid.ts` is forty lines. The consequence is that the remote root's
+   mutators are free functions rather than methods, because that babel preset emits module-level calls;
+   a node carries the root it is attached to in a side table.
+
+4. **The worker script is served from `app://acorn/plugin-worker/<hash>.js`.** The plan said the shell's
+   scheme gains `worker-src 'self'`, and it already had it. What it did not have was a way to *serve* a
+   bundle at its own origin, which a worker script needs: `new Worker()` cannot cross to
+   `app-plugin://<hash>`. `app_scheme.rs` now reads the same content-addressed cache the plugin scheme
+   reads and answers under `PLUGIN_WORKER_CSP`.
+
+5. **The tree channel is a second port, not a second message kind.** The host transfers two ports in
+   the same hello: the bridge on `ports[0]`, the tree on `ports[1]`. `broker.ts`, `verbs.ts` and
+   `scopes.ts` are untouched, exactly as planned, and the reason they could be is that nothing about
+   the tree ever reaches them.
+
+6. **changes ships compiled, and the remote proof is a test bundle.** As the plan's own scope note
+   said. Its renderer was rewritten in the kit — `Fold`, `Stack`, `Badge`, `CodeBlock`, `Button`, no
+   raw tag and no class — which is the part that ships.
+
+7. **The two-path equivalence test compares a description, not a component.** A `.tsx` file compiles
+   under one JSX preset per vitest project and the remote path's preset is `generate: 'universal'`, so
+   compiling one component both ways needs a second build pipeline. `twoPaths.test.tsx` describes the
+   tool card once as calls over a sink, renders it compiled and through the remote root plus `TreeHost`,
+   and asserts the two `innerHTML`s are identical. Everything downstream of the preset is pinned; that
+   Solid's universal preset reaches these same calls is the adapter's own test and the running app's.
+
+8. **A tree's bridge carries no task and no project.** One worker per bundle means one bridge per
+   bundle, and a bridge bound to whichever tree happened to start the worker would let a card in one
+   task push a pane into another through `bridge.ui.openPane`. So the binding has no subject and the
+   subject reaches a tree through its mount props, which are per slot and always current. The cost is
+   that `openPane` and the in-app rung of `openUrl` are inert from a tree. That is the right default
+   anyway — opening into somebody else's task layout is not obviously a contributor's to do — and
+   phase 4 is where a slot's scope gets designed rather than inherited.
+
+Two things the phase gained that the plan did not ask for:
+
+- **An arch rule** (`tools/arch/boundaries.test.ts`, "the plugin SDK carries no dependency into a
+  stranger's bundle"). `mountTree` reached for a protocol constant from the module beside the Zod
+  schemas, and the published bundle went from 26 KB to 166 KB. The vite config already warned about it
+  in a comment; a comment is not a check.
+- **`contributions.remote` ids are namespaced** like frames, sources and slots
+  (`packages/client-core/src/plugins/contributionIds.ts`), because a remote id is what a roster row and
+  a failure row name it by.
+- **One pre-existing flake fixed.** `registries/panes.test.tsx` polls for a lazy layout import with a
+  250 ms budget and lost the race under a full `pnpm test` once this phase added more jsdom work to the
+  same project. The budget is two seconds now.
+
+Owed and not done: the manual check that changes' card renders through a worker in the running app.
+`docs/testing.md`'s smoke checklist is where that belongs.
 
 ## Verify before building
 
