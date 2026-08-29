@@ -186,10 +186,10 @@ export default function PluginTrustDialog() {
               <p class="plugin-trust-escape">
                 Not sure? Press <Kbd size="xs">Esc</Kbd> — {previousVersion() ? `${previousVersion()} keeps running and ` : ''}acorn asks again next launch.
               </p>
-              <Button variant="ghost" disabled={saving()} onClick={() => void decide('rejected')}>
+              <Button variant="ghost" disabled={saving()} onPress={() => void decide('rejected')}>
                 {previousVersion() ? `Keep ${previousVersion()}` : 'Don’t run it'}
               </Button>
-              <Button disabled={saving()} onClick={() => void decide('accepted')}>
+              <Button disabled={saving()} onPress={() => void decide('accepted')}>
                 {saving() ? 'Saving…' : previousVersion() ? 'Trust the update' : `Trust ${current().row.name} ${current().row.installed?.version}`}
               </Button>
             </div>

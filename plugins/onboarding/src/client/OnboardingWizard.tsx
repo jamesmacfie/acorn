@@ -177,7 +177,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                 acorn is a workspace for running coding tasks — agents, terminals, editors — against your
                 projects. Setup takes about a minute.
               </p>
-              <Button variant="solid" tone="accent" onClick={() => go('add')}>Get started</Button>
+              <Button variant="solid" tone="accent" onPress={() => go('add')}>Get started</Button>
             </div>
           </Show>
 
@@ -189,12 +189,12 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                 up as they're detected.
               </p>
               <div class="wizard-cards">
-                <Card class="wizard-card" interactive disabled={!canPickFolder() || busy()} onActivate={() => void openFolder()}>
+                <Card interactive disabled={!canPickFolder() || busy()} onPress={() => void openFolder()}>
                   <span class="wizard-card-title">Open a folder</span>
                   <span class="wizard-card-desc">Point acorn at any folder. Plain folders work fine.</span>
                   <span class="wizard-card-tag">recommended</span>
                 </Card>
-                <Card class="wizard-card" interactive onActivate={() => go('github')}>
+                <Card interactive onPress={() => go('github')}>
                   <span class="wizard-card-title">Connect GitHub</span>
                   <span class="wizard-card-desc">Import repositories — clone them, or map ones you already have locally.</span>
                   <span class="wizard-card-tag">optional · anytime in settings</span>
@@ -237,17 +237,14 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                     <div class="wizard-project">
                       <Input
                         width="auto"
-                        aria-label={`Name of ${current().name}`}
+                        label={`Name of ${current().name}`}
                         value={names()[current().id] ?? current().name}
-                        onInput={(event) => {
-                          const value = event.currentTarget.value
-                          setNames((all) => ({ ...all, [current().id]: value }))
-                        }}
+                        onInput={(value) => setNames((all) => ({ ...all, [current().id]: value }))}
                       />
                       <span class="wizard-facets">
-                        <Show when={current().path} fallback={<Badge>no folder yet</Badge>}><Badge tone="add">Folder</Badge></Show>
-                        <Show when={current().vcs === 'git'}><Badge tone="add">Git</Badge></Show>
-                        <Show when={current().github}><Badge tone="add">GitHub</Badge></Show>
+                        <Show when={current().path} fallback={<Badge>no folder yet</Badge>}><Badge tone="ok">Folder</Badge></Show>
+                        <Show when={current().vcs === 'git'}><Badge tone="ok">Git</Badge></Show>
+                        <Show when={current().github}><Badge tone="ok">GitHub</Badge></Show>
                       </span>
                       <span class="wizard-path">
                         {current().path
@@ -266,14 +263,11 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                             <>
                               <Input
                                 width="auto"
-                                aria-label={`New workspace for ${current().name}`}
+                                label={`New workspace for ${current().name}`}
                                 placeholder="Workspace name"
                                 value={drafts()[current().id] ?? ''}
                                 ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
-                                onInput={(event) => {
-                                  const value = event.currentTarget.value
-                                  setDrafts((all) => ({ ...all, [current().id]: value }))
-                                }}
+                                onInput={(value) => setDrafts((all) => ({ ...all, [current().id]: value }))}
                                 onKeyDown={(event) => {
                                   if (event.key !== 'Enter') return
                                   event.preventDefault()
@@ -285,7 +279,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                                 size="sm"
                                 busy={busy()}
                                 disabled={!drafts()[current().id]?.trim()}
-                                onClick={() => void createHome(current(), drafts()[current().id]!.trim())}
+                                onPress={() => void createHome(current(), drafts()[current().id]!.trim())}
                               >
                                 Create
                               </Button>
@@ -294,25 +288,17 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                         >
                           <Select
                             width="auto"
-                            aria-label={`Workspace for ${current().name}`}
-                            onChange={(event) => {
-                              const value = event.currentTarget.value
+                            label={`Workspace for ${current().name}`}
+                            value={homes()[current().id] ?? current().workspaceId}
+                            options={[
+                              ...(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name })),
+                              { value: NEW_WORKSPACE, label: 'New workspace…' },
+                            ]}
+                            onChange={(value) => {
                               if (value === NEW_WORKSPACE) setDrafts((all) => ({ ...all, [current().id]: '' }))
                               else setHomes((all) => ({ ...all, [current().id]: value }))
                             }}
-                          >
-                            <For each={workspaces.data ?? []}>
-                              {(workspace) => (
-                                <option
-                                  value={workspace.id}
-                                  selected={workspace.id === (homes()[current().id] ?? current().workspaceId)}
-                                >
-                                  {workspace.name}
-                                </option>
-                              )}
-                            </For>
-                            <option value={NEW_WORKSPACE}>New workspace…</option>
-                          </Select>
+                          />
                         </Show>
                       </span>
                     </div>
@@ -320,7 +306,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                 </Index>
               </Show>
               <Show when={error()}><Alert>{error()}</Alert></Show>
-              <Button variant="solid" tone="accent" busy={busy()} onClick={() => void saveNames()}>Continue</Button>
+              <Button variant="solid" tone="accent" busy={busy()} onPress={() => void saveNames()}>Continue</Button>
             </div>
           </Show>
 
@@ -328,12 +314,12 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
             <div class="wizard-body">
               <h2>You're set.</h2>
               <p class="wizard-lede">Start a task whenever you're ready. A few keys worth knowing:</p>
-              <DescriptionList class="wizard-keys" size="sm">
+              <DescriptionList size="sm">
                 <For each={SHORTCUTS}>
                   {([chord, label]) => <DescriptionList.Item label={<Kbd>{chord}</Kbd>}>{label}</DescriptionList.Item>}
                 </For>
               </DescriptionList>
-              <Button variant="solid" tone="accent" busy={busy()} onClick={() => void finish()}>Open acorn</Button>
+              <Button variant="solid" tone="accent" busy={busy()} onPress={() => void finish()}>Open acorn</Button>
             </div>
           </Show>
         </div>
@@ -343,10 +329,10 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
             <For each={[0, 1, 2, 3]}>{(index) => <i classList={{ on: index <= DOT_OF[step()] }} />}</For>
           </span>
           <Show when={trail().length}>
-            <Button variant="bare" onClick={back}>← back</Button>
+            <Button variant="bare" onPress={back}>← back</Button>
           </Show>
           <Show when={step() !== 'done'}>
-            <Button variant="bare" busy={busy()} onClick={() => void finish()}>skip for now</Button>
+            <Button variant="bare" busy={busy()} onPress={() => void finish()}>skip for now</Button>
           </Show>
         </div>
       </div>

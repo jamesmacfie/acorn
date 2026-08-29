@@ -113,10 +113,10 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
           </EmptyState>
         }>
           <div class="preview-chrome">
-            <Button variant="bare" class="preview-nav-btn" title="Back" disabled={!canBack()} onClick={() => preview?.command(props.taskId, 'back')}>‹</Button>
-            <Button variant="bare" class="preview-nav-btn" title="Forward" disabled={!canFwd()} onClick={() => preview?.command(props.taskId, 'forward')}>›</Button>
-            <Button variant="bare" class="preview-nav-btn" title={loading() ? 'Stop' : 'Reload'} onClick={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}>{loading() ? '✕' : '↻'}</Button>
-            <Button variant="bare" class="preview-nav-btn" title="Home" onClick={() => props.url && preview?.load(props.taskId, props.url)}>⌂</Button>
+            <Button variant="bare" title="Back" disabled={!canBack()} onPress={() => preview?.command(props.taskId, 'back')}>‹</Button>
+            <Button variant="bare" title="Forward" disabled={!canFwd()} onPress={() => preview?.command(props.taskId, 'forward')}>›</Button>
+            <Button variant="bare" title={loading() ? 'Stop' : 'Reload'} onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}>{loading() ? '✕' : '↻'}</Button>
+            <Button variant="bare" title="Home" onPress={() => props.url && preview?.load(props.taskId, props.url)}>⌂</Button>
             <input
               class="preview-url"
               type="text"
@@ -125,7 +125,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
               onInput={(e) => setAddr(e.currentTarget.value)}
               onKeyDown={(e) => e.key === 'Enter' && go()}
             />
-            <Button variant="bare" class="preview-nav-btn" title="Toggle preview DevTools" aria-label="Toggle preview DevTools" onClick={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</Button>
+            <Button variant="bare" title="Toggle preview DevTools" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</Button>
             <Show when={loading()}><Spinner label="Loading page" /></Show>
           </div>
         </Show>

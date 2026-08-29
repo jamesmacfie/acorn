@@ -91,10 +91,9 @@ export function WillConfirmationHost() {
                       <Show when={concern.checkbox}>
                         {(checkbox) => (
                           <Checkbox
-                            class="will-concern-option"
                             label={checkbox().label}
                             checked={checks()[concern.id] ?? checkbox().checked}
-                            onChange={(event) => setChecks((all) => ({ ...all, [concern.id]: event.currentTarget.checked }))}
+                            onChange={(checked) => setChecks((all) => ({ ...all, [concern.id]: checked }))}
                           />
                         )}
                       </Show>
@@ -103,8 +102,8 @@ export function WillConfirmationHost() {
                 </ul>
               </Show>
               <div class="close-actions">
-                <Button autofocus={current.concerns.some((concern) => concern.severity === 'danger')} onClick={() => finish(false)}>Cancel</Button>
-                <Button autofocus={!current.concerns.some((concern) => concern.severity === 'danger')} class="close-confirm" onClick={() => finish(true)}>{current.actionLabel}</Button>
+                <Button autofocus={current.concerns.some((concern) => concern.severity === 'danger')} onPress={() => finish(false)}>Cancel</Button>
+                <Button autofocus={!current.concerns.some((concern) => concern.severity === 'danger')} onPress={() => finish(true)}>{current.actionLabel}</Button>
               </div>
             </div>
           </div>

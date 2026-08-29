@@ -195,8 +195,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   return (
     <section class="db-frame">
       <SectionHeader
-        class="db-head"
-        actions={<Button size="sm" iconOnly title="Reconnect" aria-label="Reconnect" onClick={() => void connect()}>⟳</Button>}
+        actions={<Button size="sm" iconOnly title="Reconnect" label="Reconnect" onPress={() => void connect()}>⟳</Button>}
       >
         Database
         <span class="db-status" classList={{ err: status() === 'error', ok: status() === 'connected' }}>
@@ -205,21 +204,21 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       </SectionHeader>
 
       <Show when={error()}>
-        <Alert class="db-error">{error()}</Alert>
+        <Alert>{error()}</Alert>
       </Show>
 
       <ListDetail
         listLabel="Tables"
         list={
           <>
-            <Input class="db-filter" kind="filter" placeholder="Filter tables…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
+            <Input kind="filter" placeholder="Filter tables…" value={filter()} onInput={(value) => setFilter(value)} />
             <div class="db-table-list">
               <For each={filtered()} fallback={<EmptyState align="start">{status() === 'connected' ? 'No tables.' : ''}</EmptyState>}>
                 {(t) => (
                   <Row
                     density="compact"
                     selected={selected()?.schema === t.schema && selected()?.name === t.name}
-                    onActivate={() => void openTable(t)}
+                    onPress={() => void openTable(t)}
                     title={`${t.schema}.${t.name}`}
                   >
                     {t.schema === 'public' ? t.name : `${t.schema}.${t.name}`}
@@ -234,7 +233,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             move makes to this pane. It stays the PLUGIN's because it is a searchable picker with
             per-row delete chips and a conditionally-visible button — common, not impossible, which is
             the bar a host-drawn region has to clear (docs/plugins.md § Document surfaces). */}
-        <Toolbar class="db-editor-bar" variant="actions" ariaLabel="Query actions">
+        <Toolbar variant="actions" ariaLabel="Query actions">
           <span class="muted db-hint">⌘↵ to run</span>
           <Picker<DbSavedQuery>
             label={loadedName() || 'Queries'}
@@ -245,7 +244,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             rowLabel={savedQueryLabel}
             isActive={(q) => q.name === loadedName()}
             leading={(q) => (
-              <Button variant="bare" size="sm" iconOnly tone="danger" title="Delete query" aria-label="Delete query" onClick={() => void deleteSaved(q)}>✕</Button>
+              <Button variant="bare" size="sm" iconOnly tone="danger" title="Delete query" label="Delete query" onPress={() => void deleteSaved(q)}>✕</Button>
             )}
             onSelect={loadSaved}
           />
@@ -254,21 +253,21 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               no-op. Same trade the compiled version made against a Monaco model that was not a signal. */}
           <Button
             variant="solid"
-            onClick={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
+            onPress={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
           >
             Save
           </Button>
           <Show when={connections().length}>
-            <Button variant="solid" disabled={busy() || status() !== 'connected'} onClick={() => setGenerating(true)}>Generate</Button>
+            <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => setGenerating(true)}>Generate</Button>
           </Show>
-          <Button variant="solid" disabled={busy() || status() !== 'connected'} onClick={() => void execute()}>Execute</Button>
+          <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => void execute()}>Execute</Button>
         </Toolbar>
 
         <div class="db-result">
-          <Toolbar class="db-result-bar" size="sm" ariaLabel="Result actions">
+          <Toolbar size="sm" ariaLabel="Result actions">
             <span class="db-footer">{footer()}</span>
             <Show when={resultTable() && columns().some((c) => c.isPk)}>
-              <Button size="sm" disabled={busy()} onClick={() => setInserting(true)}>+ Row</Button>
+              <Button size="sm" disabled={busy()} onPress={() => setInserting(true)}>+ Row</Button>
             </Show>
           </Toolbar>
           <Show when={result()} fallback={<EmptyState align="start">Select a table or run a query.</EmptyState>}>
@@ -437,7 +436,7 @@ function RowDetail(props: {
 
   return (
     <aside class="db-detail">
-      <SectionHeader actions={<Button size="sm" iconOnly title="Close" aria-label="Close" onClick={props.onClose}>✕</Button>}>
+      <SectionHeader actions={<Button size="sm" iconOnly title="Close" label="Close" onPress={props.onClose}>✕</Button>}>
         {props.insert ? `${props.table?.name ?? ''} · new row` : props.table ? `${props.table.name} · row` : 'Row'}
       </SectionHeader>
       <div class="db-detail-fields">
@@ -453,7 +452,7 @@ function RowDetail(props: {
                 </span>
                 <textarea
                   class="db-field-input"
-                  rows="1"
+                  rows={1}
                   spellcheck={false}
                   disabled={!editable() || draft()[col]?.isNull}
                   value={draft()[col]?.isNull ? '' : draft()[col]?.value ?? ''}
@@ -464,7 +463,7 @@ function RowDetail(props: {
                     take their DB default); edit mode only for nullable columns. */}
                 <Show when={editable() && (props.insert || (m?.nullable ?? true))}>
                   <label class="db-null-toggle">
-                    <Checkbox label="null" checked={draft()[col]?.isNull} onChange={(e) => set(col, { isNull: e.currentTarget.checked })} />
+                    <Checkbox label="null" checked={draft()[col]?.isNull} onChange={(checked) => set(col, { isNull: checked })} />
                   </label>
                 </Show>
               </label>
@@ -474,9 +473,9 @@ function RowDetail(props: {
       </div>
       <div class="db-detail-actions">
         <Show when={editable()} fallback={<span class="muted db-hint">Read-only (no single-table PK).</span>}>
-          <Button variant="solid" disabled={props.busy} onClick={save}>Save</Button>
+          <Button variant="solid" disabled={props.busy} onPress={save}>Save</Button>
           <Show when={!props.insert}>
-            <Button tone="danger" disabled={props.busy} onClick={() => void props.onDelete?.()}>{props.deleteArmed ? 'Delete?' : 'Delete'}</Button>
+            <Button tone="danger" disabled={props.busy} onPress={() => void props.onDelete?.()}>{props.deleteArmed ? 'Delete?' : 'Delete'}</Button>
           </Show>
         </Show>
       </div>

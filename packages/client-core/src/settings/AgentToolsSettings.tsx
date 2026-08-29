@@ -73,11 +73,10 @@ export default function AgentToolsSettings() {
               fallback={<div class="settings-field-row"><span class="settings-label">{tier.label} tools · tier always available</span></div>}
             >
               <Checkbox
-                class="settings-field-row"
                 label={`${tier.label} tools`}
                 indeterminate={tierState(tier.risk) === 'mixed'}
                 checked={tierState(tier.risk) !== 'off'}
-                onChange={(e) => void setTier(tier.risk, e.currentTarget.checked)}
+                onChange={(checked) => void setTier(tier.risk, checked)}
               />
             </Show>
             <p class="muted" style={{ 'margin-top': '0' }}>
@@ -86,10 +85,9 @@ export default function AgentToolsSettings() {
             <For each={toolsFor(tier.risk)}>
               {(t) => (
                 <Checkbox
-                  class="settings-field-row"
                   nested
                   checked={toolOn(t)}
-                  onChange={(e) => void setTool(t.name, e.currentTarget.checked)}
+                  onChange={(checked) => void setTool(t.name, checked)}
                   label={
                     <>
                       <code>{t.name}</code> — {t.description}

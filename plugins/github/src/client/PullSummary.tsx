@@ -51,25 +51,23 @@ export function PullSummary(props: {
         <div class="pr-detail-meta muted">
           <span class={`state-badge state-${props.pull().state}`}>{props.pull().draft ? 'draft' : props.pull().state}</span>
           <Show when={props.pull().author}>
-            {(author) => <Chip class="identity-chip" leading={<UserAvatar login={author()} />}>{author()}</Chip>}
+            {(author) => <Chip leading={<UserAvatar login={author()} />}>{author()}</Chip>}
           </Show>
           <span class="branch-flow">
             <Chip
-              class="branch-chip"
               reveal
               title={props.pull().baseRef ?? 'base'}
-              onActivate={() => void navigator.clipboard.writeText(props.pull().baseRef ?? '')}
+              onPress={() => void navigator.clipboard.writeText(props.pull().baseRef ?? '')}
             >
-              {props.pull().baseRef ?? 'base'}<Icon name="copy" class="branch-chip-copy" size={12} />
+              {props.pull().baseRef ?? 'base'}<Icon name="copy" size={12} />
             </Chip>
             <span class="branch-arrow">←</span>
             <Chip
-              class="branch-chip"
               reveal
               title={props.pull().headRef ?? 'head'}
-              onActivate={() => void navigator.clipboard.writeText(props.pull().headRef ?? '')}
+              onPress={() => void navigator.clipboard.writeText(props.pull().headRef ?? '')}
             >
-              {props.pull().headRef ?? 'head'}<Icon name="copy" class="branch-chip-copy" size={12} />
+              {props.pull().headRef ?? 'head'}<Icon name="copy" size={12} />
             </Chip>
           </span>
           <span>{props.fileSummary().count} files · <span class="file-stat add">+{props.fileSummary().additions}</span> / <span class="file-stat del">−{props.fileSummary().deletions}</span></span>
@@ -78,30 +76,27 @@ export function PullSummary(props: {
         <Show when={!props.readOnly && props.pull().state === 'open'}>
           <div class="pr-actions">
             <Show when={!props.pull().autoMergeEnabled}>
-              <Select size="sm" width="auto" aria-label="Merge method" value={props.mergeMethod()} onChange={(e) => props.setMergeMethod(e.currentTarget.value)}>
-                <option value="squash">squash</option><option value="merge">merge</option><option value="rebase">rebase</option>
-              </Select>
+              <Select size="sm" width="auto" label="Merge method" value={props.mergeMethod()} onChange={(value) => props.setMergeMethod(value)} options={[{ value: 'squash', label: 'squash' }, { value: 'merge', label: 'merge' }, { value: 'rebase', label: 'rebase' }]} />
             </Show>
-            <Show when={props.pull().autoMergeEnabled}><Button onClick={() => props.run(props.disableAutoMerge.run())} disabled={props.disableAutoMerge.pending}>Disable auto-merge</Button></Show>
-            <Show when={!props.pull().autoMergeEnabled && props.pull().mergeStateStatus === 'BLOCKED'}><Button onClick={() => props.run(props.enableAutoMerge.run())} disabled={props.enableAutoMerge.pending}>Enable auto-merge ({props.mergeMethod()})</Button></Show>
+            <Show when={props.pull().autoMergeEnabled}><Button onPress={() => props.run(props.disableAutoMerge.run())} disabled={props.disableAutoMerge.pending}>Disable auto-merge</Button></Show>
+            <Show when={!props.pull().autoMergeEnabled && props.pull().mergeStateStatus === 'BLOCKED'}><Button onPress={() => props.run(props.enableAutoMerge.run())} disabled={props.enableAutoMerge.pending}>Enable auto-merge ({props.mergeMethod()})</Button></Show>
             <Show when={!props.pull().autoMergeEnabled && props.pull().mergeStateStatus !== 'BLOCKED'}>
-              <Button onClick={() => props.run(props.merge.run())} disabled={props.merge.pending || props.pull().mergeable === 'CONFLICTING'} title={props.pull().mergeable === 'CONFLICTING' ? 'Resolve merge conflicts before merging' : undefined}>Merge</Button>
+              <Button onPress={() => props.run(props.merge.run())} disabled={props.merge.pending || props.pull().mergeable === 'CONFLICTING'} title={props.pull().mergeable === 'CONFLICTING' ? 'Resolve merge conflicts before merging' : undefined}>Merge</Button>
             </Show>
             <Button
-              data-armed={closeArmed.armed() ? '' : undefined}
-              onClick={() => { if (closeArmed.request('close')) props.run(props.close.run()) }}
+              armed={!!closeArmed.armed()}
+              onPress={() => { if (closeArmed.request('close')) props.run(props.close.run()) }}
               disabled={props.close.pending}
             >{closeArmed.armed() ? 'Close?' : 'Close'}</Button>
-            <Button onClick={() => props.run(props.draft.run(!props.pull().draft))} disabled={props.draft.pending}>{props.pull().draft ? 'Ready for review' : 'Convert to draft'}</Button>
+            <Button onPress={() => props.run(props.draft.run(!props.pull().draft))} disabled={props.draft.pending}>{props.pull().draft ? 'Ready for review' : 'Convert to draft'}</Button>
           </div>
         </Show>
-        <Show when={!props.readOnly && props.pull().state === 'closed'}><div class="pr-actions"><Button onClick={() => props.run(props.reopen.run())} disabled={props.reopen.pending}>Reopen</Button></div></Show>
+        <Show when={!props.readOnly && props.pull().state === 'closed'}><div class="pr-actions"><Button onPress={() => props.run(props.reopen.run())} disabled={props.reopen.pending}>Reopen</Button></div></Show>
         <Show when={props.actionError()}><Alert>{props.actionError()}</Alert></Show>
       </div>
 
       <Show when={props.conflicting}>
         <CollapsibleSection
-          class="nav-section"
           persistKey="conflicts"
           open
           label="Merge conflicts"

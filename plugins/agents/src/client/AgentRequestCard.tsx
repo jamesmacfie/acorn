@@ -64,24 +64,20 @@ export default function AgentRequestCard(props: {
                 <Input
                   type="text"
                   value={answers()[question.id] ?? ''}
-                  onInput={(event) => setAnswers((current) => ({ ...current, [question.id]: event.currentTarget.value }))}
+                  onInput={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
                 />
               }
             >
               <Select
                 value={answers()[question.id] ?? ''}
-                onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.currentTarget.value }))}
-              >
-                <option value="">Choose…</option>
-                <For each={question.options}>{(option) => <option value={option.label}>{option.label}</option>}</For>
-              </Select>
+                onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))} options={[{ value: '', label: 'Choose…' }, ...(question.options ?? []).map((option) => ({ value: option.label, label: option.label }))]} />
             </Show>
           </label>
         )}
       </For>
       <div class="agent-request-actions">
         <Show when={questions().length}>
-          <Button disabled={busy() || props.request.status !== 'pending'} onClick={() => void resolve({ answers: answers() })}>
+          <Button disabled={busy() || props.request.status !== 'pending'} onPress={() => void resolve({ answers: answers() })}>
             Submit answers
           </Button>
         </Show>
@@ -89,9 +85,8 @@ export default function AgentRequestCard(props: {
           {(option) => (
             <Button
               tone={option.kind?.startsWith('reject') ? 'danger' : 'neutral'}
-              classList={{ 'agent-request-reject': option.kind?.startsWith('reject') }}
               disabled={busy() || props.request.status !== 'pending'}
-              onClick={() => void resolve({ optionId: option.id })}
+              onPress={() => void resolve({ optionId: option.id })}
             >
               {option.label}
             </Button>

@@ -176,7 +176,7 @@ export default function AgentPricingSettings() {
           <span class="settings-label">Unpriced models seen recently</span>
           <For each={unpricedModels()}>
             {(model) => (
-              <Button variant="bare" class="agent-pricing-model-add" onClick={() => addCustom(model)}>
+              <Button variant="bare" onPress={() => addCustom(model)}>
                 Add <code>{model}</code>
               </Button>
             )}
@@ -189,7 +189,7 @@ export default function AgentPricingSettings() {
           <>
             <section>
               <h3 class="settings-section-label agent-pricing-heading">Built-in Claude prices</h3>
-              <Table class="agent-pricing-table" size="sm" minWidth={620}>
+              <Table size="sm" minWidth={620}>
                   <thead>
                     <tr>
                       <th>Model</th>
@@ -230,9 +230,9 @@ export default function AgentPricingSettings() {
                             </For>
                             <td>
                               <Button
-                                variant="bare" class="agent-pricing-reset"
+                                variant="bare"
                                 disabled={!row.overridden}
-                                onClick={() => resetCatalogPrice(row.catalogId)}
+                                onPress={() => resetCatalogPrice(row.catalogId)}
                               >
                                 Reset
                               </Button>
@@ -250,7 +250,7 @@ export default function AgentPricingSettings() {
                 <h3 class="settings-section-label agent-pricing-heading">Exact model prices</h3>
                 <Button
                   disabled={current().customModels.some((entry) => !entry.model.trim())}
-                  onClick={() => addCustom()}
+                  onPress={() => addCustom()}
                 >
                   Add model
                 </Button>
@@ -263,7 +263,7 @@ export default function AgentPricingSettings() {
                 when={current().customModels.length}
                 fallback={<p class="muted agent-pricing-empty">No exact model prices.</p>}
               >
-                <Table class="agent-pricing-table" size="sm" minWidth={620}>
+                <Table size="sm" minWidth={620}>
                     <thead>
                       <tr>
                         <th>Exact model id</th>
@@ -308,8 +308,8 @@ export default function AgentPricingSettings() {
                             </For>
                             <td>
                               <Button
-                                variant="bare" class="agent-pricing-remove"
-                                onClick={() => removeCustom(row.id)}
+                                variant="bare"
+                                onPress={() => removeCustom(row.id)}
                               >
                                 Remove
                               </Button>
@@ -328,7 +328,7 @@ export default function AgentPricingSettings() {
       <Show when={error()}><p class="settings-error" role="alert">{error()}</p></Show>
       <Show when={saved()}><p class="muted agent-pricing-saved" role="status">{saved()}</p></Show>
       <div class="settings-actions">
-        <Button type="submit" disabled={!dirty() || saving()}>
+        <Button submit disabled={!dirty() || saving()}>
           {saving() ? 'Saving…' : 'Save pricing'}
         </Button>
       </div>

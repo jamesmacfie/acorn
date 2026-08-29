@@ -13,9 +13,8 @@ export default function AgentUsageIndicator() {
   return (
     <div class="managed-agent-usage">
       <Button
-        class="managed-agent-usage-trigger"
-        aria-label="Agent utilization"
-        aria-describedby={tooltipId}
+        label="Agent utilization"
+        describedBy={tooltipId}
       >
         <Icon name="gauge" />
         {/* The placeholder names no harness, because only the node knows which ones exist. */}

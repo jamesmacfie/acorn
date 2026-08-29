@@ -36,11 +36,11 @@ const STATE_LABEL: Record<ProvidedNodeState, string> = {
   failed: 'Failed',
 }
 
-const STATE_TONE: Record<ProvidedNodeState, 'accent' | 'add' | 'del' | 'neutral'> = {
+const STATE_TONE: Record<ProvidedNodeState, 'accent' | 'ok' | 'danger' | 'neutral'> = {
   provisioning: 'accent',
-  ready: 'add',
+  ready: 'ok',
   stopped: 'neutral',
-  failed: 'del',
+  failed: 'danger',
 }
 
 const VERB_LABEL: Record<NodeLifecycleVerb, string> = {
@@ -113,7 +113,7 @@ export default function ProvidedNodes() {
                       node there is none, so the row shows without the button rather than offering one
                       that cannot work. */}
                   <Show when={!row.adoptedAs && row.state === 'ready' && canPairNodes()}>
-                    <Button disabled={busy()} onClick={() => void run(async () => { await adoptProvidedNode(row) })}>
+                    <Button disabled={busy()} onPress={() => void run(async () => { await adoptProvidedNode(row) })}>
                       Add to this client
                     </Button>
                   </Show>
@@ -122,7 +122,7 @@ export default function ProvidedNodes() {
                       <Show
                         when={NODE_LIFECYCLE_RISK[verb] === 'execute'}
                         fallback={
-                          <Button disabled={busy()} onClick={() => void run(() => runNodeLifecycle(verb, row))}>
+                          <Button disabled={busy()} onPress={() => void run(() => runNodeLifecycle(verb, row))}>
                             {VERB_LABEL[verb]}
                           </Button>
                         }
@@ -132,7 +132,6 @@ export default function ProvidedNodes() {
                             is the most consequential button in the product, and it is the only one here
                             that asks twice. */}
                         <ConfirmButton
-                          class="node-danger"
                           disabled={busy()}
                           confirmLabel="Destroy it?"
                           onConfirm={() => void run(() => runNodeLifecycle(verb, row))}
@@ -153,7 +152,7 @@ export default function ProvidedNodes() {
             <Show
               when={creating() === target.id}
               fallback={
-                <Button class="nodes-add-btn" onClick={() => { setCreating(target.id); setNewLabel('') }}>
+                <Button onPress={() => { setCreating(target.id); setNewLabel('') }}>
                   <span class="integration-add-icon">+</span> New node on {target.label}
                 </Button>
               }
@@ -164,20 +163,20 @@ export default function ProvidedNodes() {
                   <Input
                     value={newLabel()}
                     ref={(el) => queueMicrotask(() => el.focus())}
-                    onInput={(event) => setNewLabel(event.currentTarget.value)}
+                    onInput={(value) => setNewLabel(value)}
                   />
                 </label>
                 <div class="node-step-actions">
                   <Button
                     disabled={busy() || !newLabel().trim()}
-                    onClick={() => void run(async () => {
+                    onPress={() => void run(async () => {
                       await createProvidedNode({ providerId: target.id, sourceNodeId: target.sourceNodeId }, newLabel().trim())
                       setCreating(null)
                     })}
                   >
                     {busy() ? 'Creating…' : 'Create'}
                   </Button>
-                  <Button onClick={() => setCreating(null)}>Cancel</Button>
+                  <Button onPress={() => setCreating(null)}>Cancel</Button>
                 </div>
               </div>
             </Show>

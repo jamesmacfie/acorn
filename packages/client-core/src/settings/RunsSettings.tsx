@@ -19,11 +19,11 @@ import './settings.css'
 
 type RunsResponse = { runs: RunRow[]; failed: string[] }
 
-const STATUS_TONE: Record<RunStatus, 'ok' | 'bad' | 'warn' | 'muted'> = {
+const STATUS_TONE: Record<RunStatus, 'ok' | 'danger' | 'warn' | 'muted'> = {
   running: 'ok',
   waiting: 'warn',
   done: 'muted',
-  failed: 'bad',
+  failed: 'danger',
   cancelled: 'muted',
 }
 
@@ -60,9 +60,7 @@ export default function RunsSettings() {
       <Show when={nodes().length > 1}>
         <label class="settings-field">
           <span>Node</span>
-          <Select value={nodeId() ?? ''} onChange={(event) => setTarget(event.currentTarget.value || null)}>
-            <For each={nodes()}>{(candidate) => <option value={candidate.nodeId}>{candidate.label}</option>}</For>
-          </Select>
+          <Select value={nodeId() ?? ''} onChange={(value) => setTarget(value || null)} options={[...nodes().map((candidate) => ({ value: candidate.nodeId, label: candidate.label }))]} />
         </label>
       </Show>
 
@@ -109,7 +107,7 @@ export default function RunsSettings() {
       </Show>
 
       <div class="settings-actions">
-        <Button size="sm" disabled={runs.isFetching} onClick={() => void runs.refetch()}>Refresh</Button>
+        <Button size="sm" disabled={runs.isFetching} onPress={() => void runs.refetch()}>Refresh</Button>
       </div>
     </div>
   )

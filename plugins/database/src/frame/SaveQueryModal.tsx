@@ -46,7 +46,6 @@ export default function SaveQueryModal(props: {
   return (
     <Modal
       title="Save query"
-      class="db-generate"
       autoFocus={() => nameInput}
       onClose={props.onClose}
       onKeyDown={(event) => {
@@ -55,32 +54,32 @@ export default function SaveQueryModal(props: {
         return true
       }}
     >
-      <Modal.Body class="db-generate-body">
+      <Modal.Body>
         <Input
           type="text"
-          maxlength="80"
+          maxLength={80}
           placeholder="Name — e.g. recent paid orders"
           ref={(el) => { nameInput = el }}
           value={name()}
-          onInput={(e) => setName(e.currentTarget.value)}
+          onInput={(value) => setName(value)}
         />
         <Textarea
           mono
-          rows="3"
-          maxlength="2000"
-          spellcheck={false}
+          rows={3}
+          maxLength={2000}
+          assist={false}
           placeholder="Notes — what it answers, gotchas. Sent to the AI with the query when used as an example."
           value={notes()}
-          onInput={(e) => setNotes(e.currentTarget.value)}
+          onInput={(value) => setNotes(value)}
         />
-        <CodeBlock class="db-sql-preview" size="xs" maxHeight="block" wrap>{props.sql}</CodeBlock>
+        <CodeBlock size="xs" maxHeight="block" wrap>{props.sql}</CodeBlock>
         <Show when={error()}>
           <Alert>{error()}</Alert>
         </Show>
       </Modal.Body>
       <div class="db-generate-actions">
-        <Button disabled={busy()} onClick={props.onClose}>Cancel</Button>
-        <Button variant="solid" disabled={busy() || !name().trim()} onClick={() => void submit()}>
+        <Button disabled={busy()} onPress={props.onClose}>Cancel</Button>
+        <Button variant="solid" disabled={busy() || !name().trim()} onPress={() => void submit()}>
           {busy() ? 'Saving…' : overwrites() ? 'Overwrite' : 'Save'}
         </Button>
       </div>

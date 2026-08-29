@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js'
+import { Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '../queries'
 import { savePref } from './savePref'
@@ -28,41 +28,36 @@ export default function AppearanceSettings() {
   const lightTheme = () => resolveTheme(prefs.data?.[PrefKeys.themeLight], 'light')
   const darkTheme = () => resolveTheme(prefs.data?.[PrefKeys.themeDark], 'dark')
 
-  const themeOptions = () => <For each={THEMES()}>{([value, label]) => <option value={value}>{label}</option>}</For>
+  const themeOptions = () => THEMES().map(([value, label]) => ({ value, label }))
 
   return (
     <>
       <Field label="Style" hint="Shape, typography and density. Colour is the theme below.">
-        <Select value={style()} onChange={(e) => void savePref(qc, PrefKeys.style, e.currentTarget.value)}>
-          <For each={STYLES()}>{([value, label]) => <option value={value}>{label}</option>}</For>
-        </Select>
+        <Select
+          value={style()}
+          options={STYLES().map(([value, label]) => ({ value, label }))}
+          onChange={(value) => void savePref(qc, PrefKeys.style, value)}
+        />
       </Field>
 
       <Checkbox
-        class="settings-field settings-field-row"
         label="Follow system light/dark setting"
         checked={followSystem()}
-        onChange={(e) => void savePref(qc, PrefKeys.themeFollowSystem, e.currentTarget.checked ? 'true' : 'false')}
+        onChange={(checked) => void savePref(qc, PrefKeys.themeFollowSystem, checked ? 'true' : 'false')}
       />
       <Show
         when={followSystem()}
         fallback={
           <Field label="Theme">
-            <Select value={theme()} onChange={(e) => void savePref(qc, PrefKeys.theme, e.currentTarget.value)}>
-              {themeOptions()}
-            </Select>
+            <Select value={theme()} options={themeOptions()} onChange={(value) => void savePref(qc, PrefKeys.theme, value)} />
           </Field>
         }
       >
         <Field label="Light theme">
-          <Select value={lightTheme()} onChange={(e) => void savePref(qc, PrefKeys.themeLight, e.currentTarget.value)}>
-            {themeOptions()}
-          </Select>
+          <Select value={lightTheme()} options={themeOptions()} onChange={(value) => void savePref(qc, PrefKeys.themeLight, value)} />
         </Field>
         <Field label="Dark theme">
-          <Select value={darkTheme()} onChange={(e) => void savePref(qc, PrefKeys.themeDark, e.currentTarget.value)}>
-            {themeOptions()}
-          </Select>
+          <Select value={darkTheme()} options={themeOptions()} onChange={(value) => void savePref(qc, PrefKeys.themeDark, value)} />
         </Field>
       </Show>
     </>

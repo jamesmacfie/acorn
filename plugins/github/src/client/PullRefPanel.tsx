@@ -2,7 +2,7 @@ import { createMemo, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
-import { CHECK_TONE, checksState, formatRelativeTime, openInAppUrl, type RefPanelProps } from '@acorn/plugin-api/client'
+import { CHECK_TONE, railDotProps, checksState, formatRelativeTime, openInAppUrl, type RefPanelProps } from '@acorn/plugin-api/client'
 import { Button, EmptyState, StatusDot, Toolbar } from '@acorn/plugin-api/ui'
 import { RefPanelTaskLink } from '@acorn/plugin-api/ui/host'
 import { parsePullRef } from '../contract/pullRef'
@@ -43,7 +43,7 @@ export default function PullRefPanel(props: RefPanelProps) {
         <header class="integrations-panel-head">
           <span class="integrations-panel-title">{props.target.displayId}</span>
           <Toolbar.Spacer />
-          <Button class="integrations-panel-close" onClick={props.onClose} aria-label="Close">✕</Button>
+          <Button onPress={props.onClose} label="Close">✕</Button>
         </header>
         <div class="integrations-panel-body">
           <Show
@@ -73,12 +73,12 @@ export default function PullRefPanel(props: RefPanelProps) {
                 {/* Checks as one word, not a list. The list is the pane's job. */}
                 <Show when={checks().length}>
                   <div class="gh-ref-meta">
-                    <StatusDot tone={CHECK_TONE[checksState(checks())]} />
+                    <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} />
                     <span>{checks().length} check{checks().length === 1 ? '' : 's'}</span>
                   </div>
                 </Show>
                 <Toolbar>
-                  <Button onClick={openFull}>Open pull request</Button>
+                  <Button onPress={openFull}>Open pull request</Button>
                 </Toolbar>
                 {/* Host-drawn and provider-agnostic: whether a task tracks this PR, and how to start
                     one. github never touches core's task routes to offer it. */}

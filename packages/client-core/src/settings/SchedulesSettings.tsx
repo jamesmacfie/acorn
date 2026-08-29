@@ -30,7 +30,7 @@ import './settings.css'
 // node owns, in one list, whoever declared it. The arming confirmation for a schedule's risk tier is
 // taken once at creation, drawn by the host, and cannot be talked out of asking.
 
-const OWNER_TONE = { core: 'neutral', plugin: 'accent', user: 'add' } as const
+const OWNER_TONE = { core: 'neutral', plugin: 'accent', user: 'ok' } as const
 
 /** What the arming strip says about each tier, in the register a person would use. The vocabulary is
  *  `ToolRisk` (docs/schedules.md § Settings), the same three the agent-tool permission surface
@@ -49,10 +49,10 @@ const CADENCE_CHOICES = [
   { id: 'weekly', label: 'Every Monday at 09:00', cadence: { weekly: { day: 1, at: '09:00' } } satisfies Cadence },
 ] as const
 
-const STATUS_TONE: Record<ScheduleStatus, 'ok' | 'bad' | 'warn' | 'muted'> = {
+const STATUS_TONE: Record<ScheduleStatus, 'ok' | 'danger' | 'warn' | 'muted'> = {
   ok: 'ok',
-  error: 'bad',
-  timeout: 'bad',
+  error: 'danger',
+  timeout: 'danger',
   skipped: 'muted',
 }
 
@@ -175,9 +175,7 @@ export default function SchedulesSettings() {
       <Show when={nodes().length > 1}>
         <label class="settings-field">
           <span>Node</span>
-          <Select value={nodeId() ?? ''} onChange={(event) => setTarget(event.currentTarget.value || null)}>
-            <For each={nodes()}>{(candidate) => <option value={candidate.nodeId}>{candidate.label}</option>}</For>
-          </Select>
+          <Select value={nodeId() ?? ''} onChange={(value) => setTarget(value || null)} options={[...nodes().map((candidate) => ({ value: candidate.nodeId, label: candidate.label }))]} />
         </label>
       </Show>
 
@@ -192,13 +190,12 @@ export default function SchedulesSettings() {
       {/* The kill switch. Deliberately above the list and phrased as what it does, because the moment
           you want it is the moment you do not want to read about it. */}
       <Checkbox
-        class="settings-field-row"
         switch
         label="Pause every schedule on this node"
         hint="Stops the loop without changing any schedule. Nothing runs until you turn this off."
         checked={paused()}
         disabled={busy() === 'pause'}
-        onChange={(event) => void setPaused(event.currentTarget.checked)}
+        onChange={(checked) => void setPaused(checked)}
       />
 
       <Show when={schedules.isSuccess && rows().length === 0}>
@@ -214,12 +211,14 @@ export default function SchedulesSettings() {
       >
         <label class="settings-field">
           <span>Action</span>
-          <Select value={chosen()} onChange={(event) => setChosen(event.currentTarget.value)}>
-            <option value="">Pick something to run…</option>
-            <For each={options()}>
-              {(option) => <option value={optionKey(option)}>{option.name} · {option.pluginId}</option>}
-            </For>
-          </Select>
+          <Select
+            value={chosen()}
+            options={[
+              { value: '', label: 'Pick something to run…' },
+              ...options().map((option) => ({ value: optionKey(option), label: `${option.name} · ${option.pluginId}` })),
+            ]}
+            onChange={(value) => setChosen(value)}
+          />
         </label>
 
         {/* The arming strip. Host-drawn from the node's declared tier, shown BEFORE the create button
@@ -236,19 +235,17 @@ export default function SchedulesSettings() {
                 <Input
                   value={newName()}
                   placeholder={option().name}
-                  onInput={(event) => setNewName(event.currentTarget.value)}
+                  onInput={(value) => setNewName(value)}
                 />
               </label>
               <label class="settings-field">
                 <span>When</span>
-                <Select value={cadenceId()} onChange={(event) => setCadenceId(event.currentTarget.value)}>
-                  <For each={CADENCE_CHOICES}>{(choice) => <option value={choice.id}>{choice.label}</option>}</For>
-                </Select>
+                <Select value={cadenceId()} onChange={(value) => setCadenceId(value)} options={[...CADENCE_CHOICES.map((choice) => ({ value: choice.id, label: choice.label }))]} />
               </label>
               <Row
                 variant="stacked"
                 trailing={
-                  <Button size="sm" disabled={busy() === 'create'} onClick={() => void create()}>
+                  <Button size="sm" disabled={busy() === 'create'} onPress={() => void create()}>
                     Accept and schedule
                   </Button>
                 }
@@ -274,10 +271,10 @@ export default function SchedulesSettings() {
                 leading={<StatusDot tone={row.enabled && row.registered ? STATUS_TONE[row.lastStatus ?? 'ok'] : 'muted'} label={row.lastStatus ?? 'never run'} />}
                 trailing={
                   <>
-                    <Button size="sm" disabled={busy() === row.key || !row.registered} onClick={() => void runNow(row)}>
+                    <Button size="sm" disabled={busy() === row.key || !row.registered} onPress={() => void runNow(row)}>
                       Run now
                     </Button>
-                    <Button size="sm" disabled={busy() === row.key} onClick={() => void setEnabled(row, !row.enabled)}>
+                    <Button size="sm" disabled={busy() === row.key} onPress={() => void setEnabled(row, !row.enabled)}>
                       {row.enabled ? 'Pause' : 'Resume'}
                     </Button>
                     <Show when={row.owner === 'user'}>
@@ -301,7 +298,7 @@ export default function SchedulesSettings() {
                   {row.enabled ? `next ${formatWhen(row.nextRunAt, now)}` : 'paused'}
                   <Show when={row.lastRunAt}>{(last) => <> · last run {formatRelativeTime(last(), now)}</>}</Show>
                   {' · '}
-                  <Button variant="bare" class="schedule-runs" onClick={() => setExpanded(expanded() === row.key ? null : row.key)}>
+                  <Button variant="bare" onPress={() => setExpanded(expanded() === row.key ? null : row.key)}>
                     {expanded() === row.key ? 'hide runs' : 'runs'}
                   </Button>
                 </span>
@@ -322,7 +319,7 @@ export default function SchedulesSettings() {
                   <Row
                     variant="stacked"
                     trailing={
-                      <Button size="sm" disabled={busy() === row.key} onClick={() => void reconfirm(row)}>
+                      <Button size="sm" disabled={busy() === row.key} onPress={() => void reconfirm(row)}>
                         Accept the new tier
                       </Button>
                     }

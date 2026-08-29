@@ -51,7 +51,7 @@ function ExtensionGroup(props: { contribution: ExtensionContribution }) {
               leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
               trailing={<Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>}
               meta={<Show when={item.subtitle}>{(subtitle) => <span class="muted">{subtitle()}</span>}</Show>}
-              {...(props.contribution.run ? { onActivate: () => props.contribution.run!(item) } : {})}
+              {...(props.contribution.run ? { onPress: () => props.contribution.run!(item) } : {})}
             >
               {item.title}
             </Row>

@@ -9,7 +9,7 @@ export function ContributionBoundary(props: { contributionId: string; children: 
           <section class="pane contribution-failed" role="status">
             <strong>Contribution failed</strong>
             <span class="muted">{props.contributionId}</span>
-            <Button onClick={reset}>Try again</Button>
+            <Button onPress={reset}>Try again</Button>
             <span class="sr-only">{error instanceof Error ? error.message : String(error)}</span>
           </section>
         )

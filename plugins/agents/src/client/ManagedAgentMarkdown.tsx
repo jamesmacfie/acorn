@@ -10,7 +10,6 @@ export default function AgentMarkdown(props: { text: string; taskId: string; cla
       text={props.text}
       images="placeholder"
       copy
-      class={`agent-markdown ${props.class ?? ''}`}
       onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.taskId })}
     />
   )

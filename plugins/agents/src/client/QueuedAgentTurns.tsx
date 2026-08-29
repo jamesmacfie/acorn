@@ -70,7 +70,7 @@ export default function QueuedAgentTurns(props: {
             <Button
               variant="bare"
               size="sm"
-              onClick={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-concurrency' })}
+              onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-concurrency' })}
             >
               Change
             </Button>
@@ -85,8 +85,8 @@ export default function QueuedAgentTurns(props: {
               >
                 <Textarea
                   value={text()}
-                  onInput={(event) => setText(event.currentTarget.value)}
-                  rows="2"
+                  onInput={(value) => setText(value)}
+                  rows={2}
                   size="sm"
                 />
               </Show>
@@ -99,9 +99,9 @@ export default function QueuedAgentTurns(props: {
                       size="sm"
                       iconOnly
                       title="Edit queued prompt"
-                      aria-label="Edit queued prompt"
+                      label="Edit queued prompt"
                       disabled={pending() != null}
-                      onClick={() => {
+                      onPress={() => {
                         setEditing(turn.id)
                         setText(promptText(turn))
                       }}
@@ -116,10 +116,10 @@ export default function QueuedAgentTurns(props: {
                     size="sm"
                     iconOnly
                     title="Save queued prompt"
-                    aria-label="Save queued prompt"
+                    label="Save queued prompt"
                     busy={pending() === `${turn.id}:save`}
                     disabled={!text().trim() || pending() != null}
-                    onClick={() => void save(turn)}
+                    onPress={() => void save(turn)}
                   >
                     <Icon name="check" />
                   </Button>
@@ -128,9 +128,9 @@ export default function QueuedAgentTurns(props: {
                     size="sm"
                     iconOnly
                     title="Cancel editing"
-                    aria-label="Cancel editing"
+                    label="Cancel editing"
                     disabled={pending() != null}
-                    onClick={() => setEditing(null)}
+                    onPress={() => setEditing(null)}
                   >
                     <Icon name="x" />
                   </Button>
@@ -140,10 +140,10 @@ export default function QueuedAgentTurns(props: {
                   size="sm"
                   iconOnly
                   title="Move queued prompt up"
-                  aria-label="Move queued turn up"
+                  label="Move queued turn up"
                   busy={pending() === `${turn.id}:up`}
                   disabled={index() === 0 || pending() != null}
-                  onClick={() => void run(`${turn.id}:up`, () =>
+                  onPress={() => void run(`${turn.id}:up`, () =>
                     managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() - 1 }))}
                 >
                   <Icon name="arrow-up" />
@@ -153,10 +153,10 @@ export default function QueuedAgentTurns(props: {
                   size="sm"
                   iconOnly
                   title="Move queued prompt down"
-                  aria-label="Move queued turn down"
+                  label="Move queued turn down"
                   busy={pending() === `${turn.id}:down`}
                   disabled={index() === queued().length - 1 || pending() != null}
-                  onClick={() => void run(`${turn.id}:down`, () =>
+                  onPress={() => void run(`${turn.id}:down`, () =>
                     managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() + 1 }))}
                 >
                   <Icon name="arrow-down" />
@@ -167,10 +167,10 @@ export default function QueuedAgentTurns(props: {
                   size="sm"
                   iconOnly
                   title="Remove queued prompt"
-                  aria-label="Remove queued prompt"
+                  label="Remove queued prompt"
                   busy={pending() === `${turn.id}:remove`}
                   disabled={pending() != null}
-                  onClick={() => void run(`${turn.id}:remove`, () =>
+                  onPress={() => void run(`${turn.id}:remove`, () =>
                     managedAgentApi.removeQueuedTurn(props.sessionId, turn.id))}
                 >
                   <Icon name="trash-2" />

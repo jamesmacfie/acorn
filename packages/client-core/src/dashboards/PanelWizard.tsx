@@ -247,7 +247,7 @@ export default function PanelWizard(props: {
         return true
       }}
     >
-      <Modal.Body class="dash-wizard">
+      <Modal.Body>
         {/* The rail. A list with `aria-current="step"`, so the position is announced rather than only
             drawn; on a narrow window CSS turns it into a horizontal strip and no second markup path
             exists. Steps are navigable both ways — a step whose prerequisites vanished re-derives
@@ -286,10 +286,10 @@ export default function PanelWizard(props: {
               <Field label={draft.queries().length ? 'Add another collection' : 'Choose a collection'}>
                 <Input
                   size="sm"
-                  aria-label="Filter collections"
+                  label="Filter collections"
                   placeholder="Filter collections"
                   value={filter()}
-                  onInput={(event) => setFilter(event.currentTarget.value)}
+                  onInput={(value) => setFilter(value)}
                 />
               </Field>
               <div class="dash-gallery">
@@ -302,7 +302,7 @@ export default function PanelWizard(props: {
                     // The board card's own classes, reused: a gallery card is a title, a mark and some
                     // meta, which is what those are (dashboards.css, Board).
                     return (
-                      <Card interactive pad="sm" class="dash-card" onActivate={() => draft.addSource(entry)}>
+                      <Card interactive pad="sm" onPress={() => draft.addSource(entry)}>
                         <span class="dash-card-title">
                           {/* The plugin's own mark where it registered one, its id where it did not
                               (docs/ui-design.md § Icons): an unmatched name renders as text, so
@@ -344,10 +344,9 @@ export default function PanelWizard(props: {
                   <Card
                     interactive
                     pad="sm"
-                    class="dash-card"
                     disabled={!entry.ok}
                     selected={draft.view().kind === entry.kind}
-                    onActivate={() => draft.chooseView(entry.kind)}
+                    onPress={() => draft.chooseView(entry.kind)}
                   >
                     <span class="dash-card-title">
                       <span class="dash-view-glyph" aria-hidden="true"><Icon name={VIEW_GLYPHS[entry.kind]} /></span>
@@ -432,10 +431,10 @@ export default function PanelWizard(props: {
                 <Field label="Name" layout="split">
                   <Input
                     size="sm"
-                    aria-label="New dashboard name"
+                    label="New dashboard name"
                     placeholder="New dashboard"
                     value={newTabName()}
-                    onInput={(event) => setNewTabName(event.currentTarget.value)}
+                    onInput={(value) => setNewTabName(value)}
                   />
                 </Field>
               </Show>
@@ -453,18 +452,18 @@ export default function PanelWizard(props: {
       </Modal.Body>
 
       <Modal.Actions>
-        <Button variant="bare" onClick={props.onClose}>Cancel</Button>
+        <Button variant="bare" onPress={props.onClose}>Cancel</Button>
         {/* For people who want the whole sheet at once. Cheap because both edit the same draft
             shape; if it proves unused, delete it. */}
-        <Button variant="bare" disabled={!draft.ready()} onClick={openEditor}>Open in editor</Button>
-        <Button variant="ghost" disabled={stepIndex() === 0} onClick={() => goTo(stepIndex() - 1)}>Back</Button>
+        <Button variant="bare" disabled={!draft.ready()} onPress={openEditor}>Open in editor</Button>
+        <Button variant="ghost" disabled={stepIndex() === 0} onPress={() => goTo(stepIndex() - 1)}>Back</Button>
         <Show
           when={stepIndex() < STEPS.length - 1}
           fallback={(
-            <Button variant="solid" tone="accent" disabled={!draft.ready()} onClick={commit}>Add panel</Button>
+            <Button variant="solid" tone="accent" disabled={!draft.ready()} onPress={commit}>Add panel</Button>
           )}
         >
-          <Button variant="solid" tone="accent" disabled={!draft.ready()} onClick={() => goTo(stepIndex() + 1)}>
+          <Button variant="solid" tone="accent" disabled={!draft.ready()} onPress={() => goTo(stepIndex() + 1)}>
             Next
           </Button>
         </Show>

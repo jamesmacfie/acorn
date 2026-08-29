@@ -130,16 +130,14 @@ export default function CreatePullForm() {
 
         {/* Was `.pr-filter` — the PR title is not a filter, so it is a plain Input. */}
         <Input
-          class="create-pr-title"
           placeholder="Title"
           value={title()}
-          onInput={(e) => {
+          onInput={(value) => {
             setTouched(true)
-            setTitle(e.currentTarget.value)
+            setTitle(value)
           }}
         />
         <MentionTextarea
-          class="composer-input create-pr-body"
           placeholder="Describe this pull request… (⌘↵ to create)"
           value={body()}
           onInput={(v) => { setTouched(true); setBody(v) }}
@@ -148,12 +146,12 @@ export default function CreatePullForm() {
         />
 
         <label class="create-pr-draft">
-          <Checkbox checked={draft()} onChange={(e) => setDraft(e.currentTarget.checked)} />
+          <Checkbox checked={draft()} onChange={(checked) => setDraft(checked)} />
           Create as draft
         </label>
 
         <div class="pr-actions">
-          <Button onClick={submit} disabled={!canCreate()}>
+          <Button onPress={submit} disabled={!canCreate()}>
             {create.isPending ? 'Creating…' : draft() ? 'Create draft pull request' : 'Create pull request'}
           </Button>
         </div>

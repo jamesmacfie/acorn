@@ -101,7 +101,6 @@
    clipped, with the rest of the drag height blank under it. */
 .document-surface { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .document-surface-host { flex: 1; min-height: 0; }
-.document-surface-error { flex: none; padding: var(--space-2) var(--space-3); }
 
 /* The `document-over-frame` template (docs/third-party/monaco.md § document-over-frame,
    concretely): host editor, host drag handle, the plugin's frame below. All three rules are the
@@ -111,21 +110,3 @@
 .document-over-frame { display: flex; flex-direction: column; overflow: hidden; }
 .document-over-frame-document { flex: none; min-height: 0; display: flex; flex-direction: column; }
 .document-over-frame-frame { flex: 1; min-height: 0; }
-/* SplitHandle owns the grip (ui/split.ts + primitives.css). */
-.document-over-frame-split { margin: 0; }
-
-.section-refresh.ui-btn {
-  flex: none;
-  margin-left: var(--space-2);
-  width: 22px;
-  font: inherit;
-  font-size: var(--fs);
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  line-height: 1;
-}
-.section-refresh:hover:not(:disabled) { color: var(--text); }
-.section-refresh:disabled { color: var(--text-faint); cursor: wait; }

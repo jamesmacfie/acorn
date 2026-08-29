@@ -252,8 +252,6 @@ export default function EditorPane(props: { task: Task }) {
         <Show when={root()} fallback={<EmptyState>Open a terminal first to map this repo's checkout.</EmptyState>}>
           <ListDetail
             listLabel="Editor sidebar"
-            listClass="editor-side"
-            detailClass="editor-main"
             list={
               <>
                 <Tabs
@@ -307,9 +305,8 @@ export default function EditorPane(props: { task: Task }) {
                     <Button
                       variant="bare"
                       size="sm"
-                      class="editor-save"
-                      data-tip="Add file/selection reference to the agent composer"
-                      onClick={() => {
+                      tip="Add file/selection reference to the agent composer"
+                      onPress={() => {
                         const p = currentPath
                         if (!p) return
                         const sel = editor?.getSelection()

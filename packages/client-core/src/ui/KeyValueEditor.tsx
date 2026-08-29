@@ -1,5 +1,4 @@
 import { createMemo, Index, Show, type JSX } from 'solid-js'
-import { cx } from './cx'
 import Icon from './Icon'
 import { Button, Checkbox, Input } from './primitives'
 
@@ -30,7 +29,6 @@ export function KeyValueEditor(props: {
   keyPlaceholder?: string
   valuePlaceholder?: string
   ariaLabel: string
-  class?: string
 }) {
   const blank = (): KVRow => ({ key: '', value: '', enabled: true })
   const padded = createMemo(() => [...props.rows, blank()])
@@ -45,7 +43,7 @@ export function KeyValueEditor(props: {
 
   return (
     <div
-      class={cx('ui-kvgrid', props.class)}
+      class="ui-kvgrid"
       role="table"
       aria-label={props.ariaLabel}
       style={{ '--kv-extra-cols': String(props.columns?.length ?? 0) }}
@@ -65,21 +63,21 @@ export function KeyValueEditor(props: {
                 <Checkbox
                   checked={row().enabled}
                   disabled={index === props.rows.length}
-                  aria-label="Enabled"
-                  onChange={(event) => write(index, { enabled: event.currentTarget.checked })}
+                  ariaLabel="Enabled"
+                  onChange={(checked) => write(index, { enabled: checked })}
                 />
               </Show>
               <Input
                 size="sm"
                 value={row().key}
                 placeholder={props.keyPlaceholder ?? 'Name'}
-                onInput={(event) => write(index, { key: event.currentTarget.value })}
+                onInput={(value) => write(index, { key: value })}
               />
               <Input
                 size="sm"
                 value={row().value}
                 placeholder={props.valuePlaceholder ?? 'Value'}
-                onInput={(event) => write(index, { value: event.currentTarget.value })}
+                onInput={(value) => write(index, { value: value })}
               />
               <Index each={props.columns ?? []}>
                 {(column) => <>{column().render(row(), (patch) => write(index, patch), index)}</>}
@@ -89,8 +87,8 @@ export function KeyValueEditor(props: {
                   variant="bare"
                   size="sm"
                   iconOnly
-                  aria-label="Remove row"
-                  onClick={() => props.onChange(props.rows.filter((_, i) => i !== index))}
+                  label="Remove row"
+                  onPress={() => props.onChange(props.rows.filter((_, i) => i !== index))}
                 >
                   <Icon name="x" />
                 </Button>

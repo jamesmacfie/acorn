@@ -17,12 +17,11 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
             variant="bare"
             size="sm"
             iconOnly
-            class="section-refresh"
             title="Refresh agent usage"
-            aria-label="Refresh agent usage"
+            label="Refresh agent usage"
             busy={agentUsageStore.refreshing()}
             disabled={agentUsageStore.refreshing()}
-            onClick={() => void agentUsageStore.refresh()}
+            onPress={() => void agentUsageStore.refresh()}
           >
             <Icon name="refresh-cw" />
           </Button>
@@ -53,9 +52,9 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
             <Show when={provider.error}>
               {(error) => <div class="agent-usage-error" role="status">{error().message}</div>}
             </Show>
-            <DescriptionList class="agent-usage-values" size="sm">
+            <DescriptionList size="sm">
               <For each={providerUsageRows(provider)}>
-                {(row) => <DescriptionList.Item class="agent-usage-value" label={row.label}>{row.value}</DescriptionList.Item>}
+                {(row) => <DescriptionList.Item label={row.label}>{row.value}</DescriptionList.Item>}
               </For>
             </DescriptionList>
           </div>

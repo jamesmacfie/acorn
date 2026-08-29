@@ -23,17 +23,17 @@ export type OccurrenceState =
 const occurrenceTitle = (occurrence: RollbarOccurrenceSummary | RollbarOccurrenceDetail): string =>
   occurrence.exceptionClass || occurrence.message || occurrence.kind
 
-const badgeTone = (value: string): 'neutral' | 'add' | 'del' | 'warn' => {
-  if (/critical|error|failed/i.test(value)) return 'del'
+const badgeTone = (value: string): 'neutral' | 'ok' | 'danger' | 'warn' => {
+  if (/critical|error|failed/i.test(value)) return 'danger'
   if (/warning|active/i.test(value)) return 'warn'
-  if (/resolved|enabled/i.test(value)) return 'add'
+  if (/resolved|enabled/i.test(value)) return 'ok'
   return 'neutral'
 }
 
 // `Fact` was a local div-pair with no <dt>/<dd> pairing; DescriptionList.Item is the same shape with
 // the semantics. This alias keeps the call sites reading as facts rather than as list items.
 const Fact = (props: { label: string; value: string }) => (
-  <DescriptionList.Item class="rb-fact" label={props.label} mono>{props.value}</DescriptionList.Item>
+  <DescriptionList.Item label={props.label} mono>{props.value}</DescriptionList.Item>
 )
 
 export function RollbarItemView(props: {
@@ -54,7 +54,7 @@ export function RollbarItemView(props: {
           <div class="rb-eyebrow">{item().integrationLabel} · #{item().identifier}</div>
           <h1>{item().title}</h1>
         </div>
-        <Button size="sm" onClick={props.onRefresh}>Refresh</Button>
+        <Button size="sm" onPress={props.onRefresh}>Refresh</Button>
       </header>
 
       <div class="rb-chips">
@@ -75,8 +75,8 @@ export function RollbarItemView(props: {
       />
 
       {/* Was six hand-written attributes that had to agree with the strip's ids, twice. */}
-      <Tabs.Panel idPrefix="rollbar" id="overview" active={props.activeTab} class="rb-panel">
-        <DescriptionList class="rb-stats" layout="facts">
+      <Tabs.Panel idPrefix="rollbar" id="overview" active={props.activeTab}>
+        <DescriptionList layout="facts">
           <Fact label="Occurrences" value={String(item().totalOccurrences)} />
           <Fact label="First seen" value={relativeTime(item().firstOccurrenceAt)} />
           <Fact label="Last seen" value={relativeTime(item().lastOccurrenceAt)} />
@@ -86,23 +86,19 @@ export function RollbarItemView(props: {
         </DescriptionList>
       </Tabs.Panel>
 
-      <Tabs.Panel idPrefix="rollbar" id="occurrences" active={props.activeTab} class="rb-panel">
+      <Tabs.Panel idPrefix="rollbar" id="occurrences" active={props.activeTab}>
         <Show
           when={props.state.occurrences.length}
           fallback={<EmptyState>No occurrence sample is available.</EmptyState>}
         >
           <ListDetail
-            class="rb-occurrence-workbench"
             listLabel="Occurrences"
-            listClass="rb-occurrence-list"
-            detailClass="rb-occurrence-detail"
             scrollDetail
             list={
               <For each={props.state.occurrences}>{(entry) => (
                 <Row
-                  class="rb-occurrence-row"
                   density="roomy"
-                  onActivate={() => props.onOccurrence(entry.id)}
+                  onPress={() => props.onOccurrence(entry.id)}
                   meta={relativeTime(entry.occurredAt)}
                 >
                   <span class="rb-occurrence-summary">
@@ -162,7 +158,7 @@ function OccurrenceContent(props: {
             {[relativeTime(detail().occurredAt), detail().environment, detail().codeVersion].filter(Boolean).join(' · ')}
           </div>
         </div>
-        <Button size="sm" onClick={() => props.onCopy(detail())}>Copy context</Button>
+        <Button size="sm" onPress={() => props.onCopy(detail())}>Copy context</Button>
       </div>
       <DescriptionList layout="facts">
         <Show when={detail().request?.url}>

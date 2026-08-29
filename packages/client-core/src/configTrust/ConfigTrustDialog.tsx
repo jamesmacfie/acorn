@@ -91,8 +91,8 @@ export default function ConfigTrustDialog() {
             </Show>
           </div>
           <div class="overlay-actions">
-            <Button variant="ghost" onClick={closeRepoConfigTrust}>Not now</Button>
-            <Button disabled={saving() || !review()?.current} onClick={() => void trustAndRun()}>
+            <Button variant="ghost" onPress={closeRepoConfigTrust}>Not now</Button>
+            <Button disabled={saving() || !review()?.current} onPress={() => void trustAndRun()}>
               {saving() ? 'Trusting…' : configTrustRequest()?.retry ? 'Trust and run' : 'Trust configuration'}
             </Button>
           </div>

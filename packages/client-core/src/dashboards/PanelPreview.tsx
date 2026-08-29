@@ -22,7 +22,7 @@ export default function PanelPreview(props: { draft: PanelDraft }) {
   const draft = () => props.draft
   return (
     <div class="dash-preview" aria-label="Panel preview">
-      <Card class="dash-panel" pad="sm">
+      <Card pad="sm">
         <div class="dash-panel-head">
           <span class="dash-panel-title">{draft().definition().title || 'Untitled panel'}</span>
         </div>

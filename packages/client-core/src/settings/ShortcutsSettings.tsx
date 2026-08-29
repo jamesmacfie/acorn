@@ -121,7 +121,7 @@ export default function ShortcutsSettings() {
             <div class="settings-section-label shortcut-group-heading">
               <span>{group.label}<Show when={group.pluginId}> · {nodeLabel()}</Show></span>
               <Show when={group.bindings.length}>
-                <Button variant="bare" class="shortcut-reset" onClick={() => void resetBindings(group.bindings)}>Reset section</Button>
+                <Button variant="bare" onPress={() => void resetBindings(group.bindings)}>Reset section</Button>
               </Show>
             </div>
             <Show when={group.disabled}><p class="shortcut-plugin-state muted">Plugin disabled — shortcuts remain editable and will apply when it is enabled.</p></Show>
@@ -146,9 +146,9 @@ export default function ShortcutsSettings() {
                       {binding.description}
                       {/* Sits mid-sentence inside the description, so it keeps inline flow — the one
                           `.action-error` site that was not a standalone message. */}
-                      <Show when={binding.conflict}><Alert class="shortcut-conflict-note"> · conflicts with {binding.conflict}</Alert></Show>
-                      <Button variant="bare" class="shortcut-reset" aria-label={`Unbind ${binding.description}`} onClick={() => void saveOverride(binding, null)}>×</Button>
-                      <Button variant="bare" class="shortcut-reset" onClick={() => void resetBindings([binding])}>Reset</Button>
+                      <Show when={binding.conflict}><Alert> · conflicts with {binding.conflict}</Alert></Show>
+                      <Button variant="bare" label={`Unbind ${binding.description}`} onPress={() => void saveOverride(binding, null)}>×</Button>
+                      <Button variant="bare" onPress={() => void resetBindings([binding])}>Reset</Button>
                     </dd>
                   </>
                 )}
@@ -164,7 +164,7 @@ export default function ShortcutsSettings() {
       </For>
       <Show when={orphaned().length}>
         <div class="settings-actions shortcut-cleanup">
-          <Button onClick={() => void saveOverrides(removeOverrideIds(overrides(), orphaned()))}>
+          <Button onPress={() => void saveOverrides(removeOverrideIds(overrides(), orphaned()))}>
             Remove settings for plugins that are no longer installed ({orphaned().length})
           </Button>
         </div>

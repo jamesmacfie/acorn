@@ -13,7 +13,7 @@ const FRESHNESS_TONE = {
   stale: 'warn',
   offline: 'muted',
   disabled: 'muted',
-  error: 'bad',
+  error: 'danger',
 } as const
 
 // The two error codes the badge must not flatten into "offline". Both describe a node that's reachable
@@ -47,7 +47,7 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
       data-tip={`${props.label ?? props.nodeId}: ${nodeState(props.nodeId)}`}
       data-tip-sub={detail() || undefined}
     >
-      <StatusDot class="node-chip-dot" tone={FRESHNESS_TONE[hard() ? 'error' : freshness()]} />
+      <StatusDot tone={FRESHNESS_TONE[hard() ? 'error' : freshness()]} />
       <Show when={props.label}>{(label) => <span class="node-chip-label">{label()}</span>}</Show>
       <span class="node-chip-state">{hard()?.label ?? FRESHNESS_LABELS[freshness()]}</span>
       <Show when={detail() && !hard()}>

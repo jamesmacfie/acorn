@@ -37,14 +37,6 @@
 
 .managed-agent-picker-button { max-width: 170px; padding-inline: var(--space-3); }
 .managed-agent-head .repo-picker-tools .ui-btn { width: var(--control-h); border-left: var(--chrome-divider); }
-
-.managed-agent-error { flex: none; padding: var(--space-3) var(--space-5); }
-/* EmptyState owns the centring and the muted body; this keeps the onboarding pane's own width and
-   puts it in the middle of the detail column, which stretches its children edge to edge. */
-.managed-agent-onboarding { width: 100%; max-width: 720px; margin-inline: auto; padding: var(--space-8); }
-.managed-agent-onboarding .ui-empty-title { font-size: var(--fs-xl); }
-/* EmptyState wraps its children in a 42ch line of prose. The card row is not prose. */
-.managed-agent-onboarding .ui-empty-text { width: 100%; max-width: none; }
 .agent-empty-mark { color: var(--accent); font-size: calc(var(--fs-xl) * 1.67); }
 /* Wrapped flex, not a grid: a grid keeps its three tracks whatever the count, so two providers left a
    hole on the right and a fourth would sit off to the left. Wrapping centres every row it makes. */
@@ -56,17 +48,6 @@
   margin: var(--space-7) auto 0;
   max-width: calc(200px * 3 + var(--space-5) * 2);
 }
-/* Card owns the surface and its interactive states; this is the provider card's inner stack. */
-.managed-agent-provider-card {
-  flex: 0 1 200px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-6);
-}
-/* The card's second line. A direct child, because the title line now holds a glyph of its own and a
-   descendant selector greyed it out. */
-.managed-agent-provider-card > span { color: var(--text-muted); font-size: var(--fs-sm); }
 
 /* A provider's mark beside its name, on the onboarding cards, the New picker's rows and each block in
    Settings -> Agent defaults. --brand-legible is the mark's own colour, held to the theme's contrast;
@@ -77,9 +58,8 @@
   vertical-align: -0.125em;
   color: var(--brand-legible);
 }
-/* The picker row brings its own gap; a run of text does not. :where() so neither rule can outrank
-   what a surface says about its own glyph later. */
-:where(.managed-agent-provider-card strong, .agent-defaults-provider) .managed-agent-provider-glyph {
+                                                                                                                                                       
+.agent-defaults-provider) .managed-agent-provider-glyph {
   margin-inline-end: var(--space-3);
 }
 
@@ -172,15 +152,6 @@
 .agent-turn-manifest small { color: var(--text-faint); font-size: var(--fs-2xs); }
 .agent-turn-manifest pre { white-space: pre-wrap; font: var(--fs-xs) var(--font-mono); }
 .agent-message-head { display: flex; align-items: center; justify-content: space-between; }
-.agent-copy.ui-btn {
-  color: var(--text-faint);
-  background: transparent;
-  border: 0;
-  font: inherit;
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-.agent-copy:hover { color: var(--text); }
 /* `.ui-markdown` owns the type, the links, the headings and the code backgrounds. What is left is
    what a transcript needs that a document does not: a height cap on long tool output, wrapped rather
    than scrolled pre, and remote images suppressed by policy (core's `.ui-md-omitted` stands in). */
@@ -205,7 +176,6 @@
 .agent-reasoning,
 .agent-tool,
 .agent-plan,
-.agent-artifact-link,
 .agent-error-card {
   margin: var(--space-2) 0;
   padding: var(--space-4) var(--space-5);
@@ -263,8 +233,6 @@
 /* Nothing inside gets its own outer margin: the card already spaces its contents, and a first child
    with a top margin puts a visible gap between the summary and the run it describes. */
 .agent-subagent-stream > .agent-event:first-child > * { margin-top: 0; }
-/* Pushed to the end of the summary row, and only drawn once there is something to open. */
-.agent-subagent-open.ui-btn { margin-left: auto; flex: none; color: var(--accent); }
 .agent-subagent-stream:empty { display: none; }
 
 /* The header for a subagent's own run, when it owns the window rather than sitting in a box. Above the
@@ -309,17 +277,6 @@
   color: var(--text-muted);
   text-decoration: line-through;
 }
-.agent-artifact-link {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.agent-artifact-link:hover { border-color: var(--accent); }
 .agent-usage-event,
 .agent-diagnostic,
 .agent-turn-complete { padding: var(--space-2) var(--space-4); font-size: var(--fs-xs); }
@@ -342,7 +299,6 @@
   color: var(--text-muted);
   font-size: var(--fs-2xs);
 }
-.agent-config-field { flex: none; white-space: nowrap; }
 .agent-composer {
   max-width: 880px;
   margin: 0 auto;
@@ -351,21 +307,6 @@
   box-shadow: var(--elev-card);
 }
 .agent-file-input { display: none; }
-/* Chip owns the box, the tones and the × affordance. These keep the composer's own wrapping inset,
-   its label truncation, and the accent tint that distinguishes a context chip from an attachment. */
-.agent-attachment-chip,
-.agent-context-chip {
-  max-width: calc(100% - var(--space-6));
-  margin: var(--space-3) 0 0 var(--space-3);
-  color: var(--text);
-  background: var(--bg-subtle);
-  border: var(--control-border);
-}
-.agent-attachment-chip .ui-chip-label,
-.agent-context-chip .ui-chip-label { max-width: 240px; white-space: nowrap; }
-.agent-attachment-chip small,
-.agent-context-chip small { color: var(--text-faint); }
-.agent-context-chip { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
 .agent-automatic-context-note {
   margin: var(--space-2) var(--space-4) 0;
   color: var(--text-muted);
@@ -422,24 +363,6 @@
 .agent-mention-token.file { color: var(--mention-file); }
 .agent-mention-token.command { color: var(--mention-command); }
 .agent-mention-token.skill { color: var(--mention-skill); }
-/* Compounded with .ui-btn, because a class handed to a primitive ties with it on specificity and
-   would lose to whichever sheet loads last (docs/ui-design.md § Migration tiers). */
-.ui-btn.agent-composer-expand {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  z-index: var(--z-base);
-  padding: var(--space-1);
-  color: var(--text-faint);
-  background: none;
-  border: 0;
-  opacity: 0;
-  transition: opacity var(--dur-short) var(--ease-out);
-}
-.agent-mention-input:hover .ui-btn.agent-composer-expand,
-.ui-btn.agent-composer-expand:focus-visible,
-.ui-btn.agent-composer-expand[aria-pressed='true'] { opacity: 1; }
-.ui-btn.agent-composer-expand:hover { color: var(--text); }
 /* Expanded, the composer covers the detail column the way a maximised terminal covers the pane
    region, rather than taking a flex share and leaving the transcript half a screen. Laid over the
    transcript instead of collapsing it, so the transcript keeps its scroll position for the moment
@@ -486,7 +409,6 @@
   border-top: var(--divider);
 }
 .agent-send-hint { margin-left: auto; font-size: var(--fs-2xs); }
-.agent-send.ui-btn { padding-inline: var(--space-5); font-weight: 600; }
 .agent-composer-picker-button {
   min-height: var(--control-h-sm);
   max-width: 180px;
@@ -495,45 +417,11 @@
   font-size: var(--fs-xs);
 }
 .agent-insert-picker-button { width: var(--control-h-sm); min-height: var(--control-h-sm); padding-inline: var(--space-2); }
-/* The trigger is a bare Button; Popover owns the surface it opens. */
-.agent-context-preview.ui-btn {
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-  padding: 0;
-}
-.agent-context-preview.agent-context-over-budget { color: var(--danger); }
-.agent-context-preview-surface { width: min(600px, 80vw); }
-.agent-context-preview-surface pre {
-  margin: 0;
-  max-height: 360px;
-  overflow: auto;
-  padding: var(--space-4);
-  color: var(--text);
-  white-space: pre-wrap;
-  font: var(--fs-xs) var(--font-mono);
-}
-
-.agent-context-option-modal > p { margin-top: 0; }
 .agent-context-option-list {
   max-height: min(52vh, 440px);
   overflow-y: auto;
   border: var(--control-border);
 }
-.agent-context-option {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border-bottom: var(--divider);
-  cursor: pointer;
-}
-.agent-context-option:last-child { border-bottom: 0; }
-.agent-context-option:hover { background: var(--bg-hover); }
-.agent-context-option > input { margin-top: 2px; }
-.agent-context-option > span { min-width: 0; display: grid; gap: var(--space-1); }
-.agent-context-option strong,
-.agent-context-option small { overflow-wrap: anywhere; }
-.agent-context-option small { color: var(--text-muted); }
 .agent-context-option-empty { margin: 0; padding: var(--space-5); }
 
 .agent-queued-turns {
@@ -574,7 +462,6 @@
 }
 .agent-queued-turn textarea { flex: 1; min-width: 0; resize: vertical; }
 .agent-queued-actions { flex: none; }
-.agent-composer-error { max-width: 880px; margin: var(--space-2) auto 0; }
 
 @media (max-width: 720px) {
   .managed-agent-state { display: none; }

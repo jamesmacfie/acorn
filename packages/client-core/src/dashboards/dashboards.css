@@ -61,13 +61,6 @@
   .dash-tab:hover { color: var(--text); background: var(--bg-hover); }
 }
 
-/* `.ui-input` with the tab's own width, so the bar does not jump when a name becomes editable. */
-.dash-tab-rename { width: 16ch; }
-
-/* The `+` matches the Add-panel button's vocabulary: a ghost that only reads as a control on hover. */
-.dash-tab-add { opacity: 0.6; }
-.dash-tab-add:hover:not(:disabled), .dash-tab-add:focus-visible { opacity: 1; }
-
 /* ── The grid ────────────────────────────────────────────────────────────────────────────── */
 
 /* Twelve columns of square cells, positioned absolutely off one ResizeObserver measurement rather
@@ -118,11 +111,6 @@
 .dash-slot[data-gesture='resize'] {
   transition: none;
 }
-.dash-slot > .dash-panel {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-}
 
 /* The dragged panel leaves the flow visually: raised, shadowed, scaled a hair, and translated under
    the pointer while its placeholder holds the cells it would land in. */
@@ -133,10 +121,6 @@
 .dash-slot[data-gesture='resize'],
 .dash-slot[data-gesture='keyboard'] {
   z-index: var(--z-float);
-}
-.dash-slot[data-gesture='keyboard'] > .dash-panel {
-  outline: var(--focus-ring-w) var(--focus-ring-style) var(--ring);
-  outline-offset: var(--focus-ring-offset);
 }
 
 /* Where the panel will be, not a diagram of it: the panel's own radius, a solid edge and a wash of the
@@ -262,27 +246,6 @@
   white-space: nowrap;
 }
 
-/* ── Panel ───────────────────────────────────────────────────────────────────────────────── */
-
-/* Fills its rect. Before geometry existed a panel was content-sized and the grid row followed it; now
-   the row is `h` square cells tall and the panel fills it, which is what gives the body something to
-   scroll inside. In the collapsed one-column state the row is auto and this is inert.
-
-   Compound with .ui-card, for the same reason as .dash-wizard below and with more at stake: Card merges
-   this class onto its own element (ui/primitives.tsx, Card), and the two rules disagree about `display`,
-   block against flex. A tie leaves the winner to chunk order, and when the primitive wins the panel is a
-   block: the body stops being a flex item, its `flex: 1` and `min-height` go inert, its height goes
-   content-driven and `overflow: auto` on an auto-height box never scrolls. A 500-row table then spills
-   past the card's border instead of scrolling inside it. */
-.dash-panel.ui-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-stack);
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-}
-
 /* Also the placement's drag surface (dashboards/PanelGrid.tsx). The body is not, so a press inside a
    board stays free for a future card gesture. The cursor is the whole affordance. */
 .dash-panel-head {
@@ -371,18 +334,6 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
-}
-
-/* ── Panel editor ────────────────────────────────────────────────────────────────────────── */
-
-/* The generated editor (dashboards/PanelEditor.tsx). Nothing bespoke: every control is a shared
-   primitive and everything here is the stacking between them. Compound with .overlay-body for the same
-   reason as .dash-wizard below: it rides on Modal.Body, and the tie on `gap` must not be left to chunk
-   order. */
-.overlay-body.dash-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-stack);
 }
 
 /* Picker's trigger is sized for the topbar, where it sits beside other chrome and is capped. As a form
@@ -509,25 +460,6 @@
   text-decoration: line-through;
 }
 
-/* ── Panel wizard ────────────────────────────────────────────────────────────────────────── */
-
-/* Three regions (dashboards/PanelWizard.tsx): the step rail, the step body, the live preview. One grid,
-   and the narrow case reflows the same markup: the rail becomes a horizontal strip above the body and
-   the preview drops below it, because an alternate markup path is two things to keep true.
-
-   No new tokens: the rail is buttons, the cards are `.ui-card`, the fields are `.ui-field`.
-
-   Compound with .overlay-body: Modal.Body merges this class onto that element, and the two rules
-   disagree about `display`. Same specificity would leave the winner to stylesheet order, which the
-   bundler does not promise. The compound outranks the primitive whatever order the chunks load in. */
-.overlay-body.dash-wizard {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) minmax(0, 15rem);
-  gap: var(--gap-stack);
-  align-items: start;
-  min-width: 0;
-}
-
 .dash-wizard-rail {
   display: flex;
   flex-direction: column;
@@ -622,17 +554,10 @@
   height: auto;
   min-height: 14rem;
 }
-.dash-preview > .dash-panel {
-  flex: 1;
-  min-width: 0;
-}
 
 /* One column below the tablet width: the rail strips across the top, the preview drops under the body.
    Same content, same order in the DOM. */
 @media (max-width: 60rem) {
-  .overlay-body.dash-wizard {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .dash-wizard-rail {
     flex-direction: row;
     overflow-x: auto;
@@ -747,16 +672,6 @@
 .dash-board-empty {
   color: var(--text-muted);
 }
-
-/* Also a Card, so also compounded with .ui-card: same `display` tie as .dash-panel, and here it costs
-   the card its stacking. */
-.dash-card.ui-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
-  text-align: start;
-}
 /* Flex so a provenance mark sits on the title's baseline row rather than pushing it. On a
    single-source panel there is nothing beside the title and the rule costs nothing. */
 .dash-card-title {
@@ -774,14 +689,6 @@
   color: var(--text-muted);
   font-size: var(--fs-sm);
   min-width: 0;
-}
-
-/* Which source a row came from, on a mixed panel (dashboards/views/Provenance.tsx). Muted and
-   `flex: none`, because it is an identifier rather than content: it must not grow, wrap or compete with
-   the title beside it. The mark itself is `currentColor`, so this one rule tones it. */
-.dash-provenance {
-  flex: none;
-  color: var(--text-muted);
 }
 
 /* ── Chart ───────────────────────────────────────────────────────────────────────────────── */

@@ -1,13 +1,13 @@
 /* Base styling for the shared primitives (core/client/ui/primitives.tsx, Modal.tsx). This file is
  * the Terminal look for these roles: every value is a token, so a pack changes the look by
- * re-pointing tokens. See docs/ui-design.md § How the primitives are built for the specificity
+ * re-pointing tokens. See docs/ui-design.md § How the kit is built for the specificity
  * model behind base/variant/pack layering.
  */
 
 /* ── Button ─────────────────────────────────────────────────────────────────────────────────
    Matches .overlay-btn exactly, so a converted call site can keep its old class alongside
    .ui-btn and render identically during migration. Height comes from --control-h, not padding
-   (docs/ui-design.md § How the primitives are built); the pads stay inline-only so a block pad
+   (docs/ui-design.md § How the kit is built); the pads stay inline-only so a block pad
    cannot fight min-height and reintroduce the old mismatch. */
 .ui-btn {
   display: inline-flex;
@@ -37,7 +37,7 @@
 .ui-btn[data-variant='solid']:hover:not(:disabled) { opacity: 0.9; background: var(--accent); }
 .ui-btn[data-variant='ghost'] { background: transparent; border-color: transparent; }
 .ui-btn[data-variant='ghost']:hover:not(:disabled) { background: var(--bg-hover); border-color: transparent; }
-/* See docs/ui-design.md § How the primitives are built (Button) for the `bare` variant. */
+/* See docs/ui-design.md § How the kit is built (Button) for the `bare` variant. */
 .ui-btn[data-variant='bare'] {
   background: transparent;
   border: 0;
@@ -53,7 +53,7 @@
 .ui-btn[data-tone='danger']:hover:not(:disabled) { border-color: var(--danger); }
 .ui-btn[data-tone='warn'] { color: var(--warn); }
 .ui-btn[data-tone='warn']:hover:not(:disabled) { border-color: var(--warn); }
-/* See docs/ui-design.md § How the primitives are built (Button): tone must survive the solid variant. */
+/* See docs/ui-design.md § How the kit is built (Button): tone must survive the solid variant. */
 .ui-btn[data-variant='solid'][data-tone='accent'] { color: var(--accent-fg); }
 .ui-btn[data-variant='solid'][data-tone='danger'] { background: var(--danger); border-color: var(--danger); color: var(--accent-fg); }
 
@@ -92,7 +92,9 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 /* The surface caps its height and the rows scroll inside it, so a filter box stays put instead of
    scrolling away from the list it is narrowing. */
 .ui-select-list { max-height: min(60vh, 420px); }
-.ui-select-filter { flex: none; margin-bottom: var(--space-3); }
+/* The filter box a long list grows. Reached by position rather than by a class, because the kit
+   hands no class to anything, not even to itself. */
+.ui-select-list > .ui-input { flex: none; margin-bottom: var(--space-3); }
 .ui-select-options { overflow-y: auto; }
 .ui-select-nomatch { margin: 0; padding: var(--space-2) var(--space-4); font-size: var(--fs-sm); }
 /* Without this the labels wrap instead of widening the list, and the list was sized to fit the
@@ -102,7 +104,7 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 
 .ui-field { display: flex; flex-direction: column; gap: var(--space-3); }
 .ui-field[data-layout='row'] { flex-direction: row; align-items: center; gap: var(--space-4); }
-/* See docs/ui-design.md § How the primitives are built (Field) for `data-layout='split'`. */
+/* See docs/ui-design.md § How the kit is built (Field) for `data-layout='split'`. */
 .ui-field[data-layout='split'] {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
@@ -136,8 +138,8 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-badge[data-size='xs'] { font-size: var(--fs-2xs); padding: 0 var(--space-3); }
 .ui-badge[data-dashed] { border-style: dashed; background: transparent; }
 .ui-badge[data-tone='accent'] { color: var(--accent); border-color: var(--accent); }
-.ui-badge[data-tone='add'] { color: var(--add-marker); border-color: var(--add-marker); }
-.ui-badge[data-tone='del'] { color: var(--del-marker); border-color: var(--del-marker); }
+.ui-badge[data-tone='ok'] { color: var(--state-ok); border-color: var(--state-ok); }
+.ui-badge[data-tone='danger'] { color: var(--danger); border-color: var(--danger); }
 .ui-badge[data-tone='warn'] { color: var(--warn); border-color: var(--warn); }
 
 /* ── Spinner ────────────────────────────────────────────────────────────────────────────────
@@ -151,7 +153,7 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-spinner[data-size='md'] { font-size: var(--fs-md); }
 
 /* ── SectionHeader ──────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the primitives are built for why the base rule lives here rather
+   See docs/ui-design.md § How the kit is built for why the base rule lives here rather
    than in shell.css (plugins/http/src/frame/http.css says the same about .settings-hint). */
 .section-header {
   flex: none;
@@ -229,7 +231,7 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-row-leading { flex: none; display: inline-flex; align-items: center; }
 .ui-row-body { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-row-meta { flex: none; color: var(--text-muted); font-variant-numeric: var(--tabular); }
-/* See docs/ui-design.md § How the primitives are built (Row) for data-fields and minmax(0, …). */
+/* See docs/ui-design.md § How the kit is built (Row) for data-fields and minmax(0, …). */
 .ui-row {
   /* docs/ui-design.md § Runtime-set custom properties covers --row-field-w. */
   --row-field-w: 84px;
@@ -266,7 +268,7 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 }
 
 /* ── Alert ──────────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the primitives are built for why this owns what `.action-error`
+   See docs/ui-design.md § How the kit is built for why this owns what `.action-error`
    used to, and why the inline variant matches it value-for-value. */
 .ui-alert { font-size: var(--fs-sm); }
 .ui-alert-title { display: block; font-weight: var(--fw-semibold); }
@@ -288,8 +290,8 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-alert[data-variant='banner'] .ui-alert-body { flex: 1; min-width: 0; }
 .ui-alert[data-tone='danger'] { color: var(--danger); }
 .ui-alert[data-tone='warn'] { color: var(--state-warn); }
-.ui-alert[data-tone='success'] { color: var(--success); }
-.ui-alert[data-tone='info'] { color: var(--text-muted); }
+.ui-alert[data-tone='ok'] { color: var(--success); }
+.ui-alert[data-tone='muted'] { color: var(--text-muted); }
 .ui-alert[data-variant='banner'][data-tone='danger'] { border-color: var(--danger); }
 
 /* ── EmptyState ─────────────────────────────────────────────────────────────────────────────
@@ -317,7 +319,7 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-empty-action { display: inline-flex; gap: var(--space-3); margin-top: var(--space-2); }
 
 /* ── StatusDot ──────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the primitives are built for the two colour vocabularies this
+   See docs/ui-design.md § How the kit is built for the two colour vocabularies this
    replaces. 8px is the majority size (.check-dot, .checks-dot, .docker-dot); terminal's 7px and
    notes' 10px converge onto sm/md. */
 .ui-dot {
@@ -332,18 +334,18 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-dot[data-size='md'] { width: var(--space-5); height: var(--space-5); }
 .ui-dot[data-tone='ok'] { background: var(--state-ok); }
 .ui-dot[data-tone='warn'] { background: var(--state-warn); }
-.ui-dot[data-tone='bad'] { background: var(--state-bad); }
+.ui-dot[data-tone='danger'] { background: var(--state-bad); }
 .ui-dot[data-tone='accent'] { background: var(--accent); }
 .ui-dot[data-tone='muted'] { background: var(--text-faint); }
 /* "Some failed, some still running": half bad, half warn. */
-.ui-dot[data-tone='mixed'] { background: linear-gradient(90deg, var(--state-bad) 0 50%, var(--state-warn) 50% 100%); }
+.ui-dot[data-mixed] { background: linear-gradient(90deg, var(--state-bad) 0 50%, var(--state-warn) 50% 100%); }
 /* Terminal hand-rolled this keyframe and skipped the reduced-motion guard that core's .spin has. */
 .ui-dot[data-pulse] { animation: ui-dot-pulse 1s var(--ease-in-out) infinite; }
 @keyframes ui-dot-pulse { 50% { opacity: 0.25; } }
 @media (prefers-reduced-motion: reduce) { .ui-dot[data-pulse] { animation: none; } }
 
 /* ── Checkbox ───────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the primitives are built for why this styles the native input. */
+   See docs/ui-design.md § How the kit is built for why this styles the native input. */
 .ui-check {
   display: flex;
   align-items: flex-start;
@@ -403,7 +405,7 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-btn[data-armed] { box-shadow: var(--ring); }
 
 /* ── Popover ────────────────────────────────────────────────────────────────────────────────
-   The floating surface for ui/anchor.ts. See docs/ui-design.md § How the primitives are built for
+   The floating surface for ui/anchor.ts. See docs/ui-design.md § How the kit is built for
    why this anchors at --z-picker. */
 .ui-popover-anchor { display: contents; }
 .ui-popover {
@@ -492,8 +494,8 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-chip[data-size='xs'] { font-size: var(--fs-2xs); padding: 0 var(--space-3); }
 .ui-chip[data-dashed] { border-style: dashed; background: transparent; }
 .ui-chip[data-tone='accent'] { color: var(--accent); border-color: var(--accent); }
-.ui-chip[data-tone='add'] { color: var(--add-marker); border-color: var(--add-marker); }
-.ui-chip[data-tone='del'] { color: var(--del-marker); border-color: var(--del-marker); }
+.ui-chip[data-tone='ok'] { color: var(--state-ok); border-color: var(--state-ok); }
+.ui-chip[data-tone='danger'] { color: var(--danger); border-color: var(--danger); }
 .ui-chip[data-tone='warn'] { color: var(--warn); border-color: var(--warn); }
 .ui-chip-label { overflow: hidden; text-overflow: ellipsis; }
 .ui-chip-leading { flex: none; display: inline-flex; align-items: center; }
@@ -504,7 +506,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-chip:focus-visible,
 .ui-chip-remove:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
 
-/* See docs/ui-design.md § How the primitives are built (Badge / Chip) for `data-colored`. */
+/* See docs/ui-design.md § How the kit is built (Badge / Chip) for `data-colored`. */
 .ui-chip[data-colored] { border-color: var(--chip-color); color: var(--text); }
 .ui-chip[data-colored]::before {
   content: '';
@@ -652,7 +654,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-sm); resize: vertical; }
 
 /* ── Card ───────────────────────────────────────────────────────────────────────────────────
-   Ten bespoke card rules. See docs/ui-design.md § How the primitives are built for why the
+   Ten bespoke card rules. See docs/ui-design.md § How the kit is built for why the
    stripe uses the same --stripe-w marker the diff rows and comment cards use. */
 .ui-card {
   display: block;
@@ -678,7 +680,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-card[data-stripe='danger'] { border-left-color: var(--danger); }
 
 /* ── Meter ──────────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the primitives are built (Meter) for why this is a div rather than
+   See docs/ui-design.md § How the kit is built (Meter) for why this is a div rather than
    a native <meter>. */
 .ui-meter {
   flex: none;
@@ -723,7 +725,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-code[data-wrap] { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Capped with its own scroll, for a preview that must not push the page down. */
 .ui-code[data-max='block'] { max-height: 240px; }
-.ui-code-copy { position: absolute; top: var(--space-2); right: var(--space-2); }
+/* CodeBlock's own copy button, reached by position for the same reason. A markdown fence's button
+   is a CopyButton and styles/copy.css owns that one. */
+.ui-code-wrap > .ui-btn { position: absolute; top: var(--space-2); right: var(--space-2); }
 
 /* ── Table ──────────────────────────────────────────────────────────────────────────────────
    Thin: real <table> semantics plus tokens. The scroll wrapper is part of the component because
@@ -877,7 +881,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
 /* ── Markdown ───────────────────────────────────────────────────────────────────────────────
    Rendered markdown, wherever it comes from: a PR body, a review comment, a Linear description, a
-   note preview, an agent turn. See docs/ui-design.md § How the primitives are built for why this
+   note preview, an agent turn. See docs/ui-design.md § How the kit is built for why this
    owns .ui-markdown now.
 
    A class as well as a component. `ui/Markdown.tsx` wraps it for a caller that holds Markdown source,
@@ -954,7 +958,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* ── Composer ───────────────────────────────────────────────────────────────────────────────
    Textarea + actions + error, with the ⌘↵ chord owned by the component. */
 .ui-composer { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-.ui-composer-input { width: 100%; resize: vertical; }
+.ui-composer .ui-input { width: 100%; resize: vertical; }
 .ui-composer-hint { font-size: var(--fs-2xs); }
 
 /* ── DocumentTabs ───────────────────────────────────────────────────────────────────────────
@@ -998,11 +1002,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    Two of the three strips were relying on the browser's default outline. */
 .ui-doctab-label:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .ui-doctab-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ui-doctab-close.ui-btn { flex: none; padding: 0 var(--space-3); opacity: 0; }
+.ui-doctab > .ui-btn { flex: none; padding: 0 var(--space-3); opacity: 0; }
 /* Keyboard-reachable, unlike the mouse-only ✕ this replaces. */
-.ui-doctab:hover .ui-doctab-close,
-.ui-doctab:focus-within .ui-doctab-close,
-.ui-doctab[data-active] .ui-doctab-close { opacity: 1; }
+.ui-doctab:hover > .ui-btn,
+.ui-doctab:focus-within > .ui-btn,
+.ui-doctab[data-active] > .ui-btn { opacity: 1; }
 
 /* ── Button/Row/Tabs extensions ─────────────────────────────────────────────────────────────
    `xs` is the slim rung: a chip-height affordance that rides inside a list row or a topbar strip
@@ -1028,3 +1032,103 @@ a.ui-row:hover { background: var(--bg-hover); }
   white-space: normal;
   overflow: visible;
 }
+
+/* ── The kit's grouping and showing nodes ───────────────────────────────────────────────────
+   The ten nodes added when the kit closed (docs/ui-design.md § The closed kit). Each one replaces
+   a shape two or more panes were drawing with raw tags and a private class. `--kit-gap` is written
+   inline from ui/kit/roles.ts: it is always a var() into a style token, so a pack still moves it. */
+/* ConfirmButton's wrapper. It exists to catch the blur and the Escape that disarm the button, which
+   are DOM events no kit node takes, so it must not be a box: `contents` leaves the button itself as
+   the flex or grid child its parent laid out. */
+.ui-confirm { display: contents; }
+
+.ui-stack { display: flex; flex-direction: column; min-width: 0; gap: var(--kit-gap); }
+.ui-inline { display: flex; align-items: center; min-width: 0; gap: var(--kit-gap); }
+.ui-inline[data-wrap] { flex-wrap: wrap; }
+
+.ui-heading { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.ui-heading-eyebrow {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  font-weight: var(--label-weight);
+}
+.ui-heading-title {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+  font-weight: var(--heading-weight);
+  text-transform: var(--heading-transform);
+  letter-spacing: var(--heading-tracking);
+  line-height: var(--lh-tight);
+}
+.ui-heading[data-level='1'] .ui-heading-title { font-size: var(--fs-xl); }
+.ui-heading[data-level='2'] .ui-heading-title { font-size: var(--fs-lg); }
+.ui-heading[data-level='3'] .ui-heading-title { font-size: var(--fs-md); }
+
+.ui-section { display: flex; flex-direction: column; min-width: 0; }
+/* Beside the label, before the actions: a fact about the fold rather than a control on it. */
+.ui-fold-meta { flex: none; display: flex; align-items: center; min-width: 0; }
+
+.ui-timeline { display: flex; flex-direction: column; gap: var(--gap-stack); min-width: 0; }
+.ui-timeline-turn { display: block; min-width: 0; }
+/* The rule between turns, not around them: a border on the turn itself would draw one under the
+   last card too. */
+.ui-timeline-turn + .ui-timeline-turn { border-top: var(--divider); padding-top: var(--gap-stack); }
+
+.ui-chiprow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-inline); min-width: 0; }
+
+.ui-log { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.ui-log-lines {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-3);
+  overflow: auto;
+  background: var(--bg-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: var(--lh);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ui-log-line { display: block; }
+.ui-log-find { flex: none; border-top: var(--divider); }
+
+/* The virtualised grid. One fixed column track, because a virtualiser needs the geometry before it
+   draws a row; `Table` is the one that lets the browser measure. */
+.ui-grid-scroll { --kit-grid-col: 12.5rem; flex: 1; min-height: 0; overflow: auto; }
+.ui-grid { position: relative; min-width: max-content; }
+.ui-grid-head {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  background: var(--bg-subtle);
+  border-bottom: var(--divider);
+}
+.ui-grid-hcell,
+.ui-grid-cell {
+  padding: 0 var(--space-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  line-height: var(--row-h-sm);
+}
+.ui-grid-hcell { color: var(--text-muted); font-weight: var(--fw-medium); }
+.ui-grid-body { position: relative; }
+.ui-grid-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  align-items: center;
+  cursor: default;
+  font-family: var(--font-mono);
+}
+.ui-grid-row:hover { background: var(--bg-hover); }
+.ui-grid-row[data-selected] { background: var(--bg-selected); }

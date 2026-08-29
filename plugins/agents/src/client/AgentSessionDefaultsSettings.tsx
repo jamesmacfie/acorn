@@ -96,7 +96,7 @@ export default function AgentSessionDefaultsSettings() {
         checked={record().followLastSession}
         label="Carry my last session's settings forward"
         hint="Switch model or effort inside a session and the next session of that provider starts there. Turn this off to pin the settings below instead."
-        onChange={(event) => void save({ followLastSession: event.currentTarget.checked })}
+        onChange={(checked) => void save({ followLastSession: checked })}
       />
 
       <Show when={!record().followLastSession}>
@@ -119,16 +119,15 @@ export default function AgentSessionDefaultsSettings() {
                   {(option) => (
                     <Field label={option.label} layout="split">
                       <Select
-                        aria-label={`${provider.label} ${option.label}`}
+                        label={`${provider.label} ${option.label}`}
                         size="sm"
                         value={record().pinned[provider.id]?.[option.id] ?? ''}
-                        onChange={(event) => choose(provider.id, option.id, event.currentTarget.value)}
-                      >
-                        <option value="">Whatever {provider.label} picks</option>
-                        <For each={option.values}>
-                          {(value) => <option value={value.value} title={value.description}>{value.label}</option>}
-                        </For>
-                      </Select>
+                        options={[
+                          { value: '', label: `Whatever ${provider.label} picks` },
+                          ...option.values.map((value) => ({ value: value.value, label: value.label, title: value.description })),
+                        ]}
+                        onChange={(value) => choose(provider.id, option.id, value)}
+                      />
                     </Field>
                   )}
                 </For>
@@ -146,15 +145,10 @@ export default function AgentSessionDefaultsSettings() {
           layout="split"
         >
           <Select
-            aria-label="Tool call display"
+            label="Tool call display"
             size="sm"
             value={fold().mode}
-            onChange={(event) => chooseFold(event.currentTarget.value as AgentToolFoldMode)}
-          >
-            <option value="collapsed">Start collapsed</option>
-            <option value="expanded">Start expanded</option>
-            <option value="sticky">Carry my last one forward</option>
-          </Select>
+            onChange={(value) => chooseFold(value as AgentToolFoldMode)} options={[{ value: 'collapsed', label: 'Start collapsed' }, { value: 'expanded', label: 'Start expanded' }, { value: 'sticky', label: 'Carry my last one forward' }]} />
         </Field>
       </section>
 

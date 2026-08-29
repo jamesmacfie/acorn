@@ -6,6 +6,7 @@ import { activeTaskId } from '../../tasks/tasks'
 import Icon from '../../ui/Icon'
 import { StatusDot } from '../../ui/primitives'
 import { formatCell, type FormattedCell } from '../format'
+import { panelDotTone } from './props'
 
 // One cell, drawn by its semantic field type. Every decision worth testing is in `formatCell`; this file
 // is the JSX for its answers and nothing else, because vitest here can't render a Solid component.
@@ -28,7 +29,7 @@ export default function Cell(props: { field: PluginCollectionField; value: Plugi
           <span class="dash-cell-enum">
             {/* An icon when the plugin named one, the dot otherwise. Both wear the value's tone, so
                 the colour vocabulary is the same either way and only the shape changes. */}
-            <Show when={value().icon} fallback={<StatusDot tone={value().tone} />}>
+            <Show when={value().icon} fallback={<StatusDot tone={panelDotTone(value().tone)} />}>
               {(name) => (
                 <span class="dash-cell-enum-icon" data-tone={value().tone} data-icon={name()}>
                   <Icon name={name()} />

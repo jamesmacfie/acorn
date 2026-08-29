@@ -209,8 +209,6 @@
   font-weight: 600;
 }
 .diff-thread-resolved .diff-thread-status { color: var(--add-marker); }
-.diff-thread-link { margin-left: auto; }
-.diff-thread-link + .diff-thread-link { margin-left: 0; }
 .diff-thread-comment { padding: var(--space-4) 0; border-top: var(--divider); }
 .diff-thread-comment:first-of-type { border-top: 0; }
 .diff-thread-comment .comment-meta { margin-bottom: 5px; }
@@ -218,21 +216,6 @@
 /* Reply box (thread) + new-line composer share the textarea + action styling. */
 .diff-reply, .diff-composer { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3); }
 .diff-composer { flex-basis: 100%; padding: 7px var(--pane-pad) 7px 68px; white-space: normal; }
-.diff-reply-input {
-  width: 100%;
-  min-height: 48px;
-  font: inherit;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: var(--space-3) var(--space-4);
-  resize: vertical;
-  white-space: normal;
-}
-.diff-reply-input:disabled { opacity: 0.5; }
 .diff-composer-actions { display: flex; gap: var(--space-3); }
 .diff-thread-err { font-size: var(--fs-sm); color: var(--del-marker); }
 
@@ -252,21 +235,6 @@
   border-bottom: var(--chrome-divider);
   background: var(--bg);
 }
-/* In-diff find (⌘F). FindBar owns the strip, the input, the count and the prev/next/close buttons
-   (ui/FindBar.tsx); what is left is the diff toolbar's own placement, sitting hard left so the
-   view-mode segments keep their flex-end spot. */
-.diff-find { flex: 1; margin-right: auto; border-bottom: 0; background: none; }
-.diff-find .ui-findbar-input { width: 200px; flex: none; }
-/* The Aa toggle keeps its compact padding. */
-.diff-find-btn { padding: var(--space-1) var(--space-3); }
-
-/* Match highlights are `.ui-find-mark` now, one vocabulary across the diff, the log viewer and the
-   file search, defined beside FindBar in primitives.css. They still layer over the line/word
-   backgrounds, and the tokens are theme-independent so the syntax colour underneath stays legible. */
-
-/* SegmentedControl owns the group; this keeps the toolbar's radius. */
-.diff-viewmode { border-radius: var(--radius); }
-.diff-viewmode .ui-segment { padding: var(--space-2) var(--space-6); font-size: var(--fs-sm); }
 
 /* Word-level intra-line diff: changed spans within a paired delete/insert line get a stronger
    background plus an inherited marker glyph on the line, never colour alone. Layers over the line bg. */
@@ -307,11 +275,8 @@
 .diff-split-pair:hover .diff-add-btn,
 .diff-split-pair:focus-within .diff-add-btn { visibility: visible; }
 
-/* Placeholder tone, which github's stylesheet used to supply for this core class. */
-.diff-reply-input::placeholder { color: var(--text-muted); }
-
 /* ── File status ────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the primitives are built for why this owns .file-status now. */
+   See docs/ui-design.md § How the kit is built for why this owns .file-status now. */
 .file-status {
   flex: none;
   width: 16px;
@@ -319,8 +284,8 @@
   font-weight: 700;
   font-size: var(--fs-xs);
 }
-.file-status-add { color: var(--add-marker); }
-.file-status-del { color: var(--del-marker); }
+.file-status-ok { color: var(--add-marker); }
+.file-status-danger { color: var(--del-marker); }
 .file-status-warn { color: var(--warn); }
 .file-status-muted { color: var(--text-muted); }
 .file-path { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; }

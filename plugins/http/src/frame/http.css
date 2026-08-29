@@ -8,7 +8,6 @@
 
 /* ── sidebar ─────────────────────────────────────────────────────────────────────────────── */
 
-
 .http-tree-group { padding-bottom: var(--space-3); }
 
 .http-tree-folder {
@@ -19,11 +18,6 @@
   text-transform: var(--label-transform);
   letter-spacing: var(--label-tracking);
 }
-
-/* TreeRow owns the row, the depth indent, the selected marker and the hover-revealed trailing
-   actions (which it also makes keyboard-reachable via :focus-within). This keeps the tree's tighter
-   row height. */
-.http-tree-row.ui-row { min-height: auto; padding: var(--space-2) var(--space-4); }
 
 .http-vars-link {
   display: flex;
@@ -57,18 +51,6 @@
 .http-method-chip[data-method='patch'] { color: var(--state-warn); }
 .http-method-chip[data-method='delete'] { color: var(--state-bad); }
 
-/* ── main column ─────────────────────────────────────────────────────────────────────────── */
-
-/* `.http-main` is ListDetail's detail column: the flex-column-that-hides-overflow this rule used to
-   declare IS the primitive's default, so the class survives only as a name for the rules below. */
-
-/* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
-.http-urlbar.ui-toolbar { padding: var(--space-4) var(--pane-pad); background: none; }
-.http-urlbar .http-method { flex: 0 0 auto; }
-.http-urlbar .http-url { flex: 1; min-width: 0; font-family: var(--font-mono, monospace); }
-
-.http-metabar.ui-toolbar { padding: var(--space-2) var(--pane-pad); }
-
 /* The request's name is a button that opens the save dialog, the only place it can be edited. */
 .http-name-btn {
   display: flex;
@@ -101,36 +83,6 @@
   min-height: 0;
   flex: 1 1 45%;
   overflow: hidden;
-}
-
-/* The body/auth mode selector rides in the tab strip's right slot rather than inside the panel,
-   so the current mode stays visible from any tab. */
-.http-tabstrip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding-right: var(--pane-pad);
-  border-bottom: var(--divider);
-}
-/* Tabs' `actions` slot holds the mode selectors now, so the strip needs no override to make room. */
-
-.http-tabpanel {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--space-3) var(--pane-pad);
-}
-
-.http-body-editor {
-  width: 100%;
-  min-height: 12em;
-  height: 100%;
-  resize: vertical;
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-sm);
-  white-space: pre;
-  overflow-wrap: normal;
-  overflow-x: auto;
 }
 
 .http-hint {
@@ -214,8 +166,6 @@
   overflow: hidden;
 }
 
-.http-failure-message { margin: 0 0 var(--space-4); }
-
 .http-response-strip {
   display: flex;
   align-items: center;
@@ -252,12 +202,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-
-/* DescriptionList owns the grid and the label styling. These keep the header list's own column
-   floor and its mono label font. */
-.http-kv-list .ui-dl-item { grid-template-columns: minmax(8em, auto) minmax(0, 1fr); }
-.http-kv-list .ui-dl-label { font-family: var(--font-mono, monospace); }
-
 
 .http-timeline-row {
   display: grid;

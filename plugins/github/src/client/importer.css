@@ -8,7 +8,6 @@
 }
 .github-importer-account { margin: 0; }
 .github-importer-foot { margin: 0; font-size: var(--fs-sm); }
-.github-importer-close { align-self: flex-start; }
 
 .github-import-list {
   display: flex;

@@ -65,14 +65,6 @@
 .integrations-panel-link:hover {
   color: var(--accent);
 }
-.integrations-panel-close {
-  font: inherit;
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  padding: var(--space-1) var(--space-3);
-}
 .integrations-panel-body {
   flex: 1;
   overflow-y: auto;
@@ -164,15 +156,7 @@
    it. Both truncate rather than wrap: a Linear project name can be a sentence. */
 .integration-map-name { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .integration-map-target { flex: 1; min-width: 0; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* "Add integration": the trigger. */
-.integration-add-btn {
-  align-self: flex-start;
-  gap: 7px;
-}
-.integration-add-btn.open { background: var(--bg-selected); }
 .integration-add-icon { font-size: var(--fs-lg); line-height: 1; transition: transform 0.18s ease; }
-.integration-add-btn.open .integration-add-icon { transform: rotate(45deg); }
 
 /* The panel that "comes down" from the Add button. Animated via max-height so it slides. */
 .integration-add-panel {
@@ -192,19 +176,6 @@
   border-radius: var(--radius);
 }
 .integration-provider-chips { display: flex; gap: var(--space-4); flex-wrap: wrap; }
-.integration-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 5px var(--space-5);
-  border: var(--control-border);
-  border-radius: var(--radius-pill);
-  color: var(--text);
-  background: transparent;
-}
-.integration-chip.active { border-color: var(--accent); color: var(--text); background: var(--bg-selected); }
-.integration-chip:disabled { opacity: 0.5; cursor: default; }
-.integration-chip .soon { font-size: var(--fs-2xs); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); color: var(--text-faint); }
 .integration-add-label { font-size: var(--fs-sm); color: var(--text); }
 .integration-add-hint { font-size: var(--fs-sm); margin: 0; }
 

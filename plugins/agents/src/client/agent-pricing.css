@@ -1,51 +1,7 @@
 .agent-pricing-settings { gap: var(--space-7); }
 .agent-pricing-heading { margin: 0 0 var(--space-4); }
-/* Table owns the h-scroll wrapper, the min-width floor and the cell/header styling. This keeps the
-   settings page's boxed frame around it. */
-/* The boxed frame goes on the scroll wrapper, which Table renders. Hence `:has()`, since the call
-   site's class lands on the <table> itself. */
-.ui-table-scroll:has(> .agent-pricing-table) {
-  border: var(--surface-border);
-  border-radius: var(--radius-surface);
-}
-.agent-pricing-table { font-size: var(--fs-xs); }
-.agent-pricing-table th,
-.agent-pricing-table td {
-  padding: var(--space-3);
-  border-bottom: var(--divider);
-  text-align: left;
-  vertical-align: middle;
-}
-.agent-pricing-table tr:last-child th,
-.agent-pricing-table tr:last-child td { border-bottom: 0; }
-.agent-pricing-table thead th {
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  font-weight: 500;
-  white-space: nowrap;
-}
-.agent-pricing-table tbody th {
-  width: 180px;
-  color: var(--text);
-  font-weight: 500;
-}
-.agent-pricing-table tbody th > span,
-.agent-pricing-table tbody th > code {
-  display: block;
-}
-.agent-pricing-table tbody th > code {
-  margin-top: var(--space-1);
-  color: var(--text-faint);
-  font-size: var(--fs-2xs);
-  font-weight: 400;
-}
 .agent-pricing-rate { width: 76px; min-width: 76px; }
 .agent-pricing-model { width: 180px; min-width: 180px; font-family: var(--font-mono); }
-.agent-pricing-reset.ui-btn[data-variant='bare']:hover:not(:disabled),
-.agent-pricing-model-add.ui-btn[data-variant='bare']:hover:not(:disabled) { color: var(--accent); }
-.agent-pricing-reset.ui-btn[data-variant='bare']:disabled { color: var(--text-faint); }
-.agent-pricing-remove.ui-btn[data-variant='bare'] { color: var(--del-marker); }
-.agent-pricing-remove:hover { text-decoration: underline; }
 .agent-pricing-custom-head {
   display: flex;
   align-items: center;
@@ -63,6 +19,5 @@
   border: var(--surface-border);
   background: var(--bg-subtle);
 }
-.agent-pricing-model-add code { color: inherit; }
 .agent-pricing-empty { margin: 0; }
 .agent-pricing-saved { margin: 0; color: var(--add-marker); }

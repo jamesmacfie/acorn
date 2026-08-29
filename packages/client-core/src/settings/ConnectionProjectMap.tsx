@@ -98,7 +98,7 @@ export default function ConnectionProjectMap(props: { connection: Integration })
         <Alert>
           Could not list this connection's projects.
           {props.connection.status === 'needs-auth' ? ' It needs reconnecting above.' : ''}
-          <Button size="sm" disabled={projects.isFetching} onClick={() => void projects.refetch()}>
+          <Button size="sm" disabled={projects.isFetching} onPress={() => void projects.refetch()}>
             {projects.isFetching ? 'Retrying…' : 'Retry'}
           </Button>
         </Alert>
@@ -117,7 +117,7 @@ export default function ConnectionProjectMap(props: { connection: Integration })
               tone="danger"
               size="sm"
               disabled={busy()}
-              onClick={() => void write(rows().filter((other) => !sameMapping(other, row)))}
+              onPress={() => void write(rows().filter((other) => !sameMapping(other, row)))}
             >
               Remove
             </Button>
@@ -129,22 +129,14 @@ export default function ConnectionProjectMap(props: { connection: Integration })
         <Select
           value={externalId()}
           disabled={busy() || !offered().length}
-          aria-label={`${props.connection.label} projects`}
-          onChange={(event) => setExternalId(event.currentTarget.value)}
-        >
-          <option value="">{projects.isPending ? 'Loading projects…' : 'Choose a project…'}</option>
-          <For each={offered()}>{(project) => <option value={project.id}>{project.label}</option>}</For>
-        </Select>
+          label={`${props.connection.label} projects`}
+          onChange={(value) => setExternalId(value)} options={[{ value: '', label: projects.isPending ? 'Loading projects…' : 'Choose a project…' }, ...offered().map((project) => ({ value: project.id, label: project.label }))]} />
         <Select
           value={target()}
           disabled={busy() || !targets().length}
-          aria-label="where it shows up"
-          onChange={(event) => setTarget(event.currentTarget.value)}
-        >
-          <option value="">Choose where…</option>
-          <For each={targets()}>{(entry) => <option value={entry.value}>{entry.label}</option>}</For>
-        </Select>
-        <Button disabled={busy() || !externalId() || !target()} onClick={add}>Follow</Button>
+          label="where it shows up"
+          onChange={(value) => setTarget(value)} options={[{ value: '', label: 'Choose where…' }, ...targets().map((entry) => ({ value: entry.value, label: entry.label }))]} />
+        <Button disabled={busy() || !externalId() || !target()} onPress={add}>Follow</Button>
       </div>
     </div>
   )

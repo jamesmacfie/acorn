@@ -31,7 +31,7 @@ export default function PluginOverlay(props: PluginOverlayProps) {
         <div class="overlay plugin-overlay" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
           <header class="overlay-title plugin-overlay-head">
             <span>{props.label}</span>
-            <Button variant="bare" class="plugin-overlay-close" onClick={closePluginOverlay} aria-label="Close">✕</Button>
+            <Button variant="bare" onPress={closePluginOverlay} label="Close">✕</Button>
           </header>
           <div class="plugin-overlay-body">
             <PluginFrame binding={props.binding()} hash={props.hash} onClose={closePluginOverlay} />

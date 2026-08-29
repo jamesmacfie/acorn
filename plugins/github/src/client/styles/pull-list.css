@@ -1,14 +1,4 @@
-/* PR list (left pane). Row owns the box, hover, selected tint and left marker. This list looked
-   different from every integration browse only because it hand-built all four. */
-.pr-row.ui-row {
-  /* The virtualizer's measured height is the truth for a row in a measured list: --row-h and
-     --row-h-virt are equal in every pack today, but a min-height that ever exceeded the slot would
-     overlap the next row and corrupt the scroll math rather than just look wrong. */
-  min-height: 0;
-  transition:
-    background-color var(--dur-short) var(--ease-out),
-    border-color var(--dur-short) var(--ease-out);
-}
+
 /* PR list tabs + filter. */
 .pr-tabs {
   display: flex;
@@ -34,9 +24,6 @@
 .pr-filter { flex: none; margin-left: auto; width: min(44%, 160px); padding: 5px 7px; }
 
 .pr-num { color: var(--text-muted); flex-shrink: 0; }
-/* The row's leading strip: checks dot, state glyph, avatar, number. Row's own gap sits between the
-   four slots it owns, not inside one of them, so the spacing is set here. */
-.pr-row .ui-row-leading { gap: var(--space-3); }
 /* Reserved width so the dot's late arrival does not shift the rest of the row. Matches --ui-dot. */
 .pr-check { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--space-4); }
 /* Same three colours the detail header's state badge uses (pull-detail.css), repeated rather than
@@ -46,13 +33,3 @@
 .pr-state-closed { color: var(--del-marker); }
 .pr-state-draft { color: var(--text-muted); }
 .pr-avatar { display: inline-flex; align-items: center; }
-.pr-load-more { display: block; width: 100%; text-align: center; }
-.pr-load-more.ui-btn[data-variant='bare'] {
-  background: var(--bg);
-  border-top: var(--chrome-divider);
-  padding: 10px var(--pane-pad);
-}
-.pr-load-more.ui-btn[data-variant='bare']:hover:not(:disabled) { background: var(--bg-hover); }
-/* Create-task failure (PullList.tsx). The Alert primitive owns the colour and size; this is only the
-   list's inset, which a shared component cannot know about. */
-.pr-task-error { margin: var(--space-2) var(--pane-pad); }

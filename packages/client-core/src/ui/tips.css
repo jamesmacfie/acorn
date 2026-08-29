@@ -30,8 +30,6 @@
      otherwise run straight out of the bubble. */
   overflow-wrap: anywhere;
 }
-/* Kbd owns the cap; the tip only asks for its muted tone. */
-.rail-tip-key { color: var(--text-muted); }
 .rail-tip-sub {
   font-size: var(--fs-xs);
   color: var(--text-muted);

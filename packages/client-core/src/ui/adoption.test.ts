@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// Primitive adoption ledger. See docs/ui-design.md § Primitive adoption ratchet for why this
+// Primitive adoption ledger. See docs/ui-design.md § The closed kit for why this
 // exists and how the list grew.
 
 // Anchored on the workspace root rather than a fixed hop to a src/ dir, because renderer code is
@@ -41,7 +41,7 @@ describe('primitive adoption', () => {
     expect(offenders).toEqual([])
   })
 
-  // See docs/ui-design.md § Primitive adoption ratchet for why a primitive spreads its own
+  // See docs/ui-design.md § The closed kit for why a primitive spreads its own
   // data-attributes after `rest`, and the bug this test caught.
   it('no call site passes a primitive its own data-attribute instead of the prop', () => {
     const owned = /<(?:Button|Badge|Chip|Row|Input|Select|Textarea|Spinner|Toolbar|SegmentedControl|ToggleButton|Card|Alert)\b[^>]*\sdata-(?:size|tone|variant|shape|dashed|icon-only|width|kind|invalid)=/
@@ -49,7 +49,7 @@ describe('primitive adoption', () => {
     expect(offenders).toEqual([])
   })
 
-  // See docs/ui-design.md § Primitive adoption ratchet for the specificity clash this guards
+  // See docs/ui-design.md § The closed kit for the specificity clash this guards
   // against. cssHygiene.test.ts already bans the bare shape for Card; this is the general rule,
   // checked against what each call site actually renders.
   const CSS_CLASH = (() => {
@@ -185,7 +185,7 @@ describe('primitive adoption', () => {
     'plugins/agents/src/client/QueuedAgentTurns.tsx',
     'plugins/agents/src/client/sourceContribution.tsx',
     'plugins/agents/src/client/toolRendererRegistry.tsx',
-    // Tier 1 (see docs/ui-design.md § Migration tiers and their two invariant tests).
+    // Tier 1 (see docs/ui-design.md § The three kit invariants).
     'packages/client-core/src/editor/DocumentSurface.tsx',
     'packages/client-core/src/node/NodeChip.tsx',
     'packages/client-core/src/settings/AgentToolsSettings.tsx',
@@ -205,16 +205,16 @@ describe('primitive adoption', () => {
     'plugins/linear/src/frame/app.tsx',
     'plugins/rollbar/src/frame/RollbarItemView.tsx',
     'plugins/rollbar/src/frame/app.tsx',
-    // Tier 2 (see docs/ui-design.md § Migration tiers and their two invariant tests).
+    // Tier 2 (see docs/ui-design.md § The three kit invariants).
     'packages/client-core/src/plugins/frames/PluginFrame.tsx',
-    'packages/client-core/src/ui/CollapsibleSection.tsx',
+    'packages/client-core/src/ui/Fold.tsx',
     'packages/client-core/src/ui/Popover.tsx',
     'plugins/database/src/frame/index.tsx',
     'plugins/docker/src/client/DockerTaskPane.tsx',
     'plugins/http/src/frame/index.tsx',
     'plugins/linear/src/frame/index.tsx',
     'plugins/rollbar/src/frame/index.tsx',
-    // Tier 3 (see docs/ui-design.md § Migration tiers and their two invariant tests).
+    // Tier 3 (see docs/ui-design.md § The three kit invariants).
     'apps/desktop/src/app/client/CommandPalette.tsx',
     'packages/client-core/src/palette/WorkspacePalette.tsx',
     'packages/client-core/src/plugins/frames/DocumentOverFrame.tsx',
@@ -228,7 +228,7 @@ describe('primitive adoption', () => {
     'packages/client-core/src/diff/DiffToolbar.tsx',
     'plugins/onboarding/src/client/OnboardingWizard.tsx',
     'plugins/http/src/frame/RequestTabs.tsx',
-    // Tier 4 (see docs/ui-design.md § Migration tiers and their two invariant tests).
+    // Tier 4 (see docs/ui-design.md § The three kit invariants).
     'apps/desktop/src/app/client/App.tsx',
     'apps/desktop/src/app/client/TaskView.tsx',
     'packages/client-core/src/configTrust/ConfigTrustDialog.tsx',
@@ -268,17 +268,8 @@ describe('primitive adoption', () => {
     expect(text, 'raw class="ui-input"').not.toMatch(/class="ui-input"/)
   })
 
-  // See docs/ui-design.md § Migration tiers and their two invariant tests for why every primitive
-  // must keep appending the caller's class rather than replacing it.
-  //
-  // Matched as `.*Class` rather than the literal `.class`, because a primitive that renders more
-  // than one element needs more than one class prop: ListDetail draws a container and two columns,
-  // so its passthroughs are `class`, `listClass`, and `detailClass`. The invariant is that every
-  // cx() takes a caller-supplied class, not that they are all spelled the same.
-  it('primitives append the caller class rather than replacing it', () => {
-    const text = readFileSync(join(SRC, 'packages/client-core/src/ui/primitives.tsx'), 'utf8')
-    const classAttrs = [...text.matchAll(/class=\{cx\(([^)]*)\)\}/g)].map((m) => m[1])
-    expect(classAttrs.length).toBeGreaterThan(0)
-    for (const attr of classAttrs) expect(attr).toMatch(/\.\w*[Cc]lass\b/)
-  })
+  // The class-passthrough invariant that used to live here is gone with the passthrough itself: no
+  // kit node takes a `class` any more, and `ui/kit/props.test-d.ts` is what holds that now. The
+  // CSS_CLASH and Checkbox checks above stay because raw tags in a plugin can still carry a class,
+  // and they go when phase 9 of the layout programme inverts this ledger.
 })

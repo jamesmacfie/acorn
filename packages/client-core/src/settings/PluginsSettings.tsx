@@ -204,9 +204,7 @@ export default function PluginsSettings() {
       <Show when={nodes().length > 1}>
         <label class="settings-field">
           <span>Node</span>
-          <Select value={nodeId() ?? ''} onChange={(event) => setTarget(event.currentTarget.value || null)}>
-            <For each={nodes()}>{(candidate) => <option value={candidate.nodeId}>{candidate.label}</option>}</For>
-          </Select>
+          <Select value={nodeId() ?? ''} onChange={(value) => setTarget(value || null)} options={[...nodes().map((candidate) => ({ value: candidate.nodeId, label: candidate.label }))]} />
         </label>
       </Show>
 
@@ -216,7 +214,7 @@ export default function PluginsSettings() {
           variant="banner"
           actions={
             <Show when={node()?.local} fallback={<span class="muted">Restart it on its own machine to apply the change.</span>}>
-              <Button size="sm" disabled={busy()} onClick={() => void restart()}>Restart node</Button>
+              <Button size="sm" disabled={busy()} onPress={() => void restart()}>Restart node</Button>
             </Show>
           }
         >
@@ -234,7 +232,7 @@ export default function PluginsSettings() {
           Drafts a prompt in the current task's agent. It writes the package and asks you to install it;
           it cannot install anything itself.
         </p>
-        <Button size="sm" disabled={busy()} onClick={() => void createPlugin()}>
+        <Button size="sm" disabled={busy()} onPress={() => void createPlugin()}>
           Create a plugin
         </Button>
       </div>
@@ -248,22 +246,17 @@ export default function PluginsSettings() {
           if (spec().trim()) void install()
         }}
       >
-        <Select value={kind()} width="auto" onChange={(event) => setKind(event.currentTarget.value as SourceKind)}>
-          <option value="github">GitHub release</option>
-          <option value="npm">npm package</option>
-          <option value="url">Tarball URL</option>
-          <option value="path">Local folder</option>
-        </Select>
+        <Select value={kind()} width="auto" onChange={(value) => setKind(value as SourceKind)} options={[{ value: 'github', label: 'GitHub release' }, { value: 'npm', label: 'npm package' }, { value: 'url', label: 'Tarball URL' }, { value: 'path', label: 'Local folder' }]} />
         <Input
           value={spec()}
           placeholder={PLACEHOLDER[kind()]}
           disabled={busy()}
-          onInput={(event) => setSpec(event.currentTarget.value)}
+          onInput={(value) => setSpec(value)}
         />
         <Show when={canBrowse()}>
-          <Button type="button" variant="ghost" disabled={busy()} onClick={() => void browse()}>Choose…</Button>
+          <Button variant="ghost" disabled={busy()} onPress={() => void browse()}>Choose…</Button>
         </Show>
-        <Button type="submit" disabled={busy() || !spec().trim()}>Install</Button>
+        <Button submit disabled={busy() || !spec().trim()}>Install</Button>
       </form>
       <p class="muted plugin-install-hint">
         A plugin's server code runs with the same access as acorn itself. This device asks again, showing
@@ -295,7 +288,7 @@ export default function PluginsSettings() {
                 label={<span class="plugin-name">{row.name}</span>}
                 checked={!row.disabled}
                 disabled={busy()}
-                onChange={(event) => void toggle(row.name, !event.currentTarget.checked)}
+                onChange={(checked) => void toggle(row.name, !checked)}
               />
               {/* Only a plugin off this node's disk has a version worth showing; a built-in's is the
                   app's, and the empty cell is how the owner tells the two apart. */}
@@ -312,7 +305,7 @@ export default function PluginsSettings() {
                       <span class="plugin-dev" role="status" title={grant().path}>
                         in development — bundle changes are auto-trusted
                       </span>
-                      <Button size="sm" variant="ghost" disabled={busy()} onClick={() => void endDevMode(row)}>
+                      <Button size="sm" variant="ghost" disabled={busy()} onPress={() => void endDevMode(row)}>
                         End dev mode
                       </Button>
                     </>
@@ -356,10 +349,10 @@ export default function PluginsSettings() {
                     when={removing() === row.name}
                     fallback={
                       <>
-                        <Button size="sm" variant="ghost" iconOnly aria-label={`Update ${row.name}`} title="Update" disabled={busy()} onClick={() => void update(row.name)}>
+                        <Button size="sm" variant="ghost" iconOnly label={`Update ${row.name}`} title="Update" disabled={busy()} onPress={() => void update(row.name)}>
                           <Icon name="refresh-cw" />
                         </Button>
-                        <Button size="sm" variant="ghost" tone="danger" iconOnly aria-label={`Uninstall ${row.name}`} title="Uninstall" disabled={busy()} onClick={() => setRemoving(row.name)}>
+                        <Button size="sm" variant="ghost" tone="danger" iconOnly label={`Uninstall ${row.name}`} title="Uninstall" disabled={busy()} onPress={() => setRemoving(row.name)}>
                           <Icon name="trash-2" />
                         </Button>
                       </>
@@ -368,13 +361,13 @@ export default function PluginsSettings() {
                     {/* Keeping the data is the default everywhere else a plugin goes away, so it is
                         the plain button here and deleting is the loud one. */}
                     <span class="plugin-confirm">Remove {row.name}?</span>
-                    <Button size="sm" disabled={busy()} onClick={() => void uninstall(row.name, false)}>
+                    <Button size="sm" disabled={busy()} onPress={() => void uninstall(row.name, false)}>
                       Keep its data
                     </Button>
-                    <Button size="sm" tone="danger" disabled={busy()} onClick={() => void uninstall(row.name, true)}>
+                    <Button size="sm" tone="danger" disabled={busy()} onPress={() => void uninstall(row.name, true)}>
                       Delete its data
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={busy()} onClick={() => setRemoving(null)}>
+                    <Button size="sm" variant="ghost" disabled={busy()} onPress={() => setRemoving(null)}>
                       Cancel
                     </Button>
                   </Show>
@@ -413,14 +406,12 @@ function ReplacedSurfaces() {
             <Field label={CORE_SLOT_LABEL[row.slot]}>
               <Select
                 value={choice(row.slot)}
-                onChange={(event) =>
-                  void savePref(qc, PrefKeys.exclusiveSlots, withExclusiveSlotChoice(stored(), row.slot, event.currentTarget.value))}
-              >
-                <option value={CORE_SLOT_PROVIDER}>acorn's own</option>
-                <For each={row.offers}>
-                  {(offer) => <option value={offer.pluginId}>{offer.label} ({offer.pluginId})</option>}
-                </For>
-              </Select>
+                options={[
+                  { value: CORE_SLOT_PROVIDER, label: "acorn's own" },
+                  ...row.offers.map((offer) => ({ value: offer.pluginId, label: `${offer.label} (${offer.pluginId})` })),
+                ]}
+                onChange={(value) => void savePref(qc, PrefKeys.exclusiveSlots, withExclusiveSlotChoice(stored(), row.slot, value))}
+              />
               {/* A replacement that fell back is the one case where the setting and the screen
                   disagree, and the owner has no other way to find out why. */}
               <Show when={choice(row.slot) !== CORE_SLOT_PROVIDER && exclusiveSlotFailed(row.slot, choice(row.slot))}>

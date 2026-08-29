@@ -95,7 +95,7 @@ Supporting documents, readable in any order:
 
 | Phase | File | What it delivers | What it unblocks |
 | --- | --- | --- | --- |
-| 0 | [phase-0-kit-and-tokens.md](./phase-0-kit-and-tokens.md) | The closed kit: node set frozen, nine gap nodes added, role tokens, support matrix, no `class` or `style` on any node | Everything. Layouts and trees are made of these nodes. |
+| 0 ✅ | [phase-0-kit-and-tokens.md](./phase-0-kit-and-tokens.md) | The closed kit: node set frozen, nine gap nodes added, role tokens, support matrix, no `class` or `style` on any node | Everything. Layouts and trees are made of these nodes. |
 | 1 | [phase-1-layouts.md](./phase-1-layouts.md) | Six host-owned layouts; a pane declares one and fills regions | Focus groups, slots in regions, responsive and terminal projections |
 | 2 | [phase-2-focus-and-keymap.md](./phase-2-focus-and-keymap.md) | `@opentui/keymap` over the command registry, intents, host-owned collection state, focus roles on the kit | Keyboard navigation and ARIA for every pane at once |
 | 3 | [phase-3-remote-root-and-worker.md](./phase-3-remote-root-and-worker.md) | The tree protocol, the worker sandbox, the host renderer, `mountTree`, proven on the changes tool card | Third-party UI inside first-party surfaces |

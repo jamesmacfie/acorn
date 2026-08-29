@@ -190,10 +190,9 @@ export default function HttpPanel(props: {
   return (
     <ListDetail
       listLabel="Requests"
-      detailClass="http-main"
       list={
         <>
-          <SectionHeader level="pane" actions={<Button size="sm" variant="ghost" onClick={() => startNew()}>+ Request</Button>}>
+          <SectionHeader level="pane" actions={<Button size="sm" variant="ghost" onPress={() => startNew()}>+ Request</Button>}>
             {props.projectName}
           </SectionHeader>
 
@@ -231,35 +230,30 @@ export default function HttpPanel(props: {
         when={selection().kind !== 'variables'}
         fallback={<HttpVariables projectId={props.projectId} projectName={props.projectName} />}
       >
-        <Toolbar class="http-urlbar" ariaLabel="Request">
+        <Toolbar ariaLabel="Request">
           <Select
-            class="http-method"
             width="narrow"
             value={draft().method}
-            aria-label="Method"
+            label="Method"
             data-method={methodTone(draft().method)}
-            onChange={(e) => patch({ method: e.currentTarget.value })}
-          >
-            <For each={httpMethods}>{(m) => <option value={m}>{m}</option>}</For>
-          </Select>
+            onChange={(value) => patch({ method: value })} options={[...httpMethods.map((m) => ({ value: m, label: m }))]} />
           <Input
-            class="http-url"
             value={draft().url}
             placeholder="{{BASE_URL}}/users  ·  or paste a curl command"
-            spellcheck={false}
-            aria-label="URL"
-            onInput={(e) => patch({ url: e.currentTarget.value })}
+            assist={false}
+            label="URL"
+            onInput={(value) => patch({ url: value })}
             onPaste={onUrlPaste}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void fire()
             }}
           />
-          <Button variant="solid" tone="accent" busy={sending()} onClick={() => void fire()}>
+          <Button variant="solid" tone="accent" busy={sending()} onPress={() => void fire()}>
             Send
           </Button>
         </Toolbar>
 
-        <Toolbar class="http-metabar" size="sm" ariaLabel="Request meta">
+        <Toolbar size="sm" ariaLabel="Request meta">
           {/* The name is a label, not a field: it opens the save dialog, which is also the rename
               and the move-into-the-repo path. */}
           <button type="button" class="http-name-btn" title="Rename, move or file this request" onClick={openSave}>
@@ -275,10 +269,10 @@ export default function HttpPanel(props: {
           <Show when={dirty()}>
             <StatusDot tone="accent" label="Unsaved changes" />
           </Show>
-          <Button size="sm" variant="ghost" onClick={() => void copyAsCurl()}>
+          <Button size="sm" variant="ghost" onPress={() => void copyAsCurl()}>
             Copy as curl
           </Button>
-          <Button size="sm" busy={saving()} onClick={onSaveClick}>
+          <Button size="sm" busy={saving()} onPress={onSaveClick}>
             {current() ? 'Save' : 'Save…'}
           </Button>
         </Toolbar>
@@ -317,11 +311,10 @@ export default function HttpPanel(props: {
 function RequestRow(props: { row: HttpRequest; active: boolean; armed: boolean; onOpen: (row: HttpRequest) => void; onCopy: (row: HttpRequest) => void; onDelete: (row: HttpRequest) => void }) {
   return (
     <TreeRow
-      class="http-tree-row"
       depth={1}
       reveal
       selected={props.active}
-      onActivate={() => props.onOpen(props.row)}
+      onPress={() => props.onOpen(props.row)}
       leading={
         <span class="http-method-chip" data-method={methodTone(props.row.method)}>
           {props.row.method}
@@ -329,7 +322,7 @@ function RequestRow(props: { row: HttpRequest; active: boolean; armed: boolean; 
       }
       trailing={
         <>
-          <Button variant="bare" size="sm" iconOnly data-tip="Duplicate as a new request" aria-label="Duplicate" onClick={() => props.onCopy(props.row)}>
+          <Button variant="bare" size="sm" iconOnly tip="Duplicate as a new request" label="Duplicate" onPress={() => props.onCopy(props.row)}>
             <Icon name="copy" />
           </Button>
           {/* Two clicks, not a dialog — a sandboxed frame's window.confirm silently returns false.
@@ -341,8 +334,8 @@ function RequestRow(props: { row: HttpRequest; active: boolean; armed: boolean; 
             iconOnly={!props.armed}
             tone={props.armed ? 'danger' : undefined}
             title={props.armed ? `Click again to delete "${props.row.name}"` : 'Delete'}
-            aria-label={props.armed ? 'Confirm delete' : 'Delete'}
-            onClick={() => props.onDelete(props.row)}
+            label={props.armed ? 'Confirm delete' : 'Delete'}
+            onPress={() => props.onDelete(props.row)}
           >
             <Show when={props.armed} fallback={<Icon name="trash-2" />}>Delete?</Show>
           </Button>

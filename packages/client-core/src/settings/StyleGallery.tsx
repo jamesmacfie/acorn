@@ -27,14 +27,10 @@ export default function StyleGallery() {
 
       <div class="gallery-pickers">
         <Field label="Style" layout="row">
-          <Select value={style()} onChange={(e) => applyStyle(e.currentTarget.value)}>
-            <For each={STYLES()}>{([v, l]) => <option value={v}>{l}</option>}</For>
-          </Select>
+          <Select value={style()} options={STYLES().map(([value, label]) => ({ value, label }))} onChange={(value) => applyStyle(value)} />
         </Field>
         <Field label="Theme" layout="row">
-          <Select value={theme()} onChange={(e) => applyTheme(e.currentTarget.value)}>
-            <For each={THEMES()}>{([v, l]) => <option value={v}>{l}</option>}</For>
-          </Select>
+          <Select value={theme()} options={THEMES().map(([value, label]) => ({ value, label }))} onChange={(value) => applyTheme(value)} />
         </Field>
       </div>
 
@@ -50,14 +46,14 @@ export default function StyleGallery() {
         </For>
         <Button size="sm">small</Button>
         <Button disabled>disabled</Button>
-        <Button busy={busy()} onClick={() => { setBusy(true); setTimeout(() => setBusy(false), 1500) }}>
+        <Button busy={busy()} onPress={() => { setBusy(true); setTimeout(() => setBusy(false), 1500) }}>
           {busy() ? 'working' : 'click me'}
         </Button>
       </div>
 
       <SectionHeader level="sub">Badges</SectionHeader>
       <div class="gallery-row">
-        <For each={['neutral', 'accent', 'add', 'del', 'warn'] as const}>
+        <For each={['neutral', 'accent', 'ok', 'danger', 'warn'] as const}>
           {(tone) => <Badge tone={tone}>{tone}</Badge>}
         </For>
         <Badge shape="pill">pill</Badge>
@@ -74,16 +70,16 @@ export default function StyleGallery() {
         <Input value="bad value" invalid />
       </Field>
       <Field label="Textarea">
-        <Textarea rows="2" placeholder="Monospace, because it holds code." />
+        <Textarea rows={2} placeholder="Monospace, because it holds code." />
       </Field>
 
       <SectionHeader level="sub">Rows</SectionHeader>
       <div class="gallery-rows">
         <Row leading={<span class="glyph">◇</span>} meta="2h">First row</Row>
         <Row leading={<span class="glyph">◷</span>} meta="4h" selected>Selected row</Row>
-        <Row leading={<span class="glyph">◍</span>} meta="1d" onActivate={() => {}}>Clickable row</Row>
+        <Row leading={<span class="glyph">◍</span>} meta="1d" onPress={() => {}}>Clickable row</Row>
         <Row leading={<span class="glyph">▦</span>} nested density="compact">Nested compact row</Row>
-        <Row leading={<span class="glyph">⎇</span>} density="roomy" trailing={<Badge tone="add">+12</Badge>}>Roomy row</Row>
+        <Row leading={<span class="glyph">⎇</span>} density="roomy" trailing={<Badge tone="ok">+12</Badge>}>Roomy row</Row>
       </div>
 
       <SectionHeader level="sub">Section headers</SectionHeader>

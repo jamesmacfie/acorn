@@ -1,4 +1,4 @@
-import { createSignal, For, onMount, Show } from 'solid-js'
+import { createSignal, onMount, Show } from 'solid-js'
 import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
@@ -129,8 +129,8 @@ export function PromoteToTaskModal(props: {
                 <input class="ui-input" type="text" placeholder="branch" value={branch()} onInput={(e) => setBranch(e.currentTarget.value)} />
               </Show>
               <div class="close-actions">
-                <Button onClick={props.onClose}>Cancel</Button>
-                <Button type="submit" disabled={busy() || !title().trim() || (project()?.vcs === 'git' && !slugifyBranch(branch()))}>Create task</Button>
+                <Button onPress={props.onClose}>Cancel</Button>
+                <Button submit disabled={busy() || !title().trim() || (project()?.vcs === 'git' && !slugifyBranch(branch()))}>Create task</Button>
               </div>
             </form>
           </Show>
@@ -138,12 +138,14 @@ export function PromoteToTaskModal(props: {
           <Show when={mode() === 'attach'}>
             <form id="promote-panel-attach" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitAttach}>
               <p class="muted">Attach this item to an existing task.</p>
-              <Select value={attachId()} onChange={(e) => setAttachId(e.currentTarget.value)}>
-                <For each={props.attachTasks}>{(t) => <option value={t.id}>{t.title} · {t.branch}</option>}</For>
-              </Select>
+              <Select
+                value={attachId()}
+                options={props.attachTasks.map((task) => ({ value: task.id, label: `${task.title} · ${task.branch}` }))}
+                onChange={(value) => setAttachId(value)}
+              />
               <div class="close-actions">
-                <Button onClick={props.onClose}>Cancel</Button>
-                <Button type="submit" disabled={busy() || !attachId()}>Attach</Button>
+                <Button onPress={props.onClose}>Cancel</Button>
+                <Button submit disabled={busy() || !attachId()}>Attach</Button>
               </div>
             </form>
           </Show>

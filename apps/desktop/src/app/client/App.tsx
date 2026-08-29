@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
+import { createEffect, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
@@ -357,10 +357,10 @@ export default function App() {
       <header class="topbar">
         <div class="topbar-side">
           <Button
-            variant="bare" class="collapse-toggle"
+            variant="bare"
             title={collapsed() ? 'Show left pane' : 'Hide left pane'}
-            aria-pressed={collapsed()}
-            onClick={toggleCollapsed}
+            pressed={collapsed()}
+            onPress={toggleCollapsed}
           >
             {collapsed() ? '»' : '«'}
           </Button>
@@ -400,7 +400,7 @@ export default function App() {
         </div>
         <div class="breadcrumb">
           <Show when={params.projectId} fallback={<span class="brand">acorn</span>}>
-            <Button variant="bare" class="crumb" onClick={() => navigate(projectPath(params.projectId ?? ''))}>
+            <Button variant="bare" onPress={() => navigate(projectPath(params.projectId ?? ''))}>
               {projects.data?.find((project) => project.id === params.projectId)?.name ?? params.projectId}
             </Button>
             <Show when={params.number}>
@@ -417,14 +417,10 @@ export default function App() {
           {/* Keep the node switcher out of production first-run until a second node exists. */}
           <Show when={nodes().length > 1 || import.meta.env.DEV}>
             <Select
-              class="node-switcher"
               width="auto"
-              aria-label="Active node"
+              label="Active node"
               value={activeNodeId() ?? ''}
-              onChange={(event) => setActiveNode(event.currentTarget.value || null)}
-            >
-              <For each={nodes()}>{(node) => <option value={node.nodeId}>{node.label}</option>}</For>
-            </Select>
+              onChange={(value) => setActiveNode(value || null)} options={[...nodes().map((node) => ({ value: node.nodeId, label: node.label }))]} />
           </Show>
           {/* The compact chip reports the active node's connection state; surfaces render their own
               freshness where they have useful scope. */}

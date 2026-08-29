@@ -8,13 +8,13 @@ export const ICON_NAMES = Object.keys(nodes)
 // Two families behind one name. See docs/ui-design.md § Icons for the resolution order and the
 // `brand:` prefix, which brandMarks.ts owns because brandStyle resolves the same names.
 
-export default function Icon(props: { name: string; size?: number | string; class?: string; title?: string }) {
+export default function Icon(props: { name: string; size?: number | string; title?: string }) {
   const brand = () => (props.name.startsWith(BRAND) ? brandMarkRegistry.get(props.name.slice(BRAND.length)) : undefined)
   return (
     <Switch
       // See docs/ui-design.md § Icons: this fallback is load-bearing, not a nicety.
       fallback={
-        <span class={`glyph ${props.class ?? ''}`} aria-hidden={props.title ? undefined : true} title={props.title}>
+        <span class="glyph" aria-hidden={props.title ? undefined : true} title={props.title}>
           {props.name}
         </span>
       }
@@ -22,7 +22,7 @@ export default function Icon(props: { name: string; size?: number | string; clas
       <Match when={brand()}>
         {(mark) => (
           <svg
-            class={props.class}
+            
             width={props.size ?? '1em'}
             height={props.size ?? '1em'}
             viewBox="0 0 24 24"
@@ -38,7 +38,7 @@ export default function Icon(props: { name: string; size?: number | string; clas
       <Match when={nodes[props.name]}>
         {(icon) => (
           <svg
-            class={props.class}
+            
             width={props.size ?? '1em'}
             height={props.size ?? '1em'}
             viewBox="0 0 24 24"

@@ -38,7 +38,7 @@ function SourceEmpty(props: { pluginId: string; nodeId: string; empty?: PluginSo
           action={
             <Show when={empty().action}>
               {(action) => (
-                <Button onClick={() => runChromeAction(action(), { pluginId: props.pluginId, nodeId: props.nodeId })}>
+                <Button onPress={() => runChromeAction(action(), { pluginId: props.pluginId, nodeId: props.nodeId })}>
                   {empty().actionLabel ?? 'Open'}
                 </Button>
               )}
@@ -169,10 +169,10 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
               <Button
                 variant="bare"
                 iconOnly
-                data-tip={`Refresh ${props.descriptor.label}`}
-                aria-label={`Refresh ${props.descriptor.label}`}
+                tip={`Refresh ${props.descriptor.label}`}
+                label={`Refresh ${props.descriptor.label}`}
                 busy={refreshing()}
-                onClick={() => void refresh()}
+                onPress={() => void refresh()}
               >
                 ↻
               </Button>
@@ -187,9 +187,9 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
             kind="filter"
             size="sm"
             placeholder="Filter…"
-            aria-label={`Filter ${props.descriptor.label} by title`}
+            label={`Filter ${props.descriptor.label} by title`}
             value={filter()}
-            onInput={(event) => setFilter(event.currentTarget.value)}
+            onInput={(value) => setFilter(value)}
           />
         </Toolbar>
 
@@ -213,7 +213,7 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
             <For each={items()} fallback={<SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}>
               {(item) => (
                 <Row
-                  onActivate={props.descriptor.onSelect ? () => select(item) : undefined}
+                  onPress={props.descriptor.onSelect ? () => select(item) : undefined}
                   selected={item.id === detailItem()}
                   leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
                   meta={(

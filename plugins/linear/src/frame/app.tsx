@@ -215,11 +215,8 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
           concern rather than the view's. The ref-panel contract's multi-ref chip strip does not cross
           the port, so a multi-ticket task gets its switcher here. */}
       <ListDetail
-        class="ln-layout"
         listWidth="narrow"
         listLabel="Linked Linear issues"
-        listClass="ln-targets"
-        detailClass="ln-content"
         detailAs="main"
         scrollDetail
         list={linked().length > 1
@@ -227,10 +224,9 @@ export function LinearFrameApp(props: { bridge: AcornBridge }) {
             <For each={linked()}>
               {(entry) => (
                 <Row
-                  class="ln-target"
                   density="compact"
                   selected={target() ? targetKey(target()!) === targetKey(entry) : false}
-                  onActivate={() => open(entry)}
+                  onPress={() => open(entry)}
                 >
                   {entry.identifier}
                 </Row>

@@ -38,7 +38,10 @@ describe('plugin-api entrypoints load in a node environment', () => {
     // import it are bare-node `*.test.ts` files like every other plugin suite, so a component finding
     // its way onto that barrel would make it unloadable by the tests it exists for. Its own header
     // states the rule; this is the check.
-    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './ui/diff', './ui/sdk'])
+    //
+    // `./ui/tokens` is the kit's vocabulary as data — role enums and the support matrix, no
+    // components — and being loadable here is exactly why it is its own entrypoint.
+    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './ui/diff', './ui/sdk', './ui/tokens'])
     expect([...BROWSER_REALM].every((entry) => entry in PKG.exports)).toBe(true)
   })
 

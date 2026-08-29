@@ -84,7 +84,7 @@ export default function DocumentOverFrame(props: DocumentOverFrameProps) {
           onHandle={(next) => setHandle(() => next)}
         />
       </div>
-      <SplitHandle axis="y" drag={drag} class="document-over-frame-split" />
+      <SplitHandle axis="y" drag={drag} />
       <div class="document-over-frame-frame">
         <PluginFrame binding={props.binding} hash={props.hash} document={handle} />
       </div>

@@ -337,19 +337,14 @@ export default function AgentComposer(props: {
       <div class="agent-composer-context">
         <For each={configOptions()}>
           {(option) => (
-            <Field class="agent-config-field" label={option.label} layout="row">
+            <Field label={option.label} layout="row">
               <Select
-                aria-label={option.label}
+                label={option.label}
                 size="sm"
                 width="auto"
                 value={option.currentValue ?? ''}
                 disabled={props.disabled || props.submitDisabled}
-                onChange={(event) => void updateOption(option, event.currentTarget.value)}
-              >
-                <For each={option.values}>
-                  {(value) => <option value={value.value} title={value.description}>{value.label}</option>}
-                </For>
-              </Select>
+                onChange={(value) => void updateOption(option, value)} options={[...option.values.map((value) => ({ value: value.value, label: value.label, title: value.description }))]} />
             </Field>
           )}
         </For>
@@ -369,7 +364,6 @@ export default function AgentComposer(props: {
         <For each={attachments()}>
           {(attachment) => (
             <Chip
-              class="agent-attachment-chip"
               title={attachment.filename}
               leading={<span>{attachment.mediaType.startsWith('image/') ? '▧' : '▤'}</span>}
               onRemove={() => removeAttachment(attachment)}
@@ -382,7 +376,6 @@ export default function AgentComposer(props: {
         <For each={contexts()}>
           {(context) => (
             <Chip
-              class="agent-context-chip"
               title={context.provenance}
               leading={<span>◇</span>}
               onRemove={() => removeContext(context)}
@@ -418,11 +411,10 @@ export default function AgentComposer(props: {
         <div class="agent-composer-actions">
           <Button
             size="sm"
-            class="agent-attach"
             title="Attach files"
             disabled={uploading() || props.disabled}
             busy={uploading()}
-            onClick={() => fileInput?.click()}
+            onPress={() => fileInput?.click()}
           >
             Attach
           </Button>
@@ -467,7 +459,6 @@ export default function AgentComposer(props: {
             {/* Was a <details> with an absolutely-positioned <pre>, which the composer's own
                 overflow clipped. Popover portals it and adds Escape + outside-click. */}
             <Popover
-              class="agent-context-preview-surface"
               placement="top-start"
               ariaLabel="Sent context preview"
               role="dialog"
@@ -475,10 +466,8 @@ export default function AgentComposer(props: {
                 <Button
                   variant="bare"
                   size="sm"
-                  class="agent-context-preview"
-                  classList={{ 'agent-context-over-budget': contextBudget().overLimit }}
-                  aria-expanded={open()}
-                  onClick={toggle}
+                  expanded={open()}
+                  onPress={toggle}
                 >
                   Preview sent context · ~{contextBudget().estimatedTokens.toLocaleString()} tokens · {(contextBudget().bytes / 1024).toFixed(1)} KiB
                 </Button>
@@ -492,18 +481,17 @@ export default function AgentComposer(props: {
             variant="solid"
             tone="accent"
             size="sm"
-            class="agent-send"
             busy={sending()}
             title={props.submitDisabled ? 'Wait for the agent to finish connecting.' : undefined}
             disabled={(!draft().trim() && !attachments().length && !contexts().length)
               || contextBudget().overLimit || props.disabled || props.submitDisabled}
-            onClick={() => void send()}
+            onPress={() => void send()}
           >
             Send
           </Button>
         </div>
       </div>
-      {error() ? <Alert class="agent-composer-error">{error()}</Alert> : null}
+      {error() ? <Alert>{error()}</Alert> : null}
       <Show when={contextPicker()}>
         {(contribution) => (
           <AgentContextPickerModal

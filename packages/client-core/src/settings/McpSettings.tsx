@@ -60,8 +60,8 @@ export default function McpSettings() {
         </For>
       </Show>
       <div class="settings-actions">
-        <Button onClick={() => void createStarter()}>Create .mcp.json</Button>
-        <Button onClick={() => void refetch()}>Rescan</Button>
+        <Button onPress={() => void createStarter()}>Create .mcp.json</Button>
+        <Button onPress={() => void refetch()}>Rescan</Button>
         <Show when={msg()}><span class="muted">{msg()}</span></Show>
       </div>
 

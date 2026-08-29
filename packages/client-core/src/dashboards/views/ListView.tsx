@@ -28,7 +28,7 @@ export default function ListView(props: PanelViewProps) {
       {(row) => (
         <Row
           density="compact"
-          onActivate={row.action ? () => props.onActivate(row) : undefined}
+          onPress={row.action ? () => props.onActivate(row) : undefined}
           leading={(
             <>
               <Show when={props.provenance}><Provenance pluginId={row.pluginId} /></Show>

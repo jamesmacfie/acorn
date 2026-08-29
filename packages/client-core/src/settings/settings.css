@@ -54,8 +54,6 @@
   overflow-y: auto;
 }
 .settings-pane .overlay-title { padding: 0 0 var(--space-4); margin: 0 var(--space-11) 0 0; }
-.settings-close { position: absolute; top: 8px; right: 8px; }
-.settings-close.ui-btn[data-variant='bare'] { padding: var(--space-2); }
 
 .settings-section { display: flex; flex-direction: column; gap: 18px; }
 .settings-field { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -86,7 +84,6 @@
 .shortcut-input { width: 3.5em; text-align: center; text-transform: lowercase; outline: none; cursor: pointer; }
 .shortcut-input:focus { border-color: var(--accent); color: var(--accent); }
 .settings-danger { margin-top: var(--space-4); padding-top: var(--space-7); border-top: var(--chrome-divider); }
-.settings-delete { color: var(--danger); border-color: var(--danger); }
 
 /* MCP inspector (docs/mcp.md). */
 .mcp-file { font-family: var(--font-mono); font-size: var(--fs-sm); }
@@ -97,14 +94,7 @@
 .mcp-server-status.mcp-invalid { color: var(--del-marker); }
 .mcp-server-cmd { max-width: 40ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
 .mcp-server-env { font-family: var(--font-mono); }
-.shortcut-reset { margin-left: var(--space-4); }
-.shortcut-reset.ui-btn[data-variant='bare'] { color: var(--text-faint); }
-.shortcut-reset:hover { text-decoration: underline; }
 .shortcut-conflict { border-color: var(--del-marker); }
-/* The conflict note is an Alert rendered mid-sentence, so it gives up the block box and the inline
-   variant's top margin. Every other Alert site is a standalone message. Distinct from
-   `.shortcut-conflict` above, which recolours the key INPUT. */
-.shortcut-conflict-note.ui-alert { display: inline; margin-top: 0; }
 .shortcut-group { display: contents; }
 /* `.help-list` is the help overlay's own scroll container, where it is the only child and owns the
    height. Here it is one of many blocks inside the scrolling settings body, and an overflow:auto flex

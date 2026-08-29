@@ -1,7 +1,7 @@
 // Where a request gets its name, its folder, and in a task its home. A modal rather than two fields
 // in the panel's metabar, because naming is a save-time decision. Inputs above the request tabs read
 // as part of the request itself.
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { Button, Field, Input, Modal, Select } from '@acorn/plugin-api/ui'
 
 export type SaveTarget = { name: string; folder: string; scope: 'task' | 'project' }
@@ -41,36 +41,30 @@ export default function SaveRequestModal(props: {
         <Field label="Name">
           <Input
             value={name()}
-            maxlength={120}
+            maxLength={120}
             placeholder="List users"
             ref={(el) => queueMicrotask(() => el.select())}
-            onInput={(e) => setName(e.currentTarget.value)}
+            onInput={(value) => setName(value)}
           />
         </Field>
 
         <Show when={props.inTask}>
           <Field label="Keep in" hint={scope() === 'task' ? 'Stays with this task and goes when the task does.' : "Filed in the project's tree, available from every task."}>
-            <Select value={scope()} onChange={(e) => setScope(e.currentTarget.value as 'task' | 'project')}>
-              <option value="task">This task</option>
-              <option value="project">The project</option>
-            </Select>
+            <Select value={scope()} onChange={(value) => setScope(value as 'task' | 'project')} options={[{ value: 'task', label: 'This task' }, { value: 'project', label: 'The project' }]} />
           </Field>
         </Show>
 
-        {/* A datalist, not a picker: existing folders are suggestions and a new path is just typed. */}
+        {/* Suggestions, not a picker: existing folders are offered and a new path is just typed. */}
         <Show when={scope() === 'project'}>
           <Field label="Folder" hint="Slash-separated. Leave blank for the top of the tree.">
             <Input
               value={folder()}
-              list="http-folder-options"
+              suggestions={props.folders}
               placeholder="auth/admin"
-              spellcheck={false}
-              onInput={(e) => setFolder(e.currentTarget.value)}
+              assist={false}
+              onInput={(value) => setFolder(value)}
             />
           </Field>
-          <datalist id="http-folder-options">
-            <For each={props.folders}>{(f) => <option value={f} />}</For>
-          </datalist>
         </Show>
 
         <Show when={props.error}>
@@ -79,8 +73,8 @@ export default function SaveRequestModal(props: {
       </Modal.Body>
 
       <Modal.Actions>
-        <Button variant="ghost" onClick={props.onClose}>Cancel</Button>
-        <Button variant="solid" tone="accent" busy={props.busy} disabled={!name().trim()} onClick={submit}>
+        <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
+        <Button variant="solid" tone="accent" busy={props.busy} disabled={!name().trim()} onPress={submit}>
           Save
         </Button>
       </Modal.Actions>

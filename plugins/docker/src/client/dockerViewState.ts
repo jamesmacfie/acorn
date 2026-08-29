@@ -37,8 +37,8 @@ clientEvents.on('runtime:task-archived', ({ taskId }) => {
 
 // A container state's StatusDot tone. One mapping for the browse list, the task pane, and the detail
 // header, which otherwise each render `.docker-dot[data-state]` and rely on one stylesheet agreeing.
-export const containerTone = (state: string): 'ok' | 'warn' | 'bad' | 'muted' =>
+export const containerTone = (state: string): 'ok' | 'warn' | 'danger' | 'muted' =>
   state === 'running' ? 'ok'
   : state === 'paused' || state === 'restarting' ? 'warn'
-  : state === 'exited' || state === 'dead' ? 'bad'
+  : state === 'exited' || state === 'dead' ? 'danger'
   : 'muted'

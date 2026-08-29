@@ -39,11 +39,9 @@ export default function DockerTaskPane(props: { task: Task }) {
           <For each={linked()}>
             {(c) => (
               <Chip
-                class="docker-chip"
-                classList={{ active: selected() === c.id }}
                 title={c.name}
                 leading={<StatusDot tone={containerTone(c.state)} />}
-                onActivate={() => void setSelected(c.id)}
+                onPress={() => void setSelected(c.id)}
               >
                 {chipLabel(c)}
               </Chip>

@@ -202,6 +202,25 @@ occluded and has no interactive children that could trap focus against it. `calc
 allowed on top of a rung, for a surface that stacks one step above it. The same file holds
 `--brand-fg`, what sits on top of a brand colour, and `--tabular` (`tabular-nums`), which every pack needs for diff gutters, line counts, and timestamps.
 
+### Roles, and what each host makes of them
+
+The role tokens are the plugin-facing half of the same system. A plugin picks a role, and the host
+maps it: on the DOM to a custom property from the two axes above, on a terminal to a cell, a colour,
+or nothing. `ui/kit/roles.ts` holds both columns and `ui/kit/roles.test.ts` holds them to it.
+
+| Role | DOM token | Terminal |
+| --- | --- | --- |
+| `space` | `--space-0`, `--gap-inline`, `--gap-row`, `--gap-stack`, `--gap-section` | 0 lines, one cell, 0, 0, one blank line |
+| `size` | `--control-h-xs`, `--control-h-sm`, `--control-h`, `--pad-control-lg` | one line either way; padding ignored |
+| `tone` | `--text`, `--text-muted`, `--accent`, `--state-ok`, `--state-warn`, `--state-bad` | default, dim, and the palette's accent, green, yellow and red |
+| `text` | `--fs`, `--fw-semibold`, `--text-muted`, `--font-mono`, `--label-size`, `--heading-weight` | plain, bold, dim, ignored, dim uppercase, bold |
+| `border` | `--bw-0`, `--divider`, `--control-border`, `--surface-border`, `--stripe-w` | nothing, a rule, an underline, box corners, a stripe |
+| `radius` | `--radius-control`, `--radius-surface`, `--radius-chip`, `--radius-pill` | ignored |
+
+So a theme stays 40-odd colours, and on a terminal it is 16 of them plus dim and bold. Most of a
+style pack is shape and padding a terminal has no answer for, which is honest: density is the one
+style axis it keeps.
+
 ### Runtime-set custom properties
 
 A handful of custom properties are set from JavaScript rather than declared in any stylesheet, and
@@ -282,143 +301,64 @@ plain `.some-button { transform: … }` at `(0,1,0)`; an element that relies on 
 positioning while hovered should use `inset` or `margin` instead, to avoid snapping back to `none` on
 hover.
 
-## Primitive adoption ratchet
+## The closed kit
 
-`packages/client-core/src/ui/adoption.test.ts` tracks the incremental migration from hand-written
-controls to the shared UI primitives. Its `CONVERTED` list may only grow; every listed file must
-avoid raw buttons, selects, textareas, and retired shared classes. New components should use the
-primitives from the start, and the retired-class check must remain clean while older surfaces are
-migrated.
+Every component a plugin may draw with is in one list, in `packages/client-core/src/ui/`, reaching
+plugins through `@acorn/plugin-api/ui`. The list is closed: a component's props are role tokens,
+content, counts, booleans, and handlers, and never `class`, `className`, `style`, or a DOM attribute
+passed through. `@acorn/plugin-api/ui/tokens` carries the role enums and the support matrix as data,
+with no components on it, so a node-environment test can read them.
 
-### How the primitives are built
+Three things follow from closing it, and each has a test.
 
-`primitives.css` holds the shared CSS for the components in `core/client/ui/primitives.tsx` and
-`Modal.tsx`. Specificity is layered by convention: a primitive's base rule is a bare class, `(0,1,0)`;
+**A node takes a meaning, not a value.** `tone="danger"`, `gap="section"`, `size="sm"`. A plugin
+never names a pixel, a colour, or a class, so the same tree can be drawn by a host with no pixels.
+`ui/kit/tokens.ts` declares the six enums and `ui/kit/roles.ts` maps each role to a CSS custom
+property and to a terminal value. That mapping is the only place outside a stylesheet that names a
+custom property.
+
+**A node says which hosts can draw it.** `ui/kit/support.ts` holds a row per node with a `dom`
+column and a `tui` column, at one of four levels: `full` draws it natively, `reduced` draws it with
+named things missing, `fallback` draws a stated substitute, and `absent` draws nothing unless the
+node has a `<Fallback>` child. Only `dom` is implemented. The `tui` column is documentation with a
+test that it is filled in, so nobody adds a node without deciding what it does on a terminal.
+`docs/future/layout/04-kit.md` holds the 80-column sentence for each one.
+
+**The classes moved inward.** A kit component keeps its `ui-*` classes and styles its own children
+by position, as in `.ui-code-wrap > .ui-btn`. Nothing exported accepts a class, `cx.ts` is internal,
+and a pane that wants a control to look different asks for that in the kit rather than in its own
+stylesheet.
+
+`Only` and `Fallback` are the two host wrappers. `Only hosts={['dom']}` draws its children on the
+named hosts and nowhere else. `Fallback forNode="Grid"` draws its children where the matrix says
+this host cannot draw that node. Both are here before there is a second host, so a plugin can be
+written against one before it arrives.
+
+### The three kit invariants
+
+Modelled on `styles/tokenAxes.test.ts`, which reads the stylesheets and asserts they agree with the
+declared axes:
+
+- `ui/kit/support.test.ts` reads the `/ui` barrel and asserts that the nodes it exports and the rows
+  in `NODE_SUPPORT` are the same list, with a `tui` level on every row.
+- `ui/kit/roles.test.ts` asserts that every role in every enum has a DOM value and a terminal value,
+  and that each DOM value names a token `tokenAxes.ts` declares.
+- `ui/kit/props.test-d.ts` is a type-level test: no exported node's props accept `class`,
+  `className`, `style`, or `classList`, and no role-typed prop accepts an arbitrary string. It has
+  nothing to run. `tsc --noEmit` across every package is the check, which `pnpm lint` already makes.
+
+### How the kit is built
+
+`primitives.css` holds the shared CSS for the components in `ui/primitives.tsx` and the component
+files beside it. Specificity is layered by convention: a node's base rule is a bare class, `(0,1,0)`;
 a variant selector adds an attribute, `(0,2,0)`; a style pack's override adds a
 `:root[data-style="x"]` prefix, `(0,3,0)`. A pack wins because it is more specific, never because its
 stylesheet loads last.
 
-A control's height comes from a token, `--control-h`, never from padding; padding on a control stays
-inline-only. Deriving height from padding is what once put four different heights in one row on the
-agent pane header: a text button measured padding plus its own line box, an icon-only button measured
-padding plus a 16px glyph, and two pickers beside them each hard-coded a number. Every control that
-reads `--control-h` lines up in the same row now.
-
-A class handed to a primitive has to be compounded onto it (`.thing.ui-card`), never left bare
-alongside it. A bare `.thing { display: … }` ties with `.ui-card { display: block }` on specificity,
-and the winner is whichever CSS chunk happened to load last. `cssHygiene.test.ts` checks this for
-`.dash-panel` and `.dash-card`: losing that tie silently turns the dashboard panel into a block and
-kills its scroll.
-
-A class that a plugin frame can render has to carry its base rule in a sheet frames are actually
-served, never in `shell.css`. `pluginFrameStyles.ts` serves a frame `primitives.css` but not
-`shell.css`, so a base rule that sits in `shell.css` reaches every shell call site and no frame at
-all. `.section-header`'s base rule lived in `shell.css` even though it is also on the
-`@acorn/plugin-api/ui` surface, which is how a plugin's section header rendered with its variant
-tweaks but no height, divider, or label typography, breaking the header for the Database and HTTP
-panes. It lives in `primitives.css` now.
-
-A class shared by several features cannot live inside one plugin's stylesheet either, because a
-shared library cannot import a plugin's CSS: disabling that plugin unstyles every consumer. Four
-classes moved into `primitives.css` for this reason, each kept value-identical to the class it
-replaces so a migrated call site renders unchanged:
-
-- `.ui-alert` replaces `.action-error` (32 call sites, 17 of them in client-core), previously defined
-  by the GitHub plugin.
-- `.ui-markdown` replaces three near-duplicate stylesheets that had already drifted apart on code
-  backgrounds and border roles: GitHub's `.markdown`, Linear's `.markdown`, and the agents plugin's
-  `.agent-markdown`. `.linear-md` was used by the notes plugin but defined by GitHub.
-- `.user-avatar` was defined by GitHub and used by core's own diff rows.
-- `.file-status`, the rendering half of the public `fileStatusMeta` helper (`ui/displayMeta.ts`),
-  lived in GitHub's stylesheet even though core's own diff rows and the Changes plugin also render it.
-  A helper on the public plugin API contract cannot have its CSS behind a plugin.
-
-Per-component notes, kept where the reason is not obvious from the CSS itself:
-
-| Primitive | Note |
-| --- | --- |
-| Button | `data-variant='bare'` is an icon affordance with no box at all, including the control height, so it can sit inline in a sentence. Tone has to survive the `solid` variant by swapping to the accent-foreground pair, or `color: var(--accent)` lands on the accent background and the label disappears. |
-| Field | `data-layout='split'` gives every label the same control-column width, so a stack of fields lines up on both edges. `row` is a different layout for an inline chip in a strip (the agent composer's config row), where a fixed column would stretch every chip to it. The split column width is a literal, not a token: one measurement, one rule, and a pack that wants a different width restates the rule. |
-| Badge / Chip | `tag` is the shape a pack may round; `pill` is a capsule in every pack. A static label is a Badge, an interactive or data-coloured one is a Chip. `data-colored` takes its colour from a `--chip-color` custom property the caller sets inline (a live provider colour from Linear or GitHub), with the dot carrying the colour so the label stays legible against any hue. |
-| Row | `data-fields` reserves fixed-width tracks so several facts read as columns rather than a sentence, the same width down the whole list; each track is `minmax(0, …)` rather than a bare width, because a grid track's default `min-width: auto` refuses to shrink below its content and would push a trailing action off a narrow pane. |
-| RowActions | The ellipsis menu on a list row. Reveals on the row's `:hover`, `:focus-within`, and `[data-selected]`, plus its own `aria-expanded`, and stops the click from reaching the row. See § Menus and right-click for why the reveal is scoped to the button rather than to `Row`'s trailing slot. |
-| StatusDot | Ten independent implementations had converged on two competing colour vocabularies (Docker's `--state-ok/warn/bad` and Agents' `--add-marker/--warn/--del-marker`); the status trio won because the dots read as status and are already derived theme tokens. |
-| Checkbox | Styles the native `<input>` rather than rebuilding it from divs, to keep the keyboard and screen-reader behaviour a rebuild would throw away; `accent-color` supplies most of the look. The switch variant is the same input and the same events, with `appearance: none` applied only there so the plain checkbox keeps its native mark. |
-| Select | Draws its own list, because the popup the platform draws ignores every token in the stylesheet. The native `<select>` stays in the DOM, hidden, holding the caller's `<option>` children and the value, and a picked row writes to it and dispatches `change`, so a call site keeps its children and its `onChange` exactly as written. A `MutationObserver` is what notices options that arrive after mount, and a second effect puts the caller's value back once its option turns up: a `<select>` asked for a value it has no option for falls back to the first one, which left a restored picker on the wrong row. The list takes the trigger's width as a floor and grows past it to fit the option labels, because the control shows one label and the list shows the longest. It clamps into the viewport and scrolls at `min(60vh, 420px)`, so a select at the bottom of a pane opens over itself rather than off the bottom of the window. |
-| Popover | Anchors at `--z-picker`, not a plain top-of-stack rung, because a portalled popover is a sibling of a modal backdrop rather than its descendant, and `--z-picker` is the rung that clears whichever modal the popover was opened from. |
-| Card | The stripe uses the same `--stripe-w` marker the diff rows and comment cards use, so a pack that zeroes stripe width degrades every surface the same way instead of leaving one with an orphan edge. |
-| Meter | A div, not a native `<meter>`, because a native meter is the one control in the app a style pack cannot reach at all. The fill width is a numeric custom property, so a pack can change the fill's shape without the component knowing. |
-| ListDetail | The border between its two columns is `--chrome-divider` (see Border roles, above), not `--control-bw`, because two of the four panes it replaced used the control role and would have lost the divider once a pack zeroed it. Its narrow-width behaviour is covered under Two-column panes, below. |
-| CollapsibleSection | Native `<details>`/`<summary>` rather than a signal and a twist glyph, so keyboard behaviour and semantics come free; the summary composes from SectionHeader's label, count, and actions structure. It replaced eight hand-written github.PullDetail sections across three different mechanisms, two of them missing `aria-expanded`. It has no accordion mode, because nothing consumes one; a card-nested fold that is not a titled section (agents' reasoning and tool-output blocks) stays a raw `<details>` instead. |
-| Markdown | The component around `.ui-markdown`, for a call site that holds Markdown source rather than HTML: it runs the sanitizing pass in `ui/markdown.ts`, then loads a Shiki grammar per fence and mounts a `CopyButton` on each. The class stays usable on its own, because GitHub renders its own HTML and two call sites need a `ref` on the element, which a component cannot offer (a props member named `ref` is a Solid DOM setter rather than data). The Shiki import is dynamic, so a plugin frame rendering a ticket description does not carry the highlighting engine. Table alignment markers are parsed and dropped: applying one needs an inline `style` attribute, which the plugin frames' CSP refuses. |
-
-Several other primitives (Toolbar, EmptyState, DescriptionList, Table, Kbd, KeyValueEditor,
-DocumentTabs) simply merge many near-identical hand-rolled versions, sometimes a dozen or more of
-them; there is nothing beyond the primitive itself to know.
-
-### Tab strips
-
-There are two, and they split on what a tab owns. `Tabs` (`.ui-tabs`) is a sub-nav: it switches
-panels within one view, and the panels belong to the caller. `DocumentTabs` (`.ui-doctabs`) is a
-document bar: each tab owns a file or a session, can be closed, and carries state such as a dirty
-dot or a run-state dot. Both take an `actions` slot for the controls pinned to the right of the
-strip, so a caller never wraps the strip in a header of its own to bolt a `+` onto it.
-
-Every strip is `--tab-h` tall, whichever of the two it is, and the floor sits on the strip as well
-as on each tab, so a `DocumentTabs` with nothing open still holds the height instead of shrinking to
-its action buttons. That token exists because the height drifted four ways before it: 40px in
-`Tabs`, `--pane-head-h` in `DocumentTabs`, 30px in the editor's file bar, and whatever the terminal
-drawer's line-height came to, which read as a bug in the drawer rather than as four independent
-decisions. A pack keeps `--tab-h` above `--control-h`, so a button can ride in the actions slot, and
-below `--pane-head-h`, so a strip under a pane header stays subordinate to it.
-
-The GitHub pane's related-PR strip borrows the `.ui-doctab` classes instead of calling
-`DocumentTabs`, because each of its tabs carries a leading kind icon and a trailing button that
-opens the linked task or agent, and the primitive has no slot for either. Sharing the classes is
-what keeps it the same height and the same look. Home's dashboard tabs are the one strip that
-matches neither: they sit in a section header's label seat as the heading itself, so they have no
-background, no bottom rule, and no strip height. See `dashboards.css`.
-
-### Migration tiers and their two invariant tests
-
-`adoption.test.ts`'s `CONVERTED` list grew in four tiers, and a file only qualifies for one once it
-clears the retired-class bar there, not merely once it uses a primitive somewhere:
-
-- Tier 1 (the 2026-08 design-system migration): Alert, EmptyState, StatusDot, Checkbox,
-  ConfirmButton / createArmedConfirm, Popover / createAnchoredPopover. These files cleared the bar
-  as a side effect of losing their bespoke error banners, empty states, status dots, and checkboxes.
-- Tier 2: Menu, Toolbar, Chip, Tooltip (the promoted attribute protocol), Toast, DescriptionList,
-  CollapsibleSection, SegmentedControl / ToggleButton, Input `kind`, Kbd.
-- Tier 3: Card, DocumentTabs, TreeRow, FindBar, Drawer, SplitHandle / createSplitDrag, CodeBlock,
-  Meter, KeyValueEditor, Table, Composer, PaletteSurface.
-- Tier 4: the Button/Select sweep. Every raw `<select>` became the Select primitive and every
-  action button became Button; the row/tab/menu-item buttons Button's own note excludes stayed as
-  they were, which is why some heavily converted files are still absent from the list.
-
-A file that gained a primitive but still hand-writes a `<button>` elsewhere does not go on the list:
-the ledger means fully converted, and a partly converted entry would spend the signal.
-
-Without the ledger, a migration like this stalls halfway: two ways to write a button, no way to tell
-which files are done, and no signal when a new one regresses. The list makes progress monotone and
-visible in one place, and a regression a test failure rather than something a reviewer has to
-notice. It uses the same shrinking-baseline idiom as `tools/arch/boundaries.test.ts`.
-
-Two invariants keep an adopted primitive from decaying quietly, both checked in `adoption.test.ts`:
-
-- A primitive spreads its own data-attributes after `rest`, so a call site that writes the raw
-  attribute instead of the matching prop is silently overridden. `<Button data-size="sm">` once
-  rendered at `md` with nobody catching it in review or in `tsc`, because `ComponentProps<'button'>`
-  accepts any `data-*`.
-- A class handed to a primitive lands on the same element as the primitive's own class, where it
-  ties `.ui-x` at `(0,1,0)` (and wins on source order) but loses outright to
-  `.ui-x[data-variant='...']` at `(0,2,0)`. Three bugs shipped from this in one week: Docker's filter
-  strip lost its padding to `.ui-toolbar[data-size='sm']`, Modern repainted every solid button
-  because its pack rule outranked the variant, and eight more strips silently lost their gap. None
-  of it was visible in review or to `tsc`.
-
-Every primitive must also keep appending the caller's class rather than replacing it, so a converted
-call site can carry its old bespoke class and still look identical; that passthrough is what makes
-migration incremental.
+`ui/adoption.test.ts` is what remains of the migration ledger that ran before the kit closed. Its
+`CONVERTED` list may only grow, and every file on it avoids raw buttons, selects, textareas, and the
+retired shared classes. The two checks around raw `div`s in a plugin's tree stay until phase 9 of the
+layout programme inverts them; see [layout](./future/layout/README.md).
 
 ## Icons
 

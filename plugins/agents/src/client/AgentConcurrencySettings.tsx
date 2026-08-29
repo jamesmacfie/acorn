@@ -83,7 +83,7 @@ export default function AgentConcurrencySettings() {
           max={MAX_AGENT_CONCURRENCY}
           width="narrow"
           value={provider()}
-          onInput={(event) => edit(setProvider)(event.currentTarget.value)}
+          onInput={(value) => edit(setProvider)(value)}
         />
         <span class="muted settings-hint">
           Counted against one agent CLI across every task and workspace. This is what keeps a single
@@ -99,7 +99,7 @@ export default function AgentConcurrencySettings() {
           max={MAX_AGENT_CONCURRENCY}
           width="narrow"
           value={workspace()}
-          onInput={(event) => edit(setWorkspace)(event.currentTarget.value)}
+          onInput={(value) => edit(setWorkspace)(value)}
         />
         <span class="muted settings-hint">
           Counted across all providers in one workspace, so one workspace cannot take the machine.
@@ -109,7 +109,7 @@ export default function AgentConcurrencySettings() {
       <Show when={error()}><p class="settings-error" role="alert">{error()}</p></Show>
       <Show when={saved()}><p class="muted" role="status">{saved()}</p></Show>
       <div class="settings-actions">
-        <Button type="submit" disabled={!dirty() || saving()}>
+        <Button submit disabled={!dirty() || saving()}>
           {saving() ? 'Saving…' : 'Save limits'}
         </Button>
       </div>

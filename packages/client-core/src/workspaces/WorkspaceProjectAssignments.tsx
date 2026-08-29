@@ -23,6 +23,23 @@ import './onboarding.css'
 /** Sentinel option value: "move this project to a workspace that does not exist yet". */
 const NEW_WORKSPACE = '__new__'
 
+/** An input that commits on blur and on Enter, and puts the old name back when the commit is
+ *  refused. It holds its own element because the reset is a DOM write, which is what the kit's
+ *  `ref` is for. */
+function RenameField(fieldProps: { label: string; value: string; disabled?: boolean; onCommit: (field: HTMLInputElement) => void }) {
+  let field: HTMLInputElement | undefined
+  return (
+    <Input
+      ref={(el) => { field = el }}
+      label={fieldProps.label}
+      value={fieldProps.value}
+      disabled={fieldProps.disabled}
+      onBlur={() => { if (field) fieldProps.onCommit(field) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') field?.blur() }}
+    />
+  )
+}
+
 export default function WorkspaceProjectAssignments() {
   const qc = useQueryClient()
   const projects = createQuery(() => projectsOptions(true))
@@ -136,13 +153,13 @@ export default function WorkspaceProjectAssignments() {
         <span class="muted">Projects</span>
         <div class="onboarding-actions">
           <Show when={canPickFolder()}>
-            <Button onClick={() => void addFolder()}>Add folder…</Button>
+            <Button onPress={() => void addFolder()}>Add folder…</Button>
           </Show>
           <For each={projectImporterRegistry.entries()}>
             {/* Through Icon, not raw text: an importer's glyph is an icon name like every other
                 registry's, so a Lucide name or a `brand:` mark both resolve here. */}
             {(entry) => (
-              <Button onClick={() => setActiveImporter(entry.id)}>
+              <Button onPress={() => setActiveImporter(entry.id)}>
                 <Icon name={entry.glyph} /> {entry.label}
               </Button>
             )}
@@ -170,12 +187,10 @@ export default function WorkspaceProjectAssignments() {
                   workspace name lines up with the project names rather than with the eye toggle. */}
               <header class="ws-group-head">
                 <span aria-hidden="true" />
-                <Input
-                  class="ws-group-name"
-                  aria-label={`Name of workspace ${group.workspace.name}`}
+                <RenameField
+                  label={`Name of workspace ${group.workspace.name}`}
                   value={group.workspace.name}
-                  onBlur={(event) => void renameInPlace(event.currentTarget, group.workspace.name, (name) => renameWorkspace(group.workspace.id, name))}
-                  onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
+                  onCommit={(field) => void renameInPlace(field, group.workspace.name, (name) => renameWorkspace(group.workspace.id, name))}
                 />
                 {/* Spans the path and facet tracks: "12 projects" must never wrap, and the path
                     track alone is sized for an ellipsised path, not for a phrase. */}
@@ -183,7 +198,7 @@ export default function WorkspaceProjectAssignments() {
                 <span />
                 {/* The default workspace is where deleted workspaces' projects land, so it cannot go. */}
                 <Show when={!group.workspace.isDefault} fallback={<span />}>
-                  <Button class="ws-group-delete" variant="bare" tone="danger" size="sm" disabled={busy()} onClick={() => setConfirmDeleteWorkspace(group.workspace)}>Delete</Button>
+                  <Button variant="bare" tone="danger" size="sm" disabled={busy()} onPress={() => setConfirmDeleteWorkspace(group.workspace)}>Delete</Button>
                 </Show>
               </header>
               {/* No empty-state row: the header already reads "no projects", and a second sentence
@@ -231,18 +246,18 @@ export default function WorkspaceProjectAssignments() {
           the primary action on a page whose primary action is adding a project. */}
       <Show
         when={newWorkspace() !== null}
-        fallback={<Button class="ws-add" onClick={() => setNewWorkspace('')}>New workspace</Button>}
+        fallback={<Button onPress={() => setNewWorkspace('')}>New workspace</Button>}
       >
         <form class="ws-add-form" onSubmit={addWorkspace}>
           <Input
             placeholder="Workspace name (e.g. Runn)"
             value={newWorkspace() ?? ''}
             ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
-            onInput={(event) => setNewWorkspace(event.currentTarget.value)}
+            onInput={(value) => setNewWorkspace(value)}
             onKeyDown={(event) => event.key === 'Escape' && setNewWorkspace(null)}
           />
-          <Button type="submit" disabled={busy() || !newWorkspace()?.trim()}>Add</Button>
-          <Button variant="bare" onClick={() => setNewWorkspace(null)}>Cancel</Button>
+          <Button submit disabled={busy() || !newWorkspace()?.trim()}>Add</Button>
+          <Button variant="bare" onPress={() => setNewWorkspace(null)}>Cancel</Button>
         </form>
       </Show>
 
@@ -260,12 +275,12 @@ export default function WorkspaceProjectAssignments() {
               </Show>
             </Modal.Body>
             <Modal.Actions>
-              <Button variant="bare" onClick={() => setConfirmDeleteWorkspace(null)}>Cancel</Button>
+              <Button variant="bare" onPress={() => setConfirmDeleteWorkspace(null)}>Cancel</Button>
               <Button
                 variant="solid"
                 tone="danger"
                 busy={busy()}
-                onClick={async () => {
+                onPress={async () => {
                   await guard(() => deleteWorkspace(workspace().id), 'Could not delete workspace.')
                   setConfirmDeleteWorkspace(null)
                 }}
@@ -325,10 +340,10 @@ function ProjectRows(props: {
         <div class="ws-row" classList={{ 'ws-row-hidden': project().hidden }}>
           <span class="ws-row-controls">
             <Button
-              variant="bare" class="onboarding-eye"
+              variant="bare"
               title={project().hidden ? 'Hidden — click to show' : 'Hide this project'}
-              aria-pressed={project().hidden}
-              onClick={() => props.onHide(project().id, !project().hidden)}
+              pressed={project().hidden}
+              onPress={() => props.onHide(project().id, !project().hidden)}
             >
               {project().hidden ? '⊘' : '◉'}
             </Button>
@@ -345,24 +360,21 @@ function ProjectRows(props: {
             <Show when={project().color}>
               <Button
                 variant="bare"
-                class="ws-project-color-clear"
                 iconOnly
-                aria-label={`Clear task tab colour for ${project().name}`}
+                label={`Clear task tab colour for ${project().name}`}
                 title="Clear task tab colour"
                 disabled={project().hidden || props.busy}
-                onClick={() => props.onColor(project().id, null)}
+                onPress={() => props.onColor(project().id, null)}
               >
                 <Icon name="x" />
               </Button>
             </Show>
           </span>
-          <Input
-            class="ws-row-name"
-            aria-label={`Name of ${project().name}`}
+          <RenameField
+            label={`Name of ${project().name}`}
             value={project().name}
             disabled={project().hidden}
-            onBlur={(event) => void props.onRename(event.currentTarget, project().name, (name) => patchProject(project().id, { name }))}
-            onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
+            onCommit={(field) => void props.onRename(field, project().name, (name) => patchProject(project().id, { name }))}
           />
           {/* data-tip, not title: the shell's own tooltip appears immediately and is legible, where a
               native one waits a second and then renders in the OS chrome. It is the only way to read a
@@ -384,19 +396,18 @@ function ProjectRows(props: {
             <Show when={project().github}><Icon name="brand:github" title="GitHub repository" /></Show>
           </span>
           <Select
-            class="ws-row-move"
-            aria-label={`Workspace for ${project().name}`}
+            label={`Workspace for ${project().name}`}
             disabled={project().hidden || props.busy}
-            onChange={(event) => props.onMove(project(), event.currentTarget.value)}
-          >
-            <For each={props.workspaces}>
-              {(workspace) => <option value={workspace.id} selected={workspace.id === project().workspaceId}>{workspace.name}</option>}
-            </For>
-            <option value={NEW_WORKSPACE}>New workspace…</option>
-          </Select>
+            value={project().workspaceId}
+            options={[
+              ...props.workspaces.map((workspace) => ({ value: workspace.id, label: workspace.name })),
+              { value: NEW_WORKSPACE, label: 'New workspace…' },
+            ]}
+            onChange={(value) => props.onMove(project(), value)}
+          />
           <span class="ws-row-actions">
             <Show when={canPickFolder()}>
-              <Button size="sm" disabled={project().hidden} onClick={() => props.onMapFolder(project().id)}>
+              <Button size="sm" disabled={project().hidden} onPress={() => props.onMapFolder(project().id)}>
                 {project().path ? 'Change folder' : 'Add folder'}
               </Button>
             </Show>
@@ -405,10 +416,10 @@ function ProjectRows(props: {
               variant="bare"
               tone="danger"
               iconOnly
-              aria-label={`Delete ${project().name}`}
+              label={`Delete ${project().name}`}
               title="Delete this project"
               disabled={props.busy}
-              onClick={() => props.onDelete(project())}
+              onPress={() => props.onDelete(project())}
             >
               <Icon name="trash-2" />
             </Button>
@@ -444,8 +455,8 @@ function DeleteProjectModal(props: {
         </p>
       </Modal.Body>
       <Modal.Actions>
-        <Button variant="bare" onClick={props.onCancel}>Cancel</Button>
-        <Button variant="solid" tone="danger" busy={props.busy} onClick={props.onConfirm}>
+        <Button variant="bare" onPress={props.onCancel}>Cancel</Button>
+        <Button variant="solid" tone="danger" busy={props.busy} onPress={props.onConfirm}>
           {props.taskCount ? `Delete project and ${props.taskCount} task${props.taskCount === 1 ? '' : 's'}` : 'Delete project'}
         </Button>
       </Modal.Actions>
@@ -474,12 +485,12 @@ function NewWorkspaceModal(props: {
             placeholder="Workspace name (e.g. Runn)"
             value={name()}
             ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
-            onInput={(event) => setName(event.currentTarget.value)}
+            onInput={(value) => setName(value)}
           />
         </Modal.Body>
         <Modal.Actions>
-          <Button variant="bare" onClick={props.onCancel}>Cancel</Button>
-          <Button type="submit" variant="solid" tone="accent" busy={props.busy} disabled={!name().trim()}>Create and move</Button>
+          <Button variant="bare" onPress={props.onCancel}>Cancel</Button>
+          <Button submit variant="solid" tone="accent" busy={props.busy} disabled={!name().trim()}>Create and move</Button>
         </Modal.Actions>
       </form>
     </Modal>

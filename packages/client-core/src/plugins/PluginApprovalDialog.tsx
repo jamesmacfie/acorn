@@ -266,19 +266,19 @@ export default function PluginApprovalDialog() {
                   when={screen() === 'review'}
                   fallback={
                     <>
-                      <Button variant="ghost" disabled={busy()} onClick={() => void deny()}>
+                      <Button variant="ghost" disabled={busy()} onPress={() => void deny()}>
                         Deny
                       </Button>
-                      <Button disabled={busy()} onClick={() => void approve()}>
+                      <Button disabled={busy()} onPress={() => void approve()}>
                         {busy() ? 'Working…' : current().action === 'uninstall' ? 'Remove it' : 'Fetch it'}
                       </Button>
                     </>
                   }
                 >
-                  <Button variant="ghost" tone="danger" disabled={busy()} onClick={() => void removeIt()}>
+                  <Button variant="ghost" tone="danger" disabled={busy()} onPress={() => void removeIt()}>
                     Remove it
                   </Button>
-                  <Button disabled={busy()} onClick={() => void enableIt()}>
+                  <Button disabled={busy()} onPress={() => void enableIt()}>
                     {busy() ? 'Working…' : current().dev ? 'Trust and develop' : 'Keep it'}
                   </Button>
                 </Show>

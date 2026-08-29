@@ -108,10 +108,9 @@ function TreeNode(props: {
         when={props.entry.dir}
         fallback={
           <TreeRow
-            class="tree-file"
             depth={props.depth}
             selected={props.openPath === path()}
-            onActivate={() => props.onOpen(path())}
+            onPress={() => props.onOpen(path())}
           >
             {props.entry.name}
           </TreeRow>
@@ -120,12 +119,11 @@ function TreeNode(props: {
         {/* The twist was a ▾/▸ glyph literal; TreeRow draws it from the marker token, so it scales
             with the style pack rather than with a font. */}
         <TreeRow
-          class="tree-dir"
           depth={props.depth}
           expandable
           expanded={open()}
           onToggle={() => setOpen(!open())}
-          onActivate={() => setOpen(!open())}
+          onPress={() => setOpen(!open())}
         >
           {props.entry.name}
         </TreeRow>

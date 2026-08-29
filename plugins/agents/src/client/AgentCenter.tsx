@@ -179,12 +179,12 @@ export default function AgentCenter() {
         </div>
       </header>
 
-      <Show when={error()}><Alert class="agent-center-error">{error()}</Alert></Show>
+      <Show when={error()}><Alert>{error()}</Alert></Show>
 
       {/* Partial node results remain visible while the unavailable-node banner explains the gap. */}
       <Show when={unavailable().length}>
         <For each={unavailable()}>
-          {(entry) => <Alert tone="warn" variant="banner" class="agent-center-banner">{entry.label} unavailable — {entry.reason}</Alert>}
+          {(entry) => <Alert tone="warn" variant="banner">{entry.label} unavailable — {entry.reason}</Alert>}
         </For>
       </Show>
 
@@ -201,11 +201,8 @@ export default function AgentCenter() {
       </section>
 
       <section class="agent-center-filters">
-        <Input type="search" value={query()} placeholder="Search sessions, tasks and repositories…" onInput={(event) => setQuery(event.currentTarget.value)} />
-        <Select value={providerFilter()} onChange={(event) => setProviderFilter(event.currentTarget.value)}>
-          <option value="">All providers</option>
-          <For each={providers() ?? []}>{(provider) => <option value={provider.id}>{provider.label}</option>}</For>
-        </Select>
+        <Input type="search" value={query()} placeholder="Search sessions, tasks and repositories…" onInput={(value) => setQuery(value)} />
+        <Select value={providerFilter()} onChange={(value) => setProviderFilter(value)} options={[{ value: '', label: 'All providers' }, ...(providers() ?? []).map((provider) => ({ value: provider.id, label: provider.label }))]} />
         {/* With one node the workspace and fleet scopes answer identically, so the switch is unnecessary. */}
         <Show when={nodes().length > 1}>
           <SegmentedControl
@@ -243,7 +240,7 @@ export default function AgentCenter() {
             const session = row.session
             const task = () => row.task
             return (
-              <Row class="agent-center-row" onActivate={() => open(row)}>
+              <Row onPress={() => open(row)}>
                 <span class="agent-center-session">
                   <span class="agent-center-session-icon" style={brandStyle(providerGlyph(session.providerId))}>
                     <Icon name={providerGlyph(session.providerId)} />

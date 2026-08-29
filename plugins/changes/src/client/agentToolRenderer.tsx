@@ -41,8 +41,7 @@ export const changesAgentToolRenderer: AgentToolRendererContribution = {
           {(path) => (
             <Button
               variant="bare"
-              class="agent-path-link"
-              onClick={() => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })}
+              onPress={() => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })}
             >
               {path}
             </Button>

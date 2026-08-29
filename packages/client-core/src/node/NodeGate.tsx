@@ -23,15 +23,15 @@ export default function NodeGate() {
         <Match when={readiness().kind === 'failed'}>
           <Acorn label="local node failed" />
           <div class="node-gate-actions">
-            <Button onClick={() => void selectActiveNode()}>Retry</Button>
-            <Button aria-expanded={showReason()} onClick={() => setShowReason((v) => !v)}>
+            <Button onPress={() => void selectActiveNode()}>Retry</Button>
+            <Button expanded={showReason()} onPress={() => setShowReason((v) => !v)}>
               Diagnostics
             </Button>
             <Show when={recoveryActions()}>
               {(recovery) => (
                 <>
-                  <Button onClick={() => recovery().openDataFolder()}>Open data folder</Button>
-                  <Button onClick={() => recovery().quit()}>Quit</Button>
+                  <Button onPress={() => recovery().openDataFolder()}>Open data folder</Button>
+                  <Button onPress={() => recovery().quit()}>Quit</Button>
                 </>
               )}
             </Show>

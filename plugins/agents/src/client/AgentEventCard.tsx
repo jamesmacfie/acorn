@@ -81,7 +81,7 @@ export default function AgentEventCard(props: {
                     {(context) => (
                       <Button
                         disabled={!context.deepLink}
-                        onClick={() => context.deepLink && dispatchLayout(props.taskId, { type: 'show', pane: context.deepLink.pane })}
+                        onPress={() => context.deepLink && dispatchLayout(props.taskId, { type: 'show', pane: context.deepLink.pane })}
                       >
                         <span>{context.label}</span>
                         <small>
@@ -107,7 +107,7 @@ export default function AgentEventCard(props: {
             <div class="agent-message agent-message-assistant">
               <div class="agent-message-head">
                 <span class="agent-message-role">Agent</span>
-                <Button variant="bare" size="sm" class="agent-copy" title="Copy response" onClick={() => copy(message().text)}>Copy</Button>
+                <Button variant="bare" size="sm" title="Copy response" onPress={() => copy(message().text)}>Copy</Button>
               </div>
               <AgentMarkdown text={message().text} taskId={props.taskId} />
             </div>
@@ -153,14 +153,12 @@ export default function AgentEventCard(props: {
                 <SubagentStateIcon status={subagent().status} />
                 <span class="agent-subagent-title">{subagent().title ?? 'Subagent'}</span>
                 <span class="muted">{subagentSummary(subagent(), props.sessionModel)}</span>
-                {/* Straight to the dedicated view, for a run too long to read in a box. `onClick` stops
-                    the event rather than the default, so the button does not also toggle the summary. */}
+                {/* Straight to the dedicated view, for a run too long to read in a box. The card
+                    underneath ignores a click that landed on a control inside it. */}
                 <Button
                   variant="bare"
                   size="sm"
-                  class="agent-subagent-open"
-                  onClick={(click) => {
-                    click.stopPropagation()
+                  onPress={() => {
                     selectManagedSubagent(props.sessionId, subagent().id)
                   }}
                 >
@@ -208,7 +206,7 @@ export default function AgentEventCard(props: {
         {(_shown) => {
           const change = () => event() as Extract<ReturnType<typeof event>, { type: 'file_change' }>
           return (
-            <Button class="agent-artifact-link" onClick={openChanges}>
+            <Button onPress={openChanges}>
               <span>Changed {change().path ?? 'files'}</span>
               <span class="muted">{change().summary ?? 'Open in Changes'} →</span>
             </Button>
@@ -219,7 +217,7 @@ export default function AgentEventCard(props: {
         {(_shown) => {
           const terminal = () => event() as Extract<ReturnType<typeof event>, { type: 'terminal' }>
           return (
-            <Button class="agent-artifact-link" onClick={() => {
+            <Button onPress={() => {
               setTerminalOpen(props.taskId, true)
               requestTerminalFocus(props.taskId, terminal().terminalSessionId)
             }}>
@@ -232,7 +230,7 @@ export default function AgentEventCard(props: {
         {(_shown) => {
           const artifact = () => event() as Extract<ReturnType<typeof event>, { type: 'artifact' }>
           return (
-            <Button class="agent-artifact-link" onClick={() => void downloadArtifact(artifact().artifactId, artifact().title)}>
+            <Button onPress={() => void downloadArtifact(artifact().artifactId, artifact().title)}>
               <span>{artifact().title}</span>
               <span class="muted">
                 {artifactSize(artifact().byteSize)}

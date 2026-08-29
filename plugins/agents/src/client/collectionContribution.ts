@@ -43,10 +43,15 @@ const ATTENTION_LABELS: Record<AgentAttentionReason, string> = {
   none: 'Nothing',
 }
 
+/** The kit says `danger`; a collection's enum tone is the wire's vocabulary and says `bad`. One
+ *  translation, at the boundary. */
+const wireTone = (tone: 'ok' | 'warn' | 'danger' | 'muted' | 'accent'): PluginCollectionEnumValue['tone'] =>
+  (tone === 'danger' ? 'bad' : tone)
+
 // Icon and tone both come from the pair in stateTone.ts, so a panel row and a sidebar row draw the
 // same state the same way.
 const stateValues: PluginCollectionEnumValue[] = Object.entries(STATE_LABELS)
-  .map(([id, label]) => ({ id, label, tone: runtimeTone(id), icon: runtimeIcon(id) }))
+  .map(([id, label]) => ({ id, label, tone: wireTone(runtimeTone(id)), icon: runtimeIcon(id) }))
 
 // Only the reasons that block the owner get a warning tone. `completed` is a nudge and the rest are
 // quiet, the same split ATTENTION_COPY makes for the inbox.

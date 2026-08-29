@@ -1,11 +1,11 @@
 // The plugin's domain-to-StatusDot tone mapping, declared once.
 //
 // StatusDot takes a semantic tone, not a domain state, because the shared component has no business
-// knowing what "reconnecting" means. See docs/ui-design.md § Primitive adoption ratchet.
+// knowing what "reconnecting" means. See docs/ui-design.md § The closed kit.
 
 import type { AgentSubagentStatus } from '@acorn/protocol/managedAgents.ts'
 
-type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'accent'
+type Tone = 'ok' | 'warn' | 'danger' | 'muted' | 'accent'
 
 /** A managed session's runtime state, as shown in the pane header, task sidebar, Agent Center and the
  *  sessions dashboard panel.
@@ -19,7 +19,7 @@ export const runtimeTone = (state: string): Tone => {
     return 'accent'
   }
   if (state === 'waiting' || state === 'cancelling' || state === 'stopped') return 'warn'
-  if (state === 'failed') return 'bad'
+  if (state === 'failed') return 'danger'
   return 'muted'
 }
 
@@ -51,7 +51,7 @@ export const runtimeIcon = (state: string): string => RUNTIME_ICON[state] ?? 'ci
 export const subagentTone = (status: AgentSubagentStatus | undefined): Tone => {
   if (status === 'running' || status === 'pending') return 'accent'
   if (status === 'completed') return 'ok'
-  if (status === 'failed') return 'bad'
+  if (status === 'failed') return 'danger'
   return 'muted'
 }
 
@@ -83,6 +83,6 @@ export const providerTone = (health: 'ok' | 'error' | 'missing'): Tone => {
 export const usageTone = (health: string): Tone => {
   if (health === 'healthy') return 'ok'
   if (health === 'warning') return 'warn'
-  if (health === 'critical') return 'bad'
+  if (health === 'critical') return 'danger'
   return 'muted'
 }
