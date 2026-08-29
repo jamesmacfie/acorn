@@ -102,10 +102,10 @@ export default function GithubBrowse() {
           <SectionHeader
             actions={
               <>
-                <Button class="new-pr-btn" data-tip="New pull request" onClick={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? '')))}>
+                <Button tip="New pull request" onPress={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(params.projectId ?? '')))}>
                   + New PR
                 </Button>
-                <Button variant="bare" iconOnly data-tip="Refresh reviews" aria-label="Refresh reviews" busy={refreshingPulls()} onClick={refreshAllPulls}>↻</Button>
+                <Button variant="bare" iconOnly tip="Refresh reviews" label="Refresh reviews" busy={refreshingPulls()} onPress={refreshAllPulls}>↻</Button>
               </>
             }
           >
@@ -131,7 +131,7 @@ export default function GithubBrowse() {
               <section class="pane pane-right">
                 <SectionHeader
                   actions={
-                    <Button variant="bare" iconOnly title="Refresh diff" aria-label="Refresh diff" busy={refreshingPull()} onClick={refreshCurrentPull}>↻</Button>
+                    <Button variant="bare" iconOnly title="Refresh diff" label="Refresh diff" busy={refreshingPull()} onPress={refreshCurrentPull}>↻</Button>
                   }
                 >
                   Diff

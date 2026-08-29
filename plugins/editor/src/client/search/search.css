@@ -17,33 +17,6 @@
   border-bottom: var(--chrome-divider);
   background: var(--bg-subtle);
 }
-/* Input kind="filter" owns the control; this keeps the panel's own padding. */
-.search-input { padding: var(--space-2) var(--space-4); }
-.search-toggles.ui-toolbar {
-  flex: none;
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-.search-toggle {
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  min-width: 26px;
-  padding: 3px 5px;
-  color: var(--text-muted);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius-control);
-  cursor: pointer;
-}
-.search-toggle:hover {
-  color: var(--text);
-}
-.search-toggle.active {
-  color: var(--text);
-  background: var(--bg-selected);
-  border-color: var(--border-strong);
-}
 .search-status {
   flex: none;
   padding: 4px var(--space-4);

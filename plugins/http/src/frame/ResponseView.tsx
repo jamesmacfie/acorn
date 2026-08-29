@@ -11,11 +11,11 @@ const formatSize = (bytes: number): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const statusTone = (status: number): 'accent' | 'warn' | 'del' | 'neutral' => {
+const statusTone = (status: number): 'accent' | 'warn' | 'danger' | 'neutral' => {
   if (status >= 200 && status < 300) return 'accent'
   if (status >= 300 && status < 400) return 'neutral'
   if (status >= 400 && status < 500) return 'warn'
-  return 'del'
+  return 'danger'
 }
 
 // Pretty-print JSON when it is JSON; otherwise show it as it came. No syntax highlighting: Monaco is
@@ -78,7 +78,7 @@ function SuccessResponse(props: { result: SendSuccess; onCopy: (text: string) =>
         <span class="http-response-spacer" />
         <Show when={tab() === 'body'}>
           <label class="http-toggle">
-            <Checkbox label="Raw" checked={raw()} onChange={(e) => setRaw(e.currentTarget.checked)} />
+            <Checkbox label="Raw" checked={raw()} onChange={(checked) => setRaw(checked)} />
           </label>
           <CopyButton text={bodyText} onCopy={props.onCopy} title="Copy body" />
         </Show>
@@ -94,7 +94,7 @@ function SuccessResponse(props: { result: SendSuccess; onCopy: (text: string) =>
         </Show>
 
         <Show when={tab() === 'headers'}>
-          <DescriptionList class="http-kv-list" size="sm">
+          <DescriptionList size="sm">
             <For each={props.result.headers}>
               {([name, value]) => <DescriptionList.Item label={name}>{value}</DescriptionList.Item>}
             </For>
@@ -121,7 +121,7 @@ function FailedResponse(props: { result: SendFailure }) {
   return (
     <>
       <div class="http-response-strip">
-        <Badge tone="del" shape="pill">Network error</Badge>
+        <Badge tone="danger" shape="pill">Network error</Badge>
         <span class="http-response-meta">{props.result.durationMs} ms</span>
       </div>
 
@@ -129,8 +129,8 @@ function FailedResponse(props: { result: SendFailure }) {
 
       <div class="http-response-body" id={`http-response-failure-panel-${tab()}`} role="tabpanel">
         <Show when={tab() === 'error'}>
-          <Alert class="http-failure-message">{props.result.error}</Alert>
-          <DescriptionList class="http-kv-list" size="sm">
+          <Alert>{props.result.error}</Alert>
+          <DescriptionList size="sm">
             <DescriptionList.Item label="URL">{props.result.url}</DescriptionList.Item>
             <Show when={props.result.code}>
               {(code) => <DescriptionList.Item label="Code">{code()}</DescriptionList.Item>}

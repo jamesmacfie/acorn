@@ -4,8 +4,8 @@ import { routeKey } from '@acorn/plugin-github/testkit/client'
 
 describe('fileStatusMeta', () => {
   it('maps common GitHub file statuses to compact letters', () => {
-    expect(fileStatusMeta('added')).toEqual({ letter: 'A', label: 'added', tone: 'add' })
-    expect(fileStatusMeta('removed')).toEqual({ letter: 'D', label: 'deleted', tone: 'del' })
+    expect(fileStatusMeta('added')).toEqual({ letter: 'A', label: 'added', tone: 'ok' })
+    expect(fileStatusMeta('removed')).toEqual({ letter: 'D', label: 'deleted', tone: 'danger' })
     expect(fileStatusMeta('renamed')).toEqual({ letter: 'R', label: 'renamed', tone: 'warn' })
     expect(fileStatusMeta('copied')).toEqual({ letter: 'C', label: 'copied', tone: 'muted' })
   })

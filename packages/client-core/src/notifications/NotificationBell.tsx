@@ -39,12 +39,11 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
   // a list of menu items, so it is not a Menu.
   return (
     <Popover
-      class="notify-popover"
       role="dialog"
       ariaLabel="Notifications"
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <Button variant="bare" class="theme-toggle" title="Notifications" aria-expanded={open()} onClick={toggle}>
+        <Button variant="bare" title="Notifications" expanded={open()} onPress={toggle}>
           ◔
           {/* One pill for both sections. An attention item always counts — it is unresolved by definition —
               so it is added rather than max()'d with the unread notices. */}
@@ -63,7 +62,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
             {/* Partial results are a banner, never a failed list (docs/architecture-overview.md § Fleet). */}
             <Show when={inbox().unavailable.length}>
               <For each={inbox().unavailable}>
-                {(entry) => <Alert tone="warn" variant="banner" class="notify-banner">{entry.label} unavailable</Alert>}
+                {(entry) => <Alert tone="warn" variant="banner">{entry.label} unavailable</Alert>}
               </For>
             </Show>
             <ul class="notify-list">
@@ -100,7 +99,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
           </Show>
           <div class="notify-head">
             <span>Notifications</span>
-            <Button variant="bare" onClick={markAllRead}>Mark all read</Button>
+            <Button variant="bare" onPress={markAllRead}>Mark all read</Button>
           </div>
           <ul class="notify-list">
             <For each={noticesForActiveNode()} fallback={<li class="notify-empty muted">No notifications.</li>}>

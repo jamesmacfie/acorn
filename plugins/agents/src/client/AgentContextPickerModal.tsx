@@ -43,7 +43,7 @@ export default function AgentContextPickerModal(props: {
       align="center"
       onClose={props.onClose}
     >
-      <Modal.Body class="agent-context-option-modal">
+      <Modal.Body>
         <p class="muted">{props.contribution.description}</p>
         <Show when={!options.loading} fallback={<p class="muted">Loading available context…</p>}>
           <Show
@@ -57,7 +57,6 @@ export default function AgentContextPickerModal(props: {
               >
                 {(option) => (
                   <Checkbox
-                    class="agent-context-option"
                     checked={selected().has(option.id)}
                     onChange={() => toggle(option.id)}
                     label={
@@ -74,13 +73,13 @@ export default function AgentContextPickerModal(props: {
         </Show>
       </Modal.Body>
       <Modal.Actions>
-        <Button variant="ghost" onClick={props.onClose}>Cancel</Button>
+        <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
         <Button
           variant="solid"
           tone="accent"
           busy={props.attaching}
           disabled={options.loading || !!options.error || selected().size === 0}
-          onClick={() => props.onAttach([...selected()])}
+          onPress={() => props.onAttach([...selected()])}
         >
           Attach
         </Button>

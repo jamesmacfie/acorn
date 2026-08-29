@@ -73,7 +73,7 @@ export default function PanelEditor(props: {
         return true
       }}
     >
-      <Modal.Body class="dash-editor">
+      <Modal.Body>
         <Field
           label={draft.queries().length > 1 ? 'Collections' : 'Collection'}
           hint="Add a second one and the panel unions their rows. Grouped by the plugin that provides it."
@@ -126,8 +126,8 @@ export default function PanelEditor(props: {
       </Modal.Body>
 
       <Modal.Actions>
-        <Button variant="bare" onClick={props.onClose}>Cancel</Button>
-        <Button variant="solid" tone="accent" disabled={!draft.ready()} onClick={submit}>
+        <Button variant="bare" onPress={props.onClose}>Cancel</Button>
+        <Button variant="solid" tone="accent" disabled={!draft.ready()} onPress={submit}>
           {creating() ? 'Add panel' : 'Save'}
         </Button>
       </Modal.Actions>

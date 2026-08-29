@@ -252,11 +252,10 @@ export default function TaskView(props: {
 
         <Show when={runError() || closeError()}>
           <Alert
-            class="task-run-error"
             variant="banner"
             actions={
               <Show when={teardownFailed()}>
-                <Button class="close-confirm" onClick={() => void confirmClose(true)}>Archive anyway (skip teardown)</Button>
+                <Button onPress={() => void confirmClose(true)}>Archive anyway (skip teardown)</Button>
               </Show>
             }
           >
@@ -270,7 +269,7 @@ export default function TaskView(props: {
             <>
               <span class="workspace-footer-worktree">
                 worktree
-                <CopyButton class="workspace-footer-copy" text={path} title="Copy worktree path" />
+                <CopyButton text={path} title="Copy worktree path" />
               </span>
               <span class="workspace-footer-branch">⎇ {props.task.branch}</span>
               <TaskSlotHost slot="task.footer" taskId={props.task.id} />

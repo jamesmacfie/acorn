@@ -3,6 +3,7 @@ import { cx } from '../ui/cx'
 import Icon from '../ui/Icon'
 import { StatusDot } from '../ui/primitives'
 import { resolveRailMarkers, type RailMarker, type RailTone } from './railMarkers'
+import { railDotProps } from '../ui/displayMeta'
 import './tabrail.css'
 
 /* The square icon control both rails are made of: the workspace rail down the left and the task
@@ -83,7 +84,7 @@ export function RailTab(props: RailTabProps) {
             data-tone={marker.tone}
             aria-hidden="true"
           >
-            <Show when={marker.icon} fallback={<Show when={marker.dotTone}>{(tone) => <StatusDot tone={tone()} />}</Show>}>
+            <Show when={marker.icon} fallback={<Show when={marker.dotTone}>{(tone) => <StatusDot {...railDotProps(tone())} />}</Show>}>
               {(name) => <Icon name={name()} />}
             </Show>
           </span>

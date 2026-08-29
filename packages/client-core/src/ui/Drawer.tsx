@@ -1,5 +1,4 @@
 import { Show, type JSX } from 'solid-js'
-import { cx } from './cx'
 import { createDismissable } from './dismissable'
 import { Button } from './primitives'
 
@@ -16,7 +15,6 @@ export function Drawer(props: {
   /** Which gestures dismiss. Defaults to Escape + backdrop. */
   dismissOn?: readonly ('escape' | 'backdrop')[]
   labelledBy?: string
-  class?: string
   children: JSX.Element
 }) {
   let dialog!: HTMLDivElement
@@ -30,7 +28,7 @@ export function Drawer(props: {
     <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
       <div
         ref={dialog}
-        class={cx('ui-drawer', props.class)}
+        class="ui-drawer"
         data-side={props.side ?? 'right'}
         data-size={props.size ?? 'md'}
         role="dialog"
@@ -43,7 +41,7 @@ export function Drawer(props: {
         <Show when={props.title}>
           <div class="ui-drawer-head">
             <span class="ui-drawer-title">{props.title}</span>
-            <Button variant="bare" iconOnly aria-label="Close" onClick={() => props.onClose()}>✕</Button>
+            <Button variant="bare" iconOnly label="Close" onPress={() => props.onClose()}>✕</Button>
           </div>
         </Show>
         {props.children}

@@ -28,7 +28,6 @@ export default function Markdown(props: {
   /** Sandboxed frames have no `navigator.clipboard`, so they pass their bridge's copy here. */
   onCopy?: (text: string) => void
   onClick?: (event: MouseEvent) => void
-  class?: string
 }) {
   let root: HTMLDivElement | undefined
   let generation = 0
@@ -64,7 +63,7 @@ export default function Markdown(props: {
         // The accessor re-queries rather than closing over the element, because the highlight pass
         // below replaces the `<pre>` it would have captured.
         const codeText = () => wrap.querySelector('code')?.textContent ?? ''
-        disposers.push(render(() => <CopyButton class="ui-code-copy" text={codeText} onCopy={props.onCopy} />, wrap))
+        disposers.push(render(() => <CopyButton text={codeText} onCopy={props.onCopy} />, wrap))
       }
     }
 
@@ -101,7 +100,7 @@ export default function Markdown(props: {
   return (
     <div
       ref={root}
-      class={`ui-markdown ${props.class ?? ''}`}
+      class="ui-markdown"
       onClick={(event) => props.onClick?.(event)}
     />
   )

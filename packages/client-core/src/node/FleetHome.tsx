@@ -128,11 +128,11 @@ export default function FleetHome() {
                 <div class="fleet-card-actions">
                   <Button
                     disabled={active()}
-                    onClick={() => setActiveNode(node.nodeId)}
+                    onPress={() => setActiveNode(node.nodeId)}
                   >
                     {active() ? 'Active' : 'Make active'}
                   </Button>
-                  <Button onClick={() => void reconnectNode(node.nodeId)}>Reconnect</Button>
+                  <Button onPress={() => void reconnectNode(node.nodeId)}>Reconnect</Button>
                 </div>
               </li>
             )

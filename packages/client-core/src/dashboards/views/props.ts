@@ -3,7 +3,7 @@ import type {
   PluginCollectionRow,
   PluginCollectionSchema,
 } from '@acorn/protocol/collections.ts'
-import type { PanelView } from '../model'
+import type { PanelTone, PanelView } from '../model'
 
   /** What every view is handed: rows already shaped and fields already projected. The shaping
    *  layer runs once per panel, not once per view, which is what lets a person flip between views
@@ -27,3 +27,8 @@ export type PanelViewProps = {
   /** Runs the row's own declared verb through the host dispatcher. Views never act themselves. */
   onActivate: (row: PluginCollectionRow) => void
 }
+
+/** A panel tone as StatusDot's. The dashboards vocabulary comes off the wire, where a plugin says
+ *  `bad`; the kit's is a role token. One translation, so both views spell it the same way. */
+export const panelDotTone = (tone: PanelTone): 'ok' | 'warn' | 'danger' | 'muted' | 'accent' =>
+  (tone === 'bad' ? 'danger' : tone)

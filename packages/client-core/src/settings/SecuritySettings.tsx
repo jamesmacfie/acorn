@@ -140,9 +140,7 @@ export default function SecuritySettings() {
       <Show when={nodes().length > 1}>
         <label class="settings-field">
           <span>Node</span>
-          <Select value={nodeId() ?? ''} onChange={(event) => setTarget(event.currentTarget.value || null)}>
-            <For each={nodes()}>{(candidate) => <option value={candidate.nodeId}>{candidate.label}</option>}</For>
-          </Select>
+          <Select value={nodeId() ?? ''} onChange={(value) => setTarget(value || null)} options={[...nodes().map((candidate) => ({ value: candidate.nodeId, label: candidate.label }))]} />
         </label>
       </Show>
 
@@ -182,11 +180,11 @@ export default function SecuritySettings() {
         <Input
           value={destPath()}
           placeholder={suggestion() ?? 'Loading…'}
-          onInput={(event) => setDestPath(event.currentTarget.value)}
+          onInput={(value) => setDestPath(value)}
         />
       </label>
       <div class="settings-actions">
-        <Button size="sm" disabled={backingUp() || !(destPath() || suggestion())} onClick={() => void runBackup()}>
+        <Button size="sm" disabled={backingUp() || !(destPath() || suggestion())} onPress={() => void runBackup()}>
           {backingUp() ? 'Backing up…' : 'Back up this node'}
         </Button>
         <Show when={backupDone()}>{(done) => <span class="muted">{done()}</span>}</Show>
@@ -222,11 +220,11 @@ export default function SecuritySettings() {
       </ul>
 
       <div class="settings-actions">
-        <Button size="sm" disabled={firstPage.loading} onClick={() => void refetch()}>Refresh</Button>
+        <Button size="sm" disabled={firstPage.loading} onPress={() => void refetch()}>Refresh</Button>
         {/* Only when a full page came back: a short page IS the end of the trail, and offering "load
             older" there would be a button that does nothing. */}
         <Show when={rows().length >= PAGE}>
-          <Button size="sm" disabled={loadingMore()} onClick={() => void loadOlder()}>Load older</Button>
+          <Button size="sm" disabled={loadingMore()} onPress={() => void loadOlder()}>Load older</Button>
         </Show>
       </div>
     </div>

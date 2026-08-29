@@ -60,21 +60,18 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
       <div class="search-bar">
         <Input
           ref={input}
-          class="search-input"
           kind="filter"
           placeholder="Search in files…"
           value={query()}
-          spellcheck={false}
-          autocapitalize="off"
-          autocorrect="off"
-          onInput={(e) => onInput(e.currentTarget.value)}
+          assist={false}
+          onInput={(value) => onInput(value)}
         />
-        <Toolbar.Group class="search-toggles">
+        <Toolbar.Group>
           {/* Three independent booleans, so three ToggleButtons, not a radiogroup, which would make
               them mutually exclusive. */}
-          <ToggleButton variant="bare" size="sm" class="search-toggle" title="Match case" pressed={caseSensitive()} onPressedChange={setCaseSensitive}>Aa</ToggleButton>
-          <ToggleButton variant="bare" size="sm" class="search-toggle" title="Whole word" pressed={wholeWord()} onPressedChange={setWholeWord}>\b</ToggleButton>
-          <ToggleButton variant="bare" size="sm" class="search-toggle" title="Use regular expression" pressed={regex()} onPressedChange={setRegex}>.*</ToggleButton>
+          <ToggleButton variant="bare" size="sm" title="Match case" pressed={caseSensitive()} onPressedChange={setCaseSensitive}>Aa</ToggleButton>
+          <ToggleButton variant="bare" size="sm" title="Whole word" pressed={wholeWord()} onPressedChange={setWholeWord}>\b</ToggleButton>
+          <ToggleButton variant="bare" size="sm" title="Use regular expression" pressed={regex()} onPressedChange={setRegex}>.*</ToggleButton>
         </Toolbar.Group>
       </div>
 

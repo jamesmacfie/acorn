@@ -1,6 +1,6 @@
 # Phase 0: the closed kit and role tokens
 
-Status: not started.
+Status: shipped 2026-08-29. Deviations from what is written below are listed at the end.
 
 ## Goal
 
@@ -140,3 +140,54 @@ accepts one. `cx.ts` becomes internal.
 - The jsdom `hosts` vitest project in `packages/client-core/vitest.config.ts` exists and can render a
   component (the memory index says it renders the seven contribution hosts).
 - Re-run the raw-tag survey command from [02-survey.md](./02-survey.md) to get current counts.
+
+## What shipped, and where it differs
+
+The kit is closed. `ui/kit/tokens.ts`, `ui/kit/roles.ts` and `ui/kit/support.ts` hold the role enums,
+the two host mappings, and the support matrix; the ten nodes are in `ui/`; `Only` and `Fallback` sit
+beside them; and no exported node accepts `class`, `className`, `style`, or `classList`. Behaviour
+now lives in [ui design](../../ui-design.md) § The closed kit.
+
+Nine deviations, each taken deliberately:
+
+1. **`Button` keeps `iconOnly` and the `bare` variant.** The sketch above derives `iconOnly` from an
+   absent label and lists three variants. Both would have cost real affordances: 64 call sites say
+   `iconOnly` while still passing a glyph as a child, and `bare` is the borderless button the whole
+   app uses inside rows and strips. `label` is the accessible name, and doubles as the visible text
+   when the button has no children.
+2. **`onPress` replaced `onClick` and `onActivate`, but the text controls keep their own handlers.**
+   `Input`, `Textarea` and `Composer` take `onKeyDown`, `onPaste`, `onDrop` and the rest, because
+   [doors left open](./09-doors-left-open.md) puts exactly those three nodes on the other side of the
+   no-key-events rule. Everything else hears an intent.
+3. **`Select` takes `options`, not `<option>` children.** A plugin writing raw tags into a control is
+   what the closed kit is for. The hidden native `<select>` stays as the value store and the form
+   participant, so the popup is still the only part the kit draws.
+4. **`Section` has no `collapsed`.** A section that opens and closes is a `Fold`. Two components with
+   the same job is what the kit exists to stop.
+5. **`Facts` takes `items` with JSX values.** The sketch says `[[label, value]]`. A fact's value is
+   often a `Badge` or a `StatusDot`; its label is always a string.
+6. **`StatusDot` gained `mixed` as a flag.** `mixed` is two states at once, not a seventh tone, so it
+   sits beside `tone` rather than inside the enum.
+7. **The tone vocabularies converged on the role enum.** `bad` became `danger`, `add` became `ok`,
+   `del` became `danger`, `success` became `ok`, `info` became `muted`. Two vocabularies stayed
+   because they are not the kit's: a collection's enum tone is a wire value and still says `bad`, and
+   a rail marker dot still says `bad` and `mixed`. `railDotProps` on
+   `@acorn/plugin-api/client` is the one translation between them.
+8. **`Row` takes `offset` and `height` in pixels.** A virtualizer computes both and no stylesheet
+   can. It is the one place a node turns a number into a length, and it takes numbers rather than a
+   style object.
+9. **`adoption.test.ts` lost one check rather than keeping all of them.** The invariant that every
+   primitive appends the caller's class cannot survive the removal of the class; `props.test-d.ts`
+   is what holds that ground now. The rest of the ledger stays until phase 9.
+
+Two things the phase says it wants that this change did not do:
+
+- **Per-plugin restyling of kit nodes is gone, not ported.** 282 selectors across 36 stylesheets
+  styled a kit node through a class a plugin handed it, and dropping the class left them matching
+  nothing. They were deleted rather than re-pointed, except where a rule set a pane's structure: the
+  Agent Center list, the session sidebar, and the kit's own internals now reach their targets by
+  position. So a number of buttons, chips, alerts and toolbars wear the kit's own padding and weight
+  instead of a plugin's. That is the drift phases 5 to 8 were always going to produce; it arrives
+  here instead.
+- **The smoke checklist has not been run.** `pnpm lint` and `pnpm test` are green, and the
+  eyes-on pass in [testing](../../testing.md) is still owed.

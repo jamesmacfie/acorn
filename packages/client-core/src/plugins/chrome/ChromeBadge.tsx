@@ -41,7 +41,7 @@ export default function ChromeBadge(props: ChromeBadgeProps) {
           size="xs"
           title={value().tooltip ?? props.descriptor.id}
           disabled={!props.descriptor.onClick}
-          onClick={click}
+          onPress={click}
         >
           <Show when={props.descriptor.icon}>{(name) => <Icon name={name()} />}</Show>
           <Badge tone={value().tone ?? 'neutral'}>{value().text}</Badge>

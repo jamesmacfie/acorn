@@ -14,9 +14,6 @@
   border-radius: var(--radius-pill-fixed);
   pointer-events: none;
 }
-/* Popover owns the surface (portal, position, elevation, dismissal). This is only the inbox's width
-   and the fact that its own rows supply all the padding. */
-.notify-popover { width: 340px; padding: 0; }
 .notify-head {
   display: flex;
   align-items: center;
@@ -50,15 +47,6 @@
 .notify-title { flex: none; }
 .notify-detail { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .notify-time { flex: none; margin-left: auto; }
-
-/* The unread-notice marker on a task row moved to core's rail marker model
-   (client-core/tasks/railStatus.ts). The rail owns where a marker sits; a feature stylesheet
-   positioning one is the signal that placement escaped the host again. */
-
-/* The attention inbox's banner and node badge (notifications/attentionInbox.ts). The rows themselves
-   reuse .notify-row: an attention item and a notice differ in lifecycle, not in shape. */
-/* Alert owns the box; this is only the popover's tighter inset. */
-.notify-banner.ui-alert { margin-top: 0; padding: var(--space-2) var(--space-3); font-size: var(--fs-xs); }
 .notify-node {
   font-size: var(--fs-xs);
   white-space: nowrap;

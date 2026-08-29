@@ -25,20 +25,20 @@
   text-transform: uppercase;
 }
 .agent-task-sidebar-empty { margin: 0; padding: var(--space-4) var(--space-5) var(--space-5); font-size: var(--fs-xs); }
-.agent-task-row { align-items: flex-start; }
-.agent-task-row .ui-row-body { min-width: 0; display: grid; gap: 1px; }
-.agent-task-row .ui-row-body strong,
-.agent-task-row .ui-row-body small {
+.agent-task-sidebar-section .ui-row { align-items: flex-start; }
+.agent-task-sidebar-section .ui-row .ui-row-body { min-width: 0; display: grid; gap: 1px; }
+.agent-task-sidebar-section .ui-row .ui-row-body strong,
+.agent-task-sidebar-section .ui-row .ui-row-body small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.agent-task-row .ui-row-body strong { font-size: var(--fs-sm); font-weight: 500; }
-.agent-task-row .ui-row-body small { color: var(--text-faint); font-size: var(--fs-2xs); }
+.agent-task-sidebar-section .ui-row .ui-row-body strong { font-size: var(--fs-sm); font-weight: 500; }
+.agent-task-sidebar-section .ui-row .ui-row-body small { color: var(--text-faint); font-size: var(--fs-2xs); }
 /* The provider's mark, ahead of its name on the sub-line. It has to restate the colour because the
    rule above paints the whole line --text-faint and wins on specificity, and it sizes off the line it
    sits in, which is already the smallest type in the app. */
-.agent-task-row .ui-row-body small .managed-agent-provider-glyph {
+.agent-task-sidebar-section .ui-row .ui-row-body small .managed-agent-provider-glyph {
   margin-inline-end: var(--space-2);
   color: var(--brand-legible);
 }
@@ -54,25 +54,13 @@
 /* A session row aligns its children to the top, so the mark needs the title's line box to centre in.
    Without it a box only as tall as its 10px icon rides above the title beside it, which a text glyph
    never showed because a line box came with it. */
-.agent-task-row .agent-state-icon { height: calc(var(--fs-sm) * var(--lh)); }
-/* A subagent, indented under the session that spawned it. Two classes in the selector on purpose:
-   `.agent-task-row` is on the same element and would tie with a single class on specificity, so the
-   indent would land or not depending on rule order (docs/ui-design.md § Border roles covers the same
-   trap for widths). The guide line carries the relationship where indentation alone gets lost in a
-   dense roster. */
-.agent-task-subagent-row.ui-row {
-  padding-left: calc(var(--space-5) + var(--space-5));
-  border-left: var(--stripe-w) solid var(--border);
-  margin-left: var(--space-5);
-}
-.agent-task-subagent-row strong { font-weight: 400; color: var(--text-muted); }
+.agent-task-sidebar-section .ui-row .agent-state-icon { height: calc(var(--fs-sm) * var(--lh)); }
 
 .agent-task-legacy-row { border-bottom: var(--divider); }
 .agent-task-legacy-row > .ui-row { border-bottom: 0; }
 .agent-task-gate-actions { display: flex; gap: var(--space-2); padding: 0 var(--space-5) var(--space-3) 31px; }
 
-
 @container (max-width: 700px) {
   .agent-task-sidebar { width: 190px; }
-  .agent-task-row .ui-row-trailing { display: none; }
+  .agent-task-sidebar-section .ui-row .ui-row-trailing { display: none; }
 }

@@ -1,7 +1,6 @@
 import { Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type Placement } from './anchor'
-import { cx } from './cx'
 
 // The common case over createAnchoredPopover: a trigger and a floating surface.
 //
@@ -24,7 +23,6 @@ export default function Popover(props: {
   role?: 'menu' | 'listbox' | 'dialog'
   ariaLabel?: string
   onDismiss?: () => void
-  class?: string
   /** A function when the content needs to dismiss itself: a menu item's click lands inside the
    *  surface, so outside-click will never fire for it. */
   children: JSX.Element | ((state: { close: () => void }) => JSX.Element)
@@ -47,7 +45,7 @@ export default function Popover(props: {
         <Portal>
           <div
             ref={(el) => popover.setSurface(el)}
-            class={cx('ui-popover', props.class)}
+            class="ui-popover"
             role={props.role}
             aria-label={props.ariaLabel}
             style={popover.surfaceStyle()}

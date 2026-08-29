@@ -53,7 +53,7 @@ export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } 
 // the tooltip legend. The registry itself stays off this surface; register through
 // `ctx.railMarkers`, which binds the contribution to the plugin's own name.
 export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/registries/railMarkers.ts'
-export type { RailMarker, RailMarkerPosition, RailTone } from '@acorn/client-core/tabs/railMarkers.ts'
+export type { RailMarker, RailMarkerDot, RailMarkerPosition, RailTone } from '@acorn/client-core/tabs/railMarkers.ts'
 export type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
 export type { ClientScheduleContribution } from '@acorn/client-core/registries/schedules.ts'
 // See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does.
@@ -185,7 +185,9 @@ export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/client-co
 // `rowHeightSm` is on ./ui instead: the one thing that needs a density number is a frame's
 // virtualized grid.
 export { rowHeight, termFontSize } from '@acorn/client-core/ui/metrics.ts'
-export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
+// `railDotProps` is here beside CHECK_TONE because that is what it is for: the rail's dot
+// vocabulary is not the kit's, and this is the one translation between them.
+export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, railDotProps, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
 
 // ── Small helpers ─────────────────────────────────────────────────────────────────────────────
 export { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/highlight/shiki.ts'

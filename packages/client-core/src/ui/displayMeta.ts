@@ -1,6 +1,7 @@
 import type { DiffFile } from './diff/model'
+import { type RailMarkerDot } from '../tabs/railMarkers'
 
-export type FileStatusTone = 'add' | 'del' | 'warn' | 'muted'
+export type FileStatusTone = 'ok' | 'danger' | 'warn' | 'muted'
 
 export type FileStatusMeta = {
   letter: string
@@ -13,11 +14,11 @@ export function fileStatusMeta(status: string | null | undefined): FileStatusMet
     case 'added':
     case 'add':
     case 'new':
-      return { letter: 'A', label: 'added', tone: 'add' }
+      return { letter: 'A', label: 'added', tone: 'ok' }
     case 'removed':
     case 'deleted':
     case 'delete':
-      return { letter: 'D', label: 'deleted', tone: 'del' }
+      return { letter: 'D', label: 'deleted', tone: 'danger' }
     case 'renamed':
     case 'rename':
       return { letter: 'R', label: 'renamed', tone: 'warn' }
@@ -73,7 +74,14 @@ export function checksState(checks: { status: string | null }[]): 'success' | 'f
 // (tasks/railStatus.ts) and the GitHub plugin's PR rows draw this dot. Before this they shared a
 // class defined in the plugin's own stylesheet, so core's markup went unstyled when it was
 // disabled.
-export const CHECK_TONE: Record<ReturnType<typeof checksState>, 'ok' | 'warn' | 'bad' | 'mixed'> = {
+// The rail's vocabulary rather than the kit's, because the rail marker takes it as it is. A
+// StatusDot wants `railDotProps` around it.
+/** A rail dot as StatusDot's props. The rail's vocabulary is not the kit's, and this is the one
+ *  translation, so core and a plugin drawing the same dot spell it the same way. */
+export const railDotProps = (dot: RailMarkerDot): { tone: 'ok' | 'warn' | 'danger'; mixed?: boolean } =>
+  dot === 'mixed' ? { tone: 'danger', mixed: true } : { tone: dot === 'bad' ? 'danger' : dot }
+
+export const CHECK_TONE: Record<ReturnType<typeof checksState>, RailMarkerDot> = {
   success: 'ok',
   failure: 'bad',
   pending: 'warn',
@@ -81,9 +89,9 @@ export const CHECK_TONE: Record<ReturnType<typeof checksState>, 'ok' | 'warn' | 
 }
 
 /** Tone for one raw check conclusion, for the per-check list under a PR's roll-up dot. */
-export const checkStatusTone = (status: string | null): 'ok' | 'warn' | 'bad' | 'muted' => {
+export const checkStatusTone = (status: string | null): 'ok' | 'warn' | 'danger' | 'muted' => {
   const s = (status ?? '').toLowerCase()
-  if (FAILED_STATUSES.has(s)) return 'bad'
+  if (FAILED_STATUSES.has(s)) return 'danger'
   if (IN_PROGRESS_STATUSES.has(s)) return 'warn'
   return s === 'success' ? 'ok' : 'muted'
 }

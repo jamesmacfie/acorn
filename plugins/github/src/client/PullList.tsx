@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { activateTaskSignals, CHECK_TONE, checksState, clientEvents, formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, registerCommands, rowHeight, watchAppearance, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import { activateTaskSignals, CHECK_TONE, railDotProps, checksState, clientEvents, formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, registerCommands, rowHeight, watchAppearance, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
 import { type Pull } from '../contract/api'
@@ -194,9 +194,9 @@ export default function PullList() {
         <button type="button" classList={{ active: tab() === 'closed' }} onClick={() => setTab('closed')}>
           Closed
         </button>
-        <Input class="pr-filter" kind="filter" placeholder="Filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
+        <Input kind="filter" placeholder="Filter…" value={filter()} onInput={(value) => setFilter(value)} />
       </div>
-      <Show when={taskError()}><Alert class="pr-task-error">{taskError()}</Alert></Show>
+      <Show when={taskError()}><Alert>{taskError()}</Alert></Show>
       {/* Scroll element stays mounted from first render so the virtualizer always observes it.
           Publish the ref after layout so the first observed rect has the flexed pane height. */}
       <div class="pr-list-scroll" ref={publishScrollEl}>
@@ -208,7 +208,7 @@ export default function PullList() {
                 align="start"
                 title="Not connected to GitHub"
                 action={
-                  <Button onClick={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
+                  <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
                     Connect GitHub
                   </Button>
                 }
@@ -231,12 +231,12 @@ export default function PullList() {
                     // list and share one hover, selected, and box treatment. `href` keeps the real
                     // link for middle-click and copy address; `onActivate` routes the plain click.
                     <Row
-                      class="pr-row"
                       href={`${githubBrowsePath(params.projectId ?? '')}/${pr.number}`}
-                      onActivate={() => navigate(`${githubBrowsePath(params.projectId ?? '')}/${pr.number}`)}
+                      onPress={() => navigate(`${githubBrowsePath(params.projectId ?? '')}/${pr.number}`)}
                       selected={params.number === String(pr.number)}
                       onHover={(entered) => (entered ? queueRowPrefetch(pr.number) : cancelRowPrefetch())}
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }}
+                      offset={vi.start}
+                      height={vi.size}
                       leading={(
                         <>
                           {/* The dot only exists once the warmed detail cache holds checks, so it
@@ -244,10 +244,10 @@ export default function PullList() {
                               prefetch lands. */}
                           <span class="pr-check">
                             <Show when={checks().length}>
-                              <StatusDot tone={CHECK_TONE[checksState(checks())]} label={`Checks: ${checksState(checks())}`} />
+                              <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={`Checks: ${checksState(checks())}`} />
                             </Show>
                           </span>
-                          <Icon class={`pr-state pr-state-${prState(pr)}`} name={PR_STATE_ICON[prState(pr)]} title={prState(pr)} size={14} />
+                          <Icon name={PR_STATE_ICON[prState(pr)]} title={prState(pr)} size={14} />
                           {/* The author column is gone, so the avatar carries the login on hover. */}
                           <span class="pr-avatar" title={pr.author ?? undefined}><UserAvatar login={pr.author} /></span>
                           <span class="pr-num">#{pr.number}</span>
@@ -278,9 +278,9 @@ export default function PullList() {
           {/* Load-more only on closed; hidden while filtering since the filter only sees loaded pages. */}
           <Show when={tab() === 'closed' && closedPulls.hasNextPage && !filter().trim()}>
             <Button
-              variant="bare" class="pr-load-more"
+              variant="bare"
               disabled={closedPulls.isFetchingNextPage}
-              onClick={() => void closedPulls.fetchNextPage()}
+              onPress={() => void closedPulls.fetchNextPage()}
             >
               {closedPulls.isFetchingNextPage ? 'Loading…' : 'Load more'}
             </Button>

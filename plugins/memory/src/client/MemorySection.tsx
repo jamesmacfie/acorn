@@ -92,8 +92,8 @@ export default function MemorySection(props: {
                     value={propEdits()[p.id] ?? p.description}
                     onInput={(e) => setPropEdits((prev) => ({ ...prev, [p.id]: e.currentTarget.value }))}
                   />
-                  <Button onClick={() => void resolveProposal(p.id, true)}>Accept</Button>
-                  <Button onClick={() => void resolveProposal(p.id, false)}>Reject</Button>
+                  <Button onPress={() => void resolveProposal(p.id, true)}>Accept</Button>
+                  <Button onPress={() => void resolveProposal(p.id, false)}>Reject</Button>
                 </div>
                 {/* Verification flags (structural `flags`, docs/notes-and-memory.md): shown as warning badges
                     beside the proposal, never folded into the description text. */}
@@ -109,7 +109,7 @@ export default function MemorySection(props: {
       </Show>
       <Show when={memoryApi()}>
         <div class="memory-section-actions">
-          <Button onClick={() => setMemFormOpen(!memFormOpen())}>+ memory</Button>
+          <Button onPress={() => setMemFormOpen(!memFormOpen())}>+ memory</Button>
           <Show when={memMsg()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
         </div>
       </Show>
@@ -123,18 +123,13 @@ export default function MemorySection(props: {
         >
           <div class="integration-key-row">
             <input class="ui-input" type="text" placeholder="name (kebab-case)" value={memName()} onInput={(e) => setMemName(e.currentTarget.value)} />
-            <Select value={memType()} onChange={(e) => setMemType(e.currentTarget.value as MemoryType)}>
-              <For each={MEMORY_TYPE_OPTIONS}>{(k) => <option value={k}>{k}</option>}</For>
-            </Select>
-            <Select value={memScope()} onChange={(e) => setMemScope(e.currentTarget.value as 'project' | 'private')}>
-              <option value="project">project (worktree, committed)</option>
-              <option value="private">private (~/.acorn)</option>
-            </Select>
+            <Select value={memType()} onChange={(value) => setMemType(value as MemoryType)} options={[...MEMORY_TYPE_OPTIONS.map((k) => ({ value: k, label: k }))]} />
+            <Select value={memScope()} onChange={(value) => setMemScope(value as 'project' | 'private')} options={[{ value: 'project', label: 'project (worktree, committed)' }, { value: 'private', label: 'private (~/.acorn)' }]} />
           </div>
           <input class="ui-input" type="text" placeholder="one-line description" value={memDesc()} onInput={(e) => setMemDesc(e.currentTarget.value)} />
-          <Textarea mono rows="3" placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(e) => setMemBody(e.currentTarget.value)} />
+          <Textarea mono rows={3} placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(value) => setMemBody(value)} />
           <div class="memory-section-actions">
-            <Button type="submit" disabled={!memName().trim() || !memDesc().trim()}>Save memory</Button>
+            <Button submit disabled={!memName().trim() || !memDesc().trim()}>Save memory</Button>
           </div>
         </form>
       </Show>

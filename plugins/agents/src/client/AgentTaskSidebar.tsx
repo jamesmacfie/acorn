@@ -132,10 +132,9 @@ export default function AgentTaskSidebar(props: {
               {({ session, request }) => (
                 <Row
                   density="compact"
-                  class="agent-task-row"
                   leading={<RuntimeStateIcon state="waiting" />}
                   trailing={<Badge tone="warn" size="xs">{request.kind.replace('_', ' ')}</Badge>}
-                  onActivate={() => props.onSelectSession(session.id, request.providerRequestId)}
+                  onPress={() => props.onSelectSession(session.id, request.providerRequestId)}
                 >
                   <strong>{request.title}</strong>
                   <small>{session.title}</small>
@@ -158,13 +157,12 @@ export default function AgentTaskSidebar(props: {
                 <>
                   <Row
                     density="compact"
-                    class="agent-task-row managed-agent-session-row"
                     selected={session().id === props.selectedSessionId}
                     leading={<RuntimeStateIcon state={session().runtimeState} />}
                     trailing={
                       <>
                         <Show when={!['none', 'unread'].includes(session().attention)}>
-                          <Badge tone={session().attention === 'error' ? 'del' : 'warn'} size="xs">
+                          <Badge tone={session().attention === 'error' ? 'danger' : 'warn'} size="xs">
                             {session().attention.replace('_', ' ')}
                           </Badge>
                         </Show>
@@ -187,7 +185,7 @@ export default function AgentTaskSidebar(props: {
                         </RowActions>
                       </>
                     }
-                    onActivate={() => props.onSelectSession(session().id)}
+                    onPress={() => props.onSelectSession(session().id)}
                   >
                     <strong>{session().title}</strong>
                     <small>
@@ -208,10 +206,9 @@ export default function AgentTaskSidebar(props: {
                     {(subagent) => (
                       <Row
                         density="compact"
-                        class="agent-task-row agent-task-subagent-row"
                         selected={session().id === props.selectedSessionId && subagent().id === props.selectedSubagentId}
                         leading={<SubagentStateIcon status={subagent().status} />}
-                        onActivate={() => props.onSelectSubagent(session().id, subagent().id)}
+                        onPress={() => props.onSelectSubagent(session().id, subagent().id)}
                       >
                         <strong>{subagent().title}</strong>
                         <small>{subagentSummary(subagent(), sessionModelLabel(session()))}</small>
@@ -232,19 +229,18 @@ export default function AgentTaskSidebar(props: {
                 <div class="agent-task-legacy-row">
                   <Row
                     density="compact"
-                    class="agent-task-row"
                     leading={<span class="agent-task-state" data-state={row.state}>{LEGACY_GLYPH[row.state] ?? '·'}</span>}
-                    onActivate={() => void openLegacy(row)}
+                    onPress={() => void openLegacy(row)}
                   >
                     <strong>{row.title}</strong>
                     <small>{row.kind === 'step' ? row.step.status : row.state}</small>
                   </Row>
                   <Show when={row.kind === 'step' && row.gate}>
                     <div class="agent-task-gate-actions">
-                      <Button size="sm" onClick={() => void resolveGate(row as Extract<RosterRow, { kind: 'step' }>, true)}>
+                      <Button size="sm" onPress={() => void resolveGate(row as Extract<RosterRow, { kind: 'step' }>, true)}>
                         Approve
                       </Button>
-                      <Button size="sm" tone="danger" onClick={() => void resolveGate(row as Extract<RosterRow, { kind: 'step' }>, false)}>
+                      <Button size="sm" tone="danger" onPress={() => void resolveGate(row as Extract<RosterRow, { kind: 'step' }>, false)}>
                         Reject
                       </Button>
                     </div>

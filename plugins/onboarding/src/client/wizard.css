@@ -47,7 +47,6 @@
   font-size: var(--fs-sm);
   color: var(--text-faint);
 }
-.wizard-link.ui-btn[data-variant='bare'] { padding: var(--space-1); }
 
 /* The branch point: open a folder, or connect GitHub. Both first-class, side by side. */
 .wizard-cards {
@@ -59,8 +58,6 @@
 @media (max-width: 560px) {
   .wizard-cards { grid-template-columns: 1fr; }
 }
-/* Card owns the surface and its interactive states. What is left is the wizard card's inner stack. */
-.wizard-card { display: flex; flex-direction: column; gap: var(--space-2); }
 .wizard-card-title { font-weight: var(--fw-semibold); }
 .wizard-card-desc { color: var(--text-muted); font-size: var(--fs-sm); }
 .wizard-card-tag {
@@ -147,13 +144,6 @@
   gap: var(--space-3);
 }
 .wizard-field { max-width: 380px; width: 100%; }
-
-/* Done: chord → what it does. */
-/* DescriptionList owns the grid, Kbd owns the cap. Each row is its own Item, so the columns are
-   per-row rather than aligned across rows, which is fine here: the caps are all one or two glyphs. */
-.wizard-keys { gap: var(--space-3); }
-.wizard-keys .ui-dl-item { grid-template-columns: max-content 1fr; gap: var(--space-6); align-items: center; }
-.wizard-keys .ui-dl-value { color: var(--text-muted); }
 
 .wizard-foot {
   flex: none;

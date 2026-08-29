@@ -1,5 +1,4 @@
 import { Show, type JSX } from 'solid-js'
-import { cx } from './cx'
 import { createDismissable } from './dismissable'
 
 // Modal chrome. Behaviour comes from createDismissable. See docs/ui-design.md § Chrome and
@@ -22,7 +21,6 @@ export function Modal(props: {
    *  the element is created before it is in the document, so this is a `queueMicrotask` focus, which
    *  two call sites were duplicating with identical comments. */
   autoFocus?: () => HTMLElement | undefined
-  class?: string
   children: JSX.Element
 }) {
   let dialog!: HTMLDivElement
@@ -38,7 +36,7 @@ export function Modal(props: {
     <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
       <div
         ref={dialog}
-        class={cx('overlay', props.class)}
+        class="overlay"
         data-size={props.size ?? 'md'}
         data-align={props.align ?? 'top'}
         data-layout={props.layout ?? 'stack'}
@@ -58,10 +56,10 @@ export function Modal(props: {
   )
 }
 
-Modal.Body = (props: { class?: string; children: JSX.Element }) => (
-  <div class={cx('overlay-body', props.class)}>{props.children}</div>
+Modal.Body = (props: { children: JSX.Element }) => (
+  <div class="overlay-body">{props.children}</div>
 )
 
-Modal.Actions = (props: { class?: string; children: JSX.Element }) => (
-  <div class={cx('ui-modal-actions', props.class)}>{props.children}</div>
+Modal.Actions = (props: { children: JSX.Element }) => (
+  <div class="ui-modal-actions">{props.children}</div>
 )

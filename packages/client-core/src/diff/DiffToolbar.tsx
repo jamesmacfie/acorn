@@ -20,7 +20,6 @@ export function DiffToolbar(props: { find: DiffFindController; viewMode: Accesso
     <div class="diff-toolbar">
       <Show when={props.find.findOpen()}>
         <FindBar
-          class="diff-find"
           ref={(element) => { findInput = element }}
           placeholder="Find in diff…"
           query={props.find.findQuery()}
@@ -35,7 +34,6 @@ export function DiffToolbar(props: { find: DiffFindController; viewMode: Accesso
             <ToggleButton
               variant="bare"
               size="sm"
-              class="diff-find-btn"
               {...tip('Match case')}
               pressed={props.find.findCase()}
               onPressedChange={(pressed) => props.find.setFindCase(pressed)}
@@ -48,7 +46,6 @@ export function DiffToolbar(props: { find: DiffFindController; viewMode: Accesso
       {/* aria-pressed on two mutually exclusive buttons said "two independent toggles"; this is one
           value with two options, which is a radiogroup, and it gains arrow keys. */}
       <SegmentedControl
-        class="diff-viewmode"
         ariaLabel="Diff view mode"
         size="sm"
         value={props.viewMode()}

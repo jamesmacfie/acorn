@@ -1,4 +1,4 @@
-import { createMemo, For, Show } from 'solid-js'
+import { createMemo, Show } from 'solid-js'
 import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 import { Select } from '../ui/primitives'
 
@@ -26,24 +26,16 @@ export default function ModelConnectionPicker(props: {
         <Select
           title="Model provider"
           value={current()?.connection.id ?? ''}
-          onChange={(e) => {
-            const next = props.connections.find((c) => c.connection.id === e.currentTarget.value)
-            props.onChange({ connectionId: e.currentTarget.value, modelId: defaultModelIdFor(next) })
-          }}
-        >
-          <For each={props.connections}>
-            {(c) => <option value={c.connection.id}>{c.connection.label || c.provider.label}</option>}
-          </For>
-        </Select>
+          onChange={(value) => {
+            const next = props.connections.find((c) => c.connection.id === value)
+            props.onChange({ connectionId: value, modelId: defaultModelIdFor(next) })
+          }} options={[...props.connections.map((c) => ({ value: c.connection.id, label: c.connection.label || c.provider.label }))]} />
       </Show>
       <Show when={models().length}>
         <Select
           title="Model"
           value={props.modelId}
-          onChange={(e) => props.onChange({ connectionId: current()?.connection.id ?? '', modelId: e.currentTarget.value })}
-        >
-          <For each={models()}>{(m) => <option value={m.id}>{m.label}</option>}</For>
-        </Select>
+          onChange={(value) => props.onChange({ connectionId: current()?.connection.id ?? '', modelId: value })} options={[...models().map((m) => ({ value: m.id, label: m.label }))]} />
       </Show>
     </>
   )

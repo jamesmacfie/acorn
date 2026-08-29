@@ -243,7 +243,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
       density="compact"
       reveal
       selected={isActive(rowProps.scope, rowProps.note.slug)}
-      onActivate={() => void open(rowProps.scope, rowProps.note.slug)}
+      onPress={() => void open(rowProps.scope, rowProps.note.slug)}
       leading={<IncludeDot scope={rowProps.scope} note={rowProps.note} />}
       meta={authorBadge(rowProps.note.author)}
       trailing={
@@ -252,8 +252,8 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
           size="sm"
           iconOnly
           title={deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? `Click again to remove “${rowProps.note.slug}”` : 'Delete note'}
-          aria-label="Delete note"
-          onClick={() => void remove(rowProps.scope, rowProps.note.slug)}
+          label="Delete note"
+          onPress={() => void remove(rowProps.scope, rowProps.note.slug)}
         >{deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}` ? '?' : '✕'}</Button>
       }
     >
@@ -264,7 +264,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
   const GroupHeader = (headProps: { label: string; count: number; scope: NoteScope }) => (
     <div class="notes-group-head">
       <span class="notes-group-label">{headProps.label} ({headProps.count})</span>
-      <Button variant="bare" size="sm" iconOnly tone="accent" title={`New ${headProps.label} note`} aria-label={`New ${headProps.label} note`} disabled={!locationFor(headProps.scope)} onClick={() => void createIn(headProps.scope)}>+</Button>
+      <Button variant="bare" size="sm" iconOnly tone="accent" title={`New ${headProps.label} note`} label={`New ${headProps.label} note`} disabled={!locationFor(headProps.scope)} onPress={() => void createIn(headProps.scope)}>+</Button>
     </div>
   )
 
@@ -272,8 +272,8 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
     <section class="pane notes-pane">
       <div class="section-header notes-header">
         <span>Notes — {props.workspace?.name ?? 'workspace'}</span>
-        <Input class="notes-filter" kind="filter" type="text" placeholder="filter…" value={filter()} onInput={(e) => setFilter(e.currentTarget.value)} />
-        <Button variant="bare" size="sm" iconOnly title={collapsed() ? 'Show library' : 'Hide library'} aria-label={collapsed() ? 'Show library' : 'Hide library'} onClick={() => setLibraryCollapsed(props.task.id, !collapsed())}>{collapsed() ? '▶' : '◀'}</Button>
+        <Input kind="filter" type="text" placeholder="filter…" value={filter()} onInput={(value) => setFilter(value)} />
+        <Button variant="bare" size="sm" iconOnly title={collapsed() ? 'Show library' : 'Hide library'} label={collapsed() ? 'Show library' : 'Hide library'} onPress={() => setLibraryCollapsed(props.task.id, !collapsed())}>{collapsed() ? '▶' : '◀'}</Button>
       </div>
       <Show when={actionError()}><Alert>{actionError()}</Alert></Show>
       <Show when={api} fallback={<EmptyState>Notes need the desktop app.</EmptyState>}>
@@ -281,8 +281,6 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
             is still there: ListDetail then has one track rather than a zero-width first one. */}
         <ListDetail
           listLabel="Notes library"
-          listClass="notes-list"
-          detailClass="notes-main"
           list={collapsed() ? undefined : (
             <>
               <GroupHeader label="Task" count={taskOther().length + 1} scope="task" />
@@ -290,7 +288,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                 <Row
                   density="compact"
                   selected={isActive('task', SCRATCHPAD_SLUG)}
-                  onActivate={() => landScratchpad()}
+                  onPress={() => landScratchpad()}
                   leading={<span class="notes-include-dot placeholder" />}
                 >
                   Scratchpad
@@ -311,7 +309,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
           <Show when={selected()} fallback={<EmptyState>Select or create a note.</EmptyState>}>
             {(sel) => (
               <>
-                <Toolbar class="notes-toolbar" size="sm" ariaLabel="Note actions">
+                <Toolbar size="sm" ariaLabel="Note actions">
                   <input
                     ref={titleInputRef}
                     class="notes-title-input"
@@ -333,13 +331,12 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                     disabled={sel().virtual}
                     onClick={() => void toggleIncluded(sel().scope, sel().slug, !selectedIncluded())}
                   />
-                  <Button size="sm" onClick={() => { scheduleSave.flush(); setPreview(!preview()) }}>{preview() ? 'Edit' : 'Preview'}</Button>
+                  <Button size="sm" onPress={() => { scheduleSave.flush(); setPreview(!preview()) }}>{preview() ? 'Edit' : 'Preview'}</Button>
                   {/* `saving…` is a live status and stays; the completed save is an event, so it toasts. */}
                   <span class="notes-save-state muted">{saving() ? 'saving…' : ''}</span>
                 </Toolbar>
                 <Show when={!preview()} fallback={
                   <Markdown
-                    class="notes-preview"
                     text={body()}
                     copy
                     onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.task.id })}
@@ -360,7 +357,7 @@ export default function NotesPane(props: { task: Task; workspace: Workspace | nu
                     size="sm"
                     tone="accent"
                     disabled={sel().virtual}
-                    onClick={() => openPane(props.task.id, 'context', { kind: 'context:reveal', sectionId: 'notes', itemId: `${sel().scope}:${sel().slug}` })}
+                    onPress={() => openPane(props.task.id, 'context', { kind: 'context:reveal', sectionId: 'notes', itemId: `${sel().scope}:${sel().slug}` })}
                   >
                     view in Context →
                   </Button>

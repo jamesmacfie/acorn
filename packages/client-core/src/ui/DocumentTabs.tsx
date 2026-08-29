@@ -1,5 +1,4 @@
 import { createEffect, For, Show, type JSX } from 'solid-js'
-import { cx } from './cx'
 import Icon from './Icon'
 import { Button, StatusDot } from './primitives'
 
@@ -36,7 +35,6 @@ export function DocumentTabs(props: {
   actions?: JSX.Element
   idPrefix: string
   ariaLabel: string
-  class?: string
 }) {
   let stripRef: HTMLDivElement | undefined
 
@@ -60,7 +58,7 @@ export function DocumentTabs(props: {
   }
 
   return (
-    <div class={cx('ui-doctabs', props.class)}>
+    <div class="ui-doctabs">
       <div
         ref={stripRef}
         class="ui-doctabs-strip"
@@ -102,7 +100,7 @@ export function DocumentTabs(props: {
               </Show>
               <span class="ui-doctab-text">{tab.label}</span>
               <Show when={tab.dirty}>
-                <StatusDot class="ui-doctab-dirty" tone="accent" label="Unsaved changes" />
+                <StatusDot tone="accent" label="Unsaved changes" />
               </Show>
             </button>
             <Show when={props.onClose}>
@@ -110,9 +108,8 @@ export function DocumentTabs(props: {
                 variant="bare"
                 size="sm"
                 iconOnly
-                class="ui-doctab-close"
-                aria-label={`Close ${tab.label}`}
-                onClick={() => props.onClose?.(tab.id)}
+                label={`Close ${tab.label}`}
+                onPress={() => props.onClose?.(tab.id)}
               >
                 <Icon name="x" />
               </Button>

@@ -38,19 +38,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.editor-save.ui-btn {
-  margin-left: auto;
-  flex: none;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-5);
-  cursor: pointer;
-}
-.editor-save:hover { background: var(--bg-hover); border-color: var(--accent); }
 .editor-host {
   flex: 1;
   min-height: 0;
@@ -60,8 +47,6 @@
 /* TreeRow owns the row, the twist and the depth indentation, replacing the nested-<ul> padding this
    tree used, which is why `.tree .tree` is gone. What is left is the tree's tighter row height. */
 .tree { list-style: none; margin: 0; padding: 0; }
-.tree-file.ui-row,
-.tree-dir.ui-row { min-height: auto; padding-block: 3px; }
 
 /* The file tab bar is DocumentTabs with nothing added: the strip, the tabs, the mono filenames, the
    dirty dot, the close buttons and the strip height all come from the primitive. This pane used to

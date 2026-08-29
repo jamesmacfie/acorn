@@ -1,6 +1,6 @@
-import { createMemo, createResource, For, Index, Show } from 'solid-js'
+import { createMemo, createResource, Index, Show } from 'solid-js'
 import { Alert, Button, Field, Input, SectionHeader, SegmentedControl, Select } from '../ui/primitives'
-import { CollapsibleSection } from '../ui/CollapsibleSection'
+import { CollapsibleSection } from '../ui/Fold'
 import Icon from '../ui/Icon'
 import { chartAxisFields, type ChartShape } from './chart'
 import type { PanelDraft } from './draft'
@@ -76,7 +76,7 @@ const AGGREGATES: readonly { value: PanelAggregate; label: string }[] = [
 ]
 
 export const removeButton = (label: string, onClick: () => void) => (
-  <Button size="xs" variant="ghost" iconOnly aria-label={label} onClick={onClick}>
+  <Button size="xs" variant="ghost" iconOnly label={label} onPress={onClick}>
     <Icon name="x" />
   </Button>
 )
@@ -107,7 +107,7 @@ export function ColdNotice(props: { draft: PanelDraft }) {
   const cold = () => props.draft.cold()
   return (
     <Show when={cold().length}>
-      <Alert tone="info">
+      <Alert tone="muted">
         {cold().map((page) => props.draft.nameOf(page.query)).join(', ')}{' '}
         {cold().length === 1 ? 'describes itself' : 'describe themselves'} in the answer and{' '}
         {cold().length === 1 ? 'has' : 'have'} not been read on this device yet, so there are no
@@ -182,7 +182,7 @@ export function TitleField(props: { draft: PanelDraft; ref?: (el: HTMLInputEleme
       <Input
         ref={props.ref}
         value={props.draft.title()}
-        onInput={(event) => props.draft.typeTitle(event.currentTarget.value)}
+        onInput={(value) => props.draft.typeTitle(value)}
       />
     </Field>
   )
@@ -265,18 +265,15 @@ export function ViewOptions(props: { draft: PanelDraft }) {
       <Show when={draft().view().kind === 'stat' || draft().view().kind === 'chart'}>
         <div class="dash-editor-pair">
           <Field label="Measure">
+            {/* Only `count` when there is no number to add up. Offering "Sum of" against a
+                collection of text fields is a choice that can only ever draw an em dash. */}
             <Select
               size="sm"
-              aria-label="Aggregate"
+              label="Aggregate"
               value={draft().view().aggregate ?? 'count'}
-              onChange={(event) => draft().chooseAggregate(event.currentTarget.value as PanelAggregate)}
-            >
-              {/* Only `count` when there is no number to add up. Offering "Sum of" against a
-                  collection of text fields is a choice that can only ever draw an em dash. */}
-              <For each={draft().numbers().length ? AGGREGATES : AGGREGATES.slice(0, 1)}>
-                {(option) => <option value={option.value}>{option.label}</option>}
-              </For>
-            </Select>
+              options={(draft().numbers().length ? AGGREGATES : AGGREGATES.slice(0, 1)).map((option) => ({ value: option.value, label: option.label }))}
+              onChange={(value) => draft().chooseAggregate(value as PanelAggregate)}
+            />
           </Field>
           {/* Only a number can be summed or averaged, so only number fields are offered: the same
               gate as the view list, one level down. */}
@@ -354,7 +351,7 @@ export function MappingSection(props: { draft: PanelDraft }) {
         level="sub"
         actions={(
           <>
-            <Button size="xs" variant="ghost" onClick={draft().addColumn}>
+            <Button size="xs" variant="ghost" onPress={draft().addColumn}>
               <Icon name="plus" /> Add column
             </Button>
             <Button
@@ -362,7 +359,7 @@ export function MappingSection(props: { draft: PanelDraft }) {
               variant="ghost"
               disabled={!draft().columns().length}
               title="Map each source value onto the column whose name matches it"
-              onClick={draft().suggestValues}
+              onPress={draft().suggestValues}
             >
               Suggest
             </Button>
@@ -379,9 +376,9 @@ export function MappingSection(props: { draft: PanelDraft }) {
               <li class="dash-editor-row">
                 <Input
                   size="sm"
-                  aria-label="Column name"
+                  label="Column name"
                   value={column().label}
-                  onInput={(event) => draft().editColumn(index, { label: event.currentTarget.value })}
+                  onInput={(value) => draft().editColumn(index, { label: value })}
                 />
                 <ToneSelect
                   ariaLabel={`${column().label} tone`}
@@ -446,7 +443,7 @@ export function MappingSection(props: { draft: PanelDraft }) {
           <SectionHeader
             level="sub"
             actions={(
-              <Button size="xs" variant="ghost" onClick={draft().addField}>
+              <Button size="xs" variant="ghost" onPress={draft().addField}>
                 <Icon name="plus" /> Add field
               </Button>
             )}
@@ -460,9 +457,9 @@ export function MappingSection(props: { draft: PanelDraft }) {
                   <li class="dash-editor-row">
                     <Input
                       size="sm"
-                      aria-label="Field name"
+                      label="Field name"
                       value={field().label}
-                      onInput={(event) => draft().editField(index, { label: event.currentTarget.value })}
+                      onInput={(value) => draft().editField(index, { label: value })}
                     />
                     <FieldTypeSelect
                       ariaLabel={`${field().label} type`}
@@ -516,7 +513,7 @@ export function ShapingSection(props: { draft: PanelDraft }) {
           <Button
             size="xs"
             variant="ghost"
-            onClick={() => draft().patch({ filters: [...draft().filters(), defaultFilterFor(draft().schema().fields[0])] })}
+            onPress={() => draft().patch({ filters: [...draft().filters(), defaultFilterFor(draft().schema().fields[0])] })}
           >
             <Icon name="plus" /> Add filter
           </Button>
@@ -570,7 +567,7 @@ export function ShapingSection(props: { draft: PanelDraft }) {
           <Button
             size="xs"
             variant="ghost"
-            onClick={() => draft().patch({
+            onPress={() => draft().patch({
               sort: [...draft().sort(), { field: draft().schema().fields[0].id, direction: 'asc' }],
             })}
           >
@@ -609,7 +606,7 @@ export function ShapingSection(props: { draft: PanelDraft }) {
         <Index each={draft().visible()}>
           {(id, index) => (
             <li class="dash-editor-field">
-              <Button size="xs" variant="ghost" iconOnly aria-label="Hide field" onClick={() => draft().toggleField(id(), false)}>
+              <Button size="xs" variant="ghost" iconOnly label="Hide field" onPress={() => draft().toggleField(id(), false)}>
                 <Icon name="eye" />
               </Button>
               <span class="dash-editor-field-name">{draft().fieldById(id())?.name ?? id()}</span>
@@ -617,9 +614,9 @@ export function ShapingSection(props: { draft: PanelDraft }) {
                 size="xs"
                 variant="ghost"
                 iconOnly
-                aria-label="Move up"
+                label="Move up"
                 disabled={index === 0}
-                onClick={() => draft().moveField(index, -1)}
+                onPress={() => draft().moveField(index, -1)}
               >
                 <Icon name="chevron-up" />
               </Button>
@@ -627,9 +624,9 @@ export function ShapingSection(props: { draft: PanelDraft }) {
                 size="xs"
                 variant="ghost"
                 iconOnly
-                aria-label="Move down"
+                label="Move down"
                 disabled={index === draft().visible().length - 1}
-                onClick={() => draft().moveField(index, 1)}
+                onPress={() => draft().moveField(index, 1)}
               >
                 <Icon name="chevron-down" />
               </Button>
@@ -639,7 +636,7 @@ export function ShapingSection(props: { draft: PanelDraft }) {
         <Index each={draft().hidden()}>
           {(field) => (
             <li class="dash-editor-field" data-hidden="">
-              <Button size="xs" variant="ghost" iconOnly aria-label="Show field" onClick={() => draft().toggleField(field().id, true)}>
+              <Button size="xs" variant="ghost" iconOnly label="Show field" onPress={() => draft().toggleField(field().id, true)}>
                 <Icon name="eye-off" />
               </Button>
               <span class="dash-editor-field-name muted">{field().name}</span>
@@ -664,7 +661,7 @@ export function LimitField(props: { draft: PanelDraft }) {
         min="0"
         placeholder="All rows"
         value={props.draft.limitText()}
-        onInput={(event) => props.draft.setLimitText(event.currentTarget.value)}
+        onInput={(value) => props.draft.setLimitText(value)}
       />
     </Field>
   )
@@ -679,7 +676,7 @@ export function RefreshField(props: { draft: PanelDraft }) {
         min="0"
         placeholder={refreshPlaceholder(props.draft.pages().map((page) => props.draft.entryFor(page.query)?.refresh))}
         value={props.draft.refreshText()}
-        onInput={(event) => props.draft.setRefreshText(event.currentTarget.value)}
+        onInput={(value) => props.draft.setRefreshText(value)}
       />
     </Field>
   )

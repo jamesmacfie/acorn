@@ -23,11 +23,6 @@
   color: var(--text);
 }
 
-/* Dev-only node switcher, for switching between paired nodes while developing. */
-.node-switcher {
-  max-width: 180px;
-}
-
 .nodes-settings {
   display: flex;
   flex-direction: column;
@@ -84,9 +79,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-}
-.node-danger {
-  color: var(--danger);
 }
 .provided-nodes {
   display: flex;
@@ -279,8 +271,6 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-.node-devices-toggle { align-self: flex-start; }
-.node-devices-toggle.ui-btn[data-variant='bare'] { font-size: var(--fs-xs); }
 .node-device-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .node-device { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
 .node-device-name { font-weight: var(--fw-medium); }

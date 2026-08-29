@@ -146,8 +146,8 @@ export default function ChangesPane(props: { task: Task }) {
               iconOnly
               tone="danger"
               title="Delete note"
-              aria-label="Delete note"
-              onClick={() => void deleteReviewNote(props.task.id, note.id).then(() => refetchNotes())}
+              label="Delete note"
+              onPress={() => void deleteReviewNote(props.task.id, note.id).then(() => refetchNotes())}
             >✕</Button>
           </div>
         )}
@@ -236,19 +236,19 @@ export default function ChangesPane(props: { task: Task }) {
         </Show>
         <Show when={groups().staged.length || groups().unstaged.length}>
           <span class="changes-toolbar">
-            <Button variant="bare" size="sm" iconOnly disabled={!groups().unstaged.length} data-tip="Stage all" data-tip-sub="git add -A" onClick={() => void gitAction(() => localGitApi.stageAll(props.task.id))}>++</Button>
-            <Button variant="bare" size="sm" iconOnly disabled={!groups().staged.length} data-tip="Unstage all" data-tip-sub="git reset" onClick={() => void gitAction(() => localGitApi.unstageAll(props.task.id))}>−−</Button>
-            <Button variant="bare" size="sm" iconOnly data-armed={discardArmed.armed() === 'all' ? '' : undefined} data-tip={discardArmed.armed() === 'all' ? 'Click again to discard all' : 'Discard all'} data-tip-sub="Reset tracked + remove untracked — cannot be undone" onClick={() => void discardAll()}>{discardArmed.armed() === 'all' ? '?' : '↺'}</Button>
+            <Button variant="bare" size="sm" iconOnly disabled={!groups().unstaged.length} tip="Stage all" tipSub="git add -A" onPress={() => void gitAction(() => localGitApi.stageAll(props.task.id))}>++</Button>
+            <Button variant="bare" size="sm" iconOnly disabled={!groups().staged.length} tip="Unstage all" tipSub="git reset" onPress={() => void gitAction(() => localGitApi.unstageAll(props.task.id))}>−−</Button>
+            <Button variant="bare" size="sm" iconOnly armed={discardArmed.armed() === 'all'} tip={discardArmed.armed() === 'all' ? 'Click again to discard all' : 'Discard all'} tipSub="Reset tracked + remove untracked — cannot be undone" onPress={() => void discardAll()}>{discardArmed.armed() === 'all' ? '?' : '↺'}</Button>
           </span>
         </Show>
-        <Button disabled={pushing()} data-tip="Push to origin" data-tip-sub="git push -u origin HEAD" onClick={() => void push()}>
+        <Button disabled={pushing()} tip="Push to origin" tipSub="git push -u origin HEAD" onPress={() => void push()}>
           {pushing() ? 'Pushing…' : 'Push → origin'}
         </Button>
         <Show when={pushMsg()}>
           <span class="changes-push-status">{pushMsg()}</span>
         </Show>
         <Show when={unsent().length}>
-          <Button title="Bracketed-paste the unsent notes into the task's agent (queued until idle)" onClick={() => void sendNotes()}>
+          <Button title="Bracketed-paste the unsent notes into the task's agent (queued until idle)" onPress={() => void sendNotes()}>
             Send {unsent().length} note{unsent().length === 1 ? '' : 's'} → agent{agentSessionsFor(props.task.id)[0]?.idle ? ' ●' : ''}
           </Button>
         </Show>
@@ -259,7 +259,6 @@ export default function ChangesPane(props: { task: Task }) {
       </div>
       <ListDetail
         listLabel="Changed files"
-        listClass="changes-list"
         list={
           <>
             <For each={[{ title: 'Staged', list: groups().staged }, { title: 'Changes', list: groups().unstaged }]}>
@@ -274,7 +273,7 @@ export default function ChangesPane(props: { task: Task }) {
                           density="compact"
                           reveal
                           selected={selected() != null && changeKey(selected()!) === changeKey(c)}
-                          onActivate={() => {
+                          onPress={() => {
                             setSelectedKey(changeKey(c))
                             // The viewer skips a scroll to the file it last targeted, so clicking the
                             // same row twice would do nothing. This is the force-scroll signal.
@@ -294,20 +293,20 @@ export default function ChangesPane(props: { task: Task }) {
                             when={c.staged}
                             fallback={
                               <>
-                                <Button variant="bare" size="sm" iconOnly data-tip="Stage file" data-tip-sub="git add" onClick={() => void gitAction(() => localGitApi.stage(props.task.id, c.path))}>+</Button>
-                                <Button variant="bare" size="sm" iconOnly data-armed={discardArmed.armed() === `file:${c.path}` ? '' : undefined} data-tip={discardArmed.armed() === `file:${c.path}` ? 'Click again to discard' : 'Discard changes'} data-tip-sub="Restore this file — cannot be undone" onClick={() => void discard(c.path, c.status === 'untracked')}>{discardArmed.armed() === `file:${c.path}` ? '?' : '↺'}</Button>
+                                <Button variant="bare" size="sm" iconOnly tip="Stage file" tipSub="git add" onPress={() => void gitAction(() => localGitApi.stage(props.task.id, c.path))}>+</Button>
+                                <Button variant="bare" size="sm" iconOnly armed={discardArmed.armed() === `file:${c.path}`} tip={discardArmed.armed() === `file:${c.path}` ? 'Click again to discard' : 'Discard changes'} tipSub="Restore this file — cannot be undone" onPress={() => void discard(c.path, c.status === 'untracked')}>{discardArmed.armed() === `file:${c.path}` ? '?' : '↺'}</Button>
                               </>
                             }
                           >
-                            <Button variant="bare" size="sm" iconOnly data-tip="Unstage file" data-tip-sub="git restore --staged" onClick={() => void gitAction(() => localGitApi.unstage(props.task.id, c.path))}>−</Button>
+                            <Button variant="bare" size="sm" iconOnly tip="Unstage file" tipSub="git restore --staged" onPress={() => void gitAction(() => localGitApi.unstage(props.task.id, c.path))}>−</Button>
                           </Show>
                           <Button
                             variant="bare"
                             size="sm"
                             iconOnly
-                            data-tip="Send to agent"
-                            data-tip-sub="Add file reference to the composer"
-                            onClick={() => void sendRef(formatFileReference(c.path))}
+                            tip="Send to agent"
+                            tipSub="Add file reference to the composer"
+                            onPress={() => void sendRef(formatFileReference(c.path))}
                           >→</Button>
                           </>}
                         >
@@ -332,7 +331,7 @@ export default function ChangesPane(props: { task: Task }) {
                   onInput={(e) => setCommitMsg(e.currentTarget.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void commit()}
                 />
-                <Button disabled={!commitMsg().trim()} onClick={() => void commit()}>
+                <Button disabled={!commitMsg().trim()} onPress={() => void commit()}>
                   Commit staged
                 </Button>
               </div>

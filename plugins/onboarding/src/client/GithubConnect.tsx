@@ -34,7 +34,7 @@ export default function GithubConnect(props: {
             <Show
               when={flow.device()}
               fallback={
-                <Button class="wizard-primary" onClick={() => void flow.start()} disabled={flow.busy()}>
+                <Button onPress={() => void flow.start()} disabled={flow.busy()}>
                   {flow.busy() ? 'Starting…' : 'Get a code'}
                 </Button>
               }
@@ -48,9 +48,9 @@ export default function GithubConnect(props: {
                   </div>
                   {/* A real link, not a fetch: main's setWindowOpenHandler routes it through
                       isAllowedExternalUrl → shell.openExternal, so it opens in the owner's browser. */}
-                  <Button href={started().verificationUri} target="_blank" rel="noopener noreferrer">Open GitHub</Button>
+                  <Button href={started().verificationUri}>Open GitHub</Button>
                   <p class="wizard-waiting">Waiting for approval…</p>
-                  <Button variant="bare" class="wizard-link" onClick={flow.cancel}>Cancel</Button>
+                  <Button variant="bare" onPress={flow.cancel}>Cancel</Button>
                 </div>
               )}
             </Show>
@@ -87,7 +87,7 @@ export default function GithubConnect(props: {
             </span>
           </div>
         </Show>
-        <Button variant="solid" tone="accent" disabled={!props.added.length} onClick={props.onContinue}>
+        <Button variant="solid" tone="accent" disabled={!props.added.length} onPress={props.onContinue}>
           {props.added.length ? 'Done adding' : 'Add a repository to continue'}
         </Button>
       </Show>

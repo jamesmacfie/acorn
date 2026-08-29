@@ -394,7 +394,6 @@ export default function TabRail() {
               {/* The rail keeps owning which menu is open, because Cmd+1-9 navigation closes it and
                   that decision cannot live inside one menu instance. */}
               <Menu
-                class="tabrail-menu"
                 ariaLabel={`Actions for ${w.title}`}
                 placement="right-start"
                 open={() => menuId() === w.id}
@@ -460,11 +459,7 @@ export default function TabRail() {
               <div class="overlay-body">
                 <Show when={d().mode === 'new'}>
                   <p class="muted">{selectedProject()?.vcs === 'git' && !noBranch() ? 'A local-first task on a new branch.' : 'Runs in the project folder.'}</p>
-                  <Select value={newProject()} onChange={(e) => setNewProject(e.currentTarget.value)}>
-                    <For each={newProjectOptions()}>
-                      {(project) => <option value={project.id}>{project.name}</option>}
-                    </For>
-                  </Select>
+                  <Select value={newProject()} onChange={(value) => setNewProject(value)} options={[...newProjectOptions().map((project) => ({ value: project.id, label: project.name }))]} />
                 </Show>
                 <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
                   <Show when={draftErr()}><Alert>{draftErr()}</Alert></Show>
@@ -496,14 +491,13 @@ export default function TabRail() {
                     </Show>
                     <Checkbox
                       size="sm"
-                      class="tabrail-nobranch"
                       label="Use the project folder and its current branch"
                       title="The task works in the project folder on whatever branch is checked out, with no worktree"
                       checked={noBranch()}
-                      onChange={(e) => setNoBranch(e.currentTarget.checked)}
+                      onChange={(checked) => setNoBranch(checked)}
                     />
                   </Show>
-                  <Button type="submit" disabled={!text().trim() || (d().mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch() && !effectiveBranch())}>
+                  <Button submit disabled={!text().trim() || (d().mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch() && !effectiveBranch())}>
                     {d().mode === 'new' ? 'Create' : 'Save'}
                   </Button>
                 </form>

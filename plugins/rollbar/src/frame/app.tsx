@@ -133,18 +133,15 @@ export function RollbarFrameApp(props: { bridge: AcornBridge }) {
       <ListDetail
         listWidth="narrow"
         listLabel="Linked Rollbar items"
-        listClass="rb-targets"
-        detailClass="rb-content"
         detailAs="main"
         scrollDetail
         list={linkedTargets().length > 1
           ? (
             <For each={linkedTargets()}>{(target) => (
               <Row
-                class="rb-target"
                 density="compact"
                 selected={view() ? targetKey(view()!.target) === targetKey(target) : false}
-                onActivate={() => void load(target)}
+                onPress={() => void load(target)}
               >
                 #{target.identifier}
               </Row>

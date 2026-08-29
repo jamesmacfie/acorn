@@ -18,16 +18,6 @@
 .copy-btn:hover {
   color: var(--text);
 }
-/* Push to the hard-right edge of a flex header (e.g. the Description summary). */
-.copy-right {
-  margin-left: auto;
-}
-/* Pin to the top-right of a positioned card (e.g. a comment). */
-.copy-abs {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
 .comment-card {
   position: relative;
 }

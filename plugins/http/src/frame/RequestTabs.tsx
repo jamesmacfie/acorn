@@ -1,7 +1,7 @@
 // The request half of the API panel: Params / Body / Headers / Auth / Vars.
 // The mode selectors for Body and Auth sit in the tab strip's right slot rather than inside their
 // panels, Bruno's arrangement, and it keeps the current mode visible from any tab.
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, Show } from 'solid-js'
 import { Input, KeyValueEditor, Select, type TabDef, Tabs, Textarea } from '@acorn/plugin-api/ui'
 import { authModes, bodyModes, joinUrl, parseFormBody, splitUrl, type AuthConfig, type BodyMode, type KeyValue } from '../shared/model'
 import type { Draft } from './draft'
@@ -17,7 +17,6 @@ type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'vars'
 function KeyValueTable(props: { rows: KeyValue[]; onChange: (rows: KeyValue[]) => void; nameLabel?: string; valueLabel?: string }) {
   return (
     <KeyValueEditor
-      class="http-grid"
       ariaLabel={`${props.nameLabel ?? 'Name'} / ${props.valueLabel ?? 'Value'}`}
       keyPlaceholder={props.nameLabel ?? 'Name'}
       valuePlaceholder={props.valueLabel ?? 'Value'}
@@ -63,11 +62,11 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
             <>
               <label class="http-field">
                 <span>Username</span>
-                <Input size="sm" value={auth().username} onInput={(e) => props.onChange({ ...auth(), username: e.currentTarget.value })} />
+                <Input size="sm" value={auth().username} onInput={(value) => props.onChange({ ...auth(), username: value })} />
               </label>
               <label class="http-field">
                 <span>Password</span>
-                <Input size="sm" type="password" value={auth().password} onInput={(e) => props.onChange({ ...auth(), password: e.currentTarget.value })} />
+                <Input size="sm" type="password" value={auth().password} onInput={(value) => props.onChange({ ...auth(), password: value })} />
               </label>
             </>
           )
@@ -80,7 +79,7 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
           return (
             <label class="http-field">
               <span>Token</span>
-              <Input size="sm" value={auth().token} placeholder="{{TOKEN}}" onInput={(e) => props.onChange({ mode: 'bearer', token: e.currentTarget.value })} />
+              <Input size="sm" value={auth().token} placeholder="{{TOKEN}}" onInput={(value) => props.onChange({ mode: 'bearer', token: value })} />
             </label>
           )
         })()}
@@ -93,18 +92,15 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
             <>
               <label class="http-field">
                 <span>Key</span>
-                <Input size="sm" value={auth().key} placeholder="X-API-Key" onInput={(e) => props.onChange({ ...auth(), key: e.currentTarget.value })} />
+                <Input size="sm" value={auth().key} placeholder="X-API-Key" onInput={(value) => props.onChange({ ...auth(), key: value })} />
               </label>
               <label class="http-field">
                 <span>Value</span>
-                <Input size="sm" value={auth().value} placeholder="{{API_KEY}}" onInput={(e) => props.onChange({ ...auth(), value: e.currentTarget.value })} />
+                <Input size="sm" value={auth().value} placeholder="{{API_KEY}}" onInput={(value) => props.onChange({ ...auth(), value: value })} />
               </label>
               <label class="http-field">
                 <span>Send in</span>
-                <Select size="sm" width="narrow" value={auth().placement} onChange={(e) => props.onChange({ ...auth(), placement: e.currentTarget.value as 'header' | 'query' })}>
-                  <option value="header">Header</option>
-                  <option value="query">Query string</option>
-                </Select>
+                <Select size="sm" width="narrow" value={auth().placement} onChange={(value) => props.onChange({ ...auth(), placement: value as 'header' | 'query' })} options={[{ value: 'header', label: 'Header' }, { value: 'query', label: 'Query string' }]} />
               </label>
             </>
           )
@@ -153,7 +149,6 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
           Bruno's arrangement, and it keeps the current mode visible from any tab. Was a sibling div
           plus a `.ui-tabs` override to make room for it. */}
       <Tabs
-        class="http-tabstrip"
         tabs={tabs()}
         active={tab()}
         onChange={(id) => setTab(id as RequestTab)}
@@ -162,20 +157,16 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
         actions={
           <>
             <Show when={tab() === 'body'}>
-              <Select size="sm" width="narrow" value={props.draft.bodyMode} aria-label="Body type" onChange={(e) => props.patch({ bodyMode: e.currentTarget.value as BodyMode })}>
-                <For each={bodyModes}>{(m) => <option value={m}>{m === 'form' ? 'form-urlencoded' : m}</option>}</For>
-              </Select>
+              <Select size="sm" width="narrow" value={props.draft.bodyMode} label="Body type" onChange={(value) => props.patch({ bodyMode: value as BodyMode })} options={[...bodyModes.map((m) => ({ value: m, label: m === 'form' ? 'form-urlencoded' : m }))]} />
             </Show>
             <Show when={tab() === 'auth'}>
-              <Select size="sm" width="narrow" value={props.draft.auth.mode} aria-label="Auth type" onChange={(e) => props.patch({ auth: emptyAuth(e.currentTarget.value as AuthConfig['mode']) })}>
-                <For each={authModes}>{(m) => <option value={m}>{m === 'apikey' ? 'API key' : m}</option>}</For>
-              </Select>
+              <Select size="sm" width="narrow" value={props.draft.auth.mode} label="Auth type" onChange={(value) => props.patch({ auth: emptyAuth(value as AuthConfig['mode']) })} options={[...authModes.map((m) => ({ value: m, label: m === 'apikey' ? 'API key' : m }))]} />
             </Show>
           </>
         }
       />
 
-      <Tabs.Panel class="http-tabpanel" idPrefix="http-request" id={tab()} active={tab()}>
+      <Tabs.Panel idPrefix="http-request" id={tab()} active={tab()}>
         <Show when={tab() === 'params'}>
           <p class="http-hint">Query parameters are part of the URL — editing either side keeps the other in step.</p>
           <KeyValueTable rows={params()} onChange={setParams} nameLabel="Parameter" />
@@ -194,11 +185,10 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
           </Show>
           <Show when={props.draft.bodyMode === 'json' || props.draft.bodyMode === 'text'}>
             <Textarea
-              class="http-body-editor"
-              spellcheck={false}
+              assist={false}
               value={props.draft.body}
               placeholder={props.draft.bodyMode === 'json' ? '{\n  "key": "{{value}}"\n}' : 'Request body'}
-              onInput={(e) => props.patch({ body: e.currentTarget.value })}
+              onInput={(value) => props.patch({ body: value })}
             />
           </Show>
         </Show>

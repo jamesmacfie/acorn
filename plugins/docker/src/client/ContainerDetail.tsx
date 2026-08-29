@@ -197,19 +197,19 @@ export default function ContainerDetail(props: { target: string; taskId?: string
               <span class="docker-detail-name" title={d().name}>{d().name}</span>
               <span class="docker-detail-actions">
                 <Show when={!running()}>
-                  <Button disabled={busy()} onClick={() => void act('start')}>Start</Button>
+                  <Button disabled={busy()} onPress={() => void act('start')}>Start</Button>
                 </Show>
                 <Show when={running()}>
-                  <Button disabled={busy()} onClick={() => void act('stop')}>Stop</Button>
-                  <Button disabled={busy()} onClick={() => void act('restart')}>Restart</Button>
+                  <Button disabled={busy()} onPress={() => void act('stop')}>Stop</Button>
+                  <Button disabled={busy()} onPress={() => void act('restart')}>Restart</Button>
                   <Button
                     title={props.taskId ? 'Open a shell in this container in the task terminal' : 'Copy a docker exec command'}
-                    onClick={() => void openExec(d().name)}
+                    onPress={() => void openExec(d().name)}
                   >
                     {props.taskId ? 'Terminal' : 'Copy exec'}
                   </Button>
                 </Show>
-                <Button tone="danger" disabled={busy()} onClick={() => void remove()}>
+                <Button tone="danger" disabled={busy()} onPress={() => void remove()}>
                   {armed.armed() ? 'Sure?' : 'Remove'}
                 </Button>
                 {props.actions}
@@ -235,7 +235,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             />
 
             <Show when={tab() === 'info'}>
-              <DescriptionList class="docker-info" size="sm">
+              <DescriptionList size="sm">
                 <DescriptionList.Item label="ID" mono>{d().id}</DescriptionList.Item>
                 <DescriptionList.Item label="Command" mono>{d().command}</DescriptionList.Item>
                 <DescriptionList.Item label="State">{d().state}{d().exitCode !== null && d().state === 'exited' ? ` (exit ${d().exitCode})` : ''}</DescriptionList.Item>
@@ -251,7 +251,6 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                       <For each={d().ports}>
                         {(p) => (
                           <Chip
-                            class="docker-port-chip"
                             title={p.hostPort ? `Copy http://localhost:${p.hostPort}` : 'Not published'}
                             {...(p.hostPort ? { onActivate: () => copyPort(p) } : {})}
                           >
@@ -274,7 +273,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 <Show when={d().networks.length}><DescriptionList.Item label="Networks" mono>{d().networks.join(', ')}</DescriptionList.Item></Show>
                 <Show when={d().env.length}>
                   <DescriptionList.Item label="Env">
-                    <Show when={showEnv()} fallback={<Button onClick={() => setShowEnv(true)}>Show {d().env.length} variables</Button>}>
+                    <Show when={showEnv()} fallback={<Button onPress={() => setShowEnv(true)}>Show {d().env.length} variables</Button>}>
                       <ul class="docker-env list-reset mono"><For each={d().env}>{(line) => <li>{line}</li>}</For></ul>
                     </Show>
                   </DescriptionList.Item>
@@ -286,7 +285,6 @@ export default function ContainerDetail(props: { target: string; taskId?: string
               {/* The three surfaces that had a find strip disagreed on the keyboard contract;
                   FindBar owns it (⏎ next, ⇧⏎ prev, Esc close) and the count is announced. */}
               <FindBar
-                class="docker-logs-bar"
                 placeholder="Find in logs"
                 query={logQuery()}
                 onQuery={(query) => {
@@ -302,20 +300,19 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 toggles={
                   <>
                     <Checkbox
-                      class="docker-follow"
                       label="Follow"
                       checked={follow()}
-                      onChange={(e) => {
-                        setFollow(e.currentTarget.checked)
+                      onChange={(checked) => {
+                        setFollow(checked)
                         rememberView()
                       }}
                     />
                     <Button
                       variant="bare"
                       size="sm"
-                      data-tip="Clear the current log view"
-                      data-tip-sub="The stream keeps appending"
-                      onClick={() => logBuf()?.clear()}
+                      tip="Clear the current log view"
+                      tipSub="The stream keeps appending"
+                      onPress={() => logBuf()?.clear()}
                     >
                       Clear
                     </Button>
@@ -350,12 +347,12 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             <Show when={tab() === 'stats'}>
               <Show when={stats()} fallback={<EmptyState align="start" busy={!statsEnded() && running()}>{statsEnded() ? 'Stats stream ended (container stopped?).' : running() ? 'Sampling…' : 'Container is not running.'}</EmptyState>}>
                 {(s) => (
-                  <DescriptionList class="docker-info docker-stats" size="sm">
+                  <DescriptionList size="sm">
                     <DescriptionList.Item label="CPU">
-                      <Meter class="docker-meter" tone="auto" label="CPU" value={s().cpuPercent / 100} /> {s().cpuPercent.toFixed(1)}%
+                      <Meter tone="auto" label="CPU" value={s().cpuPercent / 100} /> {s().cpuPercent.toFixed(1)}%
                     </DescriptionList.Item>
                     <DescriptionList.Item label="Memory">
-                      <Meter class="docker-meter" tone="auto" label="Memory" value={s().memPercent / 100} /> {s().memUsage} ({s().memPercent.toFixed(1)}%)
+                      <Meter tone="auto" label="Memory" value={s().memPercent / 100} /> {s().memUsage} ({s().memPercent.toFixed(1)}%)
                     </DescriptionList.Item>
                     <DescriptionList.Item label="Network I/O" mono>{s().netIO}</DescriptionList.Item>
                     <DescriptionList.Item label="Block I/O" mono>{s().blockIO}</DescriptionList.Item>

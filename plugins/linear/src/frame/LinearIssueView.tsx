@@ -81,7 +81,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
         <span class="ln-comment-author">{entry.author ?? 'Unknown'}</span>
         <Show when={relativeTime(entry.createdAt)}>{(age) => <span class="ln-muted">{age()}</span>}</Show>
         <Show when={!isReply}>
-          <Button size="sm" variant="bare" onClick={() => {
+          <Button size="sm" variant="bare" onPress={() => {
             setReplyDraft('')
             setReplyingId(replyingId() === entry.id ? null : entry.id)
           }}>Reply</Button>
@@ -101,12 +101,12 @@ export function LinearIssueView(props: LinearIssueViewProps) {
             rows={3}
             placeholder="Write a reply…"
             value={replyDraft()}
-            onInput={(event) => setReplyDraft(event.currentTarget.value)}
+            onInput={(value) => setReplyDraft(value)}
           />
           <Show when={props.postError}><div class="ln-error" role="alert">{props.postError}</div></Show>
           <div class="ln-composer-actions">
-            <Button size="sm" busy={props.posting} disabled={!replyDraft().trim()} onClick={() => send(replyDraft(), entry.id)}>Reply</Button>
-            <Button size="sm" variant="bare" onClick={() => setReplyingId(null)}>Cancel</Button>
+            <Button size="sm" busy={props.posting} disabled={!replyDraft().trim()} onPress={() => send(replyDraft(), entry.id)}>Reply</Button>
+            <Button size="sm" variant="bare" onPress={() => setReplyingId(null)}>Cancel</Button>
           </div>
         </div>
       </Show>
@@ -122,14 +122,14 @@ export function LinearIssueView(props: LinearIssueViewProps) {
         </div>
         <div class="ln-head-actions">
           <Show when={props.overridden}>
-            <Button size="sm" variant="bare" onClick={props.onBack}>← back</Button>
+            <Button size="sm" variant="bare" onPress={props.onBack}>← back</Button>
           </Show>
-          <Button size="sm" busy={props.refreshing} onClick={props.onRefresh}>Refresh</Button>
+          <Button size="sm" busy={props.refreshing} onPress={props.onRefresh}>Refresh</Button>
           {/* The clipboard, not `ui.openUrl`. The host resolves a URL through its content-link
               ladder, linear's recogniser claims `linear.app/…/issue/…`, and it resolves to the ticket
               already on screen, so the button would re-open where the reader is. A frame cannot ask
               for the browser specifically. See docs/integrations.md § Linear. */}
-          <Button size="sm" onClick={() => props.onCopy(issue().url)}>Copy link</Button>
+          <Button size="sm" onPress={() => props.onCopy(issue().url)}>Copy link</Button>
         </div>
       </header>
 
@@ -159,7 +159,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
 
       <section id="linear-panel-overview" class="ln-panel" role="tabpanel" aria-labelledby="linear-tab-overview" hidden={props.activeTab !== 'overview'}>
         {/* DescriptionList's `facts` layout started as this grid. */}
-        <DescriptionList class="ln-facts" layout="facts">
+        <DescriptionList layout="facts">
           <Show when={issue().assignee}>{(name) => <DescriptionList.Item label="Assignee">{name()}</DescriptionList.Item>}</Show>
           <Show when={issue().creator}>{(name) => <DescriptionList.Item label="Opened by">{name()} {relativeTime(issue().createdAt)}</DescriptionList.Item>}</Show>
           <Show when={issue().estimate != null}><DescriptionList.Item label="Estimate">{issue().estimate} pts</DescriptionList.Item></Show>
@@ -169,10 +169,10 @@ export function LinearIssueView(props: LinearIssueViewProps) {
           <Show when={issue().project}>{(project) => <DescriptionList.Item label="Project">{project().name}</DescriptionList.Item>}</Show>
           <Show when={issue().branchName}>
             {(branch) => (
-              <DescriptionList.Item label="Branch" class="ln-branch-item">
+              <DescriptionList.Item label="Branch">
                 <span class="ln-branch">
                   <code>{branch()}</code>
-                  <Button size="sm" variant="bare" onClick={() => props.onCopy(branch())}>Copy</Button>
+                  <Button size="sm" variant="bare" onPress={() => props.onCopy(branch())}>Copy</Button>
                 </span>
               </DescriptionList.Item>
             )}
@@ -195,7 +195,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
                 <li>
                   <Show when={attachment.sourceType}>{(kind) => <span class="ln-attachment-kind">{kind()}</span>}</Show>
                   <a class="ln-attachment-title" href={attachment.url}>{attachment.title}</a>
-                  <Button size="sm" variant="bare" onClick={() => props.onCopy(attachment.url)}>Copy link</Button>
+                  <Button size="sm" variant="bare" onPress={() => props.onCopy(attachment.url)}>Copy link</Button>
                 </li>
               )}
             </For>
@@ -264,11 +264,11 @@ export function LinearIssueView(props: LinearIssueViewProps) {
             rows={3}
             placeholder="Leave a comment…"
             value={draft()}
-            onInput={(event) => setDraft(event.currentTarget.value)}
+            onInput={(value) => setDraft(value)}
           />
           <Show when={props.postError && !replyingId()}><div class="ln-error" role="alert">{props.postError}</div></Show>
           <div class="ln-composer-actions">
-            <Button size="sm" busy={props.posting} disabled={!draft().trim()} onClick={() => send(draft())}>Comment</Button>
+            <Button size="sm" busy={props.posting} disabled={!draft().trim()} onPress={() => send(draft())}>Comment</Button>
             <Show when={props.posting}><Spinner size="sm" label="Sending" /></Show>
           </div>
         </div>

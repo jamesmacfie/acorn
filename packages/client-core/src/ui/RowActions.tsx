@@ -2,7 +2,6 @@ import type { JSX } from 'solid-js'
 import Icon from './Icon'
 import { Menu, type MenuContext } from './Menu'
 import { Button } from './primitives'
-import { cx } from './cx'
 
 // The per-row overflow menu: an ellipsis button that stays out of sight until you hover the row,
 // focus something inside it, select it, or open the menu itself. Lifted out of the agent session
@@ -12,7 +11,6 @@ import { cx } from './cx'
 // usually holds a badge or a status as well, and those are meant to stay visible.
 export function RowActions(props: {
   ariaLabel: string
-  class?: string
   children: (menu: MenuContext) => JSX.Element
 }) {
   return (
@@ -24,17 +22,12 @@ export function RowActions(props: {
           variant="bare"
           size="sm"
           iconOnly
-          class={cx('ui-row-actions', props.class)}
-          aria-label={props.ariaLabel}
-          aria-haspopup="menu"
-          aria-expanded={open()}
-          // The row is usually a button or a link itself; without this, opening the menu also
-          // activates whatever sits underneath it.
-          onClick={(event) => {
-            event.stopPropagation()
-            event.preventDefault()
-            toggle()
-          }}
+          label={props.ariaLabel}
+          opens="menu"
+          expanded={open()}
+          // The row underneath is usually a button or a link. Row ignores a click that landed on a
+          // control inside it, so there is nothing to stop here.
+          onPress={toggle}
         >
           <Icon name="ellipsis" />
         </Button>

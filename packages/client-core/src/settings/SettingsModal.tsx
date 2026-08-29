@@ -60,7 +60,7 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
         </nav>
 
         <div class="settings-pane">
-          <Button variant="bare" class="settings-close" onClick={props.onClose} title="Close" aria-label="Close">✕</Button>
+          <Button variant="bare" onPress={props.onClose} title="Close" label="Close">✕</Button>
           <Show when={activePage()}>
             {(page) => (
               <ContributionBoundary contributionId={`settings:${page().id}`}>

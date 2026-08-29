@@ -40,6 +40,14 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   checks machinery, not pixels: a contribution under test renders a `<span>` carrying its own id. The
   smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
   any of these;
+- the three kit invariants hold the component set closed, and each one reads the contract rather
+  than the code that implements it. `ui/kit/support.test.ts` reads the `/ui` barrel and asserts that
+  the nodes it exports and the rows in `NODE_SUPPORT` are the same list, each with a terminal level.
+  `ui/kit/roles.test.ts` asserts that every role token has a value on both hosts, and that the DOM
+  value names a token `tokenAxes.ts` declares. `ui/kit/props.test-d.ts` has nothing to run: it is a
+  type-level test that no node's props accept `class`, `className`, `style`, or an arbitrary string
+  where a role is meant, and `tsc --noEmit` under `pnpm lint` is the pass that checks it. See
+  [ui design](./ui-design.md) § The closed kit;
 - Node-core tests cover data roots, TLS, auth, pairing, idempotency, migrations, backups, audit,
   worktrees, process/filesystem guards, routes, and WebSocket behavior;
 - plugin tests cover schemas, providers, route behavior, reconciliation, and client models using

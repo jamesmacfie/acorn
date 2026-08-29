@@ -24,10 +24,9 @@ export default function MentionTextarea(props: {
   onInput: (value: string) => void
   mentions: string[]
   placeholder?: string
-  class?: string
   disabled?: boolean
   onKeyDown?: (e: KeyboardEvent) => void
-  ref?: (el: HTMLTextAreaElement) => void
+  ref?: HTMLTextAreaElement | ((el: HTMLTextAreaElement) => void)
 }) {
   let textareaEl: HTMLTextAreaElement | undefined
   const [fragment, setFragment] = createSignal<{ atIdx: number; query: string } | null>(null)
@@ -112,9 +111,11 @@ export default function MentionTextarea(props: {
       <textarea
         ref={(el) => {
           textareaEl = el
-          props.ref?.(el)
+          // Solid hands a component's `ref` through as a setter whatever the call site wrote, so the
+          // union in the prop type is a spelling, not two code paths.
+          ;(props.ref as ((element: HTMLTextAreaElement) => void) | undefined)?.(el)
         }}
-        class={props.class}
+        
         placeholder={props.placeholder}
         value={props.value}
         disabled={props.disabled}

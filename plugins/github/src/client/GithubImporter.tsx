@@ -70,10 +70,10 @@ export default function GithubImporter(props: ProjectImporterProps) {
     <div class="github-importer">
       <Show when={integrations.data && !githubReady()}>
         <Alert
-          tone="info"
+          tone="muted"
           variant="banner"
           actions={
-            <Button onClick={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>Connect GitHub</Button>
+            <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>Connect GitHub</Button>
           }
         >
           Connect GitHub to discover repositories and import them into Projects.
@@ -100,8 +100,8 @@ export default function GithubImporter(props: ProjectImporterProps) {
                           : repo.private ? 'Private' : 'Public'}
                       </span>
                       <span class="github-import-actions">
-                        <Button size="sm" busy={busy(repo, 'clone')} disabled={!!running()} onClick={() => void importOne(repo, 'clone')}>Clone</Button>
-                        <Button size="sm" busy={busy(repo, 'map')} disabled={!!running()} onClick={() => void importOne(repo, 'map')}>Map folder</Button>
+                        <Button size="sm" busy={busy(repo, 'clone')} disabled={!!running()} onPress={() => void importOne(repo, 'clone')}>Clone</Button>
+                        <Button size="sm" busy={busy(repo, 'map')} disabled={!!running()} onPress={() => void importOne(repo, 'map')}>Map folder</Button>
                       </span>
                     </div>
                   )}
@@ -116,7 +116,7 @@ export default function GithubImporter(props: ProjectImporterProps) {
         </Show>
       </Show>
       <Show when={props.showClose !== false}>
-        <Button class="github-importer-close" onClick={props.onClose}>Close</Button>
+        <Button onPress={props.onClose}>Close</Button>
       </Show>
     </div>
   )

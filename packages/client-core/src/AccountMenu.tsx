@@ -14,7 +14,6 @@ type AccountMenuProps = {
 export default function AccountMenu(props: AccountMenuProps) {
   return (
     <Menu
-      class="account-menu-popover"
       ariaLabel="App menu"
       placement="bottom-end"
       trigger={({ open, toggle }) => (

@@ -11,7 +11,6 @@ export default function CopyButton(props: {
   text: () => string
   onCopy?: (text: string) => void
   title?: string
-  class?: string
 }) {
   const [done, setDone] = createSignal(false)
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -26,7 +25,7 @@ export default function CopyButton(props: {
     timer = setTimeout(() => setDone(false), 1200)
   }
   return (
-    <button type="button" class={`copy-btn ${props.class ?? ''}`} title={props.title ?? 'Copy'} aria-label={props.title ?? 'Copy'} onClick={copy}>
+    <button type="button" class="copy-btn" title={props.title ?? 'Copy'} aria-label={props.title ?? 'Copy'} onClick={copy}>
       <Show when={done()} fallback={<Icon name="copy" size={12} />}>
         <Icon name="check" size={12} />
       </Show>

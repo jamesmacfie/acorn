@@ -870,7 +870,6 @@ describe('architecture boundaries', () => {
     // realm. The cooperative extension point can't take it: the section renders editable inputs, a
     // select, a textarea and a per-proposal accept/reject gate, which is UI rather than a descriptor.
     const BASELINE = [
-      'plugins/agents defines .agent-path-link, worn by plugins/changes/src/client/agentToolRenderer.tsx',
       'plugins/agents defines .agent-tool, worn by plugins/changes/src/client/agentToolRenderer.tsx',
       'plugins/context defines .context-tray-kind, worn by plugins/memory/src/client/MemorySection.tsx',
       'plugins/context defines .context-tray-label, worn by plugins/memory/src/client/MemorySection.tsx',

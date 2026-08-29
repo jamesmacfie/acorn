@@ -67,7 +67,6 @@ export default function GenerateSqlModal(props: {
   return (
     <Modal
       title="Generate SQL"
-      class="db-generate"
       autoFocus={() => promptInput}
       onClose={props.onClose}
       onKeyDown={(event) => {
@@ -76,16 +75,16 @@ export default function GenerateSqlModal(props: {
         return true
       }}
     >
-      <Modal.Body class="db-generate-body">
+      <Modal.Body>
         <Textarea
           mono
-          rows="4"
-          maxlength={GENERATE_MAX_PROMPT_CHARS}
-          spellcheck={false}
+          rows={4}
+          maxLength={GENERATE_MAX_PROMPT_CHARS}
+          assist={false}
           placeholder="Describe the query — e.g. the 10 most recent orders with the customer's email"
           ref={(el) => { promptInput = el }}
           value={prompt()}
-          onInput={(e) => setPrompt(e.currentTarget.value)}
+          onInput={(value) => setPrompt(value)}
         />
         <Show when={props.queries.length}>
           <div class="db-examples">
@@ -93,7 +92,7 @@ export default function GenerateSqlModal(props: {
             <div class="db-chips">
               <For each={chosen()}>
                 {(q) => (
-                  <Chip class="db-chip" title={q.notes ?? ''} onRemove={() => toggle(q)}>{q.name}</Chip>
+                  <Chip title={q.notes ?? ''} onRemove={() => toggle(q)}>{q.name}</Chip>
                 )}
               </For>
               <Picker<DbSavedQuery>
@@ -124,8 +123,8 @@ export default function GenerateSqlModal(props: {
         </Show>
       </Modal.Body>
       <div class="db-generate-actions">
-        <Button disabled={busy()} onClick={props.onClose}>Cancel</Button>
-        <Button variant="solid" disabled={busy() || !prompt().trim()} onClick={() => void generate()}>
+        <Button disabled={busy()} onPress={props.onClose}>Cancel</Button>
+        <Button variant="solid" disabled={busy() || !prompt().trim()} onPress={() => void generate()}>
           {busy() ? 'Generating…' : 'Generate'}
         </Button>
       </div>

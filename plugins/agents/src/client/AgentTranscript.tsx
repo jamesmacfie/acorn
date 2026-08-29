@@ -159,7 +159,7 @@ export default function AgentTranscript(props: {
       <Show when={focusedSubagent()}>
         {(subagent) => (
           <div class="agent-subagent-crumb">
-            <Button variant="bare" size="sm" onClick={props.onExitSubagent}>← {props.snapshot.session.title}</Button>
+            <Button variant="bare" size="sm" onPress={props.onExitSubagent}>← {props.snapshot.session.title}</Button>
             <span>
               <strong>{subagent().title ?? 'Subagent'}</strong>
               <small>{subagentSummary(subagent(), sessionModel())}</small>

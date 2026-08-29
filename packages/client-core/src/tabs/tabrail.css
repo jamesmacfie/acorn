@@ -111,18 +111,9 @@
   background: var(--border-strong);
 }
 
-/* Glyph picker and close popover, anchored just right of its tab. Menu owns the surface (portal,
-   position, elevation, dismissal) and the item vocabulary; all this keeps is the rail's own width cap
-   on the two title rows. */
-.tabrail-menu .ui-menu-label-row { max-width: 180px; }
-
 /* Project identity accent (docs/workspaces-and-tasks.md): every task for a coloured project carries
    its optional 3px strip, set as --rail-accent by RailTab. Uncoloured active tabs retain the normal
    application accent above; `:not(.active)` matches `.tabrail-tab.active`'s specificity and comes
    later, so an inactive coloured row keeps its strip. */
 .tabrail-task { border-left-width: var(--stripe-w); }
 .tabrail-task:not(.active) { border-left-color: var(--rail-accent, transparent); }
-
-/* The no-branch tick sits between the branch field and Create, so it gets its own breathing room
-   instead of the form's tight gap on both sides. */
-.tabrail-nobranch { padding: var(--space-3) 0; }

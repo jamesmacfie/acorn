@@ -7,7 +7,7 @@
 //             renderer, so the field shows a placeholder
 //   command - a stored shell command run in the task worktree, or the project checkout, when a
 //             request references it. Its output is never stored.
-import { createEffect, createResource, createSignal, For, Index, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, Index, Show } from 'solid-js'
 import { Button, Checkbox, createArmedConfirm, Icon, Input, Select } from '@acorn/plugin-api/ui'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
 import { createVariable, deleteVariable, listVariables, updateVariable } from './httpClient'
@@ -104,20 +104,18 @@ export default function HttpVariables(props: { projectId: string; projectName: s
         <Index each={rows()}>
           {(row, index) => (
             <div class="http-grid-row" role="row">
-              <Checkbox checked={row().enabled} aria-label="Enabled" onChange={(e) => editRow(index, { enabled: e.currentTarget.checked })} />
-              <Input size="sm" value={row().name} placeholder="BASE_URL" onInput={(e) => editRow(index, { name: e.currentTarget.value })} />
-              <Select size="sm" value={row().kind} aria-label="Kind" onChange={(e) => editRow(index, { kind: e.currentTarget.value as VariableKind, value: '' })}>
-                <For each={variableKinds}>{(k) => <option value={k}>{k}</option>}</For>
-              </Select>
+              <Checkbox checked={row().enabled} ariaLabel="Enabled" onChange={(checked) => editRow(index, { enabled: checked })} />
+              <Input size="sm" value={row().name} placeholder="BASE_URL" onInput={(value) => editRow(index, { name: value })} />
+              <Select size="sm" value={row().kind} label="Kind" onChange={(value) => editRow(index, { kind: value as VariableKind, value: '' })} options={[...variableKinds.map((k) => ({ value: k, label: k }))]} />
               <Input
                 size="sm"
                 type={row().kind === 'secret' ? 'password' : 'text'}
                 value={row().value}
                 placeholder={row().kind === 'secret' && row().hasStoredSecret ? 'stored — leave blank to keep' : PLACEHOLDER[row().kind]}
-                onInput={(e) => editRow(index, { value: e.currentTarget.value })}
+                onInput={(value) => editRow(index, { value: value })}
               />
               <span class="http-grid-actions">
-                <Button size="sm" busy={busy() === (row().id ?? row().name)} onClick={() => void save(index)}>
+                <Button size="sm" busy={busy() === (row().id ?? row().name)} onPress={() => void save(index)}>
                   Save
                 </Button>
                 <Button
@@ -126,8 +124,8 @@ export default function HttpVariables(props: { projectId: string; projectName: s
                   iconOnly={armedDelete.armed() !== row().id}
                   tone={armedDelete.armed() === row().id ? 'danger' : undefined}
                   title={armedDelete.armed() === row().id ? `Click again to delete "${row().name}"` : 'Delete'}
-                  aria-label={armedDelete.armed() === row().id ? 'Confirm delete' : 'Delete'}
-                  onClick={() => void remove(index)}
+                  label={armedDelete.armed() === row().id ? 'Confirm delete' : 'Delete'}
+                  onPress={() => void remove(index)}
                 >
                   <Show when={armedDelete.armed() === row().id} fallback={<Icon name="trash-2" />}>Delete?</Show>
                 </Button>
@@ -138,7 +136,7 @@ export default function HttpVariables(props: { projectId: string; projectName: s
         </Index>
       </div>
 
-      <Button size="sm" variant="ghost" onClick={() => setRows((r) => [...r, blankRow()])}>
+      <Button size="sm" variant="ghost" onPress={() => setRows((r) => [...r, blankRow()])}>
         + Variable
       </Button>
     </div>

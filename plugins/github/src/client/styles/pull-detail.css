@@ -5,8 +5,6 @@
    does not have a slot for. Sharing the classes is what keeps it the same height and the same look
    as the editor's and the terminal's strips; it used to be a fifth hand-rolled tab geometry. */
 .pr-pull-tabs.ui-doctabs { overflow-x: auto; }
-.pr-pull-tab-target.ui-btn[data-variant='bare'] { flex: none; padding: 0 var(--space-3); }
-.pr-pane-task-error { margin: var(--space-2) var(--pane-pad); }
 .pr-detail-header {
   padding: 14px var(--pane-pad);
   border-bottom: var(--chrome-divider);
@@ -16,18 +14,6 @@
 .identity-chip,
 .branch-flow,
 .branch-flow { gap: 5px; }
-/* Chip owns the box, the tones and the interactivity. What is left is what differs. */
-.branch-chip {
-  color: var(--text);
-  background: var(--bg-selected);
-  border-radius: var(--radius);
-  font-size: var(--fs-sm);
-}
-.branch-chip .ui-chip-label { max-width: 140px; white-space: nowrap; }
-/* The copy glyph rides Chip's data-reveal, so it fades in with the same gesture the × uses. */
-.branch-chip-copy { flex-shrink: 0; opacity: 0; color: var(--text-muted); transition: opacity var(--dur-instant) var(--ease-out); }
-.branch-chip[data-reveal]:hover .branch-chip-copy,
-.branch-chip[data-reveal]:focus-within .branch-chip-copy { opacity: 1; }
 .branch-arrow { color: var(--text-muted); }
 .state-badge {
   text-transform: capitalize;
@@ -39,19 +25,10 @@
 .state-open { color: var(--add-marker); }
 .state-merged { color: var(--accent); }
 .state-closed { color: var(--del-marker); }
-
-/* Navigator collapsible sections. */
-/* CollapsibleSection draws the fold and its summary carries the shared `.section-header` class, so a
-   style pack now reaches these eight sections through the same selector as every other header. What
-   is left is the navigator's own strip height and its divider. */
-.nav-section { border-bottom: var(--chrome-divider); padding: 0; }
-.nav-section > summary { min-height: 36px; user-select: none; }
-.nav-section > * + * { margin-top: 0; }
-.nav-section > :not(summary, .file-list, .check-list, .label-list, .conversation-items) { margin: 10px var(--pane-pad); }
-.nav-section > .file-list,
-.nav-section > .check-list,
-.nav-section > .label-list,
-.nav-section > .conversation-items { margin: 0; }
+.file-list,
+.check-list,
+.label-list,
+.conversation-items) { margin: 10px var(--pane-pad); }
 
 /* Rendered markdown is `.ui-markdown` in primitives.css now. It was defined here, twice over:
    once for this plugin and once as `.linear-md` — a class the NOTES plugin wore, so notes lost
@@ -85,47 +62,12 @@
   overflow: hidden auto;
 }
 .create-pr-branches { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
-.create-pr-title { width: 100%; font-size: var(--fs); }
-.create-pr-body { min-height: 160px; }
 .create-pr-draft { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-muted); cursor: pointer; }
 .create-pr-status { font-size: var(--fs-sm); color: var(--text-muted); }
-
-/* "+ New PR" entry button in the left-pane Reviews header. */
-.new-pr-btn {
-  margin-left: auto;
-  font: inherit;
-  font-size: var(--fs-sm);
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: var(--space-1) var(--space-4);
-  cursor: pointer;
-}
-.new-pr-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
 
 /* Composer owns the box and the ⌘↵ chord; `.composer-input` stays because the create-PR form still
    uses it for its body field, which is a plain MentionTextarea rather than a Composer. */
 .composer { margin-top: var(--space-3); }
-.composer-input {
-  width: 100%;
-  min-height: 64px;
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: var(--space-3) var(--space-4);
-  resize: vertical;
-}
-.ui-composer .ui-composer-input { min-height: 64px; }
-/* Only this plugin's own input. `.diff-reply-input` is core's (diff.css), `.repo-picker-filter`
-   is core's (topbar.css) and `.finder-input` is nobody's any more — Input kind="bare" retired it.
-   Reaching across for all three from here is what made github's stylesheet load-bearing. */
-.composer-input::placeholder { color: var(--text-muted); }
 
 .label-row {
   display: flex;
@@ -145,22 +87,6 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-.label-row-remove {
-  width: 24px;
-  height: 24px;
-  opacity: 0;
-  transition:
-    opacity var(--dur-short) var(--ease-out),
-    background-color var(--dur-short) var(--ease-out),
-    border-color var(--dur-short) var(--ease-out);
-}
-.label-row:hover .label-row-remove,
-.label-row:focus-within .label-row-remove { opacity: 1; }
-.label-row-remove.ui-btn[data-variant='bare'] { border: var(--control-bw) solid transparent; border-radius: var(--radius); }
-.label-row-remove.ui-btn[data-variant='bare']:hover:not(:disabled) {
-  background: var(--bg-selected);
-  border-color: var(--border);
 }
 .label-empty {
   display: block;
@@ -203,7 +129,6 @@
   border: var(--control-border);
   border-radius: var(--radius-circle);
 }
-
 
 .conversation-items {
   display: flex;
@@ -405,8 +330,6 @@
 .file-row:hover { background: var(--bg-hover); }
 .file-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
 .file-row.viewed .file-path { text-decoration: line-through; color: var(--text-muted); }
-/* Checkbox owns the control's look; the row grid decides it must not stretch. */
-.file-viewed { flex: none; }
 .file-open {
   flex: 1;
   display: flex;
@@ -421,12 +344,4 @@
   text-align: left;
   cursor: pointer;
 }
-/* `.file-status*` / `.file-stat*` moved to core's diff.css. They are the rendering half of
-   `fileStatusMeta`, which core exports on the PUBLIC plugin API — so this stylesheet was what
-   made a shared helper's output legible, and core's own diff rows plus the changes plugin both
-   depended on the github plugin being installed to get it. */
-
-/* Armed for a second click (createArmedConfirm). github had no confirmation on these at all; the
-   changed label is the prompt and the tone is what marks it destructive. */
-.label-row-remove.ui-btn[data-variant='bare'][data-armed] { opacity: 1; color: var(--danger); border-color: var(--danger); }
 .pr-actions .ui-btn[data-armed] { color: var(--danger); border-color: var(--danger); }

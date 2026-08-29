@@ -91,7 +91,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           </span>
           <textarea
             class="settings-script"
-            rows="6"
+            rows={6}
             spellcheck={false}
             placeholder="./scripts/setup-worktree.sh"
             value={setup() ?? config()?.setupScript ?? ''}
@@ -102,11 +102,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
 
         <label class="settings-field">
           <span class="settings-label">Run the script</span>
-          <Select value={trigger()} onChange={(e) => void save({ setupScriptTrigger: e.currentTarget.value as SetupTrigger })}>
-            <option value="terminal">When the terminal is first opened</option>
-            <option value="created">When the task is created</option>
-            <option value="off">Off — never run it</option>
-          </Select>
+          <Select value={trigger()} onChange={(value) => void save({ setupScriptTrigger: value as SetupTrigger })} options={[{ value: 'terminal', label: 'When the terminal is first opened' }, { value: 'created', label: 'When the task is created' }, { value: 'off', label: 'Off — never run it' }]} />
         </label>
 
         <label class="settings-field">
@@ -116,7 +112,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           </span>
           <textarea
             class="settings-script"
-            rows="4"
+            rows={4}
             spellcheck={false}
             placeholder="docker compose -f dev.yml down"
             value={teardown() ?? config()?.teardownScript ?? ''}
@@ -135,7 +131,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           </span>
           <textarea
             class="settings-script"
-            rows="2"
+            rows={2}
             spellcheck={false}
             placeholder="(blank = auto-detect)"
             value={dbUrl() ?? config()?.dbUrlScript ?? ''}
@@ -152,16 +148,11 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
             </span>
             <Select
               value={dbSchemaMode()}
-              onChange={(e) => { setDbSchemaValue(null); void save({ dbSchemaMode: e.currentTarget.value as DbSchemaMode | '' }) }}
-            >
-              <option value="">Live database introspection (default)</option>
-              <option value="script">Script — its output is the schema</option>
-              <option value="file">File in the worktree</option>
-            </Select>
+              onChange={(value) => { setDbSchemaValue(null); void save({ dbSchemaMode: value as DbSchemaMode | '' }) }} options={[{ value: '', label: 'Live database introspection (default)' }, { value: 'script', label: 'Script — its output is the schema' }, { value: 'file', label: 'File in the worktree' }]} />
             <Show when={dbSchemaMode() === 'script'}>
               <textarea
                 class="settings-script"
-                rows="2"
+                rows={2}
                 spellcheck={false}
                 placeholder={'pg_dump --schema-only "$DATABASE_URL"'}
             value={dbSchemaValue() ?? config()?.dbSchemaValue ?? ''}
@@ -192,7 +183,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
             </span>
             <textarea
               class="settings-script"
-              rows="6"
+              rows={6}
               spellcheck={false}
               placeholder={'orders.meta jsonb: { coupon: string, source: "web" | "app" }\norders.status: 0 pending, 1 paid, 2 refunded'}
             value={dbSchemaNotes() ?? config()?.dbSchemaNotes ?? ''}
@@ -210,7 +201,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           </span>
           <textarea
             class="settings-script"
-            rows="3"
+            rows={3}
             spellcheck={false}
             placeholder="pnpm dev"
             value={dev() ?? config()?.devScript ?? ''}
@@ -227,7 +218,7 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           </span>
           <textarea
             class="settings-script"
-            rows="2"
+            rows={2}
             spellcheck={false}
             placeholder="(blank = stop + start)"
             value={devRestart() ?? config()?.devRestartScript ?? ''}
@@ -241,17 +232,11 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           <span class="muted settings-hint">How the browser-preview pane finds its URL for this repo's tasks.</span>
           <Select
             value={previewMode()}
-            onChange={(e) => { setPreviewValue(null); void save({ previewMode: e.currentTarget.value as PreviewMode | '' }) }}
-          >
-            <option value="">Dev-server port (default)</option>
-            <option value="url">A fixed URL</option>
-            <option value="port">localhost with a port</option>
-            <option value="script">Script — its output is the URL</option>
-          </Select>
+            onChange={(value) => { setPreviewValue(null); void save({ previewMode: value as PreviewMode | '' }) }} options={[{ value: '', label: 'Dev-server port (default)' }, { value: 'url', label: 'A fixed URL' }, { value: 'port', label: 'localhost with a port' }, { value: 'script', label: 'Script — its output is the URL' }]} />
           <Show when={previewMode() === 'script'}>
             <textarea
               class="settings-script"
-              rows="4"
+              rows={4}
               spellcheck={false}
               placeholder="./scripts/preview-url.sh"
             value={previewValue() ?? config()?.previewValue ?? ''}
@@ -326,10 +311,10 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
         {(rule) => (
           <div class="integration-key-row">
             <Checkbox
-              aria-label="Enabled"
+              ariaLabel="Enabled"
               title="Enabled"
               checked={rule().enabled}
-              onChange={(e) => { update(rule().id, (r) => ({ ...r, enabled: e.currentTarget.checked })); debSave(); debSave.flush() }}
+              onChange={(checked) => { update(rule().id, (r) => ({ ...r, enabled: checked })); debSave(); debSave.flush() }}
             />
             <input
               class="ui-input"
@@ -358,14 +343,14 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
               onInput={(e) => { update(rule().id, (r) => ({ ...r, action: { ...r.action, value: e.currentTarget.value } })); debSave() }}
               onBlur={() => debSave.flush()}
             />
-            <Button title="Delete rule" onClick={() => remove(rule().id)}>
+            <Button title="Delete rule" onPress={() => remove(rule().id)}>
               ×
             </Button>
           </div>
         )}
       </Index>
       <div>
-        <Button onClick={add}>
+        <Button onPress={add}>
           Add rule
         </Button>
       </div>
@@ -402,7 +387,7 @@ function RepoRunTargets(props: { projectId: string }) {
     <Show when={row()} fallback={<span class="muted settings-hint">No local checkout mapped yet.</span>}>
       <textarea
         class="settings-script"
-        rows="3"
+        rows={3}
         spellcheck={false}
         placeholder='[{"id":"dev","command":"./scripts/dev.sh","urlCommand":"./scripts/dev-url.sh","default":true}]'
         value={value()}

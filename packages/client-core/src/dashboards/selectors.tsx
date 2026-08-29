@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch } from 'solid-js'
+import { For, Match, Switch } from 'solid-js'
 import {
   COLLECTION_FIELD_TYPES,
   type PluginCollectionCell,
@@ -30,19 +30,18 @@ export function FieldSelect(props: {
   /** Offered as the first option when the job has a legitimate "no field" answer. */
   emptyLabel?: string
   size?: 'sm' | 'md'
-  class?: string
 }) {
   return (
     <Select
-      class={props.class}
       size={props.size ?? 'sm'}
-      aria-label={props.ariaLabel}
+      label={props.ariaLabel}
       value={props.value ?? ''}
-      onChange={(event) => props.onChange(event.currentTarget.value)}
-    >
-      <Show when={props.emptyLabel}>{(label) => <option value="">{label()}</option>}</Show>
-      <For each={props.fields}>{(field) => <option value={field.id}>{field.name}</option>}</For>
-    </Select>
+      options={[
+        ...(props.emptyLabel ? [{ value: '', label: props.emptyLabel }] : []),
+        ...props.fields.map((field) => ({ value: field.id, label: field.name })),
+      ]}
+      onChange={(value) => props.onChange(value)}
+    />
   )
 }
 
@@ -56,14 +55,9 @@ export function OperatorSelect(props: {
   return (
     <Select
       size="sm"
-      aria-label="Condition"
+      label="Condition"
       value={props.value}
-      onChange={(event) => props.onChange(event.currentTarget.value as PanelFilterOp)}
-    >
-      <For each={operatorsForField(props.field)}>
-        {(op) => <option value={op}>{operatorLabel(op, props.field)}</option>}
-      </For>
-    </Select>
+      onChange={(value) => props.onChange(value as PanelFilterOp)} options={[...operatorsForField(props.field).map((op) => ({ value: op, label: operatorLabel(op, props.field) }))]} />
   )
 }
 
@@ -100,11 +94,11 @@ export function ValueInput(props: {
       fallback={(
         <Input
           size="sm"
-          aria-label="Value"
+          label="Value"
           type={props.field.type === 'number' ? 'number' : 'text'}
           value={text()}
-          onInput={(event) => props.onChange(
-            props.field.type === 'number' ? Number(event.currentTarget.value) : event.currentTarget.value,
+          onInput={(value) => props.onChange(
+            props.field.type === 'number' ? Number(value) : value,
           )}
         />
       )}
@@ -113,23 +107,21 @@ export function ValueInput(props: {
         <Checkbox
           checked={!!props.value}
           label={props.value ? 'Yes' : 'No'}
-          onChange={(event) => props.onChange(event.currentTarget.checked)}
+          onChange={(checked) => props.onChange(checked)}
         />
       </Match>
       <Match when={declared()}>
         {(values) => (
-          <Select size="sm" aria-label="Value" value={text()} onChange={(event) => props.onChange(event.currentTarget.value)}>
-            <For each={values()}>{(value) => <option value={value.id}>{value.label}</option>}</For>
-          </Select>
+          <Select size="sm" label="Value" value={text()} onChange={(value) => props.onChange(value)} options={[...values().map((value) => ({ value: value.id, label: value.label }))]} />
         )}
       </Match>
       <Match when={props.field.type === 'datetime'}>
         <Input
           size="sm"
-          aria-label="Value"
+          label="Value"
           type="date"
           value={toDateInput(props.value)}
-          onInput={(event) => props.onChange(fromDateInput(event.currentTarget.value))}
+          onInput={(value) => props.onChange(fromDateInput(value))}
         />
       </Match>
     </Switch>
@@ -150,13 +142,9 @@ export function ColumnSelect(props: {
   return (
     <Select
       size="sm"
-      aria-label={props.ariaLabel}
+      label={props.ariaLabel}
       value={props.value ?? ''}
-      onChange={(event) => props.onChange(event.currentTarget.value || undefined)}
-    >
-      <option value="">Unmapped</option>
-      <For each={props.columns}>{(column) => <option value={column.id}>{column.label}</option>}</For>
-    </Select>
+      onChange={(value) => props.onChange(value || undefined)} options={[{ value: '', label: 'Unmapped' }, ...props.columns.map((column) => ({ value: column.id, label: column.label }))]} />
   )
 }
 
@@ -170,12 +158,9 @@ export function ToneSelect(props: {
   return (
     <Select
       size="sm"
-      aria-label={props.ariaLabel}
+      label={props.ariaLabel}
       value={props.value ?? 'muted'}
-      onChange={(event) => props.onChange(event.currentTarget.value as PanelTone)}
-    >
-      <For each={TONES}>{(tone) => <option value={tone}>{TONE_LABELS[tone]}</option>}</For>
-    </Select>
+      onChange={(value) => props.onChange(value as PanelTone)} options={[...TONES.map((tone) => ({ value: tone, label: TONE_LABELS[tone] }))]} />
   )
 }
 
@@ -200,12 +185,9 @@ export function FieldTypeSelect(props: {
   return (
     <Select
       size="sm"
-      aria-label={props.ariaLabel}
+      label={props.ariaLabel}
       value={props.value}
-      onChange={(event) => props.onChange(event.currentTarget.value as PluginCollectionFieldType)}
-    >
-      <For each={COLLECTION_FIELD_TYPES}>{(type) => <option value={type}>{FIELD_TYPE_LABELS[type]}</option>}</For>
-    </Select>
+      onChange={(value) => props.onChange(value as PluginCollectionFieldType)} options={[...COLLECTION_FIELD_TYPES.map((type) => ({ value: type, label: FIELD_TYPE_LABELS[type] }))]} />
   )
 }
 
@@ -255,9 +237,9 @@ export function ParamInput(props: {
       fallback={(
         <Input
           size="sm"
-          aria-label={props.param.name}
+          label={props.param.name}
           value={props.value}
-          onInput={(event) => props.onChange(event.currentTarget.value)}
+          onInput={(value) => props.onChange(value)}
         />
       )}
     >
@@ -271,11 +253,11 @@ export function ParamInput(props: {
                 size="sm"
                 label={choice.label}
                 checked={selected().has(choice.id)}
-                onChange={(event) => props.onChange(toggleParamValue(
+                onChange={(checked) => props.onChange(toggleParamValue(
                   props.value,
                   choices().map((entry) => entry.id),
                   choice.id,
-                  event.currentTarget.checked,
+                  checked,
                 ))}
               />
             )}

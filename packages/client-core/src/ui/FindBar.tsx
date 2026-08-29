@@ -1,5 +1,4 @@
 import { Show, type JSX } from 'solid-js'
-import { cx } from './cx'
 import Icon from './Icon'
 import { Button, Input, Toolbar } from './primitives'
 
@@ -26,20 +25,18 @@ export function FindBar(props: {
   /** A live note beside the count: docker's stream state, the editor's truncation warning. */
   status?: JSX.Element
   placeholder?: string
-  ref?: (element: HTMLInputElement) => void
-  class?: string
+  ref?: HTMLInputElement | ((element: HTMLInputElement) => void)
 }) {
   return (
-    <Toolbar class={cx('ui-findbar', props.class)} size="sm" ariaLabel="Find">
+    <Toolbar size="sm" ariaLabel="Find">
       <div class="ui-findbar-search" role="search">
         <Input
           ref={props.ref}
           kind="filter"
           size="sm"
-          class="ui-findbar-input"
           placeholder={props.placeholder ?? 'Find…'}
           value={props.query}
-          onInput={(event) => props.onQuery(event.currentTarget.value)}
+          onInput={(value) => props.onQuery(value)}
           onKeyDown={(event) => {
             if (event.key === 'Escape' && props.onClose) {
               event.preventDefault()
@@ -67,10 +64,10 @@ export function FindBar(props: {
           size="sm"
           iconOnly
           disabled={!props.count?.total}
-          data-tip="Previous match"
-          data-tip-key="⇧⏎"
-          aria-label="Previous match"
-          onClick={() => props.onPrev()}
+          tip="Previous match"
+          tipKey="⇧⏎"
+          label="Previous match"
+          onPress={() => props.onPrev()}
         >
           <Icon name="chevron-up" />
         </Button>
@@ -79,17 +76,17 @@ export function FindBar(props: {
           size="sm"
           iconOnly
           disabled={!props.count?.total}
-          data-tip="Next match"
-          data-tip-key="⏎"
-          aria-label="Next match"
-          onClick={() => props.onNext()}
+          tip="Next match"
+          tipKey="⏎"
+          label="Next match"
+          onPress={() => props.onNext()}
         >
           <Icon name="chevron-down" />
         </Button>
       </Toolbar.Group>
       <Show when={props.toggles}>{props.toggles}</Show>
       <Show when={props.onClose}>
-        <Button variant="bare" size="sm" iconOnly data-tip="Close find" data-tip-key="Esc" aria-label="Close find" onClick={() => props.onClose?.()}>
+        <Button variant="bare" size="sm" iconOnly tip="Close find" tipKey="Esc" label="Close find" onPress={() => props.onClose?.()}>
           <Icon name="x" />
         </Button>
       </Show>

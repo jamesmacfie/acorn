@@ -36,8 +36,6 @@
    for why this takes an explicit height rather than max-height. */
 .plugin-overlay { height: min(60vh, 520px); }
 .plugin-overlay-head { display: flex; align-items: center; gap: var(--space-4); }
-.plugin-overlay-close { margin-left: auto; }
-.plugin-overlay-close.ui-btn[data-variant='bare'] { color: var(--text-faint); }
 .plugin-overlay-body { flex: 1; min-height: 0; }
 
 /* Padded body for simple form modals (matches the Integrations settings spacing). */
@@ -58,8 +56,6 @@
 .will-concerns li[data-severity='danger'] { color: var(--del-marker); }
 .will-concern-details { grid-column: 2 / -1; display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-2) 0 0; padding: 0; list-style: none; font-size: var(--fs-sm); color: var(--text-muted); }
 .will-concern-details li { overflow-wrap: anywhere; }
-.will-concern-option { grid-column: 2 / -1; display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
-
 
 /* Help: two-column key → description grid. */
 .help-list {

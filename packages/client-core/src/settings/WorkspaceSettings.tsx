@@ -91,7 +91,7 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
 
       <Show when={!props.workspace.isDefault}>
         <div class="settings-danger">
-          <Button class="settings-delete" disabled={busy()} onClick={() => void remove()}>
+          <Button disabled={busy()} onPress={() => void remove()}>
             Delete workspace
           </Button>
         </div>

@@ -18,23 +18,6 @@
 .terminal-drawer.maximized {
   top: var(--topbar-h);
 }
-/* SplitHandle owns the grip. The drawer's is full-bleed rather than inset, because it sits flush
-   against the pane above it. */
-.terminal-resize { margin: 0; }
-
-/* The drawer's header is DocumentTabs: the scrolling strip, the tabs, the run-state dot, the close
-   buttons and the pinned `actions` slot the +, ^C and ✕ ride in. This file used to hand-roll the
-   header around the strip and restyle the tabs into a shorter, underlined variant, which is how the
-   terminal ended up as the one tab strip in the app at a different height from the rest. */
-/* Menu owns the surface (portal, position, elevation, dismissal) and the item vocabulary. This is only
-   the menu's width; `position: relative` on the wrapper went with the absolute positioning. */
-.terminal-menu {
-  min-width: 180px;
-}
-.terminal-interrupt.ui-btn[data-variant='bare'] {
-  border: var(--control-border);
-  border-radius: var(--radius);
-}
 .terminal-unavailable { margin-top: 0; padding: var(--space-3) var(--space-4); }
 .terminal-drawer-btn {
   background: none;
@@ -64,7 +47,6 @@
   padding: var(--space-2) var(--space-3);
   font: var(--fs-sm) var(--font-mono);
 }
-.terminal-error-banner.ui-alert { margin-top: 0; padding: var(--space-2) var(--space-4); border-bottom: var(--chrome-divider); }
 .terminal-body {
   flex: 1;
   min-height: 0;

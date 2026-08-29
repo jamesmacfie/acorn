@@ -52,7 +52,7 @@ function ConversationItem(props: { author: string | null; action: string; body: 
   return (
     <div class="comment comment-card copyable" classList={{ 'comment-card-empty': !hasBody() }}>
       <Show when={hasBody()}>
-        <CopyButton class="copy-abs" text={() => bodyRef?.textContent ?? props.body ?? ''} title="Copy comment" />
+        <CopyButton text={() => bodyRef?.textContent ?? props.body ?? ''} title="Copy comment" />
       </Show>
       <div class="comment-meta comment-meta-with-avatar">
         <UserAvatar login={props.author} />

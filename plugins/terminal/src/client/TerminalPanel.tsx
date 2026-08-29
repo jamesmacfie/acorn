@@ -230,7 +230,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     <Portal>
       <aside ref={drawerRef} class="terminal-drawer" classList={{ maximized: maximized() }} style={{ height: maximized() ? undefined : `${height()}px` }}>
         <Show when={!maximized()}>
-          <SplitHandle axis="y" drag={drawerDrag} class="terminal-resize" />
+          <SplitHandle axis="y" drag={drawerDrag} />
         </Show>
         {/* Was a hand-rolled strip inside a hand-rolled header. DocumentTabs owns both halves now,
             the tabs and the `actions` slot the +, ^C and ✕ ride in, so this drawer's header is the
@@ -261,7 +261,6 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                   click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
                   roles. Menu brings all of it. */}
               <Menu
-                class="terminal-menu"
                 ariaLabel="New session"
                 trigger={({ toggle, open }) => (
                   <Button
@@ -270,9 +269,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                     iconOnly
                     disabled={busy() || !ws()}
                     title={ws() ? 'New session' : 'Select a task first'}
-                    aria-haspopup="menu"
-                    aria-expanded={open()}
-                    onClick={toggle}
+                    opens="menu"
+                    expanded={open()}
+                    onPress={toggle}
                   >
                     <Icon name="plus" />
                   </Button>
@@ -302,18 +301,18 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                 )}
               </Menu>
               <Show when={activeRunning()}>
-                <Button variant="bare" size="sm" class="terminal-interrupt" title="Interrupt (Ctrl-C)" onClick={() => void api.interrupt(activeId()!)}>
+                <Button variant="bare" size="sm" title="Interrupt (Ctrl-C)" onPress={() => void api.interrupt(activeId()!)}>
                   ^C
                 </Button>
               </Show>
-              <Button variant="bare" size="sm" iconOnly onClick={props.onClose} title="Close drawer (sessions keep running)" aria-label="Close">
+              <Button variant="bare" size="sm" iconOnly onPress={props.onClose} title="Close drawer (sessions keep running)" label="Close">
                 <Icon name="x" />
               </Button>
             </>
           }
         />
 
-        <Show when={error()}>{(msg) => <Alert class="terminal-error-banner">{msg()}</Alert>}</Show>
+        <Show when={error()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
 
         <div class="terminal-body">
           <Show

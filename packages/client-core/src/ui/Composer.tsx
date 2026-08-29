@@ -1,5 +1,4 @@
 import { Show, type JSX } from 'solid-js'
-import { cx } from './cx'
 import MentionTextarea from './MentionTextarea'
 import { Alert, Button, Textarea, Toolbar } from './primitives'
 
@@ -25,7 +24,6 @@ export function Composer(props: {
   /** A visible chord hint. Compose from Kbd. */
   hint?: JSX.Element
   rows?: number
-  class?: string
 }) {
   const submit = () => {
     if (props.busy || props.disabled || !props.value.trim()) return
@@ -39,24 +37,22 @@ export function Composer(props: {
   }
 
   return (
-    <div class={cx('ui-composer', props.class)}>
+    <div class="ui-composer">
       <Show
         when={props.mentions}
         fallback={
           <Textarea
-            class="ui-composer-input"
             rows={props.rows ?? 3}
             placeholder={props.placeholder}
             disabled={props.disabled}
             value={props.value}
-            onInput={(event) => props.onInput(event.currentTarget.value)}
+            onInput={(value) => props.onInput(value)}
             onKeyDown={onKeyDown}
           />
         }
       >
         {(mentions) => (
           <MentionTextarea
-            class="ui-input ui-composer-input"
             placeholder={props.placeholder}
             disabled={props.disabled}
             value={props.value}
@@ -67,7 +63,7 @@ export function Composer(props: {
         )}
       </Show>
       <Show when={props.error}><Alert>{props.error}</Alert></Show>
-      <Toolbar variant="actions" class="ui-composer-actions">
+      <Toolbar variant="actions">
         <Show when={props.hint}><span class="ui-composer-hint muted">{props.hint}</span></Show>
         <Toolbar.Spacer />
         <Show when={props.secondary}>{props.secondary}</Show>
@@ -76,7 +72,7 @@ export function Composer(props: {
           tone="accent"
           busy={props.busy}
           disabled={props.disabled || !props.value.trim()}
-          onClick={submit}
+          onPress={submit}
         >
           {props.submitLabel ?? 'Comment'}
         </Button>

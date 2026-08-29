@@ -226,7 +226,7 @@ export function PrPane(props: { task: Task }) {
                   <span>#{tab.pull.number}</span>
                 </button>
                 <Show when={kind() === 'task' && linked().length === 1}>
-                  <Button variant="bare" size="sm" iconOnly class="pr-pull-tab-target" aria-label={`Open ${linked()[0].title}`} onClick={() => openTask(linked()[0])}>
+                  <Button variant="bare" size="sm" iconOnly label={`Open ${linked()[0].title}`} onPress={() => openTask(linked()[0])}>
                     <Icon name="list-checks" size={13} />
                   </Button>
                 </Show>
@@ -234,7 +234,7 @@ export function PrPane(props: { task: Task }) {
                   <Menu
                     ariaLabel={`Tasks linked to #${tab.pull.number}`}
                     trigger={({ toggle }) => (
-                      <Button variant="bare" size="sm" iconOnly class="pr-pull-tab-target" aria-label="Choose linked task" onClick={toggle}>
+                      <Button variant="bare" size="sm" iconOnly label="Choose linked task" onPress={toggle}>
                         <Icon name="list-checks" size={13} />
                       </Button>
                     )}
@@ -247,7 +247,7 @@ export function PrPane(props: { task: Task }) {
                   </Menu>
                 </Show>
                 <Show when={kind() === 'agent'}>
-                  <Button variant="bare" size="sm" iconOnly class="pr-pull-tab-target" aria-label="Open creating agent session" onClick={() => openAgent(tab)}>
+                  <Button variant="bare" size="sm" iconOnly label="Open creating agent session" onPress={() => openAgent(tab)}>
                     <Icon name="bot" size={13} />
                   </Button>
                 </Show>
@@ -264,7 +264,7 @@ export function PrPane(props: { task: Task }) {
                 size="xs"
                 disabled={creatingTask() || !selectedProject() || !selectedDetail.data?.pull?.headRef}
                 title={taskCreationTitle()}
-                onClick={() => void createSelectedTask()}
+                onPress={() => void createSelectedTask()}
               >
                 {creatingTask() ? 'CREATING…' : '+ TASK'}
               </Button>
@@ -272,7 +272,7 @@ export function PrPane(props: { task: Task }) {
           )}>
             Navigator
           </SectionHeader>
-          <Show when={taskError()}>{(message) => <Alert class="pr-pane-task-error">{message()}</Alert>}</Show>
+          <Show when={taskError()}>{(message) => <Alert>{message()}</Alert>}</Show>
           <Show when={selected()}>{(tab) => <PullDetail task={props.task} pull={tab().pull} readOnly={!isPrimary()} />}</Show>
         </section>
         <section class="pane pane-right">

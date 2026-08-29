@@ -130,7 +130,7 @@ export default function Panel(props: PanelProps) {
   })
 
   return (
-    <Card class="dash-panel" pad="sm">
+    <Card pad="sm">
       <div class="dash-panel-head" {...props.headProps}>
         <span class="dash-panel-title">{props.definition.title}</span>
         <span class="dash-panel-meta">
@@ -144,8 +144,8 @@ export default function Panel(props: PanelProps) {
           variant="ghost"
           iconOnly
           title={data.refreshSeconds() ? `Refreshes every ${data.refreshSeconds()}s` : 'Refresh'}
-          aria-label={`Refresh ${props.definition.title}`}
-          onClick={() => data.refresh()}
+          label={`Refresh ${props.definition.title}`}
+          onPress={() => data.refresh()}
         >
           <Icon name="refresh-cw" />
         </Button>
@@ -175,8 +175,8 @@ export default function Panel(props: PanelProps) {
             {(row) => (
               <Alert tone="warn" actions={(
                 <>
-                  <Button size="xs" variant="bare" onClick={() => setPending(undefined)}>Cancel</Button>
-                  <Button size="xs" variant="solid" tone="danger" onClick={confirmPending}>Continue</Button>
+                  <Button size="xs" variant="bare" onPress={() => setPending(undefined)}>Cancel</Button>
+                  <Button size="xs" variant="solid" tone="danger" onPress={confirmPending}>Continue</Button>
                 </>
               )}
               >

@@ -98,6 +98,10 @@ export default function AgentMentionTextarea(props: {
     textarea?.setSelectionRange(at, at)
   }
 
+  /** Re-read the caret from the field itself. A kit Textarea hands back the text, not the event, so
+   *  where the caret is comes from the element this component already holds. */
+  const syncMention = () => updateMention(textarea?.value ?? '', textarea?.selectionStart ?? null)
+
   const updateMention = (value: string, cursor: number | null) => {
     setDismissed(false)
     setMention(cursor == null ? null : activeMention(value, cursor))
@@ -141,11 +145,10 @@ export default function AgentMentionTextarea(props: {
       <Show when={props.onToggleExpanded}>
         <Button
           variant="bare"
-          class="agent-composer-expand"
-          aria-label={props.expanded ? 'Collapse the message box' : 'Expand the message box'}
-          aria-pressed={props.expanded}
+          label={props.expanded ? 'Collapse the message box' : 'Expand the message box'}
+          pressed={props.expanded}
           {...tip(props.expanded ? 'Collapse' : 'Expand', { key: '⌘⇧↩' })}
-          onClick={() => props.onToggleExpanded?.()}
+          onPress={() => props.onToggleExpanded?.()}
         >
           <Icon name={props.expanded ? 'minimize-2' : 'maximize-2'} size={12} />
         </Button>
@@ -181,26 +184,25 @@ export default function AgentMentionTextarea(props: {
       </Show>
       <Textarea
         ref={textarea}
-        class="agent-composer-input"
-        onScroll={(event) => {
-          if (!mirror) return
-          mirror.scrollTop = event.currentTarget.scrollTop
-          mirror.scrollLeft = event.currentTarget.scrollLeft
+        onScroll={() => {
+          if (!mirror || !textarea) return
+          mirror.scrollTop = textarea.scrollTop
+          mirror.scrollLeft = textarea.scrollLeft
         }}
         value={props.value}
         disabled={props.disabled}
-        aria-label="Message agent"
+        label="Message agent"
         placeholder={props.placeholder}
-        rows="3"
-        onFocus={(event) => {
+        rows={3}
+        onFocus={() => {
           setFocused(true)
-          updateMention(event.currentTarget.value, event.currentTarget.selectionStart)
+          syncMention()
         }}
         onBlur={() => setFocused(false)}
-        onClick={(event) => updateMention(event.currentTarget.value, event.currentTarget.selectionStart)}
-        onInput={(event) => {
-          props.onValue(event.currentTarget.value)
-          updateMention(event.currentTarget.value, event.currentTarget.selectionStart)
+        onPress={syncMention}
+        onInput={(value) => {
+          props.onValue(value)
+          updateMention(value, textarea?.selectionStart ?? value.length)
         }}
         onPaste={(event) => {
           const pastedFiles = [...(event.clipboardData?.files ?? [])]
@@ -219,7 +221,7 @@ export default function AgentMentionTextarea(props: {
         }}
         onKeyUp={(event) => {
           if (['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(event.key)) return
-          updateMention(event.currentTarget.value, event.currentTarget.selectionStart)
+          syncMention()
         }}
         onKeyDown={(event) => {
           if (event.isComposing) return

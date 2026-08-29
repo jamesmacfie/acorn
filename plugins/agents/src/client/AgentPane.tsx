@@ -313,23 +313,22 @@ export default function AgentPane(props: { task: Task }) {
               </span>
               <Button
                 disabled={!canStopAgent(session())}
-                onClick={() => void action(() => managedAgentApi.cancel(session().id))}
+                onPress={() => void action(() => managedAgentApi.cancel(session().id))}
               >
                 Stop
               </Button>
               {/* Was a Picker — a filter input over five or six actions, which is the wrong
                   affordance: nobody types to find "Rename session". A Menu is the shape. */}
               <Menu
-                class="managed-agent-action-menu"
                 ariaLabel="Session actions"
                 placement="bottom-end"
                 trigger={({ toggle, open }) => (
                   <Button
                     iconOnly
-                    aria-label="Session actions"
-                    aria-haspopup="menu"
-                    aria-expanded={open()}
-                    onClick={toggle}
+                    label="Session actions"
+                    opens="menu"
+                    expanded={open()}
+                    onPress={toggle}
                   >
                     <Icon name="ellipsis" />
                   </Button>
@@ -355,7 +354,7 @@ export default function AgentPane(props: { task: Task }) {
         </Show>
         <AgentUsageIndicator />
         <Picker<AgentProviderDescriptor>
-          label={<><Icon name="plus" class="glyph" /> New</>}
+          label={<><Icon name="plus" /> New</>}
           ariaLabel="New"
           placement="bottom-end"
           placeholder="Filter providers…"
@@ -375,8 +374,8 @@ export default function AgentPane(props: { task: Task }) {
               variant="bare"
               iconOnly
               title="Refresh provider health"
-              aria-label="Refresh provider health"
-              onClick={() => void refreshProviders()}
+              label="Refresh provider health"
+              onPress={() => void refreshProviders()}
             >
               <Icon name="refresh-cw" />
             </Button>
@@ -386,8 +385,6 @@ export default function AgentPane(props: { task: Task }) {
 
       <ListDetail
         listLabel="Agents in this task"
-        listClass="agent-task-sidebar"
-        detailClass="managed-agent-conversation"
         list={
           <AgentTaskSidebar
             task={props.task}
@@ -410,12 +407,11 @@ export default function AgentPane(props: { task: Task }) {
           />
         }
       >
-        <Show when={error()}><Alert class="managed-agent-error">{error()}</Alert></Show>
+        <Show when={error()}><Alert>{error()}</Alert></Show>
         <Show
           when={selected()}
           fallback={
             <EmptyState
-              class="managed-agent-onboarding"
               icon={<span class="agent-empty-mark">✦</span>}
               title="Start a managed coding session"
             >
@@ -423,10 +419,9 @@ export default function AgentPane(props: { task: Task }) {
                 <For each={providers() ?? []}>
                   {(providerDescriptor) => (
                     <Card
-                      class="managed-agent-provider-card"
                       interactive
                       disabled={!providerDescriptor.installed || creating()}
-                      onActivate={() => void createSession(providerDescriptor)}
+                      onPress={() => void createSession(providerDescriptor)}
                     >
                       <strong>
                         <ProviderGlyph glyph={providerDescriptor.glyph} label={providerDescriptor.label} />
@@ -497,14 +492,14 @@ export default function AgentPane(props: { task: Task }) {
               <Input
                 value={renameText()}
                 ref={(el) => queueMicrotask(() => el.focus())}
-                onInput={(event) => setRenameText(event.currentTarget.value)}
+                onInput={(value) => setRenameText(value)}
                 onKeyDown={(event) => { if (event.key === 'Enter') void rename() }}
               />
             </Field>
           </Modal.Body>
           <Modal.Actions>
-            <Button variant="bare" onClick={() => setDialog(null)}>Cancel</Button>
-            <Button variant="solid" onClick={() => void rename()}>Rename</Button>
+            <Button variant="bare" onPress={() => setDialog(null)}>Cancel</Button>
+            <Button variant="solid" onPress={() => void rename()}>Rename</Button>
           </Modal.Actions>
         </Modal>
       </Show>
@@ -516,8 +511,8 @@ export default function AgentPane(props: { task: Task }) {
               <p>Archive “{session().title}”? It leaves this task’s list and stays readable under the archived filter in Agent Center.</p>
             </Modal.Body>
             <Modal.Actions>
-              <Button variant="bare" onClick={() => setDialog(null)}>Cancel</Button>
-              <Button variant="solid" onClick={() => void archive(session())}>Archive</Button>
+              <Button variant="bare" onPress={() => setDialog(null)}>Cancel</Button>
+              <Button variant="solid" onPress={() => void archive(session())}>Archive</Button>
             </Modal.Actions>
           </Modal>
         )}

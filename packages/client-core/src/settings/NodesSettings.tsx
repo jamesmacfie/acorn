@@ -166,7 +166,6 @@ export default function NodesSettings() {
                           working exactly as it does now.
                         </p>
                         <ConfirmButton
-                          class="node-danger"
                           disabled={busy()}
                           confirmLabel="Detach it?"
                           onConfirm={() => void run(async () => {
@@ -191,10 +190,10 @@ export default function NodesSettings() {
                   </Show>
 
                   <div class="node-actions">
-                    <Button disabled={busy()} onClick={() => reconnectNode(node.nodeId)}>Reconnect</Button>
+                    <Button disabled={busy()} onPress={() => reconnectNode(node.nodeId)}>Reconnect</Button>
                     <Button
                       disabled={busy()}
-                      onClick={() => { setRenameValue(node.label); setRenaming(node.nodeId) }}
+                      onPress={() => { setRenameValue(node.label); setRenaming(node.nodeId) }}
                     >
                       Rename
                     </Button>
@@ -205,14 +204,14 @@ export default function NodesSettings() {
                       <Button
                         disabled={busy()}
                         title="This client forgets the node. The node keeps this device paired."
-                        onClick={() => void run(() => removeNode(node.nodeId, false))}
+                        onPress={() => void run(() => removeNode(node.nodeId, false))}
                       >
                         Unpair…
                       </Button>
-                      <Button class="node-danger"
+                      <Button
                         disabled={busy()}
                         title="The node forgets this client. You will need a new pairing code to come back."
-                        onClick={() => void run(() => removeNode(node.nodeId, true))}
+                        onPress={() => void run(() => removeNode(node.nodeId, true))}
                       >
                         Revoke this client…
                       </Button>
@@ -226,7 +225,7 @@ export default function NodesSettings() {
 
         <Switch>
           <Match when={step().kind === 'idle'}>
-            <Button class="nodes-add-btn" onClick={() => setStep({ kind: 'endpoint' })}>
+            <Button onPress={() => setStep({ kind: 'endpoint' })}>
               <span class="integration-add-icon">+</span> Add a node
             </Button>
           </Match>
@@ -246,8 +245,8 @@ export default function NodesSettings() {
                 <p class="muted">The address the node prints when it starts. https only — the certificate is the identity.</p>
               </label>
               <div class="node-step-actions">
-                <Button disabled={busy()} onClick={() => void probe()}>{busy() ? 'Contacting…' : 'Continue'}</Button>
-                <Button onClick={cancel}>Cancel</Button>
+                <Button disabled={busy()} onPress={() => void probe()}>{busy() ? 'Contacting…' : 'Continue'}</Button>
+                <Button onPress={cancel}>Cancel</Button>
               </div>
             </div>
           </Match>
@@ -279,11 +278,11 @@ export default function NodesSettings() {
                   <div class="node-step-actions">
                     <Button
                       disabled={!probed().compatible}
-                      onClick={() => setStep({ kind: 'code', probe: probed() })}
+                      onPress={() => setStep({ kind: 'code', probe: probed() })}
                     >
                       It matches
                     </Button>
-                    <Button onClick={cancel}>It does not — stop</Button>
+                    <Button onPress={cancel}>It does not — stop</Button>
                   </div>
                 </div>
               )
@@ -315,10 +314,10 @@ export default function NodesSettings() {
                     <input class="ui-input" value={label()} onInput={(event) => setLabel(event.currentTarget.value)} />
                   </label>
                   <div class="node-step-actions">
-                    <Button disabled={busy() || !code().trim()} onClick={() => void pair(probed())}>
+                    <Button disabled={busy() || !code().trim()} onPress={() => void pair(probed())}>
                       {busy() ? 'Pairing…' : 'Pair'}
                     </Button>
-                    <Button onClick={cancel}>Cancel</Button>
+                    <Button onPress={cancel}>Cancel</Button>
                   </div>
                 </div>
               )

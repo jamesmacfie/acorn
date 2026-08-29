@@ -30,6 +30,9 @@ describe('no phantom tokens', () => {
       // project rather than a design decision (tabs/RailTab.tsx).
       '--rail-accent',
       '--diff-cols',
+      // The kit's space role, written inline from ui/kit/roles.ts. Always a var() into a style
+      // token, so it carries a role rather than a value (docs/ui-design.md § The closed kit).
+      '--kit-gap',
       '--dash-cell', '--dash-pitch',
     ])
 
@@ -38,6 +41,7 @@ describe('no phantom tokens', () => {
     const locallyDeclared = new Set([
       '--diff-gutter-w', '--diff-marker-w', '--diff-btn-w', '--diff-chrome-w',
       '--row-field-w',
+      '--kit-grid-col',
     ])
 
     const phantom = [...new Set(sheets.flatMap((f) => [...referenced(f.text)]))]
@@ -91,7 +95,7 @@ describe('literal ratchets (these may only go down)', () => {
     expect(leaked).toBe(0)
   })
 
-  // docs/ui-design.md § How the primitives are built covers why a class handed to a primitive
+  // docs/ui-design.md § How the kit is built covers why a class handed to a primitive
   // must compound onto it.
   it('classes merged onto Card are compounded with it', () => {
     // Anchored at the start of a selector: a descendant rule like `.dash-slot > .dash-panel`
@@ -113,7 +117,7 @@ describe('literal ratchets (these may only go down)', () => {
 })
 
 // A plugin frame is served exactly the sheets scripts/stage.mjs lists, primitives.css among them
-// (docs/ui-design.md § How the primitives are built).
+// (docs/ui-design.md § How the kit is built).
 //
 // A font shorthand needs a size and a family. `font: var(--font-ui)` parses, because any var()
 // might expand to anything, but it is invalid once substituted with a family alone. An

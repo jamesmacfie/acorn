@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
-import { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, integrationsOptions, learnRefPrefixes, linkifyRefs, openRefPanel, persistDraft, projectsOptions, refResolutionsOptions, scanContentRefs, summarizeFileStats, type Task } from '@acorn/plugin-api/client'
+import { CHECK_TONE, checkStatusTone, railDotProps, checksState, FAILED_STATUSES, fileStatusMeta, integrationsOptions, learnRefPrefixes, linkifyRefs, openRefPanel, persistDraft, projectsOptions, refResolutionsOptions, scanContentRefs, summarizeFileStats, type Task } from '@acorn/plugin-api/client'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import { Button, Checkbox, Chip, CollapsibleSection, Composer, CopyButton, createArmedConfirm, EmptyState, Kbd, Picker, StatusDot, UserAvatar } from '@acorn/plugin-api/ui'
 import { mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions } from './queries'
@@ -223,18 +223,17 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
 
             <Show when={pull().body}>
               <CollapsibleSection
-                class="nav-section"
                 persistKey="description"
                 open
                 label="Description"
-                actions={<CopyButton class="copy-right" text={() => descRef?.textContent ?? ''} title="Copy description" />}
+                actions={<CopyButton text={() => descRef?.textContent ?? ''} title="Copy description" />}
               >
                 <div class="ui-markdown" ref={descRef} onClick={onContentClick} innerHTML={pull().body!} />
               </CollapsibleSection>
             </Show>
 
             <Show when={linearRefs().length > 0}>
-              <CollapsibleSection class="nav-section" persistKey="integrations" open label="Integrations" count={linearRefs().length}>
+              <CollapsibleSection persistKey="integrations" open label="Integrations" count={linearRefs().length}>
                 <Show
                   when={linearConnected()}
                   fallback={
@@ -285,18 +284,18 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
               </CollapsibleSection>
             </Show>
 
-            <CollapsibleSection class="nav-section" persistKey="labels" open label="Labels">
+            <CollapsibleSection persistKey="labels" open label="Labels">
               <ul class="label-list list-reset">
                 <For each={detail.data?.labels} fallback={<li class="label-empty muted">None.</li>}>
                   {(l) => (
                     <li class="label-row" style={{ 'border-left-color': labelColor(l.color) }}>
                       <span class="label-row-name">{l.name}</span>
                       <Button
-                        variant="bare" class="label-row-remove"
+                        variant="bare"
                         hidden={props.readOnly}
-                        data-armed={armed.armed() === `label:${l.name}` ? '' : undefined}
+                        armed={armed.armed() === `label:${l.name}`}
                         title={armed.armed() === `label:${l.name}` ? 'Click again to remove' : 'Remove label'}
-                        onClick={() => { if (armed.request(`label:${l.name}`)) run(removeLabel(o(), r(), n(), l.name)) }}
+                        onPress={() => { if (armed.request(`label:${l.name}`)) run(removeLabel(o(), r(), n(), l.name)) }}
                       >
                         {armed.armed() === `label:${l.name}` ? '?' : '×'}
                       </Button>
@@ -323,7 +322,7 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection class="nav-section" persistKey="files" open label="Files" count={changedFiles.files().length}>
+            <CollapsibleSection persistKey="files" open label="Files" count={changedFiles.files().length}>
               <ul class="file-list list-reset">
                 <For each={changedFiles.files()} fallback={<li class="placeholder">{changedFiles.isLoading() ? 'Loading…' : 'No files.'}</li>}>
                   {(f) => {
@@ -331,12 +330,11 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
                     return (
                       <li class="file-row" classList={{ active: changedFiles.currentFile() === f.path, viewed: f.viewed }}>
                         <Checkbox
-                          class="file-viewed"
-                          aria-label="Mark viewed"
+                          ariaLabel="Mark viewed"
                           title="Mark viewed"
                           checked={f.viewed}
                           disabled={props.readOnly}
-                          onChange={(e) => { if (!props.readOnly) run(setViewed(o(), r(), n(), f.path, e.currentTarget.checked)) }}
+                          onChange={(checked) => { if (!props.readOnly) run(setViewed(o(), r(), n(), f.path, checked)) }}
                         />
                         <button type="button" class="file-open" onClick={() => selectFile(f.path)}>
                           <span class={`file-status file-status-${status().tone}`} title={status().label}>
@@ -355,11 +353,10 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
 
             <Show when={detail.data?.checks.length}>
               <CollapsibleSection
-                class="nav-section"
                 persistKey="checks"
                 label="Checks"
                 count={detail.data!.checks.length}
-                actions={<StatusDot tone={CHECK_TONE[checksState(detail.data!.checks)]} />}
+                actions={<StatusDot {...railDotProps(CHECK_TONE[checksState(detail.data!.checks)])} />}
               >
                 <ul class="check-list list-reset">
                   <For each={detail.data!.checks}>
@@ -379,7 +376,7 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
                           )}
                         </Show>
                         <Show when={!props.readOnly && FAILED_STATUSES.has((ck.status ?? '').toLowerCase()) && ck.runId != null}>
-                          <Button disabled={rerunned().has(ck.runId!)} onClick={() => triggerRerun(ck.runId!)}>
+                          <Button disabled={rerunned().has(ck.runId!)} onPress={() => triggerRerun(ck.runId!)}>
                             {rerunned().has(ck.runId!) ? 'Queued' : 'Rerun'}
                           </Button>
                         </Show>
@@ -390,11 +387,10 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
               </CollapsibleSection>
             </Show>
 
-            <CollapsibleSection class="nav-section" persistKey="conversation" open label="Comments/Commits" count={conversationEntries().length}>
+            <CollapsibleSection persistKey="conversation" open label="Comments/Commits" count={conversationEntries().length}>
               <Show when={detail.data}>
                 <Show when={!props.readOnly}>
                 <Composer
-                  class="composer"
                   placeholder="Leave a comment…"
                   value={draftText()}
                   onInput={setDraftText}
@@ -414,7 +410,7 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection class="nav-section" persistKey="review" open label="Review">
+            <CollapsibleSection persistKey="review" open label="Review">
               <ul class="label-list list-reset">
                 <For each={detail.data?.requestedReviewers} fallback={<li class="label-empty muted">No reviewers requested.</li>}>
                   {(login) => (
@@ -424,11 +420,11 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
                         <span class="label-row-name">{login}</span>
                       </span>
                       <Button
-                        variant="bare" class="label-row-remove"
+                        variant="bare"
                         hidden={props.readOnly}
-                        data-armed={armed.armed() === `reviewer:${login}` ? '' : undefined}
+                        armed={armed.armed() === `reviewer:${login}`}
                         title={armed.armed() === `reviewer:${login}` ? 'Click again to remove' : 'Remove review request'}
-                        onClick={() => { if (armed.request(`reviewer:${login}`)) run(removeReviewer(o(), r(), n(), login)) }}
+                        onPress={() => { if (armed.request(`reviewer:${login}`)) run(removeReviewer(o(), r(), n(), login)) }}
                       >
                         {armed.armed() === `reviewer:${login}` ? '?' : '×'}
                       </Button>
@@ -453,7 +449,6 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
               </div>
               <Show when={!props.readOnly}>
               <Composer
-                class="composer"
                 placeholder="Leave a review comment…"
                 value={reviewBody()}
                 onInput={setReviewBody}
@@ -466,8 +461,8 @@ export default function PullDetail(props: { task?: Task; pull?: PullRef; readOnl
                   <>
                     {/* Approve is the only verb that works on an empty body, so it cannot be the
                         primary submit — Composer disables that without text. */}
-                    <Button busy={review.isPending} onClick={() => submitReviewWith('APPROVE')}>Approve</Button>
-                    <Button disabled={review.isPending || !reviewBody().trim()} onClick={() => submitReviewWith('REQUEST_CHANGES')}>
+                    <Button busy={review.isPending} onPress={() => submitReviewWith('APPROVE')}>Approve</Button>
+                    <Button disabled={review.isPending || !reviewBody().trim()} onPress={() => submitReviewWith('REQUEST_CHANGES')}>
                       Request changes
                     </Button>
                   </>

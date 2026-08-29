@@ -11,9 +11,6 @@
   gap: var(--space-3);
   margin-left: auto;
 }
-.onboarding-eye { opacity: 0.85; }
-.onboarding-eye.ui-btn[data-variant='bare'] { font-size: var(--fs-md); padding: var(--space-1); }
-.onboarding-eye:hover { opacity: 1; }
 .ws-row-controls { display: flex; align-items: center; gap: var(--space-2); }
 .ws-project-color {
   width: 22px;
@@ -27,8 +24,6 @@
 .ws-project-color::-webkit-color-swatch { border: 0; }
 .ws-project-color:disabled { cursor: default; opacity: 0.5; }
 .ws-project-color-empty:not(:disabled) { opacity: 0.35; }
-.ws-project-color-clear.ui-btn[data-variant='bare'] { padding: var(--space-1); color: var(--text-faint); }
-.ws-project-color-clear svg { width: 12px; height: 12px; }
 
 /* ── Projects, grouped by workspace ─────────────────────────────────────────────────────────────
    The grouping is the model being edited, so it's the layout: one bordered card per workspace, its
@@ -70,23 +65,9 @@
   border-bottom: var(--chrome-divider);
 }
 .ws-group-count { grid-column: 3 / span 2; font-size: var(--fs-sm); white-space: nowrap; }
-.ws-group-delete { justify-self: end; }
 /* An empty workspace is its header and nothing else, so that header isn't dividing anything. */
 .ws-group-head:last-child { border-bottom: 0; }
 .ws-group-name-static { font-weight: var(--fw-semibold); }
-
-/* Both name fields edit in place: chrome-free until hover or focus, so a list of projects reads as a
-   list rather than a column of form controls. */
-.ws-group-name,
-.ws-row-name {
-  border-color: transparent;
-  background: none;
-}
-.ws-group-name { font-weight: var(--fw-semibold); }
-.ws-group-name:hover:not(:disabled),
-.ws-row-name:hover:not(:disabled) { border-color: var(--border); }
-.ws-group-name:focus,
-.ws-row-name:focus { background: var(--input-bg); }
 
 .ws-row { border-bottom: var(--divider); }
 .ws-row:last-child { border-bottom: 0; }
@@ -122,7 +103,6 @@
 }
 
 .ws-delete-warning { margin: 0; color: var(--danger); }
-.ws-add { align-self: flex-start; }
 .ws-add-form {
   display: flex;
   align-items: center;

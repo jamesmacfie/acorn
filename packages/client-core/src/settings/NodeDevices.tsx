@@ -41,7 +41,7 @@ export default function NodeDevices(props: { nodeId: string; onError: (message: 
 
   return (
     <div class="node-devices">
-      <Button variant="bare" class="node-devices-toggle" aria-expanded={open()} onClick={() => setOpen(!open())}>
+      <Button variant="bare" expanded={open()} onPress={() => setOpen(!open())}>
         {open() ? 'Hide paired clients' : 'Paired clients…'}
       </Button>
       <Show when={open()}>
@@ -57,12 +57,12 @@ export default function NodeDevices(props: { nodeId: string; onError: (message: 
               <li class="node-device">
                 <span class="node-device-name">{device.name}</span>
                 <span class="muted">last seen {formatLastSeen(device.lastSeenAt ?? undefined)}</span>
-                <Button class="node-danger"
+                <Button
                   disabled={busy() === device.id}
                   /* No "is this me?" guard. The client cannot know which row is its own, since the device id
                      it was issued lives in main, not here, and revoking yourself is a legitimate action that
                      `removeNode(nodeId, true)` already performs from the row below. */
-                  onClick={() => void revoke(device)}
+                  onPress={() => void revoke(device)}
                 >
                   Revoke
                 </Button>

@@ -3,8 +3,6 @@
    delete) and Button owns every control. The include dot stays: a 10px round toggle is neither. */
 .notes-pane { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .notes-header { display: flex; align-items: center; gap: var(--space-4); }
-/* Was a hand-copy of `.ui-input`'s tokens. Input kind="filter" owns the control now. */
-.notes-filter { padding: var(--space-1) var(--space-3); }
 /* ListDetail owns the split, the column width, the divider and both columns' flex and overflow, so
    `.notes-body` is gone. Collapsing the library is the `list` prop going undefined rather than a rule
    hiding a column that's still in the grid, and the `--bg-subtle` tint went with the flat list. */
@@ -19,10 +17,6 @@
 .notes-include-dot.on { background: var(--add-marker); border-color: var(--add-marker); }
 .notes-include-dot:disabled { cursor: default; }
 .notes-include-dot.placeholder { border-color: transparent; cursor: default; }
-/* :focus-within as well as :hover, because a keyboard user couldn't reach this at all. Toolbar owns the
-   strip (flex, gap, border, background), and `.notes-main` is ListDetail's detail column, whose flex
-   column is the default. What's left is what differs. */
-.notes-toolbar.ui-toolbar { gap: var(--space-4); }
 .notes-title-input { flex: 1; min-width: 0; font: inherit; font-size: var(--fs-sm); color: var(--text); background: transparent; border: 0; outline: none; }
 .notes-scope-pill { flex: none; font-size: var(--fs-2xs); color: var(--text-muted); }
 .notes-view-context:hover:not(:disabled) { color: var(--accent); }
@@ -42,6 +36,5 @@
   outline: none;
   resize: none;
 }
-.notes-preview { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5) var(--space-7); }
 
 /* Armed for a second click (createArmedConfirm): the button is the prompt. */

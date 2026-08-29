@@ -1,7 +1,6 @@
 import { createEffect, createSignal, onMount, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type AnchoredPopover, type Placement } from './anchor'
-import { cx } from './cx'
 import { nextListIndex } from './focus'
 
 // A dropdown menu: Popover plus menu semantics. See docs/ui-design.md § Menus and right-click for
@@ -22,7 +21,6 @@ const triggerOf = (wrapper: HTMLElement | undefined): HTMLElement | undefined =>
 function MenuSurface(props: {
   popover: AnchoredPopover
   ariaLabel: string
-  class?: string
   children: (context: MenuContext) => JSX.Element
 }) {
   const [active, setActive] = createSignal(0)
@@ -47,7 +45,7 @@ function MenuSurface(props: {
     <Portal>
       <div
         ref={(el) => props.popover.setSurface(el)}
-        class={cx('ui-popover ui-menu', props.class)}
+        class="ui-popover ui-menu"
         role="menu"
         aria-label={props.ariaLabel}
         style={props.popover.surfaceStyle()}
@@ -74,7 +72,6 @@ export function Menu(props: {
    *  open; see createAnchoredPopover's note. */
   open?: () => boolean
   onOpenChange?: (open: boolean) => void
-  class?: string
   children: (context: MenuContext) => JSX.Element
 }) {
   let anchorRef: HTMLSpanElement | undefined
@@ -95,7 +92,7 @@ export function Menu(props: {
         {props.trigger({ open: popover.open, toggle: popover.toggle })}
       </span>
       <Show when={popover.open()}>
-        <MenuSurface popover={popover} ariaLabel={props.ariaLabel} class={props.class}>
+        <MenuSurface popover={popover} ariaLabel={props.ariaLabel} >
           {props.children}
         </MenuSurface>
       </Show>
@@ -113,7 +110,6 @@ export function ContextMenu(props: {
   onClose: () => void
   /** The element focus returns to on dismiss: normally the row that was right-clicked. */
   returnFocus?: () => HTMLElement | undefined
-  class?: string
   children: (context: MenuContext) => JSX.Element
 }) {
   const popover = createAnchoredPopover({
@@ -133,7 +129,7 @@ export function ContextMenu(props: {
   return (
     <Show keyed when={props.at()}>
       {(_at) => (
-        <MenuSurface popover={popover} ariaLabel={props.ariaLabel} class={props.class}>
+        <MenuSurface popover={popover} ariaLabel={props.ariaLabel} >
           {props.children}
         </MenuSurface>
       )}
@@ -153,13 +149,12 @@ Menu.Item = (props: {
   leading?: JSX.Element
   trailing?: JSX.Element
   title?: string
-  class?: string
   children: JSX.Element
 }) => (
   <button
     type="button"
     ref={(el) => props.context.register(el)}
-    class={cx('ui-menu-item', props.class)}
+    class="ui-menu-item"
     role="menuitem"
     data-tone={props.tone ?? 'neutral'}
     disabled={props.disabled}
@@ -176,8 +171,8 @@ Menu.Item = (props: {
 )
 
 /** A non-interactive heading row. */
-Menu.Label = (props: { class?: string; children: JSX.Element }) => (
-  <div class={cx('ui-menu-label-row', props.class)} role="presentation">{props.children}</div>
+Menu.Label = (props: { children: JSX.Element }) => (
+  <div class="ui-menu-label-row" role="presentation">{props.children}</div>
 )
 
 Menu.Separator = () => <div class="ui-menu-separator" role="separator" />

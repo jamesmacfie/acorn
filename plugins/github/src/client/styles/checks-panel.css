@@ -33,7 +33,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.checks-panel-close.ui-btn[data-variant='bare'] { padding: var(--space-1) var(--space-3); }
 .checks-panel-body {
   flex: 1;
   overflow-y: auto;
@@ -56,15 +55,9 @@
   padding: 7px 0;
   cursor: pointer;
 }
-/* CodeBlock owns the box and the copy affordance. What is left is this panel's taller cap, its
-   bottom margin and the ANSI line metrics. */
-.step-log-wrap { margin: 0 0 var(--space-4); }
-.step-log-wrap .ui-code { max-height: 50vh; line-height: 1.45; }
 .log-line {
   min-height: 1.45em;
 }
-/* ANSI dual-theme: --syntax-fg picks the light or dark side of Shiki's dual output (mirrors diff). */
-.step-log-wrap .ui-code span { color: var(--syntax-fg); }
 /* Clickable check name in the PR detail checks list. */
 .check-name-link {
   font: inherit;

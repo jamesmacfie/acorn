@@ -49,10 +49,9 @@ export function PaletteSurface<T>(props: {
           <Input
             ref={props.palette.setInputRef}
             kind="bare"
-            class="palette-input"
             placeholder={props.placeholder}
             value={props.palette.query()}
-            onInput={(event) => props.palette.setQuery(event.currentTarget.value)}
+            onInput={(value) => props.palette.setQuery(value)}
           />
           <Show when={props.status}>{props.status}</Show>
           <ul class="palette-list">

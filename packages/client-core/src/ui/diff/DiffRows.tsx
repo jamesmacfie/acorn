@@ -65,7 +65,7 @@ export function NonCodeRow(props: {
           <span class="diff-load" classList={{ 'diff-load-error': row().status === 'error' }}>
             <span>{row().status === 'error' ? 'Could not load diff.' : 'Loading diff…'}</span>
             <Show when={row().status === 'error'}>
-              <Button variant="bare" onClick={() => props.retryDiff?.(row().file)}>
+              <Button variant="bare" onPress={() => props.retryDiff?.(row().file)}>
                 Retry
               </Button>
             </Show>
@@ -289,17 +289,16 @@ function LineComposer(props: {
       <Show when={props.composer?.isOpen()}>
         <div class="diff-composer" onClick={(e) => e.stopPropagation()}>
           <MentionTextarea
-            class="diff-reply-input"
             placeholder={'Comment on this line\u2026'}
             value={props.composer?.body() ?? ''}
             onInput={(v) => props.composer?.setBody(v)}
             mentions={props.mentions}
           />
           <div class="diff-composer-actions">
-            <Button disabled={busy() || !(props.composer?.body().trim() ?? '')} onClick={submit}>
+            <Button disabled={busy() || !(props.composer?.body().trim() ?? '')} onPress={submit}>
               {busy() ? 'Adding\u2026' : 'Comment'}
             </Button>
-            <Button onClick={() => props.composer?.setOpen(false)}>Cancel</Button>
+            <Button onPress={() => props.composer?.setOpen(false)}>Cancel</Button>
           </div>
           <Show when={err()}>
             <span class="diff-thread-err">{err()}</span>
@@ -400,11 +399,11 @@ function ThreadRow(props: {
       <div class="diff-thread-head">
         <span class="diff-thread-status">{resolved() ? 'Resolved' : 'Conversation'}</span>
         <Show when={resolved()}>
-          <Button variant="bare" class="diff-thread-link" onClick={toggleCollapsed}>
+          <Button variant="bare" onPress={toggleCollapsed}>
             {collapsed() ? 'Show' : 'Hide'}
           </Button>
         </Show>
-        <Button variant="bare" class="diff-thread-link" disabled={busy()} onClick={toggleResolve}>
+        <Button variant="bare" disabled={busy()} onPress={toggleResolve}>
           {resolved() ? 'Unresolve' : 'Resolve'}
         </Button>
       </div>
@@ -422,7 +421,6 @@ function ThreadRow(props: {
         </For>
         <div class="diff-reply">
           <MentionTextarea
-            class="diff-reply-input"
             placeholder={replyId() == null ? 'Reply unavailable' : 'Reply\u2026'}
             disabled={replyId() == null}
             value={body()}
@@ -430,7 +428,7 @@ function ThreadRow(props: {
             mentions={props.mentions}
           />
           <div class="diff-composer-actions">
-            <Button disabled={busy() || replyId() == null || !body().trim()} onClick={submitReply}>
+            <Button disabled={busy() || replyId() == null || !body().trim()} onPress={submitReply}>
               {busy() ? 'Replying\u2026' : 'Reply'}
             </Button>
           </div>

@@ -20,6 +20,29 @@ import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persi
 // The root is a `<span>` because the bar takes the section header's label seat: tabs are the heading
 // when there are several (`SectionHeader`, primitives.tsx).
 
+/** The tab title, editable in place. It holds its own element because the text is uncontrolled: the
+ *  input owns it until it commits, so nothing in the model changes per keystroke and Escape has
+ *  something to go back to. */
+function RenameTab(props: { name: string; onCommit: (name: string) => void }) {
+  let field: HTMLInputElement | undefined
+  return (
+    <Input
+      size="sm"
+      width="auto"
+      label={`Rename ${props.name}`}
+      value={props.name}
+      // Bare `autofocus` is unreliable inside a conditional in Solid; the microtask is the house
+      // workaround.
+      ref={(el) => { field = el; queueMicrotask(() => { el.focus(); el.select() }) }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') props.onCommit(field?.value ?? props.name)
+        else if (event.key === 'Escape') props.onCommit(props.name)
+      }}
+      onBlur={() => props.onCommit(field?.value ?? props.name)}
+    />
+  )
+}
+
 export default function DashboardTabs(props: {
   tabs: readonly DashboardTab[]
   /** Whose dashboards these are. Every write is scoped to it, so a workspace can only ever rewrite
@@ -152,23 +175,7 @@ export default function DashboardTabs(props: {
                 </button>
               )}
             >
-              <Input
-                size="sm"
-                width="auto"
-                class="dash-tab-rename"
-                aria-label={`Rename ${tab().name}`}
-                // The input is uncontrolled: it owns the text until it commits, so nothing in the
-                // model changes per keystroke and Escape has something to go back to.
-                value={tab().name}
-                // Bare `autofocus` is unreliable inside a conditional in Solid; the microtask is the
-                // house workaround.
-                ref={(el: HTMLInputElement) => queueMicrotask(() => { el.focus(); el.select() })}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') commitRename(tab(), event.currentTarget.value)
-                  else if (event.key === 'Escape') commitRename(tab(), tab().name)
-                }}
-                onBlur={(event) => commitRename(tab(), event.currentTarget.value)}
-              />
+              <RenameTab name={tab().name} onCommit={(name) => commitRename(tab(), name)} />
             </Show>
             <Show when={props.active === tab().id && renaming() !== tab().id}>
               <Menu
@@ -179,9 +186,9 @@ export default function DashboardTabs(props: {
                     size="xs"
                     variant="ghost"
                     iconOnly
-                    aria-label={`${tab().name} dashboard actions`}
+                    label={`${tab().name} dashboard actions`}
                     {...(open() ? { 'data-open': '' } : {})}
-                    onClick={toggle}
+                    onPress={toggle}
                   >
                     <Icon name="chevron-down" />
                   </Button>
@@ -200,11 +207,10 @@ export default function DashboardTabs(props: {
         size="xs"
         variant="ghost"
         iconOnly
-        class="dash-tab-add"
-        aria-label="New dashboard"
+        label="New dashboard"
         title={props.tabs.length >= MAX_TABS ? `${MAX_TABS} dashboards is the limit.` : 'New dashboard'}
         disabled={props.tabs.length >= MAX_TABS}
-        onClick={create}
+        onPress={create}
       >
         <Icon name="plus" />
       </Button>

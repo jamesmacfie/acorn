@@ -129,7 +129,7 @@ export default function ContextPane(props: { task: Task }) {
       <div class="section-header context-tray-head">
         <span>context</span>
         <span class="muted">{traySummary(ctx() ? { ...ctx()!, sections: visibleSections() } : undefined)}</span>
-        <Show when={msg()}><Alert class="context-tray-msg">{msg()}</Alert></Show>
+        <Show when={msg()}><Alert>{msg()}</Alert></Show>
       </div>
       <Show when={ctx()}>
         <div class="context-tray-body">
@@ -144,7 +144,7 @@ export default function ContextPane(props: { task: Task }) {
                 return (
                   <div class="context-tray-section" data-context-row={section.id}>
                     <div class="context-tray-row">
-                      <Checkbox aria-label={section.label} checked={effective()[section.id] ?? false} onChange={() => toggleSection(section.id)} />
+                      <Checkbox ariaLabel={section.label} checked={effective()[section.id] ?? false} onChange={() => toggleSection(section.id)} />
                       <span class="context-tray-kind">{section.label}</span>
                       <Show when={pendingFor(section.id)}><span class="muted">· {pendingFor(section.id)} pending</span></Show>
                       <Show when={section.omitted}><span class="muted">+{section.omitted} omitted</span></Show>
@@ -152,7 +152,7 @@ export default function ContextPane(props: { task: Task }) {
                     </div>
                     <Show when={cap()}>
                       {/* Meter's `auto` tone carries the 80% warn threshold. */}
-                      <Meter class="context-bar" tone="auto" label={`${section.label} budget`} value={ratio()} />
+                      <Meter tone="auto" label={`${section.label} budget`} value={ratio()} />
                     </Show>
                     <Show when={section.absent}><div class="context-tray-detail muted">⚠ {section.absent!.detail}</div></Show>
                     <For each={section.items}>
@@ -162,14 +162,14 @@ export default function ContextPane(props: { task: Task }) {
                           <div class="context-tray-item" data-context-row={rowId}>
                             <div class="context-tray-row">
                               <span class="context-tray-kind">{item.kind}</span>
-                              <Button variant="bare" class="context-tray-expand" onClick={() => toggleOpen(rowId)}>
+                              <Button variant="bare" onPress={() => toggleOpen(rowId)}>
                                 <span class="context-tray-twist">{isOpen(rowId) ? '▾' : '▸'}</span>
                                 <span class="context-tray-label">{item.label}</span>
                               </Button>
                               <Show when={originBadge(item.origin?.author)}><span class="context-origin-badge">{originBadge(item.origin?.author)}</span></Show>
                               <Show when={scopePill(item.jump?.noteScope)}><span class="context-origin-badge muted">{scopePill(item.jump?.noteScope)}</span></Show>
                               <Show when={item.jump?.pane === 'notes'}>
-                                <Button variant="bare" class="context-tray-edit" title="Edit in Notes" aria-label="Edit in Notes" onClick={() => followJump(item)}>✎</Button>
+                                <Button variant="bare" title="Edit in Notes" label="Edit in Notes" onPress={() => followJump(item)}>✎</Button>
                               </Show>
                             </div>
                             <Show when={isOpen(rowId)}>
@@ -203,17 +203,17 @@ export default function ContextPane(props: { task: Task }) {
             </For>
 
             <div class="context-preview">
-              <Button variant="bare" class="context-preview-toggle" onClick={() => setPreviewOpen(!previewOpen())}>
+              <Button variant="bare" onPress={() => setPreviewOpen(!previewOpen())}>
                 <span class="context-tray-twist">{previewOpen() ? '▾' : '▸'}</span>
                 <span>preview</span>
                 <span class="muted context-size">{formatSize(bytesOf(assembled()?.block ?? ''))}</span>
               </Button>
               <Show when={previewOpen()}>
-                <CodeBlock class="context-preview-block" size="xs" maxHeight="block" wrap>{assembled()?.block}</CodeBlock>
+                <CodeBlock size="xs" maxHeight="block" wrap>{assembled()?.block}</CodeBlock>
               </Show>
             </div>
 
-            <Toolbar class="context-sync-row" ariaLabel="Context sync">
+            <Toolbar ariaLabel="Context sync">
               <Picker<TerminalSession>
                 label={sessionLabel(target())}
                 placeholder="Filter sessions…"
@@ -228,9 +228,9 @@ export default function ContextPane(props: { task: Task }) {
                   {pillText(status()!)}
                 </span>
               </Show>
-              <Button class="context-sync-btn" onClick={() => void syncContext()}>Sync context</Button>
+              <Button onPress={() => void syncContext()}>Sync context</Button>
               <Toolbar.Spacer />
-              <Button variant="bare" iconOnly title="Refresh" aria-label="Refresh" onClick={() => void refreshContext()}>↻</Button>
+              <Button variant="bare" iconOnly title="Refresh" label="Refresh" onPress={() => void refreshContext()}>↻</Button>
             </Toolbar>
           </div>
       </Show>

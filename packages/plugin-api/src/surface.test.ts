@@ -35,6 +35,9 @@ const ENTRYPOINTS = {
   'ui/diff': 'ui/diff.ts',
   'ui/editor': 'ui/editor.ts',
   'ui/host': 'ui/host.ts',
+  // The kit's vocabulary as data. Its own entrypoint so a node-environment consumer can read the
+  // role enums without loading a component.
+  'ui/tokens': 'ui/tokens.ts',
   'ui/sdk': 'ui/sdk.ts',
 }
 

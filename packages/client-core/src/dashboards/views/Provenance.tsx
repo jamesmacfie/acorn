@@ -12,9 +12,9 @@ export default function Provenance(props: { pluginId: string }) {
   return (
     <Show
       when={mark()}
-      fallback={<Badge size="xs" class="dash-provenance">{props.pluginId}</Badge>}
+      fallback={<Badge size="xs">{props.pluginId}</Badge>}
     >
-      <Icon class="dash-provenance" name={`brand:${props.pluginId}`} title={props.pluginId} />
+      <Icon name={`brand:${props.pluginId}`} title={props.pluginId} />
     </Show>
   )
 }

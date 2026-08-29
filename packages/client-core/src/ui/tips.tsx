@@ -1,6 +1,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import Icon from './Icon'
 import { Kbd, StatusDot } from './primitives'
+import { railDotProps } from './displayMeta'
 import type { RailLegendItem } from '../tabs/railMarkers'
 import './tips.css'
 
@@ -97,7 +98,7 @@ export default function Tips() {
           <span class="rail-tip-title">
             {t().title}
             <Show when={t().key}>
-              <Kbd class="rail-tip-key" size="xs">{t().key}</Kbd>
+              <Kbd size="xs">{t().key}</Kbd>
             </Show>
           </span>
           <Show when={t().sub}>
@@ -110,7 +111,7 @@ export default function Tips() {
                   <div class="rail-tip-legend-row">
                     <span class="rail-tip-legend-ico" classList={{ [`tone-${it.t}`]: !!it.t }}>
                       <Show when={it.d} fallback={it.g ? <Icon name={it.g} /> : undefined}>
-                        {(tone) => <StatusDot tone={tone()} />}
+                        {(tone) => <StatusDot {...railDotProps(tone())} />}
                       </Show>
                     </span>
                     <span class="rail-tip-legend-label">{it.l}</span>

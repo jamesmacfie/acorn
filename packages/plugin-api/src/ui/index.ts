@@ -23,7 +23,9 @@ export { Menu } from '@acorn/client-core/ui/Menu.tsx'
 // to come) uses this rather than its own button, so the affordance sits in the same place and
 // reveals on the same rules in a plugin's list as in a first-party one.
 export { RowActions } from '@acorn/client-core/ui/RowActions.tsx'
-export { CollapsibleSection } from '@acorn/client-core/ui/CollapsibleSection.tsx'
+// `Fold` is the kit's name for it; `CollapsibleSection` is the same component and goes away in
+// phase 9 of the layout programme.
+export { CollapsibleSection, Fold } from '@acorn/client-core/ui/Fold.tsx'
 export { Composer } from '@acorn/client-core/ui/Composer.tsx'
 export { DocumentTabs } from '@acorn/client-core/ui/DocumentTabs.tsx'
 export { FindBar } from '@acorn/client-core/ui/FindBar.tsx'
@@ -76,3 +78,23 @@ export type { LineComposerController, ThreadCollapseController } from '@acorn/cl
 // A plugin reaching for the row components directly is building a simpler surface than this one, the
 // way the compare preview does.
 export { DiffPane } from '@acorn/client-core/diff/DiffPane.tsx'
+
+// ── The nodes the kit gained when it closed ───────────────────────────────────────────────────
+// Each one replaces a shape two or more panes were drawing with raw tags and a private class. See
+// docs/ui-design.md § The closed kit for the admission rule they had to pass, and
+// @acorn/plugin-api/ui/tokens for the role enums their props take.
+export { Stack } from '@acorn/client-core/ui/Stack.tsx'
+export { Inline } from '@acorn/client-core/ui/Inline.tsx'
+export { Heading } from '@acorn/client-core/ui/Heading.tsx'
+export { Section } from '@acorn/client-core/ui/Section.tsx'
+export { Timeline } from '@acorn/client-core/ui/Timeline.tsx'
+export { Facts } from '@acorn/client-core/ui/Facts.tsx'
+export { ChipRow } from '@acorn/client-core/ui/ChipRow.tsx'
+export { Log } from '@acorn/client-core/ui/Log.tsx'
+export { Grid } from '@acorn/client-core/ui/Grid.tsx'
+
+// The two host wrappers. Here before there is a second host, so a plugin can be written against one
+// before it arrives: `Only` is "this exists on these hosts", `Fallback` is "draw this instead where
+// the node cannot be drawn".
+export { Only } from '@acorn/client-core/ui/Only.tsx'
+export { Fallback } from '@acorn/client-core/ui/Fallback.tsx'

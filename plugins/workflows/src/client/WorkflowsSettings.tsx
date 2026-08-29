@@ -54,7 +54,7 @@ export default function WorkflowsSettings() {
       </Show>
 
       <div class="settings-actions">
-        <Button onClick={() => void refetch()}>Rescan</Button>
+        <Button onPress={() => void refetch()}>Rescan</Button>
       </div>
     </div>
   )

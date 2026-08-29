@@ -4,7 +4,7 @@ import { PANEL_SOURCE_FIELD_ID } from '../mapping'
 import { boardColumns, groupField, titleField } from '../shaping'
 import Cell from './Cell'
 import Provenance from './Provenance'
-import type { PanelViewProps } from './props'
+import { panelDotTone, type PanelViewProps } from './props'
 
 // The board view. Kanban is not a component, it is group-by over a field with finite values
 // (docs/dashboards.md § Views are derived, not chosen from a menu), so there is almost nothing here.
@@ -43,7 +43,7 @@ export default function BoardView(props: PanelViewProps) {
           {(column) => (
             <section class="dash-board-column">
               <header class="dash-board-column-head">
-                <StatusDot tone={column.tone} />
+                <StatusDot tone={panelDotTone(column.tone)} />
                 <span class="dash-board-column-label">{column.label}</span>
                 <span class="dash-board-column-count">{column.rows.length}</span>
               </header>
@@ -54,8 +54,7 @@ export default function BoardView(props: PanelViewProps) {
                   {(row) => (
                     <Card
                       pad="sm"
-                      class="dash-card"
-                      {...(row.action ? { onActivate: () => props.onActivate(row) } : {})}
+                      {...(row.action ? { onPress: () => props.onActivate(row) } : {})}
                     >
                       <span class="dash-card-title">
                         <Show when={props.provenance}><Provenance pluginId={row.pluginId} /></Show>

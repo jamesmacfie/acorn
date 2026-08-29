@@ -125,21 +125,20 @@ export default function TaskPaneHost(props: {
                     <NodeChip nodeId={activeNodeId() ?? ''} compact />
                   </Show>
                   <Button
-                    variant="bare" class="pane-pin-btn"
-                    classList={{ active: isPinned(pane.id) }}
-                    data-tip={isPinned(pane.id) ? 'Unpin pane' : 'Pin pane'}
-                    aria-label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Pin ${pane.label}`}
-                    aria-pressed={isPinned(pane.id)}
-                    onClick={() => dispatch({ type: 'pin', pane: pane.id })}
+                    variant="bare"
+                    tip={isPinned(pane.id) ? 'Unpin pane' : 'Pin pane'}
+                    label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Pin ${pane.label}`}
+                    pressed={isPinned(pane.id)}
+                    onPress={() => dispatch({ type: 'pin', pane: pane.id })}
                   >
                     {isPinned(pane.id) ? '◆' : '◇'}
                   </Button>
                   <Show when={layout().panes.length > 1 || isPinned(pane.id)}>
                     <Button
-                      variant="bare" class="pane-close-btn"
-                      data-tip={isPinned(pane.id) ? 'Unpin pane before closing' : 'Close pane'}
-                      aria-label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Close ${pane.label}`}
-                      onClick={() => dispatch({ type: 'close', pane: pane.id })}
+                      variant="bare"
+                      tip={isPinned(pane.id) ? 'Unpin pane before closing' : 'Close pane'}
+                      label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Close ${pane.label}`}
+                      onPress={() => dispatch({ type: 'close', pane: pane.id })}
                     >✕</Button>
                   </Show>
                 </div>

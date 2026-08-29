@@ -307,7 +307,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     // so carrying the class too drew a second border, radius, shadow and background inside the first, and
     // a second `contain: layout paint` nobody needed. A region of a pane is not a pane.
     <section class="document-surface">
-      <Show when={error()}><Alert class="document-surface-error">{error()}</Alert></Show>
+      <Show when={error()}><Alert>{error()}</Alert></Show>
       <Show when={ready()}><div class="document-surface-host" ref={host} /></Show>
     </section>
   )

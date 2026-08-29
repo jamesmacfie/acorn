@@ -19,29 +19,23 @@ export default function TerminalSettings() {
         <span class="settings-label">When the terminal button is clicked, open</span>
         <Select
           value={railDefault()}
-          onChange={(e) => void savePref(qc, PrefKeys.terminalRailDefault, e.currentTarget.value)}
-        >
-          <option value="empty">Empty (pick a profile with +)</option>
-          <option value="shell">Shell</option>
-          <option value="claude-code">Claude Code</option>
-          <option value="codex">Codex</option>
-        </Select>
+          onChange={(value) => void savePref(qc, PrefKeys.terminalRailDefault, value)} options={[{ value: 'empty', label: 'Empty (pick a profile with +)' }, { value: 'shell', label: 'Shell' }, { value: 'claude-code', label: 'Claude Code' }, { value: 'codex', label: 'Codex' }]} />
       </label>
       <label class="settings-field">
         <span class="settings-label">Terminal text size</span>
         <Select
           value={String(fontSize())}
-          onChange={(e) => void savePref(qc, PrefKeys.terminalFontSize, e.currentTarget.value)}
-        >
-          {TERMINAL_FONT_SIZE_OPTIONS.map((size) => (
-            <option value={String(size)}>{size}px{size === 15 ? ' (default)' : ''}</option>
-          ))}
-        </Select>
+          options={TERMINAL_FONT_SIZE_OPTIONS.map((size) => ({
+            value: String(size),
+            label: `${size}px${size === 15 ? ' (default)' : ''}`,
+          }))}
+          onChange={(value) => void savePref(qc, PrefKeys.terminalFontSize, value)}
+        />
       </label>
       <Checkbox
         label="Send task context (PR, linked issues, notes) to new agent sessions at startup"
         checked={injectContext()}
-        onChange={(e) => void savePref(qc, PrefKeys.startupContextInjection, e.currentTarget.checked ? 'true' : 'false')}
+        onChange={(checked) => void savePref(qc, PrefKeys.startupContextInjection, checked ? 'true' : 'false')}
       />
     </>
   )

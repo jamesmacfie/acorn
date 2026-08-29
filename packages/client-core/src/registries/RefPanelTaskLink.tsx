@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Task } from '../queries'
@@ -81,20 +81,17 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
             {/* One repo needs no question asked; several do. Zero means there is nothing to create INTO,
                 and offering a button that cannot work is worse than offering none. */}
             <Show when={choices().length > 1}>
-              <Select value={projectId()} onChange={(event) => setChosen(event.currentTarget.value)} aria-label="Project for the new task">
-                <option value="">Choose a project…</option>
-                <For each={choices()}>{(project) => <option value={project.id}>{project.name}</option>}</For>
-              </Select>
+              <Select value={projectId()} onChange={(value) => setChosen(value)} label="Project for the new task" options={[{ value: '', label: 'Choose a project…' }, ...choices().map((project) => ({ value: project.id, label: project.name }))]} />
             </Show>
             <Show when={choices().length}>
-              <Button disabled={!projectId() || busy()} onClick={() => void create()}>
+              <Button disabled={!projectId() || busy()} onPress={() => void create()}>
                 {busy() ? 'Creating…' : 'Create task'}
               </Button>
             </Show>
           </>
         )}
       >
-        {(task) => <Button onClick={() => open(task())}>Open task</Button>}
+        {(task) => <Button onPress={() => open(task())}>Open task</Button>}
       </Show>
     </Toolbar>
   )

@@ -367,12 +367,12 @@ export default function PanelGrid(props: {
           size="xs"
           variant="ghost"
           iconOnly
-          aria-label={`${definition.title} panel actions`}
+          label={`${definition.title} panel actions`}
           // Header actions fade out when the pointer leaves the panel, and opening this menu moves
           // pointer and focus into a portal, so without this the trigger vanishes under its own
           // open menu.
           {...(open() ? { 'data-open': '' } : {})}
-          onClick={toggle}
+          onPress={toggle}
         >
           <Icon name="ellipsis" />
         </Button>
@@ -434,7 +434,7 @@ export default function PanelGrid(props: {
   )
 
   const addButton = () => (
-    <Button size="sm" variant="ghost" onClick={() => setAdding(true)}>
+    <Button size="sm" variant="ghost" onPress={() => setAdding(true)}>
       <Icon name="plus" /> Add panel
     </Button>
   )

@@ -29,12 +29,6 @@
   overflow: hidden;
 }
 .db-empty { padding: var(--space-6); }
-
-/* SectionHeader owns the header itself (its base rule is in the shared primitives sheet, which a frame
-   is served, see packages/client-core/src/styles/primitives.css § SectionHeader). The database name
-   rides in the label slot beside the word Database rather than in `actions`, because it names what
-   this pane is looking at, so the gap goes on that slot, not on the header's own flex row. */
-.db-head .ui-section-header-label { display: flex; align-items: center; gap: var(--space-4); }
 .db-status {
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -42,47 +36,10 @@
 }
 .db-status.ok { color: var(--add-marker); }
 .db-status.err { color: var(--del-marker); }
-/* Button owns every control in this pane now: `.db-icon-btn` was <Button size="sm">,
-   `.db-run-btn` was variant="solid", `.db-del-btn` was tone="danger". The reconnect button sits in
-   SectionHeader's `actions` slot, which is what carries the `margin-left: auto` this used to. */
-
-
-/* Alert owns the tone and size; this is the full-bleed banner strip above the grid. */
-.db-error.ui-alert {
-  margin-top: 0;
-  padding: 6px var(--pane-pad);
-  background: var(--del-bg);
-  border-bottom: var(--chrome-divider);
-  white-space: pre-wrap;
-}
-
-/* ListDetail owns the split, the column width, the divider and both columns' flex/overflow, which is
-   all `.db-body` / `.db-sidebar` / `.db-main` ever declared, so all three classes are gone with it. */
-
-.db-filter {
-  margin: var(--space-4);
-  flex: none;
-}
 .db-table-list {
   flex: 1;
   min-height: 0;
   overflow: auto;
-}
-/* The table list is `Row` at compact density now. `.db-table-row` was that primitive spelled out:
-   the box, the left marker, the hover and the selected tint, a full row taller than every other
-   browse list in the app for no reason anyone recorded. */
-
-/* Main: the button bar over the results grid. The editor and the splitter that used to be here are
-   the host's, in the region above this frame, and `.db-editor` / `.db-editor-host` / `.db-split` are
-   gone with them. The column itself is ListDetail's. */
-/* The bar keeps its class name and its layout; only its position changed, from above the splitter to
-   below it. `border-bottom` rather than `border-top` now, because what it is separating itself from is
-   the grid underneath rather than an editor above. */
-/* Toolbar owns the strip (flex, gap, border, background). What is left is what differs. */
-.db-editor-bar.ui-toolbar {
-  gap: var(--space-5);
-  padding: 5px var(--space-5);
-  border-bottom: var(--chrome-divider);
 }
 .db-hint { font-size: var(--fs-sm); }
 
@@ -92,12 +49,10 @@
   display: flex;
   flex-direction: column;
 }
-.db-result-bar.ui-toolbar { gap: var(--space-5); padding: var(--space-2) var(--space-5); background: none; }
 .db-footer {
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }
-.db-result-bar .ui-btn { margin-left: auto; }
 
 /* Virtualized result grid */
 .dbgrid-scroll {
@@ -227,10 +182,8 @@
 /* Example-query multi-select: chips for the picked queries + the Picker button that adds more. */
 .db-examples { display: flex; flex-direction: column; gap: var(--space-2); }
 .db-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
-/* Chip owns the box and the × affordance; these keep the pill radius and text size this modal uses.
-   The add-chip is Picker's trigger, so it gets Chip's dashed look through the same class rather than
-   its own copy of the recipe, which is what `Badge dashed` was originally built for. */
-.db-chip, .db-chip-add { border-radius: var(--radius-pill); font-size: var(--fs-sm); }
+                                                                                                                                                                                                                                                                                                   
+.db-chip-add { border-radius: var(--radius-pill); font-size: var(--fs-sm); }
 .db-chip-add {
   background: none;
   border: var(--control-bw) dashed var(--border);
@@ -241,9 +194,5 @@
   cursor: pointer;
 }
 .db-chip-add:hover { color: var(--text); }
-
-/* Save-query modal: a read-only look at what's about to be stored. */
-/* CodeBlock owns the box; this modal wants a shorter cap and a muted tone. */
-.db-sql-preview .ui-code { max-height: 120px; color: var(--text-muted); }
 
 /* Armed for a second click (createArmedConfirm): the button is the prompt. */
