@@ -25,6 +25,7 @@ import { NODE_CORE_FACETS } from './pluginPermissions'
 import {
   hasDocumentRegion,
   hasFrameRegion,
+  hasRemoteRegion,
   isOverlaySurface,
   isProjectPaneSurface,
   isTaskPaneSurface,
@@ -102,12 +103,14 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   const taskPanes = new Set(frames.filter(isTaskPaneSurface).map((frame) => frame.id))
   const projectPanes = new Set(frames.filter(isProjectPaneSurface).map((frame) => frame.id))
   const overlays = new Set(frames.filter(isOverlaySurface).map((frame) => frame.id))
-  // Panes with both a host document region and a frame region, which is the only place a surface action
-  // has to land. A pane whose regions are all host-drawn is excluded: it draws no frame, so a command
-  // targeting it would parse and then post into nothing.
+  // Panes with both a host document region and a region of the plugin's own, which is the only place a
+  // surface action has to land. A pane whose regions are all host-drawn is excluded: it runs none of the
+  // plugin's code, so a command targeting it would parse and then post into nothing. A `remote` region
+  // counts as much as a `frame` one — the command crosses the same bridge either way, and only the thing
+  // on the far end of it differs.
   const composedPanes = new Set(
     frames
-      .filter((frame) => frame.target === 'pane' && hasFrameRegion(frame) && hasDocumentRegion(frame))
+      .filter((frame) => frame.target === 'pane' && (hasFrameRegion(frame) || hasRemoteRegion(frame)) && hasDocumentRegion(frame))
       .map((frame) => frame.id),
   )
 
@@ -173,22 +176,40 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: [...at, 'scope'], message: 'only a pane surface can be project-scoped' })
     }
     if (frame.layout) {
-      // A layout arranges a pane rectangle. A settings page, an importer, a reference panel and an
-      // overlay are all chrome the host already draws around a frame, and a webview's pixels are not the
-      // renderer's at all. None of them has a rectangle to arrange.
-      if (frame.target !== 'pane') {
-        ctx.addIssue({ code: 'custom', path: [...at, 'layout'], message: 'layout is only valid on a pane surface' })
+      // A layout arranges a pane rectangle, so a pane may name any of them.
+      //
+      // A reference panel and a settings page may name `single` and nothing else. The host already
+      // draws their chrome — the box, the backdrop, the title and the dismiss for one; the settings
+      // modal's page frame for the other — so what is left is one region, and naming it is how the
+      // surface says its body is a tree rather than an iframe. There is no second arrangement either
+      // could want.
+      //
+      // Everything else has no rectangle to arrange: an importer and an overlay are host-drawn chrome
+      // around a frame, and a webview's pixels are not the renderer's at all.
+      if (frame.target === 'refPanel' || frame.target === 'settings') {
+        if (frame.layout !== 'single') {
+          ctx.addIssue({
+            code: 'custom',
+            path: [...at, 'layout'],
+            message: `a ${frame.target === 'refPanel' ? 'reference panel' : 'settings page'}'s only layout is 'single': the host draws everything around it`,
+          })
+        }
+      } else if (frame.target !== 'pane') {
+        ctx.addIssue({ code: 'custom', path: [...at, 'layout'], message: 'layout is only valid on a pane, a reference panel or a settings page' })
       }
       for (const [name, region] of Object.entries(frame.regions ?? {})) {
-        if (region === 'frame') continue
+        // Neither of these names a route. A frame region is the plugin's own origin, and a remote region
+        // names a key of the object its bundle passed to `mountTree`.
+        if (region === 'frame' || region.kind === 'remote') continue
         const where = [...at, 'regions', name]
         route(region.read, [...where, 'read'])
         if (region.write) route(region.write, [...where, 'write'])
         if (region.completions) route(region.completions.route, [...where, 'completions', 'route'])
       }
-      // A pane with no frame region runs none of this plugin's bundle: there is no iframe to hold a
-      // chord and forward the rest. Declaring claims here would parse and then capture nothing, which
-      // is the failure this file spends its length refusing.
+      // A pane with no frame region has no iframe to hold a chord and forward the rest, and a remote
+      // region is no help: a tree has no document of its own, so every key it sees was the shell's
+      // already. Declaring claims here would parse and then capture nothing, which is the failure this
+      // file spends its length refusing.
       if (!hasFrameRegion(frame) && frame.claimsKeys.length) {
         ctx.addIssue({
           code: 'custom',

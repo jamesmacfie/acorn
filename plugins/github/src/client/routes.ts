@@ -3,7 +3,7 @@ import type { SourceRouteContribution } from '@acorn/plugin-api/client'
 // GitHub owns only its optional PR browse surface. Core owns /p/:projectId and /p/:projectId/new.
 //
 // These address a pull request; they do not decide whether the browse renders
-// (docs/plugins.md § Frame authoring and the UI kit). The bare `/pulls` entry is reachable only from
+// (docs/plugins.md § Client authoring and the UI kit). The bare `/pulls` entry is reachable only from
 // history and remembered paths now that the surface renders at the project URL, and stays registered
 // so those keep resolving.
 export const githubRouteContributions: readonly SourceRouteContribution[] = [

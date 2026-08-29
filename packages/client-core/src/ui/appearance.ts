@@ -36,10 +36,13 @@ export const isAppDark = (): boolean => {
 export function watchAppearance(onChange: () => void): () => void {
   const mo = new MutationObserver(onChange)
   mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-style'] })
-  const mq = window.matchMedia('(prefers-color-scheme: dark)')
-  mq.addEventListener('change', onChange)
+  // jsdom has no `matchMedia`, and a kit node that watches the appearance must still mount in the host
+  // test tier. The manual toggle above is what those tests exercise; the OS preference is not something
+  // they can flip anyway.
+  const mq = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null
+  mq?.addEventListener('change', onChange)
   return () => {
     mo.disconnect()
-    mq.removeEventListener('change', onChange)
+    mq?.removeEventListener('change', onChange)
   }
 }

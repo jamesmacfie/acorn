@@ -40,7 +40,7 @@ export const githubClientPlugin: ClientPlugin = {
       // known, rather than in core's route registry.
       taskPath: (task) => (task.pullNumber != null && task.github ? `${githubBrowsePath(task.projectId)}/${task.pullNumber}` : undefined),
       // The same knowledge read backwards, for "is there already a task for this PR"
-      // (docs/plugins.md § Frame authoring and the UI kit, `tracksRef`). A github-pr task records its
+      // (docs/plugins.md § Client authoring and the UI kit, `tracksRef`). A github-pr task records its
       // pull request as `pullNumber` on the task row; `links` holds the Linear tickets from the body.
       tracksRef: (task, ref) => ref.providerId === 'github' && task.pullNumber != null && !!task.github
         && pullRefMatchesTask(ref.displayId, task.github, task.pullNumber),

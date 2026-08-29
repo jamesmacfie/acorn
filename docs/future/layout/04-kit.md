@@ -178,9 +178,10 @@ is filled in, so a node cannot be added without deciding what it does there.
 They move inward. Today a plugin writes `<div class="agent-composer-actions">` and the class is
 layout. After this, only kit components have classes, they are internal to the DOM host, and they read
 the same CSS variables they read now. A plugin never sees a class. The 700 raw tags in the survey
-become kit nodes with role props, and per-plugin stylesheets are deleted rather than ported:
-`plugins/linear/src/frame/linear-frame.css`, `plugins/github/src/client/importer.css`, the agents
-CSS, and every other `.css` under `plugins/*/src`. **A plugin with a `.css` file has not moved yet.**
+become kit nodes with role props, and per-plugin stylesheets are deleted rather than ported. The
+loaded four went first and their four are gone (phase 5); `plugins/github/src/client/importer.css`, the
+agents CSS, and every other `.css` under `plugins/*/src` are what is left. **A plugin with a `.css`
+file has not moved yet.**
 
 The `ui/` purity rule stays: nothing under `client-core/src/ui/` may import state. Some focus
 machinery that lives in `/ui/host` today (the palette surface, focus trapping) moves into the kit in

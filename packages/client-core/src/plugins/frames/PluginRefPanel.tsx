@@ -1,5 +1,8 @@
+import { Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import PluginFrame from './PluginFrame'
+import { RemoteTree } from '../tree/RemoteTree'
+import type { RemoteContribution } from '../tree/registry'
 import type { FrameBinding } from './broker'
 import { Button, Toolbar } from '../../ui/primitives'
 import RefPanelTaskLink from '../../registries/RefPanelTaskLink'
@@ -25,6 +28,10 @@ export type PluginRefPanelProps = {
   // The reference the panel was opened for, as the host resolved it.
   displayId: string
   onClose: () => void
+  /** Set when the panel declared a layout with a remote region: the body is a tree of the host's own
+   *  components rather than the plugin's rectangle. The box around it does not change, which is the
+   *  whole reason a panel could move paths without anything else moving with it. */
+  tree?: RemoteContribution
 }
 
 export default function PluginRefPanel(props: PluginRefPanelProps) {
@@ -41,7 +48,18 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
           <Toolbar.Spacer />
           <Button onPress={props.onClose} label="Close">✕</Button>
         </header>
-        <PluginFrame binding={props.binding} hash={props.hash} refId={props.displayId} onClose={props.onClose} />
+        <Show
+          when={props.tree}
+          fallback={<PluginFrame binding={props.binding} hash={props.hash} refId={props.displayId} onClose={props.onClose} />}
+        >
+          {(contribution) => (
+            <RemoteTree
+              contribution={contribution()}
+              props={() => ({ item: props.displayId })}
+              scope={() => ({ item: props.displayId })}
+            />
+          )}
+        </Show>
         {/* Host-drawn, below the frame rather than inside it. Creating a task is a core write that makes a
             worktree, and a plugin that drew this itself would need `core.tasks:write` for its whole life
             to earn one button — ../../registries/RefPanelTaskLink.tsx has the argument in full. */}

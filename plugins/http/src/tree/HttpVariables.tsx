@@ -8,7 +8,9 @@
 //   command - a stored shell command run in the task worktree, or the project checkout, when a
 //             request references it. Its output is never stored.
 import { createEffect, createResource, createSignal, Index, Show } from 'solid-js'
-import { Button, Checkbox, createArmedConfirm, Icon, Input, Select } from '@acorn/plugin-api/ui'
+import {
+  Button, Checkbox, createArmedConfirm, Heading, Icon, Inline, Input, Select, Stack, Text, Toolbar,
+} from '@acorn/plugin-api/ui/tree'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
 import { createVariable, deleteVariable, listVariables, updateVariable } from './httpClient'
 
@@ -79,66 +81,68 @@ export default function HttpVariables(props: { projectId: string; projectName: s
   }
 
   return (
-    <div class="http-variables">
-      <header class="http-variables-head">
-        <h3>Variables · {props.projectName}</h3>
-        <p class="http-hint">
-          Write <code>{'{{NAME}}'}</code> anywhere in a request — the URL, a header, the body, an auth field. A request can override any of these in its own Vars tab.
-          Built in already: <code>{'{{repo}}'}</code>, <code>{'{{branch}}'}</code>, <code>{'{{worktree}}'}</code>, <code>{'{{taskId}}'}</code>.
-        </p>
-      </header>
+    <Stack gap="section">
+      <Stack gap="row">
+        <Heading level={3}>Variables · {props.projectName}</Heading>
+        <Text tone="muted" wrap>
+          {'Write {{NAME}} anywhere in a request — the URL, a header, the body, an auth field. '}
+          {'A request can override any of these in its own Vars tab. '}
+          {'Built in already: {{repo}}, {{branch}}, {{worktree}}, {{taskId}}.'}
+        </Text>
+      </Stack>
 
       <Show when={error()}>
-        <p class="http-response-error" role="alert">{error()}</p>
+        <Text tone="danger" wrap>{error()}</Text>
       </Show>
 
-      <div class="http-grid http-vars-grid" role="table">
-        <div class="http-grid-head" role="row">
-          <span />
-          <span>Name</span>
-          <span>Kind</span>
-          <span>Value</span>
-          <span />
-        </div>
-        {/* <Index>, not <For>: rows are keyed by position, so editing one doesn't recreate its input. */}
-        <Index each={rows()}>
-          {(row, index) => (
-            <div class="http-grid-row" role="row">
-              <Checkbox checked={row().enabled} ariaLabel="Enabled" onChange={(checked) => editRow(index, { enabled: checked })} />
-              <Input size="sm" value={row().name} placeholder="BASE_URL" onInput={(value) => editRow(index, { name: value })} />
-              <Select size="sm" value={row().kind} label="Kind" onChange={(value) => editRow(index, { kind: value as VariableKind, value: '' })} options={[...variableKinds.map((k) => ({ value: k, label: k }))]} />
+      {/* One row per variable, as an Inline of controls. It was a five-column CSS grid this plugin
+          declared itself; the kit has no grid whose cells are controls, and a row of fields reads the
+          same at every width without one. */}
+      {/* <Index>, not <For>: rows are keyed by position, so editing one doesn't recreate its input. */}
+      <Index each={rows()}>
+        {(row, index) => (
+          <Stack gap="none">
+            <Inline wrap>
+              <Checkbox checked={row().enabled} ariaLabel="Enabled" onChange={(checked: boolean) => editRow(index, { enabled: checked })} />
+              <Input size="sm" value={row().name} placeholder="BASE_URL" onChange={(value: string) => editRow(index, { name: value })} />
+              <Select
+                size="sm"
+                value={row().kind}
+                label="Kind"
+                onChange={(value: string) => editRow(index, { kind: value as VariableKind, value: '' })}
+                options={[...variableKinds.map((k) => ({ value: k, label: k }))]}
+              />
               <Input
                 size="sm"
                 type={row().kind === 'secret' ? 'password' : 'text'}
                 value={row().value}
                 placeholder={row().kind === 'secret' && row().hasStoredSecret ? 'stored — leave blank to keep' : PLACEHOLDER[row().kind]}
-                onInput={(value) => editRow(index, { value: value })}
+                onChange={(value: string) => editRow(index, { value })}
               />
-              <span class="http-grid-actions">
-                <Button size="sm" busy={busy() === (row().id ?? row().name)} onPress={() => void save(index)}>
-                  Save
-                </Button>
-                <Button
-                  variant="bare"
-                  size="sm"
-                  iconOnly={armedDelete.armed() !== row().id}
-                  tone={armedDelete.armed() === row().id ? 'danger' : undefined}
-                  title={armedDelete.armed() === row().id ? `Click again to delete "${row().name}"` : 'Delete'}
-                  label={armedDelete.armed() === row().id ? 'Confirm delete' : 'Delete'}
-                  onPress={() => void remove(index)}
-                >
-                  <Show when={armedDelete.armed() === row().id} fallback={<Icon name="trash-2" />}>Delete?</Show>
-                </Button>
-              </span>
-              <p class="http-grid-hint">{KIND_HINT[row().kind]}</p>
-            </div>
-          )}
-        </Index>
-      </div>
+              <Button size="sm" busy={busy() === (row().id ?? row().name)} onPress={() => void save(index)}>
+                Save
+              </Button>
+              <Button
+                variant="bare"
+                size="sm"
+                tone={armedDelete.armed() === row().id ? 'danger' : undefined}
+                title={armedDelete.armed() === row().id ? `Click again to delete "${row().name}"` : 'Delete'}
+                label={armedDelete.armed() === row().id ? 'Confirm delete' : 'Delete'}
+                onPress={() => void remove(index)}
+              >
+                <Show when={armedDelete.armed() === row().id} fallback={<Icon name="trash-2" />}>Delete?</Show>
+              </Button>
+            </Inline>
+            <Text tone="muted">{KIND_HINT[row().kind]}</Text>
+          </Stack>
+        )}
+      </Index>
 
-      <Button size="sm" variant="ghost" onPress={() => setRows((r) => [...r, blankRow()])}>
-        + Variable
-      </Button>
-    </div>
+      <Toolbar variant="actions" size="sm">
+        <Button size="sm" variant="ghost" onPress={() => setRows((r) => [...r, blankRow()])}>
+          + Variable
+        </Button>
+      </Toolbar>
+    </Stack>
   )
 }

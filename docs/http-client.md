@@ -92,12 +92,20 @@ and memory-only drafts. Node freshness/offline status follows the shared client 
 leaves the request text in the pane.
 
 The rail source lists the project's saved requests and nothing more. The host draws the rows from
-`/v2/p/http/rail-items`, and a click navigates to the project pane. Exploration lives in the frame
+`/v2/p/http/rail-items`, and a click navigates to the project pane. Exploration lives in the panel
 beside it, so the descriptor vocabulary does not have to grow into a UI framework.
 
-Two frame consequences visible in the UI: deleting a request or a variable takes two clicks rather than
-raising a dialog (a frame has no `window.confirm`), and "Copy as curl" goes through the host
-(`bridge.ui.copy`) because an unfocused document cannot write the clipboard.
+All three surfaces are **trees**: the plugin's code runs in a worker and emits a tree of the host's own
+components (`docs/future/layout/06-remote-tree.md`). Three consequences are visible in the UI, and all
+three are the same consequence — the plugin has no document of its own.
+
+- Deleting a request or a variable takes two clicks rather than raising a dialog, and "Copy as curl"
+  goes through the host (`bridge.ui.copy`).
+- **Pasting a curl command into the URL bar expands it on commit, not on paste.** Press Enter or leave
+  the field and the whole request fills in. A paste is a DOM event and there is no DOM to raise one in;
+  the check runs where the committed text arrives instead.
+- The method chip in the request tree is no longer colour-coded per verb. A plugin names a role, never
+  a colour, and the kit has no role that means POST.
 
 Saved requests are attachable to an agent's context, served by the plugin's own
 `/v2/p/http/context-options` and `/v2/p/http/context-capture` routes. Redaction runs on the Node, over

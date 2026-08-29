@@ -1,5 +1,8 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, Button, Checkbox, createArmedConfirm, EmptyState, Input, ListDetail, Picker, Row, SectionHeader, Toolbar } from '@acorn/plugin-api/ui'
+import {
+  Alert, Button, Checkbox, createArmedConfirm, DetailColumn, EmptyState, Grid, Input, Inline,
+  ListColumn, ListDetail, Picker, Row, SectionHeader, Stack, Text, Textarea, Toolbar, ToolbarSpacer,
+} from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import {
@@ -16,9 +19,8 @@ import {
   runQuery,
   updateCell,
 } from './databaseClient'
-import { filterSavedQueries, quoteIdentifier, savedQueryLabel } from './databaseModel'
+import { quoteIdentifier, savedQueryLabel } from './databaseModel'
 import GenerateSqlModal from './GenerateSqlModal'
-import ResultGrid from './ResultGrid'
 import SaveQueryModal from './SaveQueryModal'
 
 // The Database pane's plugin half: a searchable table list, the button bar, a virtualized results grid,
@@ -29,9 +31,13 @@ import SaveQueryModal from './SaveQueryModal'
 // behind Execute, `document.write()` when the picker or Generate loads a query in, and
 // `document.flush()`, which the host has already called by the time a surface action arrives.
 //
-// ⌘Enter runs the query even though it is pressed with focus in the host's editor, where this frame
+// ⌘Enter runs the query even though it is pressed with focus in the host's editor, where this plugin
 // has no keyboard. The host resolves it against the manifest's surface-scoped keybinding, flushes the
 // document, and posts `execute` here, handled below exactly as the Execute button's click is.
+//
+// The results grid is the kit's `Grid` now, not a virtualizer this plugin shipped. It was the same
+// component twice — a sticky header, a fixed row height read from the density token, an overscan of
+// sixteen — and one of the two had to go.
 
 type Selected = { schema: string; name: string } | null
 
@@ -73,7 +79,6 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   const savedList = (): DbSavedQuery[] => saved() ?? []
   // The name a Save would default to: whatever was last loaded, so load → tweak → Save updates in place.
   const [loadedName, setLoadedName] = createSignal('')
-  const matchSaved = (query: string) => filterSavedQueries(savedList(), query)
   const deleteSaved = async (q: DbSavedQuery) => {
     try {
       await deleteSavedQuery(props.taskId, q.id)
@@ -193,193 +198,199 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   }
 
   return (
-    <section class="db-frame">
-      <SectionHeader
-        actions={<Button size="sm" iconOnly title="Reconnect" label="Reconnect" onPress={() => void connect()}>⟳</Button>}
-      >
-        Database
-        <span class="db-status" classList={{ err: status() === 'error', ok: status() === 'connected' }}>
+    <Stack gap="row">
+      <Toolbar variant="bar" size="sm" ariaLabel="Connection">
+        <SectionHeader>Database</SectionHeader>
+        <Text tone={status() === 'error' ? 'danger' : status() === 'connected' ? 'ok' : 'muted'}>
           {status() === 'connected' ? dbName() || 'connected' : status() === 'connecting' ? 'connecting…' : 'error'}
-        </span>
-      </SectionHeader>
+        </Text>
+        <ToolbarSpacer />
+        <Button size="sm" title="Reconnect" label="Reconnect" onPress={() => void connect()}>⟳</Button>
+      </Toolbar>
 
       <Show when={error()}>
         <Alert>{error()}</Alert>
       </Show>
 
-      <ListDetail
-        listLabel="Tables"
-        list={
-          <>
-            <Input kind="filter" placeholder="Filter tables…" value={filter()} onInput={(value) => setFilter(value)} />
-            <div class="db-table-list">
-              <For each={filtered()} fallback={<EmptyState align="start">{status() === 'connected' ? 'No tables.' : ''}</EmptyState>}>
-                {(t) => (
-                  <Row
-                    density="compact"
-                    selected={selected()?.schema === t.schema && selected()?.name === t.name}
-                    onPress={() => void openTable(t)}
-                    title={`${t.schema}.${t.name}`}
-                  >
-                    {t.schema === 'public' ? t.name : `${t.schema}.${t.name}`}
-                  </Row>
-                )}
-              </For>
-            </div>
-          </>
-        }
-      >
-        {/* The bar moved from above the splitter to below it, and that is the only visible change the
-            move makes to this pane. It stays the PLUGIN's because it is a searchable picker with
-            per-row delete chips and a conditionally-visible button — common, not impossible, which is
-            the bar a host-drawn region has to clear (docs/plugins.md § Document surfaces). */}
-        <Toolbar variant="actions" ariaLabel="Query actions">
-          <span class="muted db-hint">⌘↵ to run</span>
-          <Picker<DbSavedQuery>
-            label={loadedName() || 'Queries'}
-            placeholder="Filter saved queries…"
-            emptyText="No saved queries yet."
-            results={matchSaved}
-            // Notes are searchable, so show their first line to explain why a row matched.
-            rowLabel={savedQueryLabel}
-            isActive={(q) => q.name === loadedName()}
-            leading={(q) => (
-              <Button variant="bare" size="sm" iconOnly tone="danger" title="Delete query" label="Delete query" onPress={() => void deleteSaved(q)}>✕</Button>
+      <ListDetail split listLabel="Tables">
+        <ListColumn label="Tables">
+          <Input kind="filter" placeholder="Filter tables…" value={filter()} onChange={(value: string) => setFilter(value)} />
+          <For each={filtered()} fallback={<EmptyState align="start">{status() === 'connected' ? 'No tables.' : ''}</EmptyState>}>
+            {(t) => (
+              <Row
+                density="compact"
+                selected={selected()?.schema === t.schema && selected()?.name === t.name}
+                onPress={() => void openTable(t)}
+                title={`${t.schema}.${t.name}`}
+              >
+                {t.schema === 'public' ? t.name : `${t.schema}.${t.name}`}
+              </Row>
             )}
-            onSelect={loadSaved}
-          />
-          {/* The editor's content is on the other side of a port, so this cannot be
-              disabled-when-empty without polling it — an empty document just makes the click a
-              no-op. Same trade the compiled version made against a Monaco model that was not a signal. */}
-          <Button
-            variant="solid"
-            onPress={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
-          >
-            Save
-          </Button>
-          <Show when={connections().length}>
-            <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => setGenerating(true)}>Generate</Button>
-          </Show>
-          <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => void execute()}>Execute</Button>
-        </Toolbar>
+          </For>
+        </ListColumn>
 
-        <div class="db-result">
+        <DetailColumn>
+          {/* The bar sits below the splitter. It stays the PLUGIN's because it is a searchable picker
+              with per-row delete controls and a conditionally-visible button — common, not impossible,
+              which is the bar a host-drawn region has to clear (docs/plugins.md § Document surfaces). */}
+          <Toolbar variant="actions" ariaLabel="Query actions">
+            <Text tone="muted">⌘↵ to run</Text>
+            {/* The data form of the picker: rows as items, filtering in the host. A tree cannot hand
+                over a `results(query)` callback, because a function does not cross a message port. */}
+            <Picker
+              label={loadedName() || 'Queries'}
+              placeholder="Filter saved queries…"
+              emptyText="No saved queries yet."
+              items={savedList().map((q) => ({
+                id: q.id,
+                label: savedQueryLabel(q),
+                active: q.name === loadedName(),
+                removable: true,
+              }))}
+              onPick={(id: string) => {
+                const q = savedList().find((candidate) => candidate.id === id)
+                if (q) loadSaved(q)
+              }}
+              onRemove={(id: string) => {
+                const q = savedList().find((candidate) => candidate.id === id)
+                if (q) void deleteSaved(q)
+              }}
+            />
+            {/* The editor's content is on the other side of a port, so this cannot be
+                disabled-when-empty without polling it — an empty document just makes the click a
+                no-op. Same trade the compiled version made against a Monaco model that was not a signal. */}
+            <Button
+              variant="solid"
+              onPress={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
+            >
+              Save
+            </Button>
+            <Show when={connections().length}>
+              <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => setGenerating(true)}>Generate</Button>
+            </Show>
+            <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => void execute()}>Execute</Button>
+          </Toolbar>
+
           <Toolbar size="sm" ariaLabel="Result actions">
-            <span class="db-footer">{footer()}</span>
+            <Text tone="muted">{footer()}</Text>
+            <ToolbarSpacer />
             <Show when={resultTable() && columns().some((c) => c.isPk)}>
               <Button size="sm" disabled={busy()} onPress={() => setInserting(true)}>+ Row</Button>
             </Show>
           </Toolbar>
           <Show when={result()} fallback={<EmptyState align="start">Select a table or run a query.</EmptyState>}>
             {(r) => (
-              <ResultGrid
+              <Grid
+                ariaLabel="Query results"
                 columns={r().columns}
-                rows={r().rows}
-                activeRow={activeRow()}
-                onRowClick={(i) => batch(() => { setInserting(false); setActiveRow(i) })}
-                onAppearance={(listener) => props.bridge.onAppearance(() => listener())}
+                // The kit's Grid takes strings, so a SQL NULL is spelled here rather than styled. It was
+                // a dimmed cell with a class; it is the word now, which is what the terminal projection
+                // of this node says anyway.
+                rows={r().rows.map((row) => row.map((cell) => cell ?? 'NULL'))}
+                selected={activeRow()}
+                onSelect={(i: number) => batch(() => { setInserting(false); setActiveRow(i) })}
               />
             )}
           </Show>
-        </div>
 
-        <Show when={inserting() && resultTable()}>
-          <RowDetail
-            insert
-            columns={result()?.columns ?? columns().map((c) => c.name)}
-            row={[]}
-            table={resultTable()}
-            meta={columns()}
-            busy={busy()}
-            onClose={() => setInserting(false)}
-            onInsert={async (values) => {
-              const t = resultTable()
-              if (!t) return
-              setBusy(true)
-              try {
-                const res = await insertRow(props.taskId, t.schema, t.name, values)
-                if (!res.ok) { setError(res.error); return }
-                batch(() => { setInserting(false); setError('') })
-                await reloadTable()
-              } catch (e) {
-                fail(e)
-              } finally {
-                setBusy(false)
-              }
-            }}
-          />
-        </Show>
-
-        <Show when={!inserting() && activeRow() !== null && result()}>
-          <RowDetail
-            columns={result()!.columns}
-            row={result()!.rows[activeRow()!]}
-            table={resultTable()}
-            meta={columns()}
-            busy={busy()}
-            onClose={() => { setActiveRow(null); deleteArmed.disarm() }}
-            onSave={async (edits) => {
-              const t = resultTable()
-              if (!t) return
-              const pk = primaryKey()
-              setBusy(true)
-              try {
-                for (const [col, val] of edits) {
-                  const res = await updateCell(props.taskId, t.schema, t.name, col, val, pk)
+          <Show when={inserting() && resultTable()}>
+            <RowDetail
+              insert
+              columns={result()?.columns ?? columns().map((c) => c.name)}
+              row={[]}
+              table={resultTable()}
+              meta={columns()}
+              busy={busy()}
+              onClose={() => setInserting(false)}
+              onInsert={async (values) => {
+                const t = resultTable()
+                if (!t) return
+                setBusy(true)
+                try {
+                  const res = await insertRow(props.taskId, t.schema, t.name, values)
                   if (!res.ok) { setError(res.error); return }
+                  batch(() => { setInserting(false); setError('') })
+                  await reloadTable()
+                } catch (e) {
+                  fail(e)
+                } finally {
+                  setBusy(false)
                 }
-                setError('')
-                await reloadTable()
-              } catch (e) {
-                fail(e)
-              } finally {
-                setBusy(false)
-              }
-            }}
-            deleteArmed={!!deleteArmed.armed()}
-            onDelete={async () => {
-              const t = resultTable()
-              if (!t) return
-              if (!deleteArmed.request('row')) return
-              const pk = primaryKey()
-              setBusy(true)
-              try {
-                const res = await deleteRow(props.taskId, t.schema, t.name, pk)
-                if (!res.ok) { setError(res.error); return }
-                setActiveRow(null)
-                setError('')
-                await reloadTable()
-              } catch (e) {
-                fail(e)
-              } finally {
-                setBusy(false)
-              }
-            }}
-          />
-        </Show>
+              }}
+            />
+          </Show>
 
-        <Show when={generating()}>
-          <GenerateSqlModal
-            taskId={props.taskId}
-            connections={connections()}
-            queries={savedList()}
-            onClose={() => setGenerating(false)}
-            onGenerated={writeSql}
-          />
-        </Show>
+          <Show when={!inserting() && activeRow() !== null && result()}>
+            <RowDetail
+              columns={result()!.columns}
+              row={result()!.rows[activeRow()!]}
+              table={resultTable()}
+              meta={columns()}
+              busy={busy()}
+              onClose={() => { setActiveRow(null); deleteArmed.disarm() }}
+              onSave={async (edits) => {
+                const t = resultTable()
+                if (!t) return
+                const pk = primaryKey()
+                setBusy(true)
+                try {
+                  for (const [col, val] of edits) {
+                    const res = await updateCell(props.taskId, t.schema, t.name, col, val, pk)
+                    if (!res.ok) { setError(res.error); return }
+                  }
+                  setError('')
+                  await reloadTable()
+                } catch (e) {
+                  fail(e)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+              deleteArmed={!!deleteArmed.armed()}
+              onDelete={async () => {
+                const t = resultTable()
+                if (!t) return
+                if (!deleteArmed.request('row')) return
+                const pk = primaryKey()
+                setBusy(true)
+                try {
+                  const res = await deleteRow(props.taskId, t.schema, t.name, pk)
+                  if (!res.ok) { setError(res.error); return }
+                  setActiveRow(null)
+                  setError('')
+                  await reloadTable()
+                } catch (e) {
+                  fail(e)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            />
+          </Show>
 
-        <Show when={saving() !== null}>
-          <SaveQueryModal
-            taskId={props.taskId}
-            sql={saving() ?? ''}
-            name={loadedName()}
-            existing={savedList()}
-            onClose={() => setSaving(null)}
-            onSaved={(q) => { setLoadedName(q.name); void refetchSaved() }}
-          />
-        </Show>
+          <Show when={generating()}>
+            <GenerateSqlModal
+              taskId={props.taskId}
+              connections={connections()}
+              queries={savedList()}
+              onDismiss={() => setGenerating(false)}
+              onGenerated={writeSql}
+            />
+          </Show>
+
+          <Show when={saving() !== null}>
+            <SaveQueryModal
+              taskId={props.taskId}
+              sql={saving() ?? ''}
+              name={loadedName()}
+              existing={savedList()}
+              onDismiss={() => setSaving(null)}
+              onSaved={(q) => { setLoadedName(q.name); void refetchSaved() }}
+            />
+          </Show>
+        </DetailColumn>
       </ListDetail>
-    </section>
+    </Stack>
   )
 }
 
@@ -435,50 +446,49 @@ function RowDetail(props: {
   }
 
   return (
-    <aside class="db-detail">
-      <SectionHeader actions={<Button size="sm" iconOnly title="Close" label="Close" onPress={props.onClose}>✕</Button>}>
-        {props.insert ? `${props.table?.name ?? ''} · new row` : props.table ? `${props.table.name} · row` : 'Row'}
-      </SectionHeader>
-      <div class="db-detail-fields">
-        <For each={props.columns}>
-          {(col) => {
-            const m = metaByName.get(col)
-            return (
-              <label class="db-field">
-                <span class="db-field-label">
-                  {col}
-                  <Show when={m?.isPk}><em class="db-pk">PK</em></Show>
-                  <span class="db-field-type">{m?.dataType}</span>
-                </span>
-                <textarea
-                  class="db-field-input"
-                  rows={1}
-                  spellcheck={false}
-                  disabled={!editable() || draft()[col]?.isNull}
-                  value={draft()[col]?.isNull ? '' : draft()[col]?.value ?? ''}
-                  placeholder={draft()[col]?.isNull ? 'NULL' : ''}
-                  onInput={(e) => set(col, { value: e.currentTarget.value })}
-                />
-                {/* Insert mode always offers the null toggle (columns start null so untouched ones
-                    take their DB default); edit mode only for nullable columns. */}
-                <Show when={editable() && (props.insert || (m?.nullable ?? true))}>
-                  <label class="db-null-toggle">
-                    <Checkbox label="null" checked={draft()[col]?.isNull} onChange={(checked) => set(col, { isNull: checked })} />
-                  </label>
-                </Show>
-              </label>
-            )
-          }}
-        </For>
-      </div>
-      <div class="db-detail-actions">
-        <Show when={editable()} fallback={<span class="muted db-hint">Read-only (no single-table PK).</span>}>
+    <Stack gap="row">
+      <Toolbar variant="bar" size="sm">
+        <SectionHeader>
+          {props.insert ? `${props.table?.name ?? ''} · new row` : props.table ? `${props.table.name} · row` : 'Row'}
+        </SectionHeader>
+        <ToolbarSpacer />
+        <Button size="sm" title="Close" label="Close" onPress={props.onClose}>✕</Button>
+      </Toolbar>
+      <For each={props.columns}>
+        {(col) => {
+          const m = metaByName.get(col)
+          return (
+            <Stack gap="none">
+              <Inline>
+                <Text emphasis="eyebrow">{col}</Text>
+                <Show when={m?.isPk}><Text emphasis="eyebrow" tone="accent">PK</Text></Show>
+                <Text tone="muted">{m?.dataType}</Text>
+              </Inline>
+              <Textarea
+                rows={1}
+                assist={false}
+                disabled={!editable() || draft()[col]?.isNull}
+                value={draft()[col]?.isNull ? '' : draft()[col]?.value ?? ''}
+                placeholder={draft()[col]?.isNull ? 'NULL' : ''}
+                onChange={(value: string) => set(col, { value })}
+              />
+              {/* Insert mode always offers the null toggle (columns start null so untouched ones take
+                  their DB default); edit mode only for nullable columns. */}
+              <Show when={editable() && (props.insert || (m?.nullable ?? true))}>
+                <Checkbox label="null" checked={draft()[col]?.isNull} onChange={(checked: boolean) => set(col, { isNull: checked })} />
+              </Show>
+            </Stack>
+          )
+        }}
+      </For>
+      <Toolbar variant="actions" size="sm">
+        <Show when={editable()} fallback={<Text tone="muted">Read-only (no single-table PK).</Text>}>
           <Button variant="solid" disabled={props.busy} onPress={save}>Save</Button>
           <Show when={!props.insert}>
             <Button tone="danger" disabled={props.busy} onPress={() => void props.onDelete?.()}>{props.deleteArmed ? 'Delete?' : 'Delete'}</Button>
           </Show>
         </Show>
-      </div>
-    </aside>
+      </Toolbar>
+    </Stack>
   )
 }

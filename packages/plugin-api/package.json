@@ -14,7 +14,8 @@
     "./ui/tokens": "./src/ui/tokens.ts",
     "./ui/diff": "./src/ui/diff.ts",
     "./ui/editor": "./src/ui/editor.ts",
-    "./ui/sdk": "./src/ui/sdk.ts"
+    "./ui/sdk": "./src/ui/sdk.ts",
+    "./ui/tree": "./src/ui/tree.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",

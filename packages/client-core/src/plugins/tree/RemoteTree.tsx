@@ -1,12 +1,13 @@
-import { createEffect, createMemo, onCleanup } from 'solid-js'
+import { createEffect, createMemo, on, onCleanup } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
-import { createFrameBridge, type FrameBinding } from '../frames/broker'
+import { createFrameBridge, postSelect, postSurfaceAction, type FrameBinding } from '../frames/broker'
 import { createFrameServices } from '../frames/frameServices'
 import { eligiblePlugins, isTaskPane } from '../contributions'
 import { recordSurfaceFailure } from '../surfaceFailures'
 import { activeNodeId } from '../../node/activeNode'
+import { clientEvents, consumePaneIntent } from '../../registries/clientEvents'
 import { TreeHost } from './TreeHost'
 import type { RemoteContribution } from './registry'
 import { acquireTreeWorker } from './workerHost'
@@ -18,11 +19,29 @@ import { acquireTreeWorker } from './workerHost'
 // different is what crosses. A frame gets a rectangle and draws it; a tree gets nothing but a port,
 // and the pixels are the host's own components all the way down.
 
+/** Where this tree is being drawn, when that is somewhere with a subject. Read at call time. */
+export type TreeScope = {
+  taskId?: string
+  projectId?: string
+  /** The routed or rail-selected item, for a tree standing in for a project pane or a reference panel. */
+  item?: string
+}
+
 export type RemoteTreeProps = {
   contribution: RemoteContribution
   /** What this tree is for. Reactive: a second mount for the same slot is a props update, which is how
    *  a tool card redraws on every transcript snapshot without its worker restarting. */
   props: () => unknown
+  /**
+   * The task or project this tree is inside, for a tree that is a pane rather than a slot.
+   *
+   * An accessor, not a value, and read on every bridge call rather than captured at connect: one worker
+   * serves every tree its bundle draws and therefore holds one bridge, so a scope frozen at connect
+   * would be whichever tree happened to start the worker. Reading it live means `openPane` and the
+   * task-active gate answer for the task on screen, which is the only task a tree can be interacted
+   * with from.
+   */
+  scope?: () => TreeScope
 }
 
 let slotSeq = 0
@@ -36,6 +55,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   let container: HTMLDivElement | undefined
 
   const contribution = componentProps.contribution
+  const scope = (): TreeScope => componentProps.scope?.() ?? {}
   const refuse = (reason: string): void => {
     recordSurfaceFailure(contribution.pluginId, contribution.id, new Error(reason))
   }
@@ -56,12 +76,13 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
       // task-scoped panes and nothing else, exactly as it is for a frame.
       panes: (owner?.installed.contributions.frames ?? []).filter(isTaskPane).map((frame) => frame.id),
       claimsKeys: [],
-      // No task and no project, deliberately. One worker serves every tree its bundle draws, so one
-      // bridge does too, and a bridge bound to whichever tree happened to start the worker would let a
-      // card in one task push a pane into another. The subject reaches a tree through its mount props
-      // instead, which are per slot and always current. What that costs is `bridge.ui.openPane` from a
-      // tree, which is inert: opening into somebody else's task layout is not obviously a contributor's
-      // to do, and phase 4 is where a slot's scope gets designed rather than inherited.
+      // Getters, for the reason `scope` above states at length: the binding outlives any one tree.
+      get taskId() {
+        return scope().taskId
+      },
+      get projectId() {
+        return scope().projectId
+      },
     }
   }
 
@@ -105,7 +126,37 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   // Mount is also update: the first call starts the tree, every later one carries new props. Solid's
   // effect gives the "later one" for free, because `props()` is the caller's accessor.
   createEffect(() => worker.mount(slot, contribution.entry, componentProps.props()))
+
+  // The three pushes that are not tree mutations. They ride the bridge rather than the tree channel,
+  // because they are the same messages a frame gets and the plugin listens for them with the same
+  // `bridge.onSelect` and `bridge.onSurfaceAction` either way (frames/sdk.ts).
+  //
+  // A rail row picked while the pane is already open. `defer`, because the selection that opened the
+  // pane crossed in the mount props and posting it again would restart a load already in flight.
+  createEffect(on(() => scope().item, (next, previous) => {
+    const port = worker.bridgePort()
+    if (!port || !next || next === previous) return
+    postSelect(port, next)
+  }, { defer: true }))
+  const unselect = clientEvents.on('presentation:pane-intent', (event) => {
+    const port = worker.bridgePort()
+    if (!port || event.taskId !== scope().taskId || event.paneId !== contribution.id) return
+    if (event.intent.kind !== 'plugin:select') return
+    // Consumed here so the retained copy does not reach a later remount as a stale selection.
+    consumePaneIntent(event.taskId, event.paneId)
+    postSelect(port, event.intent.item)
+  })
+  // A surface-scoped command the host resolved on this tree's behalf: the chord landed in the sibling
+  // editor of a composed pane, or the row was picked in the palette.
+  const unaction = clientEvents.on('plugin:surface-action', (event) => {
+    const port = worker.bridgePort()
+    if (!port || event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
+    postSurfaceAction(port, event.command)
+  })
+
   onCleanup(() => {
+    unaction()
+    unselect()
     worker.unmount(slot)
     worker.release()
   })

@@ -48,7 +48,7 @@ describe('the client plugin host', () => {
     clear('first', 'second')
   })
 
-  // `activate` is the phase two plugins needed and did not have (docs/plugins.md § "Frame authoring
+  // `activate` is the phase two plugins needed and did not have (docs/plugins.md § "Client authoring
   // and the UI kit"): plugins/http enumerated `localStorage` and plugins/agents issued a `fetch`,
   // both inside a synchronous `init` that documents itself as registration-only.
   it('runs activate after EVERY init, in declaration order, and never for a disabled plugin', () => {

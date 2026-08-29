@@ -188,9 +188,18 @@ export type InputProps = ControlOwn & {
   min?: string | number
   max?: string | number
   step?: string | number
-  /** The value as it is typed. An input is host-owned: what comes back is the text, never an event. */
+  /** The value as it is typed. An input is host-owned: what comes back is the text, never an event.
+   *  Not one of the kit's eleven events, and deliberately: a remote tree cannot bind a per-keystroke
+   *  callback, because every keystroke would be a message hop. */
   onInput?: (value: string) => void
-  onCommit?: (value: string) => void
+  /** The committed value: blur, or Enter. `onChange` rather than `onCommit` because commit IS what
+   *  the kit means by a change (docs/future/layout/04-kit.md), and only a name in that list can carry
+   *  a handler across the remote root. */
+  onChange?: (value: string) => void
+  /** Enter, with the value. The kit's own name for "the reader is done and wants this to happen",
+   *  which is what a URL bar's Enter means. A caller that also wants keys as they arrive uses
+   *  `onKeyDown`, and a remote tree cannot: a DOM event does not cross. */
+  onSubmit?: (value: string) => void
   /** An input owns its keys while focused, which is why this is here and nowhere else in the kit.
    *  See docs/ui-design.md § The closed kit. */
   onKeyDown?: (event: KeyboardEvent) => void
@@ -210,7 +219,7 @@ export function Input(props: InputProps) {
   const [own, rest] = splitProps(
     props,
     ['size', 'invalid', 'width', 'kind', 'label', 'title', 'id', 'name', 'disabled', 'required', 'autofocus', 'assist'],
-    ['onInput', 'onCommit', 'onKeyDown', 'onPaste', 'onFocus', 'onBlur', 'ref'],
+    ['onInput', 'onChange', 'onSubmit', 'onKeyDown', 'onPaste', 'onFocus', 'onBlur', 'ref'],
   )
   const listId = `ui-suggest-${++suggestionSeq}`
   return (
@@ -232,8 +241,11 @@ export function Input(props: InputProps) {
       max={props.max}
       step={props.step}
       onInput={(event) => rest.onInput?.(event.currentTarget.value)}
-      onChange={(event) => rest.onCommit?.(event.currentTarget.value)}
-      onKeyDown={(event) => rest.onKeyDown?.(event)}
+      onChange={(event) => rest.onChange?.(event.currentTarget.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' && rest.onSubmit) rest.onSubmit(event.currentTarget.value)
+        rest.onKeyDown?.(event)
+      }}
       onPaste={(event) => rest.onPaste?.(event)}
       onFocus={() => rest.onFocus?.()}
       onBlur={() => rest.onBlur?.()}
@@ -447,7 +459,8 @@ export type TextareaProps = ControlOwn & {
   readOnly?: boolean
   maxLength?: number
   onInput?: (value: string) => void
-  onCommit?: (value: string) => void
+  /** The committed value: blur, or Enter. See `InputProps.onChange`. */
+  onChange?: (value: string) => void
   /** A textarea owns its keys and its own surface while focused: the composer completes mentions,
    *  the editor takes a dropped file. One of the three nodes the kit lets keys through. See
    *  docs/ui-design.md § The closed kit. */
@@ -483,7 +496,7 @@ export function Textarea(props: TextareaProps) {
       readOnly={props.readOnly}
       maxLength={props.maxLength}
       onInput={(event) => props.onInput?.(event.currentTarget.value)}
-      onChange={(event) => props.onCommit?.(event.currentTarget.value)}
+      onChange={(event) => props.onChange?.(event.currentTarget.value)}
       onKeyDown={(event) => props.onKeyDown?.(event)}
       onKeyUp={(event) => props.onKeyUp?.(event)}
       onPaste={(event) => props.onPaste?.(event)}
@@ -955,7 +968,11 @@ export function Toolbar(props: {
 }
 
 /** flex:1 filler, in place of the `margin-left: auto` idiom. */
-Toolbar.Spacer = () => <span class="ui-toolbar-spacer" />
+/** The gap that pushes what follows to the far end of the bar. A name of its own as well as
+ *  `Toolbar.Spacer`, because a remote tree names one type per node and has nowhere to put the dot. */
+export const ToolbarSpacer = () => <span class="ui-toolbar-spacer" />
+
+Toolbar.Spacer = ToolbarSpacer
 
 /** A gap-tightened cluster, for pairs that read as one control (a find bar's prev/next). */
 Toolbar.Group = (props: { children: JSX.Element }) => (
@@ -1320,6 +1337,8 @@ export function SplitHandle(props: { axis: 'x' | 'y'; drag: SplitDrag }) {
    the layout rules, and when not to use it. */
 export function ListDetail(props: {
   list?: JSX.Element
+  /** Two columns given as `ListColumn` and `DetailColumn` children instead of through `list`. */
+  split?: boolean
   /** aria-label for the list column. It is a landmark; name it. */
   listLabel?: string
   /** `narrow` is the compact identifier switcher; `default` is the browse list. */
@@ -1335,22 +1354,41 @@ export function ListDetail(props: {
   return (
     <div
       class="ui-listdetail"
-      data-list={props.list === undefined ? undefined : (props.listWidth ?? 'default')}
+      data-list={props.list !== undefined || props.split ? (props.listWidth ?? 'default') : undefined}
     >
-      {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
-          screen reader tells two same-shaped columns apart. */}
-      <Show when={props.list !== undefined}>
-        <aside class="ui-listdetail-list" aria-label={props.listLabel}>
-          {props.list}
-        </aside>
+      <Show when={props.list !== undefined} fallback={props.children}>
+        <>
+          {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
+              screen reader tells two same-shaped columns apart. */}
+          <aside class="ui-listdetail-list" aria-label={props.listLabel}>
+            {props.list}
+          </aside>
+          <Dynamic
+            component={props.detailAs ?? 'div'}
+            class="ui-listdetail-detail"
+            data-scroll={props.scrollDetail ? '' : undefined}
+          >
+            {props.children}
+          </Dynamic>
+        </>
       </Show>
-      <Dynamic
-        component={props.detailAs ?? 'div'}
-        class="ui-listdetail-detail"
-        data-scroll={props.scrollDetail ? '' : undefined}
-      >
-        {props.children}
-      </Dynamic>
     </div>
   )
+}
+
+/* The two columns as nodes of their own, for a caller that cannot put an element in a prop.
+   A remote tree is exactly that caller: its props are JSON on a message port, so `list` above is
+   unreachable from a sandbox and the split has to be expressible as children
+   (docs/future/layout/06-remote-tree.md § The wire format).
+
+   `split` on ListDetail is what turns the grid on in that form, because the parent can no longer tell
+   from `list` whether there are two columns.
+
+   At 80×24: as ListDetail. */
+export function ListColumn(props: { label?: string; children: JSX.Element }) {
+  return <aside class="ui-listdetail-list" aria-label={props.label}>{props.children}</aside>
+}
+
+export function DetailColumn(props: { scroll?: boolean; children: JSX.Element }) {
+  return <div class="ui-listdetail-detail" data-scroll={props.scroll ? '' : undefined}>{props.children}</div>
 }

@@ -346,6 +346,25 @@
                       "properties": {
                         "kind": {
                           "type": "string",
+                          "const": "remote"
+                        },
+                        "entry": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "entry"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
                           "const": "document"
                         },
                         "languageId": {

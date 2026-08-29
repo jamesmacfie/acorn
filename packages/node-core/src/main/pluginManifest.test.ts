@@ -171,10 +171,12 @@ describe('pane layouts', () => {
   const doc = (document: Record<string, unknown>) => ({ kind: 'document', ...document })
   const layout = (document: Record<string, unknown>) =>
     ({ ...PANE, layout: 'single', regions: { body: doc(document) } })
+  // The document region by name, since that is the only kind these cases assert on: a `frame` region
+  // is a bare string and a `remote` one carries an entry rather than a route.
   const region = (result: ReturnType<typeof manifest>, name: string) => {
     if (!result.success) return undefined
     const held = result.data.contributions.frames[0]?.regions?.[name]
-    return typeof held === 'object' ? held : undefined
+    return typeof held === 'object' && held.kind === 'document' ? held : undefined
   }
 
   it('accepts a read/write document and defaults the language', () => {
@@ -199,10 +201,32 @@ describe('pane layouts', () => {
     expect(manifest({ frames: [layout({ read: '/v2/p/board/doc', languageId: 'brainfuck' })] }).success).toBe(false)
   })
 
-  it('refuses a layout on a surface with no pane rectangle to arrange', () => {
+  it('refuses a layout on a surface with no rectangle to arrange', () => {
     expect(messages(manifest({
-      frames: [{ target: 'settings', id: 'board', label: 'Board', layout: 'single', regions: { body: doc({ read: '/v2/p/board/doc' }) } }],
-    }))).toContain('layout is only valid on a pane surface')
+      frames: [{ target: 'importer', id: 'board', label: 'Board', layout: 'single', regions: { body: doc({ read: '/v2/p/board/doc' }) } }],
+    }))).toContain('layout is only valid on a pane, a reference panel or a settings page')
+  })
+
+  // A reference panel and a settings page have one region and host-drawn chrome around it, so `single`
+  // is the only layout that means anything there — and naming it is how the surface says its body is a
+  // tree rather than an iframe.
+  it("lets a panel and a settings page name 'single', and nothing wider", () => {
+    for (const target of ['refPanel', 'settings'] as const) {
+      expect(manifest({
+        frames: [{ target, id: 'board', label: 'Board', layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } } }],
+      }).success).toBe(true)
+      expect(messages(manifest({
+        frames: [{ target, id: 'board', label: 'Board', layout: 'list-detail', regions: { list: 'frame', detail: 'frame' } }],
+      })).join(' ')).toContain("only layout is 'single'")
+    }
+  })
+
+  // A remote region names a key of the object the bundle passed to `mountTree`, not a route: there is
+  // nothing to confine, and a name with no renderer behind it draws the labelled placeholder.
+  it('accepts a remote region and asks it for no route', () => {
+    const parsed = manifest({ frames: [{ ...PANE, layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } } }] })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.contributions.frames[0].regions?.body).toEqual({ kind: 'remote', entry: 'pane' })
   })
 
   it('refuses a layout name this build does not draw, and a region the layout does not have', () => {

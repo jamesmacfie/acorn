@@ -13,7 +13,7 @@ export const editorClientPlugin: ClientPlugin = {
   name: 'editor',
   init: (ctx) => {
     ctx.panes.register(editorPaneContribution)
-    // ⌘P: an overlay slot, not a pane (docs/plugins.md § Frame authoring and the UI kit), so it
+    // ⌘P: an overlay slot, not a pane (docs/plugins.md § Client authoring and the UI kit), so it
     // opens over whatever is on screen and closes on pick. Its own keybinding registers when it
     // mounts.
     ctx.slots.register({

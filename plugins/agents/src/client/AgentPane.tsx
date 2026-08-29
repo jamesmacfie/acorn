@@ -486,7 +486,7 @@ export default function AgentPane(props: { task: Task }) {
 
       </ListDetail>
       <Show when={dialog()?.kind === 'rename'}>
-        <Modal onClose={() => setDialog(null)} title="Rename session" size="sm">
+        <Modal onDismiss={() => setDialog(null)} title="Rename session" size="sm">
           <Modal.Body>
             <Field label="Title">
               <Input
@@ -506,7 +506,7 @@ export default function AgentPane(props: { task: Task }) {
 
       <Show when={dialog()?.kind === 'archive' ? dialog()!.session : undefined}>
         {(session) => (
-          <Modal onClose={() => setDialog(null)} title="Archive session" size="sm" role="alertdialog">
+          <Modal onDismiss={() => setDialog(null)} title="Archive session" size="sm" role="alertdialog">
             <Modal.Body>
               <p>Archive “{session().title}”? It leaves this task’s list and stays readable under the archived filter in Agent Center.</p>
             </Modal.Body>

@@ -47,7 +47,9 @@ export default {
   entry: '@acorn/plugin-http/node/index.ts',
   factory: 'httpPlugin',
   client: {
-    entry: './src/frame/index.tsx',
+    entry: './src/tree/index.tsx',
+    // The bundle runs in a worker and emits a tree of acorn's own component names; the builder maps
+    // this key to the Vite transforms that compile JSX into that tree rather than into a document.
     framework: 'solid',
   },
   // Staged into the built package by the builder, and opened by the host from there. The chain in
@@ -78,9 +80,36 @@ export default {
     // land somewhere. `openPane` needs a task and the rail often has none, so the answer is the same one
     // linear reached: a project-scoped pane, mounted beside the list, addressed by the route below.
     frames: [
-      { target: 'pane', id: 'http', label: 'API', glyph: 'send', order: 76 },
-      { target: 'pane', id: 'http-project', label: 'API requests', glyph: 'send', scope: 'project' },
-      { target: 'settings', id: 'http-variables', label: 'API requests', group: 'general', order: 66 },
+      // `single`, not `list-detail`, even though the panel is a split. The two columns share the
+      // selection, the draft and the send result, and two regions are two renderers with no way to hold
+      // one signal between them — so the split is a `ListDetail` inside the one tree.
+      {
+        target: 'pane',
+        id: 'http',
+        label: 'API',
+        glyph: 'send',
+        order: 76,
+        layout: 'single',
+        regions: { body: { kind: 'remote', entry: 'pane' } },
+      },
+      {
+        target: 'pane',
+        id: 'http-project',
+        label: 'API requests',
+        glyph: 'send',
+        scope: 'project',
+        layout: 'single',
+        regions: { body: { kind: 'remote', entry: 'pane' } },
+      },
+      {
+        target: 'settings',
+        id: 'http-variables',
+        label: 'API requests',
+        group: 'general',
+        order: 66,
+        layout: 'single',
+        regions: { body: { kind: 'remote', entry: 'settings' } },
+      },
     ],
     routes: [{
       id: 'http.request-route',

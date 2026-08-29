@@ -1,6 +1,6 @@
 // GitHub's own content-link recognisers, and one click handler that adds github's project resolution
 // to the host's ladder. The general registry, target type, and `parseInAppTarget` live in
-// @acorn/client-core/registries/contentLinks.ts (docs/plugins.md § Frame authoring and the UI kit).
+// @acorn/client-core/registries/contentLinks.ts (docs/plugins.md § Client authoring and the UI kit).
 import {
   activeTaskId,
   allProjects,
@@ -30,7 +30,7 @@ export const githubContentLinkContributions: ContentLinkContribution[] = [
     providerId: 'github',
     parse: (href) => {
       const match = GH_PR_RE.exec(href)
-      // `item` is what makes the panel reachable (docs/plugins.md § Frame authoring and the UI kit).
+      // `item` is what makes the panel reachable (docs/plugins.md § Client authoring and the UI kit).
       // Spelled `owner/repo#number`, the same identity the pulls collection gives its rows, so a row,
       // a URL, and the panel name the same thing.
       return match ? { kind: 'pr', owner: match[1], repo: match[2], number: match[3], item: formatPullRef(match[1], match[2], match[3]) } : null
@@ -66,7 +66,7 @@ const projectIdFor = (target: InAppTarget): string | null =>
   allProjects().find((project) => eq(project.github?.owner, target.owner) && eq(project.github?.name, target.repo))?.id ?? null
 
 // A delegated click handler for a PR content container, wrapping the host's
-// `handlePluginContentLinkClick` (docs/plugins.md § Frame authoring and the UI kit). A null from
+// `handlePluginContentLinkClick` (docs/plugins.md § Client authoring and the UI kit). A null from
 // `projectIdFor` means an untracked repo, and the URL opens the real github.com page.
 //
 // `prefer: 'refPanel'` is the one local choice: a reader half-way through a diff who clicks a link

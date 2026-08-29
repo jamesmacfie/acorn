@@ -41,7 +41,7 @@ export default function AgentContextPickerModal(props: {
       title={`Add ${props.contribution.label}`}
       size="md"
       align="center"
-      onClose={props.onClose}
+      onDismiss={props.onClose}
     >
       <Modal.Body>
         <p class="muted">{props.contribution.description}</p>

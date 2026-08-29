@@ -239,7 +239,7 @@ export default function PanelWizard(props: {
     <Modal
       title="Add panel"
       size="wide"
-      onClose={props.onClose}
+      onDismiss={props.onClose}
       autoFocus={() => heading}
       onKeyDown={(event) => {
         if (!(event.key === 'Enter' && (event.metaKey || event.ctrlKey))) return false

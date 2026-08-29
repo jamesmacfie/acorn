@@ -53,8 +53,11 @@ export function Tabs(props: {
 
 /** The panel half. Six attributes that have to agree with the strip's ids, hand-written twice in the
  *  rollbar frame before this existed. `hidden` rather than unmounting, so a panel keeps its scroll
- *  position and its in-flight state across a tab switch. */
-Tabs.Panel = (props: { idPrefix: string; id: string; active: string; children: JSX.Element }) => (
+ *  position and its in-flight state across a tab switch.
+ *
+ *  A name of its own as well as `Tabs.Panel`, because a remote tree names one type per node and has
+ *  nowhere to put the dot. */
+export const TabPanel = (props: { idPrefix: string; id: string; active: string; children: JSX.Element }) => (
   <section
     id={`${props.idPrefix}-panel-${props.id}`}
     class="ui-tab-panel"
@@ -65,3 +68,5 @@ Tabs.Panel = (props: { idPrefix: string; id: string; active: string; children: J
     {props.children}
   </section>
 )
+
+Tabs.Panel = TabPanel

@@ -125,9 +125,16 @@ outside a task, which is linear's answer applied again. The draft purge moved to
 finding a new plugin hook, because the keys it removes were written by an older release of the app and a
 frame's `localStorage` could never have reached them.
 
-## Monaco does not fit in a frame, and that ends two migrations
+## Monaco did not fit in a frame, and that ended two migrations
 
-The cheapest question in this folder has been answered, and it answered database and editor together.
+**The premise below has been overtaken twice, and both are worth reading in order.** The finding was
+about a *frame* — one file, no workers, its own origin — and it is still true of one. What changed is
+that a loaded plugin no longer has to be a frame: it draws a tree of the host's own components in a
+worker instead (phase 5 of `docs/future/layout/`), so nothing it draws ships a copy of anything. The
+host-owned document surface below is what carried database over in the meantime, and it is still the
+right answer for an editor: one Monaco, lent out, rather than one per plugin.
+
+The cheapest question in this folder was answered here, and it answered database and editor together.
 A single-file Monaco frame built with the builder's own settings comes to **7.93 MiB against an 8.00 MiB
 cap** — with a stub UI, no file tree, no tabs, no grid — and its four language-service workers
 (14.58 MiB) **cannot be served at all**: an `app-plugin://<hash>` origin serves `/client.js` and the
@@ -167,9 +174,14 @@ which is why they were worth doing without it:
 ## database has moved, and it built the editor it moved over
 
 The pane that could not be a frame is a frame — 156 KB of one, next to the 7.93 MiB a bundled Monaco
-measured. It ships `document-over-frame`: the host draws the SQL editor and the drag handle, the plugin's
-frame draws the button bar, the table sidebar, the result grid and its modals below. `⌘Enter` still runs
+measured. It ships `document-over-frame`: the host draws the SQL editor and the drag handle, the plugin
+draws the button bar, the table sidebar, the result grid and its modals below. `⌘Enter` still runs
 the query, which was the acceptance test the whole design set for itself.
+
+**The lower half is a tree now, not a frame** (phase 5 of `docs/future/layout/`). Same bytes, same trust
+prompt, same `document-over-frame` layout; what changed is that the region names a `remote` entry
+instead of `'frame'`, so the host mounts its own components for what the bundle emits. The stylesheet
+went with it, and so did the plugin's copy of a virtualised grid.
 
 The contract it built lives with its owner (`docs/plugins.md § Document surfaces`), the design record
 is `docs/third-party/monaco.md`, and the per-finding detail is in `git log`, like every move before it. Five

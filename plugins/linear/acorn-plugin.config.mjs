@@ -27,7 +27,9 @@ export default {
   entry: '@acorn/plugin-linear/node/index.ts',
   factory: 'linearPlugin',
   client: {
-    entry: './src/frame/index.tsx',
+    entry: './src/tree/index.tsx',
+    // The bundle runs in a worker and emits a tree of acorn's own component names; the builder maps
+    // this key to the Vite transforms that compile JSX into that tree rather than into a document.
     framework: 'solid',
   },
   permissions: {
@@ -52,9 +54,36 @@ export default {
     frames: [
       // `providerId` marks the task pane as a linked-items view: the host hides it on tasks with no
       // linear link (client-core plugins/frames/register.ts).
-      { target: 'pane', id: 'linear', label: 'Linear', glyph: 'brand:linear', order: 90, providerId: 'linear' },
-      { target: 'pane', id: 'linear-issue', label: 'Linear issue', glyph: 'brand:linear', scope: 'project' },
-      { target: 'refPanel', id: 'linear-ref', label: 'Linear issue', providerId: 'linear' },
+      // All three draw the same ticket from the same renderer, so all three name the same entry; what
+      // differs is the subject the host mounts each slot with. `single` is the layout, because one tree
+      // fills each of them (docs/panes.md § Layout model).
+      {
+        target: 'pane',
+        id: 'linear',
+        label: 'Linear',
+        glyph: 'brand:linear',
+        order: 90,
+        providerId: 'linear',
+        layout: 'single',
+        regions: { body: { kind: 'remote', entry: 'pane' } },
+      },
+      {
+        target: 'pane',
+        id: 'linear-issue',
+        label: 'Linear issue',
+        glyph: 'brand:linear',
+        scope: 'project',
+        layout: 'single',
+        regions: { body: { kind: 'remote', entry: 'pane' } },
+      },
+      {
+        target: 'refPanel',
+        id: 'linear-ref',
+        label: 'Linear issue',
+        providerId: 'linear',
+        layout: 'single',
+        regions: { body: { kind: 'remote', entry: 'pane' } },
+      },
     ],
     // Keyed by identifier alone, while an issue is really (integrationId, identifier). Two connected
     // Linear workspaces whose teams share a prefix collide here. A rail row click carries

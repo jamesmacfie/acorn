@@ -792,19 +792,24 @@ kinds of contribution come out of one manifest:
   hand-roll the plumbing; unlike the shell's equivalent it takes modified clicks too, because in a frame
   there is no browser default for cmd-click to preserve.
 - **Remote trees** — the second render path, and the one to reach for unless the surface genuinely owns
-  its pixels. A `contributions.remote` entry declares which host surface it fills, which renderer inside
-  the bundle draws it, and what it matches. The bundle runs in a Web Worker with no DOM and emits a
-  *tree*: names of the host's own components, with props, as a stream of mutations. The host mounts its
-  components for those names, so the result has the shell's focus handling, keyboard model, ARIA and the
-  reader's style pack, none of which an iframe can borrow. One target today, `agentToolRenderer`, keyed
-  by the tool name a harness reports.
+  its pixels. The bundle runs in a Web Worker with no DOM and emits a *tree*: names of the host's own
+  components, with props, as a stream of mutations. The host mounts its components for those names, so
+  the result has the shell's focus handling, keyboard model, ARIA and the reader's style pack, none of
+  which an iframe can borrow. Every loaded plugin acorn ships draws this way.
+
+  Two ways to declare one, and they differ only in who owns the rectangle. A **region** of a surface
+  this plugin declares names `{ "kind": "remote", "entry": "<name>" }` in its `regions` — that is how
+  the panes, reference panels and settings pages of `http`, `database`, `linear` and `rollbar` draw. A
+  **contribution into somebody else's point** is a `contributions.extensions` entry with a `remote` key,
+  which declares which host surface it fills and what it matches; `agentToolRenderer`, keyed by the tool
+  name a harness reports, is the one such target today.
 
   An author writes the same code either way. `mountTree({ toolCard: … })` on `/ui/sdk` is the entry point
   beside `mountFrame`, keyed by name because one worker serves every tree the bundle contributes and the
-  host has to say which; `contributions.remote[].entry` names a key. With a bundler,
-  `acorn-plugin-sdk/remote` is the Solid adapter and the components are ordinary JSX against
-  `@acorn/plugin-api/ui`; without one, `npm create acorn-plugin <name> -- --remote` emits a single file
-  that builds the same tree by hand.
+  host has to say which. With a bundler, `@acorn/plugin-api/ui/tree` (published as
+  `acorn-plugin-sdk/remote`) carries the Solid adapter and the kit as nodes you write in JSX; without
+  one, `npm create acorn-plugin <name> -- --remote` emits a single file that builds the same tree by
+  hand.
 
   What crosses is data, all the way down. A handler is an id the host mints a closure for, never a
   function; text is a node, never a prop; `class`, `style` and every other door into the host's DOM are
@@ -818,11 +823,12 @@ kinds of contribution come out of one manifest:
   a query editor with completions — is a message hop per key and should be a frame. And a surface whose
   pixels are the product, an image editor or a charting library, is a frame by definition.
 - **Document surfaces** — a pane whose editor the **host** draws, with the plugin supplying only the
-  document. A `pane` surface names a `layout` and fills its `regions`, and a region is either a
-  host-drawn document or `"frame"`, the plugin's own bundle. `docs/panes.md` § Layout model lists
-  every layout and its regions; the two that matter here are `single`, where the whole pane is one
-  text document, and `document-over-frame`, where that document sits above the plugin's own frame
-  with a host-owned drag handle between them.
+  document. A `pane` surface names a `layout` and fills its `regions`, and a region is a host-drawn
+  document, a remote tree, or `"frame"`, the plugin's own bundle in an iframe. `docs/panes.md` § Layout
+  model lists every layout and its regions; the two that matter here are `single`, where the whole pane is one
+  text document, and `document-over-frame`, where that document sits above the plugin's own region
+  with a host-owned drag handle between them. That lower region is a tree in every shipped case; the
+  region keeps the name its layout gave it.
 
   ```json
   {
@@ -2001,19 +2007,27 @@ Nothing here is reachable from a plugin frame. Both registries are populated hos
 the device read; the bridge gained no message kind and no route, so a frame can neither read a point's
 deliveries nor contribute to one.
 
-### Frame authoring and the UI kit
+### Client authoring and the UI kit
 
-A frame owns its document and bundle, so its framework is its choice. The repository package builder
-keeps the client Vite transform opt-in per plugin: the plugin's `acorn-plugin.config.mjs` names a
-`framework` (`solid` today) that the builder maps to the right transforms, a vanilla frame omits the
-key, and adding a framework is one line in the builder's map. A direct `solid-js`
-dependency in a Solid frame is intentional. Its separate origin and document are a separate reactive
-realm, so this is not the duplicate-Solid-in-one-realm hazard the shell dependency rules prevent.
+A loaded bundle's framework is its choice. The repository package builder keeps the client Vite
+transform opt-in per plugin: the plugin's `acorn-plugin.config.mjs` names a `framework` (`solid`
+today) that the builder maps to the right transforms, a bundle that needs none omits the key, and
+adding a framework is one line in the builder's map. A direct `solid-js` dependency is intentional and
+is not the duplicate-Solid-in-one-realm hazard the shell dependency rules prevent: a frame's origin and
+document are a separate reactive realm, and a tree's worker is a separate thread.
 
-In-repo Solid frames should import presentation components from `@acorn/plugin-api/ui`, as Rollbar and
-Linear do. This workspace dependency is the accepted intermediate package location; the UI kit will be
-published separately for external plugins later, and only that import name is expected to change.
-Do not copy the primitives or hand-roll replacements while packaging catches up.
+**`framework: 'solid'` compiles for the tree path**, which is what every loaded plugin acorn ships
+uses: the preset is told `generate: 'universal'` with `@acorn/plugin-api/ui/tree` as its module, so
+JSX becomes acorn's own node names rather than DOM. A plugin that wants a Solid *frame* brings its own
+transform, because nothing in the repository does any more.
+
+A tree imports its nodes from `@acorn/plugin-api/ui/tree` and **must not** import
+`@acorn/plugin-api/ui`: that barrel is components compiled for a document, and a tree bundle's own
+preset would compile one into a tree of its own. A frame is the other way round — it imports the
+components, as it always did. Either way the workspace dependency is the accepted intermediate
+package location; the kit will be published separately for external plugins later, and only that
+import name is expected to change. Do not copy the primitives or hand-roll replacements while
+packaging catches up.
 
 The shell owns the frame document and links `/ui.css`, a stylesheet assembled at build time from
 the same presentation-only primitive, tabs, picker, modal, copy, diff, and style-pack CSS the shell

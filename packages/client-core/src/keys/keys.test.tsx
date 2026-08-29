@@ -145,7 +145,7 @@ describe('a modal is a trap', () => {
     const opener = document.createElement('button')
     document.body.append(opener)
     opener.focus()
-    dispose = render(() => <Modal title="Archive task" onClose={() => {}}><span>body</span></Modal>, host)
+    dispose = render(() => <Modal title="Archive task" onDismiss={() => {}}><span>body</span></Modal>, host)
     const dialog = host.querySelector('[role="dialog"]')!
     expect(dialog.getAttribute('aria-modal')).toBe('true')
     dispose()

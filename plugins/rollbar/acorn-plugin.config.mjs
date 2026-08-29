@@ -12,10 +12,11 @@ export default {
   entry: '@acorn/plugin-rollbar/node/index.ts',
   factory: 'rollbarPlugin',
   client: {
-    entry: './src/frame/index.tsx',
-    // A frame owns its realm and bundle, so its Solid graph is intentionally independent from the
-    // shell's. The build seam stays framework-agnostic: the builder maps this key to the right Vite
-    // transforms, and a React/Vue/vanilla frame names its own framework (or none) here instead.
+    entry: './src/tree/index.tsx',
+    // The bundle runs in a worker and emits a tree of acorn's own component names; the builder maps
+    // this key to the Vite transforms that compile JSX into that tree rather than into a document.
+    // The seam stays framework-agnostic: a React/Vue/vanilla bundle names its own framework (or none)
+    // here instead.
     framework: 'solid',
   },
   permissions: {
@@ -30,7 +31,19 @@ export default {
   contributions: {
     // `providerId` marks the pane as a linked-items view: the host hides it on tasks with no rollbar
     // link (client-core plugins/frames/register.ts).
-    frames: [{ target: 'pane', id: 'rollbar', label: 'Rollbar', glyph: 'brand:rollbar', order: 100, providerId: 'rollbar' }],
+    frames: [{
+      target: 'pane',
+      id: 'rollbar',
+      label: 'Rollbar',
+      glyph: 'brand:rollbar',
+      order: 100,
+      providerId: 'rollbar',
+      // One tree fills the whole pane, so the layout is the trivial one. Naming it is still what says
+      // "draw this from my tree" rather than "give me a rectangle", and it is what the pane inherits
+      // its focus group and padding from (docs/panes.md § Layout model).
+      layout: 'single',
+      regions: { body: { kind: 'remote', entry: 'pane' } },
+    }],
     sources: [{
       id: 'rollbar-items',
       label: 'Rollbar',

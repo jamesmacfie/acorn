@@ -1052,6 +1052,34 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-inline { display: flex; align-items: center; min-width: 0; gap: var(--kit-gap); }
 .ui-inline[data-wrap] { flex-wrap: wrap; }
 
+/* Text: the role pair, as attributes rather than as six classes. `neutral` is the default colour and
+   so has no rule: a tone that restates the inherited value is a rule that has to be kept in step
+   with it. */
+.ui-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-text[data-wrap] { overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.ui-text[data-emphasis='strong'] { font-weight: var(--fw-semibold); }
+.ui-text[data-emphasis='muted'] { color: var(--text-muted); font-size: var(--fs-sm); }
+.ui-text[data-emphasis='mono'] { font-family: var(--font-mono); }
+.ui-text[data-emphasis='eyebrow'] {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  font-weight: var(--label-weight);
+}
+.ui-text[data-emphasis='heading'] {
+  font-weight: var(--heading-weight);
+  text-transform: var(--heading-transform);
+  letter-spacing: var(--heading-tracking);
+}
+/* Tone wins over the emphasis colour, and is written after it for exactly that reason: `muted`
+   emphasis with a `danger` tone is a small line that still reads as a failure. */
+.ui-text[data-tone='muted'] { color: var(--text-muted); }
+.ui-text[data-tone='accent'] { color: var(--accent); }
+.ui-text[data-tone='ok'] { color: var(--state-ok); }
+.ui-text[data-tone='warn'] { color: var(--state-warn); }
+.ui-text[data-tone='danger'] { color: var(--state-bad); }
+
 .ui-heading { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .ui-heading-eyebrow {
   color: var(--text-muted);

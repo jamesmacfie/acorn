@@ -334,6 +334,23 @@ named hosts and nowhere else. `Fallback forNode="Grid"` draws its children where
 this host cannot draw that node. Both are here before there is a second host, so a plugin can be
 written against one before it arrives.
 
+**A node has one name, and a handler has one of eleven.** Both fell out of the remote path, where a
+node is a type string on a message port and a prop is JSON. A compound spelling has nowhere to put its
+dot, so `Modal.Body`, `Modal.Actions`, `Tabs.Panel` and `Toolbar.Spacer` are also exported as
+`ModalBody`, `ModalActions`, `TabPanel` and `ToolbarSpacer`; the dotted names stay as aliases because
+they read better beside the node they belong to. And a callback prop is only sendable under one of the
+kit's eleven semantic events, which is why `Modal` takes `onDismiss` rather than `onClose`, `Input` and
+`Textarea` take `onChange` for the committed value rather than `onCommit`, and `Grid` takes `onSelect`
+rather than `onSelectRow`. A name outside the eleven — `onInput`, `onKeyDown`, `onPaste` — still works
+in the shell and is dropped on the way to a sandbox, which is the honest answer: a terminal host has
+no paste event to deliver.
+
+**A prop that has to hold an element has a data form beside it.** `ListDetail`'s `list` prop cannot
+cross, so `ListColumn` and `DetailColumn` are children; `Picker`'s `results(query)` callback cannot, so
+`items` is a list it filters itself; `DescriptionList.Item` children cannot, so `Facts` takes
+`{ label, value }` pairs. The callback forms stay for shell code, which is where the extra power is
+actually used.
+
 ### The three kit invariants
 
 Modelled on `styles/tokenAxes.test.ts`, which reads the stylesheets and asserts they agree with the
@@ -428,8 +445,10 @@ colour slot accepts `url()`, so any-CSS-colour would let a manifest make an outb
 `pluginContract.ts` checks `/^#[0-9a-f]{6}$/i`.
 
 A frame is the exception to all of this, because it is a separate origin and a separate JS realm with
-no reach into the registry. It draws its own copy of the mark, so it sets its own `--brand` inline;
-see `plugins/linear/src/frame/app.tsx`.
+no reach into the registry. It draws its own copy of the mark and sets its own `--brand` inline. That
+is one of the things the tree path takes back: a plugin that draws a tree names `glyph: 'brand:linear'`
+like anyone else, because the component that resolves it is the host's. Linear and Rollbar each deleted
+an inlined SVG when they moved (phase 5 of the layout programme).
 
 A mark is one SVG path's `d` attribute in a 24x24 box, not a full SVG document. A document would
 allow `<script>`, `<use href>`, `<image href>`, `<foreignObject>`, `on*` handlers, and CSS

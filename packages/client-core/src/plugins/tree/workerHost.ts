@@ -40,6 +40,15 @@ export type TreeWorkerHandle = {
   mount(slot: string, entry: string, props: unknown): void
   unmount(slot: string): void
   transport(slot: string): TreeTransport
+  /**
+   * The bridge port this bundle is connected on, for the three host-to-plugin pushes that are not tree
+   * mutations: a rail-row selection, a surface-scoped command, an appearance change (frames/broker.ts).
+   *
+   * One port per bundle, not per tree, because one worker holds one bridge. That is why the pushes
+   * carry their own addressing and the plugin's own listener decides whether the message was for the
+   * tree it drew — the same re-check a frame does, one rung up.
+   */
+  bridgePort(): MessagePort | null
   release(): void
 }
 
@@ -51,6 +60,8 @@ type Slot = {
 type Live = {
   worker: Worker
   port: MessagePort
+  /** The other half of the handshake: the bridge's port, kept so `bridgePort()` can hand it out. */
+  bridgeSide: MessagePort
   bridge: FrameBridge
   slots: Map<string, Slot>
   refs: number
@@ -112,6 +123,7 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
       live.slots.delete(slot)
       if (!live.dead) live.port.postMessage({ kind: 'tree:unmount', slot })
     },
+    bridgePort: () => (live.dead ? null : live.bridgeSide),
     transport: (slot) => ({
       onBatch: (listener) => {
         const target = slotFor(slot)
@@ -148,6 +160,7 @@ function start(input: AcquireInput): Live {
   const live: Live = {
     worker,
     port: treeChannel.port1,
+    bridgeSide: bridgeChannel.port1,
     bridge: input.connect(bridgeChannel.port1),
     slots: new Map(),
     refs: 0,

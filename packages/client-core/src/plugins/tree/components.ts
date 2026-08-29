@@ -11,8 +11,9 @@ import type { Component } from 'solid-js'
 import type { KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import {
   Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, DescriptionList, EmptyState,
-  Field, Input, Kbd, ListDetail, Meter, Row, SectionHeader, SegmentedControl, Select, Spinner,
-  SplitHandle, StatusDot, Table, Textarea, ToggleButton, Toolbar, TreeRow,
+  DetailColumn, Field, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
+  SegmentedControl, Select, Spinner, SplitHandle, StatusDot, Table, Textarea, ToggleButton, Toolbar,
+  TreeRow,
 } from '../../ui/primitives'
 import Icon from '../../ui/Icon'
 import Picker from '../../ui/Picker'
@@ -32,6 +33,7 @@ import { Modal } from '../../ui/Modal'
 import { Tabs } from '../../ui/Tabs'
 import { UserAvatar } from '../../ui/UserAvatar'
 import { Stack } from '../../ui/Stack'
+import { Text } from '../../ui/Text'
 import { Inline } from '../../ui/Inline'
 import { Heading } from '../../ui/Heading'
 import { Section } from '../../ui/Section'
@@ -55,8 +57,11 @@ type AnyKitComponent = Component<any>
 
 export const KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {
   Stack, Inline, Section, Fold, CollapsibleSection, Card, Timeline, Tabs, Toolbar,
-  Modal, Menu, Popover, ListDetail, SplitHandle, DocumentTabs, SectionHeader,
-  Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
+  Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs, SectionHeader,
+  // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
+  // remote tree only under a name of their own.
+  ModalBody: Modal.Body, ModalActions: Modal.Actions, TabPanel: Tabs.Panel, ToolbarSpacer: Toolbar.Spacer,
+  Text, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
   DescriptionList, Table, Grid, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
   FileHead, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,

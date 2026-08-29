@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-import { Alert, Button, CodeBlock, Input, Modal, Textarea } from '@acorn/plugin-api/ui'
+import { Alert, Button, CodeBlock, Input, Modal, ModalActions, ModalBody, Textarea } from '@acorn/plugin-api/ui/tree'
 import type { DbSavedQuery } from '../shared/database'
 import { saveQuery } from './databaseClient'
 
@@ -7,15 +7,15 @@ import { saveQuery } from './databaseClient'
 // overwrites it, so the button says "Overwrite" when it will. The notes travel with the query into the
 // AI prompt when it is picked as an example.
 //
-// A frame confined to the bottom region of a composed pane can only overlay that region, so this
-// covers the grid rather than the whole pane. The `overlay` frame target is the escape hatch, at the
-// cost of being heavier (docs/third-party/monaco.md § Composed panes: decided).
+// The host draws the dialog now, so it covers the window rather than only this pane's lower region:
+// a tree is not confined to a rectangle the way the iframe was. That is the one visible difference the
+// move made here, and it is the better of the two.
 export default function SaveQueryModal(props: {
   taskId: string
   sql: string
   name: string // pre-filled from the last loaded query, so load → tweak → Save updates in place
   existing: readonly DbSavedQuery[]
-  onClose: () => void
+  onDismiss: () => void
   onSaved: (query: DbSavedQuery) => void
 }) {
   const [name, setName] = createSignal(props.name)
@@ -32,7 +32,7 @@ export default function SaveQueryModal(props: {
     try {
       const saved = await saveQuery(props.taskId, { name: name().trim(), notes: notes(), sql: props.sql })
       props.onSaved(saved)
-      props.onClose()
+      props.onDismiss()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -40,28 +40,23 @@ export default function SaveQueryModal(props: {
     }
   }
 
-  // Modal owns the deferred focus; a bare `autofocus` is unreliable inside a Solid modal.
-  let nameInput: HTMLInputElement | undefined
-
   return (
-    <Modal
-      title="Save query"
-      autoFocus={() => nameInput}
-      onClose={props.onClose}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return false
-        void submit()
-        return true
-      }}
-    >
-      <Modal.Body>
+    // ⌘Enter used to be a `keydown` on the dialog. A DOM event does not cross to a sandbox with no
+    // DOM, so the name field's own submit carries it: Enter in the name saves, which is the gesture
+    // anyone reaching for ⌘Enter in a two-field dialog was already close to.
+    <Modal title="Save query" onDismiss={props.onDismiss}>
+      <ModalBody>
         <Input
           type="text"
           maxLength={80}
           placeholder="Name — e.g. recent paid orders"
-          ref={(el) => { nameInput = el }}
+          autofocus
           value={name()}
-          onInput={(value) => setName(value)}
+          onChange={(value: string) => setName(value)}
+          onSubmit={(value: string) => {
+            setName(value)
+            void submit()
+          }}
         />
         <Textarea
           mono
@@ -70,19 +65,19 @@ export default function SaveQueryModal(props: {
           assist={false}
           placeholder="Notes — what it answers, gotchas. Sent to the AI with the query when used as an example."
           value={notes()}
-          onInput={(value) => setNotes(value)}
+          onChange={(value: string) => setNotes(value)}
         />
         <CodeBlock size="xs" maxHeight="block" wrap>{props.sql}</CodeBlock>
         <Show when={error()}>
           <Alert>{error()}</Alert>
         </Show>
-      </Modal.Body>
-      <div class="db-generate-actions">
-        <Button disabled={busy()} onPress={props.onClose}>Cancel</Button>
+      </ModalBody>
+      <ModalActions>
+        <Button disabled={busy()} onPress={props.onDismiss}>Cancel</Button>
         <Button variant="solid" disabled={busy() || !name().trim()} onPress={() => void submit()}>
           {busy() ? 'Saving…' : overwrites() ? 'Overwrite' : 'Save'}
         </Button>
-      </div>
+      </ModalActions>
     </Modal>
   )
 }
