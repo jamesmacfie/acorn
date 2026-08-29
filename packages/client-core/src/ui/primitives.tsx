@@ -5,8 +5,8 @@ import {
 import { Dynamic, Portal } from 'solid-js/web'
 import { createAnchoredPopover, type AnchoredPopover } from './anchor'
 import { createArmedConfirm } from './confirm'
-import { nextListIndex } from './focus'
 import type { SplitDrag } from './split'
+import { createCollection, createDomCollection, type ItemProps } from '../keys/collection'
 import type { Size, Tone } from './kit/tokens'
 
 // The kit's nodes. Every prop on this page is the node's own: a role token, a string of content, a
@@ -284,23 +284,19 @@ function SelectList(props: {
   const topMatch = () => filtered().find((option) => !option.disabled)
   // Read the rows back out of the DOM rather than collecting them as they mount: options can arrive
   // while the list is open, and a collected array keeps handing the arrow keys rows that have been
-  // detached since.
+  // detached since. That is also why this is a DOM collection: the rows are the kit's, but their
+  // membership is only knowable at the moment a key arrives (../keys/collection.ts).
   const enabled = () => [...listRef?.querySelectorAll<HTMLButtonElement>('.ui-menu-item:not([disabled])') ?? []]
-  const [active, setActive] = createSignal(0)
-  const focusAt = (index: number) => {
-    const list = enabled()
-    if (!list.length) return
-    setActive(index)
-    list[index]?.focus()
-  }
+  const collection = createDomCollection({ selector: '.ui-menu-item' })
   // Opening on the current value is what the native control does, and it is what makes the arrow
   // keys mean "the next one" rather than "the second one". A filtered list skips this: typing is the
   // first thing you want to do there, so the box takes the caret from its own ref and the rows keep
   // the current value marked without holding focus.
   onMount(() => queueMicrotask(() => {
     if (filterable()) return
-    const chosen = enabled().findIndex((row) => row.dataset.value === props.value())
-    focusAt(chosen < 0 ? 0 : chosen)
+    const rows = enabled()
+    const chosen = rows.findIndex((row) => row.dataset.value === props.value())
+    rows[chosen < 0 ? 0 : chosen]?.focus()
   }))
 
   return (
@@ -309,30 +305,24 @@ function SelectList(props: {
         ref={(el) => {
           listRef = el
           props.popover.setSurface(el)
+          collection.attach(el)
         }}
         class="ui-popover ui-select-list"
         style={props.popover.surfaceStyle()}
         onKeyDown={(event) => {
           // From the filter box the rows are somewhere to go, not somewhere you already are: Enter
           // takes the top match and ArrowDown steps into the list. Every other key is typing, and
-          // must reach the input rather than being read as navigation.
-          if (event.target === filterRef) {
-            const match = topMatch()
-            if (event.key === 'Enter' && match) {
-              event.preventDefault()
-              props.onPick(match)
-            } else if (event.key === 'ArrowDown' && enabled().length) {
-              event.preventDefault()
-              focusAt(0)
-            }
-            return
+          // must reach the input rather than being read as navigation. The list's own arrows are the
+          // `next` and `prev` intents, so they are not here.
+          if (event.target !== filterRef) return
+          const match = topMatch()
+          if (event.key === 'Enter' && match) {
+            event.preventDefault()
+            props.onPick(match)
+          } else if (event.key === 'ArrowDown' && enabled().length) {
+            event.preventDefault()
+            enabled()[0]?.focus()
           }
-          const list = enabled()
-          if (!list.length) return
-          const next = nextListIndex(active(), list.length, event.key)
-          if (next === active() && event.key !== 'Home' && event.key !== 'End') return
-          event.preventDefault()
-          focusAt(next)
         }}
       >
         <Show when={filterable()}>
@@ -632,6 +622,9 @@ const placement = (own: { offset?: number; height?: number }): JSX.CSSProperties
    where a changed box model silently corrupts scroll math. A virtualized list row is fine; github's
    PR list takes its measured height through `style` and opts out of `min-height`. */
 export function Row(props: {
+  /** The collection's props for this row, from `Rows`. Opaque: the row spreads it and never reads
+   *  it. Without it a row is a lone stop, which is what a row outside a `Rows` still is. */
+  item?: ItemProps
   /** Number of `.ui-row-field` cells inside `meta`, so the row can reserve a track for each. */
   metaFields?: number
   selected?: boolean
@@ -679,6 +672,7 @@ export function Row(props: {
   if (props.href !== undefined) {
     return (
       <a
+        {...(props.item ?? {})}
         href={props.href}
         class="ui-row"
         data-selected={props.selected ? '' : undefined}
@@ -688,8 +682,9 @@ export function Row(props: {
         data-variant={props.variant ?? 'default'}
         title={props.title}
         aria-label={props.label}
+        aria-selected={props.item ? !!props.selected : undefined}
         style={placement(props)}
-        onFocus={() => props.onHover?.(true)}
+        onFocus={() => { props.item?.onFocus(); props.onHover?.(true) }}
         onBlur={() => props.onHover?.(false)}
         onMouseEnter={() => props.onHover?.(true)}
         onMouseLeave={() => props.onHover?.(false)}
@@ -708,8 +703,11 @@ export function Row(props: {
       </a>
     )
   }
+  // Inside a `Rows` the collection owns the role and the roving tabindex; on its own the row is a
+  // lone button-shaped stop, which is what every list was before the kit had a collection node.
   return (
     <div
+      {...(props.item ?? {})}
       class="ui-row"
       data-selected={props.selected ? '' : undefined}
       data-nested={props.nested ? '' : undefined}
@@ -719,13 +717,15 @@ export function Row(props: {
       data-variant={props.variant ?? 'default'}
       title={props.title}
       aria-label={props.label}
+      aria-selected={props.item ? !!props.selected : undefined}
       style={placement(props)}
-      role={props.onPress ? 'button' : undefined}
-      tabindex={props.onPress ? 0 : undefined}
+      role={props.item?.role ?? (props.onPress ? 'button' : undefined)}
+      tabindex={props.item ? props.item.tabindex : props.onPress ? 0 : undefined}
       onClick={props.onPress ? (event) => { if (!fromNestedControl(event)) activate() } : undefined}
-      onKeyDown={props.onPress
+      onKeyDown={props.onPress && !props.item
         ? (event) => {
-          // Only when the row itself has focus; a button nested inside owns its own keys.
+          // Only when the row itself has focus; a button nested inside owns its own keys. Inside a
+          // collection this is the `activate` intent instead, so the row does not answer twice.
           if (event.target !== event.currentTarget) return
           if (event.key !== 'Enter' && event.key !== ' ') return
           event.preventDefault()
@@ -1059,37 +1059,24 @@ export function SegmentedControl<T extends string>(props: {
   size?: 'sm' | 'md'
   ariaLabel: string
 }) {
-  const move = (delta: number) => {
-    const options = props.options.filter((option) => !option.disabled)
-    if (!options.length) return
-    const current = options.findIndex((option) => option.value === props.value)
-    const next = options[(((current < 0 ? 0 : current) + delta) + options.length) % options.length]
-    props.onChange(next.value)
-  }
+  const collection = createCollection({
+    id: () => `segments:${props.ariaLabel}`,
+    items: () => props.options.map((option) => ({ key: option.value, disabled: option.disabled })),
+    role: 'radiogroup',
+    orientation: 'horizontal',
+    selectOnMove: true,
+    selected: () => props.value,
+    onSelect: (value) => props.onChange(value as T),
+  })
   return (
-    <div
-      class="ui-segments"
-      data-size={props.size ?? 'md'}
-      role="radiogroup"
-      aria-label={props.ariaLabel}
-      onKeyDown={(event) => {
-        const delta = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1
-          : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1
-          : 0
-        if (!delta) return
-        event.preventDefault()
-        move(delta)
-      }}
-    >
+    <div class="ui-segments" data-size={props.size ?? 'md'} aria-label={props.ariaLabel} {...collection.containerProps}>
       {/* Buttons, not Row: menus and segments are their own semantics (see Button's note). */}
       {props.options.map((option) => (
         <button
+          {...collection.itemProps(option.value)}
           type="button"
           class="ui-segment"
-          role="radio"
           aria-checked={option.value === props.value}
-          // Only the selected segment is tab-reachable; arrows move within. Standard radiogroup.
-          tabindex={option.value === props.value ? 0 : -1}
           disabled={option.disabled}
           title={option.title}
           onClick={() => props.onChange(option.value)}
@@ -1261,9 +1248,12 @@ export function Table(props: {
 
 /* TreeRow: a Row with a disclosure twist and a depth, kept a wrapper so Row's API stays flat.
 
-   Tree container semantics (role="tree"/"treeitem"/aria-level) stay at the call site, since a row
-   cannot know its tree. Wire the container yourself; there is no roving-focus tree navigation. */
+   Tree container semantics come from `Rows tree`, which is the container: it gives each row its
+   `treeitem` role and its place in the roving focus, and turns the left and right arrows into the
+   `collapse` and `expand` intents. A `TreeRow` outside one is a lone stop with a twist. */
 export function TreeRow(props: {
+  /** The collection's props for this row, from `Rows tree`. Forwarded to `Row`. */
+  item?: ItemProps
   expandable?: boolean
   expanded?: boolean
   onToggle?: () => void
@@ -1281,6 +1271,7 @@ export function TreeRow(props: {
 }) {
   return (
     <Row
+      item={props.item}
       selected={props.selected}
       depth={props.depth}
       reveal={props.reveal}

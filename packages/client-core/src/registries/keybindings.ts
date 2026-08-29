@@ -5,10 +5,8 @@
 // costs an extension. If this file ever needs markup, the markup moves to its own `.tsx` module
 // rather than the extension changing; `packages/plugin-api/src/entrypoints.test.ts` is what fails if
 // it does not.
-import { createMemo, onCleanup, onMount } from 'solid-js'
-import { isTerminalTarget, isTypingTarget } from '../lib/isTypingTarget'
-import { eventChord } from '../tasks/paneShortcuts'
-import { executeCommand } from './commands'
+import { createMemo, onMount } from 'solid-js'
+import { installKeymap } from '../keys/install'
 import { Registry, type Disposable } from './registry'
 
 export type KeybindingScope = 'global' | 'task' | 'pane' | 'typing-exempt'
@@ -168,30 +166,16 @@ export function KeybindingDispatcher(props: {
   focusedPane?: string
 }) {
   const resolved = createMemo(() => resolveKeybindings(keybindingRegistry.entries(), props.prefs))
-
-  const scopeActive = (binding: ResolvedKeybinding, event: KeyboardEvent): boolean => {
-    if (binding.active && !binding.active()) return false
-    const scope = binding.when ?? 'global'
-    if (scope === 'task' && !props.taskActive) return false
-    if (scope === 'pane' && (!props.taskActive || props.focusedPane !== binding.pane)) return false
-    if (scope !== 'global' && isTypingTarget(event.target) && !(event.metaKey && isTerminalTarget(event.target))) return false
-    if (scope === 'typing-exempt' && isTypingTarget(event.target)) return false
-    return true
-  }
-
+  // The shell's one keyboard listener, and it is not one of ours any more: `keys/install.ts` puts
+  // `@opentui/keymap` on the document root and registers these bindings as a layer over the command
+  // registry. What used to be a `scopeActive` check inside a keydown handler is a matcher on each
+  // binding; everything else — the layers, the command catalog, the shadowing diagnostics — is the
+  // engine's. See docs/command-palette-and-shortcuts.md § Focus and typing.
   onMount(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && event.target instanceof Element && event.target.closest('[role="dialog"], [role="alertdialog"]')) return
-      const chord = eventChord(event)
-      if (!chord) return
-      const binding = resolved().find((candidate) => candidate.chord === chord && scopeActive(candidate, event))
-      if (!binding) return
-      event.preventDefault()
-      event.stopPropagation()
-      void executeCommand(binding.command).catch((error) => console.error(`[command:${binding.command}]`, error))
-    }
-    window.addEventListener('keydown', onKeyDown, { capture: true })
-    onCleanup(() => window.removeEventListener('keydown', onKeyDown, { capture: true }))
+    installKeymap(document.documentElement, {
+      prefs: () => ({ taskActive: props.taskActive, ...(props.focusedPane ? { focusedPane: props.focusedPane } : {}) }),
+      bindings: resolved,
+    })
   })
   return null
 }

@@ -1,6 +1,10 @@
 import { Show } from 'solid-js'
 import { createSplitDrag } from '../ui/split'
 import { layoutState } from './state'
+// Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
+// import has to be here even though nothing calls it.
+// eslint-disable-next-line no-unused-vars -- used by the `use:regionFocus` directive.
+import { regionFocus } from '../keys/regions'
 import type { LayoutProps } from './regions'
 
 // `list-detail`: a list beside a detail, with the host drawing the divider and the drag handle.
@@ -42,14 +46,14 @@ export function ListDetail(props: LayoutProps) {
       <Show when={!props.hidden?.includes('list')}>
         {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
             screen reader tells two same-shaped columns apart. */}
-        <aside ref={list} class="layout-region-list" aria-label={`${props.label} list`}>
+        <aside ref={list} class="layout-region-list" aria-label={`${props.label} list`} use:regionFocus={{ paneId: props.stateKey, regionId: 'list' }}>
           {props.regions['list-header']?.()}
           <div class="layout-list-scroll">{props.regions.list?.()}</div>
           {props.regions['list-footer']?.()}
         </aside>
         <div {...drag.handleProps} class="ui-split-handle" data-axis="x" />
       </Show>
-      <div class="layout-region-detail">{props.regions.detail?.()}</div>
+      <div class="layout-region-detail" use:regionFocus={{ paneId: props.stateKey, regionId: 'detail' }}>{props.regions.detail?.()}</div>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { Show, type JSX } from 'solid-js'
+import { bindIntents } from '../keys/host'
 import MentionTextarea from './MentionTextarea'
 import { Alert, Button, Textarea, Toolbar } from './primitives'
 
@@ -28,16 +29,16 @@ export function Composer(props: {
   const submit = () => {
     if (props.busy || props.disabled || !props.value.trim()) return
     props.onSubmit()
-  }
-  // Cmd+Enter on macOS, Ctrl+Enter elsewhere. Implemented once, here.
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return
-    event.preventDefault()
-    submit()
+    return true
   }
 
   return (
-    <div class="ui-composer">
+    // The composer owns its keys while focused, except for `commit`: Cmd+Enter on macOS and
+    // Ctrl+Enter elsewhere, which is one row of ../keys/keymap.ts rather than a chord spelled here.
+    <div
+      class="ui-composer"
+      ref={(el) => bindIntents(el, ['commit'], () => submit() === true)}
+    >
       <Show
         when={props.mentions}
         fallback={
@@ -47,7 +48,6 @@ export function Composer(props: {
             disabled={props.disabled}
             value={props.value}
             onInput={(value) => props.onInput(value)}
-            onKeyDown={onKeyDown}
           />
         }
       >
@@ -58,7 +58,6 @@ export function Composer(props: {
             value={props.value}
             mentions={mentions()}
             onInput={props.onInput}
-            onKeyDown={onKeyDown}
           />
         )}
       </Show>

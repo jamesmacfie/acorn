@@ -1,7 +1,8 @@
-import { createEffect, createSignal, onMount, Show, type JSX } from 'solid-js'
+import { createEffect, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { createDomCollection } from '../keys/collection'
+import { restoreFocusOnCleanup, trapTab } from '../keys/trap'
 import { createAnchoredPopover, type AnchoredPopover, type Placement } from './anchor'
-import { nextListIndex } from './focus'
 
 // A dropdown menu: Popover plus menu semantics. See docs/ui-design.md § Menus and right-click for
 // why this replaced four earlier implementations and how ContextMenu below reuses the same surface.
@@ -16,49 +17,36 @@ const triggerOf = (wrapper: HTMLElement | undefined): HTMLElement | undefined =>
 
 
 /** The menu itself: portal, `role="menu"`, roving focus, and first-item focus on open. Mounted only
- *  while the popover is open, which keeps the registered-item list from growing a copy of every
- *  item on each re-open. */
+ *  while the popover is open, which keeps the item list from growing a copy of every item on each
+ *  re-open.
+ *
+ *  A DOM collection (../keys/collection.ts): the items are the caller's JSX, so the host cannot key
+ *  them, but it can read them out of the DOM when a key arrives. The `register` callback stays on the
+ *  context because `Menu.Item` is a public shape, and it now records nothing. */
 function MenuSurface(props: {
   popover: AnchoredPopover
   ariaLabel: string
   children: (context: MenuContext) => JSX.Element
 }) {
-  const [active, setActive] = createSignal(0)
-  // Items register themselves as they mount so roving does not need a parallel model of the list.
-  const items: HTMLElement[] = []
-  const register = (element: HTMLElement | undefined) => {
-    if (element) items.push(element)
-  }
-  const enabled = () => items.filter((item) => !item.hasAttribute('disabled'))
-
-  const focusAt = (index: number) => {
-    const list = enabled()
-    if (!list.length) return
-    setActive(index)
-    list[index]?.focus()
-  }
-
-  // See docs/ui-design.md § Menus and right-click for why this focuses the first item on mount.
-  onMount(() => queueMicrotask(() => focusAt(0)))
+  // See docs/ui-design.md § Menus and right-click for why this focuses the first item on mount, and
+  // ../keys/trap.ts for the restore that goes with a trap.
+  const collection = createDomCollection({ selector: '.ui-menu-item', focusOnMount: true })
+  restoreFocusOnCleanup()
 
   return (
     <Portal>
       <div
-        ref={(el) => props.popover.setSurface(el)}
+        ref={(el) => {
+          props.popover.setSurface(el)
+          collection.attach(el)
+        }}
         class="ui-popover ui-menu"
         role="menu"
         aria-label={props.ariaLabel}
         style={props.popover.surfaceStyle()}
-        onKeyDown={(event) => {
-          const list = enabled()
-          if (!list.length) return
-          const next = nextListIndex(active(), list.length, event.key)
-          if (next === active() && event.key !== 'Home' && event.key !== 'End') return
-          event.preventDefault()
-          focusAt(next)
-        }}
+        onKeyDown={(event) => trapTab(event, event.currentTarget)}
       >
-        {props.children({ close: props.popover.close, register })}
+        {props.children({ close: props.popover.close, register: () => {} })}
       </div>
     </Portal>
   )

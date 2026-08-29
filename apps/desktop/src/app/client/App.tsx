@@ -34,6 +34,7 @@ import Acorn from '@acorn/client-core/Acorn.tsx'
 import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/registries/commands.ts'
 import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/registries/keybindings.ts'
+import { CheatSheet } from '@acorn/client-core/keys/CheatSheet.tsx'
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/registries/willPhase.tsx'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
 import { RefPanelHost } from '@acorn/client-core/registries/refPanelHost.tsx'
@@ -453,6 +454,10 @@ export default function App() {
         </Match>
       </Switch>
       <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView()} focusedPane={focusedPane(activeTaskId())} />
+      {/* The active bindings, read back out of the keymap's own catalog. Mounted here rather than
+          from the dispatcher because `registries/keybindings.ts` is deliberately `.ts` and may not
+          hold markup. */}
+      <CheatSheet />
       <WillConfirmationHost />
       {/* A referenced item from another provider, opened by any surface that renders content
           (client-core/registries/refPanels.ts). Mounted at the shell because the state is the shell's.

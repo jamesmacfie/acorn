@@ -1,5 +1,7 @@
 import { createEffect, createSignal, For, on, onCleanup } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
+import { bindIntents } from '../keys/host'
+import type { Intent } from '../keys/intents'
 import { rowHeightSm } from './metrics'
 
 /* Grid: Table for data that does not fit. Same meaning, virtualised rows, one sticky header.
@@ -11,6 +13,8 @@ import { rowHeightSm } from './metrics'
    Cells are strings. A cell that wants a Badge wants a Table.
 
    At 80×24: as Table, with a row-range indicator. */
+let gridSeq = 0
+
 export function Grid(props: {
   columns: readonly string[]
   rows: readonly (readonly string[])[]
@@ -22,6 +26,9 @@ export function Grid(props: {
    *  so it passes its bridge's subscribe here. */
   onAppearanceChange?: (listener: () => void) => () => void
 }) {
+  // An id of its own rather than the label's: `aria-activedescendant` needs a DOM id, and a label is
+  // a sentence.
+  const gridId = `ui-grid-${++gridSeq}`
   const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
   // Row height comes from --row-h-sm so a style pack's density reaches the grid. The virtualizer
   // writes it back as an inline height, which beats any stylesheet rule.
@@ -56,8 +63,43 @@ export function Grid(props: {
 
   const template = () => `repeat(${props.columns.length}, var(--kit-grid-col))`
 
+  // A grid's rows are a collection, but a virtualised one: most of them have no element, so the
+  // arrows move the selection and scroll it into view rather than moving DOM focus. That is the
+  // ratatui shape — the widget is a renderer and the state is outside it — and it is the only one
+  // that survives virtualisation.
+  const step = (delta: number, absolute?: 'first' | 'last'): boolean => {
+    if (!props.rows.length || !props.onSelectRow) return false
+    const at = props.selected ?? -1
+    const next = absolute === 'first' ? 0
+      : absolute === 'last' ? props.rows.length - 1
+      : Math.min(Math.max((at < 0 ? 0 : at) + delta, 0), props.rows.length - 1)
+    props.onSelectRow(next)
+    virt.scrollToIndex(next)
+    return true
+  }
+  const handle = (intent: Intent): boolean => {
+    switch (intent) {
+      case 'next': return step(1)
+      case 'prev': return step(-1)
+      case 'first': return step(0, 'first')
+      case 'last': return step(0, 'last')
+      case 'pageNext': return step(10)
+      case 'pagePrev': return step(-10)
+      default: return false
+    }
+  }
+  const GRID_INTENTS: readonly Intent[] = ['next', 'prev', 'first', 'last', 'pageNext', 'pagePrev']
+
   return (
-    <div class="ui-grid-scroll" ref={publish} role="grid" aria-label={props.ariaLabel} aria-rowcount={props.rows.length}>
+    <div
+      class="ui-grid-scroll"
+      ref={(el) => { publish(el); bindIntents(el, GRID_INTENTS, handle) }}
+      role="grid"
+      tabindex="0"
+      aria-label={props.ariaLabel}
+      aria-rowcount={props.rows.length}
+      aria-activedescendant={props.selected == null ? undefined : `${gridId}-row-${props.selected}`}
+    >
       <div class="ui-grid">
         <div class="ui-grid-head" role="row" style={{ 'grid-template-columns': template() }}>
           <For each={props.columns}>{(column) => <span class="ui-grid-hcell" role="columnheader" title={column}>{column}</span>}</For>
@@ -67,6 +109,7 @@ export function Grid(props: {
             {(item) => (
               <div
                 class="ui-grid-row"
+                id={`${gridId}-row-${item.index}`}
                 role="row"
                 aria-rowindex={item.index + 1}
                 aria-selected={props.selected === item.index}

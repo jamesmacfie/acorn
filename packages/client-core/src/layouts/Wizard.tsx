@@ -1,5 +1,9 @@
 import { For, Show } from 'solid-js'
 import { Button } from '../ui/primitives'
+// Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
+// import has to be here even though nothing calls it.
+// eslint-disable-next-line no-unused-vars -- used by the `use:regionFocus` directive.
+import { regionFocus } from '../keys/regions'
 import type { LayoutProps } from './regions'
 
 // `wizard`: one step region at a time, with the host drawing the indicator and the back and next
@@ -30,7 +34,7 @@ export function Wizard(props: LayoutProps) {
           >{entry.label}</li>
         )}</For>
       </ol>
-      <div class="layout-wizard-body">{props.regions.step?.()}</div>
+      <div class="layout-wizard-body" use:regionFocus={{ paneId: props.stateKey, regionId: 'step' }}>{props.regions.step?.()}</div>
       <div class="layout-wizard-actions">
         <Show when={at() > 0}>
           <Button variant="bare" onPress={() => step(-1)}>Back</Button>

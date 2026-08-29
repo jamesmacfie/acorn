@@ -100,6 +100,18 @@ A module-level signal is the default for anything ephemeral, and the cost of tha
 the eviction question above — so a signal keyed by task, workspace or node owes an `onScopeEvicted`
 registration in the same file.
 
+**Where a list's place lives.** Two of those signals are the host's answer for the keyboard, and both
+are session-only by choice. `client-core/keys/collectionState.ts` holds `active`, `selected` and
+`offset` for every collection node, keyed by the collection's id and by each item's own key, never by
+its index: a list rebuilt from a fresh response is a new array of new objects, and an index into it
+points at whatever moved into that slot. Keying by the item's key is what makes a refetch keep your
+place, and it is why the state sits outside the rows rather than inside them.
+`client-core/keys/regions.ts` holds which region of which pane has focus, and it is the one place
+`focusedPane` gets written and the one place the `runtime:focus-changed` event is emitted from.
+Neither is persisted. Where you are in a list is a reading posture, not a preference, and restoring
+one across a relaunch would need a scope and an eviction rule nobody has asked for. See
+[focus-and-keys.md](./future/layout/07-focus-and-keys.md).
+
 **A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
 a second function that pulled the pre-scoped aggregate key the scoped keys replaced —
 `task_layouts` and `task_panes` for the layout slice, `editor_open_files`, `pr_filters`. Those went on
