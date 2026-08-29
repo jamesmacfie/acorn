@@ -106,13 +106,13 @@ describe('trustTiers', () => {
           { target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'] },
           { target: 'coreSlot', id: 'board-rail', label: 'Board task list', glyph: 'puzzle', order: 500, formFactor: ['desktop'], coreSlot: 'rail.taskList' },
         ],
-        extensionPoints: [{ id: 'card-links', label: 'Linked items', location: 'pane.footer', surface: 'board' }],
+        extensionPoints: [{ id: 'card-links', label: 'Linked items', kind: 'rows', location: 'pane.footer', surface: 'board', max: 4 }],
         extensions: [{ id: 'tracker-rows', point: 'tracker:issues', label: 'Board cards', order: 500, items: '/v2/p/board/rows' }],
       },
     }))
     expect(keysIn(tiers, 'enforced')).toEqual([
-      'extension:extends:tracker:issues',
-      'extension:hosts:board:card-links',
+      'extension:extends:rows:tracker:issues',
+      'extension:hosts:rows:board:card-links',
       'extension:replaces:rail.taskList',
     ])
     const texts = tiers.find((tier) => tier.key === 'enforced')!.lines.map((line) => line.text)
@@ -133,7 +133,7 @@ describe('trustTiers', () => {
       previous: { extensions: [{ kind: 'extends', target: 'tracker:issues', label: 'Board cards' }] },
     }))
     const enforced = tiers.find((tier) => tier.key === 'enforced')!.lines
-    expect(enforced.map((line) => [line.key, line.added])).toEqual([['extension:extends:linear:issues', true]])
+    expect(enforced.map((line) => [line.key, line.added])).toEqual([['extension:extends:rows:linear:issues', true]])
   })
 
   it('keeps the enforced, declared and web claims in three separate lists', () => {

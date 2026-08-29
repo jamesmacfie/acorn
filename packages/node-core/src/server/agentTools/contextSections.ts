@@ -4,6 +4,7 @@ import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } fr
 import type { NoteAuthor, NoteScope } from '@acorn/protocol/notes.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
+import { runHook } from '../plugin/hooks'
 import { parseCached } from '../integrations/codec'
 import { integrationProviderRegistry } from '../integrations/registry'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
@@ -315,8 +316,18 @@ export async function assembleContext(
     notes: [],
     memory: [],
   }
+  // Budget shaping and PII stripping, as somebody else's plugin (server/plugin/hooks.ts,
+  // docs/plugins.md § Hooks). What is offered is which sections are in, as names: a handler can drop
+  // one, and nothing else. Core's, not the context plugin's — the context plugin is client-only, and
+  // the assembler that makes a snapshot lives here.
+  //
+  // The transform is intersected rather than believed, so a handler can narrow the set and cannot widen
+  // it into a section the caller did not ask for.
+  const shaped = await runHook('core:before-snapshot', { taskId, sections: [...include].sort() })
+  if (!shaped.ok) return null
+  const included = new Set(shaped.payload.sections.filter((id) => include.has(id)))
   for (const contribution of registry.list()) {
-    if (!include.has(contribution.id)) continue
+    if (!included.has(contribution.id)) continue
     const draft = await contribution.assemble({ db, userLogin, task, repo, github, workflowRunId: opts.workflowRunId })
     const budgeted = applyBudget(draft.items, contribution.budget)
     const compatibility = budgetCompatibilityProjection(draft.compatibility, contribution.budget)

@@ -131,7 +131,7 @@ export function scopeCore(
 // (server/plugin/harnesses.ts). Whoever owns worktree side-effects or agent sessions on a given node
 // fills them, so they are exempt from the namespace rule below. Held to the real constants by
 // pluginPermissions.test.ts, because a literal list is only safe if something checks it.
-export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['core.taskWorktreeCreated', 'agents.harnessRegistry']
+export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['agents.harnessRegistry']
 
 // An undeclared capability id reads as absent, the same as the providing plugin being disabled,
 // which every consumer already degrades around (docs/plugins.md). `require` still throws, because a

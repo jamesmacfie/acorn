@@ -20,6 +20,15 @@ pixels; a remote tree is plugin-authored UI in a slot the owner opened. The two 
 plugin needs UI the field-type vocabulary cannot express, the overflow path is a remote tree in a
 pane the plugin owns, or a rectangle for pixels; never a panel type.
 
+Restated against the shipped tree, 2026-08-29. `remote` is now one of five extension kinds and a `Slot`
+is an ordinary node ([docs/plugins.md](../../plugins.md) § Cooperative extension points), which makes
+the distinction sharper rather than softer. A slot's occupant is chosen by the **owner's** declared
+arbitration over a key the owner passes; a panel's contents are chosen by the **person**, over a
+collection, in a grid they laid out. Those are different questions with different answers, and the fact
+that both now end in host-drawn components is exactly why neither is a widget toolkit. What would
+reopen this is unchanged: a case where the user is composing and the plugin is drawing, at the same
+time, in the same rectangle. Nobody has one.
+
 ## No new field type without a fight
 
 The field-type and role vocabularies are closed and budgeted

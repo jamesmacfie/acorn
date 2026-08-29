@@ -292,7 +292,10 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     // manifest's own declared frames are in scope. A point hanging off a surface this manifest doesn't
     // declare would be a strip with no rectangle above it: the "parses and can never appear" failure the
     // node's parser refuses, re-refused on the device because a roster row is bytes a node sent.
-    if (!surfaceIds.has(descriptor.surface)) {
+    // Only the two kinds that hang off a surface have one to check. An annotation draws at a site the
+    // owner registered in code, a remote slot is a node in the owner's own tree, and a hook draws
+    // nothing: none of the three names a surface, so there is nothing here to hold them to.
+    if (descriptor.surface !== undefined && !surfaceIds.has(descriptor.surface)) {
       console.warn(`[plugin-chrome] ${pluginId} extension point '${descriptor.id}' names an undeclared surface '${descriptor.surface}'.`)
       continue
     }
@@ -300,6 +303,9 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   }
 
   for (const descriptor of contributions.extensions ?? []) {
+    // The two carriers that run this plugin's own bytes register in the frames pass instead, where the
+    // accepted bundle hash and the trust answer are both in scope (plugins/frames/register.ts).
+    if (descriptor.remote !== undefined || descriptor.frame !== undefined) continue
     // Same check a command and a context-menu row get. The point owner never sees this failure: a
     // contribution the device can't honour simply never delivers.
     if (descriptor.onSelect && !contextFreeActionUsable(pluginId, surfaces, descriptor.onSelect)) {

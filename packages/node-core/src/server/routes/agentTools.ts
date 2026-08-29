@@ -14,6 +14,7 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { mayActOnTask, ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
+import { runHook } from '../plugin/hooks'
 import { decodeToolCeiling, isToolWithinCeiling, type ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500> = { not_found: 404, bad_request: 400, 'needs-trust': 409, failed: 500 }
@@ -85,6 +86,12 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   if (!(await available(tool, ctx, new Map()))) return respondError(c, 404, 'not_found')
   const parsed = tool.input.safeParse(await c.req.json().catch(() => ({})))
   if (!parsed.success) return respondError(c, 400, 'bad_request', [parsed.error.message])
+  // The last gate, after the tier check and the workflow ceiling and before anything runs: an approval
+  // plugin's turn to say no (server/plugin/hooks.ts, docs/plugins.md § Hooks). The arguments are not in
+  // the payload, deliberately — a handler that saw them would be reading the agent's work, and the
+  // decision this hook exists for is about the verb.
+  const verdict = await runHook('core:before-tool-call', { taskId: ctx.taskId, tool: tool.name, sessionId: ctx.sessionId ?? '' })
+  if (!verdict.ok) return respondError(c, STATUS['needs-trust'], 'needs-trust', [`${verdict.by}: ${verdict.reason}`])
   try {
     return c.json((await tool.handler(parsed.data, ctx)) ?? null)
   } catch (error) {

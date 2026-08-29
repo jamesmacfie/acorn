@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../server/db'
-import { CapabilityRegistry } from '../server/plugin/capabilities'
+import { clearHooks, registerHookHandler } from '../server/plugin/hooks'
 import { makeTestDb, type TestDb } from '../testkit/db'
-import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setWorktreesRoot, WORKTREE_CREATED } from './taskWorktree'
+import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setWorktreesRoot } from './taskWorktree'
 
 const broadcasts: Record<string, unknown>[] = []
 vi.mock('./wsHub', async (importOriginal) => ({
@@ -34,15 +34,14 @@ describe('baseRefPref identity scope', () => {
   })
 })
 
-// The onWorktreeCreated hook is the single choke point that runs the workspace setup script: it must
-// fire exactly once per task, on whichever path creates the worktree first, including two surfaces (a
-// pane poll and a terminal open) racing in the same second.
-describe('resolveTaskCwd onWorktreeCreated hook', () => {
+// `core:worktree-created` is the single choke point that runs the workspace setup script: it must fire
+// exactly once per task, on whichever path creates the worktree first, including two surfaces (a pane
+// poll and a terminal open) racing in the same second.
+describe('resolveTaskCwd core:worktree-created hook', () => {
   let t: TestDb
   let dir: string
   let checkout: string
   let created: string[]
-  let capabilities: CapabilityRegistry
 
   let template: string
 
@@ -77,42 +76,58 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
     await t.db.insert(schema.tasks).values({ id: TASK, title: 'T', origin: 'local', projectId: 'project-web', branch: 'feat-x', status: 'active', sort: 0, createdAt: now, updatedAt: now })
     setWorktreesRoot(join(dir, 'worktrees'))
     created = []
-    capabilities = new CapabilityRegistry()
-    capabilities.provide(WORKTREE_CREATED, async (task, cwd) => {
-      created.push(`${task.id}:${cwd}`)
+    clearHooks('setup')
+    registerHookHandler({
+      id: 'setup:record',
+      pluginId: 'setup',
+      point: 'core:worktree-created',
+      mode: 'transform',
+      priority: 500,
+      call: async (payload) => {
+        created.push(`${payload.taskId as string}:${payload.path as string}`)
+        return { payload }
+      },
     })
   })
   afterEach(() => {
+    clearHooks('setup')
     t.cleanup()
     rmSync(dir, { recursive: true, force: true })
   })
 
   it('fires exactly once across concurrent creators, then never again on reuse', async () => {
     const task = await loadTask(t.db, TASK)
-    const [a, b] = await Promise.all([resolveTaskCwd(t.db, task, checkout, null, capabilities), resolveTaskCwd(t.db, task, checkout, null, capabilities)])
+    const [a, b] = await Promise.all([resolveTaskCwd(t.db, task, checkout, null), resolveTaskCwd(t.db, task, checkout, null)])
     expect(a.isWorktree).toBe(true)
     expect(b.cwd).toBe(a.cwd)
     expect(created).toEqual([`${TASK}:${a.cwd}`])
 
     // Reuse, both via the persisted worktreePath and via a stale row that predates it.
-    const fresh = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
-    const stale = await resolveTaskCwd(t.db, task, checkout, null, capabilities)
+    const fresh = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
+    const stale = await resolveTaskCwd(t.db, task, checkout, null)
     expect(fresh).toMatchObject({ cwd: a.cwd, created: false })
     expect(stale).toMatchObject({ cwd: a.cwd, created: false })
     expect(created).toHaveLength(1)
   })
 
-  it('a failing hook does not break worktree resolution', async () => {
-    capabilities = new CapabilityRegistry()
-    capabilities.provide(WORKTREE_CREATED, async () => {
-      throw new Error('setup exploded')
+  it('a failing handler does not break worktree resolution', async () => {
+    clearHooks('setup')
+    registerHookHandler({
+      id: 'setup:explode',
+      pluginId: 'setup',
+      point: 'core:worktree-created',
+      mode: 'transform',
+      priority: 500,
+      call: async () => {
+        throw new Error('setup exploded')
+      },
     })
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
     expect(res).toMatchObject({ isWorktree: true, created: true })
   })
 
   it('computes status for active worktrees after the bounded fan-out refactor', async () => {
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
     writeFileSync(join(res.cwd, 'f.txt'), 'changed\n')
 
     await expect(computeTaskStatuses(t.db)).resolves.toEqual([
@@ -131,7 +146,7 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
   // The status poll is the HEAD observer (docs/plugins.md § Hearing a core event): the first
   // sighting seeds silently, a moved tip on the next pass broadcasts, an unmoved one does not.
   it('broadcasts head:changed when a worktree tip moves between polls', async () => {
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
     broadcasts.length = 0
     const [first] = await computeTaskStatuses(t.db)
     expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([])
@@ -155,19 +170,19 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
   // that wasn't its task's. Both drifts, wrong branch and pruned admin dir, must refuse rather than
   // degrade.
   it('refuses a worktree that has drifted onto another branch', async () => {
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
     git(res.cwd, 'checkout', '-b', 'someone-elses-branch')
 
-    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)).rejects.toThrow(
+    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)).rejects.toThrow(
       /checked out on 'someone-elses-branch', not 'feat-x'/,
     )
   })
 
   it('refuses a worktree directory whose git link is gone', async () => {
-    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
     rmSync(join(checkout, '.git', 'worktrees'), { recursive: true, force: true })
 
-    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)).rejects.toThrow(
+    await expect(resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)).rejects.toThrow(
       /no longer a live git worktree/,
     )
     expect(res.isWorktree).toBe(true)
@@ -177,7 +192,7 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
   // no branch, so the task shares the checkout instead of getting a worktree.
   it('runs a branchless task in a Git project from the checkout without creating a worktree', async () => {
     await t.db.update(schema.tasks).set({ branch: null })
-    const result = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null, capabilities)
+    const result = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout, null)
     expect(result).toEqual({ cwd: checkout, isWorktree: false, created: false })
     expect(created).toEqual([])
   })
@@ -192,7 +207,7 @@ describe('resolveTaskCwd onWorktreeCreated hook', () => {
       createdAt: now, updatedAt: now,
     })
     await t.db.insert(schema.tasks).values({ id: 'plain-task', title: 'Plain', origin: 'local', projectId: 'project-plain', branch: null, status: 'active', sort: 0, createdAt: now, updatedAt: now })
-    const result = await resolveTaskCwd(t.db, await loadTask(t.db, 'plain-task'), plain, null, capabilities)
+    const result = await resolveTaskCwd(t.db, await loadTask(t.db, 'plain-task'), plain, null)
     expect(result).toEqual({ cwd: plain, isWorktree: false, created: false })
     expect(created).toEqual([])
   })

@@ -1,7 +1,7 @@
 import { type NodePlugin } from '@acorn/plugin-api/node'
 import { localGitAgentTools } from '../main/agentTools'
 import { changesArchiveConcern } from '../main/archiveCheck'
-import { localGitBridge } from '../main/localGit'
+import { CHANGES_HOOKS, localGitBridge } from '../main/localGit'
 import { localGit, LOCAL_GIT } from '../server/routes/localGit'
 import { reviewNotesRoutes } from '../server/routes/reviewNotes'
 
@@ -19,7 +19,11 @@ export const changesPlugin = (): NodePlugin => {
     ctx.routes.register(reviewNotesRoutes(db, ctx.core), { prefix: '/tasks', note: '/:id/review-notes' })
     // localGit holds no tables of its own: it shells out to git in the task worktree, so it needs
     // core's task resolution and nothing else.
-    const bridge = localGitBridge(ctx.core, ctx.events.status)
+    // The two decisions this plugin opens to other plugins, declared before the bridge that runs them
+    // (main/localGit.ts § CHANGES_HOOKS, docs/plugins.md § Hooks). Declaring is the whole consent: a
+    // point this plugin did not declare has no chain and no trust line.
+    for (const point of CHANGES_HOOKS) ctx.hooks.declare({ ...point, allows: [...point.allows] })
+    const bridge = localGitBridge(ctx.core, ctx.events.status, ctx.hooks)
     capability = ctx.capabilities.provide(LOCAL_GIT, bridge)
     // Task check: warns about uncommitted work the archive would discard
     // (docs/plugins.md § Task checks; details in main/archiveCheck.ts).

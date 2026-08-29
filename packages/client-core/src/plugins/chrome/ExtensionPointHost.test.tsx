@@ -36,7 +36,9 @@ const point = (id: string, when?: () => boolean) =>
       ownerId: id.split(':')[0],
       label: 'Ports',
       // `pane.footer` is the only location that takes deliveries today (`takesPluginExtensions`).
-      location: 'pane.footer',
+      kind: 'rows' as const,
+      location: 'pane.footer' as const,
+      max: 4,
       surface: 'containers',
       ...(when ? { when } : {}),
     }),
@@ -47,6 +49,9 @@ const delivery = (contribution: Partial<ExtensionContribution> & Pick<ExtensionC
     extensionRegistry.register({
       label: 'Preview',
       order: 0,
+      // The carrier is what the delivery filter matches against a point's kind, so it belongs on every
+      // fixture rather than only on the ones testing arbitration.
+      carrier: 'items' as const,
       fetch: async () => rows.get(contribution.id) ?? [],
       ...contribution,
     } as ExtensionContribution),

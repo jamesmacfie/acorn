@@ -7,7 +7,7 @@
 // set of plugins and this is one plugin's surface.
 import type { CoreServices } from '../../main/core'
 import type { Env } from '../../main/bindings'
-import type { NodePermissions, PluginAuditActionDescriptor, PluginCollectionDescriptor, PluginCommandDescriptor, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../../main/pluginManifest'
+import type { NodePermissions, PluginAuditActionDescriptor, PluginCollectionDescriptor, PluginCommandDescriptor, PluginExtensionDescriptor, PluginExtensionPointDescriptor, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../../main/pluginManifest'
 import { scopeCapabilities, scopeCore } from '../../main/pluginPermissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerCollectionRead } from '../collections/registry'
@@ -18,6 +18,8 @@ import { AGENTS_HARNESS_REGISTRY, qualifiedHarnessId } from './harnesses'
 import { registerTaskCheck } from './taskChecks'
 import { declareAuditAction, qualifiedAuditAction, recordAudit } from '../audit'
 import { contributeExtension, extensionsFor, openExtensionPoint } from './extensionPoints'
+import { registerHookHandler, registerHookPoint, runHook } from './hooks'
+import { qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
 import { registerRoute } from '../routeRegistry'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
@@ -68,6 +70,12 @@ export type LoadedPluginBinding = {
   // And the verbs it may write onto the audit trail, by the same route: the declaration is replayed
   // through `ctx.audit.declare` so both feeders land in one registry (../audit.ts).
   auditActions?: readonly PluginAuditActionDescriptor[]
+  // And the points it opens and the contributions it makes, of which the host reads the node-side kind:
+  // a `hook` point becomes a chain other packages may join, and an extension naming a `route` becomes a
+  // handler on somebody else's (./hooks.ts). Every other kind is drawn by the client and never reaches
+  // here. Both feeders land through `ctx.hooks`, the same shape schedules and task checks take.
+  extensionPoints?: readonly PluginExtensionPointDescriptor[]
+  extensions?: readonly PluginExtensionDescriptor[]
   // And its managed agent harnesses, by the same route. The delivery seam also needs `dir` below, since
   // an adapter entry is a path inside the installed package.
   harnesses?: readonly PluginHarnessDescriptor[]
@@ -217,6 +225,36 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       open: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
       contribute: (point, entry) => recordUndo(contributeExtension(plugin, point, entry).dispose),
       entries: (point) => extensionsFor(point),
+    },
+    // Owner-bound on both halves, like the extension points above. `declare` mints the point id from
+    // this plugin, `handle` mints the handler id from it, and `run` takes a bare id and qualifies it, so
+    // a plugin can only ever run a chain it declared. Both registrations record an undo, because the
+    // maps behind them are module singletons and a reload's candidate instance has to be able to take
+    // back what it filed.
+    //
+    // A handler registered here is a function, not a route: this is the built-in carrier, and the host
+    // builds the route-carrying one from a loaded plugin's manifest (./host.ts). Nothing inside the
+    // chain runner can tell which it has.
+    hooks: {
+      declare: (point) => recordUndo(registerHookPoint({
+        id: qualifiedExtensionPointId(plugin, point.id),
+        ownerId: plugin,
+        payload: point.payload,
+        allows: point.allows,
+        timeoutMs: point.timeoutMs ?? 5_000,
+        onTimeout: point.onTimeout ?? 'allow',
+        order: point.order ?? 'priority',
+        collect: point.collect ?? false,
+      }).dispose),
+      handle: (point, handler) => recordUndo(registerHookHandler({
+        id: `${plugin}:${handler.id}`,
+        pluginId: plugin,
+        point,
+        mode: handler.mode,
+        priority: handler.priority ?? 500,
+        call: (payload, signal) => handler.run(payload, signal),
+      }).dispose),
+      run: (id, payload) => runHook(qualifiedExtensionPointId(plugin, id), payload),
     },
     // Owner-bound on both halves, like the extension points below: `declare` qualifies the verb with
     // this plugin's id, and `record` refuses anything outside what this plugin declared. Writing goes
@@ -372,7 +410,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       return undefined as R
     }
 
-  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'runs', 'taskChecks', 'harnesses', 'contextSections', 'audit', 'extensionPoints', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'collections', 'nodeActions', 'runs', 'taskChecks', 'harnesses', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof
     // check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined
@@ -381,10 +419,12 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // when it is called, while `audit.declare` beside it is an ordinary registration that buffers.
     const buffer = group !== 'events' && group !== 'storage'
     for (const [key, value] of Object.entries(members)) {
-      // `extensionPoints.entries` reads and `audit.record` writes; a buffered call would return
-      // undefined and land on replay respectively. Both are guarded against a revoked context like the
-      // rest, and neither is ever deferred.
-      if (typeof value === 'function') members[key] = guard(value as (...args: unknown[]) => unknown, buffer && key !== 'entries' && key !== 'record')
+      // `extensionPoints.entries` reads, `audit.record` writes, and `hooks.run` awaits a chain and
+      // answers the caller: all three are guarded against a revoked context like the rest and none is
+      // ever deferred, because a buffered call would return undefined to a caller about to act on it.
+      if (typeof value === 'function') {
+        members[key] = guard(value as (...args: unknown[]) => unknown, buffer && key !== 'entries' && key !== 'record' && key !== 'run')
+      }
     }
   }
 

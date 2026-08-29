@@ -175,6 +175,24 @@ evicted when it is archived. Both are tied to the files signature, so new commit
 position and collapse choices instead of restoring them against a different diff. An explicit file
 navigation wins over a saved scroll position.
 
+### Marks from other plugins
+
+A diff pane may name an `annotation` extension point, and the host draws every contributor's marks under
+the code row they name ([plugins.md](./plugins.md) § Cooperative extension points). The two owners are
+`changes:diff-line` and `github:diff-line`, both keyed `{ file, line, side }`, and `side` is the row's
+own kind rather than the view mode: a mark on "line 42 as it will be" means the new side whether the
+reader is in split or unified.
+
+The marks compose with the source's own `lineExtra` rather than replacing it, in that order, because
+the source's annotation is the one the person using the pane wrote. They ride the same measurement path
+review threads do — drawn inside the virtualized row, counted by `hasLineExtra`, and invalidated
+through `lineExtraSignature` — so a mark arriving for a row already on screen grows it instead of
+overlapping the rows below.
+
+Every code row in the diff is asked about at once, in one request per contributor: a coverage plugin on
+a two-thousand-line diff answers once. The host compares the key set before asking, so the effect
+re-running on every scroll and every thread toggle costs a string compare.
+
 The pull-request navigator, the summary column beside the diff, keeps its own scroll entry in
 `plugins/github/src/client/reviewViewState.ts`. It is the GitHub pane's own surface, so it stays with
 that plugin, but it keys by the same scope through the exported `diffScopeKey` rather than spelling

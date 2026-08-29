@@ -6,6 +6,7 @@ import type {
   ProviderErrorCode,
   PublicIntegrationProvider,
 } from './integrations'
+import type { ExtensionPointKind, HookMode } from './extensionPoints.ts'
 import type { Cadence } from './schedules.ts'
 import type { NodeAttachment } from './node.ts'
 
@@ -355,6 +356,13 @@ export type PluginKeyClaimGrant = { surface: string; label: string; chords: stri
 //             owner picks it in settings.
 export type PluginExtensionGrant = {
   kind: 'hosts' | 'extends' | 'replaces'
+  // Which of the five things is opened, or brought (@acorn/protocol/extensionPoints.ts). Absent on
+  // `replaces`, which is the exclusive slot rather than a point. On `extends` it is derived from the
+  // carrier this manifest named, because a contributor cannot see the owner's declaration.
+  pointKind?: ExtensionPointKind
+  // `hook` contributions only: what the handler asks to do. It is the difference between "can watch a
+  // push" and "can stop a push", so it belongs in the grant and in the key.
+  mode?: HookMode
   // A point reference, or a designated core slot id. Never free text.
   target: string
   label: string

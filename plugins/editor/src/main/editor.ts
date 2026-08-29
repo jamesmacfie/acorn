@@ -3,7 +3,7 @@
 // re-derives the worktree root from the DB. Path confinement is `resolveInRoot` (docs/security.md §
 // Process, path, and configuration controls). Pure Node, so it works in dev:node too. Wired in
 // main/serverBridges.ts.
-import { BridgeError, type CoreServices, gitOrThrow } from '@acorn/plugin-api/node'
+import { BridgeError, type CoreServices, gitOrThrow, type PluginHookRegistry } from '@acorn/plugin-api/node'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 
@@ -24,7 +24,13 @@ async function confine(core: EditorCoreServices, taskId: string, relPath: string
  *  module stays plain Node and testable without a host. */
 export type EditorChanged = () => void
 
-export const editorBridge = (core: EditorCoreServices, changed: EditorChanged = () => {}): EditorBridge => ({
+export const editorBridge = (
+  core: EditorCoreServices,
+  changed: EditorChanged = () => {},
+  /** The owner's half of `editor:before-save` (docs/plugins.md § Hooks). Absent means nobody objects,
+   *  which is also what an empty chain means. */
+  hooks?: Pick<PluginHookRegistry, 'run'>,
+): EditorBridge => ({
   root: (taskId) => core.tasks.root(taskId),
 
   list: async (taskId, relPath) => {
@@ -67,8 +73,13 @@ export const editorBridge = (core: EditorCoreServices, changed: EditorChanged = 
     const root = await core.tasks.root(taskId)
     const abs = root && core.fs.resolveInRoot(root, relPath)
     if (!abs) return { ok: false, reason: 'Path is outside the worktree.' }
+    // Format on save, as somebody else's plugin (docs/plugins.md § Hooks). The autosave loop calls this
+    // on every pause, so the chain's timeout is what keeps a slow formatter from stalling typing; a
+    // handler that does not answer leaves the text as the person wrote it.
+    const verdict = await hooks?.run('before-save', { taskId, path: relPath, text: content })
+    if (verdict && !verdict.ok) return { ok: false, reason: `${verdict.by}: ${verdict.reason}` }
     try {
-      await writeFile(abs, content, 'utf8')
+      await writeFile(abs, verdict?.payload.text ?? content, 'utf8')
       // Deliberately the ordinary invalidation ping and NOT an event: "file saved" stays refused
       // (docs/plugins.md § What is not an event). A save from another client used to move nothing on this one —
       // its tree, its dirty markers and its git status all went stale until something else pinged

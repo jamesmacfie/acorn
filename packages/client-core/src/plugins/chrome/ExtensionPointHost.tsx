@@ -27,7 +27,9 @@ function ExtensionGroup(props: { contribution: ExtensionContribution }) {
     // A contributor whose node is unreachable contributes nothing, which is the same answer as a
     // contributor with nothing to say. The owner's pane is not the place to report somebody else's
     // fetch failure; the node's own banner already covers an unreachable node.
-    (_node, _revision, signal) => props.contribution.fetch(signal).catch((): PluginExtensionItem[] => []),
+    // `fetch` is bound for every `items` carrier and for no other, and only `items` carriers are
+    // delivered into a `rows` point, so the guard is a type narrowing rather than a real branch.
+    (_node, _revision, signal) => props.contribution.fetch?.(signal).catch((): PluginExtensionItem[] => []) ?? Promise.resolve([]),
     () => chromeDeps(props.contribution.pluginId),
     { nodeIds: [nodeId] },
   )

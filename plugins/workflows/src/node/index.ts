@@ -83,7 +83,17 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       ctx.extensionPoints.open(WORKFLOW_POLICY, 'Workflow gate policies')
       ctx.extensionPoints.open(WORKFLOW_TRIGGER, 'Workflow triggers')
 
+      // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks). A veto here is a
+      // safety-rail, not a failure, which is why the point allows nothing else: a plugin that could
+      // rewrite a step would be rewriting the workflow the owner read before running it.
+      ctx.hooks.declare({
+        id: 'before-step',
+        label: 'run a workflow step',
+        payload: { taskId: 'string', runId: 'string', stepId: 'string', step: 'string', kind: 'string' },
+        allows: ['observe', 'veto'],
+      })
       const runner = new WorkflowRunner(store, {
+        hooks: ctx.hooks,
         runStep: async (taskId, def, opts) => {
           // Resolved per call, not at init (docs/plugins.md § Collaboration rules): plugin init
           // order is not defined.

@@ -11,13 +11,20 @@
 //     constructing core's services itself, which is why the factories are still not here.
 
 // ── The plugin contract itself ────────────────────────────────────────────────────────────────
+// `PluginHook*` are named here for the same reason `TaskConcern` below is: a plugin that opens a hook
+// passes `ctx.hooks` into the module that runs it, and a parameter needs a type to name
+// (server/plugin/hooks.ts, docs/plugins.md § Hooks).
 export type {
   NodePlugin,
   PluginBroadcast,
   PluginFetchHandler,
+  PluginHookHandler,
+  PluginHookPoint,
+  PluginHookRegistry,
   PluginProviderResourceRequest,
   PluginRequestContext,
 } from '@acorn/node-core/server/plugin/types.ts'
+export type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 // What `ctx.taskChecks.register` answers with. Here because a check worth writing is a function, not
 // an inline literal, and a function needs a return type to name (server/plugin/taskChecks.ts).
 export type { TaskConcern } from '@acorn/node-core/server/plugin/taskChecks.ts'
@@ -76,7 +83,7 @@ export { buildSessionEnv, childEnv } from '@acorn/node-core/main/taskEnv.ts'
 export type { SessionTaskInfo } from '@acorn/node-core/main/taskEnv.ts'
 // Takes a `TaskRef` (above), not the `tasks` row; see docs/plugins.md § The plugin API for why a
 // column rename in core would otherwise be a silent plugin break.
-export { isDir, rendererBaseCheckout, taskContext, WORKTREE_CREATED } from '@acorn/node-core/main/taskWorktree.ts'
+export { isDir, rendererBaseCheckout, taskContext } from '@acorn/node-core/main/taskWorktree.ts'
 export { loadRepoConfig } from '@acorn/node-core/main/runConfig.ts'
 export type { LayoutRecipe, RunTarget } from '@acorn/node-core/main/runConfig.ts'
 export { isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'

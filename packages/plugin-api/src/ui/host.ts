@@ -12,9 +12,17 @@ export { PaletteSurface } from '@acorn/client-core/palette/PaletteSurface.tsx'
 // panel to place in its own chrome. See docs/panes.md § Not a pane: the reference panel for why the
 // host draws it, and does the write, rather than the panel.
 export { default as RefPanelTaskLink } from '@acorn/client-core/registries/RefPanelTaskLink.tsx'
-// One sandboxed plugin's tree, drawn inside a first-party surface
-// (docs/future/layout/06-remote-tree.md). Host-only for the same reason the palette is: it acquires a
+// A place in this surface where another plugin's tree may be grafted (docs/plugins.md § Cooperative
+// extension points, the `remote` kind). Host-only for the same reason the palette is: it acquires a
 // worker, wires a bridge and mounts the shell's own components. A plugin that owns a surface places
 // this where it wants a contributor's UI; it never sees the contributor's nodes.
+//
+// `Slot` is what a surface owner reaches for. `RemoteTree` beside it is the one-contributor primitive
+// underneath, exported for a host that has already resolved who draws.
+export { Slot } from '@acorn/client-core/plugins/tree/Slot.tsx'
+export type { SlotProps } from '@acorn/client-core/plugins/tree/Slot.tsx'
 export { RemoteTree } from '@acorn/client-core/plugins/tree/RemoteTree.tsx'
 export type { RemoteTreeProps } from '@acorn/client-core/plugins/tree/RemoteTree.tsx'
+// Another plugin's rectangle, beside or below this one's pane (the `rectangle` kind). The iframe twin
+// of `Slot`, for the surfaces that own pixels.
+export { InlineSlot } from '@acorn/client-core/plugins/frames/InlineSlot.tsx'

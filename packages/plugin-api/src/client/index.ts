@@ -200,5 +200,4 @@ export { onClosePaneWithin } from '@acorn/client-core/lib/onClosePaneWithin.ts'
 
 // Which sandboxed plugin, if any, draws a given agent tool call. Data, not a component: the component
 // that mounts it is `RemoteTree` on ./ui/host. See docs/future/layout/06-remote-tree.md.
-export { remoteToolRendererFor } from '@acorn/client-core/plugins/tree/registry.ts'
 export type { RemoteContribution } from '@acorn/client-core/plugins/tree/registry.ts'

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
 import { CapabilityRegistry, capabilityId } from '../server/plugin/capabilities'
 import { AGENTS_HARNESS_REGISTRY } from '../server/plugin/harnesses'
-import { WORKTREE_CREATED } from './taskWorktree'
 import type { CoreServices } from './core'
 import { pluginManifestSchema, type NodePermissions } from './pluginManifest'
 import { HOST_OWNED_CAPABILITY_IDS, scopeCapabilities, scopeCore } from './pluginPermissions'
@@ -203,9 +202,12 @@ describe('scopeCapabilities', () => {
     }
   })
 
-  it('names the same two host hooks the host actually declares', () => {
-    // A literal list is only safe if something checks it. Renaming either constant fails here rather
-    // than quietly turning an invitation into a refusal at the next boot.
-    expect([...HOST_OWNED_CAPABILITY_IDS].sort()).toEqual([AGENTS_HARNESS_REGISTRY, WORKTREE_CREATED].sort())
+  it('names the same host-owned capability the host actually declares', () => {
+    // A literal list is only safe if something checks it. Renaming the constant fails here rather than
+    // quietly turning an invitation into a refusal at the next boot.
+    //
+    // One entry since phase 4 of the layout programme: `core.taskWorktreeCreated` was the second, and
+    // it is a hook now rather than a capability a single plugin fills (server/plugin/hooks.ts).
+    expect([...HOST_OWNED_CAPABILITY_IDS].sort()).toEqual([AGENTS_HARNESS_REGISTRY])
   })
 })

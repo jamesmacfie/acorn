@@ -20,15 +20,60 @@
 // points and § There is no uncooperative extension.
 
 /**
- * Every place the host will draw a point's contributed items. See docs/plugins.md § Cooperative
- * extension points for the full argument; `pane.footer` and `pane.aside`, what each contributor may put
- * there, and why position is encoded in the name are all covered there.
+ * What a point lets somebody else bring. Five kinds, one manifest key, the same four rules
+ * (docs/plugins.md § Cooperative extension points).
+ *
+ *   rows        records the host draws with its own `Row`. Shipped first, and still the default.
+ *   annotation  facts pinned to items the owner already draws: a mark on a diff line, a container.
+ *   remote      a tree of kit nodes the contributor's sandbox renders into a slot of the owner's.
+ *   rectangle   an iframe of the contributor's, drawn as a sibling region of the owner's pane.
+ *   hook        a turn in one of the owner's decisions before it happens, node-side.
+ *
+ * `rows` is first so an absent `kind` reads as the kind every manifest written before this one meant.
  */
-export const EXTENSION_POINT_LOCATIONS = ['pane.footer', 'pane.aside'] as const
+export const EXTENSION_POINT_KINDS = ['rows', 'annotation', 'remote', 'rectangle', 'hook'] as const
+
+export type ExtensionPointKind = (typeof EXTENSION_POINT_KINDS)[number]
+
+export const isExtensionPointKind = (value: unknown): value is ExtensionPointKind =>
+  typeof value === 'string' && (EXTENSION_POINT_KINDS as readonly string[]).includes(value)
+
+/**
+ * Every place the host will draw a point's contributed items. See docs/plugins.md § Cooperative
+ * extension points for the full argument; what each contributor may put there, and why position is
+ * encoded in the name rather than in an orientation knob, are covered there.
+ *
+ * The two `inline` names are where a rectangle point puts somebody else's iframe: a sibling region of
+ * the owner's pane, below it or beside it. Same rule as the layout template family — the name says
+ * where, so there is nothing to get the wrong way round at runtime.
+ */
+export const EXTENSION_POINT_LOCATIONS = ['pane.footer', 'pane.aside', 'pane.inline-below', 'pane.inline-beside'] as const
 
 /** Does this location take rows from other plugins, or panels from the user? One predicate rather than a
  *  second list, so a location added below cannot forget to answer the question. */
 export const takesPluginExtensions = (location: ExtensionPointLocation): boolean => location === 'pane.footer'
+
+/** Does this location hold somebody else's rectangle beside the owner's own? */
+export const isInlineLocation = (location: ExtensionPointLocation): boolean =>
+  location === 'pane.inline-below' || location === 'pane.inline-beside'
+
+/** Which kinds hang off a named location of a named surface, and so must name both. An annotation
+ *  draws at whichever site the owner registered in code, a remote slot is a node in the owner's own
+ *  tree, and a hook draws nothing at all: none of the three has a location to name. */
+export const kindNeedsLocation = (kind: ExtensionPointKind): boolean => kind === 'rows' || kind === 'rectangle'
+
+/**
+ * Who fills a box when more than one contributor could.
+ *
+ *   stack    the owner's default plus every match, up to the owner's `max`.
+ *   replace  exactly one: the best match for the key the owner passed, else the owner's default.
+ *
+ * Applies to `remote` and `rectangle`. Rows already stack by construction, an annotation is a fact
+ * rather than a seat, and a hook is a chain. See docs/plugins.md § Arbitration.
+ */
+export const ARBITRATION_MODES = ['stack', 'replace'] as const
+
+export type ArbitrationMode = (typeof ARBITRATION_MODES)[number]
 
 export type ExtensionPointLocation = (typeof EXTENSION_POINT_LOCATIONS)[number]
 
@@ -72,6 +117,132 @@ export type PluginExtensionItem = {
 
 export type PluginExtensionItems = { items: PluginExtensionItem[] }
 
+// ── The annotation half ───────────────────────────────────────────────────────────────────────────
+//
+// Rows answer "what is related to this pane". Annotations answer "what do you know about this line".
+// The owner declares what its items are keyed by, the host collects the keys on screen and asks each
+// contributor in one request, and the marks come back for the host to draw at the owner's site.
+
+/** One item the owner draws, as the owner's declared key fields name it. Values are scalars because a
+ *  key is a lookup, not a payload: `{ file: 'src/auth.ts', line: 42, side: 'new' }`. */
+export type PluginAnnotationKey = Record<string, string | number>
+
+export const ANNOTATION_SEVERITIES = ['info', 'warn', 'danger'] as const
+
+export type AnnotationSeverity = (typeof ANNOTATION_SEVERITIES)[number]
+
+export const isAnnotationSeverity = (value: unknown): value is AnnotationSeverity =>
+  typeof value === 'string' && (ANNOTATION_SEVERITIES as readonly string[]).includes(value)
+
+/**
+ * One mark a contributor's route answers with. Host-defined for the same reason `PluginExtensionItem`
+ * is: the host draws these, so the shape is its contract.
+ *
+ * Display strings only, and no verb per mark. What a click does is declared once on the contribution,
+ * where the node can check it against that plugin's own surfaces.
+ */
+export type PluginAnnotationMark = {
+  key: PluginAnnotationKey
+  severity: AnnotationSeverity
+  text: string
+  // A Lucide name or a `brand:` mark, resolved client-side.
+  icon?: string
+}
+
+export type PluginAnnotationMarks = { items: PluginAnnotationMark[] }
+
+/**
+ * One key as a lookup string, in the field order the owner declared.
+ *
+ * Minted from the owner's declared fields rather than from whatever keys a mark happens to carry, so a
+ * contributor cannot widen its own match by inventing a field, and two marks agreeing on the declared
+ * fields land on the same item however else they differ.
+ */
+export const annotationKeyOf = (fields: readonly string[], key: PluginAnnotationKey): string =>
+  fields.map((field) => String(key[field] ?? '')).join(' ')
+
+// ── The hook half ─────────────────────────────────────────────────────────────────────────────────
+//
+// A turn in a decision before it happens (docs/plugins.md § Hooks). Node-side: the owner declares the
+// moment and what is allowed at it, contributors register a handler, the host runs the chain and hands
+// the owner a verdict.
+
+/** What a handler asks to do. The owner's `allows` is the subset it permits; a handler asking for a
+ *  mode the owner did not list is never called. */
+export const HOOK_MODES = ['observe', 'transform', 'veto'] as const
+
+export type HookMode = (typeof HOOK_MODES)[number]
+
+export const isHookMode = (value: unknown): value is HookMode =>
+  typeof value === 'string' && (HOOK_MODES as readonly string[]).includes(value)
+
+/**
+ * The vocabulary a payload is declared in — the tree's prop vocabulary, so a terminal or PWA client
+ * sends and receives the same shapes as this one.
+ *
+ * Scalars and arrays of scalars, and nothing else. A transform's answer is checked against the same
+ * declaration as its input, so a handler cannot turn a payload into something the owner never declared.
+ */
+export const HOOK_PAYLOAD_TYPES = ['string', 'number', 'boolean', 'string[]', 'number[]', 'boolean[]'] as const
+
+export type HookPayloadType = (typeof HOOK_PAYLOAD_TYPES)[number]
+
+/** `{ branch: 'string', commits: 'string[]' }`. */
+export type HookPayloadShape = Record<string, HookPayloadType>
+
+export type HookPayload = Record<string, unknown>
+
+const matchesType = (type: HookPayloadType, value: unknown): boolean => {
+  if (type.endsWith('[]')) {
+    const member = type.slice(0, -2) as 'string' | 'number' | 'boolean'
+    return Array.isArray(value) && value.every((entry) => typeof entry === member)
+  }
+  return typeof value === type
+}
+
+/**
+ * Is this a payload the owner declared? Exact: every declared field present and of its type, and no
+ * field the owner did not declare.
+ *
+ * Both halves matter. A missing field would reach the owner's own code as `undefined` where it had
+ * declared a string; an extra one is a handler smuggling a value past the declaration the trust prompt
+ * was written from. Either answer is "this is not a transform", which the runner records and ignores.
+ */
+export function matchesHookPayload(shape: HookPayloadShape, value: unknown): value is HookPayload {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const payload = value as Record<string, unknown>
+  const declared = Object.keys(shape)
+  if (Object.keys(payload).length !== declared.length) return false
+  return declared.every((field) => matchesType(shape[field]!, payload[field]))
+}
+
+/** What the owner gets back. `payload` is the value as the chain left it, transformed or not, so an
+ *  owner has one thing to act on and never has to ask whether anybody changed anything. */
+export type HookVerdict<T extends HookPayload = HookPayload> = {
+  ok: boolean
+  payload: T
+  /** Display text from the vetoing handler, capped by the host. Absent when nothing objected. */
+  reason?: string
+  /** The contributing plugin, stamped by the host. Never read off a handler's answer. */
+  by?: string
+  /** Every reason, when the owner declared `collect`. `reason` and `by` are the first of these. */
+  reasons?: { reason: string; by: string }[]
+}
+
+/**
+ * The hooks core itself owns, as opposed to the ones a plugin declares.
+ *
+ * Core has no manifest, so its points are named here and the runner treats this list as their
+ * declaration. Same shape as `CORE_EXCLUSIVE_SLOTS` below and for the same reason: a designated list
+ * a plugin may name but not extend.
+ */
+export const CORE_HOOK_POINTS = ['core:worktree-created', 'core:before-tool-call', 'core:before-snapshot'] as const
+
+export type CoreHookPoint = (typeof CORE_HOOK_POINTS)[number]
+
+export const isCoreHookPoint = (value: unknown): value is CoreHookPoint =>
+  typeof value === 'string' && (CORE_HOOK_POINTS as readonly string[]).includes(value)
+
 // ── The exclusive half ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -91,18 +262,13 @@ export const isCoreExclusiveSlot = (value: unknown): value is CoreExclusiveSlot 
 export const CORE_SLOT_PROVIDER = 'core'
 
 // ── The remote half ───────────────────────────────────────────────────────────────────────────────
+//
+// Phase 3 shipped one hard-coded target, `agentToolRenderer`, so the worker and the tree renderer
+// could be proven on a real surface. There is no target list any more: a remote contribution names a
+// point like every other kind, and the agents transcript's tool card is `agents:tool-card`, an
+// ordinary `remote` point in `replace` mode keyed by tool name.
 
-/**
- * Which of the host's surfaces will ask a plugin's sandbox for a tree
- * (docs/future/layout/06-remote-tree.md).
- *
- * One target, deliberately: the agents transcript's tool card is where the remote root is proven,
- * because dozens render per screen and the card is the reason the changes plugin could not be a
- * loaded plugin. The general slot, and the arbitration that goes with it, is the next phase.
- */
-export const REMOTE_TARGETS = ['agentToolRenderer'] as const
-
-export type RemoteTarget = (typeof REMOTE_TARGETS)[number]
-
-export const isRemoteTarget = (value: unknown): value is RemoteTarget =>
-  typeof value === 'string' && (REMOTE_TARGETS as readonly string[]).includes(value)
+/** The first remote points, named here only so the host's own consumers can say them out loud without
+ *  a literal per call site. A plugin's point never appears in this list; it is minted from its
+ *  manifest like any other. */
+export const AGENT_TOOL_CARD_POINT = 'agents:tool-card'

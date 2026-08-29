@@ -2,6 +2,7 @@ import { Show, type JSX } from 'solid-js'
 import PanelGrid from '../../dashboards/PanelGrid'
 import { regionScope, type PanelRegion } from '../../dashboards/region'
 import ExtensionPointHost from '../chrome/ExtensionPointHost'
+import { InlineSlot } from './InlineSlot'
 import '../chrome/extension-points.css'
 
 // A pane whose owner reserved part of its rectangle for somebody else, drawn as `pane.footer` and
@@ -13,12 +14,33 @@ export default function ExtendedPane(props: {
   /** The reserved `pane.aside`: its qualified point id, which is also the placement's owner id, and
    *  the owner's declared constraints. */
   aside?: { pointId: string; region: PanelRegion }
+  /** The reserved `pane.inline-below` and `pane.inline-beside` rectangles, each holding another
+   *  plugin's iframe (./InlineSlot.tsx). Two names rather than one plus an orientation, because the
+   *  position is a property of the location the owner declared. */
+  inlineBelowPointId?: string
+  inlineBesidePointId?: string
+  taskId?: string
+  projectId?: string | null
   children: JSX.Element
 }) {
+  const scope = () => ({
+    ...(props.taskId ? { taskId: props.taskId } : {}),
+    ...(props.projectId ? { projectId: props.projectId } : {}),
+  })
   return (
     <div class="extended-pane" {...(props.aside ? { 'data-aside': '' } : {})}>
       <div class="extended-pane-main">
-        <div class="extended-pane-frame">{props.children}</div>
+        {/* The owner's own rectangle and the one it reserved beside it, as siblings the host sits
+            between. Neither can reach into the other. */}
+        <div class="extended-pane-frame">
+          {props.children}
+          <Show when={props.inlineBesidePointId}>
+            {(pointId) => <InlineSlot point={pointId()} {...scope()} />}
+          </Show>
+        </div>
+        <Show when={props.inlineBelowPointId}>
+          {(pointId) => <InlineSlot point={pointId()} {...scope()} />}
+        </Show>
         <Show when={props.footerPointId}>{(pointId) => <ExtensionPointHost pointId={pointId()} />}</Show>
       </div>
       {/* Scoped by the point, not by the task: definitions are per-user-per-node and surface-free, so the

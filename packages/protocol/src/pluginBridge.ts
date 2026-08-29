@@ -39,7 +39,12 @@ export type PluginFrameContext = {
   // `remote` is the one value that is not a rectangle at all: the bundle is drawing a tree of the
   // host's own components rather than pixels (docs/future/layout/06-remote-tree.md). It has no
   // document, no webview and no modal to dismiss, so the verbs those gate on refuse it by default.
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote'
+  //
+  // `inline` is a rectangle drawn as a sibling of another plugin's pane, where that plugin's manifest
+  // declared a `rectangle` extension point (docs/plugins.md § Cooperative extension points). Like
+  // `coreSlot`, being told so grants nothing: the bridge's allowlist is keyed on scopes, and standing
+  // inside somebody else's pane gives a frame none of that plugin's reach.
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote' | 'inline'
   nodeId: string
   taskId?: string
   projectId?: string

@@ -1,7 +1,8 @@
 import { createSignal, For, mergeProps, Show, type Component } from 'solid-js'
-import { agentToolTone, type AgentToolRendererProps, agentToolRendererRegistry, remoteToolRendererFor } from '@acorn/plugin-api/client'
+import { agentToolTone, type AgentToolRendererProps, agentToolRendererRegistry } from '@acorn/plugin-api/client'
 import { StatusDot } from '@acorn/plugin-api/ui'
-import { RemoteTree } from '@acorn/plugin-api/ui/host'
+import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { Slot } from '@acorn/plugin-api/ui/host'
 import { useAgentToolFold } from './toolFoldPrefs'
 
 export type {
@@ -96,18 +97,20 @@ export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultO
   // Keyed on `kind`, which is the harness's own name for what the call did — ACP's tool kind, or
   // whatever a driver normalised to it. It is the only name for a call that reaches a transcript;
   // `title` is a sentence the provider wrote for a person to read.
-  const remote = () => (contribution() ? undefined : remoteToolRendererFor(props.tool.kind ?? ''))
+  // A compiled renderer still wins, because a first-party card is drawn in the same realm as the
+  // transcript and costs nothing; the slot fills the card only where nothing compiled claimed it.
   return (
-    <Show when={remote()} keyed fallback={contribution()?.component(full) ?? <GenericAgentTool {...full} />}>
-      {(entry) => (
-        <RemoteTree
-          contribution={entry}
-          // An accessor, not a value: this is what makes a redraw one message on the port rather than
-          // a worker restart and a fresh tree. `taskId` rides here rather than on the bridge because a
-          // worker is shared by every card its plugin draws, in every task.
-          props={() => ({ tool: props.tool, taskId: props.taskId, defaultOpen })}
-        />
-      )}
+    <Show when={!contribution()} fallback={contribution()!.component(full)}>
+      <Slot
+        point={AGENT_TOOL_CARD_POINT}
+        key={props.tool.kind ?? ''}
+        // An accessor, not a value: this is what makes a redraw one message on the port rather than a
+        // worker restart and a fresh tree. `taskId` rides here rather than on the bridge because a
+        // worker is shared by every card its plugin draws, in every task.
+        props={() => ({ tool: props.tool, taskId: props.taskId, defaultOpen })}
+      >
+        <GenericAgentTool {...full} />
+      </Slot>
     </Show>
   )
 }

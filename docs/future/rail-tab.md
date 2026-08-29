@@ -1,6 +1,8 @@
 # Rail controls and plugin-published status markers
 
-Status: slices 1 and 2 shipped 2026-08-27. Slice 3 is superseded, 2026-08-28.
+Status: slices 1 and 2 shipped 2026-08-27. Slice 3 is superseded, 2026-08-28; the mechanism that
+supersedes it shipped 2026-08-29 (docs/plugins.md § Cooperative extension points, the `annotation`
+kind). What is left is one draw site on the rail row, which lands with the pane it belongs to.
 
 The rail audit of 2026-08-27 planned three slices. Two shipped and their behaviour is owned by the
 docs, not by this file: [ui-design.md § Rail controls and status markers](../ui-design.md) for the
@@ -37,7 +39,13 @@ another surface draws, which is the **annotation** kind in [docs/future/layout/]
 point, keyed by task id, is the loaded-plugin rail marker: batched by the host, drawn by the host,
 provenance stamped, arbitrated by the same allocator. Building it as annotations gives docker's rail
 row, a diff line, and an editor gutter one mechanism rather than three. Every wire constraint above
-carries over to that point's row in phase 4 of the layout programme.
+carries over to that point's row.
+
+The annotation kind itself shipped in phase 4 of the layout programme: the manifest key, the batched
+POST, the host-side sanitiser, the provenance stamp and the draw site on `DiffPane`. `core:task` is not
+declared yet, because a rail marker needs the allocator above and the rail row is not a phase-4 pane.
+When it is declared, nothing in the mechanism changes — it is one more `annotation` point with one more
+draw site.
 
 ## Maintenance notes that survive
 

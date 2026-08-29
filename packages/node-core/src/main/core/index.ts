@@ -10,7 +10,6 @@ import * as proc from './exec/proc'
 import { SecretService } from './security/secrets'
 import { createTaskService, type TaskService } from './tasks/service'
 import { createProjectService, type ProjectService } from './projects'
-import type { CapabilityRegistry } from '../../server/plugin/capabilities'
 
 // The three module-shaped facets, named rather than left as `typeof <module>`.
 //
@@ -79,7 +78,6 @@ export function createCoreServices(options: {
   // The persisted binding. Required rather than defaulted, so a composition root cannot end up with
   // a process-local identity by omission. Tests pass memoryIdentityStore() from main/activeIdentity.ts.
   activeIdentity: ActiveIdentityStore
-  capabilities?: Pick<CapabilityRegistry, 'get'>
 }): CoreServices {
   return {
     // `satisfies`, not a bare reference: it is what makes the named facets above a projection of the
@@ -88,7 +86,7 @@ export function createCoreServices(options: {
     git: git satisfies CoreGitService,
     proc: proc satisfies CoreProcService,
     secrets: options.secrets,
-    tasks: createTaskService(options.db, options.capabilities),
+    tasks: createTaskService(options.db),
     context: createContextService(options.db),
     models: createModelService(options.db, options.secrets),
     prefs: createPrefService(options.db),

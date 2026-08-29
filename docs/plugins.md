@@ -1488,24 +1488,58 @@ keys close that, and the shape is the same one every other contribution has:
 `@acorn/protocol/extensionPoints.ts` holds the vocabulary, the node checks it at parse, the client
 checks it again on arrival, and the host mints every name.
 
+#### Five kinds, four rules
+
+What a contributor brings is one of five things, and the kind is a field on the point:
+
+| `kind` | What crosses | Plugin code on the client | Best for |
+| --- | --- | --- | --- |
+| `rows` | records | none | a list of things with names under a pane |
+| `annotation` | records, keyed | none | facts pinned to items the owner already draws |
+| `remote` | a tree of the host's own components | in a worker | UI inside somebody else's surface |
+| `rectangle` | nothing; an iframe is placed | in its own iframe | surfaces that own pixels |
+| `hook` | a payload and a verdict | none; a node route | acting before something happens |
+
+Ask in this order. **Is it a decision, not a drawing?** A hook. **Is it a fact about one item the owner
+already draws?** An annotation. **Is it a list of things with names?** Rows. **Is it UI you can build
+from acorn's own components?** A remote tree. **Does it own pixels, heavy typing or a third-party
+library — a canvas, Monaco, xterm, a chart library?** A rectangle.
+
+Descriptors stay boring on purpose. When someone asks for a conditional in a row, the answer is a
+remote card.
+
+All five obey the same four rules:
+
+| Rule | What it means |
+| --- | --- |
+| The owner consents in its manifest | A point A did not declare has nothing delivered into it. There is no uncooperative extension. |
+| The host mints every name | A point is `<ownerId>:<pointId>`, stamped from the plugin the manifest was read under. B cannot advertise a point in A's name, and B's manifest names A out loud. |
+| Both sides appear in the trust prompt | With host-owned copy. A plugin id and a verb are interpolated from fixed tables; manifest text never is. |
+| Code does not cross | What travels is data: rows, marks, a component tree, a typed payload. The host carries it, checks it, and draws or runs it. |
+
+`kind` defaults to `rows`, so a manifest written before this field parses to the kind it meant.
+
+#### Rows
+
 **A declares the point it hosts.** One entry, and it is all the code A writes:
 
 ```json
 { "contributions": {
   "frames": [{ "target": "pane", "id": "board", "label": "Board" }],
-  "extensionPoints": [{ "id": "card-links", "label": "Linked items", "location": "pane.footer", "surface": "board" }]
+  "extensionPoints": [{ "id": "card-links", "kind": "rows", "label": "Linked items", "location": "pane.footer", "surface": "board" }]
 } }
 ```
 
-`location` is a closed list — `pane.footer`, a strip the host draws under a plugin pane's frame, and
-`	pane.aside`, a column beside it — and it grows when a surface appears to draw it, never ahead of one.
-Position is encoded in the *name*, the same rule the frame `layout` template family follows: an
-`orientation` field alongside would be the first knob of a layout language. `surface` must be a `pane`
-this same manifest declares; a settings page, importer, overlay, reference panel or webview is chrome
-the host already draws around a frame, with nowhere to reserve a strip. One point per surface per
-location — so one pane may have both.
+`location` is a closed list and it grows when a surface appears to draw it, never ahead of one:
+`pane.footer`, a strip the host draws under a plugin pane's frame; `pane.aside`, a column beside it;
+and `pane.inline-below` and `pane.inline-beside`, which hold another plugin's rectangle and belong to
+the `rectangle` kind below. Position is encoded in the *name*, the same rule the frame `layout`
+template family follows: an `orientation` field alongside would be the first knob of a layout language.
+`surface` must be a `pane` this same manifest declares; a settings page, importer, overlay, reference
+panel or webview is chrome the host already draws around a frame, with nowhere to reserve a strip. One
+point per surface per location — so one pane may have several.
 
-**The two locations take two different contributors.** A footer is filled by other plugins'
+**The footer and the aside take two different contributors.** A footer is filled by other plugins'
 `extensions`, below. An **aside is filled by the user**: the host draws a dashboard region there, and
 what the owner declares is not a route to read but the constraints a person's own composition must
 satisfy — `panels: { collections | fieldRole, views, max }`, defaulting to this plugin's own
@@ -1514,7 +1548,7 @@ vocabulary; a rail source declares the same block to get a panel area beside its
 `extensions` entry aimed at an aside delivers nothing, which is the same silent nothing every
 unmatched contribution already gets.
 
-Both regions obey one rule without exception: **the host draws them, the plugin's layout only reserves
+Every region obeys one rule without exception: **the host draws them, the plugin's layout only reserves
 them.** Panels and rows are host components; the frame is a separate realm. No bridge API may pretend
 otherwise.
 
@@ -1537,14 +1571,127 @@ answering `{ items: [{ id, title, subtitle?, icon?, badge? }] }` — display str
 it against B's own surfaces at parse time; the clicked row's id rides along as the item. There is no
 per-item action, because that would be an unchecked verb arriving over a route.
 
-What the host binds, and what a manifest therefore cannot state:
+An extension names **exactly one** way in — `items`, `remote`, `frame` or `route` — and which one is
+right depends on the owner's kind, which the contributor's manifest cannot see. The node checks the
+shape ("name one"), and the match between a carrier and a point's kind happens at delivery, where both
+are visible.
+
+#### Annotations
+
+Rows answer "what is related to this pane". Annotations answer "what do you know about this line". The
+owner declares what its items are keyed by; the contributor answers with marks for the keys on screen.
+
+```json
+// A: changes declares what can be annotated
+{ "id": "diff-line", "kind": "annotation", "label": "Diff line",
+  "key": { "file": "string", "line": "number", "side": "string" } }
+
+// B: coverage
+{ "id": "coverage-lines", "point": "changes:diff-line", "label": "Coverage",
+  "items": "/v2/p/coverage/lines" }
+```
+
+The host POSTs the keys on screen in one request and B answers marks:
+
+```
+POST /v2/p/coverage/lines  { "keys": [{ "file": "src/auth.ts", "line": 42, "side": "new" }, …] }
+→ { "items": [{ "key": {…}, "severity": "info" | "warn" | "danger", "text": "Not covered by any test", "icon": "shield-off" }] }
+```
+
+Batched, so a plugin with two thousand marks answers one request. Display strings only, capped by the
+host, the same rule `PluginExtensionItem` has. The lookup is minted from the **owner's** declared
+fields in the owner's order, so a contributor cannot widen its own match by inventing a field.
+Provenance is stamped on every mark and drawn beside it. A contributor that fails draws nothing for
+itself and leaves the others alone: a mark is a note under somebody else's row, and one plugin's outage
+must not blank the row.
+
+#### Remote trees
+
+Plugin code runs in a sandbox, renders against a fake DOM, and the fake DOM serialises to a tree of the
+host's own component names ([06-remote-tree.md](./future/layout/06-remote-tree.md) owns the wire format
+and the worker). An owner that draws through the tree declares a point as a node:
+
+```tsx
+<Slot point="agents:attachment" key={selected?.mime}>
+  <AttachmentChip file={selected} />   {/* the default, drawn when nobody matches */}
+</Slot>
+```
+
+and in its manifest, so the trust prompt can say it:
+
+```json
+{ "id": "attachment", "kind": "remote", "label": "Attachment", "mode": "replace", "selector": "mime" }
+```
+
+A contributor names the point, the entry its bundle registered with `mountTree`, and what it matches:
+
+```json
+{ "id": "agent-images", "point": "agents:attachment", "label": "Image viewer",
+  "remote": "attachment", "matches": ["image/png", "image/jpeg"] }
+```
+
+The host grafts the contributor's subtree at the slot node. Neither plugin sees the other's nodes, and
+the contributor's code has exactly the permissions its own manifest declares — sitting inside A's pane
+grants it nothing of A's. **One level only**: a contributor's tree is a stream of kit node names, and
+`Slot` is not one of them, so a grafted subtree has no way to open a slot of its own.
+
+#### Rectangles
+
+After remote trees exist, rectangles are for surfaces that own pixels: Monaco, xterm, a canvas, a chart
+library, a preview of arbitrary HTML. The point is a region of the owner's pane, and the frame in it may
+belong to somebody else.
+
+```json
+// A: editor declares a box beside its document
+{ "id": "beside", "kind": "rectangle", "label": "Beside the document",
+  "location": "pane.inline-beside", "surface": "editor", "mode": "replace", "selector": "path" }
+
+// B: markdown-preview fills it for *.md
+"frames": [{ "target": "inline", "id": "preview", "label": "Markdown preview" }],
+"extensions": [{ "id": "md-preview", "point": "editor:beside", "label": "Markdown preview",
+                 "frame": "preview", "matches": ["*.md", "*.mdx"] }]
+```
+
+The two iframes are **siblings**; the host draws both and sits between them. An `inline` frame is
+registered in no pane switcher of its own — the only thing that ever draws it is an owner's point,
+which is what makes "the owner consents" true of this kind too. A manifest declaring an `inline` frame
+that nothing places is a parse error, and so is an extension naming a frame it never declared.
+
+Talking across the box is a hook with one handler, so there is one concept and not two.
+
+#### Arbitration: who fills a box
+
+`remote` and `rectangle` points declare one of two modes.
+
+| | `stack` | `replace` |
+| --- | --- | --- |
+| Occupants | every matching contributor, up to `max` | exactly one: the best match for the `key`, else the owner's default |
+| Selector | optional; contributors may still filter with `matches` | required in practice; the owner passes `key` when opening |
+| Example | tools beside a note; buttons in a composer | the renderer for the selected attachment |
+
+`matches` takes an exact string, a trailing star as a prefix (`image/*`) or a leading star as a suffix
+(`*.md`). A contributor that names none matches every key.
+
+`max` matters for `stack`: each remote contributor is a live subtree and each rectangle contributor is
+an iframe. Past `max` the host draws a count of what was left out — a count and no names, because the
+owner set the ceiling and listing the losers would invite a person to fix somebody else's arithmetic.
+
+When two contributors match the same key in `replace` mode, the user picks in Settings → Plugins and
+**the owner's default draws until they do**. A pick naming a plugin that has stopped matching falls
+back to the owner's default rather than to the runner-up: silently promoting the other candidate would
+mean the box changed hands because somebody uninstalled something. An override is an offer, not a
+seizure.
+
+#### What the host binds
+
+None of it can be stated by a manifest:
 
 | | |
 | --- | --- |
 | the point's public name | `<owner>:<point>`, minted from the plugin the manifest was read under. B cannot advertise a point in A's name. |
-| the provenance | every delivered group is stamped with the **contributing** plugin's id and renders it beside the rows. An owner looking at somebody else's items inside a pane can always see whose they are. |
+| the provenance | every delivered group and every mark is stamped with the **contributing** plugin's id and renders it beside the content. An owner looking at somebody else's items inside a pane can always see whose they are. |
 | the fetch | confined to the contributor's own `/v2/p/<id>/`. A contribution cannot make the host read the point owner's routes on its behalf — the "reading another plugin's routes" refusal below is enforced by construction, not by a rule. |
-| the gate | nothing is delivered unless **both** plugins are running on the node being looked at, and neither has code this device withheld. |
+| the gate | nothing is delivered unless **both** plugins are running on the node being looked at, and neither has code this device withheld. A `remote` or `rectangle` contribution additionally needs this device to have accepted the contributor's bundle, exactly as a pane does. |
 
 **Descriptors cross; code does not.** The rows are drawn by the host, with the shell's own `Row`,
 `Badge`, `SectionHeader` and `Icon`, in host markup that sits *outside* A's iframe. A never receives
@@ -1559,8 +1706,16 @@ controls, so a contribution never resolves its point at registration time; deliv
 time, and "there is nobody on both ends of this pipe today" is one outcome with one behaviour.
 
 Both directions appear in the trust prompt under **Enforced**, and both are recorded against the
-decision so a version that starts reaching into a *different* package reads as newly requested rather
-than sliding past unremarked.
+decision so a version that starts reaching into a *different* package, or bringing a *different kind*
+of thing, reads as newly requested rather than sliding past unremarked.
+
+#### Seeing what matched
+
+Silent-when-absent is right for a user and the worst possible thing for an author: a typo in `point`
+produces an empty pane and no error. **Settings → Plugins** lists every point on this node, its kind
+and mode, and who fills it; every contribution whose point nobody declares, with a nearest-name
+suggestion; and, for a tied `replace` slot, the picker that settles it. It reads the same registries the
+hosts read and adds no bridge verb, so it can never disagree with what is on screen.
 
 ### Node-side extension points
 
@@ -1574,7 +1729,9 @@ owner — but wrong for "many plugins each add a workflow step kind". Every such
 private registry inside the plugin that needed it, each with its own duplicate check and its own
 disposer convention (2026-08-27 extensibility review, finding 4).
 
-**Reach for a capability when there is one right answer, and for a point when there are many.**
+**Reach for a capability when there is one right answer, and for a point when there are many.** And
+reach for a [hook](#hooks) when the many are being asked a question rather than adding a thing: a point
+collects values, a hook runs a chain and comes back with a verdict.
 
 The rules are the client's, so there is one model to learn:
 
@@ -1614,6 +1771,110 @@ into nothing.
 The proving pair is workflows and http: workflows opens `workflows:step-kind`, `workflows:policy` and
 `workflows:trigger`, and the http plugin contributes the `http:request` step, with neither package
 importing the other's implementation ([workflows.md](./workflows.md) § Contributed step kinds).
+
+### Hooks
+
+Everything above is about drawing. Hooks are about **deciding**. "Before I push, does anyone object?"
+"Before I send this prompt, does anyone want to change it?" The owner declares the moment and what is
+allowed at it, contributors register a handler, and the host runs the chain and hands the owner a
+verdict (`node-core/server/plugin/hooks.ts`).
+
+**A hook is not an event.** An event has already happened; "task archived" cannot be blocked after the
+archive. Events fan out, fire and forget, and carry state rather than deltas. A hook runs *before*, in
+a chain, with a return value, ordered, timed out and validated. The two are different contracts and
+they stay different: a producer that declares no `emits` has said no to listeners, and an owner that
+declares no hook has said no to interceptors. An audit or analytics plugin is an event subscriber.
+
+**The owner declares it**, in the manifest or through `ctx.hooks.declare`:
+
+```json
+{ "id": "before-push", "kind": "hook", "label": "push",
+  "payload": { "taskId": "string", "branch": "string" },
+  "allows": ["observe", "veto"], "timeoutMs": 5000, "onTimeout": "allow" }
+```
+
+- `payload` is the declared shape, in the same small vocabulary a remote tree's props use: `string`,
+  `number`, `boolean` and arrays of those. Nothing else fits, which is deliberate — a payload is a
+  decision's subject, not a document.
+- `allows` is the subset of `observe | transform | veto` the owner permits. A handler asking for a mode
+  not listed gets nothing.
+- `timeoutMs` bounds each handler. `onTimeout` is `allow` or `deny` and applies to veto handlers only.
+- `order` is `priority` (the handler's own number, then install time) or `install`. Ties are stable.
+- `collect` runs every veto rather than stopping at the first, so the owner can show all the reasons.
+
+The owner's node half calls it at the moment:
+
+```ts
+const verdict = await ctx.hooks.run('before-push', { taskId, branch })
+if (!verdict.ok) return { ok: false, reason: `${verdict.by}: ${verdict.reason}` }
+await push(verdict.payload)   // transformed, or the original if nobody transformed
+```
+
+**A contributor registers a handler**, naming the owner out loud:
+
+```json
+{ "id": "scan-push", "point": "changes:before-push", "label": "Secret scan",
+  "route": "/v2/p/secret-scan/push", "mode": "veto", "priority": 50 }
+```
+
+The route is on the contributor's own namespace and is called by the host with the payload. A
+first-party plugin registers a function instead, through `ctx.hooks.handle`; the host wraps both in one
+closure at registration and nothing inside the chain knows which it has. Two carriers, one chain — the
+same shape the route registry uses.
+
+What a handler answers:
+
+| `mode` | Answers | What the host does with it |
+| --- | --- | --- |
+| `observe` | anything | dropped unread. Called alongside the chain, never in it. |
+| `transform` | `{ payload }` | validated against the owner's declared shape. A violation is treated as no change and recorded. |
+| `veto` | `{ ok: true }` or `{ ok: false, reason }` | `reason` is display text, capped; the host stamps `by` with the contributor's id. |
+
+**Chain rules**, without exception:
+
+- Handlers never see each other. Each gets the payload as it stands when its turn comes.
+- Order is the owner's rule, then install time.
+- Observers run alongside the chain and cannot affect it.
+- A handler that throws or times out is skipped and recorded on its roster row. A timed-out veto is
+  treated as `onTimeout` says. **Fail open by default**, because a plugin that stalls must not brick a
+  push.
+- The chain stops at the first veto unless the owner set `collect`.
+- A transform's output is validated against the same shape as its input. A handler cannot turn a
+  payload into something the owner did not declare.
+- Both directions appear in the trust prompt with host-owned copy: "lets other plugins act before it
+  pushes", "can stop a push in the changes plugin", "can change a prompt before the agents plugin sends
+  it". The plugin id and the verb are interpolated from fixed tables; manifest text never is. A handler
+  that changes or stops another plugin's decision is a **high** grant, the way running commands is.
+
+The owner draws the refusal in its own UI with the provenance the host stamped. Whether "push anyway"
+exists is the owner's decision: the hook says no, and the owner says what no means.
+
+**The hooks open today.** Core owns three, because core owns the choke point:
+
+| Owner | Hook | Allows | Who wants it |
+| --- | --- | --- | --- |
+| core | `core:worktree-created` | observe, transform | setup scripts. The terminal plugin's handler is the first, and used to be a single-slot capability |
+| core | `core:before-tool-call` | observe, veto | approval gates beyond the built-in tiers. `onTimeout: deny`, alone among these: a gate that opens when its keeper stops answering is not one |
+| core | `core:before-snapshot` | observe, transform, veto | budget shaping, PII stripping. The payload is section names, so a handler drops a section and nothing else |
+| changes | `changes:before-commit` | observe, transform, veto | commit lint, message helpers |
+| changes | `changes:before-push` | observe, veto | secret scanning, changesets |
+| agents | `agents:before-send` | observe, transform, veto | prompt policy, redaction, context injectors |
+| terminal | `terminal:before-run-target` | observe, veto | change freezes, environment checks |
+| workflows | `workflows:before-step` | observe, veto | "no deploys today" from an incident tool |
+| editor | `editor:before-save` | observe, transform, veto | format on save, lint on save |
+
+**What is refused.** Hooks on streams or per-keystroke paths — PTY output, editor keystrokes, the agent
+token stream. The events design refused those as events, and a hook costs more than an event. A
+transform that changes the payload's *shape*. A hook the owner did not declare, or a mode the owner did
+not allow. And hooks that run on the client: the chain is node-side, for the same reason an event is
+node-emitted and never renderer-local.
+
+**Two seams that are hook-shaped and are not hooks.** [Task checks](#task-checks) already do what
+`before-archive` would, and more: a check answers with a *concern* and an opt-in cleanup plan, which a
+`{ ok, reason }` verdict cannot express. Converting it would have deleted the checkbox. And the
+`routeCapability` seams in `server/bridge.ts` are single-provider service bridges — `scheduler.list()`,
+`sessions.archive()` — which is RPC rather than a decision; a chain in front of one would answer a
+question nobody asked.
 
 ### Node providers
 

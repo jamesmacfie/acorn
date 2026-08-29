@@ -25,9 +25,12 @@ import { dispatchPluginRoute } from './dispatch'
 import type { ManifestHarnessSpawn } from './harnesses'
 import { runPluginScheduleRoute } from './scheduleRun'
 import { runPluginTaskApply, runPluginTaskCheck } from './taskCheckRun'
+import { clearHooks, isHookMode } from './hooks'
+import type { HookMode } from '@acorn/protocol/extensionPoints.ts'
+import { runPluginHookRoute } from './hookRun'
 import { clearTaskChecks } from './taskChecks'
 import { declareEmits } from './emits'
-import type { HostPluginContext, NodePlugin, NodePluginContext, PluginStorage } from './types'
+import type { HostPluginContext, NodePlugin, NodePluginContext, PluginHookPoint, PluginStorage } from './types'
 
 // Undos for what `clearRegistrations` can't reach on its own: the WS hub's two slots, which are module
 // singletons with no duplicate guard, and schedules, which live in the composition root's scheduler.
@@ -216,6 +219,42 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   }
 
+  // Hooks, both halves (./hooks.ts). A manifest declares the points this package owns and the handlers
+  // it registers on other packages', and this is where each becomes a registration.
+  //
+  // A handler's carrier is the difference between the two tiers and the only difference: `ctx.hooks.handle`
+  // takes a function, and the closure built here calls a declared route instead. The env resolves
+  // eagerly for the same reason a task check's does — a package declaring a handler on a node with no
+  // bindings should fail at boot with the plugin named, not once per decision.
+  const registerManifestHooks = (ctx: NodePluginContext, name: string, binding?: LoadedPluginBinding): void => {
+    for (const point of binding?.extensionPoints ?? []) {
+      if (point.kind !== 'hook' || !point.payload || !point.allows) continue
+      ctx.hooks.declare({
+        id: point.id,
+        label: point.label,
+        payload: point.payload as PluginHookPoint['payload'],
+        // Narrowed here rather than believed: the wire projection widens `allows` to strings, because a
+        // roster row is bytes a node sent.
+        allows: point.allows.filter(isHookMode),
+        timeoutMs: point.timeoutMs,
+        onTimeout: point.onTimeout,
+        ...(point.order === 'priority' || point.order === 'install' ? { order: point.order } : {}),
+        collect: point.collect,
+      })
+    }
+    const handlers = (binding?.extensions ?? []).filter((entry) => entry.route !== undefined && isHookMode(entry.mode))
+    if (handlers.length === 0) return
+    const env = requireEnv(name)
+    for (const entry of handlers) {
+      ctx.hooks.handle(entry.point, {
+        id: entry.id,
+        mode: entry.mode as HookMode,
+        priority: entry.priority,
+        run: (payload, signal) => runPluginHookRoute(env, name, entry.route!, payload, signal),
+      })
+    }
+  }
+
   // The same for audit verbs (../audit.ts). Nothing to dispatch and no env needed: the declaration is
   // the whole contribution, and `ctx.audit.record` is refused for anything not in it.
   const registerManifestAuditActions = (ctx: NodePluginContext, binding?: LoadedPluginBinding): void => {
@@ -343,6 +382,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     registerEmits(plugin, loaded, (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]))
     registerManifestSchedules(ctx, plugin.name, loaded)
     registerManifestTaskChecks(ctx, plugin.name, loaded)
+    registerManifestHooks(ctx, plugin.name, loaded)
     registerManifestHarnesses(ctx, plugin.name, loaded)
     registerManifestCollections(ctx, loaded)
     registerManifestNodeActions(ctx, loaded)
@@ -475,6 +515,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // under the same keys, and registering now throws on the duplicate.
       registerManifestSchedules(candidateCtx, name, next.binding)
       registerManifestTaskChecks(candidateCtx, name, next.binding)
+      registerManifestHooks(candidateCtx, name, next.binding)
       // Not buffered: the registry is keyed by plugin id, so the candidate's declaration overwrites the
       // previous instance's, and a failed reload leaves the fresh manifest's verbs in place, which is
       // what the settings page shows anyway.
@@ -598,6 +639,7 @@ export function clearRegistrations(name: string): void {
   // Both halves of the node's many-to-many seam: the points this plugin opened and the entries it
   // filed into other plugins' points (./extensionPoints.ts).
   clearExtensionPoints(name)
+  clearHooks(name)
   // A task check is a live closure over this plugin's context, asked at archive time, long after a
   // re-init has replaced the instance behind it.
   clearTaskChecks(name)

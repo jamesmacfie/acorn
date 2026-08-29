@@ -7,7 +7,7 @@
 // Its two DB-shaped needs are now CoreServices calls, because this plugin has no handle to core's
 // database: `taskRunConfig` (the layered run-target config, docs/workspaces-and-tasks.md § Task) and
 // the executable-config trust gate (docs/workflows.md § Configuration trust).
-import { buildSessionEnv, type CoreServices, type RunTarget } from '@acorn/plugin-api/node'
+import { buildSessionEnv, type CoreServices, type PluginHookRegistry, type RunTarget } from '@acorn/plugin-api/node'
 import { type RuntimeDeps, RuntimeService } from './runtime'
 
 // The session-engine glue the service needs (terminal.ts provides it): spawn a target's command as
@@ -22,7 +22,12 @@ export type RunSessionGlue = {
 // Runtime service: run targets as terminal sessions in the task worktree (docs/terminal-and-agents.md
 // § Process broker). Short-lived scripts (stop / url_command) run out-of-band with the same ACORN_*
 // env.
-export function createRuntimeService(core: Pick<CoreServices, 'tasks' | 'projects' | 'proc'>, glue: RunSessionGlue, onChange?: RuntimeDeps['onChange']): RuntimeService {
+export function createRuntimeService(
+  core: Pick<CoreServices, 'tasks' | 'projects' | 'proc'>,
+  glue: RunSessionGlue,
+  onChange?: RuntimeDeps['onChange'],
+  hooks?: Pick<PluginHookRegistry, 'run'>,
+): RuntimeService {
   const runScript = async (taskId: string, script: string, cwd: string): Promise<{ ok: boolean; output?: string; reason?: string }> => {
     const t = await core.tasks.load(taskId)
     const project = t?.projectId ? await core.projects.byId(t.projectId) : null
@@ -44,6 +49,7 @@ export function createRuntimeService(core: Pick<CoreServices, 'tasks' | 'project
   return new RuntimeService({
     loadTargets: (taskId) => core.tasks.runConfig(taskId),
     startSession: glue.startSession,
+    ...(hooks ? { hooks } : {}),
     isRunning: glue.isRunning,
     exitCode: glue.exitCode,
     killSession: glue.killSession,

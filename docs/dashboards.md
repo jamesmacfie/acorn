@@ -794,6 +794,15 @@ mean "inside my iframe". The precedent is the document surface's frame `layout` 
 manifest reserves part of the rectangle and the host draws that part, and no bridge API may pretend
 otherwise.
 
+`pane.aside` is a location on the same `extensionPoints` key that now carries five kinds
+([plugins.md](./plugins.md) § Cooperative extension points), and it is deliberately not one of them.
+The five kinds are all "another **plugin** may come in here"; an aside is "the **user** may compose
+here". They share a key because they share the one thing that matters — the owner reserving part of its
+own surface and the host drawing it — and they differ in who fills it, which is why an aside declares
+`panels` constraints rather than a mode and a selector, and why an `extensions` entry aimed at one
+delivers nothing. The two rectangle locations beside it, `pane.inline-below` and `pane.inline-beside`,
+are the plugin-filled case and belong to the `rectangle` kind.
+
 What the owner may say about its rectangle is one small vocabulary, shared by both surfaces: which
 collections (its own by default, or an explicit list of `<pluginId>:<collectionId>` references, or
 "any collection with a status-role field"), which views, and how many panels. Those constraints are

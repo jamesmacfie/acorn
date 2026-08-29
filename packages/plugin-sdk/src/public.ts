@@ -9,7 +9,7 @@ export type PluginFrameContext = {
   /** Which kind of surface this is. It grants nothing (the bridge's allowlist is keyed on the
    * manifest's scopes, never on this field), but a frame may want to lay out differently. `remote` is
    * the tree path rather than a rectangle. */
-  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote'
+  target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote' | 'inline'
   nodeId: string
   taskId?: string
   projectId?: string
@@ -183,7 +183,7 @@ export type TreeRender = (bridge: AcornBridge, mount: TreeMount) => void
  * Register this bundle's tree renderers and wait for acorn to mount them.
  *
  * Keyed by entry name because one worker serves every tree your bundle contributes, and acorn has to
- * say which. Your manifest's `contributions.remote[].entry` names a key here; a name with no key
+ * say which. Your manifest's `contributions.extensions[].remote` names a key here; a name with no key
  * behind it draws a labelled placeholder and records a row on your plugin's page. It is not a crash.
  */
 export declare function mountTree(renderers: Record<string, TreeRender>): void
