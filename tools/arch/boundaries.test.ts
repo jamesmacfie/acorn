@@ -954,18 +954,17 @@ describe('architecture boundaries', () => {
         }
       }
     }
-    // Shrinking baseline. Everything left is one plugin contributing markup into another's container, so
-    // the markup belongs to the guest and the box belongs to the host. That wants a real seam rather
-    // than a rename, and entries may only be removed.
+    // The baseline is empty, and stays empty. It held one plugin contributing markup into another's
+    // container, where the markup belonged to the guest and the box to the host.
     //
     // Context's two vocabulary classes went with phase 6 of the layout programme: memory's section is a
     // contribution to the `context:section` point now, written in kit nodes, so there is no class for it
     // to borrow. The earlier note here said a cooperative point could not take it because the section is
     // UI rather than a descriptor — which was true of the `rows` kind and stopped being true when the
     // `remote` kind arrived with two render paths (docs/plugins.md § Cooperative extension points).
-    const BASELINE = [
-      'plugins/agents defines .agent-tool, worn by plugins/changes/src/client/agentToolRenderer.tsx',
-    ]
+    // `.agent-tool` went the same way in phase 8: the agents plugin has no stylesheet left, so there is
+    // nothing for a guest card to wear.
+    const BASELINE: string[] = []
     expect([...new Set(offenders)].sort()).toEqual(BASELINE)
   })
 })

@@ -549,6 +549,9 @@ ui: ListDetail
 ui: Log
 ui: Markdown
 ui: MarkdownOptions
+ui: MentionSegment
+ui: MentionSource
+ui: MentionSuggestion
 ui: MentionTextarea
 ui: Menu
 ui: Meter

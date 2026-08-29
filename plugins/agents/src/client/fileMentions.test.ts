@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  activeFileMention,
-  activeMention,
-  completeFileMention,
-  completeMention,
-  fileMentionSuggestions,
-  parseFileMentions,
-} from './fileMentions'
+import { fileMentionSuggestions, formatFileMention, parseFileMentions } from './fileMentions'
 
 describe('managed composer file mentions', () => {
   it('extracts relative paths and line ranges', () => {
@@ -28,37 +21,11 @@ describe('managed composer file mentions', () => {
     ])
   })
 
-  it('finds and completes the mention at the caret', () => {
-    const text = 'Check @src/comp before sending'
-    const mention = activeFileMention(text, 'Check @src/comp'.length)
-    expect(mention).toEqual({
-      start: 6,
-      end: 'Check @src/comp'.length,
-      query: 'src/comp',
-    })
-    expect(completeFileMention(text, mention!, 'src/components/AgentPane.tsx')).toEqual({
-      text: 'Check @src/components/AgentPane.tsx before sending',
-      cursor: 'Check @src/components/AgentPane.tsx '.length,
-    })
-  })
-
-  it('reads the sigil at the caret, so one dropdown serves files, commands and skills', () => {
-    expect(activeMention('run /rev', 'run /rev'.length))
-      .toEqual({ sigil: '/', start: 4, end: 8, query: 'rev' })
-    expect(activeMention('then $read', 'then $read'.length))
-      .toEqual({ sigil: '$', start: 5, end: 10, query: 'read' })
-    expect(activeMention('a@b.com', 'a@b.com'.length)).toBeNull()
-    // Mid-word, not a mention: 9/11 and and/or are the everyday false positives.
-    expect(activeMention('shipped 9/11', 'shipped 9/11'.length)).toBeNull()
-  })
-
-  it('completes a command without the quoting a path would need', () => {
-    const text = 'run /rev now'
-    const mention = activeMention(text, 'run /rev'.length)
-    expect(completeMention(text, mention!, '/review')).toEqual({
-      text: 'run /review now',
-      cursor: 'run /review '.length,
-    })
+  it('quotes a path with a space in it, so the mention it writes reads back as one token', () => {
+    expect(formatFileMention('src/app.ts')).toBe('@src/app.ts')
+    expect(formatFileMention('docs/product brief.md')).toBe('@"docs/product brief.md"')
+    expect(parseFileMentions(`Review ${formatFileMention('docs/product brief.md')} next.`))
+      .toEqual([{ type: 'file', path: 'docs/product brief.md' }])
   })
 
   it('fuzzy-ranks file suggestions and caps the list', () => {

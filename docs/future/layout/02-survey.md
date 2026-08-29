@@ -45,7 +45,7 @@ than kit it composed. High numbers gain most from host-owned layouts and cost mo
 
 | Plugin | `.tsx` | Kit components | Raw div+span | Reading |
 | --- | ---: | ---: | ---: | --- |
-| agents | 20 | 24 | 121 | Six hand-drawn structures: transcript, event card, composer, sidebar, center, provider cards. Six raw `<details>`, which is a missing `Fold`. |
+| agents | 20 | 24 | 121 | Six hand-drawn structures: transcript, event card, composer, sidebar, center, provider cards. Six raw `<details>`, which is a missing `Fold`. Moved in phase 8; all six stylesheets are gone. |
 | github | 15 | 27 | 117 | PR detail is 26 KB of custom layout around kit pieces; browse is its own three-column layout. |
 | http | 7 | 17 | 38 | Already a frame; mostly kit. URL bar and response strip are custom toolbars. |
 | linear | 3 | 12 | 32 | Already a frame; header, chips, tabs, facts. Nearly all kit. |

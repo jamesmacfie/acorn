@@ -1,18 +1,22 @@
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
-import { activateTaskSignals, activeNodeId, brandStyle, createFleetQuery, nodes, pathForTask, readJson, setActiveNode, type Task, tasksOptions, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
+import {
+  activateTaskSignals, activeNodeId, createFleetQuery, nodes, pathForTask, readJson, setActiveNode,
+  type Task, tasksOptions, workspaceForProject, workspacesOptions,
+} from '@acorn/plugin-api/client'
 import { tasksRoute } from '@acorn/protocol/api.ts'
 import { isActiveAgent, needsAttention } from './agentActivity'
 import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'
-import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
-import { Alert, EmptyState, Icon, Input, Row, SegmentedControl, Select, StatusDot } from '@acorn/plugin-api/ui'
+import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
+import {
+  Alert, Card, DetailColumn, EmptyState, Facts, Heading, Icon, Inline, Input, ListDetail, Row, Rows,
+  SegmentedControl, Select, Stack, StatusDot, Text, Toolbar,
+} from '@acorn/plugin-api/ui'
 import RuntimeStateIcon from './RuntimeStateIcon'
 import { providerTone } from './stateTone'
-import './agent-center.css'
-
 
 const elapsed = (timestamp: number): string => {
   const minutes = Math.max(0, Math.round((Date.now() - timestamp) / 60_000))
@@ -26,6 +30,11 @@ const elapsed = (timestamp: number): string => {
 // scope, so `open` has one code path instead of branching on the scope.
 type AgentRow = { session: AgentSession; nodeId: string; nodeLabel: string; task: Task | undefined }
 
+// The Agents rail source: every managed session in the workspace, or across the fleet.
+//
+// A `header-body` surface that is not a pane, so it takes the kit's one-column split as its box
+// rather than a layout: a layout is a pane's arrangement and this is a source's
+// (docs/panes.md § Layout model).
 export default function AgentCenter() {
   const navigate = useNavigate()
   const params = useParams()
@@ -92,8 +101,7 @@ export default function AgentCenter() {
   const [error, setError] = createSignal('')
 
   onMount(() => {
-    const deactivate = managedAgentStore.activate()
-    onCleanup(deactivate)
+    onCleanup(managedAgentStore.activate())
   })
 
   createEffect(on(workspaceId, () => {
@@ -147,6 +155,9 @@ export default function AgentCenter() {
     )
   })
   const unavailable = () => (fleetScope() ? fleetSessions().unavailable : [])
+  // Two nodes may hold the same session id, so a row's key names both (docs/architecture-overview.md
+  // § Fleet semantics).
+  const rowKey = (row: AgentRow) => `${row.nodeId}:${row.session.id}`
 
   function open(row: AgentRow) {
     if (!row.task) return setError('The session’s task is no longer available.')
@@ -161,111 +172,154 @@ export default function AgentCenter() {
   }
 
   return (
-    <main class="agent-center">
-      <header class="agent-center-head">
-        <div>
-          <span class="agent-center-kicker">{fleetScope() ? 'Fleet' : 'Workspace'}</span>
-          <h1>Agent Center</h1>
-          <p>
+    <ListDetail>
+      <DetailColumn scroll>
+        <Stack gap="section">
+          <Inline wrap>
+            <Heading level={1} eyebrow={fleetScope() ? 'Fleet' : 'Workspace'}>Agent Center</Heading>
+            <Facts
+              items={[
+                { label: 'active', value: String(sourceSessions().filter((session) => isActiveAgent(session)).length) },
+                { label: 'need you', value: String(sourceSessions().filter((session) => needsAttention(session)).length) },
+                { label: 'sessions', value: String(sourceSessions().length) },
+              ]}
+            />
+          </Inline>
+          <Text emphasis="muted" wrap>
             {fleetScope()
               ? 'Managed sessions across every paired node. Remote rows refresh on load rather than live.'
               : 'Managed Claude Code and Codex sessions across this workspace’s tasks and worktrees.'}
-          </p>
-        </div>
-        <div class="agent-center-stats">
-          <span><strong>{sourceSessions().filter((session) => isActiveAgent(session)).length}</strong> active</span>
-          <span><strong>{sourceSessions().filter((session) => needsAttention(session)).length}</strong> need you</span>
-          <span><strong>{sourceSessions().length}</strong> sessions</span>
-        </div>
-      </header>
+          </Text>
 
-      <Show when={error()}><Alert>{error()}</Alert></Show>
+          <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
 
-      {/* Partial node results remain visible while the unavailable-node banner explains the gap. */}
-      <Show when={unavailable().length}>
-        <For each={unavailable()}>
-          {(entry) => <Alert tone="warn" variant="banner">{entry.label} unavailable — {entry.reason}</Alert>}
-        </For>
-      </Show>
+          {/* Partial node results remain visible while the unavailable-node banner explains the gap. */}
+          <For each={unavailable()}>
+            {(entry) => <Alert tone="warn" variant="banner">{entry.label} unavailable — {entry.reason}</Alert>}
+          </For>
 
-      <section class="agent-center-providers">
-        <For each={providers() ?? []}>
-          {(provider: AgentProviderDescriptor) => (
-            <div class="agent-center-provider" data-health={provider.installed ? provider.authenticated === false ? 'error' : 'ok' : 'missing'}>
-              <StatusDot tone={providerTone(provider.installed ? provider.authenticated === false ? 'error' : 'ok' : 'missing')} />
-              <span><strong>{provider.label}</strong><small>{provider.executableVersion ?? provider.driverVersion}</small></span>
-              <span class="muted">{provider.installed ? provider.authenticated === false ? 'Authentication required' : 'Available' : 'Not installed'}</span>
-            </div>
-          )}
-        </For>
-      </section>
+          <Inline wrap>
+            <For each={providers() ?? []}>
+              {(provider) => (
+                <Card pad="sm">
+                  <Inline>
+                    <StatusDot
+                      tone={providerTone(provider.installed ? provider.authenticated === false ? 'error' : 'ok' : 'missing')}
+                      label={provider.installed ? provider.authenticated === false ? 'Authentication required' : 'Available' : 'Not installed'}
+                    />
+                    <Stack gap="none">
+                      <Text emphasis="strong">{provider.label}</Text>
+                      <Text emphasis="muted">{provider.executableVersion ?? provider.driverVersion}</Text>
+                    </Stack>
+                  </Inline>
+                </Card>
+              )}
+            </For>
+          </Inline>
 
-      <section class="agent-center-filters">
-        <Input type="search" value={query()} placeholder="Search sessions, tasks and repositories…" onInput={(value) => setQuery(value)} />
-        <Select value={providerFilter()} onChange={(value) => setProviderFilter(value)} options={[{ value: '', label: 'All providers' }, ...(providers() ?? []).map((provider) => ({ value: provider.id, label: provider.label }))]} />
-        {/* With one node the workspace and fleet scopes answer identically, so the switch is unnecessary. */}
-        <Show when={nodes().length > 1}>
-          <SegmentedControl
-            ariaLabel="Scope"
-            size="sm"
-            value={scope()}
-            onChange={setScope}
-            options={[
-              { value: 'workspace', label: 'workspace' },
-              { value: 'fleet', label: 'fleet' },
-            ]}
-          />
-        </Show>
-        <SegmentedControl
-          ariaLabel="Session state"
-          size="sm"
-          value={stateFilter()}
-          onChange={setStateFilter}
-          options={(fleetScope()
-            ? (['all', 'active', 'attention'] as const)
-            : (['all', 'active', 'attention', 'archived'] as const)
-          ).map((filter) => ({ value: filter, label: filter }))}
-        />
-      </section>
+          <Toolbar ariaLabel="Filters">
+            <Input
+              type="search"
+              value={query()}
+              label="Search sessions"
+              placeholder="Search sessions, tasks and repositories…"
+              onInput={(value) => setQuery(value)}
+            />
+            <Select
+              label="Provider"
+              width="auto"
+              value={providerFilter()}
+              onChange={(value) => setProviderFilter(value)}
+              options={[
+                { value: '', label: 'All providers' },
+                ...(providers() ?? []).map((provider) => ({ value: provider.id, label: provider.label })),
+              ]}
+            />
+            {/* With one node the workspace and fleet scopes answer identically, so the switch is unnecessary. */}
+            <Show when={nodes().length > 1}>
+              <SegmentedControl
+                ariaLabel="Scope"
+                size="sm"
+                value={scope()}
+                onChange={setScope}
+                options={[
+                  { value: 'workspace', label: 'workspace' },
+                  { value: 'fleet', label: 'fleet' },
+                ]}
+              />
+            </Show>
+            <SegmentedControl
+              ariaLabel="Session state"
+              size="sm"
+              value={stateFilter()}
+              onChange={setStateFilter}
+              options={(fleetScope()
+                ? (['all', 'active', 'attention'] as const)
+                : (['all', 'active', 'attention', 'archived'] as const)
+              ).map((filter) => ({ value: filter, label: filter }))}
+            />
+          </Toolbar>
 
-      <section class="agent-center-list">
-        <div class="agent-center-list-head">
-          <span>Session</span><span>Task</span><span>State</span><span>Updated</span>
-        </div>
-        <For
-          each={shown()}
-          fallback={<EmptyState icon={<span class="agent-empty-mark">✦</span>}>No sessions match these filters.</EmptyState>}
-        >
-          {(row) => {
-            const session = row.session
-            const task = () => row.task
-            return (
-              <Row onPress={() => open(row)}>
-                <span class="agent-center-session">
-                  <span class="agent-center-session-icon" style={brandStyle(providerGlyph(session.providerId))}>
-                    <Icon name={providerGlyph(session.providerId)} />
-                  </span>
-                  <span><strong>{session.title}</strong><small>{session.providerId} · {session.kind}</small></span>
-                </span>
-                <span>
-                  <strong>{task()?.title ?? 'Missing task'}</strong>
-                  <small>
-                    {task() ? (task()!.github ? `${task()!.github!.owner}/${task()!.github!.name}` : task()!.projectId) : session.taskId}
-                    {/* The node only when there is a fleet to disambiguate — otherwise it names the only
-                        machine there is. */}
-                    <Show when={row.nodeLabel}>{(label) => <> · {label()}</>}</Show>
-                  </small>
-                </span>
-                <span class="agent-center-state">
-                  <RuntimeStateIcon state={session.runtimeState} />
-                  <span>{session.runtimeState}<small>{session.attention === 'none' ? '' : session.attention.replace('_', ' ')}</small></span>
-                </span>
-                <span class="muted">{elapsed(session.updatedAt)}</span>
-              </Row>
-            )
-          }}
-        </For>
-      </section>
-    </main>
+          <Show
+            when={shown().length}
+            fallback={
+              <EmptyState icon={<Icon name="sparkles" tone="accent" />}>
+                No sessions match these filters.
+              </EmptyState>
+            }
+          >
+            <Rows
+              id="agents:center"
+              ariaLabel="Managed sessions"
+              items={shown().map((row) => ({ key: rowKey(row), label: row.session.title }))}
+              onActivate={(key) => {
+                const row = shown().find((candidate) => rowKey(candidate) === key)
+                if (row) open(row)
+              }}
+            >
+              {(item, itemProps) => {
+                const row = () => shown().find((candidate) => rowKey(candidate) === item.key)
+                return (
+                  <Show when={row()}>
+                    {(current) => (
+                      <Row
+                        item={itemProps}
+                        variant="stacked"
+                        leading={<Icon name={providerGlyph(current().session.providerId)} tone="brand" />}
+                        meta={
+                          <>
+                            <Inline>
+                              <RuntimeStateIcon state={current().session.runtimeState} />
+                              <Text emphasis="muted">
+                                {current().session.runtimeState}
+                                {current().session.attention === 'none'
+                                  ? ''
+                                  : ` · ${current().session.attention.replace('_', ' ')}`}
+                              </Text>
+                            </Inline>
+                            <Text emphasis="muted">{elapsed(current().session.updatedAt)}</Text>
+                          </>
+                        }
+                        metaFields={2}
+                        onPress={() => open(current())}
+                      >
+                        <Text emphasis="strong">{current().session.title}</Text>
+                        <Text emphasis="muted">
+                          {current().session.providerId} · {current().session.kind} ·{' '}
+                          {current().task?.title ?? 'Missing task'}
+                          {/* The node only when there is a fleet to disambiguate — otherwise it names
+                              the only machine there is. */}
+                          {current().nodeLabel ? ` · ${current().nodeLabel}` : ''}
+                        </Text>
+                      </Row>
+                    )}
+                  </Show>
+                )
+              }}
+            </Rows>
+          </Show>
+        </Stack>
+      </DetailColumn>
+    </ListDetail>
   )
 }

@@ -801,8 +801,10 @@ kinds of contribution come out of one manifest:
   this plugin declares names `{ "kind": "remote", "entry": "<name>" }` in its `regions` — that is how
   the panes, reference panels and settings pages of `http`, `database`, `linear` and `rollbar` draw. A
   **contribution into somebody else's point** is a `contributions.extensions` entry with a `remote` key,
-  which declares which host surface it fills and what it matches; `agentToolRenderer`, keyed by the tool
-  name a harness reports, is the one such target today.
+  which declares which host surface it fills and what it matches. The agents pane opens three:
+  `agents:tool-card`, keyed by the tool name a harness reports; `agents:attachment`, keyed by an
+  attachment's media type; and `agents:composer-actions`, which stacks up to four contributors in the
+  composer's action bar.
 
   An author writes the same code either way. `mountTree({ toolCard: … })` on `/ui/sdk` is the entry point
   beside `mountFrame`, keyed by name because one worker serves every tree the bundle contributes and the

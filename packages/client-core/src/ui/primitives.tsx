@@ -1134,8 +1134,15 @@ export function Card(props: {
   disabled?: boolean
   onPress?: () => void
   title?: string
+  /** Put the reader on this card: scroll it into view and give it focus.
+   *
+   *  The kit's, not the caller's, for the reason collection state is: a pane that has been told
+   *  "show this item" holds a key and nothing else, and the kit gives it no class and no id to
+   *  select on. Setting this is how a pane says which card it means. */
+  focus?: boolean
   children: JSX.Element
 }) {
+  let element: HTMLElement | undefined
   const attrs = () => ({
     class: 'ui-card',
     'data-selected': props.selected ? '' : undefined,
@@ -1143,12 +1150,30 @@ export function Card(props: {
     'data-pad': props.pad ?? 'md',
     title: props.title,
   })
+  createEffect(() => {
+    if (!props.focus || !element) return
+    element.scrollIntoView({ block: 'nearest' })
+    element.focus({ preventScroll: true })
+  })
   return (
     <Show
       when={props.interactive || props.onPress}
-      fallback={<div {...attrs()}>{props.children}</div>}
+      fallback={(
+        // `tabindex` only on the plain card: an interactive one is already a stop, and taking it out
+        // of the tab order to make it focusable by script would be the opposite of the ask.
+        <div ref={(el) => { element = el }} {...attrs()} tabindex={props.focus === undefined ? undefined : -1}>
+          {props.children}
+        </div>
+      )}
     >
-      <button type="button" {...attrs()} data-interactive="" disabled={props.disabled} onClick={() => props.onPress?.()}>
+      <button
+        ref={(el) => { element = el }}
+        type="button"
+        {...attrs()}
+        data-interactive=""
+        disabled={props.disabled}
+        onClick={() => props.onPress?.()}
+      >
         {props.children}
       </button>
     </Show>

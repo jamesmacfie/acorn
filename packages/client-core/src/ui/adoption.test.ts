@@ -174,7 +174,6 @@ describe('primitive adoption', () => {
     'plugins/agents/src/client/AgentComposer.tsx',
     'plugins/agents/src/client/AgentContextPickerModal.tsx',
     'plugins/agents/src/client/AgentEventCard.tsx',
-    'plugins/agents/src/client/AgentMentionTextarea.tsx',
     'plugins/agents/src/client/AgentPane.tsx',
     'plugins/agents/src/client/AgentRequestCard.tsx',
     'plugins/agents/src/client/AgentTaskSidebar.tsx',
@@ -275,6 +274,13 @@ describe('primitive adoption', () => {
     'plugins/github/src/client/pullDetail/PrFiles.tsx',
     'plugins/github/src/client/pullDetail/PrOverview.tsx',
     'plugins/github/src/client/pullDetail/PrPane.tsx',
+    // Phase 8: the agents surfaces, as layouts and kit trees. Its six stylesheets went in the same
+    // change, and the plugin has none left (docs/future/layout/phase-8-agents.md).
+    'packages/client-core/src/ui/Icon.tsx',
+    'packages/client-core/src/ui/MentionTextarea.tsx',
+    'packages/client-core/src/ui/Timeline.tsx',
+    'plugins/agents/src/client/AgentTaskSidebar.tsx',
+    'plugins/agents/src/client/AgentUsageIndicator.tsx',
   ]
 
   it.each(CONVERTED)('%s uses primitives, not raw controls', (file) => {

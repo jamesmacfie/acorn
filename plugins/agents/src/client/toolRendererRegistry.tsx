@@ -1,6 +1,6 @@
 import { createSignal, For, mergeProps, Show, type Component } from 'solid-js'
 import { agentToolTone, type AgentToolRendererProps, agentToolRendererRegistry } from '@acorn/plugin-api/client'
-import { StatusDot } from '@acorn/plugin-api/ui'
+import { CodeBlock, Fold, Inline, Stack, StatusDot, Text } from '@acorn/plugin-api/ui'
 import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { useAgentToolFold } from './toolFoldPrefs'
@@ -13,23 +13,29 @@ export type {
 // A call with no status reported yet is in flight; see AgentToolCall.status.
 const toolStatusLabel = (props: AgentToolRendererProps) => props.tool.status ?? 'running'
 
-/** Dot, name, and state, for both the expandable and the flat card. */
-const AgentToolHead: Component<AgentToolRendererProps> = (props) => (
-  <>
+/** The state half: a dot, and the word beside it while the call is not finished. The dot carries a
+ *  finished call's state on its own, and the word beside it used to read as the entire card whenever
+ *  a provider sent its updates without a title. */
+const AgentToolState: Component<AgentToolRendererProps> = (props) => (
+  <Inline>
     <StatusDot
       tone={agentToolTone(props.tool.status)}
       pulse={toolStatusLabel(props) === 'running'}
       label={toolStatusLabel(props)}
     />
-    {/* The provider's own name for the call, which for a shell command is the command itself. Held to
-        one line, with the whole of it on hover, because those run long. */}
-    <span class="agent-tool-name" title={props.tool.title || undefined}>{props.tool.title || 'Tool'}</span>
-    {/* The dot carries a finished call's state, and the word beside it used to read as the entire card
-        whenever a provider sent its updates without a title. */}
     <Show when={toolStatusLabel(props) !== 'completed'}>
-      <span class="muted">{toolStatusLabel(props)}</span>
+      <Text emphasis="muted">{toolStatusLabel(props)}</Text>
     </Show>
-  </>
+  </Inline>
+)
+
+/** The flat card: a call with nothing to open onto. The provider's own name for it, which for a
+ *  shell command is the command itself. */
+const AgentToolHead: Component<AgentToolRendererProps> = (props) => (
+  <Inline>
+    <AgentToolState {...props} />
+    <Text>{props.tool.title || 'Tool'}</Text>
+  </Inline>
 )
 
 // A disclosure with nothing behind it is worse than no disclosure: the reader clicks a card that opens
@@ -45,31 +51,29 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
   // one provider's cards opened themselves and the other's never did.
   const [open, setOpen] = createSignal(props.defaultOpen)
   return (
-    <details
-      class="agent-tool ui-fold"
+    <Fold
+      label={props.tool.title || 'Tool'}
+      level="sub"
+      meta={<AgentToolState {...props} />}
       open={open()}
-      onToggle={(toggle) => {
-        setOpen(toggle.currentTarget.open)
-        props.onOpenChange(toggle.currentTarget.open)
+      onOpenChange={(next) => {
+        setOpen(next)
+        props.onOpenChange(next)
       }}
     >
-      <summary class="ui-fold-summary">
-        <span class="ui-fold-marker" aria-hidden="true" />
-        <AgentToolHead {...props} />
-      </summary>
-      <Show when={props.tool.input}><pre>{props.tool.input}</pre></Show>
-      <Show when={props.tool.output}><pre>{props.tool.output}</pre></Show>
-      <For each={props.tool.paths ?? []}>
-        {(path) => <span class="agent-path-link">{path}</span>}
-      </For>
-    </details>
+      <Stack gap="row">
+        <Show when={props.tool.input}>{(input) => <CodeBlock wrap maxHeight="block">{input()}</CodeBlock>}</Show>
+        <Show when={props.tool.output}>{(output) => <CodeBlock wrap maxHeight="block">{output()}</CodeBlock>}</Show>
+        <For each={props.tool.paths ?? []}>{(path) => <Text emphasis="mono">{path}</Text>}</For>
+      </Stack>
+    </Fold>
   )
 }
 
 const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
   <Show
     when={props.tool.input || props.tool.output || props.tool.paths?.length}
-    fallback={<div class="agent-tool agent-tool-flat"><AgentToolHead {...props} /></div>}
+    fallback={<AgentToolHead {...props} />}
   >
     <AgentToolFold {...props} />
   </Show>
@@ -97,8 +101,6 @@ export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultO
   // Keyed on `kind`, which is the harness's own name for what the call did — ACP's tool kind, or
   // whatever a driver normalised to it. It is the only name for a call that reaches a transcript;
   // `title` is a sentence the provider wrote for a person to read.
-  // A compiled renderer still wins, because a first-party card is drawn in the same realm as the
-  // transcript and costs nothing; the slot fills the card only where nothing compiled claimed it.
   return (
     <Show when={!contribution()} fallback={contribution()!.component(full)}>
       <Slot

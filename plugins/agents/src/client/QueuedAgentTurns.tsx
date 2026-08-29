@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { AgentRuntimeState, AgentTurn } from '@acorn/protocol/managedAgents.ts'
-import { Button, Icon, Textarea } from '@acorn/plugin-api/ui'
+import { Button, Card, Icon, Inline, Section, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
 import { clientEvents } from '@acorn/plugin-api/client'
 import { agentConcurrencyOptions } from './concurrencyClient'
 import { managedAgentApi } from './managedClient'
@@ -9,6 +9,8 @@ import { managedAgentApi } from './managedClient'
 const promptText = (turn: AgentTurn): string =>
   turn.input.find((part) => part.type === 'text')?.text ?? ''
 
+// Follow-ups typed while the session was busy, in the order they will be sent. Editable and
+// reorderable until the dispatcher takes one (docs/managed-agents.md § The turn queue).
 export default function QueuedAgentTurns(props: {
   sessionId: string
   runtimeState: AgentRuntimeState
@@ -54,132 +56,138 @@ export default function QueuedAgentTurns(props: {
 
   return (
     <Show when={queued().length}>
-      <section class="agent-queued-turns" aria-label="Queued follow-ups">
-        <header><strong>Queued follow-ups</strong><span>{queued().length}</span></header>
-        <p class="agent-queued-reason">
-          <Show
-            when={blockedByLimits()}
-            fallback={props.runtimeState === 'working' || props.runtimeState === 'waiting'
-              ? 'Sends when the current turn finishes.'
-              : 'Sends when the provider is ready.'}
-          >
-            <span>
-              Waiting for a free slot. This Node runs {limits.data?.provider ?? 2} turns at once per
-              provider and {limits.data?.workspace ?? 3} per workspace.
-            </span>
-            <Button
-              variant="bare"
-              size="sm"
-              onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-concurrency' })}
+      <Section label="Queued follow-ups" count={queued().length}>
+        <Stack gap="row">
+          <Inline wrap>
+            <Show
+              when={blockedByLimits()}
+              fallback={
+                <Text emphasis="muted" wrap>
+                  {props.runtimeState === 'working' || props.runtimeState === 'waiting'
+                    ? 'Sends when the current turn finishes.'
+                    : 'Sends when the provider is ready.'}
+                </Text>
+              }
             >
-              Change
-            </Button>
-          </Show>
-        </p>
-        <For each={queued()}>
-          {(turn, index) => (
-            <div class="agent-queued-turn">
-              <Show
-                when={editing() === turn.id}
-                fallback={<p>{promptText(turn) || `${turn.input.length} attached input item${turn.input.length === 1 ? '' : 's'}`}</p>}
+              <Text emphasis="muted" wrap>
+                Waiting for a free slot. This Node runs {limits.data?.provider ?? 2} turns at once per
+                provider and {limits.data?.workspace ?? 3} per workspace.
+              </Text>
+              <Button
+                variant="bare"
+                size="sm"
+                onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-concurrency' })}
               >
-                <Textarea
-                  value={text()}
-                  onInput={(value) => setText(value)}
-                  rows={2}
-                  size="sm"
-                />
-              </Show>
-              <div class="agent-queued-actions">
-                <Show
-                  when={editing() === turn.id}
-                  fallback={
+                Change
+              </Button>
+            </Show>
+          </Inline>
+          <For each={queued()}>
+            {(turn, index) => (
+              <Card pad="sm">
+                <Stack gap="row">
+                  <Show
+                    when={editing() === turn.id}
+                    fallback={
+                      <Text wrap>
+                        {promptText(turn) || `${turn.input.length} attached input item${turn.input.length === 1 ? '' : 's'}`}
+                      </Text>
+                    }
+                  >
+                    <Textarea value={text()} onInput={(value) => setText(value)} rows={2} size="sm" />
+                  </Show>
+                  <Inline>
+                    <Show
+                      when={editing() === turn.id}
+                      fallback={
+                        <Button
+                          variant="bare"
+                          size="sm"
+                          iconOnly
+                          title="Edit queued prompt"
+                          label="Edit queued prompt"
+                          disabled={pending() != null}
+                          onPress={() => {
+                            setEditing(turn.id)
+                            setText(promptText(turn))
+                          }}
+                        >
+                          <Icon name="pencil" />
+                        </Button>
+                      }
+                    >
+                      <Button
+                        variant="bare"
+                        tone="accent"
+                        size="sm"
+                        iconOnly
+                        title="Save queued prompt"
+                        label="Save queued prompt"
+                        busy={pending() === `${turn.id}:save`}
+                        disabled={!text().trim() || pending() != null}
+                        onPress={() => void save(turn)}
+                      >
+                        <Icon name="check" />
+                      </Button>
+                      <Button
+                        variant="bare"
+                        size="sm"
+                        iconOnly
+                        title="Cancel editing"
+                        label="Cancel editing"
+                        disabled={pending() != null}
+                        onPress={() => setEditing(null)}
+                      >
+                        <Icon name="x" />
+                      </Button>
+                    </Show>
                     <Button
                       variant="bare"
                       size="sm"
                       iconOnly
-                      title="Edit queued prompt"
-                      label="Edit queued prompt"
-                      disabled={pending() != null}
-                      onPress={() => {
-                        setEditing(turn.id)
-                        setText(promptText(turn))
-                      }}
+                      title="Move queued prompt up"
+                      label="Move queued turn up"
+                      busy={pending() === `${turn.id}:up`}
+                      disabled={index() === 0 || pending() != null}
+                      onPress={() => void run(`${turn.id}:up`, () =>
+                        managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() - 1 }))}
                     >
-                      <Icon name="pencil" />
+                      <Icon name="arrow-up" />
                     </Button>
-                  }
-                >
-                  <Button
-                    variant="bare"
-                    tone="accent"
-                    size="sm"
-                    iconOnly
-                    title="Save queued prompt"
-                    label="Save queued prompt"
-                    busy={pending() === `${turn.id}:save`}
-                    disabled={!text().trim() || pending() != null}
-                    onPress={() => void save(turn)}
-                  >
-                    <Icon name="check" />
-                  </Button>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    iconOnly
-                    title="Cancel editing"
-                    label="Cancel editing"
-                    disabled={pending() != null}
-                    onPress={() => setEditing(null)}
-                  >
-                    <Icon name="x" />
-                  </Button>
-                </Show>
-                <Button
-                  variant="bare"
-                  size="sm"
-                  iconOnly
-                  title="Move queued prompt up"
-                  label="Move queued turn up"
-                  busy={pending() === `${turn.id}:up`}
-                  disabled={index() === 0 || pending() != null}
-                  onPress={() => void run(`${turn.id}:up`, () =>
-                    managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() - 1 }))}
-                >
-                  <Icon name="arrow-up" />
-                </Button>
-                <Button
-                  variant="bare"
-                  size="sm"
-                  iconOnly
-                  title="Move queued prompt down"
-                  label="Move queued turn down"
-                  busy={pending() === `${turn.id}:down`}
-                  disabled={index() === queued().length - 1 || pending() != null}
-                  onPress={() => void run(`${turn.id}:down`, () =>
-                    managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() + 1 }))}
-                >
-                  <Icon name="arrow-down" />
-                </Button>
-                <Button
-                  variant="bare"
-                  tone="danger"
-                  size="sm"
-                  iconOnly
-                  title="Remove queued prompt"
-                  label="Remove queued prompt"
-                  busy={pending() === `${turn.id}:remove`}
-                  disabled={pending() != null}
-                  onPress={() => void run(`${turn.id}:remove`, () =>
-                    managedAgentApi.removeQueuedTurn(props.sessionId, turn.id))}
-                >
-                  <Icon name="trash-2" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </For>
-      </section>
+                    <Button
+                      variant="bare"
+                      size="sm"
+                      iconOnly
+                      title="Move queued prompt down"
+                      label="Move queued turn down"
+                      busy={pending() === `${turn.id}:down`}
+                      disabled={index() === queued().length - 1 || pending() != null}
+                      onPress={() => void run(`${turn.id}:down`, () =>
+                        managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() + 1 }))}
+                    >
+                      <Icon name="arrow-down" />
+                    </Button>
+                    <Button
+                      variant="bare"
+                      tone="danger"
+                      size="sm"
+                      iconOnly
+                      title="Remove queued prompt"
+                      label="Remove queued prompt"
+                      busy={pending() === `${turn.id}:remove`}
+                      disabled={pending() != null}
+                      onPress={() => void run(`${turn.id}:remove`, () =>
+                        managedAgentApi.removeQueuedTurn(props.sessionId, turn.id))}
+                    >
+                      <Icon name="trash-2" />
+                    </Button>
+                  </Inline>
+                </Stack>
+              </Card>
+            )}
+          </For>
+        </Stack>
+      </Section>
     </Show>
   )
 }

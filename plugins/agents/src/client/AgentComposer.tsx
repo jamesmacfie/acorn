@@ -1,16 +1,23 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
+import { AGENT_ATTACHMENT_POINT, AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from './managedClient'
 import { agentContextContributions } from '@acorn/plugin-api/client'
-import { Alert, Button, Chip, Field, Picker, Popover, Select } from '@acorn/plugin-api/ui'
+import {
+  Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, Inline, Kbd, MentionTextarea, Picker,
+  Popover, Select, Stack, Text, Toolbar,
+  type MentionSegment, type MentionSource,
+} from '@acorn/plugin-api/ui'
+import { Slot } from '@acorn/plugin-api/ui/host'
 import { hydrateManagedDraft, managedDraft, setManagedDraft } from './managedDrafts'
 import { sameAgentConfigOptions } from './agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
 import { canStopAgent } from './agentActivity'
-import { parseFileMentions } from './fileMentions'
+import { fileMentionSuggestions, formatFileMention, parseFileMentions } from './fileMentions'
+import { advertisedSuggestions, composerSegments, MAX_HIGHLIGHT_LENGTH } from './composerTokens'
+import { useWorktreeFiles } from './worktreeFiles'
 import AgentContextPickerModal from './AgentContextPickerModal'
-import AgentMentionTextarea from './AgentMentionTextarea'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
   TASK_CONTEXT_CONTRIBUTION_ID,
@@ -29,6 +36,17 @@ type InsertChoice = {
   value: string
 }
 
+// The `footer` of the Agent pane's detail: what is going to be sent, and everything that can be
+// added to it.
+//
+// The field is the kit's `MentionTextarea` (docs/future/layout/phase-8-agents.md): `@file`,
+// `/command` and `$skill` are three `sources`, and the colour behind the text is `segments`. What
+// this file still owns is what those three mean here — the worktree walk, the commands the session
+// advertised, and which spans of the draft the turn will actually send as file parts.
+//
+// A colour per kind, so a path does not read as a command.
+const TOKEN_TONE = { file: 'accent', command: 'warn', skill: 'ok' } as const
+
 export default function AgentComposer(props: {
   session: AgentSession
   disabled?: boolean
@@ -46,8 +64,8 @@ export default function AgentComposer(props: {
   const [contextPickerId, setContextPickerId] = createSignal('')
   const [dismissedAutomaticPayload, setDismissedAutomaticPayload] = createSignal<string>()
   const [error, setError] = createSignal('')
-  // Session-only, like the terminal drawer's own maximise: a composer that stayed full height across
-  // a relaunch would hide the transcript of a session nobody had started typing into yet.
+  // Session-only, like the terminal drawer's own maximise: a composer that stayed tall across a
+  // relaunch would hide the transcript of a session nobody had started typing into yet.
   const [expanded, setExpanded] = createSignal(false)
   const composerSessionId = createMemo(() => props.session.id)
   const configOptions = createMemo<AgentConfigOption[]>(
@@ -190,14 +208,11 @@ export default function AgentComposer(props: {
     return next
   }
 
+  const nothingToSend = () => !draft().trim() && !attachments().length && !contexts().length
+
   async function send() {
     const text = draft().trim()
-    if (
-      (!text && !attachments().length && !contexts().length)
-      || sending()
-      || props.disabled
-      || props.submitDisabled
-    ) return
+    if (nothingToSend() || sending() || props.disabled || props.submitDisabled) return
     setSending(true)
     setError('')
     try {
@@ -250,10 +265,9 @@ export default function AgentComposer(props: {
     const nextOptions = configOptions().map((item) =>
       item.id === option.id ? { ...item, currentValue: value } : item)
     try {
-      const session = await managedAgentApi.patch(props.session.id, {
+      props.onSessionUpdated(await managedAgentApi.patch(props.session.id, {
         config: { ...props.session.config, configOptions: nextOptions },
-      })
-      props.onSessionUpdated(session)
+      }))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to update agent configuration.')
     }
@@ -330,168 +344,267 @@ export default function AgentComposer(props: {
     }
   }
 
+  // Only fetched once something asks for a file. A session whose composer never types `@` never pays
+  // for the worktree walk.
+  const files = useWorktreeFiles(() => props.session.taskId)
+  const advertised = (sigil: '/' | '$', items: readonly { name: string; description?: string }[], query: string) =>
+    advertisedSuggestions(items, query).map((item) => ({
+      value: `${sigil}${item.name}`,
+      label: `${sigil}${item.name}`,
+      detail: item.description,
+    }))
+  const sources = createMemo<MentionSource[]>(() => [
+    {
+      sigil: '@',
+      label: 'Worktree files',
+      emptyText: 'No matching files.',
+      loading: files.loading(),
+      error: files.error() ? 'Unable to load worktree files.' : undefined,
+      suggest: (query) => fileMentionSuggestions(files.paths(), query).map((path) => {
+        const slash = path.lastIndexOf('/')
+        return {
+          value: formatFileMention(path),
+          label: slash < 0 ? path : path.slice(slash + 1),
+          detail: slash < 0 ? undefined : path.slice(0, slash),
+        }
+      }),
+    },
+    {
+      sigil: '/',
+      label: 'Provider commands',
+      emptyText: 'No matching commands.',
+      suggest: (query) => advertised('/', commands(), query),
+    },
+    {
+      sigil: '$',
+      label: 'Provider skills',
+      emptyText: 'No matching skills.',
+      suggest: (query) => advertised('$', skills(), query),
+    },
+  ])
+  const advertisedNames = createMemo(() => ({
+    commands: commands().map((command) => command.name),
+    skills: skills().map((skill) => skill.name),
+  }))
+  const describe = (kind: 'command' | 'skill', name: string) =>
+    (kind === 'command' ? commands() : skills()).find((item) => item.name === name)?.description
+  // Above the cap the mirror is dropped and the field paints its own text again: a pasted stack trace
+  // is still a draft somebody has to be able to type into.
+  const segments = (value: string): MentionSegment[] | null =>
+    value.length > MAX_HIGHLIGHT_LENGTH
+      ? null
+      : composerSegments(value, advertisedNames()).map((segment) => segment.token
+        ? {
+          text: segment.text,
+          tone: TOKEN_TONE[segment.token.kind],
+          tip: segment.token.kind === 'file' ? undefined : describe(segment.token.kind, segment.token.name),
+          caret: segment.token.end,
+        }
+        : { text: segment.text })
+
   let fileInput: HTMLInputElement | undefined
 
   return (
-    <div class="agent-composer-shell" classList={{ expanded: expanded() }}>
-      <div class="agent-composer-context">
-        <For each={configOptions()}>
-          {(option) => (
-            <Field label={option.label} layout="row">
-              <Select
-                label={option.label}
-                size="sm"
-                width="auto"
-                value={option.currentValue ?? ''}
-                disabled={props.disabled || props.submitDisabled}
-                onChange={(value) => void updateOption(option, value)} options={[...option.values.map((value) => ({ value: value.value, label: value.label, title: value.description }))]} />
-            </Field>
-          )}
-        </For>
-      </div>
-      <div class="agent-composer">
-        <input
-          ref={fileInput}
-          class="agent-file-input"
-          type="file"
-          multiple
-          accept=".txt,.md,.json,.yaml,.yml,.toml,.xml,.csv,.ts,.tsx,.js,.jsx,.css,.html,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.hpp,.swift,.sh,.sql,.diff,.patch,image/jpeg,image/png,image/gif,image/webp,application/pdf"
-          onChange={(event) => {
-            void addFiles([...(event.currentTarget.files ?? [])])
-            event.currentTarget.value = ''
-          }}
-        />
-        <For each={attachments()}>
-          {(attachment) => (
-            <Chip
-              title={attachment.filename}
-              leading={<span>{attachment.mediaType.startsWith('image/') ? '▧' : '▤'}</span>}
-              onRemove={() => removeAttachment(attachment)}
-            >
-              {attachment.filename}
-              <small>{Math.max(1, Math.round(attachment.byteSize / 1024))} KiB</small>
-            </Chip>
-          )}
-        </For>
-        <For each={contexts()}>
-          {(context) => (
-            <Chip
-              title={context.provenance}
-              leading={<span>◇</span>}
-              onRemove={() => removeContext(context)}
-            >
-              {context.label}
-              <small>~{(context.estimatedTokens ?? Math.ceil((context.byteSize ?? context.content.length) / 4)).toLocaleString()} tok</small>
-            </Chip>
-          )}
-        </For>
-        <Show when={contexts().find((context) => context.source === AUTOMATIC_TASK_CONTEXT_SOURCE)}>
-          {(context) => (
-            <p class="agent-automatic-context-note">
-              {context().label.endsWith('updated')
-                ? 'Context changed since it was last sent. The refreshed snapshot will be attached to this turn.'
-                : 'Acorn attached the task’s selected Context-pane information to the first turn.'}
-            </p>
-          )}
-        </Show>
-        <AgentMentionTextarea
-          taskId={props.session.taskId}
-          value={draft()}
-          commands={commands()}
-          skills={skills()}
-          expanded={expanded()}
-          disabled={props.disabled}
-          placeholder={disabledMessage() ?? 'Ask the agent…  @file  /command  $skill'}
-          onValue={setDraft}
-          onFiles={(files) => void addFiles(files)}
-          onSubmit={() => void send()}
-          onStop={canStopAgent(props.session) ? () => void stop() : undefined}
-          onToggleExpanded={() => setExpanded((current) => !current)}
-        />
-        <div class="agent-composer-actions">
-          <Button
-            size="sm"
-            title="Attach files"
-            disabled={uploading() || props.disabled}
-            busy={uploading()}
-            onPress={() => fileInput?.click()}
-          >
-            Attach
-          </Button>
-          <Picker<AgentContextContribution>
-            label="Context"
-            ariaLabel="Add Acorn context"
-            placeholder="Filter context sources…"
-            emptyText="No context sources available."
-            results={(query) => agentContextContributions().filter((contribution) =>
-              contribution.label.toLowerCase().includes(query.trim().toLowerCase()))}
-            rowLabel={(contribution) => contribution.label}
-            rowDescription={(contribution) => contribution.description}
-            isActive={(contribution) => contexts().some((context) => contextBelongsTo(context, contribution))}
-            isDisabled={(contribution) =>
-              !!capturingContext()
-                || (contribution.id === TASK_CONTEXT_CONTRIBUTION_ID && taskContextAdded())}
-            onSelect={(contribution) => {
-              // Solid delegates click handlers at the document. Mounting a backdrop synchronously
-              // lets the selecting click reach the new backdrop and dismiss the modal immediately.
-              window.setTimeout(() => setContextPickerId(contribution.id), 0)
-            }}
-            buttonClass="repo-picker-button agent-composer-picker-button"
-            disabled={props.disabled}
-            placement="top-start"
-          />
-          <Picker<InsertChoice>
-            label="＋"
-            ariaLabel="Insert provider command or skill"
-            placeholder="Filter commands and skills…"
-            emptyText="No commands or skills advertised."
-            results={(query) => insertChoices().filter((choice) =>
-              `${choice.label} ${choice.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()))}
-            rowLabel={(choice) => choice.label}
-            rowDescription={(choice) => choice.description}
-            isActive={() => false}
-            onSelect={(choice) => insert(choice.value)}
-            buttonClass="repo-picker-button agent-composer-picker-button agent-insert-picker-button"
-            disabled={props.disabled}
-            placement="top-start"
-          />
-          <Show when={contexts().length}>
-            {/* Was a <details> with an absolutely-positioned <pre>, which the composer's own
-                overflow clipped. Popover portals it and adds Escape + outside-click. */}
-            <Popover
-              placement="top-start"
-              ariaLabel="Sent context preview"
-              role="dialog"
-              trigger={({ toggle, open }) => (
-                <Button
-                  variant="bare"
+    <Stack gap="row">
+      <Show when={configOptions().length}>
+        <Inline wrap>
+          <For each={configOptions()}>
+            {(option) => (
+              <Field label={option.label} layout="row">
+                <Select
+                  label={option.label}
                   size="sm"
-                  expanded={open()}
-                  onPress={toggle}
+                  width="auto"
+                  value={option.currentValue ?? ''}
+                  disabled={props.disabled || props.submitDisabled}
+                  onChange={(value) => void updateOption(option, value)}
+                  options={option.values.map((value) => ({ value: value.value, label: value.label, title: value.description }))}
+                />
+              </Field>
+            )}
+          </For>
+        </Inline>
+      </Show>
+
+      {/* `hidden`, not a class: the picker is the Attach button and this element only exists to open
+          the platform's file dialog. */}
+      <input
+        ref={fileInput}
+        hidden
+        type="file"
+        multiple
+        accept=".txt,.md,.json,.yaml,.yml,.toml,.xml,.csv,.ts,.tsx,.js,.jsx,.css,.html,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.hpp,.swift,.sh,.sql,.diff,.patch,image/jpeg,image/png,image/gif,image/webp,application/pdf"
+        onChange={(event) => {
+          void addFiles([...(event.currentTarget.files ?? [])])
+          event.currentTarget.value = ''
+        }}
+      />
+
+      <Show when={attachments().length || contexts().length}>
+        <ChipRow ariaLabel="Attached to this turn">
+          <For each={attachments()}>
+            {(attachment) => (
+              // A plugin that knows more about this kind of file than a chip can say draws it instead
+              // (docs/plugins.md § Cooperative extension points, the `remote` kind). Keyed by media
+              // type, `replace`, so one attachment is always exactly one chip.
+              <Slot
+                point={AGENT_ATTACHMENT_POINT}
+                key={attachment.mediaType}
+                props={() => ({ attachment, taskId: props.session.taskId })}
+              >
+                <Chip
+                  title={attachment.filename}
+                  leading={<Icon name={attachment.mediaType.startsWith('image/') ? 'image' : 'file'} />}
+                  onRemove={() => removeAttachment(attachment)}
                 >
-                  Preview sent context · ~{contextBudget().estimatedTokens.toLocaleString()} tokens · {(contextBudget().bytes / 1024).toFixed(1)} KiB
-                </Button>
-              )}
-            >
-              <pre>{contexts().map((context) => `## ${context.label}\n${context.content}`).join('\n\n')}</pre>
-            </Popover>
-          </Show>
-          <span class="muted agent-send-hint">Shift+Enter for newline</span>
+                  {attachment.filename} · {Math.max(1, Math.round(attachment.byteSize / 1024))} KiB
+                </Chip>
+              </Slot>
+            )}
+          </For>
+          <For each={contexts()}>
+            {(context) => (
+              <Chip
+                title={context.provenance}
+                leading={<Icon name="diamond" />}
+                onRemove={() => removeContext(context)}
+              >
+                {context.label} · ~{(context.estimatedTokens ?? Math.ceil((context.byteSize ?? context.content.length) / 4)).toLocaleString()} tok
+              </Chip>
+            )}
+          </For>
+        </ChipRow>
+      </Show>
+      <Show when={contexts().find((context) => context.source === AUTOMATIC_TASK_CONTEXT_SOURCE)}>
+        {(context) => (
+          <Text emphasis="muted" wrap>
+            {context().label.endsWith('updated')
+              ? 'Context changed since it was last sent. The refreshed snapshot will be attached to this turn.'
+              : 'Acorn attached the task’s selected Context-pane information to the first turn.'}
+          </Text>
+        )}
+      </Show>
+
+      <MentionTextarea
+        label="Message agent"
+        value={draft()}
+        disabled={props.disabled}
+        placeholder={disabledMessage() ?? 'Ask the agent…  @file  /command  $skill'}
+        rows={expanded() ? 18 : 3}
+        sources={sources()}
+        segments={segments}
+        onInput={setDraft}
+        onFiles={(dropped) => void addFiles(dropped)}
+        onSubmit={() => void send()}
+        onCancel={canStopAgent(props.session) ? () => void stop() : undefined}
+        onKeyDown={(event) => {
+          // The shell's own meta+shift+enter maximises the focused pane, and its dispatcher skips a
+          // typing target for anything but a global binding, so the chord is unclaimed in here. Same
+          // fingers, nearest meaning: the surface you are typing in grows.
+          if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'Enter') {
+            event.preventDefault()
+            setExpanded((current) => !current)
+          }
+        }}
+        overlay={
           <Button
-            variant="solid"
-            tone="accent"
+            variant="bare"
             size="sm"
-            busy={sending()}
-            title={props.submitDisabled ? 'Wait for the agent to finish connecting.' : undefined}
-            disabled={(!draft().trim() && !attachments().length && !contexts().length)
-              || contextBudget().overLimit || props.disabled || props.submitDisabled}
-            onPress={() => void send()}
+            iconOnly
+            label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
+            pressed={expanded()}
+            tip={expanded() ? 'Collapse' : 'Expand'}
+            tipKey="⌘⇧↩"
+            onPress={() => setExpanded((current) => !current)}
           >
-            Send
+            <Icon name={expanded() ? 'minimize-2' : 'maximize-2'} size={12} />
           </Button>
-        </div>
-      </div>
-      {error() ? <Alert>{error()}</Alert> : null}
+        }
+      />
+
+      <Toolbar variant="actions" size="sm">
+        <Button
+          size="sm"
+          title="Attach files"
+          disabled={uploading() || props.disabled}
+          busy={uploading()}
+          onPress={() => fileInput?.click()}
+        >
+          Attach
+        </Button>
+        <Picker<AgentContextContribution>
+          label="Context"
+          ariaLabel="Add Acorn context"
+          placeholder="Filter context sources…"
+          emptyText="No context sources available."
+          results={(query) => agentContextContributions().filter((contribution) =>
+            contribution.label.toLowerCase().includes(query.trim().toLowerCase()))}
+          rowLabel={(contribution) => contribution.label}
+          rowDescription={(contribution) => contribution.description}
+          isActive={(contribution) => contexts().some((context) => contextBelongsTo(context, contribution))}
+          isDisabled={(contribution) =>
+            !!capturingContext()
+              || (contribution.id === TASK_CONTEXT_CONTRIBUTION_ID && taskContextAdded())}
+          onSelect={(contribution) => {
+            // Solid delegates click handlers at the document. Mounting a backdrop synchronously
+            // lets the selecting click reach the new backdrop and dismiss the modal immediately.
+            window.setTimeout(() => setContextPickerId(contribution.id), 0)
+          }}
+          disabled={props.disabled}
+          placement="top-start"
+        />
+        <Picker<InsertChoice>
+          label="Insert"
+          ariaLabel="Insert provider command or skill"
+          placeholder="Filter commands and skills…"
+          emptyText="No commands or skills advertised."
+          results={(query) => insertChoices().filter((choice) =>
+            `${choice.label} ${choice.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()))}
+          rowLabel={(choice) => choice.label}
+          rowDescription={(choice) => choice.description}
+          isActive={() => false}
+          onSelect={(choice) => insert(choice.value)}
+          disabled={props.disabled}
+          placement="top-start"
+        />
+        <Show when={contexts().length}>
+          {/* Was a <details> with an absolutely-positioned <pre>, which the composer's own overflow
+              clipped. Popover portals it and adds Escape + outside-click. */}
+          <Popover
+            placement="top-start"
+            ariaLabel="Sent context preview"
+            role="dialog"
+            trigger={({ toggle, open }) => (
+              <Button variant="bare" size="sm" expanded={open()} onPress={toggle}>
+                Preview sent context · ~{contextBudget().estimatedTokens.toLocaleString()} tokens · {(contextBudget().bytes / 1024).toFixed(1)} KiB
+              </Button>
+            )}
+          >
+            <CodeBlock wrap maxHeight="block">
+              {contexts().map((context) => `## ${context.label}\n${context.content}`).join('\n\n')}
+            </CodeBlock>
+          </Popover>
+        </Show>
+        {/* Room for another plugin beside this pane's own controls. A `stack` point: several plugins
+            with something to offer a draft is a real answer, and four is the owner's ceiling because
+            it is the owner's bar. */}
+        <Slot point={AGENT_COMPOSER_ACTIONS_POINT} props={() => ({ taskId: props.session.taskId, sessionId: props.session.id })} />
+        <Toolbar.Spacer />
+        <Text emphasis="muted"><Kbd size="xs">Shift+Enter</Kbd> for newline</Text>
+        <Button
+          variant="solid"
+          tone="accent"
+          size="sm"
+          busy={sending()}
+          title={props.submitDisabled ? 'Wait for the agent to finish connecting.' : undefined}
+          disabled={nothingToSend() || contextBudget().overLimit || props.disabled || props.submitDisabled}
+          onPress={() => void send()}
+        >
+          Send
+        </Button>
+      </Toolbar>
+
+      <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       <Show when={contextPicker()}>
         {(contribution) => (
           <AgentContextPickerModal
@@ -504,6 +617,6 @@ export default function AgentComposer(props: {
           />
         )}
       </Show>
-    </div>
+    </Stack>
   )
 }

@@ -2,7 +2,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import type { AgentConfigOption } from '@acorn/protocol/managedAgents.ts'
 import { prefsOptions } from '@acorn/plugin-api/client'
-import { Checkbox, Field, Select } from '@acorn/plugin-api/ui'
+import { Alert, Checkbox, Field, Section, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import {
   defaultAgentSessionDefaults,
   type AgentSessionDefaults,
@@ -79,17 +79,17 @@ export default function AgentSessionDefaultsSettings() {
   }
 
   return (
-    <div class="settings-section">
-      <p class="muted settings-hint">
+    <Stack gap="section">
+      <Text emphasis="muted" wrap>
         What a new agent session starts on: the model, the reasoning effort, the mode, and anything
         else the provider offers. Acorn applies these once the provider reports its options, and
         writes the switch into the transcript so a session reads back under the settings it ran with.
-      </p>
+      </Text>
 
       <Show when={stored.error}>
-        <p class="settings-error" role="alert">
+        <Alert>
           {stored.error instanceof Error ? stored.error.message : 'Agent defaults could not be loaded.'}
-        </p>
+        </Alert>
       </Show>
 
       <Checkbox
@@ -102,43 +102,43 @@ export default function AgentSessionDefaultsSettings() {
       <Show when={!record().followLastSession}>
         <For each={providers()?.filter((provider) => provider.installed) ?? []}>
           {(provider) => (
-            <section class="settings-subsection">
-              <h3 class="settings-label agent-defaults-provider">
-                <ProviderGlyph glyph={provider.glyph} label={provider.label} />
-                {provider.label}
-              </h3>
+            <Section
+              label={provider.label}
+              actions={<ProviderGlyph glyph={provider.glyph} label={provider.label} />}
+            >
               <Show
                 when={advertised()[provider.id]?.length}
                 fallback={
-                  <p class="muted settings-hint">
+                  <Text emphasis="muted" wrap>
                     Open a {provider.label} session once. The settings it offers appear here after that.
-                  </p>
+                  </Text>
                 }
               >
-                <For each={advertised()[provider.id]}>
-                  {(option) => (
-                    <Field label={option.label} layout="split">
-                      <Select
-                        label={`${provider.label} ${option.label}`}
-                        size="sm"
-                        value={record().pinned[provider.id]?.[option.id] ?? ''}
-                        options={[
-                          { value: '', label: `Whatever ${provider.label} picks` },
-                          ...option.values.map((value) => ({ value: value.value, label: value.label, title: value.description })),
-                        ]}
-                        onChange={(value) => choose(provider.id, option.id, value)}
-                      />
-                    </Field>
-                  )}
-                </For>
+                <Stack gap="row">
+                  <For each={advertised()[provider.id]}>
+                    {(option) => (
+                      <Field label={option.label} layout="split">
+                        <Select
+                          label={`${provider.label} ${option.label}`}
+                          size="sm"
+                          value={record().pinned[provider.id]?.[option.id] ?? ''}
+                          options={[
+                            { value: '', label: `Whatever ${provider.label} picks` },
+                            ...option.values.map((value) => ({ value: value.value, label: value.label, title: value.description })),
+                          ]}
+                          onChange={(value) => choose(provider.id, option.id, value)}
+                        />
+                      </Field>
+                    )}
+                  </For>
+                </Stack>
               </Show>
-            </section>
+            </Section>
           )}
         </For>
       </Show>
 
-      <section class="settings-subsection">
-        <h3 class="settings-label">Transcript</h3>
+      <Section label="Transcript">
         <Field
           label="Tool call display"
           hint="How a tool call's output starts out when it first appears. This one is a setting for this device, not for a provider."
@@ -148,11 +148,17 @@ export default function AgentSessionDefaultsSettings() {
             label="Tool call display"
             size="sm"
             value={fold().mode}
-            onChange={(value) => chooseFold(value as AgentToolFoldMode)} options={[{ value: 'collapsed', label: 'Start collapsed' }, { value: 'expanded', label: 'Start expanded' }, { value: 'sticky', label: 'Carry my last one forward' }]} />
+            onChange={(value) => chooseFold(value as AgentToolFoldMode)}
+            options={[
+              { value: 'collapsed', label: 'Start collapsed' },
+              { value: 'expanded', label: 'Start expanded' },
+              { value: 'sticky', label: 'Carry my last one forward' },
+            ]}
+          />
         </Field>
-      </section>
+      </Section>
 
-      <Show when={error()}><p class="settings-error" role="alert">{error()}</p></Show>
-    </div>
+      <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+    </Stack>
   )
 }

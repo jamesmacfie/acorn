@@ -1,4 +1,4 @@
-import { createEffect, For, on, onCleanup, Show, createSignal, type JSX } from 'solid-js'
+import { createEffect, createMemo, For, on, onCleanup, Show, createSignal, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { createCollection, type CollectionItem, type ItemProps } from '../keys/collection'
 import { watchAppearance } from './appearance'
@@ -54,14 +54,37 @@ export function Rows<T extends CollectionItem>(props: {
   const virtual = props.virtual === true
   let virt: ReturnType<typeof createVirtualizer<HTMLDivElement, Element>> | undefined
 
+  const NO_PLACE: RowPlacement = {}
+
+  // The same object back for an unchanged row, so `<For>` below reconciles instead of remounting.
+  //
+  // A list rebuilt from a live store hands out fresh item objects on every frame — the agents sidebar
+  // rebuilds its roster on every event the socket delivers — and reference keying would dispose and
+  // recreate every row several times a second. Focus and selection survive that, because both live in
+  // the host's store keyed by `item.key`, but the DOM does not, and neither does a text selection or
+  // an open menu inside a row. Held only while every field matches: an item whose `label` or
+  // `disabled` changed is a different row and must redraw.
+  const cache = new Map<string, T>()
+  const items = createMemo<readonly T[]>(() => {
+    const next = props.items.map((item: T) => {
+      const held = cache.get(item.key)
+      const same = held && Object.keys(item).length === Object.keys(held).length
+        && Object.entries(item).every(([field, value]) => (held as Record<string, unknown>)[field] === value)
+      if (!same) cache.set(item.key, item)
+      return same ? held! : item
+    })
+    for (const key of [...cache.keys()]) if (!next.some((item) => item.key === key)) cache.delete(key)
+    return next
+  })
+
   const collection = createCollection({
     id: () => props.id,
-    items: () => props.items,
+    items: () => items(),
     role: props.tree ? 'tree' : 'listbox',
     ...(virtual
       ? {
         scrollToKey: (key: string) => {
-          const index = props.items.findIndex((item) => item.key === key)
+          const index = items().findIndex((item) => item.key === key)
           if (index >= 0) virt?.scrollToIndex(index)
         },
       }
@@ -73,15 +96,10 @@ export function Rows<T extends CollectionItem>(props: {
     ...(props.onMenu ? { onMenu: props.onMenu } : {}),
   })
 
-  const NO_PLACE: RowPlacement = {}
-
   if (!virtual) {
     return (
       <div class="ui-rows" aria-label={props.ariaLabel} {...collection.containerProps}>
-        {/* `<For>`, and safely: the rows are keyed by object here, but nothing focus-related lives in
-            them. `active` and `selected` are in the host's store keyed by `item.key`, which is the whole
-            point of holding them outside the rows. */}
-        <For each={props.items}>
+        <For each={items()}>
           {(item) => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)}
         </For>
       </div>
@@ -94,7 +112,7 @@ export function Rows<T extends CollectionItem>(props: {
   // the token is the only way density is real here (./metrics.ts).
   const [rowH, setRowH] = createSignal(rowHeight())
   virt = createVirtualizer({
-    get count() { return props.items.length },
+    get count() { return items().length },
     getScrollElement: () => scrollEl() ?? null,
     estimateSize: () => rowH(),
     overscan: 12,
@@ -119,7 +137,7 @@ export function Rows<T extends CollectionItem>(props: {
       virt?.measure()
     })
   }
-  createEffect(on(() => props.items.length, measureSoon, { defer: true }))
+  createEffect(on(() => items().length, measureSoon, { defer: true }))
 
   return (
     <div class="ui-rows-scroll" ref={publish}>
@@ -131,7 +149,7 @@ export function Rows<T extends CollectionItem>(props: {
       >
         <For each={virt.getVirtualItems()}>
           {(slot) => {
-            const item = () => props.items[slot.index] as T | undefined
+            const item = () => items()[slot.index] as T | undefined
             return (
               <Show when={item()}>
                 {(row) => props.children(

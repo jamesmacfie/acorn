@@ -272,3 +272,11 @@ export const CORE_SLOT_PROVIDER = 'core'
  *  a literal per call site. A plugin's point never appears in this list; it is minted from its
  *  manifest like any other. */
 export const AGENT_TOOL_CARD_POINT = 'agents:tool-card'
+
+/** Room in the agent composer's own action bar, beside Attach and the two pickers. A `stack` point,
+ *  because "everyone with something to offer this draft" is a real answer for a toolbar. */
+export const AGENT_COMPOSER_ACTIONS_POINT = 'agents:composer-actions'
+
+/** How one attachment on an unsent turn is drawn, keyed by its media type. `replace`, because a chip
+ *  is one thing and two plugins drawing the same file would be two chips for one attachment. */
+export const AGENT_ATTACHMENT_POINT = 'agents:attachment'

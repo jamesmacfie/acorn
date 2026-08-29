@@ -17,7 +17,6 @@ export const DERIVED_THEME_TOKENS = [
   '--surface-sunken', '--accent-fg',
   '--state-ok', '--state-warn', '--state-bad',
   '--find-hit-bg', '--find-current-bg', '--scrim-color',
-  '--mention-file', '--mention-command', '--mention-skill',
   '--brand-legible',
 ] as const
 

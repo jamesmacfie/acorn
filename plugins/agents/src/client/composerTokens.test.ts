@@ -5,7 +5,6 @@ import {
   composerSegments,
   composerTokens,
   MAX_HIGHLIGHT_LENGTH,
-  scrollDeltaFor,
   type ComposerToken,
 } from './composerTokens'
 
@@ -73,26 +72,6 @@ describe('composerSegments', () => {
 
   it('ends with a newline even when the draft is empty, keeping the first row aligned', () => {
     expect(composerSegments('', advertised)).toEqual([{ text: '\n', token: null }])
-  })
-})
-
-describe('scrollDeltaFor', () => {
-  const list = { top: 100, bottom: 300 }
-
-  it('leaves a row that already fits alone', () => {
-    expect(scrollDeltaFor(list, { top: 120, bottom: 160 })).toBe(0)
-    // Flush against either edge still counts as visible.
-    expect(scrollDeltaFor(list, { top: 100, bottom: 140 })).toBe(0)
-    expect(scrollDeltaFor(list, { top: 260, bottom: 300 })).toBe(0)
-  })
-
-  it('scrolls just far enough to reveal a row past either edge', () => {
-    expect(scrollDeltaFor(list, { top: 310, bottom: 350 })).toBe(50)
-    expect(scrollDeltaFor(list, { top: 60, bottom: 100 })).toBe(-40)
-  })
-
-  it('brings the top of a row taller than the list into view, not the bottom', () => {
-    expect(scrollDeltaFor(list, { top: 40, bottom: 400 })).toBe(-60)
   })
 })
 

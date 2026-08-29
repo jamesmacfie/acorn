@@ -1,522 +1,254 @@
-import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
-import { setTerminalOpen, type Task } from '@acorn/plugin-api/client'
-import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
-import { managedAgentApi } from './managedClient'
-import { managedAgentStore } from './managedStore'
+import { For, Show } from 'solid-js'
+import type { Task } from '@acorn/plugin-api/client'
+import type { AgentProviderDescriptor } from '@acorn/protocol/managedAgents.ts'
 import {
-  clearManagedSession,
-  focusedManagedRequest,
-  openManagedSession,
-  clearManagedSubagent,
-  selectManagedSession,
-  selectManagedSubagent,
-  selectedManagedSession,
-  selectedManagedSubagent,
-} from './managedSelection'
+  Alert, Button, Card, EmptyState, Field, Heading, Icon, Inline, Input, Menu, Modal, Picker, Stack,
+  Text, Toolbar,
+} from '@acorn/plugin-api/ui'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from './AgentComposer'
-import AgentTaskSidebar from './AgentTaskSidebar'
 import AgentUsageIndicator from './AgentUsageIndicator'
 import ProviderGlyph from './ProviderGlyph'
 import QueuedAgentTurns from './QueuedAgentTurns'
-import { latestAutomaticTaskContext } from './automaticTaskContext'
+import RuntimeStateIcon from './RuntimeStateIcon'
+import { agentPaneModel } from './agentPaneModel'
 import { canStopAgent } from './agentActivity'
 import { agentSessionIsStarting } from './agentComposerState'
-import { Alert, Button, Card, EmptyState, Field, Icon, Input, ListDetail, Menu, Modal, Picker } from '@acorn/plugin-api/ui'
-import RuntimeStateIcon from './RuntimeStateIcon'
-import './managed-agents.css'
+import { managedAgentApi } from './managedClient'
+import { managedAgentStore } from './managedStore'
+import { clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } from './managedSelection'
 
-const capability = (provider: AgentProviderDescriptor | undefined, name: string): boolean =>
-  provider?.capabilities.includes(name as never) ?? false
+// The Agent pane's `detail` region: the open session's header, its transcript, and the composer.
+//
+// Header, body and footer without a nested layout. The transcript is a `Timeline follow`, which owns
+// the scroll and takes what height is left, so the bar above it and the composer below it are pinned
+// by being its siblings rather than by a second set of regions (docs/panes.md § Layout model).
 
-type SessionAction = {
-  id: string
-  label: string
-  description?: string
-  disabled?: boolean
-  run(): void
-}
-
-export default function AgentPane(props: { task: Task }) {
-  const [error, setError] = createSignal('')
-  const [creating, setCreating] = createSignal(false)
-  const [providers, { refetch: refreshProviders }] = createResource(() => managedAgentApi.providers())
-  const taskSessions = createMemo(() =>
-    managedAgentStore.sessions()
-      .filter((session) => session.taskId === props.task.id && !session.archivedAt)
-      .sort((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id)))
-  const selected = createMemo(() => {
-    const id = selectedManagedSession(props.task.id)
-    return taskSessions().find((session) => session.id === id) ?? taskSessions()[0]
-  })
-  const selectedSessionId = createMemo(() => selected()?.id)
-  const snapshot = createMemo(() => {
-    const session = selected()
-    return session ? managedAgentStore.snapshots()[session.id] : undefined
-  })
-  const provider = createMemo(() =>
-    providers()?.find((candidate) => candidate.id === selected()?.providerId))
-  const previousAutomaticContext = createMemo(() =>
-    latestAutomaticTaskContext(snapshot()?.turns ?? []))
-
-  onMount(() => {
-    const deactivate = managedAgentStore.activate()
-    void managedAgentStore.loadTask(props.task.id)
-      .then((sessions) => {
-        if (!selectedManagedSession(props.task.id) && sessions[0]) selectManagedSession(props.task.id, sessions[0].id)
-      })
-      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to load agent sessions.'))
-    onCleanup(() => {
-      deactivate()
-    })
-  })
-
-  // The dep must be the memo, not an inline `() => selected()?.id`. Solid's `on()` runs its callback on
-  // every notification without comparing the input, so an inline getter re-fires whenever `selected()`
-  // changes identity, and `loadSnapshot` below ends in `upsertSession`, which replaces that object. That
-  // was an infinite reload loop; a memo dedupes with `===` and keeps it quiet.
-  createEffect(on(selectedSessionId, (sessionId) => {
-    setError('')
-    if (!sessionId) return
-    void managedAgentStore.loadSnapshot(sessionId).catch((caught) => {
-      if (selected()?.id !== sessionId) return
-      setError(caught instanceof Error ? caught.message : 'Unable to load the agent transcript.')
-    })
-  }))
-
-  let readTimer: ReturnType<typeof setTimeout> | null = null
-  createEffect(() => {
-    const session = selected()
-    if (!session || session.lastEventSeq <= session.lastReadSeq) return
-    if (readTimer) clearTimeout(readTimer)
-    readTimer = setTimeout(() => {
-      void managedAgentApi.patch(session.id, { lastReadSeq: session.lastEventSeq })
-        .then(managedAgentStore.upsertSession)
-        .catch(() => undefined)
-    }, 350)
-  })
-  onCleanup(() => {
-    if (readTimer) clearTimeout(readTimer)
-  })
-
-  async function createSession(providerDescriptor: AgentProviderDescriptor) {
-    if (!providerDescriptor.installed || creating()) return
-    setCreating(true)
-    setError('')
-    try {
-      const session = await managedAgentApi.createSession({
-        taskId: props.task.id,
-        providerId: providerDescriptor.id,
-        profileId: providerDescriptor.profileId,
-        kind: 'interactive',
-        config: {},
-      })
-      managedAgentStore.upsertSession(session)
-      selectManagedSession(props.task.id, session.id)
-      await managedAgentStore.loadSnapshot(session.id)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to start the managed agent.')
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  async function action(operation: () => Promise<unknown>, reload = true) {
-    setError('')
-    try {
-      await operation()
-      if (reload && selected()) await managedAgentStore.loadSnapshot(selected()!.id)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Agent operation failed.')
-    }
-  }
-
-  async function fork() {
-    const session = selected()
-    if (!session) return
-    await action(async () => {
-      const next = await managedAgentApi.fork(session.id)
-      managedAgentStore.upsertSession(next)
-      selectManagedSession(props.task.id, next.id)
-      await managedAgentStore.loadSnapshot(next.id)
-    }, false)
-  }
-
-  async function archive(session: AgentSession) {
-    setDialog(null)
-    const next = taskSessions().find((candidate) => candidate.id !== session.id)
-    await action(async () => {
-      managedAgentStore.upsertSession(await managedAgentApi.patch(session.id, { archived: true }))
-      if (next) selectManagedSession(props.task.id, next.id)
-      else clearManagedSession(props.task.id, session.id)
-    }, false)
-  }
-
-  // Prompt-for-text is not arm-to-confirm, and neither is archiving: window.prompt and
-  // window.confirm are unstyled in Electron and suppressed outright in a sandboxed frame, so both
-  // become dialogs. `dialog` carries which one is open and which session it addresses, because the
-  // sidebar's row menu can act on a session that is not the open one.
-  const [dialog, setDialog] = createSignal<{ kind: 'rename' | 'archive'; session: AgentSession } | null>(null)
-  const [renameText, setRenameText] = createSignal('')
-
-  // One entry point for both menus: the header's, which always addresses the open session, and the
-  // sidebar row's, which names its own.
-  function sessionAction(session: AgentSession, kind: 'rename' | 'archive' | 'stop') {
-    if (kind === 'stop') return void action(() => managedAgentApi.cancel(session.id))
-    if (kind === 'rename') setRenameText(session.title)
-    setDialog({ kind, session })
-  }
-
-  async function rename() {
-    const target = dialog()?.session
-    const title = renameText().trim()
-    setDialog(null)
-    if (!target || !title || title === target.title) return
-    await action(async () => {
-      managedAgentStore.upsertSession(await managedAgentApi.patch(target.id, { title }))
-    })
-  }
-
-  async function exportHistory(format: 'json' | 'markdown') {
-    const session = selected()
-    if (!session) return
-    await action(async () => {
-      const exported = await managedAgentApi.export(session.id, format)
-      const url = URL.createObjectURL(new Blob([exported.content], {
-        type: format === 'json' ? 'application/json' : 'text/markdown',
-      }))
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `${session.title.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 80) || 'agent-session'}.${format === 'json' ? 'json' : 'md'}`
-      anchor.click()
-      URL.revokeObjectURL(url)
-    }, false)
-  }
-
-  async function retryLastTurn() {
-    const session = selected()
-    const value = snapshot()
-    const turn = [...(value?.turns ?? [])].reverse()
-      .find((candidate) => candidate.status === 'failed' || candidate.status === 'interrupted')
-    if (!session || !turn) return
-    await action(async () => {
-      await managedAgentApi.enqueue(session.id, {
-        input: turn.input,
-        source: 'interactive',
-        effectivePolicy: {
-          ...turn.effectivePolicy,
-          retryOfTurnId: turn.id,
-          includePartialHistory: true,
-        },
-      })
-    })
-  }
-
-  async function handoff() {
-    const session = selected()
-    if (!session) return
-    await action(async () => {
-      const updated = await managedAgentApi.handoff(session.id)
-      managedAgentStore.upsertSession(updated)
-      setTerminalOpen(props.task.id, true)
-    })
-  }
-
-  async function resumeManaged() {
-    const session = selected()
-    if (!session) return
-    await action(async () => {
-      const updated = await managedAgentApi.resumeManaged(session.id)
-      managedAgentStore.upsertSession(updated)
-    })
-  }
-
-  async function verifyImportedResume() {
-    const session = selected()
-    if (!session) return
-    await action(async () => {
-      const updated = await managedAgentApi.verifyImportedResume(session.id)
-      managedAgentStore.upsertSession(updated)
-    })
-  }
-
-  const sessionActions = createMemo<SessionAction[]>(() => {
-    const session = selected()
-    if (!session) return []
-    return [
-      {
-        id: 'fork',
-        label: 'Fork session',
-        run: () => void fork(),
-      },
-      ...(snapshot()?.turns.some((turn) => turn.status === 'failed' || turn.status === 'interrupted')
-        ? [{
-            id: 'retry',
-            label: 'Retry last turn with partial history',
-            run: () => void retryLastTurn(),
-          }]
-        : []),
-      ...(capability(provider(), 'compact')
-        ? [{
-            id: 'compact',
-            label: 'Compact context',
-            run: () => void action(() => managedAgentApi.compact(session.id)),
-          }]
-        : []),
-      ...(session.controller === 'acorn'
-        ? [{
-            id: 'terminal',
-            label: 'Continue in terminal',
-            description: session.providerSessionRef
-              ? undefined
-              : 'The provider has not supplied a resumable session reference.',
-            disabled: !capability(provider(), 'resume') || !session.providerSessionRef,
-            run: () => void handoff(),
-          }]
-        : []),
-      ...(session.controller === 'terminal'
-        ? [{
-            id: 'managed',
-            label: 'Return to managed mode',
-            run: () => void resumeManaged(),
-          }]
-        : []),
-      ...(session.controller === 'external' && session.kind === 'imported'
-        ? [{
-            id: 'verify',
-            label: 'Verify & resume provider session',
-            disabled: typeof session.config.importedProviderSessionRef !== 'string',
-            run: () => void verifyImportedResume(),
-          }]
-        : []),
-      { id: 'rename', label: 'Rename session', run: () => sessionAction(session, 'rename') },
-      { id: 'export-markdown', label: 'Export Markdown', run: () => void exportHistory('markdown') },
-      { id: 'export-json', label: 'Export lossless JSON', run: () => void exportHistory('json') },
-      { id: 'archive', label: 'Archive session…', run: () => sessionAction(session, 'archive') },
-    ]
-  })
-
+/** The header bar: which session is open, what it is doing, and how to start another. */
+function AgentDetailHeader(props: { task: Task }) {
+  const model = agentPaneModel(props.task)
   return (
-    <section class="pane managed-agent-pane">
-      <header class="managed-agent-head">
-        <div class="managed-agent-heading">
-          <strong>{selected()?.title ?? 'Agents'}</strong>
-          <Show when={selected()}>
-            {(session) => <span>{session().providerId}</span>}
-          </Show>
-        </div>
-        <Show when={selected()}>
-          {(session) => (
-            <>
-              <span class="managed-agent-state">
-                <RuntimeStateIcon state={session().runtimeState} />{session().runtimeState}
-              </span>
-              <Button
-                disabled={!canStopAgent(session())}
-                onPress={() => void action(() => managedAgentApi.cancel(session().id))}
-              >
-                Stop
-              </Button>
-              {/* Was a Picker — a filter input over five or six actions, which is the wrong
-                  affordance: nobody types to find "Rename session". A Menu is the shape. */}
-              <Menu
-                ariaLabel="Session actions"
-                placement="bottom-end"
-                trigger={({ toggle, open }) => (
-                  <Button
-                    iconOnly
-                    label="Session actions"
-                    opens="menu"
-                    expanded={open()}
-                    onPress={toggle}
-                  >
-                    <Icon name="ellipsis" />
-                  </Button>
-                )}
-              >
-                {(menu) => (
-                  <For each={sessionActions()}>
-                    {(item) => (
-                      <Menu.Item
-                        context={menu}
-                        disabled={!!item.disabled}
-                        title={item.description}
-                        onSelect={() => item.run()}
-                      >
-                        {item.label}
-                      </Menu.Item>
-                    )}
-                  </For>
-                )}
-              </Menu>
-            </>
-          )}
-        </Show>
-        <AgentUsageIndicator />
-        <Picker<AgentProviderDescriptor>
-          label={<><Icon name="plus" /> New</>}
-          ariaLabel="New"
-          placement="bottom-end"
-          placeholder="Filter providers…"
-          emptyText="No managed providers available."
-          results={(query) => (providers() ?? []).filter((item) =>
-            item.label.toLowerCase().includes(query.trim().toLowerCase()))}
-          leading={(item) => <ProviderGlyph glyph={item.glyph} label={item.label} />}
-          rowLabel={(item) => item.label}
-          rowDescription={(item) =>
-            item.installed ? item.executableVersion ?? 'Available' : item.diagnostics[0] ?? 'Not installed'}
-          isActive={() => false}
-          isDisabled={(item) => !item.installed || creating()}
-          onSelect={(item) => void createSession(item)}
-          buttonClass="repo-picker-button managed-agent-picker-button"
-          tools={
+    <Toolbar ariaLabel="Agent session">
+      <Heading level={2} eyebrow={model.selected()?.providerId}>
+        {model.selected()?.title ?? 'Agents'}
+      </Heading>
+      <Show when={model.selected()}>
+        {(session) => (
+          <>
+            <Inline>
+              <RuntimeStateIcon state={session().runtimeState} />
+              <Text emphasis="muted">{session().runtimeState}</Text>
+            </Inline>
             <Button
-              variant="bare"
-              iconOnly
-              title="Refresh provider health"
-              label="Refresh provider health"
-              onPress={() => void refreshProviders()}
+              size="sm"
+              disabled={!canStopAgent(session())}
+              onPress={() => void model.action(() => managedAgentApi.cancel(session().id))}
             >
-              <Icon name="refresh-cw" />
+              Stop
             </Button>
-          }
-        />
-      </header>
-
-      <ListDetail
-        listLabel="Agents in this task"
-        list={
-          <AgentTaskSidebar
-            task={props.task}
-            managedSessions={taskSessions()}
-            selectedSessionId={selectedSessionId()}
-            selectedSubagentId={selectedSessionId() ? selectedManagedSubagent(selectedSessionId()!) : undefined}
-            onSelectSession={(sessionId, requestId) => {
-              // Picking the session row is how you come back out of a subagent's run.
-              clearManagedSubagent(sessionId)
-              openManagedSession(props.task.id, sessionId, requestId)
-            }}
-            onSelectSubagent={(sessionId, subagentId) => {
-              // The session first: a sub-row under a session that is not the open one has to bring its
-              // parent's transcript up before there is a card to scroll to.
-              if (sessionId !== selectedSessionId()) openManagedSession(props.task.id, sessionId)
-              selectManagedSubagent(sessionId, subagentId)
-            }}
-            onSessionAction={sessionAction}
-            onError={setError}
-          />
-        }
-      >
-        <Show when={error()}><Alert>{error()}</Alert></Show>
-        <Show
-          when={selected()}
-          fallback={
-            <EmptyState
-              icon={<span class="agent-empty-mark">✦</span>}
-              title="Start a managed coding session"
+            {/* Was a Picker — a filter input over five or six actions, which is the wrong
+                affordance: nobody types to find "Rename session". A Menu is the shape. */}
+            <Menu
+              ariaLabel="Session actions"
+              placement="bottom-end"
+              trigger={({ toggle, open }) => (
+                <Button
+                  size="sm"
+                  iconOnly
+                  label="Session actions"
+                  opens="menu"
+                  expanded={open()}
+                  onPress={toggle}
+                >
+                  <Icon name="ellipsis" />
+                </Button>
+              )}
             >
-              <div class="managed-agent-provider-cards">
-                <For each={providers() ?? []}>
-                  {(providerDescriptor) => (
-                    <Card
-                      interactive
-                      disabled={!providerDescriptor.installed || creating()}
-                      onPress={() => void createSession(providerDescriptor)}
+              {(menu) => (
+                <For each={model.sessionActions()}>
+                  {(item) => (
+                    <Menu.Item
+                      context={menu}
+                      disabled={!!item.disabled}
+                      title={item.description}
+                      onSelect={() => item.run()}
                     >
-                      <strong>
-                        <ProviderGlyph glyph={providerDescriptor.glyph} label={providerDescriptor.label} />
-                        {providerDescriptor.label}
-                      </strong>
-                      <span>{providerDescriptor.installed ? 'Start managed session' : providerDescriptor.diagnostics[0] ?? 'Unavailable'}</span>
-                    </Card>
+                      {item.label}
+                    </Menu.Item>
                   )}
                 </For>
-              </div>
-            </EmptyState>
-          }
-        >
-          {(session) => (
-            <>
-              <Show
-                when={snapshot()}
-                fallback={
-                  <EmptyState busy>
-                    {agentSessionIsStarting(session()) ? 'Connecting…' : 'Loading conversation…'}
-                  </EmptyState>
-                }
-              >
-                {(value) => (
-                  <>
-                    <AgentTranscript
-                      taskId={props.task.id}
-                      snapshot={value()}
-                      focusRequestId={focusedManagedRequest(session().id)}
-                      focusSubagentId={selectedManagedSubagent(session().id)}
-                      onExitSubagent={() => clearManagedSubagent(session().id)}
-                      onRequestResolved={() => void managedAgentStore.loadSnapshot(session().id)}
-                    />
-                    <QueuedAgentTurns
-                      sessionId={session().id}
-                      runtimeState={value().session.runtimeState}
-                      turns={value().turns}
-                      onChanged={() => managedAgentStore.loadSnapshot(session().id)}
-                      onError={setError}
-                    />
-                  </>
-                )}
-              </Show>
-              {/* Gone while a subagent's run owns the window. The composer only ever addresses the
-                  session, so leaving it under a subagent's transcript would read as "reply to this
-                  subagent", which is not a thing either harness offers. The draft survives: it lives in
-                  a module signal keyed by session (managedDrafts.ts) plus localStorage, not in the
-                  component, so stepping into a subagent and back leaves half-typed text alone. */}
-              <Show when={!selectedManagedSubagent(session().id)}>
-                <AgentComposer
-                  session={session()}
-                  disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
-                  submitDisabled={agentSessionIsStarting(session())}
-                  previousAutomaticContext={previousAutomaticContext()}
-                  onSessionUpdated={managedAgentStore.upsertSession}
-                  onSent={() => void managedAgentStore.loadSnapshot(session().id)}
-                />
-              </Show>
-            </>
-          )}
-        </Show>
+              )}
+            </Menu>
+          </>
+        )}
+      </Show>
+      <Toolbar.Spacer />
+      <AgentUsageIndicator />
+      <Picker<AgentProviderDescriptor>
+        label="New"
+        ariaLabel="New session"
+        placement="bottom-end"
+        placeholder="Filter providers…"
+        emptyText="No managed providers available."
+        results={(query) => model.providers().filter((item) =>
+          item.label.toLowerCase().includes(query.trim().toLowerCase()))}
+        leading={(item) => <ProviderGlyph glyph={item.glyph} label={item.label} />}
+        rowLabel={(item) => item.label}
+        rowDescription={(item) =>
+          item.installed ? item.executableVersion ?? 'Available' : item.diagnostics[0] ?? 'Not installed'}
+        isActive={() => false}
+        isDisabled={(item) => !item.installed || model.creating()}
+        onSelect={(item) => void model.createSession(item)}
+        tools={
+          <Button
+            variant="bare"
+            iconOnly
+            title="Refresh provider health"
+            label="Refresh provider health"
+            onPress={() => void model.refreshProviders()}
+          >
+            <Icon name="refresh-cw" />
+          </Button>
+        }
+      />
+    </Toolbar>
+  )
+}
 
-      </ListDetail>
-      <Show when={dialog()?.kind === 'rename'}>
-        <Modal onDismiss={() => setDialog(null)} title="Rename session" size="sm">
+/** Nothing open yet: one card per harness this node can run. */
+function AgentProviderCards(props: { task: Task }) {
+  const model = agentPaneModel(props.task)
+  return (
+    <EmptyState
+      icon={<Icon name="sparkles" tone="accent" />}
+      title="Start a managed coding session"
+      action={
+        <Inline wrap>
+          <For each={model.providers()}>
+            {(provider) => (
+              <Card
+                interactive
+                disabled={!provider.installed || model.creating()}
+                onPress={() => void model.createSession(provider)}
+              >
+                <Stack gap="row">
+                  <Inline>
+                    <ProviderGlyph glyph={provider.glyph} label={provider.label} />
+                    <Text emphasis="strong">{provider.label}</Text>
+                  </Inline>
+                  <Text emphasis="muted">
+                    {provider.installed ? 'Start managed session' : provider.diagnostics[0] ?? 'Unavailable'}
+                  </Text>
+                </Stack>
+              </Card>
+            )}
+          </For>
+        </Inline>
+      }
+    />
+  )
+}
+
+/** Rename and archive. Both are dialogs rather than `window.prompt` and `window.confirm`, which are
+ *  unstyled in the shell and suppressed outright in a sandboxed frame. */
+function AgentSessionDialogs(props: { task: Task }) {
+  const model = agentPaneModel(props.task)
+  return (
+    <>
+      <Show when={model.dialog()?.kind === 'rename'}>
+        <Modal onDismiss={() => model.setDialog(null)} title="Rename session" size="sm">
           <Modal.Body>
             <Field label="Title">
               <Input
-                value={renameText()}
+                value={model.renameText()}
                 ref={(el) => queueMicrotask(() => el.focus())}
-                onInput={(value) => setRenameText(value)}
-                onKeyDown={(event) => { if (event.key === 'Enter') void rename() }}
+                onInput={(value) => model.setRenameText(value)}
+                onSubmit={() => void model.rename()}
               />
             </Field>
           </Modal.Body>
           <Modal.Actions>
-            <Button variant="bare" onPress={() => setDialog(null)}>Cancel</Button>
-            <Button variant="solid" onPress={() => void rename()}>Rename</Button>
+            <Button variant="bare" onPress={() => model.setDialog(null)}>Cancel</Button>
+            <Button variant="solid" onPress={() => void model.rename()}>Rename</Button>
           </Modal.Actions>
         </Modal>
       </Show>
-
-      <Show when={dialog()?.kind === 'archive' ? dialog()!.session : undefined}>
+      <Show when={model.dialog()?.kind === 'archive' ? model.dialog()!.session : undefined}>
         {(session) => (
-          <Modal onDismiss={() => setDialog(null)} title="Archive session" size="sm" role="alertdialog">
+          <Modal onDismiss={() => model.setDialog(null)} title="Archive session" size="sm" role="alertdialog">
             <Modal.Body>
-              <p>Archive “{session().title}”? It leaves this task’s list and stays readable under the archived filter in Agent Center.</p>
+              <Text wrap>
+                Archive “{session().title}”? It leaves this task’s list and stays readable under the
+                archived filter in Agent Center.
+              </Text>
             </Modal.Body>
             <Modal.Actions>
-              <Button variant="bare" onPress={() => setDialog(null)}>Cancel</Button>
-              <Button variant="solid" onPress={() => void archive(session())}>Archive</Button>
+              <Button variant="bare" onPress={() => model.setDialog(null)}>Cancel</Button>
+              <Button variant="solid" onPress={() => void model.archive(session())}>Archive</Button>
             </Modal.Actions>
           </Modal>
         )}
       </Show>
-    </section>
+    </>
+  )
+}
+
+export default function AgentPaneDetail(props: { task: Task }) {
+  const model = agentPaneModel(props.task)
+  return (
+    <>
+      <AgentDetailHeader task={props.task} />
+      <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+      <Show when={model.selected()} fallback={<AgentProviderCards task={props.task} />}>
+        {(session) => (
+          <>
+            <Show
+              when={model.snapshot()}
+              fallback={
+                <EmptyState busy>
+                  {agentSessionIsStarting(session()) ? 'Connecting…' : 'Loading conversation…'}
+                </EmptyState>
+              }
+            >
+              {(snapshot) => (
+                <>
+                  <AgentTranscript
+                    taskId={props.task.id}
+                    snapshot={snapshot()}
+                    focusRequestId={focusedManagedRequest(session().id)}
+                    focusSubagentId={selectedManagedSubagent(session().id)}
+                    onExitSubagent={() => clearManagedSubagent(session().id)}
+                    onRequestResolved={() => void managedAgentStore.loadSnapshot(session().id)}
+                  />
+                  <QueuedAgentTurns
+                    sessionId={session().id}
+                    runtimeState={snapshot().session.runtimeState}
+                    turns={snapshot().turns}
+                    onChanged={() => managedAgentStore.loadSnapshot(session().id)}
+                    onError={model.setError}
+                  />
+                </>
+              )}
+            </Show>
+            {/* Gone while a subagent's run owns the window. The composer only ever addresses the
+                session, so leaving it under a subagent's transcript would read as "reply to this
+                subagent", which is not a thing either harness offers. The draft survives: it lives in
+                a module signal keyed by session (managedDrafts.ts) plus localStorage, not in the
+                component, so stepping into a subagent and back leaves half-typed text alone. */}
+            <Show when={!selectedManagedSubagent(session().id)}>
+              <AgentComposer
+                session={session()}
+                disabled={session().controller !== 'acorn' || session().runtimeState === 'archived'}
+                submitDisabled={agentSessionIsStarting(session())}
+                previousAutomaticContext={model.previousAutomaticContext()}
+                onSessionUpdated={managedAgentStore.upsertSession}
+                onSent={() => void managedAgentStore.loadSnapshot(session().id)}
+              />
+            </Show>
+          </>
+        )}
+      </Show>
+      <AgentSessionDialogs task={props.task} />
+    </>
   )
 }

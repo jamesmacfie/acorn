@@ -1,6 +1,6 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createSignal, Show } from 'solid-js'
-import { Button, Input } from '@acorn/plugin-api/ui'
+import { Alert, Button, Field, Input, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { MAX_AGENT_CONCURRENCY, validateAgentConcurrency } from '../shared/concurrency'
 import {
   agentConcurrencyOptions,
@@ -62,57 +62,56 @@ export default function AgentConcurrencySettings() {
   }
 
   return (
-    <form class="settings-section" onSubmit={(event) => void submit(event)}>
-      <p class="muted settings-hint">
-        How many agent turns this Node runs at once. A session always runs one turn at a time, so
-        these ceilings only decide how many sessions can be working together. Turns over a ceiling
-        wait in the queue and start when there is room.
-      </p>
+    <form onSubmit={(event) => void submit(event)}>
+      <Stack gap="section">
+        <Text emphasis="muted" wrap>
+          How many agent turns this Node runs at once. A session always runs one turn at a time, so
+          these ceilings only decide how many sessions can be working together. Turns over a ceiling
+          wait in the queue and start when there is room.
+        </Text>
 
-      <Show when={limits.error}>
-        <p class="settings-error" role="alert">
-          {limits.error instanceof Error ? limits.error.message : 'Agent concurrency could not be loaded.'}
-        </p>
-      </Show>
+        <Show when={limits.error}>
+          <Alert>
+            {limits.error instanceof Error ? limits.error.message : 'Agent concurrency could not be loaded.'}
+          </Alert>
+        </Show>
 
-      <label class="settings-field">
-        <span class="settings-label">Turns at once per provider</span>
-        <Input
-          type="number"
-          min="1"
-          max={MAX_AGENT_CONCURRENCY}
-          width="narrow"
-          value={provider()}
-          onInput={(value) => edit(setProvider)(value)}
-        />
-        <span class="muted settings-hint">
-          Counted against one agent CLI across every task and workspace. This is what keeps a single
-          provider account from running several turns at once.
-        </span>
-      </label>
+        <Field
+          label="Turns at once per provider"
+          hint="Counted against one agent CLI across every task and workspace. This is what keeps a single provider account from running several turns at once."
+        >
+          <Input
+            type="number"
+            min="1"
+            max={MAX_AGENT_CONCURRENCY}
+            width="narrow"
+            value={provider()}
+            onInput={(value) => edit(setProvider)(value)}
+          />
+        </Field>
 
-      <label class="settings-field">
-        <span class="settings-label">Turns at once per workspace</span>
-        <Input
-          type="number"
-          min="1"
-          max={MAX_AGENT_CONCURRENCY}
-          width="narrow"
-          value={workspace()}
-          onInput={(value) => edit(setWorkspace)(value)}
-        />
-        <span class="muted settings-hint">
-          Counted across all providers in one workspace, so one workspace cannot take the machine.
-        </span>
-      </label>
+        <Field
+          label="Turns at once per workspace"
+          hint="Counted across all providers in one workspace, so one workspace cannot take the machine."
+        >
+          <Input
+            type="number"
+            min="1"
+            max={MAX_AGENT_CONCURRENCY}
+            width="narrow"
+            value={workspace()}
+            onInput={(value) => edit(setWorkspace)(value)}
+          />
+        </Field>
 
-      <Show when={error()}><p class="settings-error" role="alert">{error()}</p></Show>
-      <Show when={saved()}><p class="muted" role="status">{saved()}</p></Show>
-      <div class="settings-actions">
-        <Button submit disabled={!dirty() || saving()}>
-          {saving() ? 'Saving…' : 'Save limits'}
-        </Button>
-      </div>
+        <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+        <Show when={saved()}>{(message) => <Alert tone="ok">{message()}</Alert>}</Show>
+        <Toolbar variant="actions">
+          <Button submit disabled={!dirty() || saving()}>
+            {saving() ? 'Saving…' : 'Save limits'}
+          </Button>
+        </Toolbar>
+      </Stack>
     </form>
   )
 }

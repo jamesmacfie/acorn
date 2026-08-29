@@ -1,6 +1,5 @@
-import { brandMarkRegistry, brandStyle } from '@acorn/plugin-api/client'
+import { brandMarkRegistry } from '@acorn/plugin-api/client'
 import { Icon } from '@acorn/plugin-api/ui'
-import './managed-agents.css'
 
 // A provider's mark, drawn wherever a surface names the provider: the onboarding cards, the New
 // picker's rows, and each provider's block in Settings -> Agent defaults.
@@ -10,14 +9,10 @@ import './managed-agents.css'
 // Lucide name, or nothing at all, which is why the label's first letter is the fallback and why the
 // mark goes through Icon: an unmatched name renders as text (docs/ui-design.md section Icons).
 //
-// aria-hidden, because the label it sits beside already says which provider this is.
+// `tone="brand"` is the kit asking the mark for its own colour, held to the theme's contrast. No
+// title, because the label it sits beside already says which provider this is.
 export default function ProviderGlyph(props: { glyph?: string; label: string }) {
-  const name = () => props.glyph ?? props.label.slice(0, 1).toUpperCase()
-  return (
-    <span class="managed-agent-provider-glyph" style={brandStyle(name())} aria-hidden="true">
-      <Icon name={name()} />
-    </span>
-  )
+  return <Icon name={props.glyph ?? props.label.slice(0, 1).toUpperCase()} tone="brand" />
 }
 
 // The same mark, for a surface holding a provider id and no descriptor: the session rows in the task

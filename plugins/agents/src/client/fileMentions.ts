@@ -1,12 +1,6 @@
 import type { AgentInputPart } from '@acorn/protocol/managedAgents.ts'
 import { fuzzyScore } from '@acorn/plugin-api/client'
 
-export type ActiveFileMention = {
-  start: number
-  end: number
-  query: string
-}
-
 // Composer file mentions are deliberately conservative: a token must begin with @ at a word
 // boundary, use a workspace-relative path, and may end in :line or :line-line. Email addresses,
 // absolute paths and parent traversal remain ordinary text and are not promoted to provider files.
@@ -52,61 +46,12 @@ export function parseFileMentions(text: string): Extract<AgentInputPart, { type:
   return output
 }
 
-/** The three things the composer completes. `@` reaches the worktree's files, `/` and `$` the
- * commands and skills the session advertises. */
-export type MentionSigil = '@' | '/' | '$'
-
-export type ActiveMention = ActiveFileMention & { sigil: MentionSigil }
-
-/** The mention being typed at the caret, if the caret is in one. */
-export function activeMention(text: string, cursor: number): ActiveMention | null {
-  const before = text.slice(0, cursor)
-  const match = /(?:^|\s)([@/$])(?:"([^"]*)|([^\s"]*))$/.exec(before)
-  if (!match) return null
-  const sigil = match[1] as MentionSigil
-  const start = match.index + match[0].lastIndexOf(sigil)
-  const suffix = /^[^\s]*/.exec(text.slice(cursor))?.[0] ?? ''
-  return {
-    sigil,
-    start,
-    end: cursor + suffix.length,
-    query: match[2] ?? match[3] ?? '',
-  }
-}
-
-export function activeFileMention(text: string, cursor: number): ActiveFileMention | null {
-  const mention = activeMention(text, cursor)
-  if (!mention || mention.sigil !== '@') return null
-  const { sigil: _sigil, ...rest } = mention
-  return rest
-}
-
+/** The mention text for a path: quoted when the path has a space in it, so completing one does not
+ *  end the token halfway through. Paired with `fileMentionMatches` above, which has to be able to
+ *  read back what this writes. */
 export function formatFileMention(path: string): string {
   if (!/\s/.test(path)) return `@${path}`
   return `@"${path.replace(/(["\\])/g, '\\$1')}"`
-}
-
-/** Swap the mention under the caret for a chosen one, landing the caret past the space that follows
- * it. One space, never two: a mention completed mid-sentence already has one. */
-export function completeMention(
-  text: string,
-  mention: ActiveFileMention,
-  replacement: string,
-): { text: string; cursor: number } {
-  const hasFollowingSpace = /\s/.test(text[mention.end] ?? '')
-  const inserted = `${replacement}${hasFollowingSpace ? '' : ' '}`
-  return {
-    text: `${text.slice(0, mention.start)}${inserted}${text.slice(mention.end)}`,
-    cursor: mention.start + inserted.length + (hasFollowingSpace ? 1 : 0),
-  }
-}
-
-export function completeFileMention(
-  text: string,
-  mention: ActiveFileMention,
-  path: string,
-): { text: string; cursor: number } {
-  return completeMention(text, mention, formatFileMention(path))
 }
 
 export function fileMentionSuggestions(files: readonly string[], query: string, limit = 10): string[] {
