@@ -1,13 +1,13 @@
 import { createMemo, Show } from 'solid-js'
 import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 import { Select } from '../ui/primitives'
+import { defaultModelIdFor } from './defaultModel'
 
 // Controlled connection + model dropdowns over the configured model-provider connections
 // (availableModelConnections in core/shared/modelProviders). The connection select is hidden when
 // only one is configured. Reusable by any plugin whose route consumes generateTextForConnection.
 
-export const defaultModelIdFor = (connection: AvailableModelConnection | undefined): string =>
-  connection?.provider.defaultModelId ?? connection?.provider.models?.[0]?.id ?? ''
+export { defaultModelIdFor }
 
 export default function ModelConnectionPicker(props: {
   connections: AvailableModelConnection[]

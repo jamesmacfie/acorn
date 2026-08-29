@@ -1,4 +1,4 @@
-import { Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, on, Show, type JSX } from 'solid-js'
 import { bindIntents } from '../keys/host'
 import MentionTextarea from './MentionTextarea'
 import { Alert, Button, Textarea, Toolbar } from './primitives'
@@ -9,10 +9,16 @@ import { Alert, Button, Textarea, Toolbar } from './primitives'
 // `mentions` decides which textarea renders. The mention data sources are host-side, so a frame leaves
 // the prop unset and gets a plain Textarea. Making that a prop rather than a runtime check keeps the
 // difference legible at the call site.
+//
+// The live text is held here, not by the caller, and `onSubmit` carries it. That is what makes the
+// composer usable from a remote tree, where a per-keystroke `onInput` cannot cross — every key would
+// be a message hop, so the kit refuses to send one (docs/future/layout/06-remote-tree.md § Inputs,
+// state, and the message hop). A caller that wants each keystroke still gets `onInput`; a caller that
+// only wants the text on submit can leave it unset and read the argument.
 export function Composer(props: {
   value: string
-  onInput: (value: string) => void
-  onSubmit: () => void
+  onInput?: (value: string) => void
+  onSubmit: (value: string) => void
   busy?: boolean
   disabled?: boolean
   error?: string
@@ -26,9 +32,23 @@ export function Composer(props: {
   hint?: JSX.Element
   rows?: number
 }) {
+  // Seeded from the prop and re-seeded whenever it changes, so a caller that does hold the value stays
+  // the source of truth and a caller that does not still has a working field.
+  const [live, setLive] = createSignal(props.value)
+  createEffect(on(() => props.value, (value) => setLive(value)))
+  const type = (value: string): void => {
+    setLive(value)
+    props.onInput?.(value)
+  }
+
   const submit = () => {
-    if (props.busy || props.disabled || !props.value.trim()) return
-    props.onSubmit()
+    const value = live()
+    if (props.busy || props.disabled || !value.trim()) return
+    props.onSubmit(value)
+    // Cleared here rather than left to the caller, because a caller that never heard the keystrokes
+    // has nothing to clear. Every caller that does hold the value clears it on submit too, so the two
+    // agree.
+    setLive('')
     return true
   }
 
@@ -46,8 +66,8 @@ export function Composer(props: {
             rows={props.rows ?? 3}
             placeholder={props.placeholder}
             disabled={props.disabled}
-            value={props.value}
-            onInput={(value) => props.onInput(value)}
+            value={live()}
+            onInput={type}
           />
         }
       >
@@ -55,9 +75,9 @@ export function Composer(props: {
           <MentionTextarea
             placeholder={props.placeholder}
             disabled={props.disabled}
-            value={props.value}
+            value={live()}
             mentions={mentions()}
-            onInput={props.onInput}
+            onInput={type}
           />
         )}
       </Show>
@@ -70,7 +90,7 @@ export function Composer(props: {
           variant="solid"
           tone="accent"
           busy={props.busy}
-          disabled={props.disabled || !props.value.trim()}
+          disabled={props.disabled || !live().trim()}
           onPress={submit}
         >
           {props.submitLabel ?? 'Comment'}

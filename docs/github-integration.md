@@ -62,7 +62,7 @@ however it is asked.
 ## Content links
 
 GitHub declares two content-link recognisers (`plugins/github/src/client/contentLinks.ts`; the shared
-recognition and destination ladder is in [plugins.md](./plugins.md) under Frame authoring and the UI
+recognition and destination ladder is in [plugins.md](./plugins.md) under Client authoring and the UI
 kit). A `github.com/<owner>/<repo>/pull/<n>` URL declares `providerId: 'github'`, so a click can open
 the reference panel: a pull request is glance-sized enough to answer "what is this" without the reader
 losing their place. A bare `github.com/<owner>/<repo>` URL declares no `providerId`, because a

@@ -48,7 +48,9 @@ export default {
   entry: '@acorn/plugin-database/node/index.ts',
   factory: 'databasePlugin',
   client: {
-    entry: './src/frame/index.tsx',
+    entry: './src/tree/index.tsx',
+    // The bundle runs in a worker and emits a tree of acorn's own component names; the builder maps
+    // this key to the Vite transforms that compile JSX into that tree rather than into a document.
     framework: 'solid',
   },
   // Staged into the built package by the builder, and opened by the host from there. The chain in
@@ -92,8 +94,11 @@ export default {
             triggerCharacters: ['.'],
           },
         },
-        // This plugin's own bundle, in the sandboxed frame below the editor.
-        frame: 'frame',
+        // This plugin's own bundle below the editor, as a tree in a worker rather than a rectangle in
+        // an iframe. Same bytes, same trust prompt; what differs is that the host mounts its own
+        // components for what the bundle emits, so the two halves of this pane are now the same kind
+        // of thing (docs/future/layout/06-remote-tree.md).
+        frame: { kind: 'remote', entry: 'panel' },
       },
     }],
     agentContexts: [{

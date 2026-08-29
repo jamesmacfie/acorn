@@ -62,7 +62,7 @@ export default function PanelEditor(props: {
     <Modal
       title={creating() ? 'Add panel' : 'Edit panel'}
       size="md"
-      onClose={props.onClose}
+      onDismiss={props.onClose}
       // The collection is the first decision for a new panel and already made for an existing one, so
       // the two flows want different landing spots. A bare `autofocus` does not survive a Solid modal
       // (ui/Modal.tsx).

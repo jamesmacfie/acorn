@@ -134,18 +134,23 @@ data the host renders, so there are no filter inputs, facet selects, or state co
 serve. Ordering and the priority projection did survive, moved onto the node since that is where the
 rows are built.
 
-Ticket attachments are proxied through a Node route rather than loaded straight into the frame. A
-plugin frame's CSP allows no network calls, covered by the client half in
-[plugin authoring](./plugin-authoring.md), and Linear's upload host wants the same credential the
-GraphQL API takes. The route accepts only that one host, `uploads.linear.app`, as a fetch target. An
-issue description is third-party content, and any other host would turn the route into a
-general-purpose proxy spending the owner's Linear key on the caller's behalf.
+Ticket attachments are proxied through a Node route rather than fetched by the plugin: a plugin's
+client code has no network at all, and Linear's upload host wants the same credential the GraphQL API
+takes. The route accepts only that one host, `uploads.linear.app`, as a fetch target. An issue
+description is third-party content, and any other host would turn the route into a general-purpose
+proxy spending the owner's Linear key on the caller's behalf.
 
-The ticket frame renders from host-supplied context alone, never from its own idea of which surface
-it is. A reference panel carries an unscoped `refId`, an identifier another plugin found in its own
-content such as `ENG-42` in a PR body, resolved across every connected workspace because nothing
-told the panel which one owns it. A pane carries either `item` (a rail row was clicked) or `taskId`
-(show whatever this task already links). The frame reads whichever the host set.
+**The pane no longer inlines those uploads, and an image in a ticket is a link.** It used to fetch each
+one through that route and swap a `data:` URL into the markdown, which an iframe needed because its CSP
+allowed no image host. A tree does not draw the markdown at all — the host does, from a `text` prop on
+a message port — and a screenshot as base64 is a prop big enough to trip the batch cap and take the
+whole ticket down with it. The route stays for anything that wants a proxied upload by URL.
+
+The ticket renders from what the host mounted it with, never from its own idea of which surface it is.
+A reference panel carries an unscoped identifier another plugin found in its own content, such as
+`ENG-42` in a PR body, resolved across every connected workspace because nothing told the panel which
+one owns it. A pane carries either that same `item` (a rail row was clicked) or `taskId` (show whatever
+this task already links). The tree reads whichever the host set.
 
 A `linear.app` ticket link inside rendered ticket content re-points this same view rather than going
 through the host's usual link resolution. The host's resolution would swap the reference panel's

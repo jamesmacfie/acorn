@@ -16,7 +16,7 @@ afterAll(() => dispose.forEach((d) => d()))
 
 describe('parseInAppTarget', () => {
   it('recognises GitHub PR links (ignoring trailing path)', () => {
-    // `item`/`providerId` make the reference panel reachable (docs/plugins.md § Frame authoring and
+    // `item`/`providerId` make the reference panel reachable (docs/plugins.md § Client authoring and
     // the UI kit). The spelling matches the pulls collection's row id.
     expect(parseInAppTarget('https://github.com/runn/acorn/pull/42/files'))
       .toEqual({ kind: 'pr', providerId: 'github', owner: 'runn', repo: 'acorn', number: '42', item: 'runn/acorn#42' })

@@ -254,6 +254,41 @@ describe('architecture boundaries', () => {
     expect(importers.filter((f) => !CHILD_PROCESS_OK.has(f))).toEqual([])
   })
 
+  it('a loaded plugin that draws a tree writes no DOM and ships no stylesheet', () => {
+    // The tree path's whole premise: the plugin names acorn's components and the host draws them
+    // (docs/future/layout/06-remote-tree.md). A raw element or a class in one of these directories is
+    // markup the host cannot draw, cannot style with the reader's pack, and cannot give focus or ARIA
+    // to — it would render as the labelled placeholder and nothing would say why.
+    //
+    // The components barrel is the other half of the rule, and the subtler one. A tree bundle is built
+    // with the JSX preset pointed at the remote adapter, so a shell component pulled onto its graph is
+    // compiled into a tree of its own rather than into a document, and the result is neither.
+    const TREE_DIRS = ['plugins/http/src/tree', 'plugins/database/src/tree', 'plugins/linear/src/tree', 'plugins/rollbar/src/tree']
+    // Closing tags and the void elements, not opening tags: `Promise<void>` and `createSignal<string>`
+    // are the same shape as `<div ` and there is no honest way to tell them apart with a regex.
+    const RAW_TAG = /<\/[a-z][a-z0-9]*>|<(?:br|hr|img|input|textarea|area|base|col|embed|link|meta|source|track|wbr)[\s/>]/
+    const offences: string[] = []
+    let scanned = 0
+    for (const dir of TREE_DIRS) {
+      for (const file of walk(join(ROOT, dir))) {
+        if (!file.endsWith('.tsx')) continue
+        scanned++
+        // Comments hold prose about the markup that used to be here, and prose is allowed to name a div.
+        const code = readFileSync(file, 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/^\s*\/\/.*$/gm, '')
+        if (RAW_TAG.test(code)) offences.push(`${rel(file)}: a raw element`)
+        if (/\bclass=|\bclassList=|\bstyle=|innerHTML/.test(code)) offences.push(`${rel(file)}: a class, a style or an innerHTML`)
+        if (/from '@acorn\/plugin-api\/ui'/.test(code)) offences.push(`${rel(file)}: the components barrel`)
+      }
+      for (const file of walk(join(ROOT, dir))) {
+        if (file.endsWith('.css')) offences.push(`${rel(file)}: a stylesheet`)
+      }
+    }
+    expect(scanned).toBeGreaterThan(10) // anti-vacuity: the walker found the tree directories
+    expect(offences.sort()).toEqual([])
+  })
+
   it('plugins reach the host only through @acorn/plugin-api', () => {
     // `"exports": { "./*": "./src/*" }` gives the module system no encapsulation, so this is where a
     // plugin's import surface is enforced instead: the facade, the wire types, another plugin's

@@ -57,7 +57,7 @@ export function CheatSheet() {
 
   return (
     <Show when={open()}>
-      <Modal title="Keyboard shortcuts" size="md" onClose={() => setOpen(false)}>
+      <Modal title="Keyboard shortcuts" size="md" onDismiss={() => setOpen(false)}>
         <Modal.Body>
           <Table size="sm">
             <tbody>

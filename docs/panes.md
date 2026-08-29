@@ -13,23 +13,28 @@ string owned by the contribution; core does not maintain a closed union of featu
 | `notes` | 30 | task/workspace/global notes |
 | `context` | 40 | context selection and sync |
 | `editor` | 50 | worktree editor, with find-in-files as a sidebar panel |
-| `database` | 70 | loaded database pane; a host-drawn SQL editor over the plugin's own result grid |
+| `database` | 70 | loaded database tree; a host-drawn SQL editor over the plugin's own result grid |
 | `docker` | 75 | task container surface |
-| `http` | 76 | loaded HTTP frame; API request client for this task |
+| `http` | 76 | loaded HTTP tree; API request client for this task |
 | `preview` | 80 | browser preview |
-| `linear` | 90 | loaded Linear frame; linked issue, selected descriptor row, or content-link target |
-| `rollbar` | 100 | loaded Rollbar frame; linked item or selected descriptor row |
+| `linear` | 90 | loaded Linear tree; linked issue, selected descriptor row, or content-link target |
+| `rollbar` | 100 | loaded Rollbar tree; linked item or selected descriptor row |
 
 Compiled provider panes appear when their linked provider is connected and the task has relevant
-data. The four loaded ones, `database`, `http`, `linear`, and `rollbar`, are frame surfaces declared
-in a manifest and offered whenever the plugin is running on the node the window is talking to. A task
+data. The four loaded ones, `database`, `http`, `linear`, and `rollbar`, are declared in a manifest and
+offered whenever the plugin is running on the node the window is talking to. All four draw **trees**:
+their code runs in a worker and emits a tree of the host's own components, which the host mounts, so
+they inherit its focus behaviour, keys, ARIA and appearance pack and ship no stylesheet of their own
+(`docs/future/layout/06-remote-tree.md`). A `frame` region is still available for a surface that owns
+its pixels; none of the four needs one. A task
 pane whose manifest also names a `providerId` (`linear` and `rollbar` do) is a linked-items view, and
 the host hides it on tasks with no link from that provider. `database` and `http` are useful with
 nothing linked and stay unconditional.
 
 `database` is the one composed pane. Its manifest declares a `document-over-frame` layout with a
 `document` region and a `frame` region, so the host draws the SQL editor and the drag handle and the
-plugin's frame draws everything below them. To the task layout row it is one pane with one id, which
+plugin draws everything below them. The lower region names a `remote` entry rather than `'frame'`, so
+both halves of that pane are now host-drawn components; the region keeps the name the layout gave it. To the task layout row it is one pane with one id, which
 is the point: the reader has one rectangle, and the row knows nothing about the split inside it
 (`docs/plugins.md` § Document surfaces).
 
@@ -154,10 +159,18 @@ ctx.panes.register({
 })
 ```
 
-A loaded plugin declares the same two keys on a `frames` entry, and a region there is either `'frame'`,
-the plugin's own bundle in a sandboxed iframe, or a host-drawn document
-(`{ "kind": "document", "read": "/v2/p/<id>/…" }`). A pane with no `frame` region runs none of the
-plugin's code, so it is gated like a descriptor rather than behind the bytes-hash prompt.
+A loaded plugin declares the same two keys on a `frames` entry, and a region there is one of three
+things:
+
+| Region | What fills it |
+| --- | --- |
+| `{ "kind": "remote", "entry": "pane" }` | A tree the plugin's bundle emits from a worker, named by a key of the object it passed to `mountTree`. The host mounts its own components for it. |
+| `"frame"` | The plugin's own bundle in a sandboxed iframe, drawing its own pixels. |
+| `{ "kind": "document", "read": "/v2/p/<id>/…" }` | A host-drawn editor. The plugin contributes routes and a language id, and no code at all. |
+
+A pane whose regions are all documents runs none of the plugin's code, so it is gated like a descriptor
+rather than behind the bytes-hash prompt. A `remote` region is gated exactly as a `frame` one is: the
+tree path changes where a plugin's bytes run, not whose they are.
 
 ```json
 "frames": [{
@@ -165,10 +178,14 @@ plugin's code, so it is gated like a descriptor rather than behind the bytes-has
   "layout": "document-over-frame",
   "regions": {
     "document": { "kind": "document", "languageId": "sql", "read": "/v2/p/database/tasks/:taskId/scratch" },
-    "frame": "frame"
+    "frame": { "kind": "remote", "entry": "panel" }
   }
 }]
 ```
+
+A reference panel and a settings page may name `layout: 'single'` too, and nothing wider: the host
+already draws the box, the backdrop, the title and the dismiss for one and the settings page frame for
+the other, so all that is left is one region. Naming it is how such a surface says its body is a tree.
 
 A layout naming a region it does not have, or missing one it requires, throws at registration rather
 than at render. The manifest parser refuses the same thing on the node, and the client repeats the

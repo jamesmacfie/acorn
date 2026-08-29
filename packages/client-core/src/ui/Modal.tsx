@@ -11,7 +11,10 @@ import { createDismissable } from './dismissable'
 // again from the top of the page.
 
 export function Modal(props: {
-  onClose: () => void
+  /** `onDismiss` rather than `onClose` because dismissal is one of the kit's eleven events, and only
+   *  a name in that list can carry a handler across the remote root
+   *  (docs/future/layout/06-remote-tree.md § The wire format). */
+  onDismiss: () => void
   title?: string
   size?: 'sm' | 'md' | 'lg' | 'wide'
   align?: 'top' | 'center'
@@ -30,7 +33,7 @@ export function Modal(props: {
 }) {
   let dialog!: HTMLDivElement
   const dismiss = createDismissable({
-    onDismiss: () => props.onClose(),
+    onDismiss: () => props.onDismiss(),
     container: () => dialog,
     on: props.dismissOn,
   })
@@ -63,10 +66,17 @@ export function Modal(props: {
   )
 }
 
-Modal.Body = (props: { children: JSX.Element }) => (
-  <div class="overlay-body">{props.children}</div>
-)
+/* The two halves, as nodes of their own rather than only as `Modal.Body` and `Modal.Actions`. A
+   remote tree names one type per node and has nowhere to put the dot, and the kit is meant to be the
+   same set on both render paths. The compound spellings stay as aliases, because they read better at
+   a call site that already has `Modal` in hand. */
+export function ModalBody(props: { children: JSX.Element }) {
+  return <div class="overlay-body">{props.children}</div>
+}
 
-Modal.Actions = (props: { children: JSX.Element }) => (
-  <div class="ui-modal-actions">{props.children}</div>
-)
+export function ModalActions(props: { children: JSX.Element }) {
+  return <div class="ui-modal-actions">{props.children}</div>
+}
+
+Modal.Body = ModalBody
+Modal.Actions = ModalActions

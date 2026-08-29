@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PluginDocumentRegion, PluginFrameSurface } from '@acorn/protocol/api.ts'
-import { isHostOwnedSurface, paneLayoutFor } from './layouts'
+import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 
 // The line between a pane that runs plugin code and one the host draws (docs/panes.md § Layout model).
 // It is the trust gate for a whole class of surface, so it is worth pinning in both directions: a
@@ -26,6 +26,12 @@ const composed = surface({
   regions: { document: document({ read: '/v2/p/board/doc' }), frame: 'frame' },
 })
 
+const remote = surface({
+  id: 'issues',
+  layout: 'single',
+  regions: { body: { kind: 'remote', entry: 'pane' } },
+})
+
 describe('isHostOwnedSurface', () => {
   it('is true only for a pane whose whole rectangle the host draws', () => {
     expect(isHostOwnedSurface(withDocument({ read: '/v2/p/board/doc' }))).toBe(true)
@@ -40,6 +46,25 @@ describe('isHostOwnedSurface', () => {
   // cheaper way to run untrusted code.
   it("is false for a pane with a frame region, which draws the plugin's own bundle in half the rectangle", () => {
     expect(isHostOwnedSurface(composed)).toBe(false)
+  })
+
+  // The tree path changes where a plugin's bytes run, not whose they are. A `remote` region is the
+  // same bundle in a worker, so it sits behind the same prompt as an iframe.
+  it('is false for a pane with a remote region, which runs the same bundle in a worker', () => {
+    expect(isHostOwnedSurface(remote)).toBe(false)
+    expect(isHostOwnedSurface(surface({
+      id: 'query',
+      layout: 'document-over-frame',
+      regions: { document: document({ read: '/v2/p/board/doc' }), frame: { kind: 'remote', entry: 'panel' } },
+    }))).toBe(false)
+  })
+})
+
+describe('remoteRegionEntry', () => {
+  it('names the bundle entry of a remote region and nothing else', () => {
+    expect(remoteRegionEntry({ kind: 'remote', entry: 'pane' })).toBe('pane')
+    expect(remoteRegionEntry('frame')).toBeNull()
+    expect(remoteRegionEntry(document({ read: '/v2/p/board/doc' }))).toBeNull()
   })
 })
 
@@ -79,6 +104,12 @@ describe('paneLayoutFor', () => {
 
   // A capability route is a route like any other: the host POSTs to it on the plugin's behalf on every
   // completion trigger, so it is confined on the same terms as the two above.
+  // A remote region names a key of the object the bundle passed to `mountTree`, not a route, so there
+  // is nothing to confine. A name with no renderer behind it draws the labelled placeholder.
+  it('accepts a remote region without asking it for a route', () => {
+    expect(paneLayoutFor('board', remote)).toEqual({ layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } } })
+  })
+
   it('refuses an escaping COMPLETIONS route', () => {
     expect(() => paneLayoutFor('board', withDocument({ read: '/v2/p/board/doc', completions: { route: '/v2/core/tasks', triggerCharacters: [] } })))
       .toThrow(/completions route/)

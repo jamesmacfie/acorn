@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, on, onCleanup } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { bindIntents } from '../keys/host'
+import { watchAppearance } from './appearance'
 import type { Intent } from '../keys/intents'
 import { rowHeightSm } from './metrics'
 
@@ -20,11 +21,8 @@ export function Grid(props: {
   rows: readonly (readonly string[])[]
   /** Index into `rows`. The host owns the selection; this reflects it. */
   selected?: number | null
-  onSelectRow?: (index: number) => void
+  onSelect?: (index: number) => void
   ariaLabel: string
-  /** Re-read the density token when the appearance changes. A frame has no shell signal to watch,
-   *  so it passes its bridge's subscribe here. */
-  onAppearanceChange?: (listener: () => void) => () => void
 }) {
   // An id of its own rather than the label's: `aria-activedescendant` needs a DOM id, and a label is
   // a sentence.
@@ -39,12 +37,13 @@ export function Grid(props: {
     estimateSize: () => rowH(),
     overscan: 16,
   })
-  if (props.onAppearanceChange) {
-    onCleanup(props.onAppearanceChange(() => {
-      setRowH(rowHeightSm())
-      virt.measure()
-    }))
-  }
+  // Re-read the density token when the style pack changes, and measure again against it. Watched here
+  // rather than passed in: this component is always the host's, on both render paths, so there is always
+  // a shell signal to watch. A plugin drawing a `Grid` in a tree is not drawing it — the host is.
+  onCleanup(watchAppearance(() => {
+    setRowH(rowHeightSm())
+    virt.measure()
+  }))
 
   let frame = 0
   onCleanup(() => cancelAnimationFrame(frame))
@@ -68,12 +67,12 @@ export function Grid(props: {
   // ratatui shape — the widget is a renderer and the state is outside it — and it is the only one
   // that survives virtualisation.
   const step = (delta: number, absolute?: 'first' | 'last'): boolean => {
-    if (!props.rows.length || !props.onSelectRow) return false
+    if (!props.rows.length || !props.onSelect) return false
     const at = props.selected ?? -1
     const next = absolute === 'first' ? 0
       : absolute === 'last' ? props.rows.length - 1
       : Math.min(Math.max((at < 0 ? 0 : at) + delta, 0), props.rows.length - 1)
-    props.onSelectRow(next)
+    props.onSelect(next)
     virt.scrollToIndex(next)
     return true
   }
@@ -115,7 +114,7 @@ export function Grid(props: {
                 aria-selected={props.selected === item.index}
                 data-selected={props.selected === item.index ? '' : undefined}
                 style={{ transform: `translateY(${item.start}px)`, height: `${rowH()}px`, 'grid-template-columns': template() }}
-                onClick={() => props.onSelectRow?.(item.index)}
+                onClick={() => props.onSelect?.(item.index)}
               >
                 <For each={props.rows[item.index]}>
                   {(cell) => <span class="ui-grid-cell" role="gridcell" title={cell}>{cell}</span>}

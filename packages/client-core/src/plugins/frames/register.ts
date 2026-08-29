@@ -27,7 +27,7 @@ import {
 import { eligiblePlugins, isTaskPane } from '../contributions'
 import { clearSurfaceFailures, recordSurfaceFailure } from '../surfaceFailures'
 import type { FrameBinding } from './broker'
-import { isHostOwnedSurface, paneLayoutFor } from './layouts'
+import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 import { closePluginOverlay, pluginOverlayOpen } from './overlays'
 
 // Turning accepted manifests into shell contributions (docs/plugins.md § Frame contribution kind).
@@ -62,6 +62,10 @@ const PluginOverlay = lazy(() => import('./PluginOverlay'))
 // The pane wrapper for an owner that reserved a strip for other plugins' rows. Only reached by a
 // manifest that declared a point: a pane with no point renders the bare frame.
 const ExtendedPane = lazy(() => import('./ExtendedPane'))
+// The tree path's mount point, the counterpart to PluginFrame above: a region, a panel body or a slot
+// drawn from the host's own components rather than from the plugin's pixels
+// (docs/future/layout/06-remote-tree.md).
+const RemoteTree = lazy(() => import('../tree/RemoteTree').then((module) => ({ default: module.RemoteTree })))
 // Lazy for the reason above, plus one more: this file is evaluated on every shell boot, and a static
 // import would put Monaco's tree in the boot graph for a pane most sessions never open. That includes
 // the client-graph test suites, where `monaco-editor` reads `window.location` at module scope and there
@@ -70,6 +74,10 @@ const DocumentSurface = lazy(() => import('../../editor/DocumentSurface'))
 // The host's layouts. Its own lazy boundary rather than a branch inside the one above, so a shell that
 // only opens whole-pane documents never pulls the splitters and the tab strip in.
 const paneLayouts = () => import('../../layouts')
+
+/** What a pane's regions are being drawn for: a task, or a routed project item. Read per call, never
+ *  captured, so a region that mounts late still sees the current subject. */
+type LayoutScope = { taskId?: string; projectId?: string; item?: string }
 
 const registered = new Map<string, Disposable[]>()
 
@@ -168,6 +176,22 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
 }
 
 function registerSurface(pluginId: string, hash: string, row: NodePluginRow, surface: PluginFrameSurface): Disposable {
+  /**
+   * The bundle entry this surface's one region names, as a contribution ready to mount, or `null` when
+   * it names none and the surface is a rectangle after all.
+   *
+   * For the surfaces whose chrome the host already draws — a reference panel, a settings page — where
+   * `single` is the only layout the manifest parser accepts. There is no arrangement to draw and no
+   * layout component to load; what the layout key buys is the same re-checked way of naming a bundle
+   * entry that a pane uses.
+   */
+  const singleRegionTree = (candidate: PluginFrameSurface) => {
+    const entry = Object.values(paneLayoutFor(pluginId, candidate)?.regions ?? {})
+      .map(remoteRegionEntry)
+      .find((name) => name !== null)
+    return entry ? { id: candidate.id, pluginId, hash, entry } : null
+  }
+
   switch (surface.target) {
     // Unreachable: the loop above skips these before they get here, because an `inline` rectangle has
     // no registry of its own. Spelled rather than left to the exhaustiveness check, so the reason is at
@@ -189,89 +213,108 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         }),
       })
     case 'pane':
+      // How this pane's inside is drawn, once the layout block below has worked it out. Declared out
+      // here because the block that decides it and the block that registers the task pane are two
+      // blocks: the second one also owns the provider gate and the extension-point wrapper, and a pane
+      // with a layout needs both of those as much as one without.
+      let paneDraw: ((scope: () => LayoutScope) => JSX.Element) | null = null
       // A pane that declared one of the host's layouts. The host draws the arrangement and fills each
-      // region: a document region is the host's editor and runs no plugin code at all, a `frame`
-      // region is the plugin's own bundle in an iframe (docs/panes.md § Layout model). This branch
-      // comes before everything else the `pane` case does, because a pane with no `frame` region has
-      // no bundle to mount and no bridge to open.
+      // region: a document region is the host's editor and runs no plugin code at all, a `frame` region
+      // is the plugin's own bundle in an iframe, and a `remote` region is that same bundle in a worker
+      // emitting a tree the host draws (docs/panes.md § Layout model). This comes before everything else
+      // the `pane` case does, because a pane whose regions are all documents has no bundle to mount and
+      // no bridge to open.
       //
       // The routes were confined to `/v2/p/<id>/` when the node parsed the manifest and are confined
       // again here: the manifest reached this device as a roster row, and a node could have sent
       // something its own parser would have rejected.
+      //
+      // Throws, and so is skipped and logged by registerSurfaces, when a roster row carried a layout
+      // name, a region set or a route the node's own parser would have refused.
       {
-        // Throws, and so is skipped and logged by registerSurfaces, when a roster row carried a layout
-        // name, a region set or a route the node's own parser would have refused.
         const declared = paneLayoutFor(pluginId, surface)
-        if (declared) {
-          const Draw = lazy(async () => ({ default: (await paneLayouts()).LAYOUTS[declared.layout] }))
-          return paneRegistry.register({
-            id: surface.id,
-            label: surface.label,
-            glyph: surface.glyph,
-            order: surface.order,
-            when: () => pluginEnabledOnNode(frameNode(), pluginId),
-            component: (props) => {
-              const scope = { taskId: props.task.id, projectId: props.task.projectId ?? undefined }
-              const binding = () => frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId })
-              // Held here rather than passed down, because the regions mount independently: an iframe
-              // can connect its bridge before the editor has finished fetching its document. PluginFrame
-              // reads through the accessor per call, so a frame that got there first still finds the
-              // document when it arrives.
-              const [document, setDocument] = createSignal<DocumentHandle | null>(null)
-              const regions: Record<string, () => JSX.Element> = {}
-              for (const [name, region] of Object.entries(declared.regions)) {
-                // A `frame` region is half this rectangle running the plugin's own bundle in an iframe.
-                // That is why `isHostOwnedSurface` excluded such a pane from the trust bypass, and why
-                // there is a `hash` to hand over.
-                regions[name] = region === 'frame'
-                  ? () => createComponent(PluginFrame, { binding: binding(), hash, document })
-                  : () => createComponent(DocumentSurface, {
-                    pluginId,
-                    surfaceId: surface.id,
-                    nodeId: frameNode(),
-                    region,
-                    scope,
-                    // The updater form, because a Solid setter given a bare value it can call would
-                    // call it, and a document handle is a bag of methods.
-                    onHandle: (next: DocumentHandle | null) => { setDocument(() => next) },
-                  })
+        // One region builder for the two registries below, because the only thing that differs between a
+        // task pane and a project pane here is what the subject is: a task, or a routed item.
+        const drawLayout = declared === null ? null : (() => {
+          const layout = declared.layout
+          const Draw = lazy(async () => ({ default: (await paneLayouts()).LAYOUTS[layout] }))
+          return (scope: () => LayoutScope): JSX.Element => {
+            const binding = () => frameBindingFor(pluginId, surface, row, { taskId: scope().taskId, projectId: scope().projectId })
+            // Held here rather than passed down, because the regions mount independently: an iframe
+            // can connect its bridge before the editor has finished fetching its document. PluginFrame
+            // reads through the accessor per call, so a frame that got there first still finds the
+            // document when it arrives.
+            const [document, setDocument] = createSignal<DocumentHandle | null>(null)
+            const regions: Record<string, () => JSX.Element> = {}
+            for (const [name, region] of Object.entries(declared.regions)) {
+              // Both of these run the plugin's own bytes, which is why `isHostOwnedSurface` excluded such
+              // a pane from the trust bypass and why there is a `hash` to hand over. What differs is
+              // where they run: an iframe with its own origin, or a worker with no DOM at all.
+              if (region === 'frame') {
+                regions[name] = () => createComponent(PluginFrame, { binding: binding(), hash, document })
+                continue
               }
-              return createComponent(Draw, { stateKey: surface.id, label: surface.label, regions })
-            },
+              if (region.kind === 'remote') {
+                // The surface id, not the region name, is the contribution id: `surfaceAction` and the
+                // rail's pane intent both address a pane, and a pane with two remote regions is still one
+                // pane. Which region a message is for is the plugin's own question, and the plugin is the
+                // only side that can answer it.
+                const contribution = { id: surface.id, pluginId, hash, entry: region.entry }
+                regions[name] = () => createComponent(RemoteTree, { contribution, props: scope, scope })
+                continue
+              }
+              regions[name] = () => createComponent(DocumentSurface, {
+                pluginId,
+                surfaceId: surface.id,
+                nodeId: frameNode(),
+                region,
+                scope: scope(),
+                // The updater form, because a Solid setter given a bare value it can call would
+                // call it, and a document handle is a bag of methods.
+                onHandle: (next: DocumentHandle | null) => { setDocument(() => next) },
+              })
+            }
+            return createComponent(Draw, { stateKey: surface.id, label: surface.label, regions })
+          }
+        })()
+
+        // Project scope lands in its own registry: the surface is drawn beside its plugin's rail list, with
+        // no task to hand it and no layout key to persist (registries/projectSurfaces.ts says why the two
+        // aren't one registry). The manifest guarantees both a route and a source that navigates to it, but
+        // it reached this device as a roster row, so the confinement is re-applied here.
+        if (surface.scope === 'project') {
+          const route = (row.installed?.contributions.routes ?? []).find((entry) => entry.surface === surface.id)
+          if (!route) throw new Error(`project-scoped surface '${surface.id}' has no declared route`)
+          if (!route.path.startsWith(pluginProjectRoutePrefix(pluginId))) {
+            throw new Error(`route '${route.path}' is outside ${pluginProjectRoutePrefix(pluginId)}`)
+          }
+          if (!route.path.split('/').includes(`:${route.item}`)) {
+            throw new Error(`route '${route.path}' does not capture '${route.item}'`)
+          }
+          return projectSurfaceRegistry.register({
+            id: surface.id,
+            path: route.path,
+            item: route.item,
+            order: route.order,
+            // No `when` gate, unlike the task pane below. The only thing that renders this is the plugin's
+            // own descriptor rail panel, and the source registry already gates that on the plugin running
+            // on the node being looked at.
+            component: (props) => drawLayout
+              ? drawLayout(() => ({ projectId: props.projectId, item: props.item }))
+              : createComponent(PluginFrame, {
+                binding: frameBindingFor(pluginId, surface, row, { projectId: props.projectId }),
+                hash,
+                // A getter, because the routed item is the project surface's selection and the host
+                // updates it in place rather than remounting (PluginFrame turns each change into a
+                // `select` message). A tree gets the same thing through `scope` above, which is read
+                // per call for the same reason.
+                get item() {
+                  return props.item
+                },
+              }),
           })
         }
-      }
-      // Project scope lands in its own registry: the surface is drawn beside its plugin's rail list, with
-      // no task to hand it and no layout key to persist (registries/projectSurfaces.ts says why the two
-      // aren't one registry). The manifest guarantees both a route and a source that navigates to it, but
-      // it reached this device as a roster row, so the confinement is re-applied here.
-      if (surface.scope === 'project') {
-        const route = (row.installed?.contributions.routes ?? []).find((entry) => entry.surface === surface.id)
-        if (!route) throw new Error(`project-scoped surface '${surface.id}' has no declared route`)
-        if (!route.path.startsWith(pluginProjectRoutePrefix(pluginId))) {
-          throw new Error(`route '${route.path}' is outside ${pluginProjectRoutePrefix(pluginId)}`)
-        }
-        if (!route.path.split('/').includes(`:${route.item}`)) {
-          throw new Error(`route '${route.path}' does not capture '${route.item}'`)
-        }
-        return projectSurfaceRegistry.register({
-          id: surface.id,
-          path: route.path,
-          item: route.item,
-          order: route.order,
-          // No `when` gate, unlike the task pane below. The only thing that renders this is the plugin's
-          // own descriptor rail panel, and the source registry already gates that on the plugin running
-          // on the node being looked at.
-          component: (props) => createComponent(PluginFrame, {
-            binding: frameBindingFor(pluginId, surface, row, { projectId: props.projectId }),
-            hash,
-            // A getter, because the routed item is the project surface's selection and the host updates
-            // it in place rather than remounting (PluginFrame turns each change into a `select` message).
-            get item() {
-              return props.item
-            },
-          }),
-        })
+        paneDraw = drawLayout
       }
       // Did this manifest reserve part of this pane for somebody else? Two locations, two contributors:
       // a `pane.footer` strip filled by other plugins' rows, and a `pane.aside` column filled by the
@@ -321,10 +364,15 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           when: (task) => pluginEnabledOnNode(frameNode(), pluginId)
             && (!surface.providerId || task.links.some((link) => link.providerId === surface.providerId)),
           component: (props) => {
-            const frame = createComponent(PluginFrame, {
-              binding: frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId }),
-              hash,
-            })
+            // A pane that named a layout draws its regions; one that named none is a single rectangle.
+            // Either way the wrapper below is the same, because a footer strip and an aside column
+            // belong to the pane rather than to whatever fills it.
+            const frame = paneDraw
+              ? paneDraw(() => ({ taskId: props.task.id, projectId: props.task.projectId ?? undefined }))
+              : createComponent(PluginFrame, {
+                binding: frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId }),
+                hash,
+              })
             if (!pointId && !aside && !inlineBelow && !inlineBeside) return frame
             return createComponent(ExtendedPane, {
               ...(pointId ? { footerPointId: pointId } : {}),
@@ -368,6 +416,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       if (surface.providerId && surface.providerId !== pluginId) {
         throw new Error(`declared provider '${surface.providerId}' is not '${pluginId}'`)
       }
+      const panelTree = singleRegionTree(surface)
       return refPanelRegistry.register({
         id: surface.id,
         providerId: pluginId,
@@ -376,9 +425,12 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         // `openRefPanel` consults it to decide whether to claim the click at all.
         when: () => pluginEnabledOnNode(frameNode(), pluginId),
         // The host draws the box (./PluginRefPanel.tsx says why it's the host's job, not the frame's).
+        // What goes in it is either the plugin's rectangle or a tree it emits: a panel body is a tree,
+        // and a panel that declared a layout with a remote region says so.
         component: (props) => createComponent(PluginRefPanel, {
           binding: frameBindingFor(pluginId, surface, row),
           hash,
+          ...(panelTree ? { tree: panelTree } : {}),
           get displayId() {
             return props.target.displayId
           },
@@ -443,14 +495,20 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       ]
       return { dispose: () => [...disposables].reverse().forEach((disposable) => disposable.dispose()) }
     }
-    case 'settings':
+    case 'settings': {
+      // Same question as the reference panel above, same answer: the host draws the page around it, so
+      // a settings surface either fills its one region with a tree or hands over a rectangle.
+      const settingsTree = singleRegionTree(surface)
       return settingsRegistry.register({
         id: surface.id,
         label: surface.label,
         group: surface.group ?? 'general',
         order: surface.order,
-        component: () => createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row), hash }),
+        component: () => settingsTree
+          ? createComponent(RemoteTree, { contribution: settingsTree, props: () => ({}) })
+          : createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row), hash }),
       })
+    }
     case 'importer':
       return projectImporterRegistry.register({
         id: surface.id,

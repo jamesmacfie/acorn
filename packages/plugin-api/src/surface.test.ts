@@ -39,6 +39,8 @@ const ENTRYPOINTS = {
   // role enums without loading a component.
   'ui/tokens': 'ui/tokens.ts',
   'ui/sdk': 'ui/sdk.ts',
+  // The tree path's kit: one node per name, plus the universal-renderer calls the JSX preset emits.
+  'ui/tree': 'ui/tree.ts',
 }
 
 // `export { a, b as c, type D } from '…'` and `export type { E, F } from '…'`. The entrypoints are

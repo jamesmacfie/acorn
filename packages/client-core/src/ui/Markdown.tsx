@@ -28,6 +28,15 @@ export default function Markdown(props: {
   /** Sandboxed frames have no `navigator.clipboard`, so they pass their bridge's copy here. */
   onCopy?: (text: string) => void
   onClick?: (event: MouseEvent) => void
+  /**
+   * A link inside the rendered content was clicked, by its href. The browser's own navigation is
+   * cancelled, so the handler owns where it goes.
+   *
+   * One of the kit's eleven events, and that is the point: `onClick` hands over a DOM event, which a
+   * remote tree cannot receive and a terminal host does not have. A plugin that re-points itself when
+   * one of its own tickets is linked needs this and nothing more.
+   */
+  onSelect?: (href: string) => void
 }) {
   let root: HTMLDivElement | undefined
   let generation = 0
@@ -101,7 +110,14 @@ export default function Markdown(props: {
     <div
       ref={root}
       class="ui-markdown"
-      onClick={(event) => props.onClick?.(event)}
+      onClick={(event) => {
+        const href = (event.target as HTMLElement | null)?.closest('a')?.getAttribute('href')
+        if (props.onSelect && href) {
+          event.preventDefault()
+          props.onSelect(href)
+        }
+        props.onClick?.(event)
+      }}
     />
   )
 }

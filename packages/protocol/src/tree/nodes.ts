@@ -22,9 +22,10 @@ export const TREE_PROTOCOL_VERSION = 1
 export const KIT_NODES = [
   // Grouping
   'Stack', 'Inline', 'Section', 'Fold', 'CollapsibleSection', 'Card', 'Timeline', 'Tabs', 'Toolbar',
-  'Modal', 'Menu', 'Popover', 'ListDetail', 'SplitHandle', 'DocumentTabs', 'SectionHeader',
+  'Modal', 'ModalBody', 'ModalActions', 'Menu', 'Popover', 'ListDetail', 'ListColumn', 'DetailColumn',
+  'SplitHandle', 'DocumentTabs', 'SectionHeader', 'TabPanel', 'ToolbarSpacer',
   // Showing
-  'Heading', 'Rows', 'Row', 'TreeRow', 'RowActions', 'Badge', 'Chip', 'ChipRow', 'StatusDot', 'Facts',
+  'Text', 'Heading', 'Rows', 'Row', 'TreeRow', 'RowActions', 'Badge', 'Chip', 'ChipRow', 'StatusDot', 'Facts',
   'DescriptionList', 'Table', 'Grid', 'Meter', 'CodeBlock', 'Log', 'Markdown', 'DiffPane', 'DiffLine',
   'FileHead', 'NonCodeRow', 'SplitCell', 'EmptyState', 'Alert', 'Spinner', 'Kbd', 'UserAvatar', 'Icon',
   // Asking

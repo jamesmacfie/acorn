@@ -263,7 +263,7 @@ export default function WorkspaceProjectAssignments() {
 
       <Show when={confirmDeleteWorkspace()}>
         {(workspace) => (
-          <Modal onClose={() => setConfirmDeleteWorkspace(null)} title="Delete workspace" size="sm" role="alertdialog">
+          <Modal onDismiss={() => setConfirmDeleteWorkspace(null)} title="Delete workspace" size="sm" role="alertdialog">
             <Modal.Body>
               <p>Delete <strong>{workspace().name}</strong>?</p>
               <Show when={projectsIn(workspace().id)}>
@@ -438,7 +438,7 @@ function DeleteProjectModal(props: {
   onConfirm: () => void
 }) {
   return (
-    <Modal onClose={props.onCancel} title="Delete project" size="sm" role="alertdialog">
+    <Modal onDismiss={props.onCancel} title="Delete project" size="sm" role="alertdialog">
       <Modal.Body>
         <p>
           Delete <strong>{props.project.name}</strong> from acorn?
@@ -477,7 +477,7 @@ function NewWorkspaceModal(props: {
     if (value) props.onConfirm(value)
   }
   return (
-    <Modal onClose={props.onCancel} title="Move to a new workspace" size="sm">
+    <Modal onDismiss={props.onCancel} title="Move to a new workspace" size="sm">
       <form onSubmit={submit}>
         <Modal.Body>
           <p class="muted">Create a workspace and move <strong>{props.project.name}</strong> into it.</p>

@@ -44,11 +44,15 @@ const ROOT = resolve(NODE_APP, '../..')
 const PLUGINS_DIR = join(ROOT, 'plugins')
 const CONFIG_FILE = 'acorn-plugin.config.mjs'
 
-// A frame owns its realm and bundle, so its framework choice is independent of the shell's. The
-// config names a framework and this maps it to the Vite transforms the frame bundle needs; a plugin
-// whose frame needs none omits the key, and adding a framework is one line here.
+// A loaded bundle's framework choice is its own, and this maps it to the Vite transforms that choice
+// needs; a bundle that needs none omits the key, and adding a framework is one line here.
+//
+// `generate: 'universal'` is what makes the output a tree rather than a document: every element
+// creation and property set in the plugin's JSX compiles to a call into the module named below, which
+// builds acorn's own node names instead of DOM (docs/future/layout/06-remote-tree.md § The SDK). A
+// bundle that still wants an iframe writes no JSX at all, or brings its own transform.
 const FRAMEWORKS = {
-  solid: () => [solid()],
+  solid: () => [solid({ solid: { generate: 'universal', moduleName: '@acorn/plugin-api/ui/tree' } })],
 }
 
 const buildable = () =>

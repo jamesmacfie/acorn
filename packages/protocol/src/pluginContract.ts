@@ -109,13 +109,22 @@ const documentRegion = z.object({
   completions: documentCompletions.optional(),
 })
 
-// What fills one region of a layout.
+// What fills one region of a layout. Three kinds, and the difference between them is who draws the
+// pixels.
 //
-// `'frame'` is this plugin's own bundle in a sandboxed iframe, which is the only thing a loaded plugin
-// can put in a region until the remote tree lands (docs/future/layout/phase-3-remote-root-and-worker.md).
-// A document region is host-drawn: the plugin contributes routes and a language id, no code.
+// `'frame'` is this plugin's own bundle in a sandboxed iframe: the plugin draws, and the host sees a
+// rectangle. A `remote` region is the same bundle running in a worker with no DOM, emitting a tree of
+// the host's own component names, which the host draws (docs/future/layout/06-remote-tree.md); `entry`
+// is a key of the object the bundle passed to `mountTree`. A document region is host-drawn outright:
+// the plugin contributes routes and a language id, no code.
+//
+// Two of the three run the plugin's bytes, and both are gated on an accepted bundle hash. Only the
+// document region is free of that, which is why `hasFrameRegion` and `hasRemoteRegion` are asked
+// separately below rather than being one "does this run code" predicate: they differ in what the
+// runtime has to hand over, an iframe origin versus a worker port.
 const paneRegionSource = z.union([
   z.literal('frame'),
+  z.object({ kind: z.literal('remote'), entry: z.string().min(1).max(64) }).strict(),
   z.object({ kind: z.literal('document') }).extend(documentRegion.shape),
 ])
 
@@ -880,10 +889,17 @@ export const isProjectPaneSurface = (frame: { target: string; scope?: string }):
 /** A full-screen picker the host places. Not a pane: it belongs to no task's layout. */
 export const isOverlaySurface = (frame: { target: string }): boolean => frame.target === 'overlay'
 
-/** Does this pane run any of the plugin's own bundle? A `frame` region is the only thing that does,
- *  which makes it the question behind the trust gate, the key claims, and `surfaceAction`. */
+/** Does this pane hold a rectangle of the plugin's own pixels? A `frame` region is the only thing that
+ *  does, which makes it the question behind the key claims and `surfaceAction`. */
 export const hasFrameRegion = (frame: { regions?: Record<string, unknown> }): boolean =>
   Object.values(frame.regions ?? {}).some((region) => region === 'frame')
+
+/** Does this pane draw any region from a tree the plugin's own bundle emits? Same bytes as a frame and
+ *  the same trust gate; what differs is that the host mounts its own components for what arrives. */
+export const hasRemoteRegion = (frame: { regions?: Record<string, unknown> }): boolean =>
+  Object.values(frame.regions ?? {}).some(
+    (region) => typeof region === 'object' && region !== null && (region as { kind?: unknown }).kind === 'remote',
+  )
 
 /** Does this pane have a host-drawn editor in it? */
 export const hasDocumentRegion = (frame: { regions?: Record<string, unknown> }): boolean =>
@@ -923,9 +939,12 @@ export type PluginDocumentRegion = Omit<z.infer<typeof documentRegion>, 'languag
   languageId: string
   completions?: PluginDocumentCompletions
 }
-/** What one region holds. A document region carries the `kind` tag so the union stays discriminated
- *  once a remote entry joins it in phase 3 of the layout programme. */
-export type PluginPaneRegion = 'frame' | ({ kind: 'document' } & PluginDocumentRegion)
+/** What one region holds. The two object kinds carry a `kind` tag so the union stays discriminated;
+ *  `'frame'` is a bare string because it has nothing to say beyond its own name. */
+export type PluginPaneRegion =
+  | 'frame'
+  | { kind: 'remote'; entry: string }
+  | ({ kind: 'document' } & PluginDocumentRegion)
 export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'layout' | 'regions' | 'coreSlot'> & {
   scope?: 'task' | 'project'
   claimsKeys?: string[]

@@ -1,11 +1,13 @@
 import { createSignal, For, Show } from 'solid-js'
-import { Alert, Button, Chip, defaultModelIdFor, Modal, ModelConnectionPicker, Picker, Textarea } from '@acorn/plugin-api/ui'
+import {
+  Alert, Button, Chip, ChipRow, defaultModelIdFor, Modal, ModalActions, ModalBody,
+  ModelConnectionPicker, Picker, Stack, Text, Textarea,
+} from '@acorn/plugin-api/ui/tree'
 import { AcornBridgeError } from '@acorn/plugin-api/ui/sdk'
 import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
 import type { DbSavedQuery } from '../shared/database'
 import { GENERATE_MAX_PROMPT_CHARS } from '../shared/database'
 import { generateSql } from './databaseClient'
-import { filterSavedQueries } from './databaseModel'
 
 // Describe a query in words, get SQL. The prompt is built on the node from the live schema, the repo's
 // schema notes and any saved queries picked as examples; the key never comes near this frame.
@@ -26,7 +28,7 @@ export default function GenerateSqlModal(props: {
   taskId: string
   connections: AvailableModelConnection[]
   queries: readonly DbSavedQuery[]
-  onClose: () => void
+  onDismiss: () => void
   onGenerated: (sql: string) => void
 }) {
   const [prompt, setPrompt] = createSignal('')
@@ -39,7 +41,6 @@ export default function GenerateSqlModal(props: {
   const chosen = () => props.queries.filter((q) => exampleIds().includes(q.id))
   const toggle = (q: DbSavedQuery) =>
     setExampleIds((ids) => (ids.includes(q.id) ? ids.filter((i) => i !== q.id) : [...ids, q.id]))
-  const matches = (query: string) => filterSavedQueries(props.queries, query)
 
   const generate = async () => {
     if (busy() || !prompt().trim() || !connectionId()) return
@@ -53,7 +54,7 @@ export default function GenerateSqlModal(props: {
         ...(exampleIds().length ? { queryIds: exampleIds() } : {}),
       })
       props.onGenerated(res.sql)
-      props.onClose()
+      props.onDismiss()
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -61,59 +62,55 @@ export default function GenerateSqlModal(props: {
     }
   }
 
-  // Modal owns the deferred focus; a bare `autofocus` is unreliable inside a Solid modal.
-  let promptInput: HTMLTextAreaElement | undefined
-
   return (
-    <Modal
-      title="Generate SQL"
-      autoFocus={() => promptInput}
-      onClose={props.onClose}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return false
-        void generate()
-        return true
-      }}
-    >
-      <Modal.Body>
+    // ⌘Enter used to be a `keydown` on the dialog. A DOM event does not cross to a sandbox with no
+    // DOM, so the Generate button is the only way to fire it now.
+    <Modal title="Generate SQL" onDismiss={props.onDismiss}>
+      <ModalBody>
         <Textarea
           mono
           rows={4}
           maxLength={GENERATE_MAX_PROMPT_CHARS}
           assist={false}
+          autofocus
           placeholder="Describe the query — e.g. the 10 most recent orders with the customer's email"
-          ref={(el) => { promptInput = el }}
           value={prompt()}
-          onInput={(value) => setPrompt(value)}
+          onChange={(value: string) => setPrompt(value)}
         />
         <Show when={props.queries.length}>
-          <div class="db-examples">
-            <span class="muted db-hint">Example queries</span>
-            <div class="db-chips">
+          <Stack gap="row">
+            <Text emphasis="eyebrow">Example queries</Text>
+            <ChipRow ariaLabel="Example queries">
               <For each={chosen()}>
                 {(q) => (
                   <Chip title={q.notes ?? ''} onRemove={() => toggle(q)}>{q.name}</Chip>
                 )}
               </For>
-              <Picker<DbSavedQuery>
+              {/* The data form of the picker: a tree cannot hand over a `results(query)` callback. */}
+              <Picker
                 keepOpen
                 label="Add example…"
                 placeholder="Filter saved queries…"
                 emptyText="No matching queries."
-                buttonClass="db-chip-add"
-                results={matches}
-                rowLabel={(q) => q.name}
-                isActive={(q) => exampleIds().includes(q.id)}
-                onSelect={toggle}
+                items={props.queries.map((q) => ({
+                  id: q.id,
+                  label: q.name,
+                  ...(q.notes ? { note: q.notes } : {}),
+                  active: exampleIds().includes(q.id),
+                }))}
+                onPick={(id: string) => {
+                  const q = props.queries.find((candidate) => candidate.id === id)
+                  if (q) toggle(q)
+                }}
               />
-            </div>
-          </div>
+            </ChipRow>
+          </Stack>
         </Show>
         <ModelConnectionPicker
           connections={props.connections}
           connectionId={connectionId()}
           modelId={modelId()}
-          onChange={(sel) => {
+          onChange={(sel: { connectionId: string; modelId: string }) => {
             setConnectionId(sel.connectionId)
             setModelId(sel.modelId)
           }}
@@ -121,13 +118,13 @@ export default function GenerateSqlModal(props: {
         <Show when={error()}>
           <Alert>{error()}</Alert>
         </Show>
-      </Modal.Body>
-      <div class="db-generate-actions">
-        <Button disabled={busy()} onPress={props.onClose}>Cancel</Button>
+      </ModalBody>
+      <ModalActions>
+        <Button disabled={busy()} onPress={props.onDismiss}>Cancel</Button>
         <Button variant="solid" disabled={busy() || !prompt().trim()} onPress={() => void generate()}>
           {busy() ? 'Generating…' : 'Generate'}
         </Button>
-      </div>
+      </ModalActions>
     </Modal>
   )
 }

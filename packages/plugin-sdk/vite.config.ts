@@ -7,9 +7,11 @@ import { defineConfig } from 'vite'
 // which import a dependency. If a future edit makes it pull in Zod, Solid or anything else, that is
 // the signal that the export it followed does not belong on that surface.
 //
-// `remote.js` is the Solid adapter, and it externalizes both Solid and this package's own entry. The
-// second one matters: the remote root holds per-root state, so a bundled copy would give the adapter
-// a different root from the one `mountTree` handed it.
+// `remote.js` is the Solid adapter, and it externalizes Solid. What it must NOT do is carry its own
+// copy of the remote root, which holds per-root state: a second copy would give the adapter a
+// different root from the one `mountTree` handed it. Both entries reach that module, so Rollup emits
+// it once as a shared chunk beside them — which is why `dist` is three files rather than two, and why
+// the chunk is as load-bearing as the two named ones.
 export default defineConfig({
   build: {
     target: 'es2022',

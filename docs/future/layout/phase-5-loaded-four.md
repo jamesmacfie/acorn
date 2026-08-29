@@ -1,6 +1,8 @@
 # Phase 5: the loaded four move to the remote root
 
-Status: not started.
+Status: **shipped**. Behaviour is owned by `docs/plugin-authoring.md` § The client half,
+`docs/panes.md` § Layout model, `docs/plugins.md` § Remote trees and `docs/ui-design.md` § The closed
+kit. What follows is the plan as written, plus the deviations at the end.
 
 ## Goal
 
@@ -113,8 +115,45 @@ Files: `plugins/rollbar/src/frame/{index.tsx,app.tsx,RollbarItemView.tsx}` and i
 ## Verify before building
 
 - The four plugins still have `src/frame/index.tsx` calling `mountFrame` and a `.css?inline` import.
-- `plugins/database/src/frame/ResultGrid.tsx` exists and is the custom grid.
+- `plugins/database/src/frame/ResultGrid.tsx` (deleted) exists and is the custom grid.
 - `packages/client-core/src/plugins/frames/PluginRefPanel.tsx` draws the box and mounts a
   `PluginFrame`.
 - Each plugin's `acorn-plugin.config.mjs` (or equivalent) names `framework: 'solid'`.
 - Re-run the raw-tag survey for these four to size the work.
+
+## What actually shipped, and where it differs
+
+Six deviations, all decided while building and all for the same underlying reason: the kit as phase 0
+left it was written for the shell, and the wire only carries data.
+
+1. **Three panes are `single`, not the layout the plan named.** http was to be `list-detail` and
+   rollbar and linear `header-body`. A pane layout fills each region from its own renderer, and the two
+   columns of the API panel share the selection, the draft and the send result — two regions are two
+   renderers with no way to hold one signal between them. So the split stayed a `ListDetail` inside one
+   tree, and the pane declares `single`. Database keeps `document-over-frame`, where the two regions
+   genuinely are two things.
+2. **The kit grew seven nodes and lost four prop names.** A remote tree names one type per node and can
+   only carry a handler under one of the kit's eleven events, and neither was true of the shipped kit.
+   `Text` (named in 04-kit.md and never built), `ToolbarSpacer`, `ModalBody`, `ModalActions`,
+   `TabPanel`, `ListColumn` and `DetailColumn` are new; `Modal.onClose` became `onDismiss`,
+   `Input`/`Textarea` `onCommit` became `onChange`, and `Grid.onSelectRow` became `onSelect`.
+   `docs/ui-design.md` § The closed kit carries the rule those all follow from.
+3. **Three components grew a data form beside their callback form.** `Picker` takes `items` and filters
+   them itself, `ListDetail` takes column children instead of a `list` element, and `Composer` holds its
+   own live text and hands it to `onSubmit`. The callback forms stay for shell code.
+4. **A layout is valid on a reference panel and a settings page, not only a pane.** Both had to move —
+   linear's panel and http's variables page are the same bundle as their panes — and `single` is the
+   only layout either may name, because the host draws everything around them.
+5. **Rollbar has no `refPanel` frame to move.** The plan named one for both; only linear declares one.
+6. **Four accepted UI differences, each recorded in the owning doc.** A curl command pasted into http's
+   URL bar expands on commit rather than on paste, and the method chip is no longer colour-coded per
+   verb (`docs/http-client.md`); linear no longer inlines private uploads, so an image in a ticket is a
+   link (`docs/integrations.md`); and linear and rollbar dropped the brand headers they drew because an
+   iframe had no chrome to borrow.
+
+One thing the plan asked for that is not here: a per-plugin test that renders each pane through a real
+worker and diffs it against the direct path. A worker needs a built bundle on disk and jsdom has no
+`Worker`, so what is pinned instead is everything downstream of the JSX preset —
+`client-core/src/plugins/tree/remoteSolid.test.tsx` renders the kit's node components through the
+remote root and `TreeHost` and diffs that against the components themselves. The preset itself is the
+running app's business, and `docs/testing.md`'s smoke checklist is where it is checked.

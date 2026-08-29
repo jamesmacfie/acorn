@@ -41,7 +41,9 @@ describe('plugin-api entrypoints load in a node environment', () => {
     //
     // `./ui/tokens` is the kit's vocabulary as data — role enums and the support matrix, no
     // components — and being loadable here is exactly why it is its own entrypoint.
-    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './ui/diff', './ui/sdk', './ui/tokens'])
+    // `./ui/tree` is node-safe: it is the sandbox's own renderer, so it reaches Solid's isomorphic
+    // core and the remote root and nothing that touches a document.
+    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './ui/diff', './ui/sdk', './ui/tokens', './ui/tree'])
     expect([...BROWSER_REALM].every((entry) => entry in PKG.exports)).toBe(true)
   })
 

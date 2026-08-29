@@ -10,8 +10,9 @@
 
 export {
   Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, DescriptionList, EmptyState,
-  Field, Input, Kbd, ListDetail, Meter, Row, SectionHeader, SegmentedControl, Select, Spinner,
-  SplitHandle, StatusDot, Table, Textarea, ToggleButton, Toolbar, TreeRow,
+  DetailColumn, Field, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
+  SegmentedControl, Select, Spinner, SplitHandle, StatusDot, Table, Textarea, ToggleButton, Toolbar,
+  ToolbarSpacer, TreeRow,
 } from '@acorn/client-core/ui/primitives.tsx'
 export { default as Icon } from '@acorn/client-core/ui/Icon.tsx'
 export { default as Picker } from '@acorn/client-core/ui/Picker.tsx'
@@ -43,8 +44,8 @@ export { tip } from '@acorn/client-core/ui/tips.tsx'
 export { createArmedConfirm } from '@acorn/client-core/ui/confirm.ts'
 export { default as CopyButton } from '@acorn/client-core/ui/CopyButton.tsx'
 export { default as MentionTextarea } from '@acorn/client-core/ui/MentionTextarea.tsx'
-export { Modal } from '@acorn/client-core/ui/Modal.tsx'
-export { Tabs } from '@acorn/client-core/ui/Tabs.tsx'
+export { Modal, ModalActions, ModalBody } from '@acorn/client-core/ui/Modal.tsx'
+export { Tabs, TabPanel } from '@acorn/client-core/ui/Tabs.tsx'
 export type { TabDef } from '@acorn/client-core/ui/Tabs.tsx'
 export { UserAvatar } from '@acorn/client-core/ui/UserAvatar.tsx'
 // Provider markdown to sanitized HTML. Also on ./client, which the compiled shell reaches it
@@ -67,7 +68,8 @@ export { rowHeightSm } from '@acorn/client-core/ui/metrics.ts'
 // Controlled connection and model dropdowns over `availableModelConnections`. On this barrel because
 // it is presentation only, a protocol type in and two selects out, and a plugin whose own route calls
 // `core.models.generateText` needs to offer the picker from a frame.
-export { default as ModelConnectionPicker, defaultModelIdFor } from '@acorn/client-core/modelProviders/ModelConnectionPicker.tsx'
+export { default as ModelConnectionPicker } from '@acorn/client-core/modelProviders/ModelConnectionPicker.tsx'
+export { defaultModelIdFor } from '@acorn/client-core/modelProviders/defaultModel.ts'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.
@@ -85,6 +87,7 @@ export { DiffPane } from '@acorn/client-core/diff/DiffPane.tsx'
 // @acorn/plugin-api/ui/tokens for the role enums their props take.
 export { Stack } from '@acorn/client-core/ui/Stack.tsx'
 export { Inline } from '@acorn/client-core/ui/Inline.tsx'
+export { Text } from '@acorn/client-core/ui/Text.tsx'
 export { Heading } from '@acorn/client-core/ui/Heading.tsx'
 export { Section } from '@acorn/client-core/ui/Section.tsx'
 export { Timeline } from '@acorn/client-core/ui/Timeline.tsx'

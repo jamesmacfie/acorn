@@ -539,33 +539,84 @@ be here was interchangeable with `console` at every call site, so nobody reached
 
 ## The client half
 
-A frame is a **host-generated iframe document**, not a component in the shell's tree. The shell
-serves it from a content-addressed cache on `app-plugin://<bundle-hash>/`, and the handler answers
-exactly four paths (`apps/desktop/src-tauri/src/plugin_scheme.rs`):
+There are two ways for your bundle to draw, and the choice is one line in your package config.
 
-- `/` and `/index.html` — the generated document. The plugin owns what runs; it does not own the
-  document, the CSP or the bootstrap, which is what keeps the policy un-overridable by markup.
-- `/ui.css` — the host's shared presentation stylesheet, identical at every plugin origin.
-- `/client.js` — your file.
+**A tree** is the one to reach for. Your code runs in a Web Worker with no DOM and emits a tree of
+acorn's own component names; the host mounts its own components for them. What the reader gets has the
+shell's focus behaviour, keyboard handling, ARIA and appearance pack, none of which an iframe can
+borrow — and you ship no stylesheet, because you never name a pixel. The four loaded plugins acorn
+ships (`http`, `database`, `linear`, `rollbar`) all draw this way.
 
-Everything else is a 404. **That is the single-file rule**: there is no plugin-controlled asset tree,
-so a second module, a stylesheet, an image or a font cannot be fetched. Inline them — the CSP allows
-`img-src 'self' data:` for exactly this. And `connect-src 'none'` means a frame has no network at all:
-not a restricted one, none. `fetch`, XHR, WebSocket, `sendBeacon` and EventSource all fail. Its only
-I/O is the `MessagePort` the host transfers in.
+**A frame** is an iframe with your own document in it. It survives for surfaces that own their pixels —
+a canvas, a chart library, a rich editor — and it is priced honestly: DOM-only, no focus or key
+handling from the host, and a stylesheet of your own to keep in step. See
+[Appendix: the frame path](#appendix-the-frame-path).
 
-Because the document is the host's and it loads your file as a module script, there is also no
-framework requirement. Vanilla DOM is the natural fit, and the bridge is the whole surface a frame
-has anyway.
+### Drawing a tree
 
-Two browser affordances that are absent and surprise people: `window.confirm` and `alert` are
-suppressed (the iframe is deliberately not `allow-modals`, so `confirm()` returns `false` and a
-guarded action silently does nothing), and `navigator.clipboard` refuses to write because the frame's
-document is not the focused one. Use the bridge's `ui.copy`, and draw your own confirmation.
+Point your JSX preset at the remote adapter and every element and property in your components compiles
+into acorn's tree instead of into a document:
+
+```js
+// acorn-plugin.config.mjs
+client: { entry: './src/tree/index.tsx', framework: 'solid' }
+```
+
+```tsx
+import { mountTree } from '@acorn/plugin-api/ui/sdk'
+import { Button, Heading, Stack, Text, solidTree } from '@acorn/plugin-api/ui/tree'
+
+function IssuePane(props: { taskId?: string; bridge: AcornBridge }) {
+  return (
+    <Stack gap="section">
+      <Heading level={1} eyebrow="ENG-4102">Retries never back off</Heading>
+      <Text tone="muted">Opened 3d ago</Text>
+      <Button onPress={() => void props.bridge.ui.toast('hello')}>Say hello</Button>
+    </Stack>
+  )
+}
+
+mountTree({ pane: solidTree(IssuePane) })
+```
+
+The manifest says which renderer fills which region. A surface that draws a tree names a `layout` and
+fills its `regions`; `single` is the trivial one, for a surface that is one tree:
+
+```json
+{ "target": "pane", "id": "issues", "label": "Issues",
+  "layout": "single", "regions": { "body": { "kind": "remote", "entry": "pane" } } }
+```
+
+A pane may name any layout ([docs/panes.md](./panes.md) § Layout model). A reference panel and a
+settings page may name `single` and nothing else, because the host already draws everything around
+them.
+
+**Four rules follow from the tree being data on a message port**, and each one is checked on arrival
+rather than trusted:
+
+- **Only acorn's components.** Every node name is one the host knows; anything else draws a labelled
+  placeholder and records a row on your plugin's page, which is the forward-compatibility rule applied
+  to nodes. `class`, `style`, `innerHTML` and `ref` never cross.
+- **Only acorn's events.** A function survives as a prop only under one of eleven names: `onPress`,
+  `onChange`, `onSubmit`, `onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`,
+  `onDismiss`, `onPick`, `onRemove`. A raw key, pointer or paste handler is dropped — a terminal host
+  has none of them, and every one of the eleven maps onto a key there.
+- **No element in a prop, and no callback in one.** A prop is JSON. A component that takes a JSX prop
+  in the shell takes data over the wire instead: `Facts` takes strings, `Picker` takes `items`, and a
+  split is a `ListDetail` with `ListColumn` and `DetailColumn` children.
+- **Text fields commit rather than stream.** `Input`, `Textarea` and `Composer` are host-owned: you
+  get the value on blur, on Enter (`onSubmit`), or on submit, never per keystroke. Per-keystroke UI
+  over a message port is a hop per key, and the kit refuses to send one.
+
+**Your subject comes from the mount props, not from `bridge.context`.** One worker serves every tree
+your bundle draws, so it holds one bridge and one context; the props are per slot and always current.
+A pane tree is mounted with `{ taskId, projectId }`, a project pane and a reference panel with
+`{ item }`. `bridge.onSelect` and `bridge.onSurfaceAction` reach you exactly as they reach a frame.
 
 ### Reaching the bridge
 
-In-repo frames import `connect()` and `mountFrame()` from `@acorn/plugin-api/ui/sdk`. **A hand-written
+In-repo bundles import `connect()`, `mountFrame()` and `mountTree()` from `@acorn/plugin-api/ui/sdk`,
+and the tree path's nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. **A hand-written
 `client.js` cannot.** That is a bare specifier with no bundler to resolve it, and the origin would have
 nowhere to serve the resolved file from even if there were. Copying the SDK's source in is not an
 option either: `packages/client-core/src/plugins/frames/sdk.ts` is TypeScript and imports from
@@ -575,8 +626,9 @@ There are two answers, and which one you want is decided by a question this prof
 asks you: **do you have a bundler?**
 
 **If you do** — and you may; nothing here forbids it, the rule is that the *output* is one file —
-`npm install acorn-plugin-sdk` and import `connect`, `mountFrame`, `openLinkOnClick` and the
-`AcornBridge` type from it. It is the same code in-repo frames import, published from
+`npm install acorn-plugin-sdk` and import `connect`, `mountFrame`, `mountTree`, `openLinkOnClick` and
+the `AcornBridge` type from it, plus `acorn-plugin-sdk/remote` for the tree path's nodes and its Solid
+adapter. It is the same code in-repo frames import, published from
 `packages/plugin-sdk`, framework-free and dependency-free, and bundling it into your one `client.js`
 satisfies the single-file rule exactly as your own modules do. Your node half still may not use bare
 specifiers unless you bundle that too. What you get over the copy below is the typed surface and the
@@ -631,7 +683,7 @@ messages by hand:
 | `events.on` | Subscribe to a channel the manifest declared: one of the shell's four, or your own `plugin:<your-id>:<verb>`. The payload is whatever your node half put on the frame beside `channel`. |
 | `state.get` / `state.set` | Durable storage keyed `(pluginId, key)` by the host, capped at 1 MiB per value. The same `plugin:<id>:*` namespace your node half's `prefs` facet is projected into — this is the supported node-half↔frame state channel. Distinct from the frame's own `localStorage`, which works but is keyed by bundle hash and so rotates with every update. |
 | `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. |
-| `document.read` / `write` / `flush` | Only from a pane whose layout puts a document region beside this frame. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
+| `document.read` / `write` / `flush` | Only from a pane whose layout puts a document region beside your region. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
 | `webview.*` | `navigate`, `back`, `forward`, `reload`, plus navigation and blocked events. Controller-only: you cannot read the page or type into it. |
 | `keys.claim` | Narrow the manifest's declared chord set at runtime. It can never widen it. |
 
@@ -856,6 +908,38 @@ connected.then(async (context) => {
 
 Install it with the local-path source above, restart the node, accept the bundle when the device asks,
 and the pane is in the task pane switcher.
+
+## Appendix: the frame path
+
+Everything in this section is the older of the two ways to draw. Reach for it when your surface owns
+its own pixels; reach for a tree otherwise.
+
+A frame is a **host-generated iframe document**, not a component in the shell's tree. The shell
+serves it from a content-addressed cache on `app-plugin://<bundle-hash>/`, and the handler answers
+exactly four paths (`apps/desktop/src-tauri/src/plugin_scheme.rs`):
+
+- `/` and `/index.html` — the generated document. The plugin owns what runs; it does not own the
+  document, the CSP or the bootstrap, which is what keeps the policy un-overridable by markup.
+- `/ui.css` — the host's shared presentation stylesheet, identical at every plugin origin.
+- `/client.js` — your file.
+
+Everything else is a 404. **That is the single-file rule**: there is no plugin-controlled asset tree,
+so a second module, a stylesheet, an image or a font cannot be fetched. Inline them — the CSP allows
+`img-src 'self' data:` for exactly this. And `connect-src 'none'` means a frame has no network at all:
+not a restricted one, none. `fetch`, XHR, WebSocket, `sendBeacon` and EventSource all fail. Its only
+I/O is the `MessagePort` the host transfers in.
+
+Because the document is the host's and it loads your file as a module script, there is also no
+framework requirement. Vanilla DOM is the natural fit, and the bridge is the whole surface a frame
+has anyway.
+
+Two browser affordances that are absent and surprise people: `window.confirm` and `alert` are
+suppressed (the iframe is deliberately not `allow-modals`, so `confirm()` returns `false` and a
+guarded action silently does nothing), and `navigator.clipboard` refuses to write because the frame's
+document is not the focused one. Use the bridge's `ui.copy`, and draw your own confirmation.
+
+The complete example above is a frame, and deliberately: a tree needs either a bundler or the tree
+channel written out by hand, and this profile assumes neither.
 
 ## Updating a plugin, and the data underneath it
 

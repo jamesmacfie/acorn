@@ -173,6 +173,24 @@ automated covers is a real worker started from a real bundle over the shell's ow
     the plugin's page, and the transcript around it keeps working — scrolling, selection, every other
     card.
 
+The next four are the loaded four's, from layout phase 5 (2026-08-30). All four panes are trees now and
+the automated tiers stop at the JSX preset, so these are the eyes-on pass on the shipped plugins.
+
+19. Open the API pane on a task. The request tree, the URL bar, the tabs and the response all draw.
+    Send a request; paste a curl command into the URL bar and press Enter — the whole request fills in,
+    on the commit rather than on the paste. Save one through the dialog, then delete one: two clicks,
+    with the label changing between them.
+20. Open the Database pane on a task with a database. The SQL editor is above, the table list, grid and
+    row detail below, and `⌘Enter` in the editor runs the query. Save a query, then load it back from
+    the picker and delete it from the picker's own row control.
+21. Open a task linked to a Linear ticket, then the same ticket's reference panel from a PR body. Both
+    draw from one worker. Post a comment, open a sub-issue from the Overview tab and come back with
+    the back affordance, and click a `linear.app` link inside the description — it re-points this view
+    rather than opening a browser.
+22. Open a task linked to a Rollbar item, pick an occurrence, and copy its context. Then reject one of
+    the four bundles at the trust prompt: its pane draws the labelled placeholder and the other three
+    keep working.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes

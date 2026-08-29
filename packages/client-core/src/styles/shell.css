@@ -140,6 +140,22 @@
 .layout-region-frame,
 .layout-region-top { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
+/* `single`. The one region is the scroller; see the comment in layouts/Single.tsx for why the layout
+   root cannot be. `padding-inline` rather than `padding`, because the vertical rhythm inside a region
+   is the kit's `gap` roles and a top pad would double the first one. */
+.layout-single-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding-inline: var(--pane-pad);
+}
+/* Except when the region is a split. Its divider is the two columns' shared edge and has to reach the
+   pane's, and its list column does its own padding. */
+.layout-single-body:has(> .ui-listdetail) { padding-inline: 0; }
+
 /* The regions a drag sizes take an inline pixel length; their sibling takes what is left. */
 .layout-region-document,
 .layout-region-bottom { flex: none; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }

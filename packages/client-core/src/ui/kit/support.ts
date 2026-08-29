@@ -27,14 +27,26 @@ export const NODE_SUPPORT = {
   Tabs: { dom: 'full', tui: 'full' },
   Toolbar: { dom: 'full', tui: 'full' },
   Modal: { dom: 'full', tui: 'full' },
+  // The two halves of a Modal as nodes rather than as `Modal.Body` and `Modal.Actions`: a remote tree
+  // names one type per node and has nowhere to put the dot.
+  ModalBody: { dom: 'full', tui: 'full' },
+  ModalActions: { dom: 'full', tui: 'full' },
   Menu: { dom: 'full', tui: 'full' },
   Popover: { dom: 'full', tui: 'reduced' },
   ListDetail: { dom: 'full', tui: 'reduced' },
+  // The columns as nodes, for a caller that cannot put an element in ListDetail's `list` prop.
+  ListColumn: { dom: 'full', tui: 'reduced' },
+  DetailColumn: { dom: 'full', tui: 'full' },
   SplitHandle: { dom: 'full', tui: 'absent' },
   DocumentTabs: { dom: 'full', tui: 'full' },
   SectionHeader: { dom: 'full', tui: 'full' },
+  // The panel half of a tab strip, for the same reason ModalBody is a node.
+  TabPanel: { dom: 'full', tui: 'full' },
+  // The gap that pushes what follows to the far end of a toolbar.
+  ToolbarSpacer: { dom: 'full', tui: 'full' },
 
   // Showing
+  Text: { dom: 'full', tui: 'full' },
   Heading: { dom: 'full', tui: 'full' },
   Rows: { dom: 'full', tui: 'full' },
   Row: { dom: 'full', tui: 'full' },

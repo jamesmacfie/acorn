@@ -2,7 +2,7 @@
 // in the panel's metabar, because naming is a save-time decision. Inputs above the request tabs read
 // as part of the request itself.
 import { createSignal, Show } from 'solid-js'
-import { Button, Field, Input, Modal, Select } from '@acorn/plugin-api/ui'
+import { Button, Field, Input, Modal, ModalActions, ModalBody, Select, Text } from '@acorn/plugin-api/ui/tree'
 
 export type SaveTarget = { name: string; folder: string; scope: 'task' | 'project' }
 
@@ -14,7 +14,7 @@ export default function SaveRequestModal(props: {
   folders: readonly string[]
   busy: boolean
   error: string | null
-  onClose: () => void
+  onDismiss: () => void
   onSave: (target: SaveTarget) => void
 }) {
   const [name, setName] = createSignal(props.target.name)
@@ -27,30 +27,33 @@ export default function SaveRequestModal(props: {
   }
 
   return (
-    <Modal
-      title="Save request"
-      size="sm"
-      onClose={props.onClose}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter') return
-        submit()
-        return true
-      }}
-    >
-      <Modal.Body>
+    // `onDismiss` and `Modal.Body` as `ModalBody`: the kit's eleven events are the only names a handler
+    // can cross the remote root under, and a node names one type with no dot in it.
+    <Modal title="Save request" size="sm" onDismiss={props.onDismiss}>
+      <ModalBody>
         <Field label="Name">
+          {/* Enter saves, through the kit's own submit event. The frame did this with a `keydown` on the
+              dialog, which is a DOM event and does not cross. */}
           <Input
             value={name()}
             maxLength={120}
             placeholder="List users"
-            ref={(el) => queueMicrotask(() => el.select())}
-            onInput={(value) => setName(value)}
+            autofocus
+            onChange={(value: string) => setName(value)}
+            onSubmit={(value: string) => {
+              setName(value)
+              submit()
+            }}
           />
         </Field>
 
         <Show when={props.inTask}>
           <Field label="Keep in" hint={scope() === 'task' ? 'Stays with this task and goes when the task does.' : "Filed in the project's tree, available from every task."}>
-            <Select value={scope()} onChange={(value) => setScope(value as 'task' | 'project')} options={[{ value: 'task', label: 'This task' }, { value: 'project', label: 'The project' }]} />
+            <Select
+              value={scope()}
+              onChange={(value: string) => setScope(value as 'task' | 'project')}
+              options={[{ value: 'task', label: 'This task' }, { value: 'project', label: 'The project' }]}
+            />
           </Field>
         </Show>
 
@@ -62,22 +65,22 @@ export default function SaveRequestModal(props: {
               suggestions={props.folders}
               placeholder="auth/admin"
               assist={false}
-              onInput={(value) => setFolder(value)}
+              onChange={(value: string) => setFolder(value)}
             />
           </Field>
         </Show>
 
         <Show when={props.error}>
-          <p class="http-response-error" role="alert">{props.error}</p>
+          <Text tone="danger" wrap>{props.error}</Text>
         </Show>
-      </Modal.Body>
+      </ModalBody>
 
-      <Modal.Actions>
-        <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
+      <ModalActions>
+        <Button variant="ghost" onPress={props.onDismiss}>Cancel</Button>
         <Button variant="solid" tone="accent" busy={props.busy} disabled={!name().trim()} onPress={submit}>
           Save
         </Button>
-      </Modal.Actions>
+      </ModalActions>
     </Modal>
   )
 }
