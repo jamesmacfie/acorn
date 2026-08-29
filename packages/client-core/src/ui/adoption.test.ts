@@ -248,6 +248,19 @@ describe('primitive adoption', () => {
     'plugins/terminal/src/client/TerminalPanel.tsx',
     'plugins/terminal/src/client/TerminalSettings.tsx',
     'plugins/workflows/src/client/WorkflowsSettings.tsx',
+    // Phase 6 of the layout programme: the small compiled panes, as layouts and kit trees. Each of
+    // these lost its stylesheet in the same change (docs/future/layout/phase-6-small-compiled-panes.md).
+    'packages/client-core/src/ui/Rectangle.tsx',
+    'plugins/changes/src/client/ChangesPane.tsx',
+    'plugins/changes/src/client/changesModel.tsx',
+    'plugins/docker/src/client/ContainerDetail.tsx',
+    'plugins/docker/src/client/DockerBrowse.tsx',
+    'plugins/docker/src/client/DockerExecTerminal.tsx',
+    'plugins/docker/src/client/DockerFooterBadge.tsx',
+    'plugins/docker/src/client/DockerTaskPane.tsx',
+    'plugins/memory/src/client/MemorySection.tsx',
+    'plugins/notes/src/client/NotesPane.tsx',
+    'plugins/onboarding/src/client/OnboardingWizard.tsx',
   ]
 
   it.each(CONVERTED)('%s uses primitives, not raw controls', (file) => {

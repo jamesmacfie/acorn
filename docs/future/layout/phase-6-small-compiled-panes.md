@@ -1,6 +1,6 @@
 # Phase 6: the small compiled panes
 
-Status: not started.
+Status: shipped 2026-08-30.
 
 ## Goal
 
@@ -152,3 +152,82 @@ Files: `plugins/onboarding/src/client/{OnboardingWizard.tsx,OnboardingOverlay.ts
 - `plugins/terminal/src/client/TerminalPanel.tsx` uses `SplitHandle` and `DocumentTabs`.
 - `plugins/onboarding/src/client/OnboardingWizard.tsx` has the custom `wizard-backdrop` and dots.
 - The `contextSectionSlots` registry exists in `client-core/src/registries`.
+
+## What shipped, and where it differs
+
+Nine deviations from the plan above. Each was a decision made while building, and each is recorded
+here rather than in the owning doc, because the owning doc says what is true and this says what
+changed.
+
+**1. The compiled tier gained a fifth carrier.** The plan said memory "registers as a first-party
+contributor through `ctx.contribute`-style registration onto `context:section`, which the host owns,
+so it is a named `ctx.extensions.register`". That named point exists, and so does `ctx.extensionPoints`
+beside it, both stamping what the manifest path stamps. What the plan did not say is what a compiled
+contribution carries: `ExtensionContribution.carrier` gained `'component'`, and `carrierFits` accepts
+it wherever a `remote` bundle is accepted. Which one answered is invisible to the owner. This is the
+first-decision-in-the-README made real, and it means the two render paths meet at `Slot` rather than
+at a second registry.
+
+**2. `Slot` was drawing a `stack` point as though it were `replace`.** It rendered the owner's default
+children only when nobody matched, in either mode.
+[03-extension-kinds.md](./03-extension-kinds.md) says a `stack` point is "the owner's default plus
+every match", so a stacked contributor was silently hiding its host's own content. Fixed in `Slot.tsx`,
+which is the only place the difference is visible: `resolveSlot` answers who draws, not what else is on
+screen. Without the fix, enabling memory would have deleted context's own item rows.
+
+**3. Review notes are not annotation contributions.** The plan said the detail region draws
+"`DiffPane` with `annotations` from the plugin's own review notes through the `changes:diff-line`
+point, which makes review notes the first annotation consumer". Half of that shipped: `changes:diff-line`
+is declared and `DiffPane` is given it, so any plugin can mark a line. The review notes themselves
+stayed on `DiffSource.lineExtra`, because an annotation mark carries a severity, a line of text and an
+icon and has no verb, and a review note needs Delete and a sent-or-unsent state. Converting them would
+have cost behaviour the phase promised not to change. They are drawn with kit nodes in the same shape
+a mark is, which is the visual half of what the plan asked for.
+
+**4. `Rectangle` and `ConfirmButton` joined the kit.** Both are in the frozen node set in
+[04-kit.md](./04-kit.md) and neither existed. `Rectangle` is what a PTY sits in, and this phase
+produced its first two consumers: Docker's exec tab and the terminal drawer. Adding it forced two
+table rows, a focus role, and a place on the wire vocabulary, because `protocol.test.ts` holds the wire
+and the kit to the same list. `ConfirmButton` was already implemented and simply was not exported.
+
+**5. `Row` kept `leading` and `trailing`.** The plan asked for `badge` and `actions`, which are the
+names in [04-kit.md](./04-kit.md)'s prop table. `Row` has taken `leading`, `trailing` and `meta` since
+phase 0 and every list in the app is written against them. Renaming them is a kit change with a
+30-site blast radius and no consumer asking for it, so the changes list passes a `Badge` as `leading`
+and its git actions as `trailing`. The rename belongs to phase 9 if anyone still wants it.
+
+**6. `Textarea` gained `grow`, and `.layout-hbf-body` gained a scroller.** Two small host additions
+the moves needed. `grow` is the "this region IS a text field" case, which the note editor had been
+getting from 12 lines of its own CSS. The `header-body-footer` body was `overflow: hidden`, which is
+right for a region that scrolls itself and wrong for the plain run of content context and Docker put
+there; it now mirrors `single`'s body, scroller and `padding-inline` both.
+
+**7. `lineExtra` got a host-owned wrapper.** `.diff-row` is `flex-wrap: wrap`, so anything drawn beside
+`DiffLine` needs a full basis or it shares the line with the code and squeezes it. Review notes had
+that rule in the plugin's stylesheet; the annotation marks phase 4 added did not, and would have drawn
+beside the code. `DiffCanvas` now wraps both in `.diff-line-extra`, so neither the owner nor a
+contributor has to know.
+
+**8. Onboarding imports `Wizard`.** It is a component in the `overlay` slot, not a pane, so there is no
+contribution to name a layout on. `Wizard` is exported from `@acorn/plugin-api/ui/host` alongside
+`Slot`, and that entrypoint is the right home: a layout is host machinery, and nothing else on it is
+importable by a loaded plugin either. The custom backdrop is a `Modal` with `dismissOn={[]}`, which
+keeps the rule that Escape must not skip setup.
+
+**9. `docs/first-party-plugins.md` kept its table rows.** The plan said "memory and changes move off
+their tables; docker and onboarding lose reason B rows". None of the four rows was actually earned by
+what this phase changed. memory is first-party because it is `required` and publishes two capabilities;
+changes' reason B is its agent-tool renderer, which is phase 8's; docker's is its footer badge, which
+this phase's scope excludes; onboarding's is that it draws before any plugin is trusted. What did move
+is the argument: § reason B named memory's section as the proof that a cooperative point cannot carry a
+real interface, and that paragraph is rewritten, because it can and now does.
+
+## Owed after this phase
+
+- The API major moved from 5 to 6. Removing `contextSectionSlots` from `@acorn/plugin-api/client`
+  shrinks the surface, and the snapshot gate refuses that under an unchanged number. Every loaded
+  package is stamped from `PLUGIN_API_MAJOR` at build, so a rebuild is the whole migration.
+- The terminal drawer keeps `terminal.css`, trimmed to its outer box. § Scope excluded "terminal's
+  drawer chrome beyond the layout", and the drawer is a slot rather than a pane, so no host layout
+  owns where it sits.
+- `docs/first-party-plugins.md`'s tables, per deviation 9, wait on phases 7 and 8.

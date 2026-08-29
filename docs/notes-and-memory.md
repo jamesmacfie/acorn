@@ -61,6 +61,13 @@ and Rollbar contributions under a deterministic byte/token budget. Section failu
 reported independently. The context pane previews the exact snapshot and can send it to a selected
 managed agent session.
 
+Memory also draws in the pane. Its proposal queue and its add-memory form are a component registered
+against the `context:section` extension point with `matches: ['memory']`, which the context plugin
+opens and the host mints. For more information, see the cooperative extension points in
+[the plugins doc](./plugins.md). Context draws its own rows for the section and memory's card joins
+them, because the point stacks. Neither plugin imports the other, and disabling memory leaves the
+section drawing its rows.
+
 A fresh agent session can receive that snapshot two ways. The _push_ queues the assembled block for
 the session's first idle edge. It is delivered `'after-ready'`, so if the CLI is still busy when the
 user types, the block lands after the first ask, as reference material for work already underway. A

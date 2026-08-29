@@ -455,6 +455,10 @@ export type TextareaProps = ControlOwn & {
   placeholder?: string
   /** Visible lines. A number, because a textarea's height is measured in its own text. */
   rows?: number
+  /** Fill the region it is in rather than sizing to `rows`. The note editor and any other "this pane
+   *  IS a text field" surface. A role rather than a height: the region's own box decides how tall
+   *  that is, and the reader loses the drag handle, which would fight it. */
+  grow?: boolean
   mono?: boolean
   readOnly?: boolean
   maxLength?: number
@@ -490,6 +494,7 @@ export function Textarea(props: TextareaProps) {
       required={own.required}
       autofocus={own.autofocus}
       data-mono={props.mono ? '' : undefined}
+      data-grow={props.grow ? '' : undefined}
       rows={props.rows}
       value={props.value ?? ''}
       placeholder={props.placeholder}

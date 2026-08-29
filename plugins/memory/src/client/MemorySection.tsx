@@ -1,19 +1,20 @@
 import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
 import { toast, type Task } from '@acorn/plugin-api/client'
 import { memoryApi, type MemoryType } from './memoryClient'
-import { Alert, Button, Select, Textarea } from '@acorn/plugin-api/ui'
-import './memory-section.css'
+import { Alert, Badge, Button, Card, Field, Inline, Input, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
 
 const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 
-// The memory surfaces of the Manifest pane (docs/agent-tools.md), kept as a child in the memory plugin
-// so it owns every memoryApi() call. Two things: the human gate over auto-generated proposals, where
-// accept (with an optional description edit) writes to the task worktree and index and reject leaves no
-// trace, and the manual "+ memory" form, where project scope goes to the task worktree and lands via
-// its PR while private scope goes to ~/.acorn/memory.
+// The memory surfaces of the Context pane (docs/agent-tools.md), kept in the memory plugin so it owns
+// every memoryApi() call. Two things: the human gate over auto-generated proposals, where accept (with
+// an optional description edit) writes to the task worktree and index and reject leaves no trace, and
+// the manual "+ memory" form, where project scope goes to the task worktree and lands via its PR while
+// private scope goes to ~/.acorn/memory.
 //
-// `onChanged` lets the host refresh its assembled-context view after a write; `onPendingChange`
-// surfaces the pending-proposal count on the Manifest's memory section row.
+// This is a contribution to `context:section`, so context does not import it and memory does not import
+// context's pane: the host carries the props and draws whichever of the two render paths this happens
+// to be on. `onChanged` lets the owner refresh its assembled-context view after a write;
+// `onPendingChange` surfaces the pending-proposal count on the section's own header.
 export default function MemorySection(props: {
   task: Task
   onChanged: () => void
@@ -75,64 +76,77 @@ export default function MemorySection(props: {
   }
 
   return (
-    <>
-      <Show when={proposalError()}><Alert>{proposalError()}</Alert></Show>
+    <Stack gap="row">
+      <Show when={proposalError()}>{(text) => <Alert>{text()}</Alert>}</Show>
       <Show when={(proposals() ?? []).length}>
-        <div class="memory-proposals">
-          <span class="muted">Memory proposals (auto-generated — review before they land):</span>
+        <Stack gap="row">
+          <Text emphasis="muted">Memory proposals (auto-generated — review before they land):</Text>
           <For each={proposals() ?? []}>
             {(p) => (
-              <>
-                <div class="memory-proposal">
-                  <span class="context-tray-kind">{p.type}</span>
-                  <span class="context-tray-label" title={p.body}>{p.name}</span>
-                  <input
-                    class="ui-input memory-proposal-desc"
-                    type="text"
+              <Card>
+                <Stack gap="row">
+                  <Inline gap="inline" wrap>
+                    <Text emphasis="muted">{p.type}</Text>
+                    <Text emphasis="strong">{p.name}</Text>
+                  </Inline>
+                  <Input
+                    label={`Description for ${p.name}`}
                     value={propEdits()[p.id] ?? p.description}
-                    onInput={(e) => setPropEdits((prev) => ({ ...prev, [p.id]: e.currentTarget.value }))}
+                    onInput={(value) => setPropEdits((prev) => ({ ...prev, [p.id]: value }))}
                   />
-                  <Button onPress={() => void resolveProposal(p.id, true)}>Accept</Button>
-                  <Button onPress={() => void resolveProposal(p.id, false)}>Reject</Button>
-                </div>
-                {/* Verification flags (structural `flags`, docs/notes-and-memory.md): shown as warning badges
-                    beside the proposal, never folded into the description text. */}
-                <Show when={p.flags.length}>
-                  <div class="memory-proposal-flags">
-                    <For each={p.flags}>{(f) => <span class="memory-proposal-flag">⚠ {f}</span>}</For>
-                  </div>
-                </Show>
-              </>
+                  {/* Verification flags (structural `flags`, docs/notes-and-memory.md): warning badges
+                      beside the proposal, never folded into the description text. */}
+                  <Show when={p.flags.length}>
+                    <Inline gap="inline" wrap>
+                      <For each={p.flags}>{(flag) => <Badge tone="warn" shape="pill">⚠ {flag}</Badge>}</For>
+                    </Inline>
+                  </Show>
+                  <Toolbar variant="actions" size="sm">
+                    <Button size="sm" onPress={() => void resolveProposal(p.id, true)}>Accept</Button>
+                    <Button size="sm" onPress={() => void resolveProposal(p.id, false)}>Reject</Button>
+                  </Toolbar>
+                </Stack>
+              </Card>
             )}
           </For>
-        </div>
+        </Stack>
       </Show>
       <Show when={memoryApi()}>
-        <div class="memory-section-actions">
-          <Button onPress={() => setMemFormOpen(!memFormOpen())}>+ memory</Button>
-          <Show when={memMsg()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
-        </div>
+        <Toolbar variant="actions" size="sm">
+          <Button size="sm" onPress={() => setMemFormOpen(!memFormOpen())} expanded={memFormOpen()}>+ memory</Button>
+        </Toolbar>
       </Show>
+      <Show when={memMsg()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
       <Show when={memFormOpen()}>
-        <form
-          class="memory-section-form"
-          onSubmit={(e) => {
-            e.preventDefault()
-            void addMemory()
-          }}
-        >
-          <div class="integration-key-row">
-            <input class="ui-input" type="text" placeholder="name (kebab-case)" value={memName()} onInput={(e) => setMemName(e.currentTarget.value)} />
-            <Select value={memType()} onChange={(value) => setMemType(value as MemoryType)} options={[...MEMORY_TYPE_OPTIONS.map((k) => ({ value: k, label: k }))]} />
-            <Select value={memScope()} onChange={(value) => setMemScope(value as 'project' | 'private')} options={[{ value: 'project', label: 'project (worktree, committed)' }, { value: 'private', label: 'private (~/.acorn)' }]} />
-          </div>
-          <input class="ui-input" type="text" placeholder="one-line description" value={memDesc()} onInput={(e) => setMemDesc(e.currentTarget.value)} />
-          <Textarea mono rows={3} placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(value) => setMemBody(value)} />
-          <div class="memory-section-actions">
-            <Button submit disabled={!memName().trim() || !memDesc().trim()}>Save memory</Button>
-          </div>
-        </form>
+        <Card>
+          <Stack gap="row">
+            <Inline gap="inline" wrap>
+              <Field label="Name" hint="kebab-case">
+                <Input value={memName()} placeholder="name" onInput={(value) => setMemName(value)} />
+              </Field>
+              <Field label="Type">
+                <Select value={memType()} onChange={(value) => setMemType(value as MemoryType)} options={MEMORY_TYPE_OPTIONS.map((k) => ({ value: k, label: k }))} />
+              </Field>
+              <Field label="Scope">
+                <Select
+                  value={memScope()}
+                  onChange={(value) => setMemScope(value as 'project' | 'private')}
+                  options={[{ value: 'project', label: 'project (worktree, committed)' }, { value: 'private', label: 'private (~/.acorn)' }]}
+                />
+              </Field>
+            </Inline>
+            <Field label="Description">
+              <Input value={memDesc()} placeholder="one-line description" onInput={(value) => setMemDesc(value)} />
+            </Field>
+            <Field label="Body">
+              <Textarea mono rows={3} placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(value) => setMemBody(value)} />
+            </Field>
+            <Toolbar variant="actions" size="sm">
+              <Button size="sm" disabled={!memName().trim() || !memDesc().trim()} onPress={() => void addMemory()}>Save memory</Button>
+            </Toolbar>
+          </Stack>
+        </Card>
       </Show>
-    </>
+    </Stack>
   )
 }

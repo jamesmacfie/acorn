@@ -13,6 +13,7 @@ import {
   type PluginAnnotationMark,
   type PluginExtensionItem,
 } from '@acorn/protocol/extensionPoints.ts'
+import type { Component } from 'solid-js'
 import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
 import { Registry } from './registry'
 
@@ -65,7 +66,7 @@ export type ExtensionContribution = {
   point: string
   label: string
   order: number
-  carrier: 'items' | 'remote' | 'frame' | 'route'
+  carrier: 'items' | 'remote' | 'frame' | 'route' | 'component'
   /** `remote` and `frame`: which key values this draws. Absent means every key, which is the ordinary
    *  answer in a `stack` slot. */
   matches?: readonly string[]
@@ -73,6 +74,12 @@ export type ExtensionContribution = {
   entry?: string
   /** `remote`: the bundle this device accepted. The worker runs these bytes and no others. */
   hash?: string
+  /** `component`: the first-party half of the same kind. A compiled plugin's tree is already in this
+   *  process, so the host mounts it where it would have mounted a worker's (docs/plugins.md §
+   *  Cooperative extension points, "two render paths"). `Component<any>` for the reason
+   *  `sourceRegistry` is `SourceContribution<any>`: the registry is heterogeneous by construction and
+   *  each entry's props are the point owner's, not this registry's. */
+  component?: Component<any>
   /** `frame`: the id of the `inline` surface this places. */
   frame?: string
   /** As on the point above (../hostCapabilities.ts). */
@@ -141,7 +148,10 @@ export const carrierFits = (kind: ExtensionPointKind, carrier: ExtensionContribu
     case 'annotation':
       return carrier === 'items'
     case 'remote':
-      return carrier === 'remote'
+      // Both render paths, one kind. A worker tree and a compiled component produce the same nodes in
+      // the same slot; which one a contributor brought is a fact about how it ships, and the owner and
+      // the trust prompt are told the same sentence either way.
+      return carrier === 'remote' || carrier === 'component'
     case 'rectangle':
       return carrier === 'frame'
     case 'hook':

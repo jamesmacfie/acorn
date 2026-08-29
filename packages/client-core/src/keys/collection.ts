@@ -49,6 +49,21 @@ export type CollectionOptions = {
 const PAGE = 10
 const TYPE_AHEAD_RESET_MS = 700
 
+// Every collection on screen, by its stable id, so something outside one can put an item in view.
+//
+// A pane that is told "show this item" — context, from notes' "show in context" — has a key and a
+// collection id and nothing else. It cannot reach the row: the kit gives it no class and no id to
+// select on, which is the point. So the collection publishes the one operation, and scroll stays the
+// host's, as `collectionState` already made selection the host's.
+const live = new Map<string, (key: string) => void>()
+
+/** Put an item of a named collection in view and make it the roving stop. A no-op for a collection
+ *  that is not mounted, or a key it does not hold: both are the ordinary answer when a person asks
+ *  for something that has since gone. */
+export function revealCollectionItem(id: string, key: string): void {
+  live.get(id)?.(key)
+}
+
 /** The DOM's own role vocabulary, so a node cannot invent one. */
 type AriaRole = NonNullable<JSX.HTMLAttributes<HTMLElement>['role']>
 
@@ -77,6 +92,8 @@ export type Collection = {
   itemProps: (key: string) => ItemProps
   /** Move roving focus onto an item, for a pointer landing on one. */
   focus: (key: string) => void
+  /** Move roving focus onto an item and put it in view. See `revealCollectionItem`. */
+  reveal: (key: string) => void
 }
 
 export function createCollection(options: CollectionOptions): Collection {
@@ -181,10 +198,21 @@ export function createCollection(options: CollectionOptions): Collection {
     land(match.key)
   }
 
+  const reveal = (key: string) => {
+    if (!has(key)) return
+    setActiveItem(options.id(), key)
+    elements.get(key)?.scrollIntoView({ block: 'nearest' })
+  }
+  // Registered for the life of the node, and taken back out with it: a stale entry would scroll a
+  // collection that is no longer on screen.
+  live.set(options.id(), reveal)
+  onCleanup(() => { if (live.get(options.id()) === reveal) live.delete(options.id()) })
+
   return {
     active,
     selected,
     focus: (key) => { setActiveItem(options.id(), key) },
+    reveal,
     containerProps: {
       ref: (element: HTMLElement) => bindIntents(element, INTENTS, handle),
       role: options.role,

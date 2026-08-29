@@ -41,6 +41,15 @@
   min-height: 20px;
   white-space: normal;
 }
+/* Whatever a source or a contributing plugin draws under a code row (DiffCanvas). A full basis, so it
+   takes its own line in the wrapping row rather than squeezing the code, and the indent lines it up
+   under the code rather than under the gutters. */
+.diff-line-extra {
+  flex-basis: 100%;
+  min-width: 0;
+  padding-left: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w));
+}
+.diff-line-extra:empty { display: none; }
 .diff-gutter { flex: none; width: var(--diff-gutter-w); padding-right: var(--space-4); text-align: right; color: var(--text-faint); user-select: none; }
 .diff-marker { flex: none; width: var(--diff-marker-w); text-align: center; color: var(--text-faint); user-select: none; }
 /* `flex: 1 1 0` with `min-width: 0`, even though the text no longer wraps: the row is

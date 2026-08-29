@@ -1582,6 +1582,14 @@ right depends on the owner's kind, which the contributor's manifest cannot see. 
 shape ("name one"), and the match between a carrier and a point's kind happens at delivery, where both
 are visible.
 
+A compiled plugin has a fifth carrier that no manifest can name: `component`, registered through
+`ctx.extensions`. It fills a `remote` point, the same kind a bundle fills, because from the owner's
+side and from the trust prompt's side the two are one thing: another plugin's tree of kit nodes in a
+slot the owner reserved. What differs is where the code runs. A loaded plugin's bundle runs in a worker
+and its tree crosses as a stream of node names; a compiled plugin's component is already in this
+process and the host mounts it. The owner writes one `Slot` and cannot tell which answered. Context's
+`context:section` point is the worked example, with memory as its one contributor.
+
 #### Annotations
 
 Rows answer "what is related to this pane". Annotations answer "what do you know about this line". The
@@ -2198,15 +2206,19 @@ across a fleet exactly one bundle per plugin id is active — highest version at
 major, chosen at boot and stable for the session — because contribution ids are un-namespaced
 persisted layout keys and two versions registering at once would collide on them.
 
-Client initialization for compiled-in plugins is synchronous registration. The host exposes contribution points for panes,
-sources, settings pages, slots, context-section slots, provider reference panels, palette rows,
-agent contexts, agent-tool renderers, schedules, persisted-state slices, Node statistics, attention
-sources, brand marks, and content links. `slots` is one point for both shapes: the slot id decides
-whether the component receives the shell context or only a task id (`docs/frontend.md § Registries and
-plugins`). `schedules` is the same word the node half uses for the same idea, taking a raw `intervalMs`
-because a renderer poll is not a node cadence (`docs/schedules.md § Cadence`). `contextSectionSlots` is
-NOT the node's `contextSections`: the node declares a section and assembles its prompt text, and this
-registers a component that draws inside one.
+Client initialization for compiled-in plugins is synchronous registration. The host exposes contribution
+points for panes, sources, settings pages, slots, extension points, extensions, provider reference
+panels, palette rows, agent contexts, agent-tool renderers, schedules, persisted-state slices, Node
+statistics, attention sources, brand marks, and content links. `slots` is one point for both shapes: the
+slot id decides whether the component receives the shell context or only a task id (`docs/frontend.md §
+Registries and plugins`). `schedules` is the same word the node half uses for the same idea, taking a
+raw `intervalMs` because a renderer poll is not a node cadence (`docs/schedules.md § Cadence`).
+
+`extensionPoints` and `extensions` are the compiled halves of the two manifest keys of the same name,
+and the host stamps the same fields either way in: it mints `<pluginId>:<id>` for a point from the
+plugin that registered it, and stamps `pluginId` on a contribution. A compiled contribution's carrier is
+a `component`, which is the only one available to code already running in this process. See §
+Cooperative extension points for the five kinds and for what the two render paths have in common.
 
 `ctx.contribute(registry, entry)` is the escape hatch beside them, and the line it sits on is: a
 registry the HOST owns gets a named member, and `contribute` is for a registry another PLUGIN

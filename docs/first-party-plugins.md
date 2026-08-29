@@ -53,21 +53,28 @@ manifest adapter draws the overlay and the dismiss control itself, using the sam
 panel would, and the shell's host adds no second wrapper. A frame ref panel supplies the body; the host
 supplies the box.
 
-There is now a sanctioned alternative for the *cooperative* half of B, and it is a different shape
-rather than a relaxation. A **cooperative extension point** ([plugins.md](./plugins.md) § Cooperative
-extension points) lets plugin A declare, in its manifest, a strip inside one of its panes that other
-plugins may fill — and what crosses is a *descriptor*: an id, a label, an icon, a badge, and a verb from
-the closed set, fetched by the host from the contributor's own node route and drawn by the host in its
-own markup, outside A's iframe. So it is not B: no component enters anyone's render tree, in either
-direction. It is B's use case served by data.
+There is a sanctioned alternative for the *cooperative* half of B, and it is a different shape rather
+than a relaxation. A **cooperative extension point** ([plugins.md](./plugins.md) § Cooperative
+extension points) lets plugin A declare a place inside one of its own surfaces that other plugins may
+fill. It comes in five kinds, and two of them answer B.
 
-The reason B is still B is that the descriptor vocabulary does not stretch to a real UI, and it is not
-going to. memory's section inside context's tray is the clean example: editable inputs, a type and a
-scope select, a textarea, and a two-button accept/reject gate per proposal. That is a component. It
-stays in the compiled tier as `contextSections`, and the answer to "make the descriptors richer until it
-fits" is no — that is a widget toolkit in the wire format, which the plugin contract refuses by name.
-The bar for a cooperative point is the same as the bar for a host-owned pane region: a list of things
-with names, not an interface.
+The `rows` kind carries a *descriptor*: an id, a label, an icon, a badge, and a verb from the closed
+set, fetched by the host from the contributor's own node route and drawn by the host in its own markup.
+No component enters anyone's render tree. It is B's use case served by data, and its ceiling is a list
+of things with names.
+
+The `remote` kind carries a *tree of kit nodes*, which does stretch to a real interface. Memory's
+section inside the Context pane is the worked example, and it used to be the argument for the opposite
+conclusion: editable inputs, a type and a scope select, a textarea, and a two-button accept-or-reject
+gate per proposal. It is a `context:section` contribution now. The thing that changed is not the
+descriptor vocabulary, which is as narrow as it ever was. It is that a contributor can write against
+the same closed component kit the host draws with, on either of two render paths: a compiled plugin
+hands over a component and a loaded plugin hands over a bundle a worker runs. The owner writes one
+`Slot` and cannot tell which answered.
+
+What is left of B is a component that has to share a render tree with its host, not merely occupy a box
+inside it: an agent-tool card sharing the transcript's scroll and selection, or a first-run wizard that
+exists before any plugin is trusted.
 
 What has no sanctioned alternative, ever, is the *uncooperative* half — B reaching into A without A
 saying so. See [plugins.md](./plugins.md) § There is no uncooperative extension.

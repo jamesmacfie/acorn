@@ -58,6 +58,7 @@ onScopeEvicted((event) => {
 
 function build(taskId: string, projectId: string | null) {
   const api = notesApi()
+  let titleField: HTMLInputElement | undefined
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
   const workspace = () => workspaceForProject(workspaces.data, projectId ?? undefined)
   const wsId = () => workspace()?.id ?? null
@@ -273,6 +274,11 @@ function build(taskId: string, projectId: string | null) {
 
   return {
     taskId,
+    // The title field's element, held by the model rather than by the list, because the two are in
+    // different regions the host mounts independently: the "+" that creates a note is in the list and
+    // the field it wants focused is in the detail.
+    titleRef: (element: HTMLInputElement) => { titleField = element },
+    requestTitleFocus: () => queueMicrotask(() => { titleField?.focus(); titleField?.select() }),
     api,
     workspace,
     locationFor,

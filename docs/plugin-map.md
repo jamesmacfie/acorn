@@ -109,7 +109,8 @@ Your plugin exports a `ClientPlugin`: a `name`, an `init`, and optionally `activ
 | `projectImporters` | An importer the first-run onboarding hosts |
 | `settingsPages` | A page in Settings, with a group and an order |
 | `slots` | A component in a host-owned region of the shell, or inside a task's chrome. The slot id decides which, and which context your component receives |
-| `contextSectionSlots` | A component drawn inside a section the node assembled. Not the node's `contextSections`, which declares the section itself |
+| `extensionPoints` | A place inside one of your own surfaces that other plugins may fill. The host mints the id from your plugin name |
+| `extensions` | What you bring to somebody else's point, as a component the host mounts |
 | `refPanels` | A reference panel for an external item. Not a pane, see [panes.md](./panes.md) |
 | `paletteRows` | Rows the palette can search, sourced from your own state |
 | `agentContexts` | Context an agent can pull from your plugin |

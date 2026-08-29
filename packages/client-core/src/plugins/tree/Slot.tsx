@@ -1,4 +1,5 @@
 import { For, Show, createMemo, type JSX } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { PrefKeys } from '../../persistence/prefKeys'
 import { prefsOptions } from '../../queries'
@@ -15,6 +16,11 @@ import { resolveSlot, slotChoiceFor, slotChoices } from './arbitration'
 // for core; this is a plugin standing in a space another plugin reserved, and it exists in `stack` as
 // well as `replace`, because "everyone who has something to add" is a real answer for a toolbar and
 // never is for a task list.
+//
+// Two render paths, one node. A compiled plugin's contribution is a component in this process and is
+// mounted here; a loaded plugin's is a bundle in a worker and goes through RemoteTree. The owner writes
+// the same `Slot` either way and cannot tell which answered, which is the whole reason first-party and
+// third-party share a component API (docs/future/layout/README.md, the first decision).
 //
 // Neither plugin sees the other's nodes. The contributor's code has exactly the permissions its own
 // manifest declared: sitting inside somebody else's pane grants it nothing of theirs.
@@ -43,36 +49,53 @@ export type SlotProps = {
 export function Slot(props: SlotProps) {
   const prefs = createQuery(() => prefsOptions(true))
 
-  const outcome = createMemo(() => {
+  const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
     // A point nobody declared, or one whose owner is not running here, has nothing to deliver into.
     // Silent, like every other unmatched contribution; the developer view is where an author finds out.
     if (!point || point.kind !== 'remote') return null
     const choices = slotChoices(prefs.data?.[PrefKeys.remoteSlots])
-    return resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key))
+    return { mode: point.mode ?? 'stack', outcome: resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key)) }
   })
+  const outcome = () => resolved()?.outcome
+  // `stack` is the owner's default PLUS everyone who matched; `replace` is one contributor instead of
+  // it (docs/plugins.md § Arbitration). The difference is only visible here, which is why it lives
+  // here and not in the arbitration rule: `resolveSlot` answers who draws, not what else is on screen.
+  const drawDefault = () => resolved()?.mode !== 'replace' || !outcome()?.occupants.length
 
   return (
-    <Show when={outcome()?.occupants.length} fallback={props.children}>
-      <For each={outcome()!.occupants}>
-        {(contribution) => (
-          <RemoteTree
-            contribution={{
-              id: contribution.id,
-              pluginId: contribution.pluginId,
-              hash: contribution.hash ?? '',
-              entry: contribution.entry ?? '',
-            }}
-            props={props.props ?? (() => ({}))}
-          />
-        )}
-      </For>
-      {/* The disclosure past `max`. A count and no names: the owner set the ceiling because it is the
-          owner's screen, and listing who was left out would be inviting a person to fix somebody else's
-          arithmetic. */}
-      <Show when={outcome()!.why === 'match' ? outcome()!.overflow : 0}>
-        {(overflow) => <span class="muted">{overflow()} more from other plugins</span>}
+    <>
+      <Show when={drawDefault()}>{props.children}</Show>
+      <Show when={outcome()?.occupants.length}>
+        <For each={outcome()!.occupants}>
+          {(contribution) => (
+            <Show
+              when={contribution.carrier === 'component' && contribution.component}
+              fallback={
+                <RemoteTree
+                  contribution={{
+                    id: contribution.id,
+                    pluginId: contribution.pluginId,
+                    hash: contribution.hash ?? '',
+                    entry: contribution.entry ?? '',
+                  }}
+                  props={props.props ?? (() => ({}))}
+                />
+              }
+            >
+              {/* Spread rather than one `props` object, so the contributor writes an ordinary component
+                  with the owner's own prop names. Solid keeps a dynamic spread reactive. */}
+              {(component) => <Dynamic component={component()} {...(props.props?.() as Record<string, unknown>)} />}
+            </Show>
+          )}
+        </For>
+        {/* The disclosure past `max`. A count and no names: the owner set the ceiling because it is the
+            owner's screen, and listing who was left out would be inviting a person to fix somebody
+            else's arithmetic. */}
+        <Show when={outcome()!.why === 'match' ? outcome()!.overflow : 0}>
+          {(overflow) => <span class="muted">{overflow()} more from other plugins</span>}
+        </Show>
       </Show>
-    </Show>
+    </>
   )
 }

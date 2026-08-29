@@ -958,15 +958,13 @@ describe('architecture boundaries', () => {
     // the markup belongs to the guest and the box belongs to the host. That wants a real seam rather
     // than a rename, and entries may only be removed.
     //
-    // The two survivors are context's vocabulary: `.context-tray-kind` and `.context-tray-label` are
-    // worn by ContextPane too. They don't go until memory's section stops being a component in context's
-    // realm. The cooperative extension point can't take it: the section renders editable inputs, a
-    // select, a textarea and a per-proposal accept/reject gate, which is UI rather than a descriptor.
+    // Context's two vocabulary classes went with phase 6 of the layout programme: memory's section is a
+    // contribution to the `context:section` point now, written in kit nodes, so there is no class for it
+    // to borrow. The earlier note here said a cooperative point could not take it because the section is
+    // UI rather than a descriptor — which was true of the `rows` kind and stopped being true when the
+    // `remote` kind arrived with two render paths (docs/plugins.md § Cooperative extension points).
     const BASELINE = [
       'plugins/agents defines .agent-tool, worn by plugins/changes/src/client/agentToolRenderer.tsx',
-      'plugins/context defines .context-tray-kind, worn by plugins/memory/src/client/MemorySection.tsx',
-      'plugins/context defines .context-tray-label, worn by plugins/memory/src/client/MemorySection.tsx',
-      'plugins/editor defines .tree, worn by plugins/changes/src/client/ChangesPane.tsx',
     ]
     expect([...new Set(offenders)].sort()).toEqual(BASELINE)
   })

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { agentContextRegistry } from '@acorn/client-core/registries/agentContexts.ts'
 import { agentToolRendererRegistry } from '@acorn/client-core/registries/agentToolRenderers.ts'
-import { contextSectionSlotRegistry } from '@acorn/client-core/registries/contextSectionSlots.ts'
+import { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/registries/extensionPoints.ts'
 import { paletteRowRegistry } from '@acorn/client-core/registries/paletteRows.ts'
 import { attentionRegistry } from '@acorn/client-core/registries/attention.ts'
 import { collectionRegistry } from '@acorn/client-core/registries/collections.ts'
@@ -26,7 +26,10 @@ const REGISTRIES = {
   sources: sourceRegistry,
   settingsPages: settingsRegistry,
   slots: uiSlotRegistry,
-  contextSectionSlots: contextSectionSlotRegistry,
+  // Both halves of the cooperative seam, so a plugin's point and a plugin's contribution to somebody
+  // else's both have to come back after a disable (registries/extensionPoints.ts).
+  extensionPoints: extensionPointRegistry,
+  extensions: extensionRegistry,
   refPanels: refPanelRegistry,
   paletteRows: paletteRowRegistry,
   agentContexts: agentContextRegistry,

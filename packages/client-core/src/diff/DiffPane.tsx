@@ -11,8 +11,8 @@ import { savePref } from '../settings/savePref'
 import { EmptyState } from '../ui/primitives'
 import { DiffCanvas } from './DiffCanvas'
 import { FileHead, type LineComposerController, type ThreadCollapseController } from '../ui/diff/DiffRows'
-import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
 import { AnnotationMarks } from '../plugins/annotations/AnnotationMarks'
+import { annotationKey } from './annotationKey'
 import { annotationSignature, annotationsFor, requestAnnotations } from '../plugins/annotations/annotations'
 import { DiffToolbar } from './DiffToolbar'
 import { createDiffFindController } from './findController'
@@ -57,19 +57,6 @@ import { createDiffMeasureSchedulers, createDiffVirtualizer } from '../ui/diff/v
 // interleave at render time (matched by path), so a thread mutation rerenders without re-tokenizing.
 const HIGHLIGHT_MAX_PATCH_CHARS = 120_000
 const HIGHLIGHT_MAX_PATCH_LINES = 2_000
-
-/**
- * One code row, as an annotation key.
- *
- * The three fields the two diff owners declare (`{ file, line, side }`) and the one string the host
- * mints its lookup from. `side` is the row's own kind rather than the view mode: a contributor marking
- * "line 42 as it will be" means the new side whether the reader is in split or unified.
- */
-const annotationKey = (row: CodeRow): PluginAnnotationKey => ({
-  file: row.path,
-  line: (row.kind === 'delete' ? row.oldNo : row.newNo) ?? 0,
-  side: row.kind === 'delete' ? 'old' : 'new',
-})
 
 const rejectUnsupported = async () => {
   throw new Error('Not supported here.')

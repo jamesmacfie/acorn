@@ -30,7 +30,13 @@
       "overlay/onboarding.first-run",
       "drawer/terminal.drawer"
     ],
-    "contextSectionSlots": [
+    "extensionPoints": [
+      "changes:diff-line",
+      "context:section",
+      "docker:stats-beside",
+      "docker:container"
+    ],
+    "extensions": [
       "memory.section"
     ],
     "refPanels": [
@@ -92,6 +98,9 @@
       "panes": [
         "changes"
       ],
+      "extensionPoints": [
+        "changes:diff-line"
+      ],
       "agentToolRenderers": [
         "changes.agent-file-tool"
       ]
@@ -99,6 +108,9 @@
     "context": {
       "panes": [
         "context"
+      ],
+      "extensionPoints": [
+        "context:section"
       ],
       "agentContexts": [
         "acorn-task-context"
@@ -119,6 +131,10 @@
       ],
       "slots": [
         "task.footer/docker-footer-badge"
+      ],
+      "extensionPoints": [
+        "docker:stats-beside",
+        "docker:container"
       ],
       "agentContexts": [
         "acorn-docker"

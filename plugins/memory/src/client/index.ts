@@ -6,9 +6,17 @@ export const memoryClientPlugin: ClientPlugin = {
   name: 'memory',
   required: true,
   init: (ctx) => {
-    // Under the node-side `memory` section, which plugins/memory's own node part registers. Both halves
-    // key on the same id, and neither plugin names the other.
-    ctx.contextSectionSlots.register({ id: 'memory.section', sectionId: 'memory', order: 10, component: MemorySection })
+    // Into the section slot the context pane opens, matched on the node-side `memory` section id, which
+    // plugins/memory's own node part registers. Both halves key on that id, and neither plugin imports
+    // the other: the host carries the props and mounts the component.
+    ctx.extensions.register({
+      id: 'memory.section',
+      point: 'context:section',
+      label: 'Memory proposals and add form',
+      order: 10,
+      matches: ['memory'],
+      component: MemorySection,
+    })
     ctx.attentionSources.register({
       id: 'memory.proposals', order: 20,
       fetch: async (nodeId, signal) => {

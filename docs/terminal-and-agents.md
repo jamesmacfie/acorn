@@ -101,5 +101,14 @@ rules), never by importing the engine.
 
 The terminal drawer is a bottom task surface with tabs, task-local last-active selection, profile
 launchers, status badges, and xterm rendering. It is available when the desktop terminal capability
-is present. The Agent pane shows managed sessions; the drawer remains the home for shells and raw
+is present. The Agent pane shows managed sessions; the drawer is the home for shells and raw
 provider TUIs.
+
+Inside the drawer, everything is a kit node. `DocumentTabs` draws the session strip and carries the
+profile `Menu`, the "+" and the close control in its actions slot. `SplitHandle` is the resize grip.
+The session itself is a `Rectangle kind="pty"`: the kit owns the box and the keyboard contract, so a
+reader who tabs into a terminal can press Escape to get back out, and xterm owns the pixels.
+
+The drawer is a `drawer` slot rather than a pane, so no host layout owns its outer box. That geometry
+stays in `plugins/terminal/src/client/terminal.css`, written in shell tokens: where the drawer sits
+between the two rails, how tall it is, and what maximizing does.

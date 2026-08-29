@@ -1,3 +1,10 @@
+/* The terminal drawer's chrome: where the drawer sits and how tall it is. Everything inside it is
+   kit nodes now — the tab strip is `DocumentTabs`, the resize grip is `SplitHandle`, and the PTY is a
+   `Rectangle kind="pty"` (docs/terminal-and-agents.md § Client).
+
+   What is left here is the box itself, and it is deliberately still the plugin's: the drawer is a
+   `drawer` slot rather than a pane, so no host layout owns it, and its geometry is written entirely in
+   the shell's own tokens rather than in pixels. */
 .terminal-drawer {
   position: fixed;
   /* Sit between the two icon rails (left TabRail, right pane-switcher, both --tabrail-w wide) rather
@@ -17,40 +24,6 @@
    region between the two rails. top plus bottom, with no inline height, makes the flex column fill. */
 .terminal-drawer.maximized {
   top: var(--topbar-h);
-}
-.terminal-unavailable { margin-top: 0; padding: var(--space-3) var(--space-4); }
-.terminal-drawer-btn {
-  background: none;
-  border: var(--control-border);
-  color: var(--text);
-  border-radius: var(--radius);
-  padding: var(--space-1) var(--space-4);
-  cursor: pointer;
-}
-.terminal-prompt {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: var(--chrome-divider);
-  font: var(--fs-sm) / 1.4 var(--font-mono);
-  color: var(--text);
-  flex-wrap: wrap;
-}
-.terminal-prompt-input {
-  flex: 1;
-  min-width: 200px;
-  background: var(--bg);
-  border: var(--control-border);
-  color: var(--text);
-  border-radius: var(--radius);
-  padding: var(--space-2) var(--space-3);
-  font: var(--fs-sm) var(--font-mono);
-}
-.terminal-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
 }
 .terminal-surface {
   flex: 1;

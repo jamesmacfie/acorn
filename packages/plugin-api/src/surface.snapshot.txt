@@ -1,4 +1,4 @@
-# plugin API major: 5
+# plugin API major: 6
 client: AgentToolRendererContribution
 client: AgentToolRendererProps
 client: CHECK_TONE
@@ -69,7 +69,6 @@ client: closeTunnelsForTask
 client: consumePaneIntent
 client: consumeTerminalFocusIntent
 client: contentLinkRegistry
-client: contextSectionSlots
 client: contextSnapshot
 client: createDeviceFlow
 client: createFleetQuery
@@ -136,6 +135,7 @@ client: renderMarkdown
 client: requestTerminalFocus
 client: requestTerminalFocusIntent
 client: requireClientCapability
+client: revealCollectionItem
 client: rowHeight
 client: runApi
 client: saveJsonPref
@@ -367,6 +367,7 @@ ui/editor: MONACO_THEME
 ui/editor: monacoLanguageForPath
 ui/editor: watchMonacoTheme
 ui/host: Acorn
+ui/host: AnnotationMarks
 ui/host: Concern
 ui/host: InlineSlot
 ui/host: PaletteSurface
@@ -375,8 +376,12 @@ ui/host: RemoteTree
 ui/host: RemoteTreeProps
 ui/host: Slot
 ui/host: SlotProps
+ui/host: Wizard
+ui/host: annotationsFor
 ui/host: registerKeybindings
 ui/host: registerWillHandler
+ui/host: requestAnnotations
+ui/host: slotFills
 ui/sdk: AcornBridge
 ui/sdk: AcornBridgeError
 ui/sdk: PluginFrameContext
@@ -426,6 +431,7 @@ ui/tree: ChipRow
 ui/tree: CodeBlock
 ui/tree: CollapsibleSection
 ui/tree: Composer
+ui/tree: ConfirmButton
 ui/tree: CopyButton
 ui/tree: DescriptionList
 ui/tree: DetailColumn
@@ -464,6 +470,7 @@ ui/tree: Only
 ui/tree: Picker
 ui/tree: PickerRow
 ui/tree: Popover
+ui/tree: Rectangle
 ui/tree: Row
 ui/tree: RowActions
 ui/tree: Rows
@@ -512,6 +519,7 @@ ui: ChipRow
 ui: CodeBlock
 ui: CollapsibleSection
 ui: Composer
+ui: ConfirmButton
 ui: CopyButton
 ui: DescriptionList
 ui: DetailColumn
@@ -550,6 +558,7 @@ ui: Only
 ui: Picker
 ui: PickerRow
 ui: Popover
+ui: Rectangle
 ui: Row
 ui: RowActions
 ui: Rows

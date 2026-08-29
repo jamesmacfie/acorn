@@ -9,7 +9,7 @@
 // design system stops being able to change.
 
 export {
-  Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, DescriptionList, EmptyState,
+  Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, ConfirmButton, DescriptionList, EmptyState,
   DetailColumn, Field, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
   SegmentedControl, Select, Spinner, SplitHandle, StatusDot, Table, Textarea, ToggleButton, Toolbar,
   ToolbarSpacer, TreeRow,
@@ -99,6 +99,11 @@ export { Grid } from '@acorn/client-core/ui/Grid.tsx'
 // the arrows, Home, End, the page keys, type-ahead, `aria-activedescendant`, and a selection that
 // survives a refetch all come from it, and the pane writes no key handling at all.
 export { Rows } from '@acorn/client-core/ui/Rows.tsx'
+
+// The box the kit owns and something else fills with pixels: a PTY, a webview, a plugin's iframe.
+// The kit's one admission that not everything is a tree, and the keyboard contract for getting in
+// and out of one.
+export { Rectangle } from '@acorn/client-core/ui/Rectangle.tsx'
 
 // The two host wrappers. Here before there is a second host, so a plugin can be written against one
 // before it arrives: `Only` is "this exists on these hosts", `Fallback` is "draw this instead where
