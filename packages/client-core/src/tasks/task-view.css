@@ -160,9 +160,6 @@
 .task-slot { position: relative; flex: 1 1 0; display: flex; min-height: 0; overflow: hidden; outline: none; }
 .task-slot:focus-visible { box-shadow: var(--ring); }
 .task-slot > .pane { flex: 1; min-width: 0; }
-.pr-pane-grid { flex: 1; display: flex; min-width: 0; min-height: 0; }
-.pr-pane-grid > .pane-mid { flex: 0 0 clamp(280px, 20vw, 430px); }
-.pr-pane-grid > .pane-right { flex: 1; min-width: 0; }
 /* SplitHandle owns the hit area, the hairline and the hover/focus tone (ui/split.ts + primitives.css). */
 .pane-slot-actions { position: absolute; top: 4px; right: 4px; z-index: calc(var(--z-resizer) + 1); display: flex; gap: var(--space-1); }
 .contribution-failed { align-items: center; justify-content: center; gap: var(--space-4); }

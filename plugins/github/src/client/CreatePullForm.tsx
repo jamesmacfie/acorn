@@ -4,16 +4,14 @@ import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { branchesOptions, compareOptions, mentionsOptions } from './queries'
 import { projectsOptions } from '@acorn/plugin-api/client'
 import { pullsKey, type Branch } from '../contract/api'
-import { Alert, Button, Checkbox, EmptyState, Input, MentionTextarea, Picker } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, EmptyState, Field, Inline, Input, MentionTextarea, Picker, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
 import { githubBrowsePath } from './routes'
-import './styles/pull-list.css'
-import './styles/pull-detail.css'
 
-// Mid (Navigator) pane in create mode: base and head pickers, title, body, draft and Create. base and
+// The navigator column in create mode: base and head pickers, title, body, draft and Create. base and
 // head live in the URL (?base=&head=) so they're shareable and reactive, and the compare query and the
-// right-pane preview both read them. Title and body prefill from the compare until the user edits.
+// preview column both read them. Title and body prefill from the compare until the user edits.
 export default function CreatePullForm() {
   const params = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -105,69 +103,71 @@ export default function CreatePullForm() {
 
   return (
     <Show when={repoKnown()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
-      <div class="create-pr">
-        <div class="create-pr-branches">
-          <Picker<Branch>
-            label={base() || 'base'}
-            placeholder="Filter branches…"
-            emptyText="No matching branches."
-            results={branchResults}
-            rowLabel={(b) => b.name}
-            isActive={(b) => b.name === base()}
-            onSelect={(b) => setSearchParams({ base: b.name })}
+      <Stack gap="section">
+        <Field label="Branches" hint="The pull request compares head into base.">
+          <Inline>
+            <Picker<Branch>
+              label={base() || 'base'}
+              placeholder="Filter branches…"
+              emptyText="No matching branches."
+              results={branchResults}
+              rowLabel={(branch) => branch.name}
+              isActive={(branch) => branch.name === base()}
+              onSelect={(branch) => setSearchParams({ base: branch.name })}
+            />
+            <Text emphasis="muted">←</Text>
+            <Picker<Branch>
+              label={head() || 'Choose a branch…'}
+              placeholder="Filter branches…"
+              emptyText="No matching branches."
+              results={branchResults}
+              rowLabel={(branch) => branch.name}
+              isActive={(branch) => branch.name === head()}
+              onSelect={(branch) => setSearchParams({ head: branch.name })}
+            />
+          </Inline>
+        </Field>
+
+        <Field label="Title">
+          <Input
+            placeholder="Title"
+            value={title()}
+            onInput={(value) => {
+              setTouched(true)
+              setTitle(value)
+            }}
           />
-          <span class="branch-arrow">←</span>
-          <Picker<Branch>
-            label={head() || 'Choose a branch…'}
-            placeholder="Filter branches…"
-            emptyText="No matching branches."
-            results={branchResults}
-            rowLabel={(b) => b.name}
-            isActive={(b) => b.name === head()}
-            onSelect={(b) => setSearchParams({ head: b.name })}
+        </Field>
+        <Field label="Description">
+          <MentionTextarea
+            placeholder="Describe this pull request… (⌘↵ to create)"
+            value={body()}
+            onInput={(value) => { setTouched(true); setBody(value) }}
+            onKeyDown={onBodyKey}
+            mentions={mentionsList()}
           />
-        </div>
+        </Field>
 
-        {/* Was `.pr-filter` — the PR title is not a filter, so it is a plain Input. */}
-        <Input
-          placeholder="Title"
-          value={title()}
-          onInput={(value) => {
-            setTouched(true)
-            setTitle(value)
-          }}
-        />
-        <MentionTextarea
-          placeholder="Describe this pull request… (⌘↵ to create)"
-          value={body()}
-          onInput={(v) => { setTouched(true); setBody(v) }}
-          onKeyDown={onBodyKey}
-          mentions={mentionsList()}
-        />
+        <Checkbox label="Create as draft" checked={draft()} onChange={(checked) => setDraft(checked)} />
 
-        <label class="create-pr-draft">
-          <Checkbox checked={draft()} onChange={(checked) => setDraft(checked)} />
-          Create as draft
-        </label>
-
-        <div class="pr-actions">
-          <Button onPress={submit} disabled={!canCreate()}>
+        <Toolbar variant="actions">
+          <Button tone="accent" onPress={submit} disabled={!canCreate()}>
             {create.isPending ? 'Creating…' : draft() ? 'Create draft pull request' : 'Create pull request'}
           </Button>
-        </div>
+        </Toolbar>
 
-        <Show when={comparable()} fallback={<div class="create-pr-status">Choose a branch to open a pull request.</div>}>
-          <Show when={!compare.isLoading} fallback={<div class="create-pr-status">Comparing…</div>}>
-            <div class="create-pr-status">
-              {aheadBy() > 0 ? `${aheadBy()} commit${aheadBy() === 1 ? '' : 's'} · ${compare.data?.files.length ?? 0} files` : 'Nothing to compare — branches are identical.'}
-            </div>
+        <Show when={comparable()} fallback={<Text emphasis="muted">Choose a branch to open a pull request.</Text>}>
+          <Show when={!compare.isLoading} fallback={<Text emphasis="muted">Comparing…</Text>}>
+            <Text emphasis="muted">
+              {aheadBy() > 0
+                ? `${aheadBy()} commit${aheadBy() === 1 ? '' : 's'} · ${compare.data?.files.length ?? 0} files`
+                : 'Nothing to compare — branches are identical.'}
+            </Text>
           </Show>
         </Show>
 
-        <Show when={error()}>
-          <Alert>{error()}</Alert>
-        </Show>
-      </div>
+        <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
+      </Stack>
     </Show>
   )
 }

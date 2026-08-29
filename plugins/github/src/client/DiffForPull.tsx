@@ -6,6 +6,7 @@ import { fetchFilePatches, fileBlobOptions, filesOptions, mentionsOptions, pullD
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { DiffPane } from '@acorn/plugin-api/ui'
 import type { DiffSource } from '@acorn/plugin-api/ui/diff'
+import { DIFF_LINE_POINT } from './extensionPoints'
 
 // Right (Diff) pane: the shared diff shell (client-core's DiffPane, docs/diff-rendering.md) filled in
 // from a pull request. Everything here answers one of the shell's questions and nothing more: which
@@ -81,5 +82,8 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     },
   }
 
-  return <DiffPane source={source} />
+  // What another plugin knows about a line of this diff — coverage, a lint result — drawn under the
+  // row it belongs to. The host fetches, batches and stamps; this only names the point
+  // (docs/plugins.md § Cooperative extension points, the `annotation` kind).
+  return <DiffPane source={source} annotations={DIFF_LINE_POINT} />
 }

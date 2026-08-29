@@ -34,7 +34,9 @@
       "changes:diff-line",
       "context:section",
       "docker:stats-beside",
-      "docker:container"
+      "docker:container",
+      "github:diff-line",
+      "github:summary-badges"
     ],
     "extensions": [
       "memory.section"
@@ -172,6 +174,10 @@
       ],
       "slots": [
         "overlay/palette.pull-files"
+      ],
+      "extensionPoints": [
+        "github:diff-line",
+        "github:summary-badges"
       ],
       "refPanels": [
         "github-pull"

@@ -870,14 +870,15 @@ privileged webview had no policy. It has one; the config is simply not where it 
 plainly, because the next reader will look in the same place.
 
 What the policy is a second layer behind. The renderer displays text this app did not author — agent
-transcripts, GitHub `bodyHTML`, Linear descriptions, Rollbar payloads, notes an agent wrote — and four
+transcripts, GitHub `bodyHTML`, Linear descriptions, Rollbar payloads, notes an agent wrote — and two
 bindings pass GitHub's `bodyHTML` to `innerHTML` verbatim, trusting GitHub's sanitizer:
 
-- `plugins/github/src/client/PullDetail.tsx`
-- `plugins/github/src/client/pullDetail/Conversation.tsx`, twice
+- `packages/client-core/src/registries/ProviderHtml.tsx`, the host component every provider-rendered
+  body now goes through: github's description, its comments and its review threads
 - `packages/client-core/src/ui/diff/DiffRows.tsx`
 
-None is a known bug. They are listed because each one is a place where a sanitizer being wrong once
+The first was three hand-written bindings inside the github plugin until phase 7 of the layout
+programme. Neither is a known bug. They are listed because each one is a place where a sanitizer being wrong once
 would put script in a webview that can call into Rust, and the policy is what stands behind them if
 that ever happens.
 

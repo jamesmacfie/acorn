@@ -4,6 +4,7 @@ import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
 import { reposRoute } from '../contract/api'
 import { PULL_INVOLVEMENT, PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../contract/collections'
 import { pullRefMatchesTask } from '../contract/pullRef'
+import { DIFF_LINE_KEY, SUMMARY_BADGES_MAX } from './extensionPoints'
 import { prFiltersSlice } from './pullList/filterSlice'
 import { prPaneContribution } from './pullDetail/PrPane'
 import { pullFilePaletteSlotContribution } from './slotContribution'
@@ -107,6 +108,16 @@ export const githubClientPlugin: ClientPlugin = {
     })
     ctx.integrationFlows.register(githubIntegrationFlow)
     ctx.panes.register(prPaneContribution)
+    // The two places another plugin may come into a pull request (docs/plugins.md § Cooperative
+    // extension points). Marks on a line of the diff, keyed the way the shared viewer keys a row;
+    // and room beside the state and checks on the overview, where the owner's own facts stay and a
+    // contributor is added to them.
+    ctx.extensionPoints.register({
+      id: 'diff-line', label: 'Pull request diff line', kind: 'annotation', key: [...DIFF_LINE_KEY], max: 4,
+    })
+    ctx.extensionPoints.register({
+      id: 'summary-badges', label: 'Pull request summary', kind: 'remote', mode: 'stack', max: SUMMARY_BADGES_MAX,
+    })
     ctx.slots.register(pullFilePaletteSlotContribution)
     ctx.persistedStateSlices.register(prFiltersSlice)
   },

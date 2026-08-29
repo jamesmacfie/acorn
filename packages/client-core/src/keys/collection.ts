@@ -44,6 +44,9 @@ export type CollectionOptions = {
   onActivate?: (key: string) => void
   onExpand?: (key: string, expand: boolean) => void
   onMenu?: (key: string) => void
+  /** Put an off-screen item on screen. A virtualised collection draws only the rows in view, so most
+   *  of its items have no element to focus until the scroller has been asked to reach them. */
+  scrollToKey?: (key: string) => void
 }
 
 const PAGE = 10
@@ -122,7 +125,14 @@ export function createCollection(options: CollectionOptions): Collection {
   const land = (key: string | undefined) => {
     if (!key) return false
     setActiveItem(options.id(), key)
-    elements.get(key)?.focus()
+    const element = elements.get(key)
+    if (element) element.focus()
+    else if (options.scrollToKey) {
+      // Nothing to focus yet: the row is outside a virtualised window. Scroll it in, then focus it on
+      // the next frame, by which time it exists.
+      options.scrollToKey(key)
+      requestAnimationFrame(() => elements.get(key)?.focus())
+    }
     if (options.selectOnMove) pick(key)
     return true
   }
@@ -201,7 +211,9 @@ export function createCollection(options: CollectionOptions): Collection {
   const reveal = (key: string) => {
     if (!has(key)) return
     setActiveItem(options.id(), key)
-    elements.get(key)?.scrollIntoView({ block: 'nearest' })
+    const element = elements.get(key)
+    if (element) element.scrollIntoView({ block: 'nearest' })
+    else options.scrollToKey?.(key)
   }
   // Registered for the life of the node, and taken back out with it: a stale entry would scroll a
   // collection that is no longer on screen.

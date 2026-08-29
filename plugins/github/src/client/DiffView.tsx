@@ -1,32 +1,28 @@
 import { createMemo, Show } from 'solid-js'
 import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
-import { projectsOptions, type Task } from '@acorn/plugin-api/client'
+import { projectsOptions } from '@acorn/plugin-api/client'
 import { routeKey as makeRouteKey } from './fileNavigation'
 import { DiffForPull, type PullRoute } from './DiffForPull'
 import { EmptyState } from '@acorn/plugin-api/ui'
-import type { PullRef } from '../contract/pullRef'
 
-export default function DiffView(props: { task?: Task; pull?: PullRef; readOnly?: boolean } = {}) {
-  const params = props.task ? null : useParams()
+// The diff column of the browse surface. The PR pane reaches `DiffForPull` directly from its Files
+// tab, where the route comes from the selected pull rather than from the URL.
+export default function DiffView() {
+  const params = useParams()
   const projects = createQuery(() => projectsOptions(true))
   const route = createMemo<PullRoute | null>(() => {
-    const project = projects.data?.find((candidate) => candidate.id === params?.projectId)
-    const owner = props.pull?.owner ?? props.task?.github?.owner ?? project?.github?.owner
-    const repo = props.pull?.repo ?? props.task?.github?.name ?? project?.github?.name
-    const number = props.pull?.number ?? (props.task?.pullNumber != null ? String(props.task.pullNumber) : params?.number)
+    const project = projects.data?.find((candidate) => candidate.id === params.projectId)
+    const owner = project?.github?.owner
+    const repo = project?.github?.name
+    const number = params.number
     if (!owner || !repo || !number) return null
-    return {
-      owner,
-      repo,
-      number,
-      key: makeRouteKey(owner, repo, number),
-    }
+    return { owner, repo, number, key: makeRouteKey(owner, repo, number) }
   })
 
   return (
     <Show when={route()} keyed fallback={<EmptyState align="start">Select a PR.</EmptyState>}>
-      {(r) => <DiffForPull route={r} router={!props.task} taskId={props.task?.id} readOnly={props.readOnly} />}
+      {(resolved) => <DiffForPull route={resolved} router />}
     </Show>
   )
 }

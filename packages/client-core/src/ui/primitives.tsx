@@ -1346,8 +1346,9 @@ export function ListDetail(props: {
   split?: boolean
   /** aria-label for the list column. It is a landmark; name it. */
   listLabel?: string
-  /** `narrow` is the compact identifier switcher; `default` is the browse list. */
-  listWidth?: 'narrow' | 'default'
+  /** `narrow` is the compact identifier switcher, `default` is the browse list, and `wide` is a
+   *  column that holds a document rather than a picker. */
+  listWidth?: 'narrow' | 'default' | 'wide'
   /** Detail column scrolls as one region. Otherwise its children own their scrolling. */
   scrollDetail?: boolean
   /** `main` when this split is the document itself, such as a plugin frame where nothing else
@@ -1390,8 +1391,19 @@ export function ListDetail(props: {
    from `list` whether there are two columns.
 
    At 80×24: as ListDetail. */
-export function ListColumn(props: { label?: string; children: JSX.Element }) {
-  return <aside class="ui-listdetail-list" aria-label={props.label}>{props.children}</aside>
+export function ListColumn(props: {
+  label?: string
+  /** This column is a document rather than a list: it scrolls as one region and takes the pane's
+   *  inline padding. A column of rows leaves it unset — its rows own their scrolling and sit flush
+   *  against the divider, which is what every list in the app does. */
+  scroll?: boolean
+  children: JSX.Element
+}) {
+  return (
+    <aside class="ui-listdetail-list" data-scroll={props.scroll ? '' : undefined} aria-label={props.label}>
+      {props.children}
+    </aside>
+  )
 }
 
 export function DetailColumn(props: { scroll?: boolean; children: JSX.Element }) {

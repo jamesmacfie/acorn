@@ -90,6 +90,9 @@
      before the primitive existed. */
   --listdetail-w: clamp(200px, 22vw, 300px);
   --listdetail-w-narrow: 150px;
+  /* A third genre: a column that is a document rather than a picker. github's browse puts the pull
+     request itself between the list and the diff, and it needs prose width. */
+  --listdetail-w-wide: clamp(360px, 23vw, 430px);
   --icon-size: 14px;
   --icon-box: 18px;
   --avatar-sm: 18px;

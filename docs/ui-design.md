@@ -471,12 +471,18 @@ does not cross into its document.
 ## Two-column panes
 
 A pane that puts a list beside a detail uses the `ListDetail` primitive, not a hand-rolled grid. It
-owns the split, the two column widths (`narrow` for an identifier switcher, the default for a browse
-list), the `--chrome-divider` between them, and each column's flex/overflow behaviour. Its consumers
-are the Rollbar, Linear, API and Database panes plus the Editor, Notes, Agents and Changes task
-panes, and Rollbar's occurrence workbench nests one inside another; before it existed those eight had
-eight column widths and two different border roles, which is why they read as variations on a pane
-rather than the same pane.
+owns the split, the three column widths (`narrow` for an identifier switcher, the default for a browse
+list, `wide` for a column that holds a document rather than a picker), the `--chrome-divider` between
+them, and each column's flex/overflow behaviour. Its consumers are the Rollbar, Linear, API and
+Database panes plus the Editor, Notes, Agents and Changes task panes, and Rollbar's occurrence
+workbench and GitHub's browse each nest one inside another; before it existed those eight had eight
+column widths and two different border roles, which is why they read as variations on a pane rather
+than the same pane.
+
+A list column is flush and scrolls its own rows. A column holding a document instead says so with
+`scroll`, and then it scrolls as one region and takes the pane's inline padding, the same rule
+`single` and `header-body-footer` apply to their bodies. GitHub's browse is the case: its middle
+column is a pull request, not a picker.
 
 **The list column is flat — no tint.** The four task panes each gave it `--bg-subtle` and the four
 rail/frame panes did not, so the split read differently depending on which rail you reached it from.
@@ -487,17 +493,16 @@ A list column that can be collapsed passes `list={undefined}` rather than hiding
 still in the grid — `ListDetail` then has one track instead of a zero-width first one. Notes' library
 toggle works this way.
 
-It is deliberately not the layout for two separate surfaces. Docker's browse and the GitHub PR pane
-are `.panes` + `.pane` from `styles/shell.css` — inset surfaces with a gap between them, and in the
-PR pane's case a `SplitHandle` that makes the divide draggable. That layout stays the shell's. The
-test is whether the two columns are one surface split by a divider or two surfaces side by side.
+It is deliberately not the layout for two separate surfaces. The test is whether the two columns are
+one surface split by a divider or two surfaces side by side; `.panes` + `.pane` from
+`styles/shell.css` is the second case, inset surfaces with a gap between them.
 
 **A Source with fewer than three columns spans the shell grid; it never redefines it.** `grid-column:
-2 / -1` on the last pane is how GitHub's empty state, the editor pane and Docker's browse all say it.
-A plugin that writes its own `grid-template-columns` for `.panes` gets a column width that only
-resembles the shell's — Docker's was `clamp(320px, 30vw, 460px)` against the shell's
-`clamp(320px, 28vw, 420px)` — and a rule that has to out-specify every style pack's own
-`.app.left-collapsed .panes`. Spanning has neither problem and needs no CSS at all.
+2 / -1` on the last pane is how the chrome source panel says it. A plugin that writes its own
+`grid-template-columns` for `.panes` gets a column width that only resembles the shell's — Docker's
+was `clamp(320px, 30vw, 460px)` against the shell's `clamp(320px, 28vw, 420px)` — and a rule that has
+to out-specify every style pack's own `.app.left-collapsed .panes`. Spanning has neither problem and
+needs no CSS at all.
 
 `ListDetail` sets no narrow-width behaviour. Stacking the columns needs a container query rather
 than a media query, and `container-type` would make the element a containing block for
@@ -712,3 +717,9 @@ renders `listbox` or `tree` with `aria-activedescendant`, a tab strip renders `t
 renders `dialog` with `aria-modal` and hands focus back to its opener. Hover is never load-bearing:
 anything a pointer can reach, focus can reach, so a `RowActions` that appears on hover appears on
 focus too.
+
+A long list says `virtual` on its `Rows` and changes nothing else. The scroller, the row placement and
+the density number all become the kit's, and the collection stays keyed over the whole list rather than
+the drawn window, so the arrows still walk past the last row on screen. Before it existed, GitHub's
+pull list owned a virtualizer, a scroll element, two animation frames and a pair of hand-registered
+`j` and `k` bindings to say the same thing.

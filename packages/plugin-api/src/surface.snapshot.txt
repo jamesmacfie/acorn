@@ -371,6 +371,8 @@ ui/host: AnnotationMarks
 ui/host: Concern
 ui/host: InlineSlot
 ui/host: PaletteSurface
+ui/host: ProviderHtml
+ui/host: RefPanelBox
 ui/host: RefPanelTaskLink
 ui/host: RemoteTree
 ui/host: RemoteTreeProps
@@ -381,6 +383,7 @@ ui/host: annotationsFor
 ui/host: registerKeybindings
 ui/host: registerWillHandler
 ui/host: requestAnnotations
+ui/host: selectPaneTab
 ui/host: slotFills
 ui/sdk: AcornBridge
 ui/sdk: AcornBridgeError
