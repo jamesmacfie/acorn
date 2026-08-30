@@ -459,6 +459,7 @@ ui/tree: KIT_NODE_COMPONENTS
 ui/tree: Kbd
 ui/tree: KeyValueEditor
 ui/tree: KitNodeProps
+ui/tree: Link
 ui/tree: ListColumn
 ui/tree: ListDetail
 ui/tree: Log
@@ -548,6 +549,7 @@ ui: Input
 ui: Kbd
 ui: KeyValueEditor
 ui: LineComposerController
+ui: Link
 ui: ListColumn
 ui: ListDetail
 ui: Log

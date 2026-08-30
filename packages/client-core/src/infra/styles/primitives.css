@@ -1201,6 +1201,22 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-text[data-tone='warn'] { color: var(--state-warn); }
 .ui-text[data-tone='danger'] { color: var(--state-bad); }
 
+/* Link: words in a sentence that act. The same three declarations `.ref-inline-link` wears in
+   styles/integrations.css, moved inward now the kit has a node for this; that class stays for
+   `linkifyRefs`, which mints anchors over provider HTML the framework never sees. The button reset
+   is for the no-href form, which is a real `<button>` so the keyboard reaches it. */
+.ui-link {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  text-align: inherit;
+}
+.ui-link:hover { text-decoration: underline; }
+
 .ui-heading { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .ui-heading-eyebrow {
   color: var(--text-muted);

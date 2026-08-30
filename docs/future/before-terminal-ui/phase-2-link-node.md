@@ -1,6 +1,6 @@
 # Phase 2: a Link node, for clickable text inside a sentence
 
-Status: not started. Waits on nothing.
+Status: shipped 2026-08-31.
 
 ## Goal
 

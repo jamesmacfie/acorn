@@ -50,6 +50,8 @@ export const NODE_FOCUS = {
 
   // Showing
   Text: 'none',
+  // Always a stop: an anchor or a button either way, and a link nobody can tab to is not a link.
+  Link: 'stop',
   Heading: 'none',
   Rows: 'collection',
   Row: 'item',

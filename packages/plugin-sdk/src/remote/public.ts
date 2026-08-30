@@ -48,6 +48,7 @@ export declare const SectionHeader: (props: KitNodeProps) => JSX.Element
 export declare const TabPanel: (props: KitNodeProps) => JSX.Element
 export declare const ToolbarSpacer: (props: KitNodeProps) => JSX.Element
 export declare const Text: (props: KitNodeProps) => JSX.Element
+export declare const Link: (props: KitNodeProps) => JSX.Element
 export declare const Heading: (props: KitNodeProps) => JSX.Element
 export declare const Rows: (props: KitNodeProps) => JSX.Element
 export declare const Row: (props: KitNodeProps) => JSX.Element

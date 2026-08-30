@@ -1,10 +1,10 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import {
   CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, formatRelativeTime, railDotProps,
-  REF_LINK_CLASS, splitRefTokens,
+  splitRefTokens,
 } from '@acorn/plugin-api/client'
 import {
-  Alert, Badge, Button, Chip, ChipRow, ConfirmButton, CopyButton, Facts, Fold, Heading, Inline,
+  Alert, Badge, Button, Chip, ChipRow, ConfirmButton, CopyButton, Facts, Fold, Heading, Inline, Link,
   Picker, Row, Rows, Select, Stack, StatusDot, Text, Toolbar, UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { ProviderHtml, Slot } from '@acorn/plugin-api/ui/host'
@@ -15,14 +15,16 @@ import type { PrModel } from './prModel'
 // The Overview tab of the pull-request pane, and the top of the browse navigator: what this pull is,
 // what state it is in, and every verb that changes that state.
 //
-// The Solid-rendered twin of the host's `linkifyRefs`: same split, same class, different mechanism,
-// because a pull's title is text this component owns and its body is opaque provider HTML.
+// The Solid-rendered twin of the host's `linkifyRefs`: same split, different mechanism, because a
+// pull's title is text this component owns and its body is opaque provider HTML. The twin used to
+// mint the same raw anchor with the same private class; the kit has a word for a clickable run of
+// text now, so it writes a node (docs/ui-design.md § The closed kit).
 function RefText(props: { text: string; prefixes: ReadonlyMap<string, string>; onOpen: (id: string) => void }) {
   const parts = createMemo(() => splitRefTokens(props.text, props.prefixes))
   return (
     <For each={parts()}>
       {(part) => part.ref
-        ? <a class={REF_LINK_CLASS} onClick={() => props.onOpen(part.ref!.item)}>{part.text}</a>
+        ? <Link onPress={() => props.onOpen(part.ref!.item)}>{part.text}</Link>
         : <>{part.text}</>}
     </For>
   )

@@ -90,6 +90,9 @@ export { DiffPane } from '@acorn/client-core/features/diff/DiffPane.tsx'
 export { Stack } from '@acorn/client-core/kit/components/layout/Stack.tsx'
 export { Inline } from '@acorn/client-core/kit/components/layout/Inline.tsx'
 export { Text } from '@acorn/client-core/kit/components/content/Text.tsx'
+// Clickable words inside a sentence. `Text` has no press handler on purpose, so this is the node a
+// pane reaches for when a run of its own text opens something.
+export { Link } from '@acorn/client-core/kit/components/content/Link.tsx'
 export { Heading } from '@acorn/client-core/kit/components/content/Heading.tsx'
 export { Section } from '@acorn/client-core/kit/components/layout/Section.tsx'
 export { Timeline } from '@acorn/client-core/kit/components/content/Timeline.tsx'
