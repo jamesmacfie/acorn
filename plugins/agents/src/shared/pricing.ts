@@ -51,7 +51,7 @@ function sonnetFivePrice(at: number): AgentModelPrice {
 }
 
 // Standard global API prices per million tokens. The catalog entries are agent-plugin data: the client
-// renders them in settings and the main-process collector resolves local Claude JSONL model ids through
+// renders them in settings and the node's collector resolves local Claude JSONL model ids through
 // the same definitions.
 export const claudePriceCatalog: readonly ClaudePriceCatalogEntry[] = [
   {

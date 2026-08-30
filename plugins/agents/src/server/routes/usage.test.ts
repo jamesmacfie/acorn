@@ -9,13 +9,13 @@ import { makeTestDb } from '@acorn/plugin-api/testkit'
 import type { AgentUsageSnapshot } from '../../shared/usage'
 import { emptyAgentPricingPreferences, type AgentPricingPreferences } from '../../shared/pricing'
 import { defaultAgentConcurrency, type AgentConcurrencyLimits } from '../../shared/concurrency'
-import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../../main/pricingStore'
-import { readAgentConcurrency, writeAgentConcurrency } from '../../main/concurrencyStore'
+import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../pricingStore'
+import { readAgentConcurrency, writeAgentConcurrency } from '../concurrencyStore'
 import {
   defaultAgentSessionDefaults,
   type AgentSessionDefaults,
 } from '../../shared/sessionDefaults'
-import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../../main/sessionDefaultsStore'
+import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../sessionDefaultsStore'
 import { agentUsage, setAgentUsageBridge } from './usage'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 

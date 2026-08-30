@@ -40,7 +40,7 @@ export const agentUsage = new Hono<AppEnv>()
   // reasonable, and it's the owner's own data either way.
   .put('/pricing', requireDevice, async (c) => {
     const body = await c.req.json().catch(() => null) as unknown
-    // Validated at the boundary, before anything is stored: the renderer is the less-trusted side, and
+    // Validated at the boundary, before anything is stored: the client is the less-trusted side, and
     // a malformed override would be parsed back into the built-in table on every read and look like a
     // silently discarded save.
     const result = validateAgentPricingPreferences(body)

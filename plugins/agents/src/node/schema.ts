@@ -3,7 +3,7 @@
 //
 // The companion FTS5 virtual table (`agent_events_fts` and its three triggers over `agent_events`) is
 // hand-written into the migration rather than declared here. See docs/data-layer.md § Migrations.
-// migrations/0000_*.sql is the only place its shape is stated, main/sessionRepository.ts reads it with
+// migrations/0000_*.sql is the only place its shape is stated, server/sessions/sessionRepository.ts reads it with
 // raw SQL, and node/ftsSchema.test.ts keeps the two in step.
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
@@ -30,7 +30,7 @@ export const agentSessions = sqliteTable(
     parentSessionId: text('parent_session_id'),
     parentTurnId: text('parent_turn_id'),
     // The subagent roster, projected from this session's own `subagent` events by
-    // main/sessionRepository.ts. On the row rather than in a table of its own because the row is
+    // server/sessions/sessionRepository.ts. On the row rather than in a table of its own because the row is
     // already broadcast to every client after every event, which is what makes the task sidebar's
     // sub-rows live for sessions nobody has opened.
     subagentsJson: text('subagents_json'),

@@ -1,7 +1,7 @@
 import { lazy } from 'solid-js'
 import type { SourceContribution } from '@acorn/plugin-api/client'
 
-const AgentCenter = lazy(() => import('./AgentCenter'))
+const AgentCenter = lazy(() => import('./center/AgentCenter'))
 
 export const agentCenterSourceContribution: SourceContribution<never> = {
   id: 'agents',

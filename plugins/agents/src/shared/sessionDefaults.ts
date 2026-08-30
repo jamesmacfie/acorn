@@ -32,7 +32,7 @@ export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   last: {},
 })
 
-// The renderer is the less-trusted side and this decides which model a provider child runs, so the
+// The client is the less-trusted side and this decides which model a provider child runs, so the
 // bounds are here rather than trusted from the caller. They are loose enough that no real provider
 // hits them: 20 providers, 20 options each.
 const MAX_PROVIDERS = 20

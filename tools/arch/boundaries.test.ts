@@ -234,11 +234,11 @@ describe('architecture boundaries', () => {
       'packages/desktop-helper/src/supervision/serviceHost.ts',
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/server/terminal.ts', // PTYs
-      'plugins/agents/src/main/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
-      'plugins/agents/src/main/drivers/acpDriver.ts', // the generic ACP driver, one process per session
-      'plugins/agents/src/main/drivers/codexDriver.ts',
-      'plugins/agents/src/main/drivers/authProbe.ts',
-      'plugins/agents/src/main/usage/codexUsage.ts',
+      'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
+      'plugins/agents/src/server/drivers/acpDriver.ts', // the generic ACP driver, one process per session
+      'plugins/agents/src/server/drivers/codexDriver.ts',
+      'plugins/agents/src/server/drivers/authProbe.ts',
+      'plugins/agents/src/server/usage/codexUsage.ts',
       'plugins/docker/src/server/cli.ts',
       'plugins/docker/src/server/dockerService.ts', // `docker logs -f` / `stats` streams
       'plugins/database/src/server/database.ts',

@@ -3,24 +3,24 @@ import { agentProfileRegistry, AGENTS_HARNESS_REGISTRY, getProfile, type Interna
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import { AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
-import { claudeHarness } from '../main/drivers/claudeHarness'
-import { CodexAgentDriver } from '../main/drivers/codexDriver'
-import { agentDriverRegistry } from '../main/drivers/registry'
-import { createHarnessRegistry } from '../main/harnessRegistry'
-import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../main/pricingStore'
-import { ManagedAgentRuntime } from '../main/runtime'
+import { claudeHarness } from '../server/drivers/claudeHarness'
+import { CodexAgentDriver } from '../server/drivers/codexDriver'
+import { agentDriverRegistry } from '../server/drivers/registry'
+import { createHarnessRegistry } from '../server/harnessRegistry'
+import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../server/pricingStore'
+import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
-import { createSessionExecute } from '../main/sessionExecute'
-import { agentUsageCollectors } from '../main/usage/collectors'
-import { readAgentConcurrency, writeAgentConcurrency } from '../main/concurrencyStore'
-import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../main/sessionDefaultsStore'
-import { collectClaudeUsage } from '../main/usage/claudeUsage'
-import { collectCodexUsage } from '../main/usage/codexUsage'
-import { createAgentUsageService } from '../main/usage/service'
+import { createSessionExecute } from '../server/sessions/sessionExecute'
+import { agentUsageCollectors } from '../server/usage/collectors'
+import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
+import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../server/sessionDefaultsStore'
+import { collectClaudeUsage } from '../server/usage/claudeUsage'
+import { collectCodexUsage } from '../server/usage/codexUsage'
+import { createAgentUsageService } from '../server/usage/service'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
-import { aiderProfile, claudeCodeProfile, codexProfile } from '../main/index'
+import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profiles/index'
 
 let builtInProfileDisposables: (() => void)[] | null = null
 export function registerBuiltInProfiles(): void {
@@ -45,7 +45,7 @@ function registerBuiltInDrivers(): void {
 
 // The two built-in plan-usage probes, one per built-in harness. They register beside the drivers rather
 // than inside the usage service, because a plugin-contributed harness feeds the same registry
-// (main/usage/collectors.ts). `probeDir` is only known at init, so it arrives as a parameter.
+// (../server/usage/collectors.ts). `probeDir` is only known at init, so it arrives as a parameter.
 let builtInCollectorDisposables: (() => void)[] | null = null
 function registerBuiltInUsageCollectors(probeDir: string): void {
   if (builtInCollectorDisposables) return
@@ -148,7 +148,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime))
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits
       // under the data root, and the pricing read goes through `CoreServices.prefs` because `prefs` is
-      // core's table (main/pricingStore.ts).
+      // core's table (../server/pricingStore.ts).
       const probeDir = join(dataDir, 'agent-usage-probe')
       registerBuiltInUsageCollectors(probeDir)
       usageRoute = ctx.capabilities.provide(AGENT_USAGE, {

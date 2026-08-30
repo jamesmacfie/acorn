@@ -84,7 +84,7 @@ export type AgentProviderUsage = {
 }
 
 // What a collector answers: the reading, never the naming. The service stamps on the label and glyph
-// from the registration (main/usage/service.ts), so a probe never repeats its own id.
+// from the registration (server/usage/service.ts), so a probe never repeats its own id.
 export type AgentProviderUsageReading = Omit<AgentProviderUsage, 'label' | 'glyph'>
 
 export type AgentUsageSnapshot = {

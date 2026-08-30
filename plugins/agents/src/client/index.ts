@@ -5,27 +5,27 @@
 // exist.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
-import { ATTENTION_COPY, isActiveAgent, needsAttention } from './agentActivity'
+import { ATTENTION_COPY, isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { agentSessionsCollection } from './collectionContribution'
-import { managedAgentApi } from './managedClient'
-import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents } from './managedSelection'
-import { activateManagedAgentNotifications } from './managedStore'
+import { managedAgentApi } from './sessions/managedClient'
+import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents } from './sessions/managedSelection'
+import { activateManagedAgentNotifications } from './sessions/managedStore'
 import { agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
 import { agentCenterSourceContribution } from './sourceContribution'
-import { agentToolFoldSlice } from './toolFoldPrefs'
+import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
 
-const AgentConcurrencySettings = lazy(() => import('./AgentConcurrencySettings'))
-const AgentPricingSettings = lazy(() => import('./AgentPricingSettings'))
-const AgentSessionDefaultsSettings = lazy(() => import('./AgentSessionDefaultsSettings'))
+const AgentConcurrencySettings = lazy(() => import('./settings/AgentConcurrencySettings'))
+const AgentPricingSettings = lazy(() => import('./settings/AgentPricingSettings'))
+const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionDefaultsSettings'))
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
   required: true,
   init: (ctx) => {
     // The harnesses' own marks, so a provider reads as itself wherever it is named. The node's
-    // descriptors point their `glyph` at these names (main/drivers/claudeHarness.ts, codexDriver.ts).
+    // descriptors point their `glyph` at these names (server/drivers/claudeHarness.ts, codexDriver.ts).
     //
     // Same artwork as `brand:model-providers/anthropic` and `brand:model-providers/openai`, copied
     // rather than borrowed: a mark belongs to the plugin that draws it, and naming another package's
