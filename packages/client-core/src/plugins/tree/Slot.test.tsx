@@ -18,7 +18,9 @@ vi.mock('../../queries', () => ({ prefsOptions: () => ({}) }))
 // The tree itself is the worker path, tested in TreeHost/workerHost. Here it only has to be
 // identifiable on screen.
 vi.mock('./RemoteTree', () => ({
-  RemoteTree: (props: { contribution: { pluginId: string } }) => <span>tree:{props.contribution.pluginId}</span>,
+  RemoteTree: (props: { contribution: { pluginId: string }; scope?: () => { taskId?: string } }) => (
+    <span>tree:{props.contribution.pluginId}{props.scope?.().taskId ? ` in ${props.scope!().taskId}` : ''}</span>
+  ),
 }))
 
 const registered: Disposable[] = []
@@ -94,6 +96,19 @@ describe('Slot', () => {
     expect(text).not.toContain('tree:c')
     // A count and no names: the owner set the ceiling because it is the owner's screen.
     expect(text).toContain('1 more from other plugins')
+  })
+
+  it('hands the contributor’s tree the owner’s task, so a card drawn in a pane is not inert', () => {
+    // Without a subject the tree's bridge has no `taskId`, and `openPane`, in-app `openUrl` and every
+    // task-scoped key binding answer `undefined` (../frames/frameServices.ts). The owner's task, never
+    // the ambient one: a project pane and a reference panel are not looking at a task even while one is
+    // selected in the rail behind them.
+    point()
+    contributor('images', 'agents:attachment', ['image/png'])
+    expect(draw(() => () => <Slot point="agents:attachment" key="image/png" taskId="t-42">default</Slot>))
+      .toBe('tree:images in t-42')
+    // And an owner with no task to give says so rather than inventing one.
+    expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('tree:images')
   })
 
   it('has no way to nest, because a contributor’s tree cannot name a Slot', () => {
