@@ -64,8 +64,8 @@ future reader will trip over.
 
 ## Not built here, by design
 
-Focus changed lands in the layout programme's phase 2
-([layout/phase-2-focus-and-keymap.md](./layout/phase-2-focus-and-keymap.md)), from the host-owned
-region store, on the client bus only. The refusals (file saved, streams, per-keystroke, machine-scale
+Focus changed shipped as `runtime:focus-changed`
+([docs/command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Focus and typing),
+from the host-owned region store, on the client bus only. The refusals (file saved, streams, per-keystroke, machine-scale
 invalidation, process and port lifecycle, raw user activity, request and query payloads, compose up
 and down) are in `docs/plugins.md § What is not an event`, with the argument for each.

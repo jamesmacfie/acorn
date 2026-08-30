@@ -56,10 +56,10 @@ costume, and the costume is cheap enough to keep for uniformity. That end state 
 These, not the moves themselves, are the architecture in this file. Each is a place where two
 plugins share a realm today; each has a designed answer that is data-plus-messages.
 
-**Read with [docs/future/layout/](./layout/README.md), 2026-08-28.** Couplings 1 to 3 below were
-written when the only data-shaped answer was a descriptor, and each one concluded "component-shaped,
-so it stays first-party." The layout programme adds a third shape between descriptor and iframe: a
-remote component tree the host mounts from a closed kit. Under it, memory's tray section becomes a
+**Rewritten 2026-08-28.** Couplings 1 to 3 below were written when the only data-shaped answer was a
+descriptor, and each one concluded "component-shaped, so it stays first-party." There is a third shape
+between descriptor and iframe now: a remote component tree the host mounts from a closed kit
+([docs/plugins.md](../plugins.md) § Descriptors for facts, trees for UI, rectangles for pixels). Under it, memory's tray section becomes a
 tree in a `context:section` slot (layout phase 6), changes' tool card becomes a tree behind
 `contributions.remote` (phase 3, **shipped**), and `WORKFLOW_CONTROL`'s sidebar controls can be a tree
 too. The census table's "stays first-party" calls for changes and memory are therefore superseded; the
@@ -108,8 +108,8 @@ true. Coupling 4, the projects row, is untouched by the layout programme.
 
 - **Dead slot ids** `topbar.left` and `task.switcher.extra` — zero consumers anywhere (the
   manifest slot enum grew to `footer | topbar` without them, which confirms nobody wants them). Still
-  present in `client-core/src/registries/slots.ts` on 2026-08-28; the layout programme's phase 9
-  deletes the component slot table, so do this then or before.
+  present in `client-core/src/registries/slots.ts` on 2026-08-28, and they outlived the cleanup that
+  would have taken them. Delete them the next time that file is opened.
 - ~~The `themes` registry~~ — resolved: manifest-declared token themes shipped
   (`docs/ui-design.md § Plugin themes`), so that registry now has its plugin feeder. `styles`
   stays core-only by decision (style packs are deliberately not contributable).

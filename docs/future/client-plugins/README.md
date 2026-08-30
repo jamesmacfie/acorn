@@ -32,8 +32,8 @@ shell. [02-omarchy-survey.md](./02-omarchy-survey.md) is the record of that read
 acorn kind by kind. [01-why.md](./01-why.md) is the argument that came out of it.
 
 Where this folder and an owning doc under `docs/` disagree after a phase ships, the owning doc wins.
-Where this folder and [layout/](../layout/README.md) disagree, layout wins: this programme leans on
-its remote root and its `replace` arbitration and must not redesign either.
+This programme leans on the shipped remote root and its `replace` arbitration
+([docs/plugins.md](../../plugins.md) § Cooperative extension points) and must not redesign either.
 
 ## The goals, in the order they appeared
 

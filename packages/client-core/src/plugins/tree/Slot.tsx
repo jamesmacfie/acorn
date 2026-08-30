@@ -20,14 +20,14 @@ import { resolveSlot, slotChoiceFor, slotChoices } from './arbitration'
 // Two render paths, one node. A compiled plugin's contribution is a component in this process and is
 // mounted here; a loaded plugin's is a bundle in a worker and goes through RemoteTree. The owner writes
 // the same `Slot` either way and cannot tell which answered, which is the whole reason first-party and
-// third-party share a component API (docs/future/layout/README.md, the first decision).
+// third-party share a component API (docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels).
 //
 // Neither plugin sees the other's nodes. The contributor's code has exactly the permissions its own
 // manifest declared: sitting inside somebody else's pane grants it nothing of theirs.
 //
 // Slots are one level, and nothing here enforces it because nothing has to: a contributor's tree is a
 // stream of kit node names (@acorn/protocol/tree/nodes.ts), `Slot` is not one of them, and so a grafted
-// subtree has no way to open a slot of its own. See docs/future/layout/refused.md for why nesting was
+// subtree has no way to open a slot of its own. See docs/security.md § Rung 0 — The client sandbox for why nesting was
 // refused rather than left to a runtime guard — it turns "who draws this" into a graph nobody can
 // answer at trust time.
 

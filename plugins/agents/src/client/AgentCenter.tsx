@@ -13,7 +13,7 @@ import { openManagedSession } from './managedSelection'
 import type { AgentSession } from '@acorn/protocol/managedAgents.ts'
 import {
   Alert, Card, DetailColumn, EmptyState, Facts, Heading, Icon, Inline, Input, ListDetail, Row, Rows,
-  SegmentedControl, Select, Stack, StatusDot, Text, Toolbar,
+  SegmentedControl, Select, Stack, StatusDot, Text,
 } from '@acorn/plugin-api/ui'
 import RuntimeStateIcon from './RuntimeStateIcon'
 import { providerTone } from './stateTone'
@@ -217,7 +217,10 @@ export default function AgentCenter() {
             </For>
           </Inline>
 
-          <Toolbar ariaLabel="Filters">
+          {/* Not a `Toolbar`: this is a page, and a toolbar is a chrome strip with a background and a
+              rule that reaches the surface's edges. In the middle of a padded column it read as a
+              stray band. */}
+          <Inline wrap gap="row">
             <Input
               type="search"
               value={query()}
@@ -258,7 +261,7 @@ export default function AgentCenter() {
                 : (['all', 'active', 'attention', 'archived'] as const)
               ).map((filter) => ({ value: filter, label: filter }))}
             />
-          </Toolbar>
+          </Inline>
 
           <Show
             when={shown().length}
@@ -268,55 +271,57 @@ export default function AgentCenter() {
               </EmptyState>
             }
           >
-            <Rows
-              id="agents:center"
-              ariaLabel="Managed sessions"
-              items={shown().map((row) => ({ key: rowKey(row), label: row.session.title }))}
-              onActivate={(key) => {
-                const row = shown().find((candidate) => rowKey(candidate) === key)
-                if (row) open(row)
-              }}
-            >
-              {(item, itemProps) => {
-                const row = () => shown().find((candidate) => rowKey(candidate) === item.key)
-                return (
-                  <Show when={row()}>
-                    {(current) => (
-                      <Row
-                        item={itemProps}
-                        variant="stacked"
-                        leading={<Icon name={providerGlyph(current().session.providerId)} tone="brand" />}
-                        meta={
-                          <>
-                            <Inline>
-                              <RuntimeStateIcon state={current().session.runtimeState} />
-                              <Text emphasis="muted">
-                                {current().session.runtimeState}
-                                {current().session.attention === 'none'
-                                  ? ''
-                                  : ` · ${current().session.attention.replace('_', ' ')}`}
-                              </Text>
-                            </Inline>
-                            <Text emphasis="muted">{elapsed(current().session.updatedAt)}</Text>
-                          </>
-                        }
-                        metaFields={2}
-                        onPress={() => open(current())}
-                      >
-                        <Text emphasis="strong">{current().session.title}</Text>
-                        <Text emphasis="muted">
-                          {current().session.providerId} · {current().session.kind} ·{' '}
-                          {current().task?.title ?? 'Missing task'}
-                          {/* The node only when there is a fleet to disambiguate — otherwise it names
-                              the only machine there is. */}
-                          {current().nodeLabel ? ` · ${current().nodeLabel}` : ''}
-                        </Text>
-                      </Row>
-                    )}
-                  </Show>
-                )
-              }}
-            </Rows>
+            <Card pad="sm">
+              <Rows
+                id="agents:center"
+                ariaLabel="Managed sessions"
+                items={shown().map((row) => ({ key: rowKey(row), label: row.session.title }))}
+                onActivate={(key) => {
+                  const row = shown().find((candidate) => rowKey(candidate) === key)
+                  if (row) open(row)
+                }}
+              >
+                {(item, itemProps) => {
+                  const row = () => shown().find((candidate) => rowKey(candidate) === item.key)
+                  return (
+                    <Show when={row()}>
+                      {(current) => (
+                        <Row
+                          item={itemProps}
+                          variant="stacked"
+                          leading={<Icon name={providerGlyph(current().session.providerId)} tone="brand" />}
+                          meta={
+                            <>
+                              <Inline>
+                                <RuntimeStateIcon state={current().session.runtimeState} />
+                                <Text emphasis="muted">
+                                  {current().session.runtimeState}
+                                  {current().session.attention === 'none'
+                                    ? ''
+                                    : ` · ${current().session.attention.replace('_', ' ')}`}
+                                </Text>
+                              </Inline>
+                              <Text emphasis="muted">{elapsed(current().session.updatedAt)}</Text>
+                            </>
+                          }
+                          metaFields={2}
+                          onPress={() => open(current())}
+                        >
+                          <Text emphasis="strong">{current().session.title}</Text>
+                          <Text emphasis="muted">
+                            {current().session.providerId} · {current().session.kind} ·{' '}
+                            {current().task?.title ?? 'Missing task'}
+                            {/* The node only when there is a fleet to disambiguate — otherwise it names
+                                the only machine there is. */}
+                            {current().nodeLabel ? ` · ${current().nodeLabel}` : ''}
+                          </Text>
+                        </Row>
+                      )}
+                    </Show>
+                  )
+                }}
+              </Rows>
+            </Card>
           </Show>
         </Stack>
       </DetailColumn>

@@ -1,11 +1,9 @@
 import { Show } from 'solid-js'
 import { fileStatusMeta } from '@acorn/plugin-api/client'
-import { Badge, Checkbox, DetailColumn, EmptyState, ListColumn, ListDetail, Row, Rows, Text } from '@acorn/plugin-api/ui'
-import { DiffForPull } from '../DiffForPull'
-import { routeKey } from '../fileNavigation'
+import { Badge, Checkbox, EmptyState, Row, Rows, Text } from '@acorn/plugin-api/ui'
 import type { PrModel } from './prModel'
 
-// The changed files of a pull request: the list on its own, and the list beside the diff.
+// The changed files of a pull request.
 //
 // Accepted difference from the plan: the list is flat rather than a directory tree. A tree is a
 // change in what the navigator says, not a move to the kit, and this list has always been the file
@@ -73,40 +71,5 @@ export function PrFileList(props: {
         }}
       </Rows>
     </Show>
-  )
-}
-
-/** The Files tab: the navigator beside the diff, as a split the host draws. */
-export function PrFilesTab(props: {
-  model: PrModel
-  current: () => string | undefined
-  onSelect: (path: string) => void
-  /** Pinned above the list. The pull strip, so the Files tab can switch pulls like the others; it
-   *  goes in the navigator column rather than over the split, which would put a scroller between the
-   *  layout and the two panes it sizes. */
-  header?: import('solid-js').JSX.Element
-}) {
-  const model = () => props.model
-  const route = () => ({
-    owner: model().scope.owner,
-    repo: model().scope.repo,
-    number: model().scope.number,
-    key: routeKey(model().scope.owner, model().scope.repo, model().scope.number),
-  })
-  return (
-    <ListDetail split>
-      <ListColumn label="Changed files">
-        {props.header}
-        <PrFileList virtual model={model()} current={props.current} onSelect={props.onSelect} />
-      </ListColumn>
-      <DetailColumn>
-        <DiffForPull
-          route={route()}
-          router={false}
-          taskId={model().scope.taskId}
-          readOnly={model().readOnly}
-        />
-      </DetailColumn>
-    </ListDetail>
   )
 }

@@ -96,6 +96,13 @@ changes plugin fills it with a `component` carrier the same way a loaded plugin 
 Both render paths, one kind, one arbitration, one settings picker. That is the pattern for anything
 that looks like a private renderer registry: open a point instead.
 
+**This is not the five extension kinds, and it was not replaced by them.** A slot is a place in the
+*shell's* own chrome that a plugin may put a badge in; an extension point is a place in *another
+plugin's* surface, and its five kinds are in [plugins.md](./plugins.md) § Cooperative extension
+points. The layout programme was expected to fold this table into that one and did not, because the
+descriptor slot registry outlived it: a topbar chip has to be live when no plugin UI is mounted
+anywhere, which is the one thing a tree cannot be.
+
 Two spellings, deliberately, and this is where they meet. The manifest's `slots[].slot` is a short
 enum a descriptor may name; `UiSlotId` is the full set of places the shell draws a slot, most of
 which have no descriptor form because what goes in them is a component.

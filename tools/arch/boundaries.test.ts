@@ -256,7 +256,7 @@ describe('architecture boundaries', () => {
 
   it('a loaded plugin that draws a tree writes no DOM and ships no stylesheet', () => {
     // The tree path's whole premise: the plugin names acorn's components and the host draws them
-    // (docs/future/layout/06-remote-tree.md). A raw element or a class in one of these directories is
+    // (docs/plugins.md § The tree contract). A raw element or a class in one of these directories is
     // markup the host cannot draw, cannot style with the reader's pack, and cannot give focus or ARIA
     // to — it would render as the labelled placeholder and nothing would say why.
     //

@@ -8,7 +8,7 @@ import {
   runHook,
 } from './hooks'
 
-// The chain rules (docs/plugins.md § Hooks, docs/future/layout/08-hooks.md § Chain rules). Every one of
+// The chain rules (docs/plugins.md § Hooks, docs/plugins.md § Hooks). Every one of
 // them is a decision about what happens when somebody else's code is between a plugin and something it
 // was about to do, so every one of them is here rather than left to the call sites.
 //

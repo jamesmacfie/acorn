@@ -96,7 +96,7 @@ The rail source lists the project's saved requests and nothing more. The host dr
 beside it, so the descriptor vocabulary does not have to grow into a UI framework.
 
 All three surfaces are **trees**: the plugin's code runs in a worker and emits a tree of the host's own
-components (`docs/future/layout/06-remote-tree.md`). Three consequences are visible in the UI, and all
+components (`docs/plugins.md` § The tree contract). Three consequences are visible in the UI, and all
 three are the same consequence — the plugin has no document of its own.
 
 - Deleting a request or a variable takes two clicks rather than raising a dialog, and "Copy as curl"

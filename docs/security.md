@@ -592,6 +592,27 @@ fails is dropped whole and recorded; a node name this build does not know draws 
 placeholder. What a worker that misbehaves can do to the surface around it is nothing — it is
 terminated and its trees show placeholders.
 
+**Four things rung 0 refuses permanently**, and each will be asked for again in words that sound
+reasonable:
+
+- **An iframe inside an iframe.** The original request for "let another plugin draw inside my pane",
+  taken literally. `frame-src 'none'` in `apps/desktop/src-tauri/src/plugin_scheme.rs` says no, and
+  that is load-bearing. An iframe embedded by another plugin's iframe lets the outer plugin overlay,
+  resize and clickjack the inner one with no way for the inner one to detect it, puts the messages
+  between them out of the host's sight, and makes the outer plugin's trust prompt a lie — "draws a
+  pane" cannot describe a tree of other plugins' frames. A rectangle contributed into somebody else's
+  point is a **sibling** the host places, never a child of a plugin's document.
+- **Free `postMessage` between plugin origins.** Every cross-plugin byte in acorn passes the host and
+  is validated against a declared shape. Two plugin origins talking directly cannot be gated, capped,
+  logged, or described in a trust prompt. The remote tree, hooks, and rectangle slots all carry
+  messages the host checks.
+- **Nested slots.** A contributor's subtree grafted into an owner's slot does not itself open slots.
+  One level. `Slot` is not one of the node names a tree may emit, so this is enforced by the wire and
+  not by convention. A tree of grafts makes the trust prompt a tree and makes "who is drawing this"
+  unanswerable.
+- **Reopening `frame-src`**, for any reason. The Rust test in `plugin_scheme.rs` that pins the policy
+  stays green for the life of the design.
+
 #### Rung 1 — Permission-shaped context (phase 1, shipped with the loader)
 
 The host builds a loaded plugin's `NodePluginContext` from its manifest's `permissions.node`

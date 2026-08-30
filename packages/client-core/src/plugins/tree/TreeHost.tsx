@@ -8,7 +8,7 @@ import { isHandlerRef, sanitizeProps } from '@acorn/protocol/tree/props.ts'
 import { KIT_COMPONENTS } from './components'
 import { TreePlaceholder } from './placeholder'
 
-// The host end of the remote tree (docs/future/layout/06-remote-tree.md).
+// The host end of the remote tree (docs/plugins.md § The tree contract).
 //
 // This component is the only thing standing between a stranger's code and the shell's DOM, so the
 // order matters: a batch is checked whole, applied whole, and only then rendered. Nothing a message

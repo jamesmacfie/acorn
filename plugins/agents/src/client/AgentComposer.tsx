@@ -40,7 +40,7 @@ type InsertChoice = {
 // The `footer` of the Agent pane's detail: what is going to be sent, and everything that can be
 // added to it.
 //
-// The field is the kit's `MentionTextarea` (docs/future/layout/phase-8-agents.md): `@file`,
+// The field is the kit's `MentionTextarea` (docs/ui-design.md § The closed kit): `@file`,
 // `/command` and `$skill` are three `sources`, and the colour behind the text is `segments`. What
 // this file still owns is what those three mean here — the worktree walk, the commands the session
 // advertised, and which spans of the draft the turn will actually send as file parts.

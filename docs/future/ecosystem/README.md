@@ -45,10 +45,11 @@ What remains is exactly three programs plus one map:
    a download, then discovery over signed packages. (`work-plan.md`)
 
 `docs/future/compiled-tier.md` is not a phase — it is the standing per-plugin map for shrinking
-the compiled tier, consulted whenever a move is considered. Since 2026-08-28 that map defers to
-[docs/future/layout/](../layout/README.md) for the three couplings that were component-shaped: the
-remote component tree is what lets memory's tray section, changes' tool card, and docker's chrome
-leave the compiled tier without widening the sandbox.
+the compiled tier, consulted whenever a move is considered. Since 2026-08-28 the answer for the three
+couplings that were component-shaped is the remote component tree
+([docs/plugins.md](../../plugins.md) § Descriptors for facts, trees for UI, rectangles for pixels),
+which is what lets memory's tray section, changes' tool card, and docker's chrome leave the compiled
+tier without widening the sandbox.
 
 Before picking one up, read `work-plan.md § What is actually waiting on something`. The short version:
 all three are startable today except discovery, which is hard-gated on containment — and the only item

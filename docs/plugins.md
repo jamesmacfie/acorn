@@ -93,8 +93,11 @@ Eight entrypoints:
 | `@acorn/plugin-api/ui/diff` | The diff model, virtualizer, hydration and find pass, plus the `DiffSource` port `DiffPane` is driven through |
 | `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components and registration seams; never import this from an isolated frame |
 | `@acorn/plugin-api/ui/editor` | The host-owned Monaco surface: the theme and the language map. Compiled panes only, and browser-realm only — it pulls in `monaco-editor`, which reads `window` at module scope |
-| `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims, plus `mountFrame` |
+| `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims, plus `mountFrame` and `mountTree`, the two render paths' entry points |
+| `@acorn/plugin-api/ui/tree` | The kit as nodes a remote tree writes in JSX, and the Solid adapter behind them. A tree imports this and never the `/ui` barrel |
+| `@acorn/plugin-api/ui/tokens` | The role enums and the node support matrix as data, with no components on them |
 | `@acorn/plugin-api/testkit` | Test scaffolding: a real plugin context and request context, temp-directory databases, the auth gate, core's tables for seeding fixtures, and the manifest validator |
+| `@acorn/plugin-api/testkit/client` | The client-side half of the same, including the two extension registries a plugin's own jsdom test reaches |
 
 The line between `/client`, `/ui`, and `/ui/host` is drawn by the runtime, not by taste. Solid
 compiles a component to code that touches `window` at module scope, so `/client` remains free of
@@ -154,10 +157,10 @@ improved by waiting for one.
 | Package | What it is |
 | --- | --- |
 | `create-acorn-plugin` | The scaffold (`packages/create-acorn-plugin`). Emits the whole no-bundler profile; depends on nothing, including this list's other entries. |
-| `acorn-plugin-sdk` | The frame bridge (`packages/plugin-sdk`) — `connect`, `mountFrame`, `openLinkOnClick`, `AcornBridgeError` and the `AcornBridge` type, re-exported from `@acorn/plugin-api/ui/sdk` so the two cannot drift. |
+| `acorn-plugin-sdk` | The sandbox bridge (`packages/plugin-sdk`) — `connect`, `mountFrame`, `mountTree`, `openLinkOnClick`, `AcornBridgeError` and the `AcornBridge` type, re-exported from `@acorn/plugin-api/ui/sdk` so the two cannot drift. Its `/remote` subpath is `@acorn/plugin-api/ui/tree`, for a tree written in JSX. |
 | `acorn-plugin-types` | The node-side API as declarations (`packages/plugin-types`), plus the generated manifest schema. No runtime, and `@types/node` as its only peer. |
 
-**Only the frame bridge and the declarations are published, and the eight entrypoints never will be.** They re-export
+**Only the sandbox bridge and the declarations are published, and the eleven entrypoints never will be.** They re-export
 node-core and client-core — Hono, drizzle, Solid, Monaco — and a plugin does not want a second copy of
 any of those. It wants the host's, which a compiled plugin gets from the builder and a loaded plugin
 gets through `ctx` and through the document its frame is served in. The bridge is the one thing an
@@ -895,7 +898,7 @@ kinds of contribution come out of one manifest:
   layouts to address: a whole-pane declaration would have meant something different once a second
   arrangement arrived, and changing that later would change what already-published manifests mean.
   `frame-beside-document` exists and lands with its consumer, the editor plugin. The design record is
-  `docs/third-party/monaco.md`, and `docs/future/layout/05-layouts.md` owns the layout set.
+  `docs/third-party/monaco.md`, and `docs/panes.md § Layout model` owns the layout set.
 
   ### `document-over-frame`
 
@@ -1255,6 +1258,63 @@ kinds of contribution come out of one manifest:
   }
   ```
 
+#### The tree contract
+
+What actually crosses the port, for anyone reading `packages/protocol/src/tree/` or writing a second
+host. It is the tree half of the same story `frames/verbs.ts` tells for the bridge: one list both ends
+compile against, and neither end may reach for the other's copy. Nothing in it names the DOM, which is
+what lets a terminal renderer apply the same mutations to a cell buffer.
+
+**A node is `{ id, type, props, children }`.** `type` is a kit node name. `id` is minted by the
+sandbox adapter and is stable for the node's life; it is what events and patches address. `props` is a
+plain object. Text is its own node (`#text`), never an attribute, so the wire has one node shape
+rather than two.
+
+**Five mutation kinds, in a batch per animation frame**: `insert(parent, index, node)`, `remove(id)`,
+`patch(id, props)`, `move(id, parent, index)`, `text(id, value)`. `parent: null` addresses the slot's
+root. A batch applies atomically or is dropped whole with a row on the plugin's page — half a batch is
+a tree the sandbox never described.
+
+**Eleven events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
+`onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`.
+Never a key and never a pointer event, because a terminal host has neither and has to be able to map
+its own keys onto these eleven names. A prop whose name is in the list carries a handler id; a prop
+whose name starts with `on` and is not in the list is dropped.
+
+**Lifecycle** is `tree:mount(slot, entry, props)` and `tree:unmount(slot)` from host to sandbox, with
+`tree:ready`, `tree:batch` and `tree:failed` coming back, plus a ping. One worker serves many trees —
+a tool card per call, a section per tray — so every message names its slot. A second `tree:mount` for
+a slot already mounted is a props update, which keeps a tool card's redraw one message rather than a
+teardown.
+
+**Every message is validated**, because the host is the only thing between a stranger's code and the
+shell's DOM:
+
+- `type` has to be a node this build knows and can draw on this host. Anything else renders the
+  labelled placeholder and records a roster row — the forward-compatibility rule applied to nodes.
+- A prop value is a handler id or plain JSON, depth-bounded. `class`, `className`, `style` and
+  `classList` are refused outright, a role prop carrying a raw colour is refused, and a function can
+  never cross because a function is not JSON. A failing prop is dropped, the node still renders, and
+  the row says which prop.
+- Text is set as text. `Markdown` goes through the shell's own markdown policy. A `Button` carries a
+  handler id, never a URL or a command id; navigation is `bridge.ui.openUrl`, held to the same rules
+  as a frame's.
+- **Caps**, in `TREE_LIMITS`: 1 MiB and 4,000 mutations per batch, 5,000 live nodes and 64 levels of
+  depth per tree, 65,536 characters in one text node, 512 trees per worker. The byte cap is sized like
+  the state channel's 1 MiB per value: generous for anything honest, small enough that a bundle cannot
+  use the renderer as a memory bomb. Past a cap the batch is dropped and recorded.
+- **Rate**: batches are coalesced per frame on the host side. A sandbox that floods is throttled, not
+  trusted.
+
+The version travels in the handshake (`TREE_PROTOCOL_VERSION`), and a mismatch is a placeholder rather
+than a crash. `packages/protocol/src/tree/nodes.ts` carries the node names, the eleven events and the
+role enums as plain constants with no Zod on them, because that file is bundled into a stranger's
+plugin; `messages.ts` holds the schemas the host parses with. The lists are duplicated from
+client-core's kit, which owns them, and a test over there fails the moment the two disagree.
+
+The sandbox itself — one Web Worker per bundle, what it has and what it does not, and what happens
+when it throws — is `docs/shell.md § The plugin worker`.
+
 ### One shared eligibility and trust check
 
 Both registration passes (frames and chrome) need the same answer to "who may contribute, and what did
@@ -1310,6 +1370,42 @@ same source runs compiled in this process or sandboxed in a worker.
 A PTY, a webview, a canvas, a code editor: those are pixels, and they are rectangles. The rule used
 to be "descriptors for chrome, frames for rectangles", which had only two answers and pushed every
 pane into an iframe by default. The middle answer is the one the layout programme added.
+
+**A static schema and a component tree are not the same object**, and conflating them is what made the
+middle answer look forbidden for so long. A static schema is Slack Block Kit or Adaptive Cards: the
+plugin sends JSON saying "a card with a title and three rows", the host has one renderer per block,
+and every click is a round trip and a whole new blob. It is always one field short. Somebody needs an
+`if`, then a loop, then a computed value, and a bad programming language has been invented inside
+JSON. That is what this page refuses as "a widget toolkit in the wire format", and the refusal stands.
+
+A remote component tree is the other thing. The plugin's code runs in a sandbox and renders with a
+normal framework against a fake DOM; the fake DOM serialises to a tree of named host components and
+streams mutations. Logic stays in the plugin. Pixels, theme, focus and accessibility stay in the host.
+No conditional is ever written in JSON, because the plugin's real code does the conditional and emits a
+different tree. Its vocabulary is the kit, which exists and is versioned already through
+`@acorn/plugin-api/ui`, so the tree adds no second vocabulary and the schema never grows an `if`. The
+word "DSL" is discouraged for it internally, because the word invites the first shape; it is a
+component model with more than one renderer.
+
+**One reversal, on the record.** `docs/third-party/monaco.md` argued that "the moment the host renders
+a plugin's list from data, someone has to design and eternally version a descriptor vocabulary … That
+request will recur; the answer stays no." That refusal was aimed at a static schema and it still holds
+against one. Its other half — that a frame can always draw what a descriptor cannot — is true and
+unchanged: the frame survives as the rectangle, for pixels. What the tree adds is the tier between "a
+list of facts" and "an iframe", which is where a tool card, a sidebar tab and a settings section live
+and where nothing lived before.
+
+Three things were considered for that tier and refused. **A remote subtree per item at volume** — one
+per diff line, one per file-tree row — would be thousands of sandboxed mounts; facts pinned to items
+are annotations, which are batched, host-drawn and indexable, and a remote tree is for a card, a tab or
+a section, things that number in the dozens on a screen. **The hidden iframe as the sandbox** was the
+cheapest path, reusing `app-plugin://`, the CSP and the bridge and never drawing; a Web Worker won
+because it has no DOM at all, is lighter per plugin, and the bridge was a transport swap. The iframe
+survives only as the rectangle. **First-party plugins through the remote root** would have been the
+flattest possible story, and was refused for this programme: every first-party pane would pay the
+sandbox hop, and the agents transcript's performance risk would land on it. First-party renders
+directly against the same API, the two paths produce the same tree, so slots and focus work across
+both, and making a first-party plugin loadable stays a later per-plugin decision.
 
 That is why the `slots` enum is two names rather than the client's six, and why the refusals are
 recorded next to it in `@acorn/protocol/pluginContract.ts`:
@@ -1526,7 +1622,33 @@ from acorn's own components?** A remote tree. **Does it own pixels, heavy typing
 library — a canvas, Monaco, xterm, a chart library?** A rectangle.
 
 Descriptors stay boring on purpose. When someone asks for a conditional in a row, the answer is a
-remote card.
+remote card. The line between rows and annotations on one side and remote trees on the other is **data
+versus code**, not simple versus complex — a remote card can open a `Modal`. What differs is whether a
+plugin's code runs on the client, and this is what that costs:
+
+| | Descriptor (rows, annotations) | Remote tree | Rectangle | Hook |
+| --- | --- | --- | --- | --- |
+| What crosses | records | a component tree | nothing; an iframe is placed | a payload and a verdict |
+| Plugin code on the client | none | in a worker | in its own iframe | none; a node route |
+| Needs a client bundle | no | yes | yes | no |
+| Can open a modal or a menu | no | yes, host-drawn | yes, in its own overlay | not applicable |
+| Cost of N contributors | N route reads, batched | N live subtrees | N iframes | N route calls |
+| The host can index it | yes | no | no | no |
+| Best for | facts about many items | UI in someone else's surface | owning pixels | acting before something happens |
+
+Most third-party plugins will be a rail source, a pane, and a few remote cards. Rectangles are the
+exception, not the default.
+
+**Where a point id lives.** A point is `<ownerId>:<pointId>`, and the string a contributor spells has
+to come from somewhere. Two homes, and the rule is which owner you are: core's own points and the
+first-party points core's consumers say — `agents:*`, `core:*` — are in
+`@acorn/protocol/extensionPoints.ts`, because both ends of the wire compile against protocol. A
+plugin's own points — `changes:diff-line`, `github:diff-line`, `docker:container`,
+`context:section` — are in that plugin's own `extensionPoints.ts`, because that is where the owner
+lives. **A contributor in another plugin spells the string.** It cannot import the owner's module: a
+plugin may not import another plugin, and that boundary is the whole reason these points exist. The
+string is the contract, the host mints it from the manifest it was read under, and a typo shows up on
+the plugin's page as a contribution whose point nobody declares.
 
 All five obey the same four rules:
 
@@ -1636,8 +1758,8 @@ must not blank the row.
 #### Remote trees
 
 Plugin code runs in a sandbox, renders against a fake DOM, and the fake DOM serialises to a tree of the
-host's own component names ([06-remote-tree.md](./future/layout/06-remote-tree.md) owns the wire format
-and the worker). An owner that draws through the tree declares a point as a node:
+host's own component names ([The tree contract](#the-tree-contract) owns the wire format, and
+`docs/shell.md § The plugin worker` the sandbox). An owner that draws through the tree declares a point as a node:
 
 ```tsx
 <Slot point="agents:attachment" key={selected?.mime}>
@@ -2032,15 +2154,17 @@ behaviour without A's declared consent.** Specifically refused, permanently:
 - **Reading another plugin's routes.** Refused at manifest parse, refused again on the device, and
   refused a third time at the frame bridge (`packages/client-core/src/plugins/frames/scopes.ts`).
 
-If a real need surfaces that cooperative points cannot express, **the answer is to widen the descriptor
-vocabulary, not to open the realm.** Some things will not fit, and that is a real cost paid on purpose:
-memory's section inside context's tray renders editable inputs, a select, a textarea and a two-button
-gate per proposal, which is UI rather than a descriptor. It stays a compiled-tier component, and the
-answer is not to grow descriptors into a widget toolkit until it fits.
+If a real need surfaces that cooperative points cannot express, **the answer is a wider vocabulary, not
+an open realm** — and which vocabulary depends on which of the three tiers it is. Memory's section
+inside context's tray is the worked example: editable inputs, a select, a textarea and a two-button
+gate per proposal, which is UI rather than a descriptor. Growing descriptors until that fits would have
+built a widget toolkit in the wire format. It is a `context:section` contribution instead, drawn from
+kit nodes, and the same source would work from a worker if memory were ever loaded rather than
+compiled.
 
-Nothing here is reachable from a plugin frame. Both registries are populated host-side from manifests
-the device read; the bridge gained no message kind and no route, so a frame can neither read a point's
-deliveries nor contribute to one.
+Nothing here is reachable from a plugin frame. The registry is populated host-side from the manifests
+and contributions the device read; the bridge gained no message kind and no route, so a frame can
+neither read a point's deliveries nor contribute to one.
 
 ### Client authoring and the UI kit
 

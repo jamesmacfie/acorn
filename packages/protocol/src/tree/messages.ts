@@ -1,5 +1,5 @@
 // The wire between a plugin's sandbox and the host renderer: nodes, a mutation batch, an event, and
-// the mount lifecycle. See docs/future/layout/06-remote-tree.md § The wire format.
+// the mount lifecycle. See docs/plugins.md § The tree contract.
 //
 // Nothing here names the DOM. A terminal host applies the same mutations to a cell buffer, and the
 // events are the kit's eleven semantic names rather than keys or pointers, so a terminal host maps

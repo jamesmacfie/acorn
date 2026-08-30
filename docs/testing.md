@@ -67,7 +67,7 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   themselves. That shared config is the same two projects client-core has, split the same way:
   `logic` is `.test.ts` in bare Node with git config neutralized, and `hosts` is `.test.tsx` under
   jsdom with `vite-plugin-solid`. The second one is what lets a plugin test a region it ships where
-  the region lives — the PR pane through each of its tabs, the agents attachment slot handing a `.png`
+  the region lives — the PR pane's navigator beside its diff, the agents attachment slot handing a `.png`
   to the plugin that declared it — which nothing could do before, because client-core does not have
   those components and a plugin's own suite could not render one. A plugin test reaches the host
   through `@acorn/plugin-api/testkit/client`, not by importing into `client-core` (`tools/arch/
@@ -285,8 +285,6 @@ Verified on a clean tree. If you see exactly these and nothing else, your change
   `pnpm rebuild:node` fixes the ABI class of failure; this one survives it.
 - `plugins/http/src/server/send.test.ts` fails one case comparing a temporary worktree path, a
   macOS `/var` against `/private/var` artefact of the test's own fixture.
-- `tools/arch`'s `docPaths` test reports broken citations in `docs/future/layout/`, which is an
-  untracked design folder in progress. Check `git status` before reading that one as your own.
 
 Also worth knowing before you read a red gate as your own: the root `lint` script is
 `oxlint && turbo run lint`, so an oxlint failure means `tsc --noEmit` never ran at all. Check

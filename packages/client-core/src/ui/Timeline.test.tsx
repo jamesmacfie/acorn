@@ -6,7 +6,7 @@ import { Timeline } from './Timeline'
 
 // The transcript's two guardrails, at the node that owns them: appending a turn must not replace the
 // ones already drawn, and following the newest turn must stop when the reader scrolls away from it
-// (docs/future/layout/phase-8-agents.md § Performance guardrails).
+// (docs/ui-design.md § The closed kit, on Timeline's two guardrails).
 
 let dispose: (() => void) | undefined
 let host: HTMLElement

@@ -37,7 +37,7 @@ export type PluginFrameContext = {
   // nothing. The bridge's allowlist is keyed on scopes, never on this field.
   //
   // `remote` is the one value that is not a rectangle at all: the bundle is drawing a tree of the
-  // host's own components rather than pixels (docs/future/layout/06-remote-tree.md). It has no
+  // host's own components rather than pixels (docs/plugins.md § The tree contract). It has no
   // document, no webview and no modal to dismiss, so the verbs those gate on refuse it by default.
   //
   // `inline` is a rectangle drawn as a sibling of another plugin's pane, where that plugin's manifest

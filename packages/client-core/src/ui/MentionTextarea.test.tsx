@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import MentionTextarea, { type MentionSource } from './MentionTextarea'
 
 // The field the agents composer is written against: three sigils, three lists, and a coloured copy of
-// the draft behind the text (docs/future/layout/phase-8-agents.md).
+// the draft behind the text (docs/ui-design.md § The closed kit).
 
 let dispose: (() => void) | undefined
 let host: HTMLElement

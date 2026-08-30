@@ -9,7 +9,7 @@ import type { Tone } from './kit/tokens'
 // One node for three fields that had grown apart: the diff viewer's `@login` box, github's comment
 // composer, and the agents composer's `@file` / `/command` / `$skill` draft, which was the only one
 // with a coloured mirror and was the only one that lived in a plugin — with the stylesheet the two
-// boxes need in order to agree on where a glyph sits (docs/future/layout/phase-8-agents.md).
+// boxes need in order to agree on where a glyph sits (docs/ui-design.md § The closed kit).
 //
 // What crosses is data: sources say what may be completed after which sigil, and `segments` says
 // which runs of the text are already a mention and what tone to draw them in. Neither is a DOM

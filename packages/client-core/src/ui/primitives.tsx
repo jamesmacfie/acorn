@@ -12,7 +12,7 @@ import type { Size, Tone } from './kit/tokens'
 // The kit's nodes. Every prop on this page is the node's own: a role token, a string of content, a
 // count, a boolean, or a handler from the kit's event set. None of them is `class`, `style`, or a
 // DOM attribute passed through. See docs/ui-design.md § The closed kit for the rule and what it
-// buys, and docs/future/layout/04-kit.md for the node set it closes.
+// buys, and docs/ui-design.md § The closed kit for the node set it closes.
 
 /** The delegated tooltip, as props rather than attributes. See docs/ui-design.md § Tooltips: the
  *  contract is still four data attributes on the element, but only the kit writes them now. */
@@ -193,7 +193,7 @@ export type InputProps = ControlOwn & {
    *  callback, because every keystroke would be a message hop. */
   onInput?: (value: string) => void
   /** The committed value: blur, or Enter. `onChange` rather than `onCommit` because commit IS what
-   *  the kit means by a change (docs/future/layout/04-kit.md), and only a name in that list can carry
+   *  the kit means by a change (docs/ui-design.md § The closed kit), and only a name in that list can carry
    *  a handler across the remote root. */
   onChange?: (value: string) => void
   /** Enter, with the value. The kit's own name for "the reader is done and wants this to happen",
@@ -1410,7 +1410,7 @@ export function ListDetail(props: {
 /* The two columns as nodes of their own, for a caller that cannot put an element in a prop.
    A remote tree is exactly that caller: its props are JSON on a message port, so `list` above is
    unreachable from a sandbox and the split has to be expressible as children
-   (docs/future/layout/06-remote-tree.md § The wire format).
+   (docs/plugins.md § The tree contract).
 
    `split` on ListDetail is what turns the grid on in that form, because the parent can no longer tell
    from `list` whether there are two columns.

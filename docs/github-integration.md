@@ -99,7 +99,8 @@ the common API envelope and surfaced as GitHub-specific status where the UI need
 
 A PR can promote to a task. The task stores the core project ID and pull number; the project's GitHub
 facet supplies provider owner/name metadata. Subsequent task context and changes use the owning Node.
-The PR pane keeps that scalar PR as its primary and adds read-only tabs from three sources: durable
+The PR pane keeps that scalar PR as its primary and adds read-only chips to the strip from three
+sources: durable
 `task_pulls` relations, the connected base/head graph of the mirrored open-PR list, and PR links in
 the primary description, comments, reviews, and threads. Stack and mention evidence is derived on
 read, so retargeting a stack or editing out a link removes it without a cleanup migration. A linked
@@ -112,8 +113,8 @@ number, and any unambiguous Linear references from the PR body. If exactly one o
 already owns that PR, the chip opens it instead; several owners keep the explicit task chooser.
 
 Within a task PR body, another GitHub PR link is a `plugin:select` intent for the existing PR pane,
-not a route change or reference-panel overlay. Which pull is selected changes what all three panels
-read but never changes the current task's scalar primary, branch, or worktree. All GitHub writes,
+not a route change or reference-panel overlay. Which pull is selected changes what the navigator and
+the diff read but never changes the current task's scalar primary, branch, or worktree. All GitHub writes,
 including diff comments and thread actions, are omitted on a non-primary pull.
 
 Linear reference panels are contributed through a provider contract, so the GitHub plugin does not
@@ -139,11 +140,11 @@ Every GitHub surface is a host layout filled with kit components; the plugin shi
 
 | Surface | Arrangement |
 | --- | --- |
-| The PR pane | The `tabs` layout: Overview, Conversation, Files. Every panel opens with the strip of pull requests this task is about, because which one is showing is shared between them. |
+| The PR pane | The `single` layout holding one split: the navigator beside the diff, which is browse's inner pair without browse's pull list. The navigator opens with the strip of pull requests this task is about. |
+| Navigator | Overview, then the changed files and the conversation as folds. Browse and the PR pane draw the same three trees over the same model. |
 | Overview | The pull's heading and facts, the actions toolbar, the conflict alert, description, linked tickets, labels, checks, reviewers, and the `github:summary-badges` slot. |
 | Conversation | The comment and review composers over a timeline of cards: comments, review summaries, commits, and file threads. |
-| Files | A split: the changed-file list beside the diff. |
-| Browse | Two splits, one inside the other: the pull list, then the pull request beside its diff, or the create form beside its compare preview. |
+| Browse | Two splits, one inside the other: the pull list, then the navigator beside its diff, or the create form beside its compare preview. |
 | The reference panel | A heading, facts, and the host's task-link control, in the box the host draws. |
 | The importer | One row per repository with Clone and Map beside it. |
 
