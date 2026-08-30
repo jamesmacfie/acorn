@@ -58,5 +58,5 @@ on an older one.
 
 Until there is a terminal host, every user of this file has Settings open in front of them, and the
 file is a second way to do something the UI already does well. Building it earlier would mean
-maintaining two surfaces for one audience. When `docs/future/terminal.md`'s toy host exists, its
+maintaining two surfaces for one audience. When the `acorn` command from `docs/future/terminal/phase-3-process-and-auth.md` exists, its
 first user will want this on day one, and that is the day to build it.

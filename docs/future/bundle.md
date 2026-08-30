@@ -5,8 +5,10 @@ did not. This records what was established so a future project starts from concl
 re-deriving them. Nothing below the "What shipped" section is scheduled.
 
 The goal being worked towards: a node you download onto another computer, extract, run, and connect
-to — with the desktop client shipping a node by default, and a standalone install being the same
-artifact rather than a second product.
+to. Two artifacts carry it. The desktop app ships Tauri, the helper, the node, and the `acorn` terminal
+client. The headless tarball ships the same node and the same `acorn` and nothing else. The node inside
+each is one build, and so is `acorn`; what is in each is
+[terminal/08-deployables.md](./terminal/08-deployables.md), and how it is built is this file.
 
 ## What shipped
 
@@ -42,7 +44,10 @@ This is what decides how hard a downloadable artifact is, and it is in better sh
 
 **SQLite is no longer native.** `node:sqlite` is part of the runtime, so there is no ABI to match and
 no compiler to have installed. The desktop helper runs the node under the Node it bundles
-(`docs/shell.md § Node child`), so the desktop-supervised and standalone hosts share one story.
+(`docs/shell.md § Node child`), so the desktop-supervised and standalone hosts share one story. The
+terminal client is a third supervisor of the same child: `acorn` attaches to a running node for its
+data root or starts one under the same bundled runtime
+([terminal/03-process-model.md](./terminal/03-process-model.md)).
 (When this was written the desktop was Electron 42 with Node 24.17; the Tauri migration replaced the
 supervisor and kept the property.) Drizzle publishes no `node:sqlite` driver
 (0.45.2 ships better-sqlite3, bun, expo, op and proxy), so `main/sqlite.ts` presents the small
@@ -61,14 +66,20 @@ it, and types do not need a compiler.
 **node-pty is the only native module left**, and it builds against node-addon-api (N-API), so its
 binaries are ABI-stable across Node versions. It ships prebuilds for `darwin-arm64`,
 `darwin-x64`, `win32-arm64` and `win32-x64` — **not Linux**, which compiles from source today. So
-Linux is the one platform needing a prebuild produced in CI, once. That prebuild carries a libc
+Linux is the one platform needing a prebuild produced in CI, once. **The terminal client adds a
+second**: OpenTUI's render core is Zig, published as `@opentui/core-<triple>` packages with a prebuilt
+library each (`@opentui/core-darwin-arm64` is already in the lockfile through `@opentui/keymap`). It
+loads over FFI rather than N-API, so it has no ABI to match either, and it has the same question as
+node-pty: which triples upstream prebuilds, and which CI has to build once. `terminal/phase-7` answers
+that per triple. The libc decision below applies to both. The node-pty prebuild carries a libc
 decision: build against glibc and it loads on Debian, Ubuntu, Fedora and a `-slim` Docker base, but
 not Alpine (musl). Producing a second musl build doubles the Linux matrix for a distribution nobody
 has asked for — pick glibc, let the Docker image use a Debian base, and revisit only if an Alpine
 request actually arrives.
 
 `scripts/rebuild-node-abi.mjs` now probes node-pty rather than asserting anything: on a platform
-where the prebuilt binary loads, it exits immediately.
+where the prebuilt binary loads, it exits immediately. Once the terminal client ships it probes
+OpenTUI's core the same way and exits when both load.
 
 ## The build pipeline
 
@@ -82,6 +93,10 @@ release. Linux and Windows first — see Gatekeeper below. The eventual front do
 plus a `curl | sh` installer that picks the right tarball, and a container image on ghcr with a
 compose example; service-manager units stay documentation, not an installer product
 (settled during the Tauri migration).
+
+The terminal client rides inside the node tarball rather than being a sixth artifact: `pack-node.mjs`
+grows a `dist/tui.js` entry, a `bin/acorn` wrapper, and OpenTUI's packages in the generated
+`package.json`, and the installer links `bin/acorn`. Five tarballs stays five.
 
 ## Docker (2026-08-22)
 
@@ -104,6 +119,9 @@ Three container-specific decisions, none of them code:
 - **Publish the same port the node listens on.** The Host guard compares the port, so a compose
   remap (`8080:4317`) fails as a bare 403. Same rule as the SSH-tunnel note in
   docs/node-distribution.md.
+- **The image does not carry the terminal client.** A container is the no-TTY shape. Whether
+  `docker exec -it <container> acorn` attaching from inside is worth the image size is decided after
+  the tarball ships (`terminal/phase-7`), not promised here.
 
 ## The snags
 
@@ -121,7 +139,10 @@ This is why macOS is last, not first.
 **Windows is POSIX-shaped in two places.** `SIGUSR1` is how a running node reopens its pairing
 window (`apps/node/src/server/standalone.ts`), and that signal does not exist on Windows — pairing a
 second device there means a restart until some other trigger exists (a stdin command, or a
-device-authenticated route). And the 0600/0700 file modes on the data root, `session.key` and the
+device-authenticated route). The terminal client is such a trigger: a TUI attached to the local node
+is an out-of-band channel of its own and can offer "open a pairing window" as a command, which is
+noted in `terminal/phase-3`'s doors left open and designed nowhere yet. And the 0600/0700 file modes
+on the data root, `session.key` and the
 TLS key are advisory at best on NTFS; the guarantee those modes state needs restating as an ACL, or
 at least an honest doc note that Windows does not get it.
 
@@ -131,13 +152,20 @@ Eventually yes, so the install stops being "first install Node 24". Costs roughl
 tarball. Not for a first release: requiring a modern Node is a reasonable ask of someone
 deliberately installing a headless service, and it keeps the artifact small enough to iterate on.
 
+It is not a reasonable ask of someone who typed `acorn`. The terminal client inverts the argument, so
+bundling the runtime moves from the last step of the order below to before the tarball carries the
+TUI. The desktop already bundles it (`apps/desktop/src-tauri/tauri.conf.json`, `externalBin`), and both
+artifacts read the same pin (`node-runtime.json`), so the cost is size, not a second decision.
+
 Node SEA (single executable) is *not* the path — combining it with native modules is painful, and
-node-pty means there is still one.
+node-pty means there is still one. With OpenTUI's core there are two.
 
-## One artifact, two hosts
+## One node, three supervisors
 
-`apps/node/src/server/composition.ts` already builds the same plugin graph for both hosts; the
-difference is supervision and native capability injection, not a second assembly. The remaining
+`apps/node/src/server/composition.ts` already builds the same plugin graph for every host; the
+difference is supervision and native capability injection, not a second assembly. The desktop helper
+supervises it in the app, a service manager or a shell supervises it on a server, and the terminal
+client supervises it when nothing else is (`terminal/03-process-model.md`). The remaining
 thing that made them different *artifacts* was ABI: the desktop used to run the node inside
 Electron, standalone under plain Node. With the desktop helper spawning the bundled Node, SQLite no
 longer native, and node-pty ABI-stable, that difference stops existing — which is what makes "the
@@ -149,7 +177,10 @@ module.** A barrel evaluates every module on it, so a folder-picker helper that 
 the desktop shell made `@acorn/plugin-terminal/main/index.ts` unloadable in a plain-Node process, and
 the standalone node died at boot. Desktop-only exports import from their module directly; anything
 reachable from a node composition root stays loadable in bare Node. `boundaries.test.ts` enforces the
-shell-binding half of this today.
+shell-binding half of this today. The terminal client has the mirror rule: **a barrel reachable from
+the TUI composition root must not re-export a DOM-only module.** Client-core's `ui/` is DOM-out by
+design and that is fine, because the TUI imports the kit's contract (`ui/kit/`) and its own components,
+never `ui/primitives.tsx`; the same arch test grows the second rule when `apps/tui/` exists.
 
 ## Ordering
 
@@ -158,13 +189,18 @@ shell-binding half of this today.
 3. A Linux node-pty prebuild produced in CI (glibc; see above).
 4. The CI matrix and release upload: Linux and Windows.
 5. Replace or bundle `openssl`, and decide the Windows answers for `SIGUSR1` and file modes.
-6. macOS, once there is a Developer ID.
-7. Bundle a Node runtime, if "install Node first" turns out to be the adoption blocker.
+6. Bundle a Node runtime. Moved up from last: the terminal client's user typed `acorn`, not "install
+   a service", and both artifacts already read one pin.
+7. `acorn` in the tarball and in the app bundle, with OpenTUI's core in the prebuild matrix
+   (`terminal/phase-7`).
+8. macOS, once there is a Developer ID. It gates the node tarball and `acorn` alike.
 
 ## Not in scope here
 
 Reaching a node across the internet rather than a LAN, browser clients, and the relay service are a
-different problem with a different trust model — see [remote.md](./remote.md). Nothing in this
+different problem with a different trust model — see [remote.md](./remote.md). The terminal client
+itself, what it draws and how it runs, is [terminal/](./terminal/README.md); this file only packages
+it. Nothing in this
 document assumes anything beyond a network the operator already trusts, and exposing a node that
 runs PTYs, spawns agents and executes repo-configured commands is a decision that should stay
 explicit at every layer.

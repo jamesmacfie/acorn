@@ -177,10 +177,16 @@ waits for a case that wants it.
 ## Plugins get building blocks, not just a boundary
 
 A sandbox that isolates a plugin and then leaves it to rebuild a button is a sandbox nobody enjoys
-writing against. The intent is that a plugin author gets acorn's own Solid UI components — buttons,
-fields, badges, pickers, the diff model — so a plugin looks and behaves like the rest of the app
-without effort, and so the work of making a plugin is the plugin's own logic rather than its
-chrome.
+writing against. A plugin author gets acorn's own components — buttons, fields, badges, pickers, the
+diff viewer — so a plugin looks and behaves like the rest of the app without effort, and so the work
+of making a plugin is the plugin's own logic rather than its chrome.
+
+The kit is **closed**, and that is the part that turned out to matter most. Every component a plugin
+may draw with is in one list; a node's props are role tokens, content, counts, booleans and handlers,
+and never `class`, `style` or a DOM attribute passed through
+([docs/ui-design.md § The closed kit](./ui-design.md#the-closed-kit)). Closing it is what lets the
+same source render two ways — compiled in this process, or in a worker with no DOM at all — and it is
+what keeps a second host, a phone or a terminal, from being a rewrite.
 
 Two earlier decisions are what make this possible, and neither was made for this reason:
 
@@ -363,9 +369,9 @@ Roughly in order of how much they matter:
 - `command-palette-and-shortcuts.md` — commands, shortcuts, and plugin bindings.
 - `third-party/` — the review record from the first migration out of the binary.
 - `future/remote.md` — web, mobile, and remote access.
-- `future/terminal.md` — a terminal client and how plugin UI would render there.
+- `future/terminal/` — the terminal client programme: `acorn` in a terminal as a second host for the same component tree, and the node + tui deployable.
 - `future/events.md` — the three event items still unbuilt; the catalogue, the admission rule, and
   the refusals shipped into `plugins.md § Hearing another plugin`.
-- `third-party/monaco.md` — a host-owned document surface: the concrete instance of terminal.md's
+- `third-party/monaco.md` — a host-owned document surface: the concrete instance of `future/terminal/01-why.md`'s
   "one host-owned template". Built through step 6 (database ships on it); editor's move is the step
   that remains.

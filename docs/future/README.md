@@ -15,8 +15,8 @@ Multi-file designs with an order of work.
 
 | Folder | What it is | Status, 2026-08-28 |
 | --- | --- | --- |
-| [layout/](./layout/README.md) | Host-owned layouts, a closed component kit, remote component trees, five extension kinds, host-owned focus and keys. Ten phases, desktop only. | **Shipped 2026-08-30.** The folder sequences and links; the owning docs under `docs/` describe the behaviour. |
-| [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; layout phase 4 shipped, so nothing blocks it. |
+| [terminal/](./terminal/README.md) | `acorn` in a terminal: a second host for the same component tree and layouts, the process model, and the node + tui deployable beside the desktop. Nine phases. | Proposal, 2026-08-30. Not started; phase 0 blocks on nothing. Replaces the single file `terminal.md`. |
+| [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [events.md](./events.md) | Node-emitted core events, plugin events on `plugin:<id>:*`, and cross-plugin subscription. | Shipped 2026-08-28; three items open (preview URL, `emits` on the settings page, connection deletion). |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
@@ -35,16 +35,17 @@ Multi-file designs with an order of work.
 | [rail-tab.md](./rail-tab.md) | Rail controls and status markers. | Slices 1 and 2 shipped; slice 3 superseded by the layout programme's annotations. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
-| [terminal.md](./terminal.md) | A terminal client as a second host for the same component tree. | Rewritten for the layout programme; last of the three hosts. |
 
 ## How these relate
 
-The layout programme is the seam most of the others lean on, and it has shipped: the terminal client
-is a second host for its tree, the PWA is its layouts' narrow projections, compiled-tier's component
-couplings dissolved into its slots, rail-tab's slice 3 became one of its annotation points, and the
-marketing plugin docs should be written against it. Client-plugins consumes its remote root and its
-`replace` arbitration and adds device provenance beside them; nothing in it waits any more. Events and sandbox are independent of it and of each
-other. Ecosystem's rung-2 containment is the one design restated in more than one place (its
+Host-owned plugin UI is the seam most of the others lean on, and it shipped in 2026-08: the terminal
+client ([terminal/](./terminal/README.md)) is a second host for the same component tree and is the
+first programme to build one, the PWA is the layouts' narrow projections,
+compiled-tier's component couplings dissolved into slots, rail-tab's slice 3 became the `core:task`
+annotation point, and the marketing plugin docs should be written against the tree rather than the
+frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
+beside them; nothing in it waits any more. Events and sandbox are independent of all of that and of
+each other. Ecosystem's rung-2 containment is the one design restated in more than one place (its
 `blockers.md`, sandbox's `phases.md`, `docs/security.md § The containment ladder`); the security
 doc owns it and the others point.
 
