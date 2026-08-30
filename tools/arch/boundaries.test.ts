@@ -518,7 +518,10 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
       ['packages/node-core/src/server/plugins/permissions.ts', "'context' the permission name"],
       // Where a task's terminals live is a node question, asked of the roster
-      // (infra/node/hostCapabilities.ts). Sanctioned: see docs/future/structure-followup/refused.md.
+      // (infra/node/hostCapabilities.ts). Sanctioned permanently: "does this host have that plugin"
+      // is the host's own question, and the probe is what lets a compiled plugin's absence degrade
+      // cleanly rather than crash. What moved out of core on 2026-08-31 is each decision that used
+      // the answer, not the asking.
       ['packages/client-core/src/features/tabs/TabRail.tsx', 'the host-capability probe'],
       ['packages/client-core/src/features/tasks/agentSessions.ts', 'the host-capability probe'],
       // `github` the website an installable plugin comes from, which is a different thing wearing the

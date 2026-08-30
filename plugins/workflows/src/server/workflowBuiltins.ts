@@ -80,7 +80,7 @@ function headlessOutcome(result: HeadlessResult): StepHandlerOutcome {
 
 // What ships in the box. Built-ins are not contributions: they are this plugin's own implementation of
 // its own kinds, so they live in a plain object rather than going out through
-// `ctx.extensionPoints.contribute` and back in. That also keeps them addressable as bare words
+// `ctx.extensionPoints.handle` and back in. That also keeps them addressable as bare words
 // (`agent`, `join`) while a contributed kind is qualified (../contract/extensions.ts).
 export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
   stepKinds: Map<string, StepKindContribution>
