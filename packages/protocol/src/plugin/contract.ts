@@ -84,11 +84,11 @@ const pluginRoute = z.string().min(1).max(256)
 // ── Host-owned document surfaces ──────────────────────────────────────────────────────────────────
 //
 // The host owns the editor and the plugin supplies the document: an identity, a read route, an optional
-// write route, and a language id. See docs/third-party/monaco.md for why the sandbox cannot serve one,
+// write route, and a language id. See docs/editor.md for why the sandbox cannot serve one,
 // and for the bar a further host-owned region has to clear.
 
 // LSP-shaped request/response routes: position and text in, standard items out, never "run my code
-// inside the editor". See docs/third-party/monaco.md.
+// inside the editor". See docs/editor.md.
 const documentCompletions = z.object({
   route: pluginRoute,
   // What re-opens the popup mid-word, beyond the editor's own identifier rule. Punctuation, not a

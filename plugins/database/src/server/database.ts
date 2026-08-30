@@ -114,7 +114,7 @@ async function readEnvUrl(envPath: string): Promise<string | null> {
 
 const getPool = (taskId: string): InstanceType<typeof Pool> | null => pools.get(taskId)?.pool ?? null
 
-// The introspected catalog behind table and column completions, cached per task. Monaco asks its
+// The introspected catalog behind table and column completions, cached per task. The editor asks its
 // provider once per completion session and filters client-side as the reader types, so this is one
 // lookup per trigger. A full introspection per trigger would still stall on a remote node.
 //
@@ -241,7 +241,7 @@ export function databaseBridge(core: DatabaseCoreServices, emit?: (frame: { chan
       }
     },
 
-    // Arbitrary SQL from the Monaco editor, run verbatim since writes are wanted. Timed for the footer.
+    // Arbitrary SQL from the host's editor, run verbatim since writes are wanted. Timed for the footer.
     query: async (taskId, sql): Promise<DbQueryResult> => {
       const pool = getPool(taskId)
       if (!pool) return { error: 'Not connected.' }

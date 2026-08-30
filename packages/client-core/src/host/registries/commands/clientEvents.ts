@@ -29,7 +29,7 @@ export type ClientEventMap = {
   // every pane that might ever need one.
   'presentation:open-settings': { tab: string }
   // A surface-scoped plugin command, on its way to the frame region of a composed pane
-  // (docs/third-party/monaco.md § Communication between regions). Not retained like a pane intent:
+  // (docs/editor.md § Communication between regions). Not retained like a pane intent:
   // an intent describes a destination the reader is being taken to, so it waits for the pane to
   // exist, whereas this is a verb fired at a frame that is already on screen. Replaying "run the
   // query" into a pane that opens ten minutes later would be a surprise, not a fix.

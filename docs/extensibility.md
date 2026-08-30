@@ -363,7 +363,7 @@ Roughly in order of how much they matter:
 2. **The editor plugin's move, the last one.** The migration candidates are done being candidates.
    http moved first with tables; database followed over the **document surface** — the host owns one
    editor and lends it through a vendor-neutral contract (`docs/plugins.md § Document surfaces`,
-   design record `editor-monaco.md`). That surface exists because a Monaco frame measurably cannot be
+   design record `editor.md`). That surface exists because a Monaco frame measurably cannot be
    served: 7.93 MiB against an 8.00 MiB cap with a stub UI, and its language-service workers denied
    outright by the one-file origin and a CSP with no `worker-src`
    (docs/first-party-plugins.md § First-party only by history) — the first surface class the sandbox
@@ -405,6 +405,6 @@ Roughly in order of how much they matter:
 - `future/terminal/` — the terminal client programme: `acorn` in a terminal as a second host for the same component tree, and the node + tui deployable.
 - `future/events.md` — the three event items still unbuilt; the catalogue, the admission rule, and
   the refusals shipped into `plugins.md § Hearing another plugin`.
-- `editor-monaco.md` — a host-owned document surface: the concrete instance of `future/terminal/01-why.md`'s
+- `editor.md` — a host-owned document surface: the concrete instance of `future/terminal/01-why.md`'s
   "one host-owned template". Built through step 6 (database ships on it); editor's move is the step
   that remains.

@@ -730,7 +730,7 @@ describe('architecture boundaries', () => {
     //
     // A direct-specifier grep for a transitive property, so it's incomplete: `/client` reaches
     // client-core/host/registries/keybindings in two hops, and `.tsx` isn't the only way to lose node-safety
-    // (./ui/editor is plain `.ts` and unloadable, because monaco-editor reads `window` at module scope).
+    // — a dependency that reads `window` at module scope does it from a plain `.ts` too.
     // packages/plugin-api/src/entrypoints.test.ts is what actually knows; this stays because it's
     // instant and names the offending specifier.
     const componentEntrypoints = new Set([

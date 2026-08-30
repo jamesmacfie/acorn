@@ -10,7 +10,7 @@ import type { LayoutProps } from './regions'
 // host-owned drag handle between them.
 //
 // ┌──────────────────────────────────┐
-// │ document region                  │  host: Monaco, theme, workers, dirty state, ⌘S, view state
+// │ document region                  │  host: the editor, theme, dirty state, ⌘S, view state
 // ├──────────────────────────────────┤  host: this layout's drag handle
 // │ [picker] [Save] [Generate] [Run] │  the plugin's region starts here
 // │ results grid                     │

@@ -14,7 +14,7 @@ describe('parseRgJson', () => {
     expect(out.files).toEqual([{ path: 'src/a.ts', hits: [{ line: 12, col: 7, endCol: 10, preview: 'const foo = 1' }] }])
   })
 
-  it('converts ripgrep UTF-8 byte offsets to Monaco UTF-16 columns', () => {
+  it('converts ripgrep UTF-8 byte offsets to editor UTF-16 columns', () => {
     const prefix = '🙂 café '
     const start = Buffer.byteLength(prefix)
     const out = parseRgJson([begin('unicode.ts'), match('unicode.ts', 4, `${prefix}needle\n`, start, start + 6), end('unicode.ts')].join('\n'))

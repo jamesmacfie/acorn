@@ -191,8 +191,9 @@ stop applying and Oniguruma would fail inside it.
 (`apps/desktop/vite.config.ts`) is required, not cosmetic: Vite emits two files derived from
 `highlighter.worker.ts`, the worker entry itself and a roughly 270-byte main-thread wrapper that
 constructs it, and without a distinguishing prefix both would be named
-`highlighter.worker-<hash>.js` with no way to tell them apart. Monaco's five workers keep the plain
-`[name]` pattern, so they get their own names and the document's ordinary policy. If a future bundler
+`highlighter.worker-<hash>.js` with no way to tell them apart. It is the only worker the renderer
+bundles now that the editor is CodeMirror, which needs none; anything else that arrives keeps the
+plain `[name]` pattern and the document's ordinary policy. If a future bundler
 change renames the worker entry, the pattern stops matching, the worker falls back to the document's
 policy, Oniguruma fails inside it, and `highlight/worker.ts` logs the failure and falls back to the
 main thread: degraded and loud, which is the failure mode this area was built to have.

@@ -89,13 +89,13 @@
 .pane-left { display: flex; flex-direction: column; overflow: hidden; }
 
 /* Host-owned document surface: the editor a loaded plugin declares instead of bundling
-   (docs/third-party/monaco.md). Core CSS rather than a plugin stylesheet, since the plugin ships
-   no code for this pane and has nowhere to put a rule. Same flex-column shape as .pane-right:
-   Monaco is absolutely positioned inside its host and needs a definite box to fill.
+   (docs/editor.md). Core CSS rather than a plugin stylesheet, since the plugin ships no code for this
+   pane and has nowhere to put a rule. Same flex-column shape as .pane-right: an editor needs a
+   definite box to fill.
 
    `flex: 1; min-height: 0` is the line that makes that box definite. Without it this section is a
    plain flex item at `flex: 0 1 auto`, so its height comes from its content, and its content is a
-   host div at `flex: 1` with an absolutely-positioned Monaco inside, which measures nothing. The
+   host div at `flex: 1` holding an editor that measures nothing until it is told a height. The
    editor collapsed to a sliver at the top of an otherwise empty 200px region: the SQL was there,
    clipped, with the rest of the drag height blank under it. */
 .document-surface { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }

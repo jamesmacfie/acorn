@@ -9,7 +9,7 @@ export type SearchOpts = {
 }
 
 // One match within a file. `col`/`endCol` are 1-based UTF-16 columns, matching JavaScript string
-// indices and Monaco positions. The node's parser converts ripgrep's UTF-8 byte offsets.
+// indices and editor positions. The node's parser converts ripgrep's UTF-8 byte offsets.
 export type SearchHit = {
   line: number
   col: number

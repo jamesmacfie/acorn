@@ -32,7 +32,7 @@ acorn cannot keep. If discovery ever ships it ships unreviewed and says so
 
 The 8 MiB cap, the no-workers CSP, and `connect-src 'none'` are the boundary, not a blocker. Monaco
 proved some surfaces cannot live in a frame; the answer is a host-owned surface with a borrowed,
-vendor-neutral contract, designed once per surface class (`docs/editor-monaco.md`). Widening the
+vendor-neutral contract, designed once per surface class (`docs/editor.md`). Widening the
 sandbox instead would buy one surface and cost the trust story
 ([blockers.md](./blockers.md) § What is deliberately not on this list).
 

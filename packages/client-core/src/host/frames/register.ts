@@ -74,9 +74,7 @@ const ExtendedPane = lazy(() => import('../chrome/ExtendedPane'))
 // (docs/plugins.md § The tree contract).
 const RemoteTree = lazy(() => import('../tree/RemoteTree').then((module) => ({ default: module.RemoteTree })))
 // Lazy for the reason above, plus one more: this file is evaluated on every shell boot, and a static
-// import would put Monaco's tree in the boot graph for a pane most sessions never open. That includes
-// the client-graph test suites, where `monaco-editor` reads `window.location` at module scope and there
-// is no real window.
+// import would put the editor and its grammars in the boot graph for a pane most sessions never open.
 const DocumentSurface = lazy(() => import('../../features/editor/DocumentSurface'))
 // The host's layouts. Its own lazy boundary rather than a branch inside the one above, so a shell that
 // only opens whole-pane documents never pulls the splitters and the tab strip in.

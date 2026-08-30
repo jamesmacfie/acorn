@@ -47,7 +47,7 @@ export function createOverlayPalette(opts: {
   const [query, setQuerySignal] = createSignal('')
   const [sel, setSel] = createSignal(0)
   let inputRef: HTMLInputElement | undefined
-  let prevFocus: HTMLElement | null = null // element focused when we opened (e.g. the Monaco editor)
+  let prevFocus: HTMLElement | null = null // element focused when we opened (e.g. the code editor)
 
   const close = () => {
     if (activeClose === close) activeClose = null

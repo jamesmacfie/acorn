@@ -12,7 +12,7 @@ import { createSignal, Show, type JSX } from 'solid-js'
    the one it draws as its own text editor; the other two are absent there and draw their `Fallback`
    child instead.
 
-   `editor` arrived in phase 9 of the layout programme with the last two Monaco hosts — the editor
+   `editor` arrived in phase 9 of the layout programme with the app's two editor hosts — the editor
    pane's and the host's own document surface — which had been a `<div>` and a stylesheet each. A code
    editor is the case the kit is least able to express and the easiest of the four to project: at 80
    columns it is the text of the file.
@@ -26,7 +26,7 @@ export function Rectangle(props: {
   /**
    * The element the library attaches to, handed over once.
    *
-   * Every rectangle in the app holds something that wants a DOM node of its own — xterm, Monaco, a
+   * Every rectangle in the app holds something that wants a DOM node of its own — xterm, CodeMirror, a
    * WebContentsView, an iframe — and each of them used to be a bare `<div ref={host}>` the plugin
    * wrote next to a stylesheet giving it a size. That is the one shape the closed kit cannot express
    * and the one a plugin must not spell, so the host draws the element and the caller is given it.

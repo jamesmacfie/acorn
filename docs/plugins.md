@@ -160,6 +160,14 @@ name to hand them back their own rows. Each now lives in the package that owns t
 facade offers instead is the arithmetic they shared: `truncateBytes`, `formatOmitted`, and the
 `PluginContextSection` type.
 
+It went to `9` on 2026-08-31, when the editor moved off Monaco. `ui/editor` published three names
+that said Monaco out loud — `MONACO_THEME`, `watchMonacoTheme`, `monacoLanguageForPath` — and a
+theme name is not a thing CodeMirror has. What the entrypoint offers instead is `editorTheme`,
+`refreshEditorTheme` and `watchEditorTheme` (an extension, a re-read and a subscription),
+`languageForPath`, and the view-state pair
+`captureViewState`/`applyViewState` with its `EditorViewState` type, which is the selection and
+scroll a pane used to hand back to a library as an opaque blob.
+
 **Folding a removal into an open batch is a judgement, not a loophole.** The snapshot guard compares the
 committed major against the current one, so it cannot tell "this major already shipped" from "this major
 was bumped an hour ago in the same uncommitted change". Nothing had been released under `4` when the
@@ -998,7 +1006,7 @@ inside the editor".
 layouts to address: a whole-pane declaration would have meant something different once a second
 arrangement arrived, and changing that later would change what already-published manifests mean.
 `frame-beside-document` exists and lands with its consumer, the editor plugin. The design record is
-`docs/editor-monaco.md`, and `docs/panes.md § Layout model` owns the layout set.
+`docs/editor.md`, and `docs/panes.md § Layout model` owns the layout set.
 
 ### `document-over-frame`
 
@@ -1496,7 +1504,7 @@ different tree. Its vocabulary is the kit, which exists and is versioned already
 word "DSL" is discouraged for it internally, because the word invites the first shape; it is a
 component model with more than one renderer.
 
-**One reversal, on the record.** `docs/editor-monaco.md` argued that "the moment the host renders
+**One reversal, on the record.** `docs/editor.md` argued that "the moment the host renders
 a plugin's list from data, someone has to design and eternally version a descriptor vocabulary … That
 request will recur; the answer stays no." That refusal was aimed at a static schema and it still holds
 against one. Its other half — that a frame can always draw what a descriptor cannot — is true and

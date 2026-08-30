@@ -167,7 +167,7 @@ describe('webview surfaces', () => {
 describe('pane layouts', () => {
   // A pane names one of the host's layouts and fills its regions (@acorn/protocol/paneLayouts.ts). The
   // host draws the editor and the plugin supplies the document, because a Monaco frame cannot be served
-  // at all (docs/third-party/monaco.md). What is worth pinning is the same class of rule as every other
+  // at all (docs/editor.md). What is worth pinning is the same class of rule as every other
   // cross-field check here: a plugin may not name a route outside its own namespace, a layout has the
   // regions it has, and a surface that parses and can never do anything is refused rather than shipped.
   const doc = (document: Record<string, unknown>) => ({ kind: 'document', ...document })

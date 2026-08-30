@@ -2,7 +2,8 @@
 
 Design notes from the http-migration session (2026-08-11), when measuring Monaco against the plugin
 frame contract ended two migrations; extended the same day when the composed-pane question was worked
-through and decided. Companion to [terminal/01-why.md](./future/terminal/01-why.md) and [remote.md](./future/remote.md): this is
+through and decided; and rewritten on 2026-08-31, when the engine behind the surface changed and the
+file lost the vendor name it should never have carried (it was `editor-monaco.md`). Companion to [terminal/01-why.md](./future/terminal/01-why.md) and [remote.md](./future/remote.md): this is
 the concrete instance of the "one host-owned template" conclusion those two reach in the abstract.
 It began life in `docs/future/` as a design to build; with steps 1–6 shipped it lives here as the
 design record of the document surface, beside the migration record it belongs to.
@@ -33,7 +34,7 @@ class names and the frame regions below are how the world looked in 2026-08.
 The contract lives in `docs/plugins.md § Document surfaces`; the code is
 `node-core/server/plugins/manifest.ts` (the `layout` block and the `surfaceAction` verb),
 `client-core/src/features/editor/` (the surface, its theme, its language map, its view state, the chord
-resolution and the completion provider), `client-core/host/layouts/DocumentSplit.tsx` (the composed
+resolution and the completion source), `client-core/host/layouts/DocumentSplit.tsx` (the composed
 layout) and `client-core/host/frames/layouts.ts` (the trust and confinement
 gate). The wire shapes both ends read are `@acorn/protocol/documentSurface.ts`.
 
@@ -43,8 +44,42 @@ out differently from the design is recorded against each step below and, in more
 `docs/loaded-plugin-migration.md § database has moved`. The rest of this document is the design, kept as
 written.
 
+## The engine is CodeMirror, and that is the point
+
+**Both instances run on CodeMirror 6 since 2026-08-31** — the editor plugin's pane and the host's own
+document surface — and `monaco-editor` is out of the tree. Nothing in the contract moved: a plugin
+still declares a language id and two routes, the host still draws the whole rectangle, and the
+acceptance test still passes. That is the argument for a neutral contract, collected: the engine
+underneath it was replaced and no plugin had to know.
+
+What changed, and why:
+
+- **Monaco was 2 to 5 MB of VS Code for a feature set two call sites barely touched** — multiple
+  documents, view-state restore, a save chord and one completion provider. CodeMirror is modular and
+  MIT, a few hundred kilobytes with the grammars this app actually maps, and it needs no workers at
+  all. `monacoSetup.ts`, the file § What is already true calls "half of this design existing by
+  accident", is gone rather than rewritten: there is no worker environment to wire.
+- **The two shared modules kept their jobs.** `theme.ts` builds the same colours out of the same live
+  app tokens, as a CodeMirror extension in a compartment instead of a globally named theme — which
+  quietly fixes the last-writer-wins hazard that table below describes, because a compartment is per
+  view rather than per process. `language.ts` is the same total map over the same published
+  vocabulary, resolving to Lezer grammars instead of Monaco language ids.
+- **View state stopped being opaque**, which is the one place the design got *better* rather than
+  merely equivalent — see § View state below.
+- **The `ui/editor` entrypoint survives, and is no longer node-hostile.** It exists to keep the
+  grammars out of every other pane's boot graph, which is still true. What is no longer true is the
+  reason it sat on the browser-realm list in `packages/plugin-api/src/entrypoints.test.ts`: Monaco
+  read `window` at module scope and CodeMirror does not, so a plugin test that wants an editor theme
+  can now have one.
+- **`PLUGIN_API_MAJOR` went to `9`**, because three published names said Monaco out loud. See
+  `docs/plugins.md § The plugin API`.
+
+Everything below this section is the design as it was argued, kept because the argument is what
+survives an engine change. Where it says "Monaco", read "the editor the host owns": the measurements
+are Monaco's and are the reason the surface exists at all.
+
 The filename is the search term, not the contract name. See § Naming for why the contract must not
-say "monaco" anywhere.
+name a vendor anywhere.
 
 ## The question
 
@@ -78,9 +113,11 @@ design.)*
 
 Monaco is already a host-owned singleton, and half of this design exists by accident.
 
-`packages/client-core/src/features/editor/monacoSetup.ts` assigns `self.MonacoEnvironment` once at the renderer
-entry, and its comment says why: it used to be imported by both panes, and "two panes racing to set it
-was a real bug." One module, one set of workers, two consumers.
+`packages/client-core/src/features/editor/monacoSetup.ts` (deleted with the CodeMirror move, since there
+are no workers to wire) assigned `self.MonacoEnvironment` once at the renderer entry, and its comment
+said why: it used to be imported by both panes, and "two panes racing to set it was a real bug." One
+module, one set of workers, two consumers — which is what made the case that the editor was always a
+host singleton.
 
 Everything above that line is duplicated, and the duplication is already load-bearing in ways nobody
 chose:
@@ -178,15 +215,21 @@ a reserved set that cannot be claimed — so the carrier exists and the surface-
 one to reuse. A design that forgets this produces a database pane whose Execute chord silently stops
 working, which is exactly the class of regression the http move kept finding.
 
-### View state is the one type that must go opaque
+### View state
 
-`plugins/editor/src/client/editorViewState.ts` currently stores
-`editor.ICodeEditorViewState` — a Monaco type — in a module-level map. That is fine *inside* a plugin
-and impossible over a descriptor: the blob cannot cross a contract that does not name Monaco.
+`plugins/editor/src/client/editorViewState.ts` used to store `editor.ICodeEditorViewState` — a Monaco
+type, an opaque blob — in a module-level map. That was fine *inside* a plugin and impossible over a
+descriptor: the blob cannot cross a contract that does not name a vendor. This section used to be
+called "the one type that must go opaque", and the answer it gave was that it stops being the
+plugin's at all: scroll and cursor position are host state, keyed by (node, task, uri) and evicted by
+the host's own scope-eviction signals.
 
-The answer is that it stops being the plugin's at all. Scroll and cursor position are host state, keyed
-by (node, task, uri), evicted by the host's own scope-eviction signals. The plugin never sees it, which
-is both cleaner and one less thing for a frame to persist.
+That half still holds. The other half got better on the move to CodeMirror, which has no such blob:
+what both call sites persist is `{ anchor, head, scrollTop }`, declared in
+`client-core/features/editor/viewState.ts` and published as `EditorViewState`. So there is no opaque
+type left in the design at all — the app owns what it saves, can read it, and clamps it to the
+document on restore, which matters because the agent and the human share a worktree and the file may
+have moved underneath a stashed offset.
 
 ## Naming
 
@@ -216,9 +259,14 @@ owners.
 
 **The trap:** do not build an abstraction *layer* inside the shell. One implementation behind an
 internal interface is over-building, and the neutral name does not require one. The shell should call
-Monaco directly and bluntly; only the plugin-facing name and contract stay neutral. Neutral contract,
-un-neutral implementation — and when shiki backs the read-only variant, that is a branch in one host
-module, not a strategy pattern.
+its editor directly and bluntly; only the plugin-facing name and contract stay neutral. Neutral
+contract, un-neutral implementation — and when shiki backs the read-only variant, that is a branch in
+one host module, not a strategy pattern.
+
+The 2026-08-31 engine swap is the evidence this was the right call rather than a guess. Two files
+changed shape, no interface had to be honoured, and no plugin noticed — which is what "neutral
+contract, un-neutral implementation" buys, and it is exactly what an abstraction layer would have
+charged for up front and then not delivered.
 
 ## Composed panes: decided
 
@@ -319,7 +367,7 @@ listeners — so nothing below invents a channel; it adds message kinds to one.
 
 **Host → frame: surface actions.** The ⌘Enter walk-through:
 
-1. The chord lands in the host's Monaco. The host checks the reserved set, then the surface-scoped
+1. The chord lands in the host's editor. The host checks the reserved set, then the surface-scoped
    actions the pane's plugin declared. It finds `execute`.
 2. **The host flushes the document first** — writes the current buffer to the plugin's declared write
    route. This is a contract guarantee, not an implementation detail: *a surface action never fires
@@ -388,8 +436,8 @@ handle the `execute` event, call your own query route, render results, and use
 `bridge.document.read()` behind your own Run button.
 
 What database's client *deletes* in the move, which is the DX argument in one list:
-`monaco.editor.create` and all its options, the theme application, the `addCommand(⌘Enter)` binding,
-the `editorH` signal and the splitter's pointer handlers. The plugin author never sees Monaco, never
+constructing an editor and all its options, the theme application, the ⌘Enter binding, the `editorH`
+signal and the splitter's pointer handlers. The plugin author never sees the editor library, never
 ships a byte of it, and gets the host's theme, save semantics and dirty-state handling without being
 able to get them wrong.
 
@@ -441,8 +489,8 @@ The host never learns SQL — it stays a dumb proxy from "completion requested a
 host provider is generic enough that a GraphQL console or a YAML config plugin uses the identical
 mechanism with zero host changes.
 
-Two operational notes: on remote nodes the route call crosses the network, but Monaco calls the
-provider once per completion session and filters client-side as the user types, and the schema
+Two operational notes: on remote nodes the route call crosses the network, but the editor calls the
+source once per completion session and filters client-side as the user types, and the schema
 snapshot is already cached node-side, so it is one lookup per trigger, not per keystroke. And the
 node-side schema cache needs invalidating on reconnect and after DDL runs through the pane — stale
 columns in a popup is a small bug but a visible one.
@@ -452,7 +500,7 @@ request/response routes — position and text in, standard items out — never a
 editor."** Hover and diagnostics can follow the same shape when a real consumer needs them. Custom
 widgets, decorations and inline UI cannot, and the answer to those requests stays no. The test for
 any proposed addition is "is this an LSP method". As long as every addition passes it, the contract
-grows without becoming Monaco's API in a trench coat.
+grows without becoming an editor library's API in a trench coat.
 
 ## What this does not fix
 
@@ -471,7 +519,7 @@ grows without becoming Monaco's API in a trench coat.
 ## Sequence
 
 1. ~~Consolidate what already exists.~~ **Done.** `applyMonacoTheme` and the global `app` theme name
-   are `client-core/features/editor/theme.ts` (with `watchMonacoTheme`, since both call sites always wanted the
+   are `client-core/features/editor/theme.ts` (with a watcher, since both call sites always wanted the
    apply-then-subscribe pair), reached by the two compiled panes through a new
    `@acorn/plugin-api/ui/editor` entrypoint — its own barrel rather than more lines on `ui/host`,
    because `monaco-editor` reads `window.location` at module scope and docker's archive concern
@@ -481,7 +529,7 @@ grows without becoming Monaco's API in a trench coat.
    from day one, degenerate `document` template first.
 3. ~~Publish the language-id vocabulary.~~ **Done.** `@acorn/protocol/languageIds.ts`, LSP spellings,
    the union of the two extension maps, one fallback. The per-engine maps sit beside their engines —
-   `client-core/features/editor/language.ts` for Monaco, `client-core/infra/highlight/shiki.ts` for shiki, each total
+   `client-core/features/editor/language.ts` for the editor, `client-core/infra/highlight/shiki.ts` for shiki, each total
    over the vocabulary so a new id fails `tsc` until someone says what that engine does with it.
 4. ~~Build the contract.~~ **Done.** `layout` and `regions` on a `pane` surface, with a document
    region carrying `{ languageId, read, write? }`, host-owned dirty state, autosave, ⌘S, flush-on-unmount and view
@@ -500,7 +548,7 @@ grows without becoming Monaco's API in a trench coat.
    own frame" was not in the closed set. `surfaceAction` names its surface rather than deriving it from
    the keybinding, which keeps the command reachable from the palette too.
    **The chord cannot be resolved by the shell's window dispatcher**: that one refuses scoped bindings
-   while a typing target has focus, and Monaco's input area is one. `DocumentSurface` resolves it
+   while a typing target has focus, and the editor's content area is one. `DocumentSurface` resolves it
    against the same registry a frame's forwarded chords go through, then flushes, then runs.
    **The bridge document API is gated structurally** — `services.document` is present only for a frame
    that has a document beside it — so there is no scope for a manifest to over-ask for.
@@ -515,6 +563,17 @@ grows without becoming Monaco's API in a trench coat.
    so this design is the last thing between editor and the loaded tier. Planning that move settles
    the two questions reserved above: its template shape (`frame-beside-document` vs host-drawn tabs)
    and the open-document verb.
+8. ~~Change the engine.~~ **Done** on 2026-08-31, out of order and on its own
+   (`docs/future/before-terminal-ui/` phase 4). Both instances run CodeMirror 6, `monaco-editor` is
+   out of both `package.json`s, `monacoSetup.ts` is deleted, and the editor pane's root is kit layout
+   rather than a raw `<section>`. Two things came out differently from that phase's sketch.
+   **The pane's close-tab chord did not need an element after all**: `onClosePaneWithin` grew a
+   sibling, `onClosePaneWhen`, that takes a predicate, and the pane answers it with the host's own
+   `focusedPane(taskId)` — so nothing had to mint a `<div>` to hold a ref.
+   **Completions got simpler rather than merely different.** Monaco's providers register per language
+   and are global, so the surface had to filter every request down to its own model; CodeMirror hangs
+   a source off the state, so a second document pane in the same language cannot be offered another
+   plugin's items and there is nothing to filter.
 
 ## Related
 

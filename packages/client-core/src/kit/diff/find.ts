@@ -3,7 +3,7 @@ import { isCodeRow, type CodeRow, type Row } from './diffModel'
 // In-diff find (Cmd+F). The diff list is virtualized, so off-screen lines aren't in the DOM and the
 // native find can't see them. This searches the row model instead: every code row's raw text,
 // scrolls the virtualizer to matches, and splits tokens so the matched substring gets a highlight
-// class while keeping its syntax colour, like Monaco's in-file find.
+// class while keeping its syntax colour, like an editor's in-file find.
 
 export type FindMatch = { row: CodeRow; rowIndex: number; start: number; end: number }
 export type FindHighlight = { ranges: [number, number][]; current: [number, number] | null }

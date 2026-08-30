@@ -1,4 +1,4 @@
-// Monaco editor pane backing: read, write, and list files on the task's worktree. The EditorBridge
+// Editor pane backing: read, write, and list files on the task's worktree. The EditorBridge
 // behind the HTTP routes in server/routes/editor.ts. The taskId is the capability, and every call
 // re-derives the worktree root from the DB. Path confinement is `resolveInRoot` (docs/security.md §
 // Process, path, and configuration controls). Pure Node, so it works in dev:node too. Wired in

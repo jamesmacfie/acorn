@@ -196,7 +196,7 @@ export { persistDraft, readDraft, writeDraft } from '@acorn/client-core/kit/lib/
 export { formatRelativeTime } from '@acorn/client-core/kit/lib/formatRelativeTime.ts'
 export { bytesOf, formatSize } from '@acorn/client-core/kit/lib/formatSize.ts'
 export { latestOnly } from '@acorn/client-core/kit/lib/latestOnly.ts'
-export { onClosePaneWithin } from '@acorn/client-core/host/keys/onClosePaneWithin.ts'
+export { onClosePaneWhen, onClosePaneWithin } from '@acorn/client-core/host/keys/onClosePaneWithin.ts'
 
 // Which sandboxed plugin, if any, draws a given agent tool call. Data, not a component: the component
 // that mounts it is `RemoteTree` on ./ui/host. See docs/plugins.md § The tree contract.

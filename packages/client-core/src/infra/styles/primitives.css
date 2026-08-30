@@ -92,6 +92,11 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 /* FitAddon subtracts padding from xterm's own element, not from its parent host, so the visual inset
    has to be here: put it on the host and the fitted row count clips the final terminal row. */
 .ui-rect[data-kind='pty'] .xterm { height: 100%; padding: var(--space-2) var(--space-3); }
+/* CodeMirror sizes to its content unless it is told a height, and the box is the host's, so the host
+   says. Without this the editor is as tall as the file and the pane scrolls instead of the document,
+   which for a thousand-line file means no visible editor at all. */
+.ui-rect[data-kind='editor'] .cm-editor { height: 100%; }
+.ui-rect[data-kind='editor'] .cm-scroller { overflow: auto; }
 
 /* `grow`: the textarea IS the region. No drag handle, because the box is the region's to size. */
 textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }

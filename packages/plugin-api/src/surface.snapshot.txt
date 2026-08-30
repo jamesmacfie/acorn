@@ -1,4 +1,4 @@
-# plugin API major: 8
+# plugin API major: 9
 client: CHECK_TONE
 client: ClientPlugin
 client: ClientScheduleContribution
@@ -98,6 +98,7 @@ client: learnRefPrefixes
 client: linkifyRefs
 client: nodeReady
 client: nodes
+client: onClosePaneWhen
 client: onClosePaneWithin
 client: onScopeEvicted
 client: openInAppUrl
@@ -369,9 +370,13 @@ ui/diff: splitBandIdentityKeys
 ui/diff: synth
 ui/diff: toBands
 ui/diff: tokenizeDocument
-ui/editor: MONACO_THEME
-ui/editor: monacoLanguageForPath
-ui/editor: watchMonacoTheme
+ui/editor: EditorViewState
+ui/editor: applyViewState
+ui/editor: captureViewState
+ui/editor: editorTheme
+ui/editor: languageForPath
+ui/editor: refreshEditorTheme
+ui/editor: watchEditorTheme
 ui/host: Acorn
 ui/host: AnnotationMarks
 ui/host: Concern
