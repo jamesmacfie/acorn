@@ -7,8 +7,8 @@ import { eventChord } from '@acorn/protocol/keybindings.ts'
 import { isLanguageId } from '@acorn/protocol/languageIds.ts'
 import { readJson, writeJson } from '../infra/node/apiClient'
 import { debounce } from '../kit/lib/debounce'
-import { executeCommand } from '../registries/commands'
-import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../registries/keybindings'
+import { executeCommand } from '../host/registries/commands/commands'
+import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../host/registries/commands/keybindings'
 import {
   documentUri,
   documentViewState,

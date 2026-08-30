@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import type { PluginCollectionFieldType } from '@acorn/protocol/collections.ts'
 import { formatRelativeTime } from '@acorn/dashboards-core/relativeTime.ts'
-import type { CollectionContribution } from '../registries/collections'
+import type { CollectionContribution } from '../host/registries/sources/collections'
 import { Button, Card, Chip, Field, Input, SectionHeader, SegmentedControl } from '../kit/components/primitives'
 import { brandMarkRegistry } from '../kit/lib/brandMarks'
 import Icon from '../kit/components/Icon'

@@ -13,7 +13,7 @@ import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker
 // to the renderer, which names bundles by hash and nothing else.
 //
 // See docs/future/remote.md: a browser client does the same job with IndexedDB. The renderer reaches
-// this through one narrow module, client-core/plugins/host.ts, so the interface is the portable part
+// this through one narrow module, client-core/host/plugins/host.ts, so the interface is the portable part
 // rather than the storage.
 
 const CACHE_DIR = 'plugin-cache'

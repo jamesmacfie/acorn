@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { sourceRegistry } from '../registries/sources'
+import { sourceRegistry } from '../host/registries/sources/sources'
 import { taskOriginAppearance } from './origin'
 
 let dispose: (() => void) | undefined

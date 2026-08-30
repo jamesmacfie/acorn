@@ -1,5 +1,5 @@
 import { createEffect, createSignal, on, Show, type JSX } from 'solid-js'
-import { bindIntents } from '../../keys/host'
+import { bindIntents } from '../keys/host'
 import MentionTextarea from './MentionTextarea'
 import { Alert, Button, Textarea, Toolbar } from './primitives'
 

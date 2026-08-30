@@ -79,7 +79,7 @@ is why Settings can show it as a conflict while the keyboard behaves as if it we
 ## Focus and typing
 
 The keyboard is one engine, `@opentui/keymap`, installed on the shell root by
-`client-core/keys/install.ts`. Its HTML adapter turns DOM keydowns into keymap events and tracks
+`client-core/host/keys/install.ts`. Its HTML adapter turns DOM keydowns into keymap events and tracks
 targets with a `MutationObserver`; the same package carries a terminal adapter, which is what keeps a
 terminal renderer a matter of swapping the adapter rather than rewriting the keyboard.
 
@@ -90,9 +90,9 @@ reaches Settings → Shortcuts, the palette, and the cheat sheet at once; a hand
 engine reaches none of them and cannot be rebound, overridden, or shown to the reader in a conflict.
 
 **Keys become intents before a component sees one.** The closed set is in
-`client-core/keys/intents.ts`: `next`, `prev`, `first`, `last`, `pageNext`, `pagePrev`, `expand`,
+`client-core/kit/keys/intents.ts`: `next`, `prev`, `first`, `last`, `pageNext`, `pagePrev`, `expand`,
 `collapse`, `activate`, `dismiss`, `commit`, `search`, `menu`, `delete`, and the four region and pane
-moves. `client-core/keys/keymap.ts` maps this host's keys onto them, and it is the only file that
+moves. `client-core/kit/keys/keymap.ts` maps this host's keys onto them, and it is the only file that
 knows a platform difference: `commit` is Cmd+Enter on macOS and Ctrl+Enter everywhere else, and
 nothing else changes between the two. A kit node handles intents. A plugin receives `onSelect`,
 `onActivate` and the rest, and never a key event, outside `Input`, `Textarea`, `Composer` and the
@@ -107,12 +107,12 @@ layer does, or nothing does.
 focus, items inside a collection, and the two traps. Every layout region is a focus group. F6 and
 Shift+F6 move between the regions of a pane, Ctrl+Option+Right and Ctrl+Option+Left move between
 panes, and each group remembers the node focus was last on, so coming back lands where you left.
-`client-core/keys/regions.ts` holds that, writes `focusedPane`, and emits `runtime:focus-changed`
+`client-core/host/keys/regions.ts` holds that, writes `focusedPane`, and emits `runtime:focus-changed`
 with the task, pane and region.
 
 **Collection state is the host's.** A run of `Row`s inside a `Rows`, a tab strip, a menu, a chip row,
 a segmented control, a timeline and a grid are all one collection with roving focus inside, and the
-arrows, Home, End, the page keys and type-ahead come from `client-core/keys/collection.ts` rather
+arrows, Home, End, the page keys and type-ahead come from `client-core/kit/keys/collection.ts` rather
 than from the pane. `active` and `selected` live in the host's store keyed by the item's own key
 ([state-ownership.md](./state-ownership.md)), so a refetch keeps your place.
 
@@ -148,7 +148,7 @@ Escape is the exception the engine cannot express. An open overlay answers its o
 binding goes inactive while focus is inside a dialog. Consuming the key in the engine would stop the
 DOM event too, and the overlay would never see it.
 
-**The cheat sheet** (`client-core/keys/CheatSheet.tsx`, Cmd+/) lists what the keyboard will do right
+**The cheat sheet** (`client-core/host/keys/CheatSheet.tsx`, Cmd+/) lists what the keyboard will do right
 here, read from the engine's own catalog rather than from the keybinding registry. `getActiveKeys`
 answers for the layers that are live against the element that has focus, so a chord a pane shadows
 shows the pane's meaning and a chord whose command is unavailable does not appear.

@@ -12,7 +12,7 @@
 import { integrationsKey } from '../infra/queries'
 import { activeCacheId } from '../infra/node/activeNode'
 import { clientFor } from '../infra/node/fleet'
-import { clientEvents } from '../registries/clientEvents'
+import { clientEvents } from '../host/registries/commands/clientEvents'
 import { wsOnConnectionChanged } from '../infra/node/wsClient'
 
 /** Subscribe for the life of the shell. Returns the unsubscribe for symmetry with the other watchers;

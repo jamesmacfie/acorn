@@ -22,7 +22,7 @@ import TabRail from '@acorn/client-core/tabs/TabRail.tsx'
 import Tips from '@acorn/client-core/kit/components/tips.tsx'
 import { ToastHost } from '@acorn/client-core/notifications/ToastHost.tsx'
 import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/tasks/tasks.ts'
-import { isTerminalTarget } from '@acorn/client-core/keys/install.ts'
+import { isTerminalTarget } from '@acorn/client-core/host/keys/install.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
 import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilities.ts'
 import { desktopExtras } from '@acorn/client-core/infra/platform/index.ts'
@@ -34,19 +34,19 @@ import { warnOnceAboutDisk } from '@acorn/client-core/infra/node/nodeSecurity.ts
 import { applyNodePlugins } from './activate'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/Acorn.tsx'
-import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
-import { registerCommands } from '@acorn/client-core/registries/commands.ts'
-import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/registries/keybindings.ts'
-import { CheatSheet } from '@acorn/client-core/keys/CheatSheet.tsx'
-import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/registries/willPhase.tsx'
+import { clientEvents } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
+import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
+import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
+import { CheatSheet } from '@acorn/client-core/host/keys/CheatSheet.tsx'
+import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
-import { RefPanelHost } from '@acorn/client-core/registries/refPanelHost.tsx'
-import { startClientSchedules } from '@acorn/client-core/registries/schedules.ts'
-import { SlotHost, type UiSlotContext } from '@acorn/client-core/registries/uiSlots.tsx'
+import { RefPanelHost } from '@acorn/client-core/host/registries/panes/refPanelHost.tsx'
+import { startClientSchedules } from '@acorn/client-core/host/registries/shell/schedules.ts'
+import { SlotHost, type UiSlotContext } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/infra/persistence/appStartup.ts'
 import { createTaskDeepLink } from '@acorn/client-core/tasks/taskDeepLink.ts'
-import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/registries/sources.ts'
-import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/registries/corePaths.ts'
+import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
 import { availableSources } from '@acorn/client-core/tabs/sources.ts'
 import { createSourceScope } from '@acorn/client-core/tabs/sourceScope.ts'
 
@@ -463,7 +463,7 @@ export default function App() {
       <CheatSheet />
       <WillConfirmationHost />
       {/* A referenced item from another provider, opened by any surface that renders content
-          (client-core/registries/refPanels.ts). Mounted at the shell because the state is the shell's.
+          (client-core/host/registries/panes/refPanels.ts). Mounted at the shell because the state is the shell's.
           Before this, the only place in the app that could open one was github's PR conversation. */}
       <RefPanelHost />
       <Show when={settingsOpen()}>

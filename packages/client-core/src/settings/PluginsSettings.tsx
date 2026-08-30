@@ -13,8 +13,8 @@ import {
   updateNodePlugin,
 } from '../infra/node/nodePlugins'
 import { canPickFolder, pickFolder } from '../infra/platform'
-import { readPluginHostState, setPluginDevGrant } from '../plugins/host'
-import { syncPluginDistribution } from '../plugins/distribution'
+import { readPluginHostState, setPluginDevGrant } from '../host/plugins/host'
+import { syncPluginDistribution } from '../host/plugins/distribution'
 import { Alert, Button, Checkbox, Field, Input, Select } from '../kit/components/primitives'
 import Icon from '../kit/components/Icon'
 import { activeTaskId } from '../tasks/tasks'
@@ -31,7 +31,7 @@ import {
   exclusiveSlotOffers,
   withExclusiveSlotChoice,
   type CoreExclusiveSlot,
-} from '../registries/exclusiveSlots'
+} from '../host/registries/extensionPoints/exclusiveSlots'
 import './settings.css'
 
 // Settings > Plugins: per-node install, toggle, and the install lifecycle (docs/plugins.md

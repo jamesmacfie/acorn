@@ -7,7 +7,7 @@ import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 import { wsOnNotice } from '../infra/node/wsClient'
 import { activeNodeId } from '../infra/node/activeNode'
 import { homeNodeId } from '../infra/node/fleet'
-import { noticeKindContribution } from '../registries/notices'
+import { noticeKindContribution } from '../host/registries/rail/notices'
 
 export type NoticeKind = string
 export type NoticeTarget = {

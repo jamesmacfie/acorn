@@ -150,7 +150,7 @@ providers is what the feature *is* — two plugins' rows can share one board onl
 them draws anything. The same budget discipline applies with the same words: a field type added is a
 rendering rule every provider inherits forever, and the overflow path is a frame pane. Both feeders —
 `contributions.collections` in a manifest and `ctx.collections` from a compiled plugin — land in one
-client registry (`client-core/src/registries/collections.ts`), and nothing downstream can tell which
+client registry (`client-core/src/host/registries/sources/collections.ts`), and nothing downstream can tell which
 supplied a collection. That is the strongest form of the descriptor argument: a stranger's plugin gets
 panels that ship no client bundle, raise no trust prompt, and are pixel-identical to a first-party
 one's under every appearance pack.

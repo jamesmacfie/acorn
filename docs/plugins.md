@@ -130,7 +130,7 @@ fails that test until the snapshot is regenerated
 (`UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test`), which is the point: growing the contract
 should be a deliberate act. The implementation still lives in
 `packages/node-core/src/server/pluginHost/types.ts` and
-`packages/client-core/src/registries/plugin.ts`, which stay free to move files around underneath.
+`packages/client-core/src/host/registries/extensionPoints/plugin.ts`, which stay free to move files around underneath.
 
 **Adding a name is free. Removing one is a major bump.** The snapshot's first line records the
 `PLUGIN_API_MAJOR` it was written under, and regeneration REFUSES to drop a name while that major is
@@ -618,7 +618,7 @@ Four properties worth stating because they are easy to lose:
 - **The queue rides the roster.** `GET /v2/core/plugins` carries `requests`, so there is no second route
   to remember to gate. `POST /v2/core/plugins/requests/:requestId` records the answer, is device-only by
   the same mount, and is permanently unmappable from a frame
-  (`client-core/plugins/frames/scopes.ts`) — a frame that could post an approval would answer the very
+  (`client-core/host/frames/scopes.ts`) — a frame that could post an approval would answer the very
   question that exists because an agent must not install.
 - **One ask is one question.** Identical arguments resolve to the same pending row, and only the *first*
   raise rings the bell, so an agent cannot put a prompt on the owner's screen in a loop. Twenty
@@ -742,14 +742,14 @@ appear. Each renders in an iframe on `app-plugin://<bundle-hash>`, a scheme the 
 from its content-addressed cache with `connect-src 'none'`: the frame has no network, no
 `window.acorn`, and no reach into the shell. Its only I/O is one `MessagePort`, where every call
 is checked against the manifest's declared scopes by an allowlist naming each path and method
-(`packages/client-core/src/plugins/frames/`, `scopes.ts` is the choke point). The host pins which
+(`packages/client-core/src/host/frames/`, `scopes.ts` is the choke point). The host pins which
 Node the frame talks to; the frame cannot name one. A `refPanel` frame is one of the two surfaces whose
 surrounding chrome the host draws rather than the plugin (`overlay` is the other): an iframe cannot
 `Portal` out of the box its consumer placed it in, and the bridge's close verb does not reach a
 reference panel — it is granted to importers and overlays only — so the manifest adapter
 supplies the drawer and its dismiss control while the frame supplies the body. It is also the one
 surface no plugin *mounts*: the shell holds which ref is open and draws it in one place
-(`client-core/registries/refPanels.ts` + `refPanelHost.tsx`), so any surface that renders content can
+(`client-core/host/registries/panes/refPanels.ts` + `refPanelHost.tsx`), so any surface that renders content can
 call `openRefPanel({ providerId, displayId })` and get any provider's panel. One at a time, on
 purpose — a stack of reference panels is a navigation history, which is what panes and routes are for
 — and `openRefPanel` returns `false` rather than opening an empty overlay when that provider has no
@@ -788,7 +788,7 @@ cost nothing to introduce: every id that has ever shipped already passes, so no 
 there is no alias map. Commands were already qualified as `plugin.<pluginId>.<commandId>`.
 
 The binding happens once, where the device reads the roster row
-(`packages/client-core/src/plugins/contributionIds.ts`), rewriting the declaration and every reference
+(`packages/client-core/src/host/plugins/contributionIds.ts`), rewriting the declaration and every reference
 to it — `action.pane`, `action.surface`, `action.overlay`, `routes[].surface`, `contentLinks[].pane`.
 Doing it at each registration site would be the same change made in eleven places and wrong in
 whichever one got missed. Compiled plugins are untouched: they are the app, and an id they collide
@@ -857,7 +857,7 @@ function; text is a node, never a prop; `class`, `style` and every other door in
 dropped with a row on the plugin's page; a node name this build does not know draws a labelled
 placeholder, which is the forward-compatibility rule above applied to drawing. A batch applies whole or
 not at all, and a worker that stops answering is terminated with a placeholder in every tree it served.
-The wire is `@acorn/protocol/tree/`, the host is `client-core/src/plugins/tree/`, and
+The wire is `@acorn/protocol/tree/`, the host is `client-core/src/host/tree/`, and
 `docs/shell.md § The plugin worker` has the sandbox.
 
 Two things a tree is not for. Anything that must react per keystroke — a live filter over a large list,
@@ -1019,7 +1019,7 @@ routes (`routes`), agent-context entries (`agentContexts`), batch reference reso
 (`refResolvers`), typed record sets (`collections`), periodic node-side work (`schedules`), and colour
 themes (`themes`). These are data, not code: the host renders them with its own components and fetches their content
 from routes in the plugin's own `/v2/p/<id>/` namespace, so they stay live when no frame is
-mounted anywhere (`packages/client-core/src/plugins/chrome/`). Freshness rides the existing
+mounted anywhere (`packages/client-core/src/host/chrome/`). Freshness rides the existing
 invalidation ping plus one shared timer. A plugin that ships only descriptors needs no client
 bundle at all, and therefore no trust prompt — nothing of its executes on the device. A source may
 declare `createTask`; its row supplies the task seed and optional external link, while the host owns
@@ -1139,7 +1139,7 @@ The host POSTs `{ identifiers }`, count-capped, and parses the answer as
 the plugin whose route answered, the same rule that stops a recogniser claiming another provider,
 because a row that could name its own provider could publish a stranger's items behind a stranger's
 reference panel. A consumer addresses a resolver by provider and never by route
-(`refResolutionsOptions` in `client-core/registries/refResolvers.ts` owns the query key and a
+(`refResolutionsOptions` in `client-core/host/registries/panes/refResolvers.ts` owns the query key and a
 five-minute staleness for every provider alike), so a surface enriches Linear and a tracker nobody
 has written yet with the same call.
 
@@ -1367,7 +1367,7 @@ and `chrome/register.ts`, including a byte-identical task-pane predicate that fe
 allowlist, the list deciding which pane ids a sandboxed frame may ask the host to open. A security
 check maintained in two copies, connected by nothing, fails silently in whichever direction an author
 updates only one of them, and `tsc` stays quiet because each copy is locally consistent on its own.
-`packages/client-core/src/plugins/contributions.ts` now owns that shared half; the passes keep their
+`packages/client-core/src/host/plugins/contributions.ts` now owns that shared half; the passes keep their
 own job, rendering a sandboxed iframe versus registering a command palette row.
 
 `eligiblePlugins()` returns one row per plugin id, and each row's `hash` and `trusted` come from the
@@ -1527,7 +1527,7 @@ Four properties worth knowing before building on it:
   prefixes through `ctx.events.channel` and is compiled into the binary.
 - **A loaded plugin still cannot claim a prefix.** `ctx.events.channel` remains withheld. Core claims
   the one `plugin` prefix on every loaded plugin's behalf and routes by the id inside the name
-  (`client-core/plugins/pluginChannel.ts`), which is what lets this work across a message-passing
+  (`client-core/host/plugins/pluginChannel.ts`), which is what lets this work across a message-passing
   boundary that a handler function could never cross.
 - **Frames get every frame; chrome gets a coalesced one.** A subscribed frame is delivered each
   broadcast, paying for it through the bridge's own message budget. Chrome is nudged at most twice a
@@ -1545,7 +1545,7 @@ is the rule for every line in that group.
 ## Context menus
 
 `contextMenus` is the declarative right-click contribution, and the registry behind it
-(`packages/client-core/src/registries/contextMenus.ts`) is core's as much as a plugin's: the tab rail's
+(`packages/client-core/src/host/registries/panes/contextMenus.ts`) is core's as much as a plugin's: the tab rail's
 own Pin / Unpin / Rename / Archive rows are registrations on it. That is the point — a contribution
 contract whose only consumer is a third party is a contract nobody has used. Both doors onto a task row
 (the button menu it already had, and the new right-click) draw the same list from the same registry, so
@@ -2196,7 +2196,7 @@ behaviour without A's declared consent.** Specifically refused, permanently:
 - **Patching another plugin's registrations.** A plugin's contributions are registered by the host from
   the manifest the host read. There is no runtime door onto anyone's, including its own.
 - **Reading another plugin's routes.** Refused at manifest parse, refused again on the device, and
-  refused a third time at the frame bridge (`packages/client-core/src/plugins/frames/scopes.ts`).
+  refused a third time at the frame bridge (`packages/client-core/src/host/frames/scopes.ts`).
 
 If a real need surfaces that cooperative points cannot express, **the answer is a wider vocabulary, not
 an open realm** — and which vocabulary depends on which of the three tiers it is. Memory's section
@@ -2402,7 +2402,7 @@ plugin has no client bytes to trust and registers its data directly. The prompt 
 permissions, enforced UI scopes and key claims, and webview host grants as **three separate lists**. Webview hosts are
 enforced but the remote page has live network access, so folding them into the networkless UI list
 would be misleading. For the original two groups, only the second is enforced —
-`packages/client-core/src/plugins/permissions.ts` explains why they must never be merged, and it
+`packages/client-core/src/host/trust/permissions.ts` explains why they must never be merged, and it
 classifies every line against what the host can actually grant rather than echoing manifest text.
 
 Two behaviours that surprise authors, both deliberate: the `footer` slot is the **task** footer
@@ -2471,7 +2471,7 @@ Two feeders, one registry, exactly like schedules and collections: a compiled pl
 its manifest and the host synthesises the same registration over the two routes above. Nothing
 downstream can tell which one answered. The registry is
 `packages/node-core/src/server/pluginHost/taskChecks.ts`; the dialog it feeds is
-`packages/client-core/src/registries/willPhase.tsx`.
+`packages/client-core/src/host/registries/shell/willPhase.tsx`.
 
 A concern is plain data:
 

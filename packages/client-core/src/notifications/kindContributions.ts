@@ -1,4 +1,4 @@
-import type { NoticeKindContribution } from '../registries/notices'
+import type { NoticeKindContribution } from '../host/registries/rail/notices'
 
 export const noticeKindContributions: NoticeKindContribution[] = [
   { id: 'finished', glyph: 'circle-dot', severity: 'info', toast: true },

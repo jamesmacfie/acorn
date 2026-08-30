@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { workspacesOptions } from '../infra/queries'
-import { settingsContributions } from '../registries/settings'
+import { settingsContributions } from '../host/registries/shell/settings'
 import { ContributionBoundary } from '../kit/components/ContributionBoundary'
 import { createDismissable } from '../kit/lib/dismissable'
 import { Dynamic } from 'solid-js/web'

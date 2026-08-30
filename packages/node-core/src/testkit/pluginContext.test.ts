@@ -48,7 +48,7 @@ describe('makeTestNodeContext', () => {
   it('confines a loaded plugin\'s broadcast to its own channel namespace', () => {
     // `send` used to be handed over raw, which let a loaded package post on `term:` or `workflow:` and
     // impersonate core's own streams. The confinement is also the definition of the namespace its frames
-    // may subscribe to (client-core/plugins/pluginChannel.ts).
+    // may subscribe to (client-core/host/plugins/pluginChannel.ts).
     const ctx = makeTestNodeContext({ plugin, permissions: {} })
     try {
       expect(() => ctx.events.send({ channel: 'plugin:testkit-probe:sample', cpu: 1 })).not.toThrow()

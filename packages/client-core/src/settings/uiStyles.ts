@@ -1,4 +1,4 @@
-import { styleContributions, styleRegistry, type StyleContribution } from '../registries/styles'
+import { styleContributions, styleRegistry, type StyleContribution } from '../host/registries/shell/styles'
 
 // Settings → Appearance style picker. 'terminal' is the plain-:root default in
 // styles/tokens-style.css and has no [data-style] block, exactly as 'light' has no [data-theme]

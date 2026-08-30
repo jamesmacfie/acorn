@@ -1,4 +1,4 @@
-import type { KeybindingContribution } from '../registries/keybindings'
+import type { KeybindingContribution } from '../host/registries/commands/keybindings'
 
 export const visibleShortcutBindings = <T extends KeybindingContribution>(bindings: readonly T[]): T[] =>
   bindings.filter((binding) => binding.plugin?.state() !== 'absent')

@@ -77,17 +77,17 @@ uses for fields added after rows were written.
 
 - `packages/protocol/src/pluginBundles.ts` (new): `BundleSource`, `bundleSourceSchema`,
   `hasNodeHalf(manifest)`.
-- `packages/client-core/src/plugins/resolveBundles.ts`: `source` on candidates and winners; the
+- `packages/client-core/src/host/trust/resolveBundles.ts`: `source` on candidates and winners; the
   device-wins sort key.
-- `packages/client-core/src/plugins/distribution.ts`: device candidates from
+- `packages/client-core/src/host/plugins/distribution.ts`: device candidates from
   `PluginHostState.cached`; `eligiblePlugins()` merge.
-- `packages/client-core/src/plugins/trustModel.ts`: provenance line; empty `declared` tier.
-- `packages/client-core/src/plugins/host.ts`: `installPluginOnDevice`, `removePluginFromDevice`.
+- `packages/client-core/src/host/trust/trustModel.ts`: provenance line; empty `declared` tier.
+- `packages/client-core/src/host/plugins/host.ts`: `installPluginOnDevice`, `removePluginFromDevice`.
 - `packages/client-core/src/infra/platform/{index.ts,contract.ts}`: `PluginCustody.install`, `remove`; the
   `plugins` group's member list.
 - `packages/client-core/src/infra/persistence/devicePrefs.ts`: prefix rule for device plugin state;
   `devicePluginsDisabled`.
-- `packages/client-core/src/plugins/frames/broker.ts`: `state` verb routes by `source`.
+- `packages/client-core/src/host/frames/broker.ts`: `state` verb routes by `source`.
 - `packages/client-core/src/settings/PluginsSettings.tsx`: the device section.
 - `packages/desktop-helper/src/plugins/pluginCache.ts`: `putFromSource`, `remove`, `source` on entries.
 - `packages/desktop-helper/src/plugins/pluginTrustStore.ts`: `source` on rows and grants, with the read
@@ -127,7 +127,7 @@ new), `docs/security.md` (three sections), `docs/state-ownership.md`, `docs/plug
 
 Against [07-hosts.md](./07-hosts.md):
 
-1. 1. Only `packages/client-core/src/plugins/host.ts` calls `pluginCustody()`. The arch rule already
+1. 1. Only `packages/client-core/src/host/plugins/host.ts` calls `pluginCustody()`. The arch rule already
    holds this; the phase adds two functions there and nowhere else.
 2. `BundleSource` and the cache and acknowledgement schemas are protocol types.
 3. `{ path }` is drawn only where `folderPicker` resolves.
@@ -150,7 +150,7 @@ Against [07-hosts.md](./07-hosts.md):
   `cachePut`, `trustRecord`, `devGrant`, and `contract.ts` lists the same four in `SEAM_GROUPS`.
 - `packages/desktop-helper/src/plugins/pluginCache.ts` has `putFromNode` and `MAX_BUNDLE_BYTES`;
   `pluginTrustStore.ts` keys `decisionFor` on `(pluginId, hash)` and carries `nodeId` on rows.
-- `packages/client-core/src/plugins/resolveBundles.ts` exports `resolveActiveBundles` with
+- `packages/client-core/src/host/trust/resolveBundles.ts` exports `resolveActiveBundles` with
   `BundleCandidate.nodeId` and `ActiveBundle.nodeIds`.
 - `packages/node-core/src/server/routes/plugins/plugins.ts` has the four-form `installSource` union and
   `server/plugins/installer.ts` resolves it.

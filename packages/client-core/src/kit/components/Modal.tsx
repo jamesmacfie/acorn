@@ -1,5 +1,5 @@
 import { Show, type JSX } from 'solid-js'
-import { restoreFocusOnCleanup } from '../../keys/trap'
+import { restoreFocusOnCleanup } from '../keys/trap'
 import { createDismissable } from '../lib/dismissable'
 
 // Modal chrome. Behaviour comes from createDismissable. See docs/ui-design.md § Chrome and

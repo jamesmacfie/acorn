@@ -316,8 +316,7 @@ describe('architecture boundaries', () => {
     // touch it; never add a root. Lower MAX_DEEP_IMPORTS below when you migrate a file.
     const TESTKIT_BASELINE = [
       '@acorn/client-core/infra/node',
-      '@acorn/client-core/palette',
-      '@acorn/client-core/registries',
+      '@acorn/client-core/host/registries',
       '@acorn/client-core/settings',
       '@acorn/client-core/tasks',
       '@acorn/client-core/kit/lib',
@@ -447,7 +446,7 @@ describe('architecture boundaries', () => {
     // Two spellings that must not drift (docs/architecture-overview.md § Package boundaries).
     const client = byName.get('@acorn/client-core')!
     const node = byName.get('@acorn/node-core')!
-    const corePaths = readFileSync(join(client.src, 'registries/corePaths.ts'), 'utf8')
+    const corePaths = readFileSync(join(client.src, 'host/registries/commands/corePaths.ts'), 'utf8')
     const manifest = readFileSync(join(node.src, 'server/plugins/manifest.ts'), 'utf8')
     const segment = /export const PLUGIN_ROUTE_SEGMENT = '([^']+)'/.exec(corePaths)?.[1]
     expect(segment).toBe('x')
@@ -463,7 +462,7 @@ describe('architecture boundaries', () => {
       'notes.ts',
       // The workflow row types are read by client-core's notification pipeline as well as the plugin.
       'workflow.ts',
-      // Blocked, not kept: client-core/registries/agentToolRenderers.ts imports it, so it can't move
+      // Blocked, not kept: client-core/host/registries/agentToolRenderers.ts imports it, so it can't move
       // until the shell stops naming agents.
       'managedAgents.ts',
     ]
@@ -500,7 +499,7 @@ describe('architecture boundaries', () => {
 
   it('only main touches the third-party plugin cache and trust store', () => {
     // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
-    // client-core/plugins/host.ts is the one door on the renderer side, speaking hashes and
+    // client-core/host/plugins/host.ts is the one door on the renderer side, speaking hashes and
     // decisions only.
     const PLUGIN_STORE_OK = new Set(['packages/desktop-helper', 'apps/desktop'])
     const offenders = PACKAGES.flatMap((p) =>
@@ -613,7 +612,7 @@ describe('architecture boundaries', () => {
     // module, or that entrypoint stops loading from a plugin's node-environment suite.
     //
     // A direct-specifier grep for a transitive property, so it's incomplete: `/client` reaches
-    // client-core/registries/keybindings in two hops, and `.tsx` isn't the only way to lose node-safety
+    // client-core/host/registries/keybindings in two hops, and `.tsx` isn't the only way to lose node-safety
     // (./ui/editor is plain `.ts` and unloadable, because monaco-editor reads `window` at module scope).
     // packages/plugin-api/src/entrypoints.test.ts is what actually knows; this stays because it's
     // instant and names the offending specifier.
@@ -639,19 +638,11 @@ describe('architecture boundaries', () => {
     // shape it renders rather than a store it reads. Known and deliberate: kit/diff/DiffRows.tsx reaches
     // kit/lib/draftState, which touches localStorage, because the draft belongs to the comment box.
     //
-    // Three carve-outs remain until the host/ commit of docs/future/structure/phase-5-client-core.md
-    // moves the components that need them out of the kit:
-    //   palette/model.ts  fuzzyScore, a module with zero imports of its own
-    //   registries/registry.ts  the Registry class, importing only solid-js
-    //   keys/           the keyboard engine's pure half; keys/install.ts and keys/regions.ts stay out
     const UI_MAY_IMPORT = (file: string): boolean => {
       const p = rel(file)
       if (!p.startsWith('packages/client-core/src/')) return false
       const inner = p.slice('packages/client-core/src/'.length)
-      if (inner === 'keys/install.ts' || inner === 'keys/regions.ts') return false
       return inner.startsWith('kit/') || inner.startsWith('infra/highlight/')
-        || inner.startsWith('keys/')
-        || inner === 'palette/model.ts' || inner === 'registries/registry.ts'
     }
     // `[^'"]*?` for the clause, because a preceding import's specifier contains the quotes that bound
     // the statement.
@@ -736,7 +727,7 @@ describe('architecture boundaries', () => {
       return out
     }
 
-    const entry = join(ROOT, 'packages/client-core/src/plugins/frames/sdk.ts')
+    const entry = join(ROOT, 'packages/client-core/src/host/frames/sdk.ts')
     const seen = new Set<string>([entry])
     const queue = [{ file: entry, path: 'sdk.ts' }]
     const offenders: string[] = []
@@ -828,7 +819,7 @@ describe('architecture boundaries', () => {
     // with a blank title over an empty frame, and TypeScript can't see it because `ref` lives on
     // `IntrinsicAttributes`. A callback `ref` is the legitimate form, so that's what the rule allows.
     // Scoped to registries/, where the props types that cross a registry call site are declared.
-    const dir = join(ROOT, 'packages/client-core/src/registries')
+    const dir = join(ROOT, 'packages/client-core/src/host/registries')
     const files = walk(dir).filter((f) => !isTestCode(f))
     const offenders: string[] = []
     for (const file of files) {

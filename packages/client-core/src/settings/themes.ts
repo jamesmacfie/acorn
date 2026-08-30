@@ -1,4 +1,4 @@
-import { themeContributions, themeRegistry, type ThemeContribution } from '../registries/themes'
+import { themeContributions, themeRegistry, type ThemeContribution } from '../host/registries/shell/themes'
 
 const builtInThemes: ThemeContribution[] = [
   { id: 'light', label: 'Light' },

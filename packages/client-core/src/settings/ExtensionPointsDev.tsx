@@ -8,8 +8,8 @@ import {
   extensionDeliveries,
   extensionPointRegistry,
   unmatchedExtensions,
-} from '../registries/extensionPoints'
-import { slotChoices, withSlotChoice } from '../plugins/tree/arbitration'
+} from '../host/registries/extensionPoints/extensionPoints'
+import { slotChoices, withSlotChoice } from '../host/tree/arbitration'
 
 // Every extension point on this node, who fills it, and every contribution that fills nothing
 // (docs/plugins.md § Seeing what matched).

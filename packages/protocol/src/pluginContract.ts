@@ -185,7 +185,7 @@ const frameSurface = z.object({
 }).superRefine((surface, ctx) => {
   // The one cross-field rule a surface can check on its own: a layout has the regions it has. The
   // client repeats it over a roster row, because a manifest reaches a device as bytes a node sent
-  // (client-core/plugins/frames/layouts.ts).
+  // (client-core/host/frames/layouts.ts).
   if (surface.regions && !surface.layout) {
     ctx.addIssue({ code: 'custom', path: ['regions'], message: 'regions need a layout to name them' })
     return
@@ -207,7 +207,7 @@ const frameSurface = z.object({
 
 const chromeAction = z.discriminatedUnion('verb', [
   // A pane the same manifest declares under `frames`, checked below. The clicked row's id rides along
-  // as a pane intent (client-core/registries/clientEvents.ts).
+  // as a pane intent (client-core/host/registries/commands/clientEvents.ts).
   z.object({ verb: z.literal('openPane'), pane: z.string().min(1).max(64) }),
   // Go to the task the click names and stop there, for a row whose thing IS a task. Only a dashboard
   // row carries one (@acorn/protocol/collections.ts), so elsewhere the host refuses it out loud.
@@ -302,7 +302,7 @@ const sourceDescriptor = z.object({
   // Does this rail read the routed project? Opt in, so an older manifest and a plugin that never
   // thought about projects both land on `false`, which is true of most of them. Declaring it turns on
   // the shell's project picker for this source and adds `?project=` to the items route
-  // (client-core/plugins/chrome/ChromeSourcePanel.tsx).
+  // (client-core/host/chrome/ChromeSourcePanel.tsx).
   projectScoped: z.boolean().optional(),
   onSelect: chromeAction.optional(),
   // Shown when the route answered with no items, not when it failed. An unreachable node has its own
@@ -427,7 +427,7 @@ const extensionDescriptor = z.object({
   order: z.number().int().min(0).max(100_000).default(500),
   // Exactly one carrier, checked below. Which one is right depends on the owner's `kind`, which this
   // manifest cannot see, so the shape rule here is "name one way in" and the match against the point's
-  // kind happens where both are visible (client-core/registries/extensionPoints.ts).
+  // kind happens where both are visible (client-core/host/registries/extensionPoints/extensionPoints.ts).
   //
   //   items   `rows` and `annotation`: a route on this plugin's own namespace (confined below).
   //   remote  a key of the object this plugin's bundle passed to `mountTree`.
@@ -746,7 +746,7 @@ const harnessDescriptor = z.object({
   terminal: harnessTerminal.optional(),
 })
 
-// `api` and `events` are enforced by the UI bridge (client-core/plugins/frames). `contributions` stays
+// `api` and `events` are enforced by the UI bridge (client-core/host/plugins/frames). `contributions` stays
 // loose: a manifest written for a newer acorn should contribute less on an older one rather than fail
 // to parse.
 //

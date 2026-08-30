@@ -10,10 +10,10 @@ plugin may offer to fill instead. Phases 1 and 2 build it.
 
 - `CORE_EXCLUSIVE_SLOTS = ['rail.taskList'] as const` in `packages/protocol/src/extensionPoints.ts`,
   with `CORE_SLOT_PROVIDER = 'core'`.
-- `packages/client-core/src/registries/exclusiveSlots.ts` holds `ExclusiveSlotProvider` (`id`,
+- `packages/client-core/src/host/registries/extensionPoints/exclusiveSlots.ts` holds `ExclusiveSlotProvider` (`id`,
   `pluginId`, `slot`, `label`, `when?`, `component`), the registry, `resolveExclusiveSlot`,
   `noteExclusiveSlotFailure`, and the user's choices under `PrefKeys.exclusiveSlots`.
-- `packages/client-core/src/plugins/ExclusiveSlotHost.tsx` draws the resolved provider inside an
+- `packages/client-core/src/host/plugins/ExclusiveSlotHost.tsx` draws the resolved provider inside an
   error boundary and falls back to `core` on a throw.
 - `TabRail.tsx:347` is the one call site. `PluginsSettings.tsx:430` has the one label.
 - A loaded plugin offers through a frame with `target: 'coreSlot'` and `coreSlot: 'rail.taskList'`

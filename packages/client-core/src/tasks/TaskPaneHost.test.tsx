@@ -1,8 +1,8 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
-import { paneRegistry, type PaneContribution } from '../registries/panes'
-import type { Disposable } from '../registries/registry'
+import { paneRegistry, type PaneContribution } from '../host/registries/panes/panes'
+import type { Disposable } from '../kit/lib/registry'
 import TaskPaneHost from './TaskPaneHost'
 
 // The busiest host in the shell: it decides which panes a task shows, drops the ones this task or
@@ -29,7 +29,7 @@ vi.mock('./tasks', () => ({
 vi.mock('../infra/node/activeNode', () => ({ activeNodeId: () => 'node-1' }))
 vi.mock('../infra/node/fleet', () => ({ nodeState: () => ({}) }))
 vi.mock('../infra/node/freshness', () => ({ freshnessOf: () => 'live' }))
-vi.mock('../registries/railMarkers', () => ({ markersFor: () => [] }))
+vi.mock('../host/registries/rail/railMarkerFeed', () => ({ markersFor: () => [] }))
 
 let host: HTMLElement
 let dispose: () => void

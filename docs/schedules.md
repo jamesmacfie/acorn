@@ -145,7 +145,7 @@ The calendar forms use node-local time, because the node is the owner's machine 
 their 03:30. Daylight saving does what local time does and nobody pretends otherwise.
 
 **The renderer has its own `ctx.schedules`, and it is not this one.** A client schedule takes a raw
-`intervalMs` with no floor and no budget (`client-core/src/registries/schedules.ts`), because below the
+`intervalMs` with no floor and no budget (`client-core/src/host/registries/shell/schedules.ts`), because below the
 300s floor a schedule *is* a poll, and polling is the client's job for a person who is present. Same
 word for the same idea, different shape where the difference is real. It was called `ctx.pollers` until
 2026-08-27, which made one idea look like two.
@@ -267,7 +267,7 @@ taken once, at creation, because 3am cannot answer a confirmation strip.
 the tier the host just showed; letting it post a tier would make the confirmation something a client
 could quietly widen, which is the one property the arming rule exists to prevent.
 
-Plugin frames cannot reach any of these (`client-core/plugins/frames/scopes.ts`): reading the list
+Plugin frames cannot reach any of these (`client-core/host/frames/scopes.ts`): reading the list
 enumerates what the machine does unwatched, and creating one is a way to make code run later.
 
 ## Settings

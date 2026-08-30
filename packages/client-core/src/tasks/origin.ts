@@ -1,4 +1,4 @@
-import { sourceRegistry } from '../registries/sources'
+import { sourceRegistry } from '../host/registries/sources/sources'
 
 export type TaskOriginAppearance = { glyph: string; tooltip?: string }
 

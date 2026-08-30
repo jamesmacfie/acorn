@@ -89,7 +89,7 @@ const text = (value: unknown, max: number): string | null =>
  * What a check said, reduced to what the host is willing to draw.
  *
  * Per-field rather than all-or-nothing, matching how the client sanitises plugin chrome
- * (client-core/plugins/chrome/data.ts): a concern with one unusable detail loses the detail, not the
+ * (client-core/host/chrome/data.ts): a concern with one unusable detail loses the detail, not the
  * warning. `null` means nothing here is worth a row, either no message or an answer that is not a
  * concern at all.
  */

@@ -10,7 +10,7 @@ and the answer is a `<Fallback>` child, not a branch.
 
 ## A second `KIT_COMPONENTS`
 
-`packages/client-core/src/plugins/tree/components.ts` is the DOM host's table: one enumerated import
+`packages/client-core/src/host/tree/components.ts` is the DOM host's table: one enumerated import
 per `KitNodeName`, no wildcard, compound halves flattened. The TUI has its own table with the same
 key type, and the same test that says the two lists are the kit and nothing else. Each entry is a Solid
 component written against OpenTUI's renderables through `@opentui/solid`, so first-party panes, which
@@ -66,7 +66,7 @@ has a terminal projection per layout, and phase 2 builds each from its projectio
 - `stack-split`: regions on successive blocks with a rule between, the split moved by a key.
 - `wizard`: one step at a time, the step count on the header line, the actions on the footer line.
 
-`LayoutProps` and `Region` (`packages/client-core/src/layouts/regions.ts`) are host-neutral: a region
+`LayoutProps` and `Region` (`packages/client-core/src/host/layouts/regions.ts`) are host-neutral: a region
 is a thunk that returns JSX, and on the TUI that JSX is kit components on OpenTUI. `layouts/state.ts`
 is shared as-is. The DOM layouts' drag handling (`createSplitDrag`, `offsetWidth`) has no sibling.
 
@@ -94,7 +94,7 @@ iframe fills, `docs/panes.md`) is absent entirely: no iframe, no pixels, a place
 ## Unknown nodes and failed trees
 
 The DOM host renders a labelled placeholder for a node type this build cannot draw
-(`packages/client-core/src/plugins/tree/placeholder.tsx`), the same placeholder for a failed slot, and one error boundary per
+(`packages/client-core/src/host/tree/placeholder.tsx`), the same placeholder for a failed slot, and one error boundary per
 tree. The TUI keeps all three, drawn as an `Alert` in `warn` tone. The forward-compatibility rule is
 the same on both hosts: a new node name from a newer plugin renders as a placeholder and a roster
 row, never as a crash.

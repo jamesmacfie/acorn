@@ -10,7 +10,7 @@ there.
 
 - **Custody.** `packages/client-core/src/infra/platform/index.ts` declares `PluginCustody` with four
   members: `state()`, `cachePut()`, `trustRecord()`, `devGrant()`.
-  `packages/client-core/src/plugins/host.ts` is the only client module that calls it, and its header
+  `packages/client-core/src/host/plugins/host.ts` is the only client module that calls it, and its header
   already names the future: "today it fronts the desktop helper's content-addressed store, and a
   future web client fronts IndexedDB."
 - **The cache.** `packages/desktop-helper/src/plugins/pluginCache.ts` stores bundles content-addressed
@@ -21,11 +21,11 @@ there.
   on `(pluginId, hash)`. A row carries `nodeId`, and the comment beside it says "did this come from.
   Not part of the key, because the same bundle from a second node is the same bundle." Dev grants
   are keyed on `(pluginId, nodeId)`.
-- **Resolution.** `packages/client-core/src/plugins/resolveBundles.ts` takes `BundleCandidate[]`
+- **Resolution.** `packages/client-core/src/host/trust/resolveBundles.ts` takes `BundleCandidate[]`
   (each with `pluginId`, `version`, `hash`, `nodeId`) and picks one `ActiveBundle` per plugin id:
   highest version whose `apiVersion` range covers `PLUGIN_API_MAJOR`, ties on hash. The winner
   records `nodeIds[]`, the nodes offering that exact bundle.
-- **The roster.** `packages/client-core/src/plugins/distribution.ts` builds candidates from each
+- **The roster.** `packages/client-core/src/host/plugins/distribution.ts` builds candidates from each
   node's `GET /v2/core/plugins` answer (`installedByNode`), keeps `pendingTrust`, and
   `syncPluginDistribution()` re-resolves after any change.
 - **The render paths.** `frames/register.ts` mounts a trusted bundle in an iframe at
@@ -100,7 +100,7 @@ pins it against the case that matters: node offers 2.0, device holds 1.9, device
 The trust prompt is the same three-tier prompt with a different provenance line. Today the copy says
 which node the bundle came from. For a device bundle it says "installed on this device from `<source
 as the user gave it>`", and the `declared` tier is empty because there is no node half to disclose.
-`packages/client-core/src/plugins/trustModel.ts` already builds lines from grant classes, so this is
+`packages/client-core/src/host/trust/trustModel.ts` already builds lines from grant classes, so this is
 one new line builder and one absent section, not a new prompt.
 
 Consent is still per `(pluginId, hash)`, still per device, still recorded on both accept and reject.
@@ -123,7 +123,7 @@ plugin has no node of its own to follow.
 ### The roster and Settings
 
 `GET /v2/core/plugins` is a node's roster and does not change. The client's roster view
-(`eligiblePlugins()` in `packages/client-core/src/plugins/contributions.ts`) merges the device's
+(`eligiblePlugins()` in `packages/client-core/src/host/plugins/contributions.ts`) merges the device's
 `PluginHostState.cached` entries whose `source.kind` is `device` as rows with no node. Settings →
 Plugins gains a section, "On this device", with install (the four sources), update, remove, enable
 and disable, and the dev grant toggle. The existing per-node section is unchanged. A plugin id that

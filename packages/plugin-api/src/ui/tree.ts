@@ -18,14 +18,14 @@ export {
   Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
   KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelConnectionPicker, Rectangle, Only,
   Fallback,
-} from '@acorn/client-core/plugins/frames/remoteSolid.ts'
+} from '@acorn/client-core/host/frames/remoteSolid.ts'
 // The universal-renderer surface. Solid's JSX preset emits calls to these by name; you do not write
 // them, and their names are Solid's rather than acorn's.
 export {
   render, effect, memo, createComponent, createElement, createTextNode, insertNode, insert, spread,
   setProp, mergeProps, use,
-} from '@acorn/client-core/plugins/frames/remoteSolid.ts'
-export type { KitNodeProps } from '@acorn/client-core/plugins/frames/remoteSolid.ts'
+} from '@acorn/client-core/host/frames/remoteSolid.ts'
+export type { KitNodeProps } from '@acorn/client-core/host/frames/remoteSolid.ts'
 // The two-press delete, as a helper rather than a node. Here rather than on ./ui because that barrel is
 // components compiled for a document, and a tree bundle must not pull one in: its own build compiles
 // JSX into acorn's nodes, so a shell component reaching it would come out the far side as a tree.

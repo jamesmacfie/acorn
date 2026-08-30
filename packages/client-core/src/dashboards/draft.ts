@@ -1,7 +1,7 @@
 import { createMemo, createSignal, type Accessor } from 'solid-js'
 import type { PluginCollectionField } from '@acorn/protocol/collections.ts'
 import { activeNodeId } from '../infra/node/activeNode'
-import type { CollectionContribution } from '../registries/collections'
+import type { CollectionContribution } from '../host/registries/sources/collections'
 import { chartSeriesFields, chartShapesFor, defaultChartAxis, type ChartShape } from './chart'
 import { collectionsForPicker, defaultPanelTitle } from './compose'
 import { cachedCollectionAnsweredAt, cachedCollectionPage, createCollectionCacheRevision, scopedQuery } from './data'

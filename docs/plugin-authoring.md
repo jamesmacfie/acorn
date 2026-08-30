@@ -435,7 +435,7 @@ so the first call is a `TypeError` the author sees immediately.
 
 `permissions.api` is the **frame's** scope list, and unlike the node block it is genuinely enforced —
 by an allowlist of (path shape, method) pairs at
-`packages/client-core/src/plugins/frames/scopes.ts`, which is the choke point for everything a
+`packages/client-core/src/host/frames/scopes.ts`, which is the choke point for everything a
 sandboxed frame can reach. Your own `/v2/p/<id>` namespace needs no scope and is always allowed.
 Another plugin's namespace is always denied. Everything else needs one of six scopes:
 
@@ -452,7 +452,7 @@ would install unsandboxed code and make every other line moot.
 `permissions.events` names channels the frame may subscribe to. Subscribing does not create a channel,
 and there are two kinds to name:
 
-- **Five of the shell's own**, listed in `client-core/plugins/frames/channels.ts`. Four say that
+- **Five of the shell's own**, listed in `client-core/host/frames/channels.ts`. Four say that
   something a frame may be showing has gone or moved: `runtime:task-archived`,
   `runtime:workspace-removed`, `runtime:node-removed`, `runtime:node-switched`. The fifth,
   `runtime:focus-changed`, says which pane and region of this window the keyboard is in, as
@@ -626,7 +626,7 @@ In-repo bundles import `connect()`, `mountFrame()` and `mountTree()` from `@acor
 and the tree path's nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. **A hand-written
 `client.js` cannot.** That is a bare specifier with no bundler to resolve it, and the origin would have
 nowhere to serve the resolved file from even if there were. Copying the SDK's source in is not an
-option either: `packages/client-core/src/plugins/frames/sdk.ts` is TypeScript and imports from
+option either: `packages/client-core/src/host/frames/sdk.ts` is TypeScript and imports from
 `@acorn/protocol`, so it has the same problem one level down.
 
 There are two answers, and which one you want is decided by a question this profile otherwise never
@@ -844,7 +844,7 @@ export async function handle(request, context, core) {
 ```js
 // The bridge handshake, inlined. @acorn/plugin-api/ui/sdk is what a bundled frame imports;
 // a single-file frame has no way to resolve a bare specifier, so it sends the same messages
-// by hand. packages/client-core/src/plugins/frames/sdk.ts is the reference for the semantics.
+// by hand. packages/client-core/src/host/frames/sdk.ts is the reference for the semantics.
 
 const pending = new Map()
 let port = null

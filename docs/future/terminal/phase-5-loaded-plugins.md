@@ -20,7 +20,7 @@ back to an iframe, means the node half inherits a tested design.
 In:
 
 - A `worker_threads` factory through `_setWorkerFactory` in
-  `packages/client-core/src/plugins/tree/workerHost.ts`, loading a bundle by path from the cache
+  `packages/client-core/src/host/tree/workerHost.ts`, loading a bundle by path from the cache
   under `--permission` with no grants.
 - The tree host's rendering shell on the TUI: `RemoteTree` and `Slot` siblings that apply
   `acceptable()`/`apply()` to a Solid store and draw through the TUI's `KIT_COMPONENTS`, with the
@@ -51,7 +51,7 @@ and a compiled one are indistinguishable in a terminal.
 **Custody.** `apps/tui/src/plugins/custody.ts` (new) implements the four members. The cache is
 `<config>/plugins/cache/<hash>.js`, written after hashing and compared to the manifest's hash; the
 acknowledgement file is `<config>/plugins/trust.json`, the desktop's trust store schema from
-`@acorn/protocol`. `packages/client-core/src/plugins/host.ts` remains the only caller of `pluginCustody()`.
+`@acorn/protocol`. `packages/client-core/src/host/plugins/host.ts` remains the only caller of `pluginCustody()`.
 
 **Permission flags.** `--permission` is process-wide in Node and a worker thread inherits the
 parent's grants, which means the TUI process itself would run under `--permission` with grants for its
@@ -62,9 +62,9 @@ the terminal and in `docs/future/ecosystem/blockers.md` for rung 2.
 ## Code touched
 
 - `apps/tui/src/plugins/{workerFactory,custody,RemoteTree,Slot,TrustPrompt}.ts(x)` (new).
-- `packages/client-core/src/plugins/tree/TreeHost.tsx`: the coalescer takes a scheduler; the
+- `packages/client-core/src/host/tree/TreeHost.tsx`: the coalescer takes a scheduler; the
   rendering shell is separated from `acceptable()`/`apply()` if it is not already.
-- `packages/client-core/src/plugins/tree/workerHost.ts`: no change expected beyond the factory seam.
+- `packages/client-core/src/host/tree/workerHost.ts`: no change expected beyond the factory seam.
 - `docs/security.md`: five sections.
 
 ## Tests
@@ -101,8 +101,8 @@ not granted is refused and shown as a placeholder.
 
 ## Verify before building
 
-- `packages/client-core/src/plugins/tree/workerHost.ts` still exposes `_setWorkerFactory`.
+- `packages/client-core/src/host/tree/workerHost.ts` still exposes `_setWorkerFactory`.
 - `TreeHost.tsx` still separates `acceptable()` and `apply()` from the JSX.
-- `packages/client-core/src/plugins/host.ts` is still the only caller of `pluginCustody()`.
+- `packages/client-core/src/host/plugins/host.ts` is still the only caller of `pluginCustody()`.
 - Node's `--permission` model at the pinned runtime version: check whether worker threads can be
   granted less than the parent.

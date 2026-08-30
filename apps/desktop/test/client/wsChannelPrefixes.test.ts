@@ -11,12 +11,12 @@ describe('registered ws channel prefixes', () => {
   it('are exactly the twelve the app expects', async () => {
     await import('../../src/client/activate')
     // term, workflow, plugins, tasks, connection, head, run, agent-session and project are core's
-    // (client-core/wsClient.ts): term is transport on both ends, workflow:notice feeds core's
+    // (client-core/infra/node/wsClient.ts): term is transport on both ends, workflow:notice feeds core's
     // notification pipeline, and the rest are the node announcing one of its own facts moved
     // (docs/plugins.md § Hearing a core event). `agent-session` rather than `agent` because the latter is
     // the agents plugin's own prefix. `plugin` — singular,
     // one letter from `plugins` and deliberately distinct — is the namespace core claims for every
-    // loaded plugin's own live channel (client-core/plugins/pluginChannel.ts). docker and agent are
+    // loaded plugin's own live channel (client-core/host/plugins/pluginChannel.ts). docker and agent are
     // their plugins'.
     expect(wsChannelPrefixes()).toEqual(['agent', 'agent-session', 'connection', 'docker', 'head', 'plugin', 'plugins', 'project', 'run', 'tasks', 'term', 'workflow'])
   })

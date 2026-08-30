@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Row } from './primitives'
 import { Rows } from './Rows'
-import { _resetCollectionState } from '../../keys/collectionState'
+import { _resetCollectionState } from '../keys/collectionState'
 
 // A list rebuilt from a live store hands out fresh item objects on every frame. The rows must not go
 // with them: the DOM inside a row holds a text selection, an open menu, and whatever the caller drew.

@@ -2,7 +2,7 @@
 // (docs/plugins.md § Hearing a core event). None of them backs a query the shell caches, so there is
 // nothing to invalidate: each is re-emitted on the client bus, which is the only thing a plugin frame
 // or a compiled-in consumer can subscribe to (plugins/frames/channels.ts).
-import { clientEvents } from '../../registries/clientEvents'
+import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { wsOnNodeEvent } from './wsClient'
 
 /** Subscribe for the life of the shell. Returns one unsubscribe for the three, for symmetry with the

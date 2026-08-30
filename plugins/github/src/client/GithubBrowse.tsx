@@ -82,7 +82,7 @@ export default function GithubBrowse() {
         // Linked tickets, both list enrichment and any open detail, refetch too. Keyed by string
         // rather than by importing the plugin that supplies them, so a force-refresh of a pull does
         // not make this plugin depend on whichever providers enrich it. The host's one prefix covers
-        // every provider (client-core/registries/refResolvers.ts).
+        // every provider (client-core/host/registries/panes/refResolvers.ts).
         queryClient.invalidateQueries({ queryKey: ['plugin-ref-resolutions'] }),
       ])
     } finally {

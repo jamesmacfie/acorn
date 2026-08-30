@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readStyleSheets, stripComments } from '../infra/styles/readStyleSheets'
-import { PLUGIN_THEME_PREFIX } from '../plugins/chrome/themes'
+import { PLUGIN_THEME_PREFIX } from '../host/chrome/themes'
 import { THEMES } from './themes'
 
 // Drift guard (docs/ui-design.md § Plugin themes): the Appearance themes picker is hand-synced with

@@ -1,7 +1,7 @@
 import { createMemo, Match, Show, Switch } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { PluginCollectionCell, PluginCollectionField } from '@acorn/protocol/collections.ts'
-import { openInAppUrl } from '../../registries/contentLinks'
+import { openInAppUrl } from '../../host/registries/panes/contentLinks'
 import { activeTaskId } from '../../tasks/tasks'
 import Icon from '../../kit/components/Icon'
 import { StatusDot } from '../../kit/components/primitives'

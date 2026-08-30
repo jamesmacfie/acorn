@@ -16,7 +16,7 @@ import { formatDate, relativeTime } from './model'
 // the shell's appearance packs.
 //
 // Two things live outside this file. The panel chrome belongs to whoever opened the panel
-// (client-core/plugins/frames/PluginRefPanel.tsx). The ticket switcher for a task linking several
+// (client-core/host/frames/PluginRefPanel.tsx). The ticket switcher for a task linking several
 // tickets sits in app.tsx beside the task read.
 
 // Glyph per activity kind (Linear-style compact feed).

@@ -2,7 +2,7 @@ import type { Integration, WorkspaceExternalProject } from '@acorn/protocol/api.
 import type { ProviderCapabilityName, PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import type { SourceId } from '../tasks/tasks'
 import { hasHostCapability } from '../infra/node/hostCapabilities'
-import { sourceRegistry } from '../registries/sources'
+import { sourceRegistry } from '../host/registries/sources/sources'
 
 export type SourceEntry = { id: SourceId; glyph: string; label: string }
 

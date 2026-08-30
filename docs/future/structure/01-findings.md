@@ -163,7 +163,7 @@ Overlaps and misplacements:
   publish half of one because `Row` would collide.
 - Annotations live in `plugins/annotations/`, `tasks/taskAnnotations.ts`, and
   `diff/annotationKey.ts`.
-- `packages/client-core/src/registries/ProviderHtml.tsx`, `RefPanelBox.tsx`, and
+- `packages/client-core/src/host/components/ProviderHtml.tsx`, `RefPanelBox.tsx`, and
   `RefPanelTaskLink.tsx` are components filed under registries because `ui/` may not import a
   registry function. `packages/plugin-api/src/ui/host.ts` explains this in a comment.
 - `packages/client-core/src/AccountMenu.tsx` (its header says the name is wrong),
@@ -178,7 +178,7 @@ Overlaps and misplacements:
 - Exactly one `use*` file in 516: `workspaces/useActiveWorkspaceId.ts`. Everything else is Solid's
   `create*`.
 - 14 CSS files colocated in feature folders; `settings/NodesSettings.tsx` imports `../node/nodes.css`
-  and `packages/client-core/src/plugins/frames/ExtendedPane.tsx` imports `../chrome/extension-points.css`.
+  and `packages/client-core/src/host/frames/ExtendedPane.tsx` imports `../chrome/extension-points.css`.
 - `configTrust`, `modelProviders`, `projects`, and `dashboards/views` have zero tests.
 
 ## The shared packages
@@ -188,7 +188,7 @@ facade, re-exports only), `acorn-plugin-types` (published node-side declarations
 (published frame bridge). Each published package is locked to its source by a `contract.test.ts`.
 
 - The 62-name remote component list exists three times: `packages/plugin-sdk/src/remote/solid.ts`,
-  `packages/plugin-api/src/ui/tree.ts`, `packages/client-core/src/plugins/frames/remoteSolid.ts`.
+  `packages/plugin-api/src/ui/tree.ts`, `packages/client-core/src/host/frames/remoteSolid.ts`.
   The first two already differ on `ConfirmButton`.
 - `packages/protocol/src` is 59 flat modules with one subfolder, `tree/`, which is justified
   (`tree/nodes.ts` has zero imports so a bundle can take it without zod). The five `plugin*.ts`

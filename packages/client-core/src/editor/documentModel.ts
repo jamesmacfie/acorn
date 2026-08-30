@@ -3,7 +3,7 @@
 // Everything here is pure or a plain module-level map, because vitest runs in node with no Solid
 // plugin (docs/testing.md), so the logic worth pinning has to live outside the .tsx.
 import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/pluginBridge.ts'
-import { onScopeEvicted } from '../registries/scopeEviction'
+import { onScopeEvicted } from '../host/registries/shell/scopeEviction'
 
 // The shapes both ends read live on the wire (`@acorn/protocol/documentSurface.ts`), because a
 // plugin's node half serves them and cannot import client-core. Re-exported so the editor half has

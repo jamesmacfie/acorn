@@ -13,7 +13,7 @@ export const pluginStateKey = (pluginId: string, key: string): string => `plugin
 // Here rather than beside either consumer because three sides have to agree on one spelling: the node
 // that stamps it, the renderer that routes it, and the manifest that declares it as an event grant.
 //
-// `plugin` is one letter from core's own `plugins` prefix (client-core/wsClient.ts), which carries the
+// `plugin` is one letter from core's own `plugins` prefix (client-core/infra/node/wsClient.ts), which carries the
 // roster's `plugins:changed`. The test that pins wsChannelPrefixes() keeps that near-miss from turning
 // into a silent drop.
 export const PLUGIN_CHANNEL_PREFIX = 'plugin'

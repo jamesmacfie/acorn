@@ -13,7 +13,7 @@ sets; this file holds the door open.
   `THEME_PALETTE_TOKENS`, every value against `isThemeColorValue` (a hex literal or a flat colour
   function whose argument alphabet excludes the characters that could close a declaration), and
   generates `:root[data-theme="plugin:<pluginId>:<themeId>"]` itself in
-  `packages/client-core/src/plugins/chrome/themes.ts`. No plugin CSS reaches the shell.
+  `packages/client-core/src/host/chrome/themes.ts`. No plugin CSS reaches the shell.
 - `data-style` selects shape, typography, space, density, chrome, and motion: `tokens-style.css`
   plus one of three packs. `STYLE_TOKENS` in `packages/client-core/src/kit/lib/tokenAxes.ts` is the list,
   and `styles/tokenAxes.test.ts` holds both axes to their files. `registries/styles.ts` exists and

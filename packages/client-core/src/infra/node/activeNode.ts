@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { fleetBridge } from '../platform'
-import { clientEvents } from '../../registries/clientEvents'
+import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { homeNode, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
 
 const [activeNodeId, setActiveNodeIdSignal] = createSignal<string | null>(null)

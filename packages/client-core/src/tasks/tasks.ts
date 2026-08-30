@@ -4,9 +4,9 @@
 import { createSignal } from 'solid-js'
 import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
 import { activeNodeId } from '../infra/node/activeNode'
-import { defaultSourceId, sourceRegistry } from '../registries/sources'
+import { defaultSourceId, sourceRegistry } from '../host/registries/sources/sources'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
-import { onScopeEvicted } from '../registries/scopeEviction'
+import { onScopeEvicted } from '../host/registries/shell/scopeEviction'
 
 export type { PaneId, TaskLayout } from './layout'
 export type { WorkspaceView } from '../workspaces/workspaceViewTransition'

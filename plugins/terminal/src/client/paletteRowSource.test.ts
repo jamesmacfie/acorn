@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PaletteItem } from '@acorn/client-core/palette/model.ts'
+import type { PaletteItem } from '@acorn/client-core/kit/lib/paletteModel.ts'
 
 const mocks = vi.hoisted(() => ({
   targets: vi.fn(),

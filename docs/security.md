@@ -337,7 +337,7 @@ a config the Node will execute and is stored on the Node; this binds a plugin to
 the device will execute and is stored beside the device token.
 
 **What "gained" means.** Each rendered permission line carries a stable grant key, separate from its
-sentence (`packages/client-core/src/plugins/permissions.ts`). The update diff compares keys, not
+sentence (`packages/client-core/src/host/trust/permissions.ts`). The update diff compares keys, not
 copy, so tightening a sentence's wording never re-prompts an existing owner as though the plugin had
 grown its reach. Only a key that did not exist before does that. A grant's severity (`icon`, `high`)
 rides beside the key as data, not something parsed back out of the copy.
@@ -894,7 +894,7 @@ What the policy is a second layer behind. The renderer displays text this app di
 transcripts, GitHub `bodyHTML`, Linear descriptions, Rollbar payloads, notes an agent wrote — and two
 bindings pass GitHub's `bodyHTML` to `innerHTML` verbatim, trusting GitHub's sanitizer:
 
-- `packages/client-core/src/registries/ProviderHtml.tsx`, the host component every provider-rendered
+- `packages/client-core/src/host/components/ProviderHtml.tsx`, the host component every provider-rendered
   body now goes through: github's description, its comments and its review threads
 - `packages/client-core/src/kit/diff/DiffRows.tsx`
 

@@ -10,7 +10,7 @@ measured against, and it says which host owns what.
 `trustRecord()`, `devGrant()`. Phase 0 adds provenance to its types and a device fill path to
 `cachePut`. After that, "a plugin installed on this device" means: this host's custody returned a
 cache entry with `source.kind === 'device'` and an accepted acknowledgement for its hash. Every host
-answers the same question with its own storage, and `packages/client-core/src/plugins/host.ts` is
+answers the same question with its own storage, and `packages/client-core/src/host/plugins/host.ts` is
 the one client module that asks.
 
 The rest of the client does not know which host it is on. That is the property to keep.
@@ -37,7 +37,7 @@ this folder adds to that list:
 
 - **A `PluginCustody` implementation over IndexedDB.** Bundles as blobs, hashed with `crypto.subtle`
   before storage, acknowledgements as rows. The renderer's
-  `packages/client-core/src/plugins/host.ts` header already names this as the plan.
+  `packages/client-core/src/host/plugins/host.ts` header already names this as the plan.
 - **Device install from the browser.** `{ github }`, `{ npm }`, and `{ url }` need CORS or a proxy;
   `remote.md` already needs a proxy story for TLS, and the same hop serves this. `{ path }` does not
   exist on the web and the Settings row is not drawn, following the folder-picker rule in
@@ -62,7 +62,7 @@ config file, is built for that host first.
 
 Each phase's "doors left open" section names which of these it touched and how it held them:
 
-1. No client module outside `packages/client-core/src/plugins/host.ts` calls `pluginCustody()`.
+1. No client module outside `packages/client-core/src/host/plugins/host.ts` calls `pluginCustody()`.
 2. No cache or acknowledgement type is defined in a host package. They are protocol types.
 3. No source form is assumed to exist on every host. `{ path }` is desktop and terminal only.
 4. No replaceable-surface contract carries a DOM type, a `MouseEvent`, or a shell callback that a

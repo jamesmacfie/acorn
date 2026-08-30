@@ -2,9 +2,9 @@
 // weights, and pins are durable; focused/maximized state is session-owned in tasks.ts. Pane ids are
 // strings so descriptors can be added without widening a core union and unknown persisted ids can
 // survive a version that does not currently register them.
-import type { PaneId } from '../registries/panes'
+import type { PaneId } from '../host/registries/panes/panes'
 
-export type { PaneId } from '../registries/panes'
+export type { PaneId } from '../host/registries/panes/panes'
 
 export type TaskLayout = {
   panes: PaneId[]

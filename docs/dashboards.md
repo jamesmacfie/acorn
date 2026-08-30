@@ -136,7 +136,7 @@ ctx.collections.register({
 
 `pluginId` and the registry id are bound by the host from the registering plugin, so a collection
 cannot be filed under a stranger's name. Both feeders land in one registry
-(`client-core/src/registries/collections.ts`) and nothing downstream can tell them apart. That is the
+(`client-core/src/host/registries/sources/collections.ts`) and nothing downstream can tell them apart. That is the
 point: a third-party plugin's panels ship no client bundle, trigger no trust prompt, and are
 pixel-identical to a first-party one's under every appearance pack.
 

@@ -1,4 +1,4 @@
-import type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+import type { ClientPlugin } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
 import { agentsClientPlugin } from '@acorn/plugin-agents/client/index.ts'
 import { changesClientPlugin } from '@acorn/plugin-changes/client/index.ts'
 import { contextClientPlugin } from '@acorn/plugin-context/client/index.ts'

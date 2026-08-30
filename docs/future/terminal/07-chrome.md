@@ -3,7 +3,7 @@
 The kit and the layouts cover every pane. They do not cover the shell around the panes, which on the
 desktop is bespoke DOM: the topbar (`apps/desktop/src/client/App.tsx`), the rail
 (`packages/client-core/src/tabs/TabRail.tsx`), the palette
-(`packages/client-core/src/palette/PaletteSurface.tsx`), and the overlay stack. None of it is kit, and
+(`packages/client-core/src/host/palette/PaletteSurface.tsx`), and the overlay stack. None of it is kit, and
 none of it is designed anywhere for a terminal. This file is that design.
 
 ## The screen

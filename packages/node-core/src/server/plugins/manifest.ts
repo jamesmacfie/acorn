@@ -36,7 +36,7 @@ import {
 
 // Re-exported so this file stays the one import for everything manifest-shaped. The declarations
 // themselves live in @acorn/protocol: the node uses them to decide what to load, the client to decide
-// which of a fleet's bundles it can run (client-core/plugins/resolveBundles.ts), and one compatibility
+// which of a fleet's bundles it can run (client-core/host/trust/resolveBundles.ts), and one compatibility
 // contract cannot live on one side.
 export { PLUGIN_API_MAJOR, speaksApiVersion } from '@acorn/protocol/pluginApiVersion.ts'
 export type {
@@ -64,7 +64,7 @@ export type {
 //
 // All three follow the rule the rest of the file already applies, that the host binds every namespace,
 // moved to the one place a manifest can name things outside itself. A descriptor route is the parse-time
-// twin of the bridge's runtime confinement (client-core/plugins/frames/scopes.ts): a plugin may address
+// twin of the bridge's runtime confinement (client-core/host/frames/scopes.ts): a plugin may address
 // its own `/v2/p/<id>/` prefix and nothing else, so it cannot make the host read core routes, or another
 // plugin's, on its behalf.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {
@@ -84,7 +84,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   const own = `/v2/p/${manifest.id}/`
   // The renderer twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v2/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
-  // client-core/registries/corePaths.ts, and node-core does not depend on the client.
+  // client-core/host/registries/commands/corePaths.ts, and node-core does not depend on the client.
   //
   // `x` is a reserved segment, and reserving it is what makes collision a parse error instead of a race.
   // It cannot collide with core's `/p/:projectId` or `/p/:projectId/new`, nor with a compiled plugin's own
@@ -243,13 +243,13 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       ctx.addIssue({ code: 'custom', path: [...at, 'hosts'], message: 'a webview must declare at least one host' })
     }
     // A webview needs the package's client bundle: the host mounts it controller-only to drive the view
-    // (client-core/plugins/frames/PluginWebview.tsx), so without one the surface renders a view nothing
+    // (client-core/host/frames/PluginWebview.tsx), so without one the surface renders a view nothing
     // steers.
     //
     // It is also the only reason the owner is ever asked about the host grant. The trust queue holds
     // bundles, so a bundle-less package never reaches the prompt, and its declared `hosts` would then be a
     // disclosure nobody was shown, for a surface displaying arbitrary web content. The device refuses to
-    // mount one either way (client-core/plugins/contributions.ts); refusing it here turns a pane that
+    // mount one either way (client-core/host/plugins/contributions.ts); refusing it here turns a pane that
     // silently never appears into an error the author sees at install time.
     if (!manifest.client) {
       ctx.addIssue({ code: 'custom', path: at, message: 'a webview surface needs a client bundle; declare `client` in the manifest' })
@@ -524,7 +524,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   contentLinks.forEach((entry, i) => {
     const at = ['contributions', 'contentLinks', i] as (string | number)[]
     // Task-scoped when named, because that rung opens a pane in the active task's layout
-    // (client-core/registries/contentLinks.ts).
+    // (client-core/host/registries/panes/contentLinks.ts).
     if (entry.openPane !== undefined && !taskPanes.has(entry.openPane)) {
       ctx.addIssue({
         code: 'custom',

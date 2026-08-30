@@ -8,7 +8,7 @@ import {
 } from '@acorn/protocol/collections.ts'
 import { activityField } from '@acorn/dashboards-core/trend.ts'
 import { defaultChartView } from './chart'
-import type { CollectionContribution } from '../registries/collections'
+import type { CollectionContribution } from '../host/registries/sources/collections'
 import { pruneMapping } from './mapping'
 import {
   PANEL_VIEW_KINDS,

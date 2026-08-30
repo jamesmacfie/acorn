@@ -6,7 +6,7 @@ import { PROJECT_COLORS, resolveProjectColor } from '@acorn/protocol/projectColo
 import { projectsKey, projectsOptions, tasksKey, tasksOptions, workspacesKey, workspacesOptions } from '../infra/queries'
 import { createProject, createWorkspace, deleteProject, deleteWorkspace, patchProject, renameWorkspace } from './mutations'
 import { canPickFolder, pickFolder } from '../infra/platform'
-import { projectImporterRegistry } from '../registries/projectImporters'
+import { projectImporterRegistry } from '../host/registries/sources/projectImporters'
 import { Alert, Button, Input, Select } from '../kit/components/primitives'
 import Icon from '../kit/components/Icon'
 import { Modal } from '../kit/components/Modal'

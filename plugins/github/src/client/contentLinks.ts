@@ -1,6 +1,6 @@
 // GitHub's own content-link recognisers, and one click handler that adds github's project resolution
 // to the host's ladder. The general registry, target type, and `parseInAppTarget` live in
-// @acorn/client-core/registries/contentLinks.ts (docs/plugins.md § Client authoring and the UI kit).
+// @acorn/client-core/host/registries/panes/contentLinks.ts (docs/plugins.md § Client authoring and the UI kit).
 import {
   activeTaskId,
   allProjects,

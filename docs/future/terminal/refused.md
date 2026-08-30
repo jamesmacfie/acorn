@@ -15,7 +15,7 @@ Considered on 2026-08-30: run every pane, first-party included, through the work
 the TUI needs no Solid reconciler. Refused with the owner. Every first-party plugin would need the
 universal JSX transform and a worker bundle, and would lose in-process access to the host it has
 today. The desktop runs first-party panes in-process and loaded ones in a worker, and the symmetry
-test (`packages/client-core/src/plugins/tree/twoPaths.test.tsx`) is what proves the two paths draw
+test (`packages/client-core/src/host/frames/twoPaths.test.tsx`) is what proves the two paths draw
 one kit. The TUI keeps the same two paths so that test keeps meaning something.
 
 ## Bun as the TUI runtime

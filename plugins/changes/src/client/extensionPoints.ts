@@ -7,6 +7,6 @@
 export const DIFF_LINE_POINT = 'changes:diff-line'
 
 // The fields the shared viewer mints per row, in the order it mints them
-// (client-core/src/diff/annotationKey.ts). A key declared in any other order looks up under a string
+// (client-core/src/host/annotations/annotationKey.ts). A key declared in any other order looks up under a string
 // nothing ever wrote.
 export const DIFF_LINE_KEY = ['file', 'line', 'side'] as const

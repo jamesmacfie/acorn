@@ -20,7 +20,7 @@ because doing it natively is the thing a terminal does better than the desktop.
 In:
 
 - Seven layout components in `apps/tui/src/layouts/`, one per `PaneLayoutName`, each from its
-  projection in `docs/panes.md § Layout model`, sharing `packages/client-core/src/layouts/state.ts`
+  projection in `docs/panes.md § Layout model`, sharing `packages/client-core/src/host/layouts/state.ts`
   and `LayoutProps` from `layouts/regions.ts`.
 - `keys/host.ts` generic over the keymap's two type parameters; the TUI installs
   `createDefaultOpenTuiKeymap`; the four tiers hold.
@@ -52,7 +52,7 @@ the DOM's asks `.closest`, the TUI's asks the focused renderable for its rectang
 the DOM one does. The DOM one's `compareDocumentPosition`, `querySelector`, `focusin`, and
 `pointerdown` have no siblings; their callers are the layouts, which supply order explicitly.
 
-**Collections.** `packages/client-core/src/keys/collection.ts` splits at the element boundary:
+**Collections.** `packages/client-core/src/kit/keys/collection.ts` splits at the element boundary:
 `collectionIntents.ts` (new) is the intent handler over the host store; `collection.ts` keeps the
 DOM element half and imports the shared one; `apps/tui/src/keys/collection.ts` (new) is the TUI
 element half. `Grid`'s exception is unchanged on both.
@@ -66,10 +66,10 @@ channel. The TUI is a second terminal emulator for it, this time a real one.
 ## Code touched
 
 - `apps/tui/src/layouts/*.tsx` (new, seven files), `apps/tui/src/keys/{regions,collection,install}.ts` (new).
-- `packages/client-core/src/keys/host.ts`, `install.ts`: generic types, host-supplied
+- `packages/client-core/src/kit/keys/host.ts`, `install.ts`: generic types, host-supplied
   `isTerminalTarget`.
-- `packages/client-core/src/keys/collection.ts`, `collectionIntents.ts` (new).
-- `packages/client-core/src/layouts/regions.ts`: `regionFocus` as a function beside the directive.
+- `packages/client-core/src/kit/keys/collection.ts`, `collectionIntents.ts` (new).
+- `packages/client-core/src/host/layouts/regions.ts`: `regionFocus` as a function beside the directive.
 - `plugins/terminal/src/client/TerminalSurface.tsx`, `plugins/docker/src/client/DockerExecTerminal.tsx`:
   write to the rectangle's handle when it offers one.
 
@@ -102,7 +102,7 @@ they do on the desktop in every collection.
 
 ## Verify before building
 
-- `packages/client-core/src/keys/host.ts` still types the keymap to `HTMLElement`.
-- `packages/client-core/src/layouts/regions.ts` still exports `LayoutProps` with `Region` as a thunk.
+- `packages/client-core/src/kit/keys/host.ts` still types the keymap to `HTMLElement`.
+- `packages/client-core/src/host/layouts/regions.ts` still exports `LayoutProps` with `Region` as a thunk.
 - `plugins/terminal/src/client/TerminalSurface.tsx` still mounts through `Rectangle`'s `mount`.
 - `docs/panes.md § Layout model` still has a projection row per layout.

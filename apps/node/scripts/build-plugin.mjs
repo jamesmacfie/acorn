@@ -184,7 +184,7 @@ writeFileSync(
     id,
     name: spec.name,
     // Brand marks, passed through untouched — node-core/server/plugins/manifest.ts is the only thing
-    // that validates them and client-core/kit/Icon.tsx the only thing that renders them.
+    // that validates them and client-core/kit/components/Icon.tsx the only thing that renders them.
     ...(spec.icon ? { icon: spec.icon } : {}),
     ...(spec.icons ? { icons: spec.icons } : {}),
     version,

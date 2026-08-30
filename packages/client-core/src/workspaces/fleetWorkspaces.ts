@@ -5,7 +5,7 @@ import { readJson } from '../infra/node/apiClient'
 import { activeNodeId, setActiveNode } from '../infra/node/activeNode'
 import { createFleetQuery, type FleetUnavailable } from '../infra/node/fanout'
 import { nodes } from '../infra/node/fleet'
-import { projectPath } from '../registries/corePaths'
+import { projectPath } from '../host/registries/commands/corePaths'
 
 export type FleetWorkspace = {
   workspace: Workspace

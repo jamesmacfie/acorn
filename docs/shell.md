@@ -227,7 +227,7 @@ from its own script's response headers. `PLUGIN_WORKER_CSP` is
 WebSocket and `sendBeacon` all fail inside the worker, so the transferred `MessagePort` is the only way
 out of it. The document's `worker-src` names `'self' blob:` and never the plugin scheme.
 
-The renderer's half is `packages/client-core/src/plugins/tree/`: `workerHost.ts` owns one worker per
+The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` owns one worker per
 bundle hash, shared by every tree that bundle draws and stopped a grace period after the last one
 unmounts; `TreeHost.tsx` validates and applies each batch and is the only thing that turns a handler id
 into a function. A worker that misses two heartbeats is terminated and every tree it served shows a
@@ -241,9 +241,9 @@ the platform seam reads: broker request and response bytes, stream frames and st
 operations, lifecycle actions, folder selection, and the webview commands. It never exposes a node
 token, a certificate, a database handle, or a process object.
 
-The same bridge serves both render paths. `packages/client-core/src/plugins/frames/broker.ts` takes a `MessagePort` and knows
+The same bridge serves both render paths. `packages/client-core/src/host/frames/broker.ts` takes a `MessagePort` and knows
 nothing about where the other end is: an iframe gets one over `window.postMessage`, a plugin worker
-gets one in its first message, and `packages/client-core/src/plugins/frames/scopes.ts` decides every call the same way for both. A tree
+gets one in its first message, and `packages/client-core/src/host/frames/scopes.ts` decides every call the same way for both. A tree
 binding carries `target: 'remote'`, which grants nothing — it has no document, no webview and no modal
 to dismiss, so the verbs that gate on those refuse it.
 

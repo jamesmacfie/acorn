@@ -12,11 +12,11 @@ import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-co
 import { activeCacheId, activeNodeId, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientFor } from '@acorn/client-core/infra/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/infra/node/wsClient.ts'
-import { sourceRouteContributions } from '@acorn/client-core/registries/sources.ts'
-import { projectSurfaceRoutes } from '@acorn/client-core/registries/projectSurfaces.ts'
-import { syncPluginDistribution } from '@acorn/client-core/plugins/distribution.ts'
-import { syncPluginContributions } from '@acorn/client-core/plugins/syncContributions.ts'
-import { watchPluginChanges } from '@acorn/client-core/plugins/reload.ts'
+import { sourceRouteContributions } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
+import { syncPluginDistribution } from '@acorn/client-core/host/plugins/distribution.ts'
+import { syncPluginContributions } from '@acorn/client-core/host/plugins/syncContributions.ts'
+import { watchPluginChanges } from '@acorn/client-core/host/plugins/reload.ts'
 import { watchTaskChanges } from '@acorn/client-core/tasks/watchTaskChanges.ts'
 import { watchConnectionChanges } from '@acorn/client-core/integrations/watchConnectionChanges.ts'
 import { watchProjectChanges } from '@acorn/client-core/projects/watchProjectChanges.ts'
@@ -96,7 +96,7 @@ render(
               <Route path="/settings/projects" component={noop} />
               {sourceRouteContributions().map((route) => <Route path={route.path} component={noop} />)}
               {/* A loaded plugin's project-scoped surfaces, whose patterns the host minted from the plugin
-                  id (client-core/registries/corePaths.ts). Read here rather than folded into the line above
+                  id (client-core/host/registries/commands/corePaths.ts). Read here rather than folded into the line above
                   because they belong to a surface rather than to a rail source, and they arrive later than
                   compiled routes do. The distribution pass settles after the first paint, and this
                   expression is inside the Router's `children` memo, so a route registered then is picked up

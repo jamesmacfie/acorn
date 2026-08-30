@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { KeybindingContribution } from '../registries/keybindings'
+import type { KeybindingContribution } from '../host/registries/commands/keybindings'
 import { orphanedPluginOverrideIds, removeOverrideIds, visibleShortcutBindings } from './shortcutSettingsModel'
 
 const binding = (id: string, state?: 'enabled' | 'disabled' | 'absent'): KeybindingContribution => ({

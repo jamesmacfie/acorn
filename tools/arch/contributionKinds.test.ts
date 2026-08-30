@@ -43,7 +43,7 @@ describe('the contribution-kind table is complete', () => {
   })
 
   it('names every client context member', () => {
-    const client = members(read('packages/client-core/src/registries/plugin.ts'), 'ClientPluginContext')
+    const client = members(read('packages/client-core/src/host/registries/extensionPoints/plugin.ts'), 'ClientPluginContext')
     expect(client.length).toBeGreaterThan(15)
     expect(client.filter((name) => name !== 'name' && !TABLE.includes(`ctx.${name}`))).toEqual([])
   })

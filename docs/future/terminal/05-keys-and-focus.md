@@ -3,7 +3,7 @@
 ## What is already host-agnostic
 
 The keymap engine is `@opentui/keymap`, adopted in layout phase 2, and acorn adds no key handling
-outside `packages/client-core/src/keys/`. Inside that folder, three files never mention the DOM:
+outside `packages/client-core/src/host/keys/`. Inside that folder, three files never mention the DOM:
 
 - `intents.ts`: the eighteen intents (`next`, `prev`, `activate`, `select`, `search`, `dismiss`, and
   the rest) plus the typing exemptions. Nodes handle intents, never keys. Its header says a terminal

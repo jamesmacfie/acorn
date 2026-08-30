@@ -132,7 +132,7 @@ namespace, a picker over rows. `contextSections` already has the one dial this n
 `defaultIncluded: false`.
 
 Neither door is a new route. The tool call and the context section both resolve inside the Node
-process, so nothing was added to the frame allowlist (`client-core/plugins/frames/scopes.ts`). The
+process, so nothing was added to the frame allowlist (`client-core/host/frames/scopes.ts`). The
 one place a frame can reach this text is `GET /v2/core/tasks/:id/context` with an explicit
 `include=plugin-authoring`, a read of acorn's own published contract under a scope the task owner
 already granted.

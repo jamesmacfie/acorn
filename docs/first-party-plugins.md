@@ -35,7 +35,7 @@ The test is *embedded in a render tree*, not *rendered by another plugin*, and t
 the case that gets it wrong — a panel looks like the first and is really the second.
 [extensibility.md](./extensibility.md) § Two tiers, permanently makes that argument in full; the
 outcome for this list is that `refPanel` is one of the frame targets
-(`packages/client-core/src/plugins/frames/register.ts`) and Linear ships as one, so B does not cover it.
+(`packages/client-core/src/host/frames/register.ts`) and Linear ships as one, so B does not cover it.
 
 Three of `RefPanelProps` do not survive the boundary, and the third was found by shipping it.
 `onContentClick` and the multi-ref `refs`/`onSelectRef` chip strip do not cross, which costs nothing

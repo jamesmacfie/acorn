@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Integration } from '@acorn/protocol/api.ts'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import { availableSources } from './sources'
-import { sourceRegistry } from '../registries/sources'
+import { sourceRegistry } from '../host/registries/sources/sources'
 
 const integration = (providerId: string, connected = true): Integration => ({
   id: providerId,

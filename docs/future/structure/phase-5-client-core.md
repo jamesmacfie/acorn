@@ -53,9 +53,9 @@ next commit. If a kit component still needs one, that component is not kit; move
 `plugins/annotations/`, `layouts/`, `keys/`, `palette/` into `host/`. The root files of `plugins/`
 (approval, bundles, trust) go to `host/trust/`. Subdivide `host/registries/` (60 files) by what is
 registered: `extensionPoints/`, `panes/`, `sources/`, `palette/`, `rail/`, `commands/`. Move
-`packages/client-core/src/registries/ProviderHtml.tsx`, `RefPanelBox.tsx`, `RefPanelTaskLink.tsx`
+`packages/client-core/src/host/components/ProviderHtml.tsx`, `RefPanelBox.tsx`, `RefPanelTaskLink.tsx`
 to `host/components/`. Move the three misplaced tests
-(`packages/client-core/src/plugins/tree/remoteSolid.test.tsx`, `compiledSlot.test.tsx`,
+(`packages/client-core/src/host/frames/remoteSolid.test.tsx`, `compiledSlot.test.tsx`,
 `twoPaths.test.tsx`) beside their subjects in `host/frames/`. Move `tasks/taskAnnotations.ts` and
 `diff/annotationKey.ts` into `host/annotations/` if they are host concerns; leave them if they are
 feature-local. Resolve the duplicate basenames: `registries/railMarkers.ts` versus
@@ -71,7 +71,7 @@ Re-point `packages/plugin-api/src/client/index.ts`.
 `modelProviders/` into `features/settings/`. Move `packages/client-core/src/AccountMenu.tsx` into
 `features/settings/` under the name its header says it should have. Fix the two cross-folder CSS
 imports (`settings/NodesSettings.tsx` importing `../node/nodes.css`,
-`packages/client-core/src/plugins/frames/ExtendedPane.tsx` importing `../chrome/extension-points.css`) by moving the
+`packages/client-core/src/host/frames/ExtendedPane.tsx` importing `../chrome/extension-points.css`) by moving the
 stylesheet to the importer's folder or the importer to the stylesheet's. Rename
 `workspaces/useActiveWorkspaceId.ts` to `activeWorkspaceId.ts` with a `create*` export. Rename
 `createTaskPath` to `taskPath`.
@@ -118,8 +118,8 @@ relative path and does not name the palette, so it needs no change.
 `docs/frontend.md`, `docs/ui-design.md`, `docs/panes.md`, `docs/command-palette-and-shortcuts.md`,
 `docs/plugins.md`, `docs/state-ownership.md` (new), `docs/dashboards.md`, `docs/architecture-overview.md`
 cite about 170 `client-core/src/*` paths. The path checker lists the ones with extensions; the
-extension-less folder citations (`client-core/src/kit/`, `client-core/src/registries/`,
-`client-core/src/plugins/`, `client-core/src/kit/lib/`) need a grep. Fix them here; phase 7 confirms.
+extension-less folder citations (`client-core/src/kit/`, `client-core/src/host/registries/`,
+`client-core/src/host/plugins/`, `client-core/src/kit/lib/`) need a grep. Fix them here; phase 7 confirms.
 
 ## Out of scope
 

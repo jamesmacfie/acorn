@@ -60,7 +60,7 @@ does not rewrite the durable row.
 component per region; it never draws the split, the divider, or the drag handle itself. The names and
 each layout's region set are in
 [@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts) and the components are in
-`client-core/src/layouts`.
+`client-core/src/host/layouts`.
 
 **Eight names, seven components**, and the mismatch is deliberate: `document-over-frame` and
 `frame-beside-document` are the same two regions with the axis flipped, so one component draws both.
@@ -126,7 +126,7 @@ Overview to Files must not lose the pull request the reader had chosen.
 
 The host holds that shared thing. A compiled pane declares a `model` beside its regions, and the host
 builds it once per task inside its own reactive root, hands it to every region, and disposes it when
-the task is evicted (`client-core/src/registries/paneModels.ts`):
+the task is evicted (`client-core/src/host/registries/panes/paneModels.ts`):
 
 ```ts
 ctx.panes.register({
@@ -181,7 +181,7 @@ otherwise. A loaded plugin may also declare a _project-scoped_ pane (`"scope": "
 manifest). That is a different thing wearing the same rectangle. It is drawn beside its own rail
 Source's list at `/p/:projectId`, it has no task, and it never enters a task layout, so none of the
 layout model, `?pane=` and `?item=` addressing, or `paneRegistry` above applies to it. It lives in
-its own registry (`client-core/registries/projectSurfaces.ts`) so those consumers do not have to
+its own registry (`client-core/host/registries/panes/projectSurfaces.ts`) so those consumers do not have to
 branch on a scope they cannot act on.
 
 It has no layout state to keep a selection in, so its selection lives in the URL: one route per
@@ -196,7 +196,7 @@ A _reference panel_ is the other thing a plugin's item can open into, and it is 
 the above: no layout entry, no `PaneId`, no `?pane=` address, nothing persisted. It is one item shown
 over whatever the reader was already looking at, and it is dismissed rather than closed. A plugin
 contributes one keyed by the provider whose items it renders and may only name its own provider
-(`client-core/registries/refPanels.ts`). The shell holds which ref is open and draws it in one place,
+(`client-core/host/registries/panes/refPanels.ts`). The shell holds which ref is open and draws it in one place,
 so any surface that renders content can call `openRefPanel({ providerId, displayId })` and get any
 installed provider's panel. One at a time: opening a second replaces the first. When the named
 provider has no registered contribution, `openRefPanel` returns `false` instead of opening. A claim
@@ -206,7 +206,7 @@ refusal is not a dead end, because the caller's next fallback, such as the real 
 there.
 
 Any reference panel can offer a "find or create a task for this" action through one shared,
-host-drawn component (`client-core/registries/RefPanelTaskLink.tsx`), instead of each panel drawing
+host-drawn component (`client-core/host/components/RefPanelTaskLink.tsx`), instead of each panel drawing
 its own. Creating a task is a core write that makes a worktree on disk and needs `core.tasks:write`;
 a plugin drawing this button itself would have to hold that permission for everything it ever does,
 to earn one click. The host draws the button and does the write instead, and the same component works

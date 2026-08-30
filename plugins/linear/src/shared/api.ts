@@ -4,7 +4,7 @@
 // namespace owns the shape of what crosses it.
 //
 // No query keys here. The host's `refResolvers` carrier owns the key for every provider
-// (client-core/registries/refResolvers.ts), and a frame calls these routes over the bridge with no
+// (client-core/host/registries/panes/refResolvers.ts), and a frame calls these routes over the bridge with no
 // query cache of its own.
 
 import type { PluginRailItem } from '@acorn/protocol/api.ts'
