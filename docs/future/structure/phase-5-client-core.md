@@ -1,6 +1,36 @@
 # Phase 5: client-core
 
-Status: not started. Waits on phase 4.
+Status: shipped 2026-08-30. Waited on phase 4.
+
+## What shipped differently
+
+- The kit rule has no carve-outs, but by the opposite move: 13 kit files, `primitives.tsx` among
+  them, read the keyboard engine's pure half, `palette/model.ts`, and `registries/registry.ts`.
+  Moving those components out would have emptied the kit, so the pure modules moved in instead:
+  `kit/keys/` (intents, keymap, collection, collectionState, trap, keymapHost), `kit/lib/paletteModel.ts`,
+  and `kit/lib/registry.ts`. `keys/install.ts`, `keys/regions.ts`, and `CheatSheet.tsx` are in `host/keys/`.
+- `Acorn.tsx` stays. The onboarding plugin mounts it through `@acorn/plugin-api/ui/host`, so deleting
+  it is a behaviour change. It has no imports and lives in `kit/components/content/`; the facade
+  export stays with an accurate comment.
+- The seven dashboards re-export shims stay in `features/dashboards/`: 78 imports, over the 40 the
+  plan set as the threshold for deleting them.
+- `createTaskPath` became `newTaskPath`, not `taskPath`, because `corePaths.ts` already exports a
+  `taskPath` that builds a task's own route.
+- The two facade lists (`packages/plugin-api/src/ui/tree.ts`, `packages/plugin-sdk/src/remote/solid.ts`)
+  stay explicit. `surface.test.ts` reads exported names off each entrypoint file with a regex, so an
+  `export *` would shrink the snapshot to nothing for that entrypoint.
+- `nodes.css` is shared by `features/fleet/` and `features/settings/nodes/`, so one cross-folder
+  stylesheet import remains on the settings side. `ExtendedPane.tsx` moved to `host/chrome/` beside
+  the stylesheet it imports.
+- Beyond the plan's six registry buckets, `host/registries/shell/` holds the registries with no
+  surface of their own: settings pages, styles, themes, schedules, scope eviction, will-phase.
+  `host/plugins/` holds the plugin lifecycle modules the plan did not place (contributions, host,
+  pluginChannel, reload, syncContributions). The kit components split into `content/`, `inputs/`,
+  `layout/`, and `overlays/`, and settings into `models/`, `nodes/`, and `trust/`, to keep every folder
+  at 30 direct files or fewer.
+- `queries.ts` is `infra/queries.ts`, not `infra/queries/queries.ts`; there was no `mutations.ts` at
+  the package root to pair it with.
+- `pluginIds.ts` moved with the other five protocol modules, as `plugin/ids.ts`.
 
 ## Goal
 
