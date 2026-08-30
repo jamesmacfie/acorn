@@ -58,7 +58,7 @@ is terminal-specific except the path.
 ## Code touched
 
 - `packages/protocol/src/deviceConfig.ts` (new): the schema.
-- `packages/desktop-helper/src/config/deviceConfig.ts` (new): read, watch, write.
+- `packages/custody/src/config/deviceConfig.ts` (new): read, watch, write.
 - `apps/desktop/src/shell/{wire.ts,bridge.ts}` and `apps/desktop/src/helper/helperServer.ts`:
   `config-read`, `config-write`, `config-changed`.
 - `packages/client-core/src/infra/platform/{index.ts,contract.ts}`: a `config` group, nullable, so a host
@@ -102,7 +102,7 @@ is nullable so the PWA is not a half-built host.
 - A terminal host exists that reads config from a path. If not, this phase is not yet due.
 - `packages/client-core/src/infra/persistence/devicePrefs.ts` has the setter every covered key goes
   through, and the write-order rule holds in it.
-- `packages/desktop-helper/src/broker/fleetStore.ts` shows how the helper owns a `0600` file; copy its
+- `packages/custody/src/broker/fleetStore.ts` shows how the helper owns a `0600` file; copy its
   shape for `acorn.json` (which is not secret and needs no `0600`, but the read and write pattern is
   the same).
 - `packages/client-core/src/infra/platform/contract.ts` lists groups as `members<T>()([...])`; add

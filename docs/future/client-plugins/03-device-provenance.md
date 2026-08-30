@@ -13,11 +13,11 @@ there.
   `packages/client-core/src/host/plugins/host.ts` is the only client module that calls it, and its header
   already names the future: "today it fronts the desktop helper's content-addressed store, and a
   future web client fronts IndexedDB."
-- **The cache.** `packages/desktop-helper/src/plugins/pluginCache.ts` stores bundles content-addressed
+- **The cache.** `packages/custody/src/plugins/pluginCache.ts` stores bundles content-addressed
   under `<userDataDir>/plugin-cache/<sha256>.js`, caps them at `MAX_BUNDLE_BYTES` (8 MiB), and
   hashes what arrived rather than trusting a claim. Its one fill path is `putFromNode(nodeId,
   pluginId, claim)`, which fetches `/v2/core/plugins/<id>/client.js` through the node broker.
-- **The trust store.** `packages/desktop-helper/src/plugins/pluginTrustStore.ts` keys acknowledgements
+- **The trust store.** `packages/custody/src/plugins/pluginTrustStore.ts` keys acknowledgements
   on `(pluginId, hash)`. A row carries `nodeId`, and the comment beside it says "did this come from.
   Not part of the key, because the same bundle from a second node is the same bundle." Dev grants
   are keyed on `(pluginId, nodeId)`.

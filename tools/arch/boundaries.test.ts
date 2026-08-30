@@ -232,7 +232,7 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/server/transport/tls.ts', // openssl, at first boot only
       // Composition roots: a login-shell PATH probe, and the supervised node's own child.
       'apps/node/src/composition/runtime.ts',
-      'packages/desktop-helper/src/supervision/serviceHost.ts',
+      'packages/custody/src/supervision/serviceHost.ts',
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/server/terminal.ts', // PTYs
       'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
@@ -412,7 +412,7 @@ describe('architecture boundaries', () => {
 
   it('protocol declares an enumerated exports map, not a wildcard', () => {
     // The first of the five library packages to close (docs/future/phased-review-steps/README.md item
-    // 5). `node-core`, `client-core`, `dashboards-core` and `desktop-helper` still declare
+    // 5). `node-core`, `client-core`, `dashboards-core` and `custody` still declare
     // `"./*": "./src/*"`, and until they close the rule above is what stands in for the module system.
     //
     // Enumerated rather than generated from the directory, because "should this be public" is the
@@ -499,11 +499,11 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)]).toContain('packages/node-core')
   })
 
-  it('only main touches the third-party plugin cache and trust store', () => {
+  it('only custody touches the third-party plugin cache and trust store', () => {
     // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
     // client-core/host/plugins/host.ts is the one door on the renderer side, speaking hashes and
     // decisions only.
-    const PLUGIN_STORE_OK = new Set(['packages/desktop-helper', 'apps/desktop'])
+    const PLUGIN_STORE_OK = new Set(['packages/custody', 'apps/desktop'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
         .filter((f) => /\b(?:PluginCache|PluginTrustStore)\b/.test(readFileSync(f, 'utf8')))
@@ -511,7 +511,7 @@ describe('architecture boundaries', () => {
     )
     expect([...new Set(offenders)].filter((p) => !PLUGIN_STORE_OK.has(p)).sort()).toEqual([])
     // Anti-vacuity: the regex must still find the classes and their tests.
-    expect([...new Set(offenders)]).toContain('packages/desktop-helper')
+    expect([...new Set(offenders)]).toContain('packages/custody')
   })
 
   it('nothing in the tree imports electron', () => {

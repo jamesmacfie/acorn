@@ -89,8 +89,8 @@ uses for fields added after rows were written.
   `devicePluginsDisabled`.
 - `packages/client-core/src/host/frames/broker.ts`: `state` verb routes by `source`.
 - `packages/client-core/src/features/settings/PluginsSettings.tsx`: the device section.
-- `packages/desktop-helper/src/plugins/pluginCache.ts`: `putFromSource`, `remove`, `source` on entries.
-- `packages/desktop-helper/src/plugins/pluginTrustStore.ts`: `source` on rows and grants, with the read
+- `packages/custody/src/plugins/pluginCache.ts`: `putFromSource`, `remove`, `source` on entries.
+- `packages/custody/src/plugins/pluginTrustStore.ts`: `source` on rows and grants, with the read
   default.
 - `apps/desktop/src/shell/{wire.ts,bridge.ts}` and `apps/desktop/src/helper/helperServer.ts`: the two
   verbs.
@@ -149,7 +149,7 @@ Against [07-hosts.md](./07-hosts.md):
 
 - `packages/client-core/src/infra/platform/index.ts` declares `PluginCustody` with exactly `state`,
   `cachePut`, `trustRecord`, `devGrant`, and `contract.ts` lists the same four in `SEAM_GROUPS`.
-- `packages/desktop-helper/src/plugins/pluginCache.ts` has `putFromNode` and `MAX_BUNDLE_BYTES`;
+- `packages/custody/src/plugins/pluginCache.ts` has `putFromNode` and `MAX_BUNDLE_BYTES`;
   `pluginTrustStore.ts` keys `decisionFor` on `(pluginId, hash)` and carries `nodeId` on rows.
 - `packages/client-core/src/host/trust/resolveBundles.ts` exports `resolveActiveBundles` with
   `BundleCandidate.nodeId` and `ActiveBundle.nodeIds`.

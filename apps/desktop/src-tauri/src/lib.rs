@@ -246,7 +246,7 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
 
 /// The Electron build's custody root and the key its device tokens are encrypted under, when both are
 /// there. The helper adopts them once, on a first launch that has nothing of its own. See
-/// `packages/desktop-helper/src/main/legacyCustody.ts` for what happens when that fails.
+/// `packages/custody/src/custody/legacyCustody.ts` for what happens when that fails.
 ///
 /// Packaged builds only. A dev build never asks the keychain (see src/keychain.rs), and its custody
 /// root is the checkout, which no Electron build ever wrote to.

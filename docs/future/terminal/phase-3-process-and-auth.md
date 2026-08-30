@@ -46,7 +46,7 @@ loopback-only route that mints a device token for a caller who can prove it owns
 reading a nonce the node wrote there at 0600), which is new. Prefer the first for this phase and
 record the second as a door.
 
-**Supervision.** `packages/desktop-helper/src/supervision/` owns spawning the node, parsing the handshake,
+**Supervision.** `packages/custody/src/supervision/` owns spawning the node, parsing the handshake,
 and the bounded drain. Import it. The one thing the helper does that the TUI does not is speak
 `shell/wire.ts` to a Rust supervisor; the TUI is its own supervisor and calls the same functions the
 wire handlers call.
@@ -66,7 +66,7 @@ kit component or pane module imports the token store.
 - `apps/tui/src/node/{supervise,attach,pair,paths}.ts` (new).
 - `apps/tui/src/platform.ts` (new): the `globalThis.acorn` object with `transport`, `fleet`,
   `pairing`, `recovery`.
-- `packages/desktop-helper/src/supervision/serviceHost.ts`: export the supervise and drain functions the wire handlers
+- `packages/custody/src/supervision/serviceHost.ts`: export the supervise and drain functions the wire handlers
   call, if they are not already exported.
 - `packages/node-core/src/server/storage/dataRoot.ts` or wherever `openDataRoot` lives: expose "is locked"
   without taking the lock, if it is not already.
@@ -109,7 +109,7 @@ server's workspace. The boot test passes in CI.
 
 - `apps/node/src/entries/standalone.ts` still prints one JSON handshake line with `deviceToken`, and
   `resolveDeviceToken` still reuses `ACORN_DEVICE_TOKEN`.
-- `packages/desktop-helper/src/broker/nodePairing.ts` still has `probeNode` and `pairWithNode`.
+- `packages/custody/src/broker/nodePairing.ts` still has `probeNode` and `pairWithNode`.
 - `packages/node-core/src/server/transport/wsHub.ts` still reads the bearer from the upgrade request's headers.
 - `apps/desktop/test/boot.test.ts` still exists and still asks `/v2/node`.
 - `openDataRoot` still takes an exclusive lock.

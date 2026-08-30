@@ -563,7 +563,7 @@ its bundle hash, so a new hash is a new origin and a new document with nothing c
 
 **Boot** trust prompts are gone from development, because a development build acknowledges the bundled
 first-party roster on exactly the terms a packaged build does — the same directory, read and hashed by
-the helper (`packages/desktop-helper/src/plugins/bundledPluginTrust.ts`). This is parity, not a widening: a
+the helper (`packages/custody/src/plugins/bundledPluginTrust.ts`). This is parity, not a widening: a
 hand-installed package, a third-party one, and anything a node serves this device still prompt. Set
 `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` to get the prompts back when the trust flow itself is what you are
 working on.
@@ -658,7 +658,7 @@ Per-hash trust is right for distribution and wrong for iteration: an agent savin
 would mean a prompt per save. So the owner makes one decision instead — approving a `dev: true` request —
 and the device stores a **dev trust grant**.
 
-The grant lives in the device's existing trust file (`packages/desktop-helper/src/plugins/pluginTrustStore.ts`),
+The grant lives in the device's existing trust file (`packages/custody/src/plugins/pluginTrustStore.ts`),
 beside the acknowledgements, as `{ pluginId, nodeId, path?, grantedAt }`. It is keyed on the **pair**.
 The design note says "per (pluginId, device)" and the device half is the file itself; the node half is an
 addition, because fleet resolution picks the highest version across every paired node and a grant keyed on
