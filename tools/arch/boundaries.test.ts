@@ -298,7 +298,7 @@ describe('architecture boundaries', () => {
     const ALLOWED_CSS = new Set([
       // A stylesheet isn't re-exportable, since `export … from` carries bindings and this file has none.
       // Core-owned CSS for a core-owned component the plugin renders.
-      '@acorn/client-core/workspaces/onboarding.css',
+      '@acorn/client-core/features/workspaces/onboarding.css',
     ])
     const offenders = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
@@ -317,8 +317,8 @@ describe('architecture boundaries', () => {
     const TESTKIT_BASELINE = [
       '@acorn/client-core/infra/node',
       '@acorn/client-core/host/registries',
-      '@acorn/client-core/settings',
-      '@acorn/client-core/tasks',
+      '@acorn/client-core/features/settings',
+      '@acorn/client-core/features/tasks',
       '@acorn/client-core/kit/lib',
       '@acorn/node-core/server',
       '@acorn/node-core/server/core',

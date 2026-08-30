@@ -1,4 +1,4 @@
-import { dispatchLayout } from '../../../tasks/tasks'
+import { dispatchLayout } from '../../../features/tasks/tasks'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { onScopeEvicted } from '../shell/scopeEviction'

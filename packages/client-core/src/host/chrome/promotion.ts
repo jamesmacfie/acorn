@@ -7,7 +7,7 @@ import {
   type TaskSeed,
 } from '@acorn/protocol/api.ts'
 import type { SourcePromotion } from '../registries/sources/sources'
-import { addTaskLink, createTask } from '../../tasks/mutations'
+import { addTaskLink, createTask } from '../../features/tasks/mutations'
 import { readJson } from '../../infra/node/apiClient'
 import { ownsTaskOrigin } from './ownership'
 

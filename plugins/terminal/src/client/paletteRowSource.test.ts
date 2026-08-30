@@ -12,15 +12,15 @@ const mocks = vi.hoisted(() => ({
   setRecipeBrowserUrl: vi.fn(),
   invokeLayoutRecipe: vi.fn(),
 }))
-vi.mock('@acorn/client-core/tasks/runClient.ts', () => ({
+vi.mock('@acorn/client-core/features/tasks/runClient.ts', () => ({
   runApi: { targets: mocks.targets, start: mocks.start, stop: mocks.stop, status: mocks.status },
 }))
-vi.mock('@acorn/client-core/tasks/tasks.ts', () => ({
+vi.mock('@acorn/client-core/features/tasks/tasks.ts', () => ({
   setTerminalOpen: mocks.setTerminalOpen,
   dispatchLayout: mocks.dispatchLayout,
   setRecipeBrowserUrl: mocks.setRecipeBrowserUrl,
 }))
-vi.mock('@acorn/client-core/tasks/agentSessions.ts', () => ({ refreshSessions: mocks.refreshSessions }))
+vi.mock('@acorn/client-core/features/tasks/agentSessions.ts', () => ({ refreshSessions: mocks.refreshSessions }))
 vi.mock('./recipes', () => ({ invokeLayoutRecipe: mocks.invokeLayoutRecipe }))
 
 import { terminalPaletteRowSource as source } from './paletteRowSource'

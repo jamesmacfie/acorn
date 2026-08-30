@@ -1,9 +1,9 @@
 import { createComponent, createSignal, lazy, type JSX } from 'solid-js'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
-import type { DocumentHandle } from '../../editor/documentModel'
+import type { DocumentHandle } from '../../features/editor/documentModel'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
-import { panelRegion } from '../../dashboards/region'
+import { panelRegion } from '../../features/dashboards/region'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { registerPluginExtension } from '../chrome/extensionPoints'
 import { commandRegistry } from '../registries/commands/commands'
@@ -17,7 +17,7 @@ import { refPanelRegistry } from '../registries/panes/refPanels'
 import type { Disposable } from '../../kit/lib/registry'
 import { settingsRegistry } from '../registries/shell/settings'
 import { uiSlotRegistry } from '../registries/extensionPoints/slots'
-import { activeTaskId } from '../../tasks/tasks'
+import { activeTaskId } from '../../features/tasks/tasks'
 import {
   activeBundles,
   pluginEnabledOnNode,
@@ -68,7 +68,7 @@ const PluginRefPanel = lazy(() => import('./PluginRefPanel'))
 const PluginOverlay = lazy(() => import('./PluginOverlay'))
 // The pane wrapper for an owner that reserved a strip for other plugins' rows. Only reached by a
 // manifest that declared a point: a pane with no point renders the bare frame.
-const ExtendedPane = lazy(() => import('./ExtendedPane'))
+const ExtendedPane = lazy(() => import('../chrome/ExtendedPane'))
 // The tree path's mount point, the counterpart to PluginFrame above: a region, a panel body or a slot
 // drawn from the host's own components rather than from the plugin's pixels
 // (docs/plugins.md § The tree contract).
@@ -77,7 +77,7 @@ const RemoteTree = lazy(() => import('../tree/RemoteTree').then((module) => ({ d
 // import would put Monaco's tree in the boot graph for a pane most sessions never open. That includes
 // the client-graph test suites, where `monaco-editor` reads `window.location` at module scope and there
 // is no real window.
-const DocumentSurface = lazy(() => import('../../editor/DocumentSurface'))
+const DocumentSurface = lazy(() => import('../../features/editor/DocumentSurface'))
 // The host's layouts. Its own lazy boundary rather than a branch inside the one above, so a shell that
 // only opens whole-pane documents never pulls the splitters and the tab strip in.
 const paneLayouts = () => import('../layouts')

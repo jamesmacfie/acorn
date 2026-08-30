@@ -32,7 +32,7 @@ class names and the frame regions below are how the world looked in 2026-08.
 
 The contract lives in `docs/plugins.md § Document surfaces`; the code is
 `node-core/server/plugins/manifest.ts` (the `layout` block and the `surfaceAction` verb),
-`client-core/src/editor/` (the surface, its theme, its language map, its view state, the chord
+`client-core/src/features/editor/` (the surface, its theme, its language map, its view state, the chord
 resolution and the completion provider), `client-core/host/layouts/DocumentSplit.tsx` (the composed
 layout) and `client-core/host/frames/layouts.ts` (the trust and confinement
 gate). The wire shapes both ends read are `@acorn/protocol/documentSurface.ts`.
@@ -73,12 +73,12 @@ where that stops being true.
 ## What is already true
 
 *(As of step 1 the table below is history: every row has been consolidated into
-`client-core/editor/`. It is kept because the argument for doing it is the argument for the whole
+`client-core/features/editor/`. It is kept because the argument for doing it is the argument for the whole
 design.)*
 
 Monaco is already a host-owned singleton, and half of this design exists by accident.
 
-`packages/client-core/src/editor/monacoSetup.ts` assigns `self.MonacoEnvironment` once at the renderer
+`packages/client-core/src/features/editor/monacoSetup.ts` assigns `self.MonacoEnvironment` once at the renderer
 entry, and its comment says why: it used to be imported by both panes, and "two panes racing to set it
 was a real bug." One module, one set of workers, two consumers.
 
@@ -471,7 +471,7 @@ grows without becoming Monaco's API in a trench coat.
 ## Sequence
 
 1. ~~Consolidate what already exists.~~ **Done.** `applyMonacoTheme` and the global `app` theme name
-   are `client-core/editor/theme.ts` (with `watchMonacoTheme`, since both call sites always wanted the
+   are `client-core/features/editor/theme.ts` (with `watchMonacoTheme`, since both call sites always wanted the
    apply-then-subscribe pair), reached by the two compiled panes through a new
    `@acorn/plugin-api/ui/editor` entrypoint — its own barrel rather than more lines on `ui/host`,
    because `monaco-editor` reads `window.location` at module scope and docker's archive concern
@@ -481,7 +481,7 @@ grows without becoming Monaco's API in a trench coat.
    from day one, degenerate `document` template first.
 3. ~~Publish the language-id vocabulary.~~ **Done.** `@acorn/protocol/languageIds.ts`, LSP spellings,
    the union of the two extension maps, one fallback. The per-engine maps sit beside their engines —
-   `client-core/editor/language.ts` for Monaco, `client-core/infra/highlight/shiki.ts` for shiki, each total
+   `client-core/features/editor/language.ts` for Monaco, `client-core/infra/highlight/shiki.ts` for shiki, each total
    over the vocabulary so a new id fails `tsc` until someone says what that engine does with it.
 4. ~~Build the contract.~~ **Done.** `layout` and `regions` on a `pane` surface, with a document
    region carrying `{ languageId, read, write? }`, host-owned dirty state, autosave, ⌘S, flush-on-unmount and view

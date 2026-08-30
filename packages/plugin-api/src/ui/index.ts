@@ -70,8 +70,8 @@ export { rowHeightSm } from '@acorn/client-core/kit/lib/metrics.ts'
 // Controlled connection and model dropdowns over `availableModelConnections`. On this barrel because
 // it is presentation only, a protocol type in and two selects out, and a plugin whose own route calls
 // `core.models.generateText` needs to offer the picker from a frame.
-export { default as ModelConnectionPicker } from '@acorn/client-core/modelProviders/ModelConnectionPicker.tsx'
-export { defaultModelIdFor } from '@acorn/client-core/modelProviders/defaultModel.ts'
+export { default as ModelConnectionPicker } from '@acorn/client-core/features/settings/ModelConnectionPicker.tsx'
+export { defaultModelIdFor } from '@acorn/client-core/features/settings/defaultModel.ts'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.
@@ -81,7 +81,7 @@ export type { LineComposerController, ThreadCollapseController } from '@acorn/cl
 // per-file collapse, gap expansion, and the comment layer. Driven by a `DiffSource` from ./ui/diff.
 // A plugin reaching for the row components directly is building a simpler surface than this one, the
 // way the compare preview does.
-export { DiffPane } from '@acorn/client-core/diff/DiffPane.tsx'
+export { DiffPane } from '@acorn/client-core/features/diff/DiffPane.tsx'
 
 // ── The nodes the kit gained when it closed ───────────────────────────────────────────────────
 // Each one replaces a shape two or more panes were drawing with raw tags and a private class. See

@@ -16,7 +16,7 @@ task's **worktree**, and resolves the URL in layers against it: a committed `[da
 in the worktree, then the worktree's `.env`, then `process.env.DATABASE_URL`. Pools are keyed by task
 id. Every layer but the last needs a `root`, and a `root` is a worktree. Panels carry no task at all —
 not on Home, and not in the `pane.aside` regions (`docs/dashboards.md § Placements`); there is no task
-id anywhere in `packages/client-core/src/dashboards/`.
+id anywhere in `packages/client-core/src/features/dashboards/`.
 
 So the saved query *rows* exist in the form run-once-and-pin assumes — project-scoped
 `db_saved_queries`, `id`/`name`/`notes`/`sql` — and the *execution* does not. Reading the storage

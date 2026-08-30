@@ -12,7 +12,7 @@
 // The projects a content-link `path` resolver will see. Production code reads this list through
 // `allProjects` and never writes it; the composition root installs the real reader. A test needs the
 // writer, and reaching for it deep in client-core is what this entrypoint exists to stop.
-export { setProjectsLookup } from '@acorn/client-core/projects/projectLookup.ts'
+export { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 // The row shape those fixtures have to satisfy. A type, so it costs nothing at runtime, and it is the
 // difference between a fixture that fails when `Project` changes and one that silently drifts.
 export type { Project } from '@acorn/client-core/infra/queries.ts'

@@ -1,5 +1,5 @@
 import Picker from './Picker'
-import type { FleetWorkspace } from '../../workspaces/fleetWorkspaces'
+import type { FleetWorkspace } from '../../features/workspaces/fleetWorkspaces'
 
 export default function WorkspacePicker(props: {
   workspaces: FleetWorkspace[]

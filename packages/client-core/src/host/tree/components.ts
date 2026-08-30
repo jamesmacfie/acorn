@@ -47,8 +47,8 @@ import { Only } from '../../kit/components/Only'
 import { Fallback } from '../../kit/components/Fallback'
 import { Rectangle } from '../../kit/components/Rectangle'
 import { DiffLine, FileHead, NonCodeRow, SplitCell } from '../../kit/diff/DiffRows'
-import { DiffPane } from '../../diff/DiffPane'
-import ModelConnectionPicker from '../../modelProviders/ModelConnectionPicker'
+import { DiffPane } from '../../features/diff/DiffPane'
+import ModelConnectionPicker from '../../features/settings/ModelConnectionPicker'
 
 // `Component<any>` and not a union of every node's props: the renderer has already validated the
 // props against the wire schema, and a union of 62 prop types would make every mount site an

@@ -7,5 +7,5 @@
 // `applyMonacoTheme` and `monacoLanguageFor` stay off this surface (docs/plugins.md § The plugin
 // API). `watchMonacoTheme` already applies the theme on subscribe, and a pane holds a path, so it
 // wants `monacoLanguageForPath`.
-export { MONACO_THEME, watchMonacoTheme } from '@acorn/client-core/editor/theme.ts'
-export { monacoLanguageForPath } from '@acorn/client-core/editor/language.ts'
+export { MONACO_THEME, watchMonacoTheme } from '@acorn/client-core/features/editor/theme.ts'
+export { monacoLanguageForPath } from '@acorn/client-core/features/editor/language.ts'

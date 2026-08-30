@@ -40,8 +40,8 @@ export { createSplitScrollSync } from '@acorn/client-core/kit/diff/splitScrollSy
 
 // The port DiffPane (on ./ui, since it is a component) is driven through. A plugin that owns a diff
 // fills this in from its own queries and mutations; nothing else about the shell is configurable.
-export type { CommentSide, DiffSource } from '@acorn/client-core/diff/source.ts'
+export type { CommentSide, DiffSource } from '@acorn/client-core/features/diff/source.ts'
 // Session-only scroll and collapse memory, keyed by scope. `diffScopeKey` is here so a caller keying
 // its own session state by the same scope stays in step rather than writing a second spelling.
-export { diffScopeKey } from '@acorn/client-core/diff/viewState.ts'
-export type { DiffCollapsedFiles, DiffScrollState, DiffViewScope } from '@acorn/client-core/diff/viewState.ts'
+export { diffScopeKey } from '@acorn/client-core/features/diff/viewState.ts'
+export type { DiffCollapsedFiles, DiffScrollState, DiffViewScope } from '@acorn/client-core/features/diff/viewState.ts'

@@ -607,7 +607,7 @@ can be wrong live where they can be. The same rule puts every scale, tick, and r
 Everything pure in that list moved to `packages/dashboards-core`, because the node's measure sampler
 has to compute a panel's number with the same functions the renderer draws it with (see
 [schedules](./schedules.md)) and a client package cannot enter the node's graph.
-`client-core/src/dashboards/*.ts` are one-line re-exports, so every path named in this document still
+`client-core/src/features/dashboards/*.ts` are one-line re-exports, so every path named in this document still
 resolves and every component here still says `./model`. Only `editor.ts`, `data.ts`, `draft.ts`,
 `persist.ts`, and the components stayed, because they read registries, signals, or the query client,
 which is the line the new package draws.

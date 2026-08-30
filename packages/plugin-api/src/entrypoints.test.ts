@@ -21,7 +21,7 @@ const PKG = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json')
 const BROWSER_REALM = new Set([
   './ui', // frame-safe presentation components, .tsx, so Solid-compiled
   './ui/host', // registration and connected shell surfaces, also .tsx
-  './ui/editor', // re-exports client-core/editor/theme.ts, which imports monaco-editor; monaco reads
+  './ui/editor', // re-exports client-core/features/editor/theme.ts, which imports monaco-editor; monaco reads
   //                `window` at module scope (monaco-editor/esm/vs/base/browser/window.js). Its own
   //                header already explains that this is why it is a separate entrypoint; it is
   //                therefore not a node-safe one, and a plugin test that needs a Monaco theme cannot

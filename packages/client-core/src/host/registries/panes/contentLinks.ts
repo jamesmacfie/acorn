@@ -3,8 +3,8 @@ import { openPane } from '../commands/clientEvents'
 import { paneAvailable, paneContribution } from './panes'
 import { openRefPanel } from './refPanels'
 import { sourceIdForPath } from '../sources/sources'
-import { taskById } from '../../../tasks/taskLookup'
-import { setSelectedSource } from '../../../tasks/tasks'
+import { taskById } from '../../../features/tasks/taskLookup'
+import { setSelectedSource } from '../../../features/tasks/tasks'
 
 // Resolving an external URL in rendered content to somewhere inside the app, so a link to
 // github.com/o/r/pull/9 or linear.app/acme/issue/ENG-1 opens the pane instead of the browser. The

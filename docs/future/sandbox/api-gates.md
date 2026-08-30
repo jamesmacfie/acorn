@@ -50,7 +50,7 @@ the rogue agent.
 ```
 
 **Why it is safe.** Prefs are written only by the settings UI, through
-`packages/client-core/src/settings/savePref.ts`, which authenticates as a paired device. The renderer
+`packages/client-core/src/features/settings/savePref.ts`, which authenticates as a paired device. The renderer
 is always a device principal, so a device gate cannot lock it out. No agent tool and no task-scoped
 path writes prefs over HTTP. The in-process `PrefService.write` used by
 `plugins/agents/src/server/pricingStore.ts` does not touch this route and is unaffected.

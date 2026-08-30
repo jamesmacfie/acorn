@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { clientEvents, consumePaneIntent, consumeTerminalFocusIntent, openPane, requestTerminalFocusIntent } from './clientEvents'
 
-vi.mock('../../../tasks/tasks', () => ({ dispatchLayout: vi.fn() }))
+vi.mock('../../../features/tasks/tasks', () => ({ dispatchLayout: vi.fn() }))
 
 describe('client events and intents', () => {
   it('delivers serializable events and disposes subscriptions', () => {

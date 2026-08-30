@@ -97,4 +97,4 @@ folder.
 - `packages/protocol/src/extensionPoints.ts` still lists `rail.taskList` in `CORE_EXCLUSIVE_SLOTS`,
   and `docs/future/client-plugins/` still plans `pane.switcher`, `rail`, and `topbar`.
 - `packages/client-core/src/kit/lib/paletteModel.ts` still has no DOM import.
-- `packages/client-core/src/tabs/TabRail.tsx` still calls `ExclusiveSlotHost` for the task list.
+- `packages/client-core/src/features/tabs/TabRail.tsx` still calls `ExclusiveSlotHost` for the task list.

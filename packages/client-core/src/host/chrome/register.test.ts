@@ -24,7 +24,7 @@ const { sourceRegistry } = await import('../registries/sources/sources')
 const { isTaskSlot, uiSlotRegistry } = await import('../registries/extensionPoints/slots')
 type ShellSlot = import('../registries/extensionPoints/slots').ShellSlotContribution
 const { contextMenuItems, contextMenuRegistry } = await import('../registries/panes/contextMenus')
-const { orphanedPluginOverrideIds } = await import('../../settings/shortcutSettingsModel')
+const { orphanedPluginOverrideIds } = await import('../../features/settings/shortcutSettingsModel')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../plugins/distribution')
 const { _resetChromeContributions, syncChromeContributions, usableEmptyState } = await import('./register')
 

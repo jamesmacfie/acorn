@@ -16,7 +16,7 @@ vi.mock('../../../infra/node/hostCapabilities', () => ({
   hasHostCapability: (requirement: 'none' | 'desktop' | 'terminal' = 'none') =>
     requirement === 'none' || capabilities[requirement],
 }))
-vi.mock('../../../tasks/tasks', () => ({ activeTaskId: () => 'task-1' }))
+vi.mock('../../../features/tasks/tasks', () => ({ activeTaskId: () => 'task-1' }))
 
 const clicked = vi.hoisted(() => vi.fn())
 vi.mock('./contentLinks', () => ({ handlePluginContentLinkClick: clicked }))

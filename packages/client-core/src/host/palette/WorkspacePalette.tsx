@@ -1,6 +1,6 @@
 import { createMemo, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { createFleetWorkspaces, selectFleetWorkspace, type FleetWorkspace } from '../../workspaces/fleetWorkspaces'
+import { createFleetWorkspaces, selectFleetWorkspace, type FleetWorkspace } from '../../features/workspaces/fleetWorkspaces'
 import { fuzzyScore } from '../../kit/lib/paletteModel'
 import { createOverlayPalette } from './overlay'
 import { PaletteSurface } from './PaletteSurface'

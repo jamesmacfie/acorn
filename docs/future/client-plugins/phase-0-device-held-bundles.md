@@ -88,7 +88,7 @@ uses for fields added after rows were written.
 - `packages/client-core/src/infra/persistence/devicePrefs.ts`: prefix rule for device plugin state;
   `devicePluginsDisabled`.
 - `packages/client-core/src/host/frames/broker.ts`: `state` verb routes by `source`.
-- `packages/client-core/src/settings/PluginsSettings.tsx`: the device section.
+- `packages/client-core/src/features/settings/PluginsSettings.tsx`: the device section.
 - `packages/desktop-helper/src/plugins/pluginCache.ts`: `putFromSource`, `remove`, `source` on entries.
 - `packages/desktop-helper/src/plugins/pluginTrustStore.ts`: `source` on rows and grants, with the read
   default.
@@ -158,5 +158,5 @@ Against [07-hosts.md](./07-hosts.md):
   `plugins-trust-record`, `plugins-dev-grant`.
 - `packages/client-core/src/infra/persistence/devicePrefs.ts` has `DEVICE_KEYS` as a literal set and
   `isDevicePref` as exact match.
-- `packages/client-core/src/settings/PluginsSettings.tsx` exists and draws the per-node roster.
+- `packages/client-core/src/features/settings/PluginsSettings.tsx` exists and draws the per-node roster.
 - `tools/arch/boundaries.test.ts` has the rule that only `platform/` names `window.acorn`.

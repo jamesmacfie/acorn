@@ -12,7 +12,7 @@
 
 import { createSignal, onCleanup } from 'solid-js'
 import { clientEvents } from '../registries/commands/clientEvents'
-import { activeTaskId, setFocusedPane } from '../../tasks/tasks'
+import { activeTaskId, setFocusedPane } from '../../features/tasks/tasks'
 
 export type RegionRef = { paneId: string; regionId: string }
 

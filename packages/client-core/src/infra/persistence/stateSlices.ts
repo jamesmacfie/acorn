@@ -1,8 +1,8 @@
-import { homeTabSlice } from '../../dashboards/homeTab'
-import { dashboardsSlice } from '../../dashboards/persist'
-import { hydrateNoticeValues, notices, type Notice } from '../../notifications/notifications'
-import { defaultLayout, normalizeLayout, type TaskLayout } from '../../tasks/layout'
-import { hydrateTaskLayout, taskLayouts } from '../../tasks/tasks'
+import { homeTabSlice } from '../../features/dashboards/homeTab'
+import { dashboardsSlice } from '../../features/dashboards/persist'
+import { hydrateNoticeValues, notices, type Notice } from '../../features/notifications/notifications'
+import { defaultLayout, normalizeLayout, type TaskLayout } from '../../features/tasks/layout'
+import { hydrateTaskLayout, taskLayouts } from '../../features/tasks/tasks'
 import { PrefKeys, PersistedSliceKeys } from './prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from './persistedState'
 

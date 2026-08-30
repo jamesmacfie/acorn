@@ -5,29 +5,29 @@ import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/infra/queries.ts'
-import { archiveTask } from '@acorn/client-core/tasks/mutations.ts'
+import { archiveTask } from '@acorn/client-core/features/tasks/mutations.ts'
 import { paneAvailable, paneContributions } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/host/registries/commands/keybindings.ts'
-import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
-import { addSession, refreshSessions, requestTerminalFocus } from '@acorn/client-core/tasks/agentSessions.ts'
+import { workspaceForProject } from '@acorn/client-core/features/workspaces/activeWorkspace.ts'
+import { addSession, refreshSessions, requestTerminalFocus } from '@acorn/client-core/features/tasks/agentSessions.ts'
 import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilities.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
-import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
-import { runApi } from '@acorn/client-core/tasks/runClient.ts'
-import { dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from '@acorn/client-core/tasks/tasks.ts'
-import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
-import { formatChord } from '@acorn/client-core/tasks/paneShortcuts.ts'
-import { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
-import TaskPaneHost from '@acorn/client-core/tasks/TaskPaneHost.tsx'
+import { taskBridge } from '@acorn/client-core/features/tasks/taskBridge.ts'
+import { runApi } from '@acorn/client-core/features/tasks/runClient.ts'
+import { dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
+import { formatChord } from '@acorn/client-core/features/tasks/paneShortcuts.ts'
+import { taskStatus } from '@acorn/client-core/features/tasks/taskStatus.ts'
+import TaskPaneHost from '@acorn/client-core/features/tasks/TaskPaneHost.tsx'
 import { confirmWillEvent } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
 import { Alert, Button } from '@acorn/client-core/kit/components/primitives.tsx'
 import { TaskSlotHost } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
-import { completeTaskArchive, isArchiving, withArchiving } from '@acorn/client-core/tasks/archiveLifecycle.ts'
+import { completeTaskArchive, isArchiving, withArchiving } from '@acorn/client-core/features/tasks/archiveLifecycle.ts'
 import { defaultSourceId } from '@acorn/client-core/host/registries/sources/sources.ts'
 import CopyButton from '@acorn/client-core/kit/components/CopyButton.tsx'
-import '@acorn/client-core/tasks/task-view.css'
-import { RailTab } from '@acorn/client-core/tabs/RailTab.tsx'
+import '@acorn/client-core/features/tasks/task-view.css'
+import { RailTab } from '@acorn/client-core/features/tabs/RailTab.tsx'
 
 export default function TaskView(props: {
   task: Task
@@ -174,7 +174,7 @@ export default function TaskView(props: {
 
   // While the guarded teardown runs (it can take seconds: teardown script plus worktree removal),
   // this task's close button and its rail row both spin, off the one shared flag in
-  // client-core/tasks/archiveLifecycle.ts.
+  // client-core/features/tasks/archiveLifecycle.ts.
   const closing = () => isArchiving(props.task.id)
   // The plugin cleanups this archive is carrying, from the dialog to the request (and to the retry).
   const [pendingChecks, setPendingChecks] = createSignal<string[]>([])

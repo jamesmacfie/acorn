@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { createTaskPath, isProjectPath, projectIdFromPath, projectPath, taskPath } from './corePaths'
+import { newTaskPath, isProjectPath, projectIdFromPath, projectPath, taskPath } from './corePaths'
 
 describe('core paths', () => {
   it('encodes ids that would otherwise change the shape of the path', () => {
     expect(projectPath('project/web')).toBe('/p/project%2Fweb')
     expect(taskPath('task 1')).toBe('/t/task%201')
-    expect(createTaskPath('project-web')).toBe('/p/project-web/new')
+    expect(newTaskPath('project-web')).toBe('/p/project-web/new')
   })
 
   it('recognises any project-scoped path, including one a plugin contributed', () => {
