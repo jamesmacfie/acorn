@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
-import { AGENT_ATTACHMENT_POINT, AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from './managedClient'
 import { agentContextContributions } from '@acorn/plugin-api/client'
 import {
@@ -18,6 +18,7 @@ import { fileMentionSuggestions, formatFileMention, parseFileMentions } from './
 import { advertisedSuggestions, composerSegments, MAX_HIGHLIGHT_LENGTH } from './composerTokens'
 import { useWorktreeFiles } from './worktreeFiles'
 import AgentContextPickerModal from './AgentContextPickerModal'
+import { AttachmentSlot } from './AttachmentSlot'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
   TASK_CONTEXT_CONTRIBUTION_ID,
@@ -444,23 +445,11 @@ export default function AgentComposer(props: {
         <ChipRow ariaLabel="Attached to this turn">
           <For each={attachments()}>
             {(attachment) => (
-              // A plugin that knows more about this kind of file than a chip can say draws it instead
-              // (docs/plugins.md § Cooperative extension points, the `remote` kind). Keyed by media
-              // type, `replace`, so one attachment is always exactly one chip.
-              <Slot
-                point={AGENT_ATTACHMENT_POINT}
-                key={attachment.mediaType}
+              <AttachmentSlot
+                attachment={attachment}
                 taskId={props.session.taskId}
-                props={() => ({ attachment, taskId: props.session.taskId })}
-              >
-                <Chip
-                  title={attachment.filename}
-                  leading={<Icon name={attachment.mediaType.startsWith('image/') ? 'image' : 'file'} />}
-                  onRemove={() => removeAttachment(attachment)}
-                >
-                  {attachment.filename} · {Math.max(1, Math.round(attachment.byteSize / 1024))} KiB
-                </Chip>
-              </Slot>
+                onRemove={() => removeAttachment(attachment)}
+              />
             )}
           </For>
           <For each={contexts()}>
