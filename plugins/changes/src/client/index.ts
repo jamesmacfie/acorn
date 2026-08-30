@@ -20,7 +20,7 @@ export const changesClientPlugin: ClientPlugin = {
     // agents: the plugin that owns a tool owns how its result reads.
     //
     // Keyed on the harness's tool kind rather than on "did this call touch a path", which is what the
-    // private renderer registry this replaced matched on. A point's arbitration has to be decidable
+    // private client registry this replaced matched on. A point's arbitration has to be decidable
     // without running a contributor's code, so a predicate is not on offer, and these four kinds are
     // what the drivers report for a call that names files (docs/plugins.md § Cooperative extension
     // points).
