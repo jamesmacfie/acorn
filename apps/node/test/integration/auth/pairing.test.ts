@@ -145,8 +145,13 @@ describe('device administration', () => {
     expect(res.status).toBe(200)
     const { devices } = (await res.json()) as DevicesResponse
     expect(devices.map((d) => d.name).sort()).toEqual(['laptop', 'seed'])
-    // The list is owner-facing, so it must never carry token material.
-    expect(JSON.stringify(devices)).not.toContain(paired.deviceToken.split('_').at(-1))
+    // The list is owner-facing, so it must never carry token material. The needle is the whole 43-char
+    // secret, not the tail after the last `_`: the secret is base64url, whose alphabet includes `_`, so
+    // that split returned a one- or two-character string about a fifth of the time and any JSON blob
+    // contains those. The token grammar is acorn_dt_<uuid>_<base64url(32)>
+    // (packages/node-core/src/server/auth/deviceTokens.ts).
+    expect(JSON.stringify(devices)).not.toContain(paired.deviceToken)
+    expect(JSON.stringify(devices)).not.toContain(paired.deviceToken.slice(-43))
   })
 
   it('stays gated: the pairing admin routes 401 without a credential', async () => {

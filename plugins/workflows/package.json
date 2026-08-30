@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-workflows",
   "version": "0.1.0",
+  "description": "Multi-step runs over a repo: the runner, its route, and the rows the notification pipeline reads.",
   "private": true,
   "type": "module",
   "exports": {

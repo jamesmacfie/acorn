@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-github",
   "version": "0.1.0",
+  "description": "GitHub as a mirrored source: pull requests, reviews, checks, and the content links that name them.",
   "private": true,
   "type": "module",
   "exports": {

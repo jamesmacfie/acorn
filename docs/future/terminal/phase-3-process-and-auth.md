@@ -46,7 +46,7 @@ loopback-only route that mints a device token for a caller who can prove it owns
 reading a nonce the node wrote there at 0600), which is new. Prefer the first for this phase and
 record the second as a door.
 
-**Supervision.** `packages/desktop-helper/src/main/` owns spawning the node, parsing the handshake,
+**Supervision.** `packages/desktop-helper/src/supervision/` owns spawning the node, parsing the handshake,
 and the bounded drain. Import it. The one thing the helper does that the TUI does not is speak
 `shell/wire.ts` to a Rust supervisor; the TUI is its own supervisor and calls the same functions the
 wire handlers call.
@@ -66,7 +66,7 @@ kit component or pane module imports the token store.
 - `apps/tui/src/node/{supervise,attach,pair,paths}.ts` (new).
 - `apps/tui/src/platform.ts` (new): the `globalThis.acorn` object with `transport`, `fleet`,
   `pairing`, `recovery`.
-- `packages/desktop-helper/src/main/`: export the supervise and drain functions the wire handlers
+- `packages/desktop-helper/src/supervision/serviceHost.ts`: export the supervise and drain functions the wire handlers
   call, if they are not already exported.
 - `packages/node-core/src/server/storage/dataRoot.ts` or wherever `openDataRoot` lives: expose "is locked"
   without taking the lock, if it is not already.

@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-terminal",
   "version": "0.1.0",
+  "description": "The PTY stream and the run targets around it. The most privileged plugin in the tree.",
   "private": true,
   "type": "module",
   "exports": {

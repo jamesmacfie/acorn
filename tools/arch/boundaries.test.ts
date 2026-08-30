@@ -940,4 +940,78 @@ describe('architecture boundaries', () => {
     expect(pluginFiles.length).toBeGreaterThan(100)
     expect({ stylesheets, roots }).toEqual({ stylesheets: [], roots: [] })
   })
+  it('a plugin src/ has only the seven folder names, and node/ holds only the entrypoint and the schema', () => {
+    // docs/conventions.md § Folders. The point of a fixed set is that a reader can predict where a
+    // file lives without opening the package, and every rule above that keys off the first path
+    // segment — the client/node split, contract/, the testkit — reads that segment as if it were one
+    // of these. A folder outside the set is not refused by any of them; it just falls through to
+    // 'shared' and stops being governed.
+    //
+    // `node/` is the activation entrypoint and its Drizzle schema, nothing else. It is the one folder
+    // an app imports by path rather than through a barrel, so a module parked there becomes public
+    // without anyone deciding it should be.
+    const NAMES = ['node', 'server', 'client', 'tree', 'contract', 'shared', 'testkit']
+    const NODE_FILES = /^(index|schema)(\.test)?\.tsx?$/
+    const problems: string[] = []
+    let scanned = 0
+    for (const pkg of PACKAGES.filter((p) => p.kind === 'plugin')) {
+      if (!existsSync(pkg.src)) continue
+      scanned++
+      for (const entry of readdirSync(pkg.src, { withFileTypes: true })) {
+        if (!entry.isDirectory()) problems.push(`${rel(join(pkg.src, entry.name))} is a loose file under src/`)
+        else if (!NAMES.includes(entry.name)) problems.push(`${rel(join(pkg.src, entry.name))} is not one of ${NAMES.join(', ')}`)
+      }
+      const nodeDir = join(pkg.src, 'node')
+      if (!existsSync(nodeDir)) continue
+      for (const entry of readdirSync(nodeDir, { withFileTypes: true })) {
+        if (entry.isDirectory() || !NODE_FILES.test(entry.name)) problems.push(`${rel(join(nodeDir, entry.name))} is not index.ts, schema.ts, or a test of one`)
+      }
+    }
+    // Anti-vacuity: a moved plugins/ root would leave nothing to scan and pass on an empty tree.
+    expect(scanned).toBeGreaterThanOrEqual(15)
+    expect(problems.sort()).toEqual([])
+  })
+
+  it('no test file sits under a contract/', () => {
+    // A plugin's `./contract/*` subpath is a directory wildcard, because a contract is a directory —
+    // so every file under it is importable from another package, tests included. Protocol's map is
+    // checked for the same thing one entry at a time; this is the wildcard half of that rule.
+    const files = PACKAGES.flatMap((pkg) => walk(join(pkg.src, 'contract')))
+    // Anti-vacuity: the contract folders exist and hold files, so an empty offender list means something.
+    expect(files.length).toBeGreaterThan(15)
+    expect(files.filter((file) => /\.test\.tsx?$/.test(file)).map(rel).sort()).toEqual([])
+  })
+
+  it('no folder is named main, service, or wiring', () => {
+    // `main/` meant "the Electron main process". Electron is gone, and while the word survived it was
+    // arbitrary which of `main/` or `server/` a module landed in: agentTools.ts sat under both in
+    // different plugins. `service/` and `wiring/` were the same kind of non-word. They are retired
+    // (docs/future/structure/README.md), and this is what keeps them retired — including nested, so
+    // `server/main/` cannot bring the word back one level down.
+    const RETIRED = ['main', 'service', 'wiring']
+    const dirs = (dir: string, out: string[] = []): string[] => {
+      if (!existsSync(dir)) return out
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue
+        out.push(join(dir, entry.name))
+        dirs(join(dir, entry.name), out)
+      }
+      return out
+    }
+    const all = PACKAGES.flatMap((pkg) => dirs(pkg.src))
+    // Anti-vacuity: the walker has to be seeing the tree for an empty offender list to mean anything.
+    expect(all.length).toBeGreaterThan(200)
+    expect(all.filter((d) => RETIRED.includes(basename(d))).map(rel).sort()).toEqual([])
+  })
+
+  it('every workspace package declares a one-line description', () => {
+    // docs/conventions.md § Packages. There is no README per package, because docs/ owns the prose, so
+    // this line is the only answer `pnpm ls -r` can give to "what is this". A package added without one
+    // is a package nobody can place without opening its source.
+    const missing = PACKAGES.filter((pkg) => {
+      const manifest = JSON.parse(readFileSync(join(pkg.dir, 'package.json'), 'utf8')) as { description?: string }
+      return !manifest.description?.trim()
+    }).map((pkg) => pkg.name)
+    expect(missing.sort()).toEqual([])
+  })
 })

@@ -31,7 +31,9 @@ const markdown = (dir: string, out: string[] = []): string[] => {
   return out
 }
 
-const FILES = markdown(DOCS)
+// The root README and CLAUDE.md are the two docs a reader meets first, and they cite the tree like any
+// other. They sit outside `docs/`, so a walk of that folder alone left them unchecked.
+const FILES = [...markdown(DOCS), join(ROOT, 'README.md'), join(ROOT, 'CLAUDE.md')].filter(existsSync)
 const rel = (file: string) => relative(ROOT, file)
 
 // A repo-rooted path starts with a workspace directory. Anything else in backticks is a fragment, a
@@ -58,9 +60,9 @@ const isDataRoot = (path: string) => path.endsWith('.sqlite')
 
 // A review is dated evidence. Rewriting one so a path resolves would falsify what was true when it
 // was written, so reviews are read-only here and excluded. The structure programme's findings file is
-// the same thing under a different name: it is the 2026-08-30 record of the tree the programme is
-// moving, so every phase that lands makes more of it stale on purpose.
-const REVIEWS = ['docs/reviews/', 'docs/future/structure/01-findings.md']
+// the 2026-08-30 record of the tree that programme is moving, so every phase that lands makes more of
+// it stale on purpose.
+const REVIEWS = ['docs/future/structure/01-findings.md']
 const isReview = (file: string) => REVIEWS.some((prefix) => rel(file).startsWith(prefix))
 
 describe('docs cite paths that exist', () => {
@@ -107,5 +109,29 @@ describe('docs cite paths that exist', () => {
     }
     expect(broken.sort()).toEqual([])
     expect(checked).toBeGreaterThan(100)
+  })
+  it('no doc cites a retired directory name', () => {
+    // The escape hatch above — a path with no file extension is a directory, and directories move for
+    // reasons that are not rot — is exactly what let twelve source paths rot behind a folder rename.
+    // This is the narrow half of the check the hatch gives up: a denylist of directory names the
+    // structure programme retired, which may only appear on a line that says they are gone.
+    //
+    // `docs/future/structure/` is excluded because it is the record of the move. Naming the old
+    // directory is what those files are for, and phase 7 deletes the folder.
+    const RETIRED = ['src/main/', 'src/app/', 'src/wiring/', 'src/service/']
+    const offenders: string[] = []
+    let checked = 0
+    for (const file of FILES) {
+      if (isReview(file) || rel(file).startsWith('docs/future/structure/')) continue
+      for (const [index, line] of readFileSync(file, 'utf8').split('\n').entries()) {
+        const lower = line.toLowerCase()
+        checked += 1
+        if (GONE.some((marker) => lower.includes(marker))) continue
+        for (const name of RETIRED) if (line.includes(name)) offenders.push(`${rel(file)}:${index + 1}: ${name}`)
+      }
+    }
+    expect(offenders.sort()).toEqual([])
+    // Anti-vacuity: the lines are being read, rather than the walk having come back empty.
+    expect(checked).toBeGreaterThan(2000)
   })
 })

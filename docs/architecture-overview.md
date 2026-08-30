@@ -99,7 +99,7 @@ cyclic, and acyclicity alone does not catch it, because a plugin whose only upst
 **What a plugin may import.** The facade (`@acorn/plugin-api`), the wire types, another plugin's
 `contract/`, and its own files. Nothing else in `packages/`. `contract/` is the one cross-plugin import
 surface, and it may not re-export a package's internals even transitively. `contract/x.ts ->
-shared/y.ts -> main/heavy.ts` would drag the implementation into every consumer. Types a contract needs
+shared/y.ts -> server/heavy.ts` would drag the implementation into every consumer. Types a contract needs
 live in `contract/` or `shared/`.
 
 **What an app may import.** A plugin's public subpaths, and no internal module, so a composition root
@@ -136,6 +136,21 @@ facade already re-exported — `testkit/db.ts`, `testkit/auth.ts`, `server/db/in
 it. Two whole roots left the list in that batch, which is the shape the exit condition wants: a root
 disappears rather than shrinking. The exit is a plugin whose suite compiles against published surfaces
 only, which is also the condition for moving that plugin out of the repository.
+
+**Folder names are part of the boundary.** A plugin's `src/` children come from seven names — `node`,
+`server`, `client`, `tree`, `contract`, `shared`, `testkit` — and nothing else, including loose files.
+The set is fixed because every rule above that keys off the first path segment reads it as if it were
+one of these: an eighth name is not refused by any of them, it just falls through to "shared" and stops
+being governed. `node/` holds the activation entrypoint and its Drizzle schema and nothing else, since
+it is the one folder an app imports by path rather than through a barrel. No test file sits under any
+`contract/`, whose wildcard subpath would otherwise make it importable from another package. And no
+folder anywhere is named `main`, `service`, or `wiring`: `main/` meant "the Electron main process",
+and while the word survived Electron it was arbitrary which of `main/` or `server/` a module landed in
+(`agentTools.ts` sat under both, in different plugins). Every workspace package also carries a one-line
+`description`, which is the only answer `pnpm ls -r` can give to "what is this" in a repo with no
+per-package README. These four rules and the description check are in
+`tools/arch/boundaries.test.ts`; `.github/workflows/ci.yml` is what makes them run on a pull request
+rather than on whoever remembered.
 
 **The node stays bootable.** Nothing in the tree imports a shell binding it should not. Tauri's
 `invoke` and its event API are confined to `apps/desktop/src/shell/`, the bridge the window injects;

@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-api",
   "version": "0.1.0",
+  "description": "The facade a plugin imports the host through. Re-exports only, split by side so a bundle stays on one.",
   "private": true,
   "type": "module",
   "sideEffects": false,

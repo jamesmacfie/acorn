@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-browser",
   "version": "0.1.0",
+  "description": "A browser of the node's own, driven by Playwright, offered to agents as tools.",
   "private": true,
   "type": "module",
   "exports": {

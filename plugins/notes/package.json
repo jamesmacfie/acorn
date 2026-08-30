@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-notes",
   "version": "0.1.0",
+  "description": "Freehand notes addressed to a task, a workspace, or nothing in particular.",
   "private": true,
   "type": "module",
   "exports": {

@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-memory",
   "version": "0.1.0",
+  "description": "Durable knowledge an agent can be handed: notes that outlive the task that wrote them.",
   "private": true,
   "type": "module",
   "exports": {

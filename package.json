@@ -1,5 +1,6 @@
 {
   "name": "acorn",
+  "description": "The acorn monorepo: an agent workspace built as a desktop shell, a Node service, and a tree of plugins.",
   "private": true,
   "packageManager": "pnpm@11.0.0",
   "//engines": "The same floor the packed standalone artifact declares (scripts/pack-node.mjs). Two things need it: the node:sqlite surface the DB shim uses, and apps/node/scripts/build-plugin.mjs importing a .ts file directly, which relies on Node's own type stripping.",

@@ -1,6 +1,7 @@
 {
   "name": "@acorn/protocol",
   "version": "0.1.0",
+  "description": "The wire contract both runtimes share: Zod schemas, route builders, and identity. A pure sink, importing nothing first-party.",
   "private": true,
   "type": "module",
   "//exports": "Enumerated, not a wildcard. Two things that buys over `\"./*\": \"./src/*\"`: a test file is not importable from another package, and a new module here is public only when someone adds it to this list. Adding the line is the decision. docs/future/phased-review-steps/README.md item 5 is the rest of that job, for node-core and client-core.",

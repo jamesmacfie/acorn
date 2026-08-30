@@ -1,6 +1,7 @@
 {
   "name": "@acorn/node-core",
   "version": "0.1.0",
+  "description": "The node half of the product: storage, the HTTP server, the MCP surface, and the seams plugins register through.",
   "private": true,
   "type": "module",
   "exports": {

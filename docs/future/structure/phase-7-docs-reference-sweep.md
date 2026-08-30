@@ -25,6 +25,13 @@ Run `pnpm --filter @acorn/arch-tests test` and fix every `docPaths` failure. Wit
 walk and retired-directory denylist, this catches the rooted paths with extensions and the moved
 directory names.
 
+Two things phase 6 changed about what that leaves. The denylist is `src/main/`, `src/app/`,
+`src/wiring/`, and `src/service/`, and it already turned up and fixed the three
+`packages/desktop-helper/src/main/` citations in `docs/future/terminal/`. And it excludes
+`docs/future/structure/` — naming the retired directory is what these files are for — so this phase
+deleting the folder is also what retires that exclusion. `client-core/src/kit` is not on the list: it
+still exists, and its row in the table below is a no-op for the same reason.
+
 ### Step 2: the grep
 
 For each moved or renamed thing, grep `docs/` and rewrite every hit that is not on a line already

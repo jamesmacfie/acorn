@@ -8,6 +8,9 @@ rule and a **Not yet everywhere** line names the exception and the phase of
 [docs/future/structure/](./future/structure/README.md) that closes it. When that programme finishes,
 those lines go and this file is just the rules.
 
+A few of these rules are held by a test rather than by review. [What a test enforces](#what-a-test-enforces)
+at the end says which, and why the rest are not worth automating.
+
 ## Files
 
 **A PascalCase `.tsx` file exports a Solid component. A camelCase `.ts` file is a module.** No
@@ -89,12 +92,17 @@ lives in `shared/`, unless another package imports it, in which case it lives in
 
 **`contract/` holds only what another package imports. `shared/` holds what both halves of this plugin
 read.** The arch test enforces the first half and the file headers say it. A test file never sits under
-`contract/`.
-
-Not yet everywhere: phase 6 adds the arch rule that keeps tests out of `contract/`.
+`contract/`, and the arch test refuses one: `./contract/*` is a directory wildcard, so anything under it
+is importable from another package, tests included.
 
 **A plugin's `src/` children are drawn from seven names**: `node`, `server`, `client`, `tree`,
-`contract`, `shared`, `testkit`. `node/` holds `index.ts` and `schema.ts` and nothing else.
+`contract`, `shared`, `testkit`. No loose files, and `node/` holds `index.ts` and `schema.ts` and
+nothing else. The arch test enforces both, because every rule that keys off the first path segment
+reads it as one of these seven; an eighth name is refused by none of them and stops being governed.
+
+**No folder is named `main`, `service`, or `wiring`**, at any depth. `main/` meant "the Electron main
+process", and once Electron went it was arbitrary which of `main/` or `server/` a module landed in. The
+arch test keeps the words retired.
 
 **A folder is plural for a collection of peers and singular for a layer.** `routes/`, `plugins/`,
 `registries/`, and `features/` are collections. `server/`, `client/`, `kit/`, and `host/` are layers.
@@ -118,8 +126,22 @@ being readable at a glance, not a number anything enforces.
 ## Packages
 
 **Every workspace `package.json` carries a one-line `description`.** A README per package is not
-required, because `docs/` owns the prose.
-
-Not yet everywhere: none have one; phase 6 adds them.
+required, because `docs/` owns the prose, which makes that line the only answer `pnpm ls -r` can give
+to "what is this". The arch test refuses a package without one.
 
 **A dependency only the tests use is a `devDependency`.**
+
+## What a test enforces
+
+Five of the rules above are checked by `tools/arch/boundaries.test.ts`, which
+`.github/workflows/ci.yml` runs on every pull request: the seven folder names, the contents of `node/`,
+no test under a `contract/`, no folder named `main`, `service`, or `wiring`, and the package
+description. `tools/arch/docPaths.test.ts` covers the citations, in this file and every other doc: a
+repo-rooted path in backticks has to resolve, a relative link between docs has to resolve, and a
+retired directory name may appear only on a line that marks it gone.
+
+The rest are review rules on purpose. A naming convention is a prompt for the reader, and a test that
+matches filenames against a pattern has to carry an exception list for every deliberate case — the two
+vendor clients that keep `server/index.ts` for a `vi.mock`, the `createTask` that really does create a
+resource, the `model.ts` that holds no state. That list is the thing people learn to append to instead
+of reading. The rules a test does hold are the ones where a wrong name silently turns another rule off.
