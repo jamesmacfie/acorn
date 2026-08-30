@@ -2,7 +2,7 @@
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { taskContextAgentContribution } from './agentContextContribution'
 import { contextPaneContribution } from './paneContribution'
-import { contextSelectionSlice } from './selectionSlice'
+import { contextSelectionSlice } from './selectionStore'
 
 export const contextClientPlugin: ClientPlugin = {
   name: 'context',
