@@ -312,6 +312,21 @@ content, counts, booleans, and handlers, and never `class`, `className`, `style`
 passed through. `@acorn/plugin-api/ui/tokens` carries the role enums and the support matrix as data,
 with no components on it, so a node-environment test can read them.
 
+**A node earns its place only if all four of these hold.** The list is closed, so the interesting
+question is what gets in, and this is the answer that keeps it small:
+
+1. Two or more plugins need it, or one first-party pane cannot be expressed without it.
+2. It has a written rendering at 80 columns by 24 rows in monochrome, even though no terminal host is
+   built. If that sentence cannot be written, the thing is a rectangle, not a node.
+3. Its props are semantic: tone, emphasis, size in three steps, grouping. Never a pixel, a colour, a
+   class, or a style.
+4. If it is an extension kind, one host-owned sentence describes it in the trust prompt, and a person
+   would knowingly accept that sentence.
+
+The same rule with the same four conditions applies to layouts, in
+[docs/panes.md § Layout model](./panes.md#layout-model), where condition 2 is a written narrow and
+terminal projection rather than one sentence.
+
 Three things follow from closing it, and each has a test.
 
 **A node takes a meaning, not a value.** `tone="danger"`, `gap="section"`, `size="sm"`. A plugin
@@ -324,8 +339,9 @@ custom property.
 column and a `tui` column, at one of four levels: `full` draws it natively, `reduced` draws it with
 named things missing, `fallback` draws a stated substitute, and `absent` draws nothing unless the
 node has a `<Fallback>` child. Only `dom` is implemented. The `tui` column is documentation with a
-test that it is filled in, so nobody adds a node without deciding what it does on a terminal.
-`docs/future/layout/04-kit.md` holds the 80-column sentence for each one.
+test that it is filled in, so nobody adds a node without deciding what it does on a terminal. The
+80-column sentence for each one is in [Every node at 80 by 24](#every-node-at-80-by-24) at the end of
+this page.
 
 **The classes moved inward.** A kit component keeps its `ui-*` classes and styles its own children
 by position, as in `.ui-code-wrap > .ui-btn`. Nothing exported accepts a class, `cx.ts` is internal,
@@ -411,6 +427,38 @@ root the host does not know about sits outside every focus group and no intent r
 
 The CSS clash and Checkbox checks stay, for the host's own code. Core still writes elements and
 stylesheets and can still lose a rule to a primitive's own attribute selector.
+
+### What the kit refuses
+
+Each of these will be asked for again and the request will sound reasonable, so the argument is
+written down once. The security-shaped refusals — an iframe inside an iframe, free `postMessage`
+between plugin origins, nested slots, reopening `frame-src` — are in
+[docs/security.md](./security.md), and the plugin-shaped ones in
+[docs/plugins.md](./plugins.md).
+
+**Styling props on kit nodes.** No `class`, `className`, or `style`, including "just for desktop" and
+"just for first-party". The moment a plugin can name a pixel or a colour, the kit stops being portable
+and a terminal host has to guess what was meant. Desktop visual tuning moves into the kit's own CSS,
+once per component. A plugin that needs its brand purple has a rectangle, priced honestly as
+DOM-only.
+
+**Raw scale values in a plugin-facing enum.** `space.row`, never `space.3` or `gap: 8`. A scale step
+is a value; a role is a meaning. Each host maps roles to its own values, and a terminal has no value
+for `8`.
+
+**Plugin-positioned layout.** A plugin picks a layout and fills regions. It never says where a region
+goes, how wide it is, or which way things flow. `orientation`, `columns` and `width` knobs are
+refused; a new named layout is the answer when eight is not enough. Position is in the name, which is
+the rule templates set before there were layouts.
+
+**Anything that depends on hover.** Hover exists on a DOM host with a pointer and nowhere else. The
+kit uses it for affordance only, and everything reachable on hover is reachable by focus.
+`ui/kit/hover.test.ts` reads the stylesheets and fails if a `:hover` rule reveals something no
+`:focus-within` rule reveals. A `RowActions` that appears only on hover is a bug, not a style.
+
+**Controlled and uncontrolled selection mixed on one node.** The host owns `selected` by default; a
+node that declares controlled mode is controlled for every operation. Never half. Supporting both on
+one node is a steady source of bugs in every library that has tried it.
 
 ## Icons
 
@@ -765,3 +813,165 @@ the density number all become the kit's, and the collection stays keyed over the
 the drawn window, so the arrows still walk past the last row on screen. Before it existed, GitHub's
 pull list owned a virtualizer, a scroll element, two animation frames and a pair of hand-registered
 `j` and `k` bindings to say the same thing.
+
+## What the kit and layouts must never do
+
+Twelve standing constraints. Each one keeps open a door that a mobile PWA
+([docs/future/remote.md](./future/remote.md)) or a terminal renderer
+([docs/future/terminal/](./future/terminal/README.md)) walks through later, and each is cheap to hold now
+and expensive to reopen. The arguments are in [What the kit refuses](#what-the-kit-refuses) above and
+in [docs/security.md](./security.md).
+
+1. No `class`, `className`, or `style` prop on any kit node, even "just for desktop".
+2. No raw scale value in a plugin-facing enum. `space.row`, never `space.3` or a number.
+3. No plugin-positioned layout. A plugin picks a layout; it never says where a region goes.
+4. No key event reaches a plugin outside `Input`, `Textarea`, `Composer`, `MentionTextarea`, and the
+   inside of a rectangle.
+5. No second keymap. One engine, one command catalog, an adapter per host
+   ([docs/command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)).
+6. No kit node without a support row and an 80×24 sentence.
+7. No layout without both projections written down.
+8. No iframe inside an iframe; `frame-src 'none'` stays.
+9. No `postMessage` between plugin origins that the host does not carry and validate.
+10. No static widget schema. Logic stays in plugin code; the wire is a tree of kit nodes.
+11. No hover-only affordance.
+12. No node or layout that reads `window`, the pointer, or a key code.
+
+### What a mobile PWA needs from this
+
+The mobile client is a browser talking to a node, so it is the same DOM host at different widths with
+a different shell. What the kit and the layouts owe it:
+
+- **Every layout carries a narrow projection**, written before the layout lands
+  ([docs/panes.md § Layout model](./panes.md#layout-model)).
+- **Breakpoints are style tokens**, not numbers inside a layout, so the mobile shell can set them.
+  Nothing in a layout reads the window width; a drag clamps against the layout's own element.
+- **`formFactor` on surfaces stays** (`packages/protocol/src/pluginContract.ts`). A rectangle that
+  only makes sense wide says `['desktop']`, and the mobile shell hides it rather than mangling it.
+- **No kit node carries a desktop-only assumption without a support row.** Hover is never
+  load-bearing and every tooltip has a focus equivalent.
+
+Host-owned layouts make a focused mobile subset cheap; they do not decide what is in it, which is
+`remote.md`'s question.
+
+### What a terminal renderer needs from this
+
+A terminal host cannot run the web renderer, so it needs the tree, the kit, the layouts and the
+keymap to be honest about intent. The host that reads these is the programme in
+[docs/future/terminal/](./future/terminal/README.md); this list is what the kit already holds for it:
+
+- **Every kit node has an 80×24 monochrome sentence** below and a `tui` level in
+  `packages/client-core/src/ui/kit/support.ts`, tested for presence even though nothing reads it.
+- **Every layout has a terminal projection** in [docs/panes.md](./panes.md#layout-model).
+- **Role tokens never expose pixels.** Each role has a documented terminal value, including
+  `ignored`, in `packages/client-core/src/ui/kit/roles.ts`.
+- **The keymap core is host-agnostic.** `@opentui/keymap`'s terminal adapter is in the same package,
+  and acorn adds no key handling outside it. Nodes handle `next`, not `ArrowDown`.
+- **Collection state is host-owned**, so a cell-buffer host keeps `active`, `selected` and `offset`
+  the same way.
+- **The tree protocol names nothing about the DOM.** The same mutations apply to a retained tree of
+  any kind ([docs/plugins.md § The tree contract](./plugins.md#the-tree-contract)).
+- **Rectangles are the only DOM-only thing**, and `kind="pty"` and `kind="editor"` are native there.
+  What crosses to a terminal plugin by plugin is in
+  [docs/future/terminal/01-why.md](./future/terminal/01-why.md).
+
+## Every node at 80 by 24
+
+The kit's admission rule asks for a written rendering on a host with no pixels, in monochrome, at 80
+columns by 24 rows. This is that list, one row per node, and it is the reason `NODE_SUPPORT`'s `tui`
+column can be filled in honestly rather than guessed.
+
+A node's props are its exported type in `@acorn/plugin-api/ui` and are not restated here, because a
+second copy would be wrong within a release and nothing would catch it. The focus column is
+`ui/kit/focusRoles.ts`, and `tools/arch/kitTable.test.ts` fails if this table and those two files
+disagree about which nodes exist or what each one does with focus.
+
+### Grouping
+
+| Node | Focus | At 80×24 |
+| --- | --- | --- |
+| `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines |
+| `Inline` | none | children on one line separated by a space; wraps to a `Stack` when too wide |
+| `Section` | conditional | label in dim uppercase, children below |
+| `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
+| `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
+| `Timeline` | collection | cards in sequence, a dim rule between turns; `follow` pins the view to the last |
+| `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets |
+| `Toolbar` | none | children on one line |
+| `Modal` | trap | a centred box over dimmed content; Escape dismisses |
+| `ModalBody` | none | the lines between the title rule and the actions line |
+| `ModalActions` | none | the buttons on one line, right-aligned inside the box |
+| `Menu` | trap | a vertical list in a box |
+| `Popover` | none | reduced: the panel opens as a full-width block under its anchor, not floating |
+| `ListDetail` | none | reduced: two columns above 80 cells, one at a time below it |
+| `ListColumn` | none | reduced: the left column, or the whole width when the split has collapsed |
+| `DetailColumn` | none | the right column, or the whole width |
+| `SplitHandle` | stop | absent: a terminal split moves by a key, not a grip |
+| `DocumentTabs` | collection | one line of tab labels with a `×` on the current one |
+| `SectionHeader` | none | a bold line with its actions right-aligned |
+| `TabPanel` | none | the rows under the tab strip |
+| `ToolbarSpacer` | none | the padding that pushes what follows to the right edge |
+
+### Showing
+
+| Node | Focus | At 80×24 |
+| --- | --- | --- |
+| `Text` | none | plain text; `mono` is a no-op, `muted` is dim, `strong` is bold |
+| `Heading` | none | eyebrow in dim uppercase, heading in bold |
+| `Rows` | collection | its items on successive lines; `virtual` is the scroll window and changes nothing else |
+| `Row` | item | one line: status glyph, title, meta right-aligned; subtitle on a second line if there is room |
+| `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
+| `RowActions` | none | the row's actions as glyphs at the right end, always drawn, never on hover |
+| `Badge` | none | `[text]` in the tone's colour |
+| `Chip` | conditional | `(text)`, with a trailing `×` when removable |
+| `ChipRow` | collection | chips on one line, wrapping |
+| `StatusDot` | none | `●` in colour, `○` for neutral |
+| `Facts` | none | two columns, labels dim; `grouping="rows"` is one pair per line |
+| `DescriptionList` | none | as `Facts`, one pair per line |
+| `Table` | none | reduced: box-drawn, truncating columns by priority |
+| `Grid` | collection | reduced: as `Table`, with a row-range indicator instead of a scrollbar |
+| `Meter` | none | `████░░░░ 62%` |
+| `CodeBlock` | none | monospace lines, a dim rule above and below |
+| `Log` | stop | monospace lines, find as a bottom line |
+| `Markdown` | none | reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables |
+| `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row |
+| `DiffLine` | none | reduced: one line, `+`/`-`/space in the gutter, no intra-line highlight |
+| `FileHead` | none | reduced: the path in bold with `+n −m` right-aligned |
+| `NonCodeRow` | none | reduced: a dim line saying what is not being shown, such as `binary file` |
+| `SplitCell` | none | absent: side-by-side needs 160 cells, so a terminal diff is unified |
+| `EmptyState` | none | centred dim text |
+| `Alert` | none | one line prefixed with the tone's glyph |
+| `Spinner` | none | reduced: a braille spinner, or `…` where motion is off |
+| `Kbd` | none | `⌘K` or `ctrl+k`, per host |
+| `UserAvatar` | none | reduced: initials in brackets; no image |
+| `Icon` | none | reduced: a glyph from a small name table, or nothing |
+
+### Asking
+
+| Node | Focus | At 80×24 |
+| --- | --- | --- |
+| `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic |
+| `ConfirmButton` | stop | `[ Delete? ]` after the first press; the armed button is the prompt |
+| `Input` | stop | an underlined field; owns keys while focused |
+| `Textarea` | stop | a boxed multi-line field; owns keys |
+| `Select` | stop | `[ value ▾ ]`, opening a `Menu` |
+| `Checkbox` | stop | `[x] label`; Space toggles |
+| `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets |
+| `ToggleButton` | stop | `[x] label` |
+| `Picker` | stop | a field that opens a `Menu` filtered by typing |
+| `PickerRow` | item | one line in that menu: glyph, label, dim hint |
+| `Composer` | stop | a boxed field with a `> ` prompt; commit submits |
+| `MentionTextarea` | stop | reduced: a `Textarea` with the mention menu below it; no inline highlight of the token |
+| `KeyValueEditor` | none | a two-column table with editable cells, each cell a stop |
+| `FindBar` | stop | `/ query  3/12` on one line |
+| `Field` | none | the label above its child |
+| `CopyButton` | stop | fallback: the host prints the value on its own line to copy by hand |
+| `ModelConnectionPicker` | stop | a `Picker` over the connected models, grouped by provider |
+
+### Pixels, and the host wrappers
+
+| Node | Focus | At 80×24 |
+| --- | --- | --- |
+| `Rectangle` | stop | absent, with two exceptions the node handles itself: `kind="pty"` and `kind="editor"` are native, and `webview` and `frame` draw their `<Fallback>` child or nothing |
+| `Only` | none | children exist on the named hosts and nowhere else; no fallback wanted |
+| `Fallback` | none | what to draw where the matrix says this host cannot draw the node it is inside |
