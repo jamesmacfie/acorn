@@ -8,7 +8,7 @@ import {
   Picker, Row, Rows, Select, Stack, StatusDot, Text, Toolbar, UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { ProviderHtml, Slot } from '@acorn/plugin-api/ui/host'
-import type { Label } from '../../contract/api'
+import type { Label } from '../../shared/api'
 import { SUMMARY_BADGES_POINT } from '../extensionPoints'
 import type { PrModel } from './prModel'
 

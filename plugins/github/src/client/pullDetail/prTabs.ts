@@ -6,8 +6,8 @@ import {
   projectsOptions, tasksOptions, type Task, wsOnStatus,
 } from '@acorn/plugin-api/client'
 import { pullDetailOptions, pullsOptions, taskPullsOptions } from '../queries'
-import { parsePullRef, type PullRef } from '../../contract/pullRef'
-import { pullsKey, taskPullsKey } from '../../contract/api'
+import { parsePullRef, type PullRef } from '../../shared/pullRef'
+import { pullsKey, taskPullsKey } from '../../shared/api'
 import { buildTaskPullTabs, pullRefKey, type TaskPullTab } from './taskPullTabs'
 import { promotePullToTask } from '../pullTasks'
 

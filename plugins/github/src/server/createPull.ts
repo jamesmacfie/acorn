@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
-import { gh, ghError } from '.'
+import { gh, ghError } from './githubApi'
 import { pullsResource } from './resourceKeys'
 import { repos, syncState } from '../node/schema'
 import { repoMatches } from './repoMatch'

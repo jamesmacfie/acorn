@@ -7,7 +7,7 @@ import {
   tasksOptions,
   type Task,
 } from '@acorn/plugin-api/client'
-import type { PullRef } from '../contract/pullRef'
+import type { PullRef } from '../shared/pullRef'
 import { pullDetailOptions } from './queries'
 
 export type PullTaskTarget = PullRef & {

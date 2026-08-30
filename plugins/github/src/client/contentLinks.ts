@@ -10,8 +10,8 @@ import {
   openPane,
   parseInAppTarget,
 } from '@acorn/plugin-api/client'
-import { formatPullRef } from '../contract/pullRef'
-import { githubBrowsePath } from './routes'
+import { formatPullRef } from '../shared/pullRef'
+import { githubBrowsePath } from './clientRoutes'
 
 const GH_PR_RE = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i
 const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$/i

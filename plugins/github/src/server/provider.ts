@@ -1,5 +1,5 @@
 import { defaultBudgets, externalIdsFor, ProviderOperationError, publicProvider } from '@acorn/plugin-api/node'
-import { gh, ghError } from './index'
+import { gh, ghError } from './githubApi'
 
 type GithubViewer = { login: string; name: string | null; avatar_url: string | null }
 type GithubValidated = { secret: string; viewer: GithubViewer; scopes: string[] }

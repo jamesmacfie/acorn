@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { contentLinkRegistry, type Task } from '@acorn/plugin-api/client'
-import type { Pull, PullDetail, TaskPullRelation } from '../../contract/api'
+import type { Pull, PullDetail, TaskPullRelation } from '../../shared/api'
 import { githubContentLinkContributions } from '../contentLinks'
 import { buildTaskPullTabs, pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 

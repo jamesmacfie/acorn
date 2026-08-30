@@ -5,7 +5,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
 import type { PrModel } from './prModel'
-import type { PullCommit, Thread, ThreadComment } from '../../contract/api'
+import type { PullCommit, Thread, ThreadComment } from '../../shared/api'
 import {
   hasRenderableBody, reviewAction, threadComments, threadSnippetFromIndex, type ConversationEntry,
   type SnippetLine, type ThreadSnippetIndex,

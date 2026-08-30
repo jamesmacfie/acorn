@@ -1,16 +1,16 @@
 import { lazy } from 'solid-js'
 import { type ClientPlugin, readJson, setSelectedSource } from '@acorn/plugin-api/client'
 import type { PluginCollectionResponse } from '@acorn/protocol/collections.ts'
-import { reposRoute } from '../contract/api'
-import { PULL_INVOLVEMENT, PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../contract/collections'
-import { pullRefMatchesTask } from '../contract/pullRef'
+import { reposRoute } from '../shared/api'
+import { PULL_INVOLVEMENT, PULLS_COLLECTION_ID, pullsCollectionRoute, pullsCollectionSchema } from '../shared/collections'
+import { pullRefMatchesTask } from '../shared/pullRef'
 import { DIFF_LINE_KEY, SUMMARY_BADGES_MAX } from './extensionPoints'
-import { prFiltersSlice } from './pullList/filterSlice'
+import { prFiltersSlice } from './pullList/filterStore'
 import { prPaneContribution } from './pullDetail/PrPane'
 import { pullFilePaletteSlotContribution } from './slotContribution'
 import { githubContentLinkContributions } from './contentLinks'
 import { githubIntegrationFlow } from './integrationFlow'
-import { githubBrowsePath, githubRouteContributions } from './routes'
+import { githubBrowsePath, githubRouteContributions } from './clientRoutes'
 import GithubImporter from './GithubImporter'
 
 const GithubBrowse = lazy(() => import('./GithubBrowse'))
@@ -80,7 +80,7 @@ export const githubClientPlugin: ClientPlugin = {
         { id: 'repo', name: 'Repository', type: 'enum' },
         // Unset means every open PR in every mirrored repo. Setting it hands the same columns from
         // a GitHub search, which is the only place two of the three answers exist
-        // (contract/collections.ts § involvement). `multiple`, because "assigned to me or waiting on
+        // (shared/collections.ts § involvement). `multiple`, because "assigned to me or waiting on
         // my review" is one question.
         { id: 'involves', name: 'Involving me', type: 'enum', multiple: true, values: [...PULL_INVOLVEMENT] },
       ],
