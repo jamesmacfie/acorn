@@ -2,8 +2,8 @@ import { memorySection, type NodePlugin } from '@acorn/plugin-api/node'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_SEND_TO_AGENT } from '@acorn/plugin-terminal/contract/sendToAgent.ts'
 import { WORKFLOWS_NOTICES } from '@acorn/plugin-workflows/contract/notices.ts'
-import { memoryAgentTools } from '../main/agentTools'
-import { registerKnowledgeIpc, type KnowledgeDeps } from '../main/knowledgeIpc'
+import { memoryAgentTools } from '../server/agentTools'
+import { registerKnowledgeChannel, type KnowledgeDeps } from '../server/knowledgeChannel'
 import { MEMORY_KNOWLEDGE } from '../contract/knowledge'
 import { knowledge, KNOWLEDGE } from '../server/routes/knowledge'
 
@@ -21,7 +21,7 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
     // open, migrate and close from there.
     migrationsModule: import.meta.url,
     init: async (ctx) => {
-      // Opened and migrated by the host before init returns. registerKnowledgeIpc closes over the handle
+      // Opened and migrated by the host before init returns. registerKnowledgeChannel closes over the handle
       // and fills the route's bridge, so no request can reach an unmigrated database.
       const db = ctx.storage.open()
       // terminal.sendToAgent, resolved at call time rather than here. Plugin init order isn't defined, so
@@ -52,7 +52,7 @@ export const memoryPlugin = (dataDir: string): NodePlugin => {
       // a reviewer to, and proposals still wait in the memory pane.
       const notice: KnowledgeDeps['notice'] = (taskId, kind, title) =>
         ctx.capabilities.get(WORKFLOWS_NOTICES)?.notice(taskId, kind, title)
-      const runtime = registerKnowledgeIpc(db, dataDir, ctx.core, { sendToAgent, notes, notice, emit: ctx.events.send })
+      const runtime = registerKnowledgeChannel(db, dataDir, ctx.core, { sendToAgent, notes, notice, emit: ctx.events.send })
       // The SQLite table is a derived index. Rebuild it once after migration so a fresh node has a warm
       // index and the project checkout and task-worktree source set is exercised at startup.
       await runtime.reconciled()

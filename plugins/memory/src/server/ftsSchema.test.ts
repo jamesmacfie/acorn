@@ -1,11 +1,11 @@
 import { getTableColumns, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import { memories } from './schema'
+import { memories } from '../node/schema'
 
 // memories_fts is a hand-written FTS5 virtual table, since drizzle can't model one, kept in sync with
 // `memories` by migration discipline alone. This guard opens a real migrated DB and asserts the FTS
-// column set still matches what main/memory.ts indexes, so a drifted migration edit fails CI.
+// column set still matches what ./memory.ts indexes, so a drifted migration edit fails CI.
 //
 // The chain that creates memories_fts is this plugin's (migrations/0000_*.sql), and the guard runs
 // against the plugin database that owns both tables.

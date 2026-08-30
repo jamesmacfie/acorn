@@ -9,7 +9,7 @@
 // proposal so a reviewer can see which agent session asked for it.
 import { z } from 'zod'
 import { type AgentToolContribution, type CoreServices, ToolError } from '@acorn/plugin-api/node'
-import type { MemoryIndex } from './knowledgeIpc'
+import type { MemoryIndex } from './knowledgeChannel'
 import { MEMORY_TYPES, type MemoryType } from './memory'
 import type { MemoryProposalStore } from './memoryProposals'
 
