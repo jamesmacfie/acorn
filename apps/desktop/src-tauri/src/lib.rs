@@ -87,6 +87,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::helper_endpoint,
             commands::pick_folder,
+            commands::pick_files,
+            commands::save_file,
             commands::reveal_data_folder,
             commands::force_quit,
             commands::quit_approved,

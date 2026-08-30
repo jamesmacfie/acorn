@@ -1,6 +1,6 @@
 # Phase 3: picking and saving files go through the platform seam
 
-Status: not started. Waits on nothing.
+Status: shipped 2026-08-31.
 
 ## Goal
 

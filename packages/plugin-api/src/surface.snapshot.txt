@@ -17,6 +17,7 @@ client: PaneLayoutContribution
 client: PaneRegistration
 client: PersistedSliceKeys
 client: PersistedStateSlice
+client: PickedFile
 client: PluginRefResolution
 client: PrefKeys
 client: PreviewState
@@ -35,6 +36,7 @@ client: RailTone
 client: RefPanelProps
 client: RefPanelTarget
 client: RemoteContribution
+client: SaveRequest
 client: ShellSlotContribution
 client: SourceContribution
 client: SourceRouteContribution
@@ -109,6 +111,7 @@ client: parseJson
 client: patchProject
 client: pathForTask
 client: persistDraft
+client: pickFiles
 client: pickFolder
 client: postJson
 client: prefsOptions
@@ -136,6 +139,7 @@ client: requireClientCapability
 client: revealCollectionItem
 client: rowHeight
 client: runApi
+client: saveFile
 client: saveJsonPref
 client: savePref
 client: scanContentRefs

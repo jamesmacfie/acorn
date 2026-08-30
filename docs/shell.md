@@ -238,8 +238,14 @@ labelled placeholder.
 `apps/desktop/src/shell/bridge.ts` is built as one IIFE and injected as the window's initialization
 script, which runs before any page script. It assembles the narrow, validated `window.acorn` surface
 the platform seam reads: broker request and response bytes, stream frames and status, fleet
-operations, lifecycle actions, folder selection, and the webview commands. It never exposes a node
-token, a certificate, a database handle, or a process object.
+operations, lifecycle actions, the three file dialogs, and the webview commands. It never exposes a
+node token, a certificate, a database handle, or a process object.
+
+The file dialogs are the folder picker, `pick_files`, and `save_file`. The last two carry bytes, not
+paths: the renderer sends a byte array to save and receives one per file it picked, base64 in both
+directions because the Tauri channel is JSON. Bytes rather than paths because the node this renderer
+talks to is not always on this machine, so a path would name a file the node cannot open. The shell
+owns the dialog and the read or write, and the renderer never learns where the file went.
 
 The same bridge serves both render paths. `packages/client-core/src/host/frames/broker.ts` takes a `MessagePort` and knows
 nothing about where the other end is: an iframe gets one over `window.postMessage`, a plugin worker

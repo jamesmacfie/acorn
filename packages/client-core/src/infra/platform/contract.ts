@@ -2,6 +2,7 @@ import {
   canPairNodes,
   canPickFolder,
   desktopExtras,
+  fileDialogs,
   fleetBridge,
   hostPlatform,
   isDesktopHost,
@@ -11,6 +12,7 @@ import {
   previewViews,
   recoveryActions,
   type DesktopExtras,
+  type FileDialogs,
   type FleetBridge,
   type NodeTransport,
   type PluginCustody,
@@ -61,6 +63,12 @@ const GROUPS = {
   },
   // Checked by its probe alone: calling `pickFolder` would open a dialog on a real host.
   folderPicker: { resolve: () => (canPickFolder() ? {} : null), members: [] },
+  // The host's native file dialogs. Absent is not the same as "the verbs are missing": the seam falls
+  // back to the page's own input and anchor, so this group says whether the shell took that over.
+  files: {
+    resolve: fileDialogs,
+    members: members<FileDialogs>()(['pick', 'save']),
+  },
   recovery: {
     resolve: recoveryActions,
     members: members<RecoveryActions>()(['openDataFolder', 'quit']),

@@ -201,6 +201,17 @@ const acorn = {
 
   folderPath: { pick: () => invoke<string | null>('pick_folder') },
 
+  // The native file dialogs. Bytes ride base64 in both directions, the same spelling the helper
+  // socket uses, because Tauri's channel is JSON and a byte array through it is an array of numbers.
+  files: {
+    pick: async (options: { accept?: readonly string[] }) => {
+      const picked = await invoke<{ name: string; type: string; bytes: string }[]>('pick_files', { accept: options.accept ?? [] })
+      return picked.map((file) => ({ name: file.name, type: file.type, bytes: decodeBytes(file.bytes) }))
+    },
+    save: (request: { bytes: Uint8Array; suggestedName: string; mimeType: string }) =>
+      invoke<boolean>('save_file', { bytes: encodeBytes(request.bytes), suggestedName: request.suggestedName }),
+  },
+
   // The browser preview pane. `show` is exclusive because one task's preview is on screen at a time,
   // and `hide` names no task because what the caller means is "no preview right now".
   preview: {

@@ -156,6 +156,15 @@ registry entries and client-core contracts. A feature that needs native behavior
 platform seam (`client-core/src/infra/platform/`), which `@acorn/plugin-api/client` re-exports the plugin-safe
 parts of; plugins do not name a shell binding and do not read the host global.
 
+The seam's verbs are the host's, but a group being absent does not always mean the verb is gone.
+`pickFolder` answers null where no host installs a picker, and callers ask `canPickFolder` first so
+they can drop the affordance. `pickFiles` and `saveFile` behave differently on purpose: a page can
+open its own file input and click its own download link, so the seam carries that fallback and every
+caller gets a working verb. A host that installs the `files` group takes over with native dialogs,
+and its save writes where the owner chose instead of into the downloads folder. Both verbs move
+bytes, never paths, which is what lets an agent attachment on this machine reach a node on another
+one. See [the renderer bridge](./shell.md#the-renderer-bridge) for the desktop half.
+
 The router is registry-driven. A source contributes path shapes with an explicit `order`, and the desktop
 shell composes them before rendering, so a static route stays ahead of a parameter route without embedding a
 provider's URL scheme in `index.tsx`.
