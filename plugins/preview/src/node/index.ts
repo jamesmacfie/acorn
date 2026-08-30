@@ -1,11 +1,8 @@
 // The preview plugin's node part (docs/plugins.md § The plugin API).
 //
-// This is the smallest NodePlugin in the tree because preview is mostly an Electron-main feature:
-// the pane is a WebContentsView and the CDP driver lives in main/. This plugin is one of three
-// packages outside apps/desktop that import electron lazily, the runtime escape hatch
-// docs/architecture-overview.md § Package boundaries describes (tools/arch/boundaries.test.ts
-// enumerates the three). Its only node-side surface is one capability: reading a task's
-// browser_rules.
+// This is the smallest NodePlugin in the tree because preview is mostly a shell feature: the pane is
+// a host-owned webview the desktop shell positions over the client (docs/shell.md § Host-owned
+// webviews). Its only node-side surface is one capability: reading a task's browser_rules.
 //
 // That read needs core's tasks and projects tables, so it takes CoreServices rather than the
 // database handle the composition root used to pass to a loose previewRulesForTask function in
