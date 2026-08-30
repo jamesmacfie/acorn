@@ -5,6 +5,10 @@
 import { lazy } from 'solid-js'
 import { activeTaskId, openPane, type ClientPlugin } from '@acorn/plugin-api/client'
 import { editorOpenFilesSlice } from './openFilesSlice'
+// Imported for the side effect: claiming the `editor` WS prefix at boot rather than when the first
+// file opens in terminal mode, so a typo is a failed assertion in wsChannelPrefixes.test.ts rather
+// than a rectangle that stays blank.
+import './wsChannel'
 import { editorPaneContribution } from './paneContribution'
 
 const FilePalette = lazy(() => import('./FilePalette'))

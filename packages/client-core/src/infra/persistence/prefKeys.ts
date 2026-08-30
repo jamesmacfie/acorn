@@ -37,6 +37,10 @@ export const PrefKeys = {
   // anything about the node the session ran on.
   agentToolFold: 'agent_tool_fold',
   dockerPrefs: 'docker_prefs',
+  // Which editor the editor pane's file view mounts: the graphical one, or `$EDITOR` in a throwaway
+  // PTY (plugins/editor/src/client/editorPrefs.ts). The device's, like `theme`: it names a program
+  // installed on this machine, and the other client paired with the same node may not have it.
+  editorMode: 'editor_mode',
   taskLayoutsScoped: 'core:task-layouts',
   editorOpenFilesScoped: 'editor:open-files',
   prFiltersScoped: 'github:pr-filters',
