@@ -127,8 +127,9 @@ export default function AgentPricingSettings() {
     return [...new Set(observed)].filter((model) => !configured.has(model.toLowerCase())).sort()
   })
 
-  const submit = async (event: SubmitEvent) => {
-    event.preventDefault()
+  // Button-only submit: this page has no <form>, so Enter in a field does not save
+  // (docs/future/before-terminal-ui/phase-0-agents-dom-hygiene.md).
+  const submit = async () => {
     const current = draft()
     if (!current || saving()) return
     const result = preferencesFromPricingDraft(current)
@@ -154,58 +155,135 @@ export default function AgentPricingSettings() {
   }
 
   return (
-    <form onSubmit={submit}>
-      <Stack gap="section">
-        <Text emphasis="muted" wrap>
-          These are estimated USD prices per million tokens for local Claude usage. They change
-          Acorn’s estimate only; they do not change what a provider bills. Codex does not currently
-          expose the token history needed for a local cost estimate.
-        </Text>
+    <Stack gap="section">
+      <Text emphasis="muted" wrap>
+        These are estimated USD prices per million tokens for local Claude usage. They change
+        Acorn’s estimate only; they do not change what a provider bills. Codex does not currently
+        expose the token history needed for a local cost estimate.
+      </Text>
 
-        <Show when={pricing.error}>
-          <Alert>
-            {pricing.error instanceof Error ? pricing.error.message : 'Agent pricing could not be loaded.'}
-          </Alert>
-        </Show>
-        <Show when={!draft() && pricing.isPending}>
-          <Text emphasis="muted">Loading prices…</Text>
-        </Show>
+      <Show when={pricing.error}>
+        <Alert>
+          {pricing.error instanceof Error ? pricing.error.message : 'Agent pricing could not be loaded.'}
+        </Alert>
+      </Show>
+      <Show when={!draft() && pricing.isPending}>
+        <Text emphasis="muted">Loading prices…</Text>
+      </Show>
 
-        <Show when={unpricedModels().length}>
-          <Section label="Unpriced models seen recently">
-            <Inline wrap>
-              <For each={unpricedModels()}>
-                {(model) => (
-                  <Button variant="bare" onPress={() => addCustom(model)}>
-                    Add <Text emphasis="mono">{model}</Text>
-                  </Button>
-                )}
-              </For>
-            </Inline>
-          </Section>
-        </Show>
+      <Show when={unpricedModels().length}>
+        <Section label="Unpriced models seen recently">
+          <Inline wrap>
+            <For each={unpricedModels()}>
+              {(model) => (
+                <Button variant="bare" onPress={() => addCustom(model)}>
+                  Add <Text emphasis="mono">{model}</Text>
+                </Button>
+              )}
+            </For>
+          </Inline>
+        </Section>
+      </Show>
 
-        <Show when={draft()}>
-          {(current) => (
-            <>
-              <Section label="Built-in Claude prices">
-                <Table size="sm" minWidth={620}>
-                  <thead>
-                    <tr>
-                      <th>Model</th>
-                      <For each={PRICE_FIELDS}>{(field) => <th>{field.label}</th>}</For>
-                      <th aria-label="Actions" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={current().catalog}>
-                      {(row) => {
-                        const definition = claudePriceCatalog.find((entry) => entry.id === row.catalogId)
-                        return (
+      <Show when={draft()}>
+        {(current) => (
+          <>
+            <Section label="Built-in Claude prices">
+              <Table size="sm" minWidth={620}>
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <For each={PRICE_FIELDS}>{(field) => <th>{field.label}</th>}</For>
+                    <th aria-label="Actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={current().catalog}>
+                    {(row) => {
+                      const definition = claudePriceCatalog.find((entry) => entry.id === row.catalogId)
+                      return (
+                        <tr>
+                          <th>
+                            <Text>{definition?.label ?? row.catalogId}</Text>
+                            <Text emphasis="mono">{definition?.models}</Text>
+                          </th>
+                          <For each={PRICE_FIELDS}>
+                            {(field) => (
+                              <td>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="1000000"
+                                  step="0.01"
+                                  required
+                                  width="narrow"
+                                  size="sm"
+                                  label={`${definition?.label ?? row.catalogId} ${field.label}`}
+                                  value={row.price[field.id]}
+                                  onInput={(value) => updateCatalogPrice(row.catalogId, field.id, value)}
+                                />
+                              </td>
+                            )}
+                          </For>
+                          <td>
+                            <Button
+                              variant="bare"
+                              disabled={!row.overridden}
+                              onPress={() => resetCatalogPrice(row.catalogId)}
+                            >
+                              Reset
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    }}
+                  </For>
+                </tbody>
+              </Table>
+            </Section>
+
+            <Section
+              label="Exact model prices"
+              actions={
+                <Button
+                  disabled={current().customModels.some((entry) => !entry.model.trim())}
+                  onPress={() => addCustom()}
+                >
+                  Add model
+                </Button>
+              }
+            >
+              <Stack gap="row">
+                <Text emphasis="muted" wrap>
+                  Add the exact model id from Claude’s usage history when a new model is not in the
+                  built-in list. An exact entry takes priority over a built-in price.
+                </Text>
+                <Show
+                  when={current().customModels.length}
+                  fallback={<Text emphasis="muted">No exact model prices.</Text>}
+                >
+                  <Table size="sm" minWidth={620}>
+                    <thead>
+                      <tr>
+                        <th>Exact model id</th>
+                        <For each={PRICE_FIELDS}>{(field) => <th>{field.label}</th>}</For>
+                        <th aria-label="Actions" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={current().customModels}>
+                        {(row) => (
                           <tr>
                             <th>
-                              <Text>{definition?.label ?? row.catalogId}</Text>
-                              <Text emphasis="mono">{definition?.models}</Text>
+                              <Input
+                                required
+                                maxLength={200}
+                                assist={false}
+                                placeholder="claude-new-model"
+                                label="Exact Claude model id"
+                                value={row.model}
+                                onInput={(value) => updateCustom(row.id, { model: value })}
+                              />
                             </th>
                             <For each={PRICE_FIELDS}>
                               {(field) => (
@@ -218,114 +296,35 @@ export default function AgentPricingSettings() {
                                     required
                                     width="narrow"
                                     size="sm"
-                                    label={`${definition?.label ?? row.catalogId} ${field.label}`}
+                                    label={`${row.model || 'Custom model'} ${field.label}`}
                                     value={row.price[field.id]}
-                                    onInput={(value) => updateCatalogPrice(row.catalogId, field.id, value)}
+                                    onInput={(value) => updateCustom(row.id, { field: field.id, value })}
                                   />
                                 </td>
                               )}
                             </For>
                             <td>
-                              <Button
-                                variant="bare"
-                                disabled={!row.overridden}
-                                onPress={() => resetCatalogPrice(row.catalogId)}
-                              >
-                                Reset
-                              </Button>
+                              <Button variant="bare" onPress={() => removeCustom(row.id)}>Remove</Button>
                             </td>
                           </tr>
-                        )
-                      }}
-                    </For>
-                  </tbody>
-                </Table>
-              </Section>
+                        )}
+                      </For>
+                    </tbody>
+                  </Table>
+                </Show>
+              </Stack>
+            </Section>
+          </>
+        )}
+      </Show>
 
-              <Section
-                label="Exact model prices"
-                actions={
-                  <Button
-                    disabled={current().customModels.some((entry) => !entry.model.trim())}
-                    onPress={() => addCustom()}
-                  >
-                    Add model
-                  </Button>
-                }
-              >
-                <Stack gap="row">
-                  <Text emphasis="muted" wrap>
-                    Add the exact model id from Claude’s usage history when a new model is not in the
-                    built-in list. An exact entry takes priority over a built-in price.
-                  </Text>
-                  <Show
-                    when={current().customModels.length}
-                    fallback={<Text emphasis="muted">No exact model prices.</Text>}
-                  >
-                    <Table size="sm" minWidth={620}>
-                      <thead>
-                        <tr>
-                          <th>Exact model id</th>
-                          <For each={PRICE_FIELDS}>{(field) => <th>{field.label}</th>}</For>
-                          <th aria-label="Actions" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <For each={current().customModels}>
-                          {(row) => (
-                            <tr>
-                              <th>
-                                <Input
-                                  required
-                                  maxLength={200}
-                                  assist={false}
-                                  placeholder="claude-new-model"
-                                  label="Exact Claude model id"
-                                  value={row.model}
-                                  onInput={(value) => updateCustom(row.id, { model: value })}
-                                />
-                              </th>
-                              <For each={PRICE_FIELDS}>
-                                {(field) => (
-                                  <td>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      max="1000000"
-                                      step="0.01"
-                                      required
-                                      width="narrow"
-                                      size="sm"
-                                      label={`${row.model || 'Custom model'} ${field.label}`}
-                                      value={row.price[field.id]}
-                                      onInput={(value) => updateCustom(row.id, { field: field.id, value })}
-                                    />
-                                  </td>
-                                )}
-                              </For>
-                              <td>
-                                <Button variant="bare" onPress={() => removeCustom(row.id)}>Remove</Button>
-                              </td>
-                            </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </Table>
-                  </Show>
-                </Stack>
-              </Section>
-            </>
-          )}
-        </Show>
-
-        <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-        <Show when={saved()}>{(message) => <Alert tone="ok">{message()}</Alert>}</Show>
-        <Toolbar variant="actions">
-          <Button submit disabled={!dirty() || saving()}>
-            {saving() ? 'Saving…' : 'Save pricing'}
-          </Button>
-        </Toolbar>
-      </Stack>
-    </form>
+      <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+      <Show when={saved()}>{(message) => <Alert tone="ok">{message()}</Alert>}</Show>
+      <Toolbar variant="actions">
+        <Button disabled={!dirty() || saving()} onPress={() => void submit()}>
+          {saving() ? 'Saving…' : 'Save pricing'}
+        </Button>
+      </Toolbar>
+    </Stack>
   )
 }

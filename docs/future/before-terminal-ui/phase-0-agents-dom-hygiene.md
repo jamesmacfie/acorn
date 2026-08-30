@@ -1,6 +1,6 @@
 # Phase 0: the agents plugin drops the raw DOM it never needed
 
-Status: not started. Waits on nothing.
+Status: shipped 2026-08-31.
 
 ## Goal
 
