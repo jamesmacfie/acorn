@@ -1,5 +1,5 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
-import { databaseBridge, endDbPools } from '../main/database'
+import { databaseBridge, endDbPools } from '../server/database'
 import { createDatabaseFetch } from '../server/routes/database'
 
 // database ships as a loaded plugin, so both host seams here are the manifest-bound ones:

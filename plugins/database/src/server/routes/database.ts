@@ -27,7 +27,7 @@ import type { PluginCompletionResponse, PluginDocumentBody } from '@acorn/protoc
 import { GENERATE_MAX_PROMPT_CHARS } from '../../shared/database'
 import type { DbGenerateResult, DbSavedQuery } from '../../shared/database'
 import { dbSavedQueries, dbScratch } from '../../node/schema'
-import type { DatabaseBridge } from '../../main/database'
+import type { DatabaseBridge } from '../database'
 import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, stripSqlFences } from '../generateSql'
 import { completeSql } from '../completions'
 import { MAX_CONTEXT_QUERIES, savedQueryOption, savedQuerySnapshot } from '../agentContext'

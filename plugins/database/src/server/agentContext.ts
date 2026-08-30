@@ -1,7 +1,7 @@
 // "Saved database queries" in the agent composer, as the two routes the manifest's `agentContexts`
 // descriptor names.
 //
-// This used to be a client contribution over rows the renderer already held. What travels here is SQL a
+// This used to be a client contribution over rows the client already held. What travels here is SQL a
 // person wrote down and a note they wrote beside it. No credential enters this file: the connection URL
 // is resolved per connect in main/database.ts and never persisted, so there's nothing to redact.
 //
