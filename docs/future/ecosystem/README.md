@@ -24,7 +24,7 @@ per-(plugin, node) dev grant; plugin themes, declarative chrome, context menus, 
 extension points and exclusive slots are manifest vocabulary (`docs/plugins.md`,
 `docs/ui-design.md § Plugin themes`). The node-first review's contracts also landed: the
 client↔node version contract (`docs/api-reference.md § Versioning`), the platform seam, and
-node-side ownership of user compositions (`docs/state.md`).
+node-side ownership of user compositions (`docs/state-ownership.md`).
 
 The front door is now finished too. `npm create acorn-plugin` and `acorn-plugin-sdk` both ship
 (`packages/create-acorn-plugin`, `packages/plugin-sdk`), so an author with no checkout gets the whole
@@ -105,5 +105,5 @@ Behavioral claims here were verified against the tree on **2026-08-14** and re-c
 **2026-08-16**. The codebase will drift before the rest is built; `references/` may move or be
 deleted. Treat the *decisions and orderings* here as durable and the *paths* as hints. The owning
 docs for current behavior are `docs/plugins.md`, `docs/plugin-authoring.md`, `docs/security.md`,
-`docs/extensibility.md`, and `docs/third-party/README.md` — where this folder disagrees with
+`docs/extensibility.md`, and `docs/loaded-plugin-migration.md` — where this folder disagrees with
 those, those win.

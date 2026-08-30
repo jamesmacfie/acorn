@@ -17,7 +17,7 @@ to pointers. Phase 8 is the reverse move, when the folder is deleted and behavio
 | `docs/ui-design.md` | What the kit and layouts must never do | Link repointed to the folder. |
 | `docs/ui-design.md` | What a terminal renderer needs from this | Framing sentence names the folder as the host that reads these; the seven bullets stay (they are shipped, tested constraints); the last bullet's link points at `01-why.md`. |
 | `docs/extensibility.md` | Related | Two bullets repointed. |
-| `docs/third-party/monaco.md` | header, three body mentions, Related | Links repointed to `01-why.md`; prose that argues from the terminal is unchanged. |
+| `docs/editor-monaco.md` | header, three body mentions, Related | Links repointed to `01-why.md`; prose that argues from the terminal is unchanged. |
 | `docs/future/remote.md` | header | The terminal is named as the third surface with a link to the folder. |
 | `docs/future/client-plugins/README.md` | What this folder is not | `terminal.md` → `terminal/`. |
 | `docs/future/client-plugins/07-hosts.md` | The terminal | Collapsed to a pointer at `06-isolation.md`, which now owns custody, provenance, and the trust prompt for the terminal. |
@@ -42,7 +42,7 @@ adapter sentence), `docs/future/compiled-tier.md`, and the `monaco.md` argument 
 | `docs/testing.md` | Test layers | 1, 3, 6 | The `tui` vitest project; the TUI boot test; pane snapshots. |
 | `docs/panes.md` | Layout model | 2 | Projections are drawn; any that changed on contact. |
 | `docs/command-palette-and-shortcuts.md` | Focus and typing | 2, 4 | The terminal adapter is used; the double-Escape rule; the region cycle and the footer. |
-| `docs/terminal-and-agents.md` | the PTY | 2, 6 | The PTY on the TUI; the editor handoff; docker exec. |
+| `docs/terminal.md` | the PTY | 2, 6 | The PTY on the TUI; the editor handoff; docker exec. |
 | `docs/node-distribution.md` | reaching a node | 3, 7 | `acorn` beside the desktop; `bin/acorn` in the tarball layout. |
 | `docs/security.md` | Transport and auth | 3 | The terminal sets the bearer on the upgrade itself. |
 | `docs/security.md` | Trust boundaries, Transport and auth, Third-party plugin bundles, The containment ladder, summary table | 5 | The terminal column, per `06-isolation.md`. |

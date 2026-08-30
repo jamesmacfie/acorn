@@ -1,7 +1,14 @@
-# Terminal and agents
+# The terminal plugin
 
 The terminal plugin provides the desktop terminal drawer, task sessions, run targets, provider
 profiles, and raw-agent handoff. The Node process broker is the only child-process seam.
+
+Three docs have "terminal" in the name and they are about different things. This one is the
+terminal drawer inside the desktop app: a shell, or a provider's own CLI, running raw in a PTY, with
+nothing between you and it. [managed-agents.md](./managed-agents.md) is the other way to run the same
+providers: acorn drives the session over a protocol, keeps a ledger of every turn, and can replay it.
+[future/terminal/](./future/terminal/README.md) is neither; it is the plan for running acorn itself
+in a terminal, as a second host beside the desktop window.
 
 Worktree creation is a core-owned choke point. When a fresh worktree is created, core resolves the
 `core.taskWorktreeCreated` capability supplied by the terminal plugin and the plugin runs the repository

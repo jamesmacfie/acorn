@@ -38,7 +38,7 @@ surfaces.
   the part of its design acorn refuses, and the argument is in [refused.md](./refused.md). A
   keybinding names a command id. A pick names a provider id.
 - A node pref. Task layouts, open files, filters, and dashboards belong to the node the resource is
-  on (`docs/state.md`), and a device file that held them would make the device the owner of state it
+  on (`docs/state-ownership.md`), and a device file that held them would make the device the owner of state it
   does not own.
 - A token, a certificate, a fingerprint, or a node endpoint. `fleet.json` and the keychain own those
   and they are not configuration.

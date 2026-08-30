@@ -6,7 +6,7 @@ Node-owned and encrypted where their values are sensitive.
 It is a loaded plugin (`docs/plugins.md` § Two tiers), in neither compiled composition list. Its node
 half serves `/v2/p/http` through the portable fetch carrier. Its client half is one sandboxed frame
 bundle drawing three surfaces, and its rail entry is a manifest descriptor the host renders. What
-moved, and what that cost, is in `docs/third-party/README.md` § "http has moved".
+moved, and what that cost, is in `docs/loaded-plugin-migration.md` § "http has moved".
 
 ## Data model
 

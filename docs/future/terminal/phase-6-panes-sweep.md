@@ -74,7 +74,7 @@ a pane change that breaks the terminal fails a test in the plugin's own CI run.
 
 - `docs/first-party-plugins.md`: a "terminal" note per plugin where something is reduced or handed
   off.
-- `docs/terminal-and-agents.md`: the editor handoff and docker exec on the TUI.
+- `docs/terminal.md`: the editor handoff and docker exec on the TUI.
 - [01-why.md](./01-why.md)'s table moves to `docs/tui.md` (new) in phase 8; this phase keeps it true.
 
 ## Doors left open

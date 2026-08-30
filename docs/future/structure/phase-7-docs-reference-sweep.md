@@ -50,7 +50,7 @@ marking it as gone. The list, from this programme:
 | `packages/protocol/src/plugin*.ts` | `packages/protocol/src/plugin/*.ts` |
 | `packages/plugin-api/src/{node,client,testkit}/index.ts` | bare files |
 | `./main/index.ts` subpath | gone |
-| `docs/pg.md`, `docs/terminal-and-agents.md`, `docs/state.md`, `docs/release-notes-vnext.md` | phase 1 names |
+| `docs/pg.md`, `docs/terminal-and-agents.md`, `docs/state.md`, `docs/release-notes-vnext.md` | moved to the phase 1 names: `docs/database.md`, `docs/terminal.md`, `docs/state-ownership.md`, `docs/release-notes.md` |
 | `docs/third-party/` | `docs/loaded-plugin-migration.md`, `docs/editor-monaco.md` (new) |
 | `docs/plugin-map.html`, `plans/`, `docs/next-review.md` | deleted in phase 0 |
 | `frame/` as a plugin folder | `tree/` |

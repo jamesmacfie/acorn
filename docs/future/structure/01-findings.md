@@ -346,15 +346,18 @@ What does not hold:
   are two full manifest references. `docs/extensibility.md` and `docs/first-party-plugins.md`
   section "What a loaded plugin cannot have" make the same argument twice. `docs/plugin-map.md` has
   two inbound links. `docs/contribution-kinds.md` is the clean one.
-- `docs/pg.md`: H1 "PostgreSQL tools", describes the database plugin, zero inbound links, thinner
-  than `docs/data-layer.md` section "Database plugin". `docs/terminal-and-agents.md` is the terminal
-  plugin and collides with `docs/future/terminal/`. `docs/state.md` has H1 "state ownership".
-  `docs/release-notes-vnext.md` is titled "Current release notes".
+- Four files carried the wrong name; phase 1 renamed all four. `docs/pg.md`, moved to
+  `docs/database.md`: H1 "PostgreSQL tools", describes the database plugin, zero inbound links,
+  thinner than `docs/data-layer.md` section "Database plugin". `docs/terminal-and-agents.md`, moved to
+  `docs/terminal.md`: the terminal plugin, colliding with `docs/future/terminal/`.
+  `docs/state.md`, moved to `docs/state-ownership.md`: its own H1 already said "state ownership".
+  `docs/release-notes-vnext.md`, moved to `docs/release-notes.md`: titled "Current release notes".
   The deleted `docs/next-review.md` was a personal TODO with zero inbound links.
 - `docs/plugin-map.html`, since deleted, was 59 KB, referenced nowhere, with no generator and a
   title that already differed from the `.md`.
-- `docs/third-party/README.md` is a migration review record and `docs/third-party/monaco.md` is a
-  Monaco design doc. They share a folder because both are "not core".
+- `docs/third-party/README.md` was a migration review record, moved to
+  `docs/loaded-plugin-migration.md`, and `docs/third-party/monaco.md` a Monaco design doc, moved to
+  `docs/editor-monaco.md`. They shared a folder because both were "not core"; phase 1 deleted it.
 - `docs/future/`: `refused.md` exists in `client-plugins/`, `dashboards/`, `terminal/` and not in
   `ecosystem/`, `marketing/`, `sandbox/`, though all three discuss refusals inline.
   `docs-migration.md` exists only in `terminal/` and `client-plugins/`. `sandbox/` is seven peer

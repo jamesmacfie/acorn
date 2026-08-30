@@ -11,9 +11,10 @@ and ends with a verify-before-building list where it names code. Nothing here is
 
 ## The programmes
 
-Multi-file designs with an order of work.
+Multi-file designs with an order of work. Every one of them carries a `refused.md` holding what it
+decided not to do and why, so a later session argues with the reasoning rather than with silence.
 
-| Folder | What it is | Status, 2026-08-28 |
+| Folder | What it is | Status, 2026-08-30 |
 | --- | --- | --- |
 | [terminal/](./terminal/README.md) | `acorn` in a terminal: a second host for the same component tree and layouts, the process model, and the node + tui deployable beside the desktop. Nine phases. | Proposal, 2026-08-30. Not started; phase 0 blocks on nothing. Replaces the single file `terminal.md`. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
@@ -22,11 +23,11 @@ Multi-file designs with an order of work.
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [structure/](./structure/README.md) | Making the folder names say what the architecture doc says: retire `main/`, regroup client-core and node-core, one plugin shape, a docs index, then a full path sweep. Eight phases. | Proposal, 2026-08-30. Phase 0 (hygiene) shipped the same day; phase 1 is next. |
+| [structure/](./structure/README.md) | Making the folder names say what the architecture doc says: retire `main/`, regroup client-core and node-core, one plugin shape, a docs index, then a full path sweep. Eight phases. | Proposal, 2026-08-30. Phases 0 (hygiene) and 1 (docs shape) shipped the same day; phase 2 is next. |
 
 ## The single files
 
-| File | What it is | Status, 2026-08-28 |
+| File | What it is | Status, 2026-08-30 |
 | --- | --- | --- |
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX half shipped; distribution half remains. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |

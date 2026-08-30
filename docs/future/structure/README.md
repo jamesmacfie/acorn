@@ -1,6 +1,6 @@
 # Structure: making the folder names say what the architecture doc says
 
-Status: proposal, 2026-08-30. Phase 0 shipped the same day; phase 1 is next.
+Status: proposal, 2026-08-30. Phases 0 and 1 shipped the same day; phase 2 is next.
 
 This folder is the plan for reorganising the repo so a reader can predict where a file lives without
 first reading `docs/architecture-overview.md`. The architecture is documented well and enforced by
@@ -44,7 +44,7 @@ docs saying the new true thing ([docs-migration.md](./docs-migration.md) says wh
 | Phase | What it does | Waits on |
 | --- | --- | --- |
 | [0: hygiene](./phase-0-hygiene.md) — shipped | Deletes and untracks: the `forge` gitlink, `.pnpm-store`, `test-results/`, the stray PNG, `plans/`, the three empty `profiles-*` dirs, the orphan HTML plugin map. Fixes the one dead test. | Nothing |
-| [1: docs shape](./phase-1-docs-shape.md) | `docs/README.md` (new), `docs/conventions.md`, the `plugins.md` split, the corrected canonical plugin layout, four renames. | 0 |
+| [1: docs shape](./phase-1-docs-shape.md) — shipped | `docs/README.md` (new), `docs/conventions.md`, the `plugins.md` split, the corrected canonical plugin layout, four renames. | 0 |
 | [2: apps](./phase-2-apps.md) | `apps/node` gets `entries/` and `composition/`; `apps/desktop` loses the empty `app/` level and gets `helper/` out of `shell/`. | 1 |
 | [3: node-core and desktop-helper](./phase-3-node-core.md) | Finish the `core/` facade migration, merge `main/` into `server/` with real groups, flatten desktop-helper. | 2 |
 | [4: plugins](./phase-4-plugins.md) | Retire `main/` in ten plugins, apply the contract rule, subdivide agents and github, apply the naming conventions, drop Electron residue. | 3 |

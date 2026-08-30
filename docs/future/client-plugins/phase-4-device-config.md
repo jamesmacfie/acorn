@@ -43,7 +43,7 @@ what makes the change live. On a Settings write, the file is regenerated from th
 owns the file so the renderer never touches disk, following the rule that the renderer holds no
 files.
 
-**Write order.** `docs/state.md` and the memory of the device-pref write-order bug both say:
+**Write order.** `docs/state-ownership.md` and the memory of the device-pref write-order bug both say:
 `localStorage` before the query cache, or the new value is discarded. A file read goes through the
 same setter and inherits the order.
 
@@ -80,7 +80,7 @@ is terminal-specific except the path.
 
 ## Docs owed
 
-Per [docs-migration.md](./docs-migration.md), phase 4 rows: `docs/state.md § Device`, `docs/shell.md
+Per [docs-migration.md](./docs-migration.md), phase 4 rows: `docs/state-ownership.md § Device`, `docs/shell.md
 § Files on disk`.
 
 ## Doors left open

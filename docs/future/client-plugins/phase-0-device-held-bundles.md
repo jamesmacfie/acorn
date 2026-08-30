@@ -119,7 +119,7 @@ uses for fields added after rows were written.
 ## Docs owed
 
 Per [docs-migration.md](./docs-migration.md), phase 0 rows: `docs/plugins.md` (two sections plus one
-new), `docs/security.md` (three sections), `docs/state.md`, `docs/plugin-authoring.md`,
+new), `docs/security.md` (three sections), `docs/state-ownership.md`, `docs/plugin-authoring.md`,
 `docs/contribution-kinds.md`, `docs/shell.md`, `docs/testing.md`, `docs/architecture-overview.md`,
 `docs/future/remote.md`, `docs/future/terminal/06-isolation.md`, `docs/future/ecosystem/README.md`.
 

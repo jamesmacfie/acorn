@@ -1,4 +1,4 @@
-# Current release notes
+# Release notes
 
 The current acorn release is the Tauri desktop app plus the protocol-v2 Node runtime.
 
