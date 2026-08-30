@@ -79,3 +79,7 @@ is a sign it has drifted; stop and file the change elsewhere.
 
 [compiled-tier.md](../compiled-tier.md) and [split.md](../split.md) describe moving plugins between
 tiers and repos. Both get easier once every plugin has the same shape, which is the point of phase 4.
+
+[structure-followup/](../structure-followup/README.md) picks up what this programme leaves: the
+custody package's name, core's remaining plugin-name literals, and the plugin context type. It starts
+when phase 7 deletes this folder.

@@ -24,6 +24,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [structure/](./structure/README.md) | Making the folder names say what the architecture doc says: retire `main/`, regroup client-core and node-core, one plugin shape, a docs index, then a full path sweep. Eight phases. | Proposal, 2026-08-30. Phases 0 (hygiene) and 1 (docs shape) shipped the same day; phase 2 is next. |
+| [structure-followup/](./structure-followup/README.md) | The three places the whiteboard drawing still lies after `structure/`: the custody package named for one host, core naming plugins, and a plugin context type that over-promises. Four phases, plus the facts that keep the cloud door open. | Proposal, 2026-08-30. Waits on `structure/` phases 5 to 7. |
 
 ## The single files
 
