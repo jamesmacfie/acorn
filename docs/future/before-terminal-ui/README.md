@@ -1,6 +1,6 @@
 # Before the terminal: every plugin UI honest about the kit
 
-Status: in progress, 2026-08-31. Phases 0 to 5 have shipped.
+Status: in progress, 2026-08-31. Phases 0 to 6 have shipped.
 
 The terminal programme ([docs/future/terminal/](../terminal/README.md)) rests on one claim: a plugin
 writes its UI once against the closed kit, and a second host draws it without the plugin knowing.
@@ -54,8 +54,8 @@ Decided with the owner on 2026-08-31. A phase file may not reopen them.
 | 3 ✅ | [phase-3-platform-file-seams.md](./phase-3-platform-file-seams.md) | `pickFiles` and `saveFile` on the platform seam; the composer's hidden input and both download anchors gone | Agents whole on any host | Nothing |
 | 4 ✅ | [phase-4-editor-codemirror.md](./phase-4-editor-codemirror.md) | Both Monaco instances on CodeMirror 6; `monaco-editor` out of the tree; the editor pane on a kit root | Phase 5; a lighter renderer everywhere | Nothing |
 | 5 ✅ | [phase-5-editor-pty-handoff.md](./phase-5-editor-pty-handoff.md) | The editor preference; `$EDITOR` in an ephemeral PTY on the desktop | Editing parity with the TUI's handoff | 4 |
-| 6 | [phase-6-preview-gating.md](./phase-6-preview-gating.md) | The `{ seam: … }` host requirement; preview absent from every rail on a host without the seam | An honest pane switcher on the TUI and the PWA | Nothing |
-| 7 | [phase-7-enforcement-and-docs.md](./phase-7-enforcement-and-docs.md) | The client-tier purity rule with an empty baseline; the terminal programme's plugin table corrected | `docs/future/terminal/` phase 6 | 0 to 6 |
+| 6 ✅ | [phase-6-preview-gating.md](./phase-6-preview-gating.md) | The `{ seam: … }` host requirement; preview absent from every rail on a host without the seam | An honest pane switcher on the TUI and the PWA | Nothing |
+| 7 | [phase-7-enforcement-and-docs.md](./phase-7-enforcement-and-docs.md) | The client-tier purity rule with an empty baseline; the terminal programme's plugin table corrected | `docs/future/terminal/` phase 6 | 0 to 6 (all shipped) |
 
 ## The order of work
 

@@ -75,12 +75,14 @@
 }
 .workspace-empty-term:hover { background: var(--bg-hover); }
 
-/* The editor pane has no box rule of its own: its root is the kit's ListDetail, which already fills
-   the slot. The rule that used to be here was the last thing keeping `class="pane editor-pane"` on a
-   raw <section> inside a plugin (docs/future/before-terminal-ui/phase-4-editor-codemirror.md). The
-   preview pane below still has one, because a <webview> is not a kit node. */
+/* Neither the editor pane nor the preview pane has a box rule of its own any more: the first roots
+   itself in the kit's ListDetail and the second declares the `single` layout, and both of those
+   already fill the slot. The rules that used to be here were the last thing keeping
+   `class="pane …"` on a raw <section> inside a plugin
+   (docs/future/before-terminal-ui/, phases 4 and 6). What is left below belongs to the host's own
+   plugin webview frame, which is core code rather than a plugin's. */
 
-/* Browser-preview pane: the <webview> fills the content columns. */
+/* Plugin webview frame: the <webview> fills the content columns. */
 .workspace-preview { grid-column: 1 / 3; display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .workspace-preview-host { flex: 1; min-height: 0; display: flex; }
 

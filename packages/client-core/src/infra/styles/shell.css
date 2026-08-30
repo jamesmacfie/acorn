@@ -188,6 +188,10 @@
 /* Except when the region is a split. Its divider is the two columns' shared edge and has to reach the
    pane's, and its list column does its own padding. */
 .layout-single-body:has(> .ui-listdetail) { padding-inline: 0; }
+/* Or a rectangle. Somebody else's pixels fill the box edge to edge — the browser preview's
+   `WebContentsView`, positioned from this element's own rect — and an inline pad would letterbox it.
+   The `Toolbar` above it carries its own padding, as chrome always does. */
+.layout-single-body:has(> .ui-rect) { padding-inline: 0; }
 
 /* The regions a drag sizes take an inline pixel length; their sibling takes what is left. */
 .layout-region-document,

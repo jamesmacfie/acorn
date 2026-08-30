@@ -149,8 +149,9 @@ It went to `4` on 2026-08-28, when `ctx.events` lost `notice` and `stepEvent` to
 capability, a loaded plugin's capability ids became bound to its own namespace, and its pane, source and
 slot ids did too. The same `4` batch then took `hostCapabilities` and the `HostCapabilities` type: a
 contribution's `requires` used to be a closed union with one plugin's name, `terminal`, compiled into
-core, and it is now `'desktop' | { plugin: id }` or an array of them, answered by `hasHostCapability`
-(2026-08-27 extensibility review, finding 8). Every bump was batched deliberately — a rename is cheap
+core, and it is now `'desktop' | { plugin: id } | { seam: group }` or an array of them, answered by
+`hasHostCapability` (2026-08-27 extensibility review, finding 8; the seam form arrived on 2026-08-31,
+docs/frontend.md § The desktop gate audit). Every bump was batched deliberately — a rename is cheap
 while every plugin is in this repository and expensive the moment one is not, and the `4` batch was the
 last window before the namespace rules would have had to grandfather an ecosystem.
 

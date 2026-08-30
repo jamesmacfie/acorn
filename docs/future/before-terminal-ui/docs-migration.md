@@ -17,7 +17,7 @@ applied. Where a row and the owning doc disagree after shipping, the owning doc 
 | `docs/first-party-plugins.md` | The plugins | 4, 5 | The editor row stops naming Monaco; gains the two editing modes after phase 5. |
 | `docs/first-party-plugins.md` | The plugins | 7 | The workflows row stops claiming the plugin registers no UI. |
 | `docs/plugins.md` | The tree contract, if node names are enumerated | 1, 2 | The four new node names. |
-| `docs/panes.md` or `docs/plugin-authoring.md` | Wherever `requires` is documented | 6 | The `{ seam: … }` variant beside `'desktop'` and `{ plugin }`. |
+| `docs/frontend.md` | Three gates, three names, three answers | 6 | The `{ seam: … }` variant beside `'desktop'` and `{ plugin }`. (`docs/panes.md` and `docs/plugin-authoring.md` turned out not to document `requires` at all; `docs/plugins.md` § The plugin API's major carries the union it enumerates.) |
 | `docs/testing.md` | Test layers, if the arch rules are enumerated | 7 | The client-tier purity rule beside the tree-directory rule. |
 | `docs/future/terminal/01-why.md` | The plugin table | 7 | Rows for onboarding and workflows; model-providers and nodes-file noted as UI-less; the browser half of the preview row corrected; a settings-pages note. |
 | `docs/future/README.md` | The programmes | each | The status cell tracks phases as they ship. |

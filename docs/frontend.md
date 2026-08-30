@@ -60,9 +60,10 @@ types until 2026-08-27, which cost a `ctx` member and a line in every contributi
 one difference.
 
 **Three gates, three names, three answers.** `requires` on a contribution is the host question, and it
-has two forms: `'desktop'` asks whether a desktop shell is hosting this renderer, and `{ plugin: id }`
-asks whether the node runs that plugin. An array means all of them. Both are answered by
-`hasHostCapability()` in `client-core/src/infra/node/hostCapabilities.ts`. `when` is a free predicate the
+has three forms: `'desktop'` asks whether a desktop shell is hosting this renderer, `{ plugin: id }`
+asks whether the node runs that plugin, and `{ seam: group }` asks whether this host installed that
+group of the platform seam (`infra/platform/contract.ts`). An array means all of them. All three are
+answered by `hasHostCapability()` in `client-core/src/infra/node/hostCapabilities.ts`. `when` is a free predicate the
 contribution supplies. A rail source's `requiresProvider` is a third question: given the integration
 behind `providerId` is connected, does it grant this capability. None of those is `ctx.capabilities`,
 which is a plugin publishing a typed function for another plugin to call. Two of the four were spelled
@@ -79,11 +80,11 @@ any id; the requirement now carries the id and core names no plugin.
 `requires: 'desktop'` means "a cloud or web client will not have this surface at all", so each one is
 a hole in the headless story (the 2026-08-27 review programme's follow-up item 8; the programme's
 files are retired to git history, `git log --follow -- docs/future/phased-review-steps`). Every site
-was reviewed on 2026-08-28. **One survives.**
+was reviewed on 2026-08-28. **None survives outside a test.**
 
 | Site | Decision |
 | --- | --- |
-| `plugins/preview` task pane | **Kept.** A `WebContentsView` the shell positions over the renderer. No HTTP route behind it, nothing for a browser client to draw. |
+| `plugins/preview` task pane | → `{ seam: 'preview' }` on 2026-08-31. Kept as `'desktop'` until then, and that was the wrong question: a desktop shell may ship without preview views, and on one that does the rail listed the pane and the pane said "needs the desktop app". A seam gate cannot disagree with the surface behind it, because the same probe answers both. |
 | `plugins/agents` pane and three settings pages | → `{ plugin: 'agents' }`. Managed sessions are `/v2` plus the shared WebSocket. |
 | `plugins/editor` pane, file palette, find-in-files command | → `{ plugin: 'editor' }`. File reads and ripgrep are routes. |
 | `plugins/terminal` settings page, and the four terminal commands in `TaskView` | → `{ plugin: 'terminal' }`. The drawer is a WebSocket stream, not a shell feature. |
@@ -92,7 +93,11 @@ was reviewed on 2026-08-28. **One survives.**
 | `plugins/workflows` settings page | → `{ plugin: 'workflows' }`. |
 | `tasks/taskStatus.ts` schedule | **Gate dropped.** `/v2/core/task-statuses` is a core route. It stays a *client* clock deliberately: it refreshes what a window is drawing, and nothing needs it when no window is open. |
 
-Adding a new `'desktop'` gate means writing a row here saying what only a shell can do.
+Adding a new `'desktop'` gate means writing a row here saying what only a shell can do. Before writing
+one, check whether the honest question is `{ seam: group }` instead: `'desktop'` is right for a
+surface that is about the shell itself, and wrong for one that needs a *capability* a shell may or may
+not have installed. Migrating the remaining shell-shaped checks as they are touched is the open door
+this table is the worklist for.
 
 Which registries carry which gate follows a rule now, rather than from history. **Every contribution the
 host filters before drawing takes `requires`**, because the question is the host's and the answer is the
