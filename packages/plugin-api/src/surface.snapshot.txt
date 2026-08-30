@@ -182,6 +182,7 @@ node: Cached
 node: CachedExternalItem
 node: CachedItemCodec
 node: CodecResult
+node: CompiledPluginBroadcast
 node: CoreFsService
 node: CoreGitService
 node: CoreProcService

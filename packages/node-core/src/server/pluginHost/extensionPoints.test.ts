@@ -17,9 +17,28 @@ describe('node extension points', () => {
   it('refuses a point outside the opening plugin\'s namespace', () => {
     const thief = context('thief')
     try {
-      expect(() => thief.extensionPoints.open(POINT, 'Things')).toThrow(/only open points under 'thief:'/)
+      expect(() => thief.extensionPoints.declare(POINT, 'Things')).toThrow(/only open points under 'thief:'/)
     } finally {
       thief.cleanup()
+    }
+  })
+
+  it('still answers to the names it carried before 2026-08-31', () => {
+    // `open`, `contribute` and `entries` are deprecated aliases for one major, so a plugin outside this
+    // repository moves on its own schedule (docs/plugins.md § The plugin API). One test rather than a
+    // second copy of the suite: the aliases share their implementations with the new names, so what is
+    // worth proving is that all three are wired and reach the same registry.
+    const owner = context('owner')
+    const other = context('other')
+    try {
+      owner.extensionPoints.open(POINT, 'Things')
+      other.extensionPoints.contribute(POINT, { id: 'thing', value: 'a' })
+      expect(owner.extensionPoints.entries(POINT).map((entry) => entry.id)).toEqual(['other:thing'])
+      // And the two spellings are one registry, not two.
+      expect(owner.extensionPoints.handlers(POINT).map((entry) => entry.id)).toEqual(['other:thing'])
+    } finally {
+      owner.cleanup()
+      other.cleanup()
     }
   })
 
@@ -27,11 +46,11 @@ describe('node extension points', () => {
     const owner = context('owner')
     const other = context('other')
     try {
-      owner.extensionPoints.open(POINT, 'Things')
-      other.extensionPoints.contribute(POINT, { id: 'late', order: 10, value: 'b' })
+      owner.extensionPoints.declare(POINT, 'Things')
+      other.extensionPoints.handle(POINT, { id: 'late', order: 10, value: 'b' })
       // The owner may fill its own point, and both plugins may call their entry the same thing.
-      owner.extensionPoints.contribute(POINT, { id: 'late', order: 1, value: 'a' })
-      expect(owner.extensionPoints.entries(POINT).map((entry) => [entry.id, entry.value])).toEqual([
+      owner.extensionPoints.handle(POINT, { id: 'late', order: 1, value: 'a' })
+      expect(owner.extensionPoints.handlers(POINT).map((entry) => [entry.id, entry.value])).toEqual([
         ['owner:late', 'a'],
         ['other:late', 'b'],
       ])
@@ -44,10 +63,10 @@ describe('node extension points', () => {
   it('refuses one plugin filing the same entry id twice, and reads nothing from an unopened point', () => {
     const other = context('other')
     try {
-      other.extensionPoints.contribute(POINT, { id: 'thing', value: 'a' })
-      expect(() => other.extensionPoints.contribute(POINT, { id: 'thing', value: 'b' })).toThrow(/Duplicate extension/)
+      other.extensionPoints.handle(POINT, { id: 'thing', value: 'a' })
+      expect(() => other.extensionPoints.handle(POINT, { id: 'thing', value: 'b' })).toThrow(/Duplicate extension/)
       // Nobody has opened `owner:things` in this test, so there is no owner to hand the entry to.
-      expect(other.extensionPoints.entries(POINT)).toEqual([])
+      expect(other.extensionPoints.handlers(POINT)).toEqual([])
     } finally {
       other.cleanup()
     }
@@ -57,15 +76,15 @@ describe('node extension points', () => {
     const owner = context('owner')
     const other = context('other')
     try {
-      owner.extensionPoints.open(POINT, 'Things')
-      other.extensionPoints.contribute(POINT, { id: 'thing', value: 'a' })
+      owner.extensionPoints.declare(POINT, 'Things')
+      other.extensionPoints.handle(POINT, { id: 'thing', value: 'a' })
       clearRegistrations('other')
-      expect(owner.extensionPoints.entries(POINT)).toEqual([])
+      expect(owner.extensionPoints.handlers(POINT)).toEqual([])
       // And the point itself goes with its owner, so a survivor cannot deliver into a plugin that
       // is no longer running.
-      other.extensionPoints.contribute(POINT, { id: 'thing', value: 'a' })
+      other.extensionPoints.handle(POINT, { id: 'thing', value: 'a' })
       clearRegistrations('owner')
-      expect(other.extensionPoints.entries(POINT)).toEqual([])
+      expect(other.extensionPoints.handlers(POINT)).toEqual([])
     } finally {
       owner.cleanup()
       other.cleanup()

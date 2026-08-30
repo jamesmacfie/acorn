@@ -222,6 +222,12 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // registrations record an undo, because the maps behind them are module singletons and a reload's
     // candidate instance has to be able to take back what it filed.
     extensionPoints: {
+      declare: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
+      handle: (point, entry) => recordUndo(contributeExtension(plugin, point, entry).dispose),
+      handlers: (point) => extensionsFor(point),
+      // The names these three carried until 2026-08-31, kept for one major so a plugin outside this
+      // repository moves on its own schedule (docs/plugins.md § The plugin API). Aliases rather than
+      // wrappers, so the guard pass below wraps each of the six once and both spellings behave the same.
       open: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
       contribute: (point, entry) => recordUndo(contributeExtension(plugin, point, entry).dispose),
       entries: (point) => extensionsFor(point),
@@ -419,11 +425,13 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // when it is called, while `audit.declare` beside it is an ordinary registration that buffers.
     const buffer = group !== 'events' && group !== 'storage'
     for (const [key, value] of Object.entries(members)) {
-      // `extensionPoints.entries` reads, `audit.record` writes, and `hooks.run` awaits a chain and
-      // answers the caller: all three are guarded against a revoked context like the rest and none is
-      // ever deferred, because a buffered call would return undefined to a caller about to act on it.
+      // `extensionPoints.handlers` reads (under both its spellings), `audit.record` writes, and
+      // `hooks.run` awaits a chain and answers the caller: all are guarded against a revoked context like
+      // the rest and none is ever deferred, because a buffered call would return undefined to a caller
+      // about to act on it.
+      const reads = key === 'handlers' || key === 'entries' || key === 'record' || key === 'run'
       if (typeof value === 'function') {
-        members[key] = guard(value as (...args: unknown[]) => unknown, buffer && key !== 'entries' && key !== 'record' && key !== 'run')
+        members[key] = guard(value as (...args: unknown[]) => unknown, buffer && !reads)
       }
     }
   }

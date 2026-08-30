@@ -3,7 +3,7 @@
 // connection and torn down on detach/kill/disconnect. Refs are shape-validated here since they
 // reach argv.
 import { spawn as ptySpawn, type IPty } from 'node-pty'
-import type { PluginBroadcast } from '@acorn/plugin-api/node'
+import type { CompiledPluginBroadcast } from '@acorn/plugin-api/node'
 import { isDockerRef } from '../shared/model'
 import type { DockerClientFrame } from '../shared/wsFrames'
 import { dockerEnv } from './cli'
@@ -17,9 +17,9 @@ const MAX_EXECS_PER_CONN = 8
 const EXEC_SHELL = 'command -v bash >/dev/null && exec bash || exec sh'
 
 // `events` rather than a direct wsHub import: the hub is reached through the plugin context
-// (server/pluginHost/types.ts § PluginBroadcast), which is what lets the host take the registration back
+// (server/pluginHost/types.ts § CompiledPluginBroadcast), which is what lets the host take the registration back
 // on a re-init.
-export function registerDockerWsChannel(events: PluginBroadcast): void {
+export function registerDockerWsChannel(events: CompiledPluginBroadcast): void {
   const service = getDockerService(events.send)
   const streamSubs = new Map<object, Map<StreamKey, { stop(): void }>>()
   const execSubs = new Map<object, Map<string, IPty>>()

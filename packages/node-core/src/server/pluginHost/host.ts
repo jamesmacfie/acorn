@@ -30,7 +30,7 @@ import type { HookMode } from '@acorn/protocol/extensionPoints.ts'
 import { runPluginHookRoute } from './hookRun'
 import { clearTaskChecks } from './taskChecks'
 import { declareEmits } from './emits'
-import type { HostPluginContext, NodePlugin, NodePluginContext, PluginHookPoint, PluginStorage } from './types'
+import type { CompiledNodePluginContext, HostPluginContext, NodePlugin, NodePluginContext, PluginHookPoint, PluginStorage } from './types'
 
 // Undos for what `clearRegistrations` can't reach on its own: the WS hub's two slots, which are module
 // singletons with no duplicate guard, and schedules, which live in the composition root's scheduler.
@@ -121,7 +121,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   const failed: PluginFailure[] = []
   const started: NodePlugin[] = []
   // Kept so the ready pass below hands each plugin the same context its init got.
-  const contexts = new Map<string, NodePluginContext>()
+  const contexts = new Map<string, CompiledNodePluginContext>()
   // Seeded from the boot options and replaced by a successful reload, so after a swap the running
   // instance takes its permissions and migrations chain from the fresh manifest. Membership also
   // answers "may this name be reloaded at all".

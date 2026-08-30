@@ -32,7 +32,7 @@ type Mutual<A, B> = [A extends B ? true : never, B extends A ? true : never]
 // Adding a name to a list below is the deliberate act. It means "acorn no longer promises the shape of
 // this one member", and it should be argued for in review like any other narrowing.
 const HOLES = {
-  context: ['storage', 'tools', 'providers', 'collections', 'contextSections', 'taskChecks'],
+  context: ['storage', 'providers', 'collections', 'taskChecks'],
   tasks: ['runConfig'],
   projects: ['config', 'setup'],
   proc: ['ProcessError'],
@@ -52,12 +52,10 @@ type Hole<C, K extends keyof C | string> = Omit<C, K>
  *  and both sides are widened here before they are compared. */
 type WidenNumbers<T> = { [K in keyof T]: T[K] extends number ? number : T[K] }
 
-// The loaded tier's projection of the real context: no `routes.register`, no `events.channel`, no
-// `events.streams`. The host withholds all three whatever a manifest says (docs/extensibility.md §
-// Two tiers, permanently), and the published type describes the tier a stranger can write.
-type LoadedContext = Omit<NodePluginContext, 'routes' | 'events' | 'core'> & {
-  routes: Omit<NodePluginContext['routes'], 'register'>
-  events: Omit<NodePluginContext['events'], 'channel' | 'streams'>
+// The host's `NodePluginContext` IS the loaded tier's shape now — the compiled-only members live on
+// `CompiledNodePluginContext` beside it — so there is nothing to subtract here any more. `core` is the
+// one exception, and not a tier one: its big facets are compared one at a time below.
+type LoadedContext = Omit<NodePluginContext, 'core'> & {
   core: WidenNumbers<Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'secrets' | 'git'>>
 }
 type PublishedContext = Omit<Published.NodePluginContext<Real[0], Real[1]>, 'core'> & {
@@ -82,15 +80,15 @@ void [_context, _task, _project, _capabilityId, _capabilities, _fs, _git, _prefs
 it('leaves most of the surface compared, not substituted', () => {
   // What the assertions above cannot catch: the hole lists growing until the comparison is vacuous.
   // These numbers are the budget. Raising one is a decision; lowering one is progress.
-  expect(HOLES.context).toHaveLength(6)
-  expect(Object.values(HOLES).flat()).toHaveLength(10)
-  // Nine of the context's fifteen members are compared in full, `core` facet by facet above, and
+  expect(HOLES.context).toHaveLength(4)
+  expect(Object.values(HOLES).flat()).toHaveLength(8)
+  // Nine of the context's thirteen members are compared in full, `core` facet by facet above, and
   // that is where most of the surface a plugin actually calls lives.
   const published: Array<keyof Published.NodePluginContext> = [
-    'name', 'routes', 'tools', 'schedules', 'collections', 'taskChecks',
-    'contextSections', 'runs', 'audit', 'extensionPoints', 'providers', 'capabilities', 'storage', 'core', 'events',
+    'name', 'routes', 'schedules', 'collections', 'taskChecks',
+    'runs', 'audit', 'extensionPoints', 'hooks', 'providers', 'capabilities', 'storage', 'core', 'events',
   ]
-  expect(published.length - HOLES.context.length).toBe(9)
+  expect(published.length - HOLES.context.length).toBe(10)
 })
 
 it('names every capability the first-party plugins publish', () => {

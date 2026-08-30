@@ -42,6 +42,11 @@ export type CompiledExtension =
   Omit<ExtensionContribution, 'pluginId' | 'carrier' | 'component' | 'entry' | 'hash' | 'frame' | 'fetch' | 'marks' | 'run'>
   & { component: NonNullable<ExtensionContribution['component']> }
 
+// What a plugin loaded from disk would be handed, if one were ever handed this object. It is not: a
+// loaded plugin's client half is a manifest plus a tree or a frame, and the descriptor pass turns those
+// into the same contributions from outside. The split is here anyway, because
+// docs/contribution-kinds.md names a tier per kind and the test that reads this file should see the same
+// partition the table does.
 export type ClientPluginContext = {
   readonly name: string
   panes: ClientContributionPoint<PaneRegistration>
@@ -50,7 +55,6 @@ export type ClientPluginContext = {
   sources: { register<Item>(entry: SourceContribution<Item>): void }
   commands: ClientContributionPoint<CommandContribution>
   keybindings: ClientContributionPoint<KeybindingContribution>
-  integrationFlows: ClientContributionPoint<IntegrationFlowContribution>
   projectImporters: ClientContributionPoint<ProjectImporterContribution>
   settingsPages: ClientContributionPoint<SettingsContribution>
   // One registry for both shapes: the slot id picks whether the component is handed the shell context
@@ -67,13 +71,6 @@ export type ClientPluginContext = {
   refPanels: ClientContributionPoint<RefPanelContribution>
   paletteRows: ClientContributionPoint<PaletteRowSource>
   agentContexts: ClientContributionPoint<AgentContextContribution>
-  // The same word the node uses for the same idea, and deliberately not the same shape
-  // (registries/schedules.ts).
-  schedules: ClientContributionPoint<ClientScheduleContribution>
-  // Status markers drawn on a rail control by the host, published from the state that owns them
-  // (registries/railMarkers.ts). Data only; a marker has no click verb.
-  railMarkers: ClientContributionPoint<RailMarkerContribution>
-  persistedStateSlices: ClientContributionPoint<PersistedStateSlice<unknown>>
   // One number on a Fleet home node card (docs/frontend.md § Registries and plugins;
   // registries/nodeStats.ts).
   nodeStats: ClientContributionPoint<NodeStatContribution>
@@ -95,6 +92,20 @@ export type ClientPluginContext = {
   // registry. Both of core's own targets got names on 2026-08-27; before that the line was drawn
   // nowhere and every contribution count that read this file was two short.
   contribute<T extends { id: string }>(registry: Registry<T>, entry: T): void
+}
+
+// What a plugin compiled into this bundle is handed: everything above, plus the five kinds
+// docs/contribution-kinds.md marks compiled-only on the client. An intersection rather than a second
+// literal, for the same reason as the node's CompiledNodePluginContext.
+export type CompiledClientPluginContext = ClientPluginContext & {
+  // The same word the node uses for the same idea, and deliberately not the same shape
+  // (registries/schedules.ts).
+  schedules: ClientContributionPoint<ClientScheduleContribution>
+  integrationFlows: ClientContributionPoint<IntegrationFlowContribution>
+  // Status markers drawn on a rail control by the host, published from the state that owns them
+  // (registries/railMarkers.ts). Data only; a marker has no click verb.
+  railMarkers: ClientContributionPoint<RailMarkerContribution>
+  persistedStateSlices: ClientContributionPoint<PersistedStateSlice<unknown>>
   // Plugin-to-plugin functions, the same four methods as the node's `ctx.capabilities`
   // (../clientCapabilities.ts). Disposal is the host's, so a second activation in one process does not
   // hit "already provided".
@@ -121,11 +132,11 @@ export type ClientPlugin = {
   required?: boolean
   // Registration only, and synchronous. Nothing here does I/O, so async would put a promise between
   // `render()` and the first paint for no gain.
-  init(ctx: ClientPluginContext): void
+  init(ctx: CompiledClientPluginContext): void
   // The side-effect phase, run after every plugin's `init`, so no plugin does I/O while half the
   // registries are empty. A disabled plugin never reaches it. Synchronous as well, so a plugin wanting
   // a network read fires it and handles its own rejection.
-  activate?(ctx: ClientPluginContext): void
+  activate?(ctx: CompiledClientPluginContext): void
 }
 
 export type ClientPluginHostOptions = {
@@ -149,7 +160,7 @@ const declaredProvider = (entry: object): string | undefined =>
     ? (entry as { providerId: string }).providerId
     : undefined
 
-function makeContext(name: string, record: (disposable: Disposable) => void): ClientPluginContext {
+function makeContext(name: string, record: (disposable: Disposable) => void): CompiledClientPluginContext {
   // Structural rather than `Registry<T>`, because the pane registry accepts a wider entry than it
   // stores: a pane may declare a layout and regions, and the registry turns that into a component.
   const own = <T extends { id: string }>(registry: { register: (entry: T) => Disposable }): ClientContributionPoint<T> => ({
@@ -246,7 +257,7 @@ export function initClientPlugins(
   const skipped: string[] = []
   // Kept so the activate pass runs in declaration order over the plugins that initialized, paired with
   // the context each one owns. A second `makeContext` would write disposables into a list nobody holds.
-  const activations: { plugin: ClientPlugin; ctx: ClientPluginContext }[] = []
+  const activations: { plugin: ClientPlugin; ctx: CompiledClientPluginContext }[] = []
 
   for (const plugin of plugins) {
     // Take back whatever this plugin registered on a previous activation, before it registers again.

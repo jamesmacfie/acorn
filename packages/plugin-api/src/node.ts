@@ -16,6 +16,7 @@
 // (server/pluginHost/hooks.ts, docs/plugins.md § Hooks).
 export type {
   NodePlugin,
+  CompiledPluginBroadcast,
   PluginBroadcast,
   PluginFetchHandler,
   PluginHookHandler,

@@ -1,6 +1,8 @@
 # Phase 2: one context type per tier, one verb vocabulary
 
-Status: not started. Nothing blocks it.
+Status: **shipped 2026-08-31**. Four things landed differently from the plan below; they are recorded
+in "What shipped differently" at the end, and the owning docs already say the true version. Phase 3
+reads that section, not this plan.
 
 ## Goal
 
@@ -105,3 +107,36 @@ new verbs in every example. `docs/contribution-kinds.md`'s member column follows
 - `PLUGIN_API_MAJOR` is still 7 (the snapshot header on 2026-08-30) and the snapshot still lists the
   old verb names.
 - Structure phase 5 has landed, so the facade paths are final.
+
+## What shipped differently
+
+**`public.ts` is still hand-written, and the test got stricter instead.** The plan offered generating it
+from the host type and pinning the bytes. Generating it would have to invent the two type parameters
+(`Conn`, `Items`), the `HostOwned<…>` aliases and the prose on every member, all of which exist so the
+published file can describe a shape without dragging in drizzle or Zod. The drift lock is exact now
+because there is nothing left to subtract for tier: the host's `NodePluginContext` IS the loaded shape,
+so `contract.test.ts` compares them directly and the hole list shrank from six members to four.
+
+**The providers registry keeps its four bespoke verbs.** The plan made a single `providers.register({
+kind, … })` conditional on the four shapes sharing a discriminant, and they do not: `integration` takes a
+descriptor plus an optional route carrier, `model` takes an adapter naming an already-registered
+connection provider, and `nodes` takes a contribution whose `create` obliges a `destroy`. The verb table
+in `docs/plugins.md` § One vocabulary across the registries says so and says why.
+
+**The client's own extension-point members were not renamed.** On the node, `ctx.extensionPoints` is one
+member carrying three verbs, which is what made the vocabulary ambiguous. On the client the same idea is
+two separate registries, `extensionPoints` and `extensions`, each with a plain `register` — already the
+"many entries, host collects" shape the table gives that word to. Renaming them would have moved them
+away from every other client contribution point, not towards it.
+
+**The client split is honest, not load-bearing.** `ClientPluginContext` and
+`CompiledClientPluginContext` both exist and `tools/arch/contributionKinds.test.ts` reads both halves,
+but nothing is ever handed the loaded one: a loaded plugin's client half is a manifest plus a tree or a
+frame. The plan said to do it anyway, and it was worth it for the arch test, which would otherwise have
+stopped seeing the compiled-only kinds the moment they moved.
+
+Two smaller notes for phase 3. `PLUGIN_API_MAJOR` did **not** move: `open`, `contribute` and `entries`
+are still there as deprecated aliases, and removing them is what buys the next major — the plan says the
+same, but the phase README's "verify before building" list says the major is 7, and phase 1 took it to 8.
+And `CompiledPluginBroadcast` is a new name on the facade surface (docker owns a WS channel prefix,
+terminal owns the PTY streams), so `surface.snapshot.txt` grew by one line.

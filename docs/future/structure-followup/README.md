@@ -59,7 +59,7 @@ docs saying the new true thing ([docs-migration.md](./docs-migration.md) says wh
 | --- | --- | --- |
 | [0: custody rename](./phase-0-custody-rename.md) | `packages/desktop-helper` becomes `packages/custody`, `@acorn/custody`. The desktop's `src/helper/` process keeps its name. | structure 7 |
 | [1: core plugin names](./phase-1-core-plugin-names.md) — **shipped 2026-08-31** | Each plugin-name literal in `packages/*` moves behind a seam that already exists; an arch rule holds the rest, with every survivor named and reasoned. | 0 |
-| [2: honest context](./phase-2-honest-context.md) | One context type per tier on both sides, the published twin held by a type test, and one verb vocabulary across the registries. | structure 5 |
+| [2: honest context](./phase-2-honest-context.md) — **shipped 2026-08-31** | One context type per tier on both sides, the published twin held by a type test, and one verb vocabulary across the registries. | structure 5 |
 | [3: docs sweep](./phase-3-docs-sweep.md) | Re-check every path the phases moved, retire this folder. | 2 |
 
 What was considered and set aside is in [refused.md](./refused.md).

@@ -87,15 +87,19 @@ export type PluginProviderRuntime = {
 export type PluginFetchHandler = (request: Request, context: PluginRequestContext) => Response | Promise<Response>
 
 export type PluginRouteRegistry = {
+  // The portable half, and the only one a loaded plugin gets. Same mount, same auth gate. The handler
+  // receives a Request whose path is relative to that mount, exactly as `register` gives a router paths
+  // relative to its own.
+  fetch(handler: PluginFetchHandler, options?: PluginRouteOptions): void
+}
+
+export type CompiledPluginRouteRegistry = PluginRouteRegistry & {
   // The plugin id is bound by the host, so a plugin can't mount itself under another's namespace, which
   // a raw registerRoute({ plugin }) call could do by typo or intent.
   //
-  // Built-ins only: this hands the host a live object from the plugin's realm. Absent from a loaded
-  // plugin's context.
+  // Built-ins only: this hands the host a live object from the plugin's realm, which is why it sits on
+  // the compiled type and not on the one a loaded plugin is handed.
   register(router: Hono<AppEnv>, options?: PluginRouteOptions): void
-  // The portable half. Same mount, same auth gate. The handler receives a Request whose path is
-  // relative to that mount, exactly as `register` gives a router paths relative to its own.
-  fetch(handler: PluginFetchHandler, options?: PluginRouteOptions): void
 }
 
 export type PluginToolRegistry = {
@@ -219,14 +223,23 @@ export type PluginNodeActionRegistry = {
 // own namespace and any number of plugins deliver entries into it, ordered, each disposed with the
 // plugin that filed it. Capabilities are the single-provider seam beside this one; reach for a
 // capability when there is one right answer and for a point when there are many.
+//
+// The verbs are the same three words hooks uses, because it is the same shape: an owner declares a
+// point, anyone handles it, the owner reads the handlers (docs/plugins.md § The plugin API).
 export type PluginExtensionPointRegistry = {
   // Declare a point this plugin hosts. The id must start with this plugin's own name.
-  open<T>(point: ExtensionPointId<T>, label: string): void
+  declare<T>(point: ExtensionPointId<T>, label: string): void
   // Deliver one entry into a point, this plugin's own or another's. The host mints the entry id from
   // the plugin, so two packages can use the same entry name without colliding.
-  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
+  handle<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
   // What is in a point right now, in declared order. Resolve at call time: the plugin that fills your
   // point may init after you do.
+  handlers<T>(point: ExtensionPointId<T>): Extension<T>[]
+  /** @deprecated Renamed to `declare`. Removed in the next PLUGIN_API_MAJOR. */
+  open<T>(point: ExtensionPointId<T>, label: string): void
+  /** @deprecated Renamed to `handle`. Removed in the next PLUGIN_API_MAJOR. */
+  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
+  /** @deprecated Renamed to `handlers`. Removed in the next PLUGIN_API_MAJOR. */
   entries<T>(point: ExtensionPointId<T>): Extension<T>[]
 }
 
@@ -260,9 +273,6 @@ export type PluginProviderRegistry = {
   integration(provider: IntegrationProviderContribution, route?: Hono<AppEnv> | PluginFetchHandler): void
   // A provider that owns credentials but contributes no mirrored resources (the model providers).
   connection(provider: ConnectionProviderContribution): void
-  // A text-generation adapter for an already-registered connection provider. Register the connection
-  // first; the registry refuses an adapter naming an unknown one.
-  model(adapter: ModelProviderAdapter): void
   // A provider that knows about nodes, and optionally can make and remove them
   // (../nodeProviders/registry.ts, docs/plugins.md § Node providers). Host-qualified id, disposal on
   // unload, and `create` obliging `destroy`, validated at registration.
@@ -278,6 +288,14 @@ export type PluginProviderRegistry = {
     providerId: string,
     visit: PluginProviderConnectionVisitor<T>,
   ): Promise<T | undefined>
+}
+
+export type CompiledPluginProviderRegistry = PluginProviderRegistry & {
+  // A text-generation adapter for an already-registered connection provider. Register the connection
+  // first; the registry refuses an adapter naming an unknown one. An adapter is a set of live functions
+  // the host calls turn by turn, which is why it is compiled-only where `integration` is not
+  // (docs/contribution-kinds.md § Providers).
+  model(adapter: ModelProviderAdapter): void
 }
 
 // The client-notification surface, and the only one there is.
@@ -308,6 +326,11 @@ export type PluginBroadcast = {
   // `permissions.events`. An absent producer delivers nothing and errors nothing
   // (docs/plugins.md § Hearing another plugin).
   on(event: NodeEventChannel | PluginEventChannel, listener: (frame: WsServerFrame) => void): Disposable
+}
+
+// The two broadcast members a loaded plugin never gets. Both are infrastructure exactly one plugin may
+// own, and neither survives a message-passing boundary (docs/plugins.md § Loaded plugins).
+export type CompiledPluginBroadcast = PluginBroadcast & {
   // Claim a WS channel prefix, the token before the first ':' in a channel name. The client mirror is
   // registerWsChannel (@acorn/client-core/infra/node/wsChannels.ts). Disposal is the host's.
   channel(prefix: string, handler: WsChannelHandler): void
@@ -328,14 +351,17 @@ export type PluginStorage = {
   open(): PluginDatabase
 }
 
-// The two plugin tiers get different runtime projections of this common authoring type. Loaded plugins
-// omit undeclared core facets plus the first-party route and event members; built-ins get the full
-// surface. server/pluginHost/host.ts builds both shapes, and server/plugins/permissions.ts explains why the
-// type doesn't describe every omission.
+// What a plugin loaded from disk is handed. One member per contribution kind the loaded tier has, and
+// no member it does not: reaching for a compiled-only seam is a `tsc` error here rather than a runtime
+// "not a function" (docs/plugins.md § The plugin API). packages/plugin-types/src/public.ts is the
+// published twin of exactly this type, and contract.test.ts holds the two equal.
+//
+// Undeclared core facets are still absent at runtime and present in the type: describing those would
+// make every facet optional for the built-ins that have all of them. server/plugins/permissions.ts
+// carries that argument.
 export type NodePluginContext = {
   readonly name: string
   routes: PluginRouteRegistry
-  tools: PluginToolRegistry
   // Both tiers. A loaded plugin normally declares its schedules in its manifest, which is what puts them
   // in front of the owner at install, and the host registers those through this same seam.
   schedules: PluginScheduleRegistry
@@ -345,7 +371,6 @@ export type NodePluginContext = {
   // Both tiers. A loaded plugin declares `taskChecks` in its manifest and the host synthesises the
   // registration through this seam.
   taskChecks: PluginTaskCheckRegistry
-  contextSections: PluginContextSectionRegistry
   // Both tiers. A route pointer, so a loaded plugin needs nothing more than the route it already has.
   runs: PluginRunRegistry
   // Both tiers, same two feeders as schedules and task checks.
@@ -367,14 +392,28 @@ export type NodePluginContext = {
   events: PluginBroadcast
 }
 
-// The two seams the host fills in on a plugin's behalf, kept off the authoring type above.
+// What a plugin compiled into this binary is handed: everything above, plus the six seams that cannot
+// cross a process boundary or are otherwise first-party
+// (docs/contribution-kinds.md names the reason per kind).
+//
+// An intersection rather than a second literal, so a member added to the loaded shape reaches this one
+// for free and the two can never disagree about the part they share.
+export type CompiledNodePluginContext = NodePluginContext & {
+  routes: CompiledPluginRouteRegistry
+  tools: PluginToolRegistry
+  contextSections: PluginContextSectionRegistry
+  providers: CompiledPluginProviderRegistry
+  events: CompiledPluginBroadcast
+}
+
+// The two seams the host fills in on a plugin's behalf, kept off the authoring types above.
 //
 // Neither is something a plugin writes. A manifest declares node actions (as commands whose verb is
 // `runNodeAction`) and harnesses, and server/pluginHost/host.ts replays those declarations through here.
-// Sitting on `NodePluginContext` they read as members an author should reach for, and in 21 plugins
+// Sitting on a context a plugin author reads they'd look like members to reach for, and in 21 plugins
 // nobody ever did. `harnesses` is not even a registry: it is a handover to whichever plugin owns agent
 // sessions (./harnesses.ts).
-export type HostPluginContext = NodePluginContext & {
+export type HostPluginContext = CompiledNodePluginContext & {
   nodeActions: PluginNodeActionRegistry
   harnesses: PluginHarnessRegistry
 }
@@ -397,10 +436,10 @@ export type NodePlugin = {
   emits?: readonly PluginEmit[]
   // Awaited before the listener binds. Init may open plugin storage, migrate rows, or prepare route
   // state that must be complete before requests are served.
-  init(ctx: NodePluginContext): void | Promise<void>
+  init(ctx: CompiledNodePluginContext): void | Promise<void>
   // A second pass, after every plugin's init and still before the listener binds. Use it only for work
   // that needs another plugin's contribution; init order is not a dependency contract.
-  ready?(ctx: NodePluginContext): void | Promise<void>
+  ready?(ctx: CompiledNodePluginContext): void | Promise<void>
   // Release what the plugin opened: timers, children, pools, slots. Not its database. The host awaits
   // this and then closes the `ctx.storage` handle, so an in-flight write still has a live connection.
   dispose?(): void | Promise<void>

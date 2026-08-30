@@ -16,7 +16,7 @@ import { CapabilityRegistry } from '../server/pluginHost/capabilities'
 import { buildPluginContext } from '../server/pluginHost/context'
 import { clearRegistrations } from '../server/pluginHost/host'
 import { pluginRequestContext } from '../server/pluginHost/requestContext'
-import type { NodePlugin, NodePluginContext, PluginProviderRuntime, PluginRequestContext, PluginStorage } from '../server/pluginHost/types'
+import type { CompiledNodePluginContext, NodePlugin, PluginProviderRuntime, PluginRequestContext, PluginStorage } from '../server/pluginHost/types'
 import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations } from './db'
 
 // Nothing granted. A loaded plugin's manifest block is all-defaulted (protocol/plugin/contract.ts), so
@@ -42,10 +42,10 @@ export type TestNodeContextOptions = {
 }
 
 // The context, plus the handles a test needs to set the world up around it. Flat rather than
-// `{ ctx, db, ... }` so `ctx.storage.open()` and `ctx.db` read the same way. If NodePluginContext grows
+// `{ ctx, db, ... }` so `ctx.storage.open()` and `ctx.db` read the same way. If the context grows
 // a member named `db`, `env` or `cleanup`, this intersection stops compiling and one of the two names
 // has to move.
-export type TestNodeContext = NodePluginContext & {
+export type TestNodeContext = CompiledNodePluginContext & {
   // Core's tables, migrated, in a temp directory. For seeding the workspaces/tasks/integrations rows a
   // route or a service reads back.
   db: AppDatabase

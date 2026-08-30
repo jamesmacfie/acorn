@@ -167,6 +167,59 @@ was bumped an hour ago in the same uncommitted change". Nothing had been release
 buying a `5` nobody could have been running. Once a major is out, the guard's two remedies — put the
 name back, or bump — are the only two.
 
+### One vocabulary across the registries
+
+Every registry on `ctx` used to pick its own verb, and each pick was defensible on its own. Together
+they were a lookup table an author kept open: `register` on most of them, `declare`/`record` on audit,
+`open`/`contribute`/`entries` on extension points, `declare`/`handle`/`run` on hooks,
+`provide`/`get`/`require` on capabilities, and five bespoke names on providers. One shape now means one
+word, on both contexts:
+
+| Shape | Verb | Where |
+| --- | --- | --- |
+| Many entries, host collects | `register` | routes, tools, schedules, collections, task checks, context sections, runs, node actions, harnesses, and every client contribution point |
+| One owner declares a place, anyone fills it, the owner reads it | `declare`, `handle`, `handlers` | `ctx.extensionPoints`, `ctx.hooks` |
+| One provider, resolved late | `provide`, `get`, `require` | `ctx.capabilities`, and its client twin |
+| A registry with one action call beside its registration | keep the action's own verb | `audit.record`, `hooks.run`, `events.send` |
+
+`ctx.extensionPoints` is the one that moved: `open` became `declare`, `contribute` became `handle`, and
+`entries` became `handlers`, so the many-to-many seam reads the same as hooks, which is the same shape
+asked a different question. The three old names are still there, marked deprecated, and they are aliases
+rather than wrappers — same implementation, same registry, same disposal. They come off at the next
+`PLUGIN_API_MAJOR`, which is what gives a plugin outside this repository a release of its own to move in.
+
+**`ctx.providers` keeps its four bespoke names**, and that is a decision rather than an oversight. A
+single `providers.register({ kind, … })` needs the four shapes to share a discriminant, and they do not:
+`integration` takes a descriptor plus an optional route carrier, `model` takes an adapter that names an
+already-registered connection provider, and `nodes` takes a contribution whose `create` obliges a
+`destroy`. Folding them would trade four honest signatures for one union with four ways to be wrong.
+
+### The two contexts, one per tier
+
+There are two node context types, and the difference between them is the difference between the tiers:
+
+- **`NodePluginContext`** is what a plugin loaded from disk is handed. It has one member per
+  contribution kind that tier actually has.
+- **`CompiledNodePluginContext`** is `NodePluginContext` plus the six seams only a plugin compiled into
+  this binary gets: `routes.register` (a live Hono instance), `tools`, `contextSections`,
+  `providers.model`, `events.channel` and `events.streams`.
+  [contribution-kinds.md](./contribution-kinds.md) says why, kind by kind, and what would have to be
+  true for one to move.
+
+`packages/client-core/src/host/registries/extensionPoints/plugin.ts` splits the client's the same way,
+into `ClientPluginContext` and `CompiledClientPluginContext`, though there the split is for honesty
+rather than for a caller: a loaded plugin's client half is a manifest plus a tree or a frame and is never
+handed the object at all.
+
+This was one type with per-member comments until 2026-08-31, and the comments were the only thing saying
+which tier got what. Reaching for a compiled-only member from a loaded plugin compiled fine and failed at
+run time as "not a function", which is a bad way to learn a rule. It is a `tsc` error now.
+
+`packages/plugin-types/src/public.ts` — the declarations acorn publishes as `acorn-plugin-types` — is the
+published twin of the loaded type, and `contract.test.ts` holds the two equal member for member. Adding a
+member to one and not the other fails that test, which is what stops the hand-written copy from quietly
+falling behind the host it describes.
+
 ### What is published, and what acorn promises about it
 
 Three packages leave this repository. All are unscoped, which is a decision and not a placeholder:
@@ -430,8 +483,10 @@ Three things differ, and all three follow from the code not being ours:
   about the boot that observed it, so fixing the package on disk leaves the row reading `failed` with
   its original reason until the restart that re-reads it.
 - **The context is shaped by the manifest.** `permissions.node` decides which `CoreServices` facets
-  and capability ids the plugin can see; `ctx.routes.register` (Hono), `ctx.events.channel` and
-  `ctx.events.streams` are never present, whatever the manifest says. A loaded plugin serves routes as
+  and capability ids the plugin can see. Which *members* it gets is not a manifest question at all: the
+  answer is the `NodePluginContext` type in
+  `packages/node-core/src/server/pluginHost/types.ts`, and everything missing from it is on
+  `CompiledNodePluginContext` beside it (§ The two contexts, one per tier). A loaded plugin serves routes as
   `ctx.routes.fetch(handler)` instead — a `(Request, PluginRequestContext) → Response` function. A
   plugin that wants Hono anyway wraps its router in `portableCarrier(id)` from
   `@acorn/plugin-api/node`, which hands back the `portableFetch` wrapper and the matching
@@ -1938,7 +1993,10 @@ hosts read and adds no bridge verb, so it can never disagree with what is on scr
 
 The same model, on the node, for the same problem: plugin A opens a named point and any number of
 plugins deliver into it. `ctx.extensionPoints` (`node-core/server/pluginHost/extensionPoints.ts`), with
-three calls — `open(point, label)`, `contribute(point, entry)`, `entries(point)`.
+three calls — `declare(point, label)`, `handle(point, entry)`, `handlers(point)`. They are the same
+three words [hooks](#hooks) uses, because it is the same shape asked a different question
+(§ One vocabulary across the registries). They were `open`, `contribute` and `entries` until
+2026-08-31; those spellings still work and are deprecated.
 
 It exists because capabilities are single-provider by construction. `ctx.capabilities.provide` throws
 on a second provider, and that is correct for what a capability is — a named typed function with one
@@ -1959,7 +2017,7 @@ The rules are the client's, so there is one model to learn:
 | ordering | by `order`, ties broken on id, so two entries at the same order are stable rather than dependent on init sequence. |
 | duplicates | one plugin filing two entries under one id on one point throws. |
 | lifecycle | both halves — points opened and entries filed — go when the plugin does. |
-| resolution | `entries()` is resolved per call, never cached at init. Contributing to a point nobody has opened yet is fine and expected: init order is not a dependency contract, so the entry waits. An unopened point reads as empty. |
+| resolution | `handlers()` is resolved per call, never cached at init. Contributing to a point nobody has opened yet is fine and expected: init order is not a dependency contract, so the entry waits. An unopened point reads as empty. |
 
 The typed id lives in the owner's `contract/` and is the only thing a contributor imports, the same
 `capabilityId` trick and for the same reason:
@@ -1969,11 +2027,11 @@ The typed id lives in the owner's `contract/` and is the only thing a contributo
 export const WORKFLOW_STEP_KIND = extensionPointId<StepKindContribution>('workflows:step-kind')
 
 // the owner, once
-ctx.extensionPoints.open(WORKFLOW_STEP_KIND, 'Workflow step kinds')
-for (const entry of ctx.extensionPoints.entries(WORKFLOW_STEP_KIND)) { /* … */ }
+ctx.extensionPoints.declare(WORKFLOW_STEP_KIND, 'Workflow step kinds')
+for (const entry of ctx.extensionPoints.handlers(WORKFLOW_STEP_KIND)) { /* … */ }
 
 // anyone else
-ctx.extensionPoints.contribute(WORKFLOW_STEP_KIND, { id: 'request', value: { handler, validate } })
+ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'request', value: { handler, validate } })
 ```
 
 Unlike the client's, this one carries **functions, not descriptors**, and that is not an inconsistency:
