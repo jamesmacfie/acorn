@@ -12,7 +12,7 @@ export {
   Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, Modal, ModalBody,
   ModalActions, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs,
   SectionHeader, TabPanel, ToolbarSpacer, Text, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
-  ChipRow, StatusDot, Facts, DescriptionList, Table, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,
+  ChipRow, StatusDot, Facts, DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,
   DiffLine, FileHead,
   NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, Input, Textarea,
   Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,

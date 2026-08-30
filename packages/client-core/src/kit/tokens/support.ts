@@ -58,6 +58,11 @@ export const NODE_SUPPORT = {
   Facts: { dom: 'full', tui: 'full' },
   DescriptionList: { dom: 'full', tui: 'full' },
   Table: { dom: 'full', tui: 'reduced' },
+  // Table's rows as nodes, for the reason ModalBody is one: a host cannot truncate columns it
+  // receives as opaque DOM, so the promise above is only keepable if it can see the rows.
+  TableHead: { dom: 'full', tui: 'reduced' },
+  TableRow: { dom: 'full', tui: 'reduced' },
+  TableCell: { dom: 'full', tui: 'reduced' },
   Grid: { dom: 'full', tui: 'reduced' },
   Meter: { dom: 'full', tui: 'full' },
   CodeBlock: { dom: 'full', tui: 'full' },

@@ -1,8 +1,9 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { registerCommands } from '../registries/commands/commands'
 import { registerKeybindings } from '../registries/commands/keybindings'
-import { Kbd, Table } from '../../kit/components/primitives'
+import { Kbd, Table, TableCell, TableRow } from '../../kit/components/primitives'
 import { Modal } from '../../kit/components/overlays/Modal'
+import { Text } from '../../kit/components/content/Text'
 import { keymap } from '../../kit/keys/keymapHost'
 
 // The cheat sheet: what the keyboard will do right now.
@@ -60,17 +61,15 @@ export function CheatSheet() {
       <Modal title="Keyboard shortcuts" size="md" onDismiss={() => setOpen(false)}>
         <Modal.Body>
           <Table size="sm">
-            <tbody>
-              <For each={rows()}>
-                {(line) => (
-                  <tr>
-                    <td><Kbd>{line.display}</Kbd></td>
-                    <td>{line.desc}</td>
-                    <td class="muted">{line.group}</td>
-                  </tr>
-                )}
-              </For>
-            </tbody>
+            <For each={rows()}>
+              {(line) => (
+                <TableRow>
+                  <TableCell><Kbd>{line.display}</Kbd></TableCell>
+                  <TableCell>{line.desc}</TableCell>
+                  <TableCell><Text emphasis="muted">{line.group}</Text></TableCell>
+                </TableRow>
+              )}
+            </For>
           </Table>
         </Modal.Body>
       </Modal>

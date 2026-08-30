@@ -14,7 +14,9 @@ import {
   type AgentPricingDraft,
 } from './pricingDraft'
 import { agentUsageStore } from '../usage/usageStore'
-import { Alert, Button, Inline, Input, Section, Stack, Table, Text, Toolbar } from '@acorn/plugin-api/ui'
+import {
+  Alert, Button, Inline, Input, Section, Stack, Table, TableCell, TableHead, TableRow, Text, Toolbar,
+} from '@acorn/plugin-api/ui'
 
 const PRICE_FIELDS: Array<{ id: AgentPriceField; label: string }> = [
   { id: 'input', label: 'Input' },
@@ -190,55 +192,51 @@ export default function AgentPricingSettings() {
           <>
             <Section label="Built-in Claude prices">
               <Table size="sm" minWidth={620}>
-                <thead>
-                  <tr>
-                    <th>Model</th>
-                    <For each={PRICE_FIELDS}>{(field) => <th>{field.label}</th>}</For>
-                    <th aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={current().catalog}>
-                    {(row) => {
-                      const definition = claudePriceCatalog.find((entry) => entry.id === row.catalogId)
-                      return (
-                        <tr>
-                          <th>
-                            <Text>{definition?.label ?? row.catalogId}</Text>
-                            <Text emphasis="mono">{definition?.models}</Text>
-                          </th>
-                          <For each={PRICE_FIELDS}>
-                            {(field) => (
-                              <td>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="1000000"
-                                  step="0.01"
-                                  required
-                                  width="narrow"
-                                  size="sm"
-                                  label={`${definition?.label ?? row.catalogId} ${field.label}`}
-                                  value={row.price[field.id]}
-                                  onInput={(value) => updateCatalogPrice(row.catalogId, field.id, value)}
-                                />
-                              </td>
-                            )}
-                          </For>
-                          <td>
-                            <Button
-                              variant="bare"
-                              disabled={!row.overridden}
-                              onPress={() => resetCatalogPrice(row.catalogId)}
-                            >
-                              Reset
-                            </Button>
-                          </td>
-                        </tr>
-                      )
-                    }}
-                  </For>
-                </tbody>
+                <TableRow head>
+                  <TableHead priority="high">Model</TableHead>
+                  <For each={PRICE_FIELDS}>{(field) => <TableHead>{field.label}</TableHead>}</For>
+                  <TableHead priority="low" />
+                </TableRow>
+                <For each={current().catalog}>
+                  {(row) => {
+                    const definition = claudePriceCatalog.find((entry) => entry.id === row.catalogId)
+                    return (
+                      <TableRow>
+                        <TableCell header>
+                          <Text>{definition?.label ?? row.catalogId}</Text>
+                          <Text emphasis="mono">{definition?.models}</Text>
+                        </TableCell>
+                        <For each={PRICE_FIELDS}>
+                          {(field) => (
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="1000000"
+                                step="0.01"
+                                required
+                                width="narrow"
+                                size="sm"
+                                label={`${definition?.label ?? row.catalogId} ${field.label}`}
+                                value={row.price[field.id]}
+                                onInput={(value) => updateCatalogPrice(row.catalogId, field.id, value)}
+                              />
+                            </TableCell>
+                          )}
+                        </For>
+                        <TableCell>
+                          <Button
+                            variant="bare"
+                            disabled={!row.overridden}
+                            onPress={() => resetCatalogPrice(row.catalogId)}
+                          >
+                            Reset
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  }}
+                </For>
               </Table>
             </Section>
 
@@ -263,53 +261,49 @@ export default function AgentPricingSettings() {
                   fallback={<Text emphasis="muted">No exact model prices.</Text>}
                 >
                   <Table size="sm" minWidth={620}>
-                    <thead>
-                      <tr>
-                        <th>Exact model id</th>
-                        <For each={PRICE_FIELDS}>{(field) => <th>{field.label}</th>}</For>
-                        <th aria-label="Actions" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <For each={current().customModels}>
-                        {(row) => (
-                          <tr>
-                            <th>
-                              <Input
-                                required
-                                maxLength={200}
-                                assist={false}
-                                placeholder="claude-new-model"
-                                label="Exact Claude model id"
-                                value={row.model}
-                                onInput={(value) => updateCustom(row.id, { model: value })}
-                              />
-                            </th>
-                            <For each={PRICE_FIELDS}>
-                              {(field) => (
-                                <td>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max="1000000"
-                                    step="0.01"
-                                    required
-                                    width="narrow"
-                                    size="sm"
-                                    label={`${row.model || 'Custom model'} ${field.label}`}
-                                    value={row.price[field.id]}
-                                    onInput={(value) => updateCustom(row.id, { field: field.id, value })}
-                                  />
-                                </td>
-                              )}
-                            </For>
-                            <td>
-                              <Button variant="bare" onPress={() => removeCustom(row.id)}>Remove</Button>
-                            </td>
-                          </tr>
-                        )}
-                      </For>
-                    </tbody>
+                    <TableRow head>
+                      <TableHead priority="high">Exact model id</TableHead>
+                      <For each={PRICE_FIELDS}>{(field) => <TableHead>{field.label}</TableHead>}</For>
+                      <TableHead priority="low" />
+                    </TableRow>
+                    <For each={current().customModels}>
+                      {(row) => (
+                        <TableRow>
+                          <TableCell header>
+                            <Input
+                              required
+                              maxLength={200}
+                              assist={false}
+                              placeholder="claude-new-model"
+                              label="Exact Claude model id"
+                              value={row.model}
+                              onInput={(value) => updateCustom(row.id, { model: value })}
+                            />
+                          </TableCell>
+                          <For each={PRICE_FIELDS}>
+                            {(field) => (
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="1000000"
+                                  step="0.01"
+                                  required
+                                  width="narrow"
+                                  size="sm"
+                                  label={`${row.model || 'Custom model'} ${field.label}`}
+                                  value={row.price[field.id]}
+                                  onInput={(value) => updateCustom(row.id, { field: field.id, value })}
+                                />
+                              </TableCell>
+                            )}
+                          </For>
+                          <TableCell>
+                            <Button variant="bare" onPress={() => removeCustom(row.id)}>Remove</Button>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </For>
                   </Table>
                 </Show>
               </Stack>
