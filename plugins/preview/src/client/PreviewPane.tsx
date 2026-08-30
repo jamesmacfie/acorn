@@ -66,8 +66,8 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     })
   })
 
-  // Reconciles the task's main-owned view against the host element (docs/shell.md § Host-owned
-  // webviews covers positioning and hide-on-cover). Main owns home identity across renderer
+  // Reconciles the task's shell-owned view against the host element (docs/shell.md § Host-owned
+  // webviews covers positioning and hide-on-cover). The shell owns home identity across client
   // remounts, so a changed run target updates the view while an ordinary pane or task switch
   // preserves whatever the user was browsing.
   createEffect(() => {
