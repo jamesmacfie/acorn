@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js'
-import { Button } from '../ui/primitives'
+import { Button } from '../kit/components/primitives'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
 // import has to be here even though nothing calls it.
 // eslint-disable-next-line no-unused-vars -- used by the `use:regionFocus` directive.

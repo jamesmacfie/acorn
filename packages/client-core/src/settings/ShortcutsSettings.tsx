@@ -19,7 +19,7 @@ import {
 import { saveJsonPref } from './savePref'
 import { PrefKeys } from '../infra/persistence/prefKeys'
 import { orphanedPluginOverrideIds, removeOverrideIds, visibleShortcutBindings } from './shortcutSettingsModel'
-import { Alert, Button } from '../ui/primitives'
+import { Alert, Button } from '../kit/components/primitives'
 
 type ShortcutGroup = {
   key: string

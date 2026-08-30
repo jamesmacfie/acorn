@@ -35,7 +35,7 @@ the root into `infra/queries/`. Rename `packages/client-core/src/infra/highlight
 
 `git mv ui/ kit/`, then inside: `kit/components/` for the `.tsx` files, `kit/tokens/` for today's
 `ui/kit/`, `kit/lib/` for the 15 utility `.ts` files plus everything from `lib/`, `kit/diff/` for
-`ui/diff/`. Delete `lib/`. `packages/client-core/src/ui/primitives.tsx` (1,436 lines) splits by
+`ui/diff/`. Delete `lib/`. `packages/client-core/src/kit/components/primitives.tsx` (1,436 lines) splits by
 component family if the split is mechanical; otherwise it moves whole and the split is filed.
 
 Re-point `packages/plugin-api/src/ui/index.ts`, `ui/host.ts`, `ui/tokens.ts`, `ui/diff.ts`,
@@ -118,8 +118,8 @@ relative path and does not name the palette, so it needs no change.
 `docs/frontend.md`, `docs/ui-design.md`, `docs/panes.md`, `docs/command-palette-and-shortcuts.md`,
 `docs/plugins.md`, `docs/state-ownership.md` (new), `docs/dashboards.md`, `docs/architecture-overview.md`
 cite about 170 `client-core/src/*` paths. The path checker lists the ones with extensions; the
-extension-less folder citations (`client-core/src/ui/`, `client-core/src/registries/`,
-`client-core/src/plugins/`, `client-core/src/lib/`) need a grep. Fix them here; phase 7 confirms.
+extension-less folder citations (`client-core/src/kit/`, `client-core/src/registries/`,
+`client-core/src/plugins/`, `client-core/src/kit/lib/`) need a grep. Fix them here; phase 7 confirms.
 
 ## Out of scope
 

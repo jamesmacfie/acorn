@@ -2,7 +2,7 @@ import { Show } from 'solid-js'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { closePluginOverlay } from './overlays'
-import { Button } from '../../ui/primitives'
+import { Button } from '../../kit/components/primitives'
 
 // The host's chrome around a plugin overlay: the full-screen picker slot, what the editor's ⌘P file
 // palette occupies as a compiled contribution (docs/plugins.md § Frame contribution kind).

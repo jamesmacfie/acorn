@@ -70,7 +70,7 @@ and it is the same thing the overlay stack in [07-chrome.md](./07-chrome.md) doe
 ## The Rectangle contract
 
 A rectangle is one tab stop from outside. Enter hands the keys to whatever is inside, Escape takes them
-back (`packages/client-core/src/ui/Rectangle.tsx`). On the TUI the PTY region takes every key while
+back (`packages/client-core/src/kit/components/Rectangle.tsx`). On the TUI the PTY region takes every key while
 entered, including `Ctrl+C`, and Escape alone leaves. A person who needs to send Escape to the PTY
 presses it twice, and the footer says so while a PTY is entered. This is the one place the TUI adds a
 key rule the desktop does not have, and it is a rule about the terminal's own limits rather than a

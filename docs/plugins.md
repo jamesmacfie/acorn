@@ -114,7 +114,7 @@ Eight entrypoints:
 
 The line between `/client`, `/ui`, and `/ui/host` is drawn by the runtime, not by taste. Solid
 compiles a component to code that touches `window` at module scope, so `/client` remains free of
-`.tsx`. The frame-safe `/ui` barrel reaches only the pure `client-core/src/ui/` presentation tree;
+`.tsx`. The frame-safe `/ui` barrel reaches only the pure `client-core/src/kit/` presentation tree;
 router/query/registry-connected components sit on `/ui/host`. The facade is declared side-effect
 free so a frame bundle retains only the named presentation components it imports.
 

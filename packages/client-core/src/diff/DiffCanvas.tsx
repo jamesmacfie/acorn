@@ -1,9 +1,9 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
-import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from '../ui/diff/DiffRows'
-import type { FindHighlight } from '../ui/diff/find'
-import { isCodeRow, type CodeRow, type DiffThread, type GapRow, type Row, type SplitBand, type ViewMode } from '../ui/diff/model'
-import { createSplitScrollSync } from '../ui/diff/splitScrollSync'
+import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from '../kit/diff/DiffRows'
+import type { FindHighlight } from '../kit/diff/find'
+import { isCodeRow, type CodeRow, type DiffThread, type GapRow, type Row, type SplitBand, type ViewMode } from '../kit/diff/model'
+import { createSplitScrollSync } from '../kit/diff/splitScrollSync'
 
 type VirtualItem = { index: number; start: number; end: number }
 type DiffVirtualizer = {

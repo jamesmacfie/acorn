@@ -1,6 +1,6 @@
 import { createMemo, Show } from 'solid-js'
 import type { AvailableModelConnection } from '@acorn/protocol/modelProviders.ts'
-import { Select } from '../ui/primitives'
+import { Select } from '../kit/components/primitives'
 import { defaultModelIdFor } from './defaultModel'
 
 // Controlled connection + model dropdowns over the configured model-provider connections

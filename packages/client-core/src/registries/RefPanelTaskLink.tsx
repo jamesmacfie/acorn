@@ -6,7 +6,7 @@ import { projectsOptions, tasksKey, tasksOptions } from '../infra/queries'
 import { taskTracksRef } from './sources'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { createTask } from '../tasks/mutations'
-import { Button, Select, Toolbar } from '../ui/primitives'
+import { Button, Select, Toolbar } from '../kit/components/primitives'
 import type { RefPanelTarget } from './refPanels'
 
 // "Is there a task for this thing, and if not, start one" for any provider's reference panel

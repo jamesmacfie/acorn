@@ -1,4 +1,4 @@
-import { Menu } from './ui/Menu'
+import { Menu } from './kit/components/Menu'
 
 // The topbar's overflow menu. It stopped being an *account* menu when the GitHub session went
 // away: there is no identity to show and nothing to log out of. It is still where the two

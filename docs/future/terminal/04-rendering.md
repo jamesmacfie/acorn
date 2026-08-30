@@ -2,7 +2,7 @@
 
 ## The one switch
 
-`packages/client-core/src/ui/kit/support.ts` exports `HOST: Host = 'dom'`, and `Only` and `Fallback`
+`packages/client-core/src/kit/tokens/support.ts` exports `HOST: Host = 'dom'`, and `Only` and `Fallback`
 are the only nodes that read it. `HOST` becomes a constant each host package supplies at build time;
 the desktop says `dom`, the TUI says `tui`. Nothing else in the kit reads it, and that stays true: a
 node that wants to know which host it is on is a node that is about to draw something host-specific,
@@ -73,7 +73,7 @@ is shared as-is. The DOM layouts' drag handling (`createSplitDrag`, `offsetWidth
 ## Rectangles
 
 `Rectangle` is the kit's one admission of defeat: four kinds, `pty`, `webview`, `frame`, `editor`,
-and the host draws the box and hands the caller an element (`packages/client-core/src/ui/Rectangle.tsx`).
+and the host draws the box and hands the caller an element (`packages/client-core/src/kit/components/Rectangle.tsx`).
 On the TUI:
 
 - `pty` is native. The terminal plugin's pane and docker's exec both mount a PTY through a

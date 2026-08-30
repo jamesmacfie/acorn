@@ -4,7 +4,7 @@ import { keymap } from '../keys/install'
 // import has to be here even though nothing calls it.
 // eslint-disable-next-line no-unused-vars -- used by the `use:regionFocus` directive.
 import { regionFocus } from '../keys/regions'
-import { Tabs as TabStrip } from '../ui/Tabs'
+import { Tabs as TabStrip } from '../kit/components/Tabs'
 import { layoutState } from './state'
 import type { LayoutProps } from './regions'
 

@@ -4,7 +4,7 @@ import PluginFrame from './PluginFrame'
 import { RemoteTree } from '../tree/RemoteTree'
 import type { RemoteContribution } from '../tree/registry'
 import type { FrameBinding } from './broker'
-import { Button, Toolbar } from '../../ui/primitives'
+import { Button, Toolbar } from '../../kit/components/primitives'
 import RefPanelTaskLink from '../../registries/RefPanelTaskLink'
 
 // The host's chrome around a plugin reference panel: the backdrop, the box, the title and the

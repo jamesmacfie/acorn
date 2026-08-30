@@ -1,5 +1,5 @@
 import { createMemo, For, Show } from 'solid-js'
-import { Card, EmptyState, StatusDot } from '../../ui/primitives'
+import { Card, EmptyState, StatusDot } from '../../kit/components/primitives'
 import { PANEL_SOURCE_FIELD_ID } from '../mapping'
 import { boardColumns, groupField, titleField } from '../shaping'
 import Cell from './Cell'

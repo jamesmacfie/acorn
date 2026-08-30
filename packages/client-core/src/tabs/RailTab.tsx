@@ -1,9 +1,9 @@
 import { createUniqueId, For, Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
-import { cx } from '../ui/cx'
-import Icon from '../ui/Icon'
-import { StatusDot } from '../ui/primitives'
+import { cx } from '../kit/lib/cx'
+import Icon from '../kit/components/Icon'
+import { StatusDot } from '../kit/components/primitives'
 import { resolveRailMarkers, type RailMarker, type RailTone } from './railMarkers'
-import { railDotProps } from '../ui/displayMeta'
+import { railDotProps } from '../kit/lib/displayMeta'
 import './tabrail.css'
 
 /* The square icon control both rails are made of: the workspace rail down the left and the task

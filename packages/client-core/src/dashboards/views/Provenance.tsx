@@ -1,7 +1,7 @@
 import { Show } from 'solid-js'
-import { Badge } from '../../ui/primitives'
-import { brandMarkRegistry } from '../../ui/brandMarks'
-import Icon from '../../ui/Icon'
+import { Badge } from '../../kit/components/primitives'
+import { brandMarkRegistry } from '../../kit/lib/brandMarks'
+import Icon from '../../kit/components/Icon'
 
 // Which source a row came from, on a panel that unions more than one collection
 // (docs/dashboards.md § The mapping layer, and cross-source panels). The brand mark and its text

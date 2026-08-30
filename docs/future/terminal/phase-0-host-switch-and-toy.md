@@ -20,7 +20,7 @@ list of kit dishonesties, fixed in `docs/ui-design.md`'s owning sections, for ev
 
 In:
 
-- `HOST` in `packages/client-core/src/ui/kit/support.ts` supplied per host package at build time.
+- `HOST` in `packages/client-core/src/kit/tokens/support.ts` supplied per host package at build time.
   The desktop says `dom`. The TUI says `tui`.
 - `apps/tui/` (new), a workspace package with one entry that sets `globalThis.acorn` from Node,
   imports client-core, and mounts one pane through OpenTUI's Solid reconciler.
@@ -66,7 +66,7 @@ workaround in `apps/tui/`.
 
 ## Code touched
 
-- `packages/client-core/src/ui/kit/support.ts`: `HOST` from a build-time define.
+- `packages/client-core/src/kit/tokens/support.ts`: `HOST` from a build-time define.
 - `packages/client-core/src/infra/node/fleet.ts`: persister chosen by capability.
 - `packages/client-core/src/infra/persistence/appStartup.ts`: host check.
 - `packages/client-core/src/keys/install.ts`, `keys/host.ts`: accept either adapter's types.
@@ -101,7 +101,7 @@ Enter, and can read it at 80 by 24. The findings list exists, even if empty.
 
 ## Verify before building
 
-- `packages/client-core/src/ui/kit/support.ts` still exports `HOST` and only `Only` and `Fallback`
+- `packages/client-core/src/kit/tokens/support.ts` still exports `HOST` and only `Only` and `Fallback`
   read it.
 - `packages/desktop-helper/src/broker/nodeBroker.ts` still has no shell binding and still sets the
   bearer on the upgrade header.

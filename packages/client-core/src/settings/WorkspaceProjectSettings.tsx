@@ -1,12 +1,12 @@
 import { createQuery } from '@tanstack/solid-query'
 import { createResource, createSignal, Index, onCleanup, Show } from 'solid-js'
-import { debounce } from '../lib/debounce'
+import { debounce } from '../kit/lib/debounce'
 import { taskBridge } from '../tasks/taskBridge'
 import { integrationsOptions } from '../infra/queries'
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch } from '@acorn/protocol/api.ts'
 import { availableModelConnections } from '@acorn/protocol/modelProviders.ts'
-import { Alert, Button, Checkbox, Select } from '../ui/primitives'
+import { Alert, Button, Checkbox, Select } from '../kit/components/primitives'
 
 // All project-level config for one folder project (docs/workspaces-and-tasks.md § Worktrees and
 // setup), collapsed behind a native <details> so a workspace with several projects is not a wall of

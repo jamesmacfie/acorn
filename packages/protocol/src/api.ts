@@ -488,7 +488,7 @@ export type InstalledPluginRow = {
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
   // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
   // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't
-  // claim another's mark. See client-core/ui/brandMarks.ts and docs/ui-design.md § Icons.
+  // claim another's mark. See client-core/kit/brandMarks.ts and docs/ui-design.md § Icons.
   icon?: { d: string; color?: string }
   icons?: Record<string, { d: string; color?: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is

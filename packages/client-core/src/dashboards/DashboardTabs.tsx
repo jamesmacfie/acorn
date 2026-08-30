@@ -1,9 +1,9 @@
 import { createSignal, Index, Show } from 'solid-js'
-import { Button, Input } from '../ui/primitives'
-import { createArmedConfirm } from '../ui/confirm'
+import { Button, Input } from '../kit/components/primitives'
+import { createArmedConfirm } from '../kit/lib/confirm'
 import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
-import Icon from '../ui/Icon'
-import { ContextMenu, Menu, type MenuContext } from '../ui/Menu'
+import Icon from '../kit/components/Icon'
+import { ContextMenu, Menu, type MenuContext } from '../kit/components/Menu'
 import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './homeTab'
 import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persist'
 

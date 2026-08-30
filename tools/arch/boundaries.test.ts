@@ -320,7 +320,7 @@ describe('architecture boundaries', () => {
       '@acorn/client-core/registries',
       '@acorn/client-core/settings',
       '@acorn/client-core/tasks',
-      '@acorn/client-core/ui',
+      '@acorn/client-core/kit/lib',
       '@acorn/node-core/server',
       '@acorn/node-core/server/core',
       '@acorn/node-core/server/integrations',
@@ -628,29 +628,28 @@ describe('architecture boundaries', () => {
     expect([...new Set([...foreign, ...declaring, ...componentLeak])].sort()).toEqual([])
   })
 
-  it('client-core ui/ is pure presentation: props in, DOM out', () => {
-    // ui/ is what @acorn/plugin-api/ui re-exports, so its import edges are the design-system contract.
+  it('client-core kit/ is pure presentation: props in, DOM out', () => {
+    // kit/ is what @acorn/plugin-api/ui re-exports, so its import edges are the design-system contract.
     //
     // An allowlist of destinations, not a denylist of data modules, because a denylist silently stops
-    // covering the next directory someone adds. Four carve-outs, all pure or presentation:
-    //   lib/         DOM predicates, debounce, the localStorage draft helper DiffRows binds to
-    //   highlight/   the shiki highlighter the diff model colours through
-    //   palette/model.ts  fuzzyScore, a module with zero imports of its own
-    //   registries/registry.ts  the Registry class, importing only solid-js. The container, not any
-    //     instance: `registries/sources.ts` and its siblings are still application state.
-    //   keys/           the keyboard engine's pure half: the intent set, the key table, the collection
-    //     store, the collection behaviour and the focus trap. `keys/install.ts` reads the command and
-    //     keybinding registries and `keys/regions.ts` reads the task state, so both stay out.
+    // covering the next directory someone adds. kit/ may import kit/ and infra/highlight/ (the shiki
+    // highlighter the diff model colours through), and nothing else.
     //
-    // Type-only imports pass: ui/WorkspacePicker.tsx imports the `FleetWorkspace` type, a shape it
-    // renders rather than a store it reads. Known and deliberate: ui/diff/DiffRows.tsx reaches
-    // lib/draftState, which touches localStorage, because the draft belongs to the comment box.
+    // Type-only imports pass: kit/components/WorkspacePicker.tsx imports the `FleetWorkspace` type, a
+    // shape it renders rather than a store it reads. Known and deliberate: kit/diff/DiffRows.tsx reaches
+    // kit/lib/draftState, which touches localStorage, because the draft belongs to the comment box.
+    //
+    // Three carve-outs remain until the host/ commit of docs/future/structure/phase-5-client-core.md
+    // moves the components that need them out of the kit:
+    //   palette/model.ts  fuzzyScore, a module with zero imports of its own
+    //   registries/registry.ts  the Registry class, importing only solid-js
+    //   keys/           the keyboard engine's pure half; keys/install.ts and keys/regions.ts stay out
     const UI_MAY_IMPORT = (file: string): boolean => {
       const p = rel(file)
       if (!p.startsWith('packages/client-core/src/')) return false
       const inner = p.slice('packages/client-core/src/'.length)
       if (inner === 'keys/install.ts' || inner === 'keys/regions.ts') return false
-      return inner.startsWith('ui/') || inner.startsWith('lib/') || inner.startsWith('infra/highlight/')
+      return inner.startsWith('kit/') || inner.startsWith('infra/highlight/')
         || inner.startsWith('keys/')
         || inner === 'palette/model.ts' || inner === 'registries/registry.ts'
     }
@@ -658,7 +657,7 @@ describe('architecture boundaries', () => {
     // the statement.
     const CLAUSE_IMPORT_RE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
     const BARE_IMPORT_RE = /\bimport\s*['"]([^'"\n]+)['"]/g
-    const uiDir = join(ROOT, 'packages/client-core/src/ui')
+    const uiDir = join(ROOT, 'packages/client-core/src/kit')
     const offenders: string[] = []
     let scanned = 0
     for (const file of walk(uiDir).filter((f) => !isTestCode(f))) {

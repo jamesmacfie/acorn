@@ -1,10 +1,10 @@
 import { createEffect, Show } from 'solid-js'
 import type { Accessor } from 'solid-js'
 import type { DiffFindController } from './findController'
-import type { ViewMode } from '../ui/diff/model'
-import { FindBar } from '../ui/FindBar'
-import { SegmentedControl, ToggleButton } from '../ui/primitives'
-import { tip } from '../ui/tips'
+import type { ViewMode } from '../kit/diff/model'
+import { FindBar } from '../kit/components/FindBar'
+import { SegmentedControl, ToggleButton } from '../kit/components/primitives'
+import { tip } from '../kit/components/tips'
 
 export function DiffToolbar(props: { find: DiffFindController; viewMode: Accessor<ViewMode>; setViewMode: (mode: ViewMode) => Promise<void> }) {
   let findInput: HTMLInputElement | undefined

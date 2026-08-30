@@ -11,7 +11,7 @@
 // (RAIL_MARKER_PLUGIN_MAX_PRIORITY), so a plugin marker can never push a core lifecycle state out of
 // its corner. The numbers are policy, not data: depend on the relative order, not the literals.
 import type { TaskStatus } from '@acorn/protocol/terminal.ts'
-import { CHECK_TONE } from '../ui/displayMeta'
+import { CHECK_TONE } from '../kit/lib/displayMeta'
 import type { RailMarker } from '../tabs/railMarkers'
 
 export type RailChecks = 'success' | 'failure' | 'pending' | 'mixed'

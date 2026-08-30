@@ -22,7 +22,7 @@ In:
 - `apps/tui/src/kit/components.ts` (new in phase 0) becomes `Record<KitNodeName, Component>`, complete, no `Partial`.
 - Each `reduced` node's loss written next to its level in `support.ts`, per
   [04-rendering.md](./04-rendering.md) § A second `KIT_COMPONENTS`.
-- `roleCell()` beside `roleVar()` in `packages/client-core/src/ui/kit/roles.ts`, reading the `tui`
+- `roleCell()` beside `roleVar()` in `packages/client-core/src/kit/tokens/roles.ts`, reading the `tui`
   column. Every TUI component gets its colour, weight, spacing, and border through it. No component
   names an ANSI colour.
 - The theme mapping: 40-odd theme tokens to 16 slots plus `dim` and `bold`, with truecolor passthrough
@@ -61,9 +61,9 @@ has no virtualiser; the component is one.
 
 - `apps/tui/src/kit/components.ts` (new in phase 0), `apps/tui/src/kit/*.tsx`: about 55 new components.
 - `apps/tui/src/appearance.ts` (new).
-- `packages/client-core/src/ui/kit/roles.ts`: `roleCell()`.
-- `packages/client-core/src/ui/kit/support.ts`: losses beside `reduced` levels.
-- `packages/client-core/src/ui/kit/support.test.ts`, `roles.test.ts`: behaviour assertions.
+- `packages/client-core/src/kit/tokens/roles.ts`: `roleCell()`.
+- `packages/client-core/src/kit/tokens/support.ts`: losses beside `reduced` levels.
+- `packages/client-core/src/kit/tokens/support.test.ts`, `roles.test.ts`: behaviour assertions.
 - `tools/arch/kitTable.test.ts`: the third cross-check.
 - `apps/tui/vitest.config.ts` (new): the `tui` project.
 

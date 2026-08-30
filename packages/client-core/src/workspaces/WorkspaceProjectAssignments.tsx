@@ -7,9 +7,9 @@ import { projectsKey, projectsOptions, tasksKey, tasksOptions, workspacesKey, wo
 import { createProject, createWorkspace, deleteProject, deleteWorkspace, patchProject, renameWorkspace } from './mutations'
 import { canPickFolder, pickFolder } from '../infra/platform'
 import { projectImporterRegistry } from '../registries/projectImporters'
-import { Alert, Button, Input, Select } from '../ui/primitives'
-import Icon from '../ui/Icon'
-import { Modal } from '../ui/Modal'
+import { Alert, Button, Input, Select } from '../kit/components/primitives'
+import Icon from '../kit/components/Icon'
+import { Modal } from '../kit/components/Modal'
 import './onboarding.css'
 
 // Projects manager. Projects are listed under the workspace they belong to rather than each carrying a

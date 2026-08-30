@@ -8,7 +8,7 @@ import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../infra/node/NodeChip'
 import '../infra/node/nodes.css'
-import { Alert, Button, ConfirmButton } from '../ui/primitives'
+import { Alert, Button, ConfirmButton } from '../kit/components/primitives'
 
 // Settings → Nodes (docs/ui-design.md § Node management): add, rename, reconnect, unpair, revoke.
 //

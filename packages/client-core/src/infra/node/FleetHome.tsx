@@ -10,7 +10,7 @@ import { reconnectNode } from './fleetActions'
 import { formatLastSeen } from './freshness'
 import NodeChip from './NodeChip'
 import './nodes.css'
-import { Alert, Button } from '../../ui/primitives'
+import { Alert, Button } from '../../kit/components/primitives'
 
 // Fleet home: the landing view once more than one node is paired, a card per node with connection
 // state, counts, last-refresh, and the two actions that matter from here.

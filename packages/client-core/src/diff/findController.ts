@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, on } from 'solid-js'
 import type { Accessor } from 'solid-js'
-import { collectMatches, type FindHighlight } from '../ui/diff/find'
-import type { CodeRow, Row, SplitBand, ViewMode } from '../ui/diff/model'
+import { collectMatches, type FindHighlight } from '../kit/diff/find'
+import type { CodeRow, Row, SplitBand, ViewMode } from '../kit/diff/model'
 
 type ScrollTarget = {
   scrollToIndex: (index: number, options?: { align?: 'auto' | 'start' | 'center' | 'end' }) => void

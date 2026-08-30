@@ -24,7 +24,7 @@ const ROOT = (() => {
 
 const read = (path: string): string => readFileSync(join(ROOT, path), 'utf8')
 
-const KIT = 'packages/client-core/src/ui/kit'
+const KIT = 'packages/client-core/src/kit/tokens'
 
 /** Keys of a top-level `const X = { ... }` object, from its declaration. A regex rather than the
  *  TypeScript API, for the reason contributionKinds.test.ts gives: these are two flat object

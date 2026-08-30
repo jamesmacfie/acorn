@@ -1,9 +1,9 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from 'solid-js'
 import { collectionContribution, collectionContributions } from '../registries/collections'
-import { Button, SectionHeader } from '../ui/primitives'
-import { createArmedConfirm } from '../ui/confirm'
-import Icon from '../ui/Icon'
-import { Menu } from '../ui/Menu'
+import { Button, SectionHeader } from '../kit/components/primitives'
+import { createArmedConfirm } from '../kit/lib/confirm'
+import Icon from '../kit/components/Icon'
+import { Menu } from '../kit/components/Menu'
 import {
   applyMove,
   applyResize,

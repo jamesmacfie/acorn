@@ -306,7 +306,7 @@ hover.
 
 ## The closed kit
 
-Every component a plugin may draw with is in one list, in `packages/client-core/src/ui/`, reaching
+Every component a plugin may draw with is in one list, in `packages/client-core/src/kit/`, reaching
 plugins through `@acorn/plugin-api/ui`. The list is closed: a component's props are role tokens,
 content, counts, booleans, and handlers, and never `class`, `className`, `style`, or a DOM attribute
 passed through. `@acorn/plugin-api/ui/tokens` carries the role enums and the support matrix as data,
@@ -874,10 +874,10 @@ keymap to be honest about intent. The host that reads these is the programme in
 [docs/future/terminal/](./future/terminal/README.md); this list is what the kit already holds for it:
 
 - **Every kit node has an 80×24 monochrome sentence** below and a `tui` level in
-  `packages/client-core/src/ui/kit/support.ts`, tested for presence even though nothing reads it.
+  `packages/client-core/src/kit/tokens/support.ts`, tested for presence even though nothing reads it.
 - **Every layout has a terminal projection** in [docs/panes.md](./panes.md#layout-model).
 - **Role tokens never expose pixels.** Each role has a documented terminal value, including
-  `ignored`, in `packages/client-core/src/ui/kit/roles.ts`.
+  `ignored`, in `packages/client-core/src/kit/tokens/roles.ts`.
 - **The keymap core is host-agnostic.** `@opentui/keymap`'s terminal adapter is in the same package,
   and acorn adds no key handling outside it. Nodes handle `next`, not `ArrowDown`.
 - **Collection state is host-owned**, so a cell-buffer host keeps `active`, `selected` and `offset`

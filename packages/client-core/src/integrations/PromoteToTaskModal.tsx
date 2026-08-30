@@ -5,9 +5,9 @@ import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
 import { projectsOptions } from '../infra/queries'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../registries/sources'
-import { Tabs } from '../ui/Tabs'
-import { createDismissable } from '../ui/dismissable'
-import { Alert, Button, Select } from '../ui/primitives'
+import { Tabs } from '../kit/components/Tabs'
+import { createDismissable } from '../kit/lib/dismissable'
+import { Alert, Button, Select } from '../kit/components/primitives'
 
 // Shared "+ Task" flow for the integration browses. Promoting an external item (a Rollbar error, a
 // Linear ticket) either creates a new task or attaches the item to an existing one: a task

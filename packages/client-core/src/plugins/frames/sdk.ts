@@ -25,7 +25,7 @@ import { eventChord, hasCommandModifier, isBrowserEditingChord, isNormalizedChor
 // The one import from outside this directory, safe for the same reason the protocol imports are:
 // ui/frameTips.ts is framework-free with no imports of its own, so it carries none of the shell into a
 // plugin's bundle. mountFrame() below needs it.
-import { mountFrameTips } from '../../ui/frameTips'
+import { mountFrameTips } from '../../kit/lib/frameTips'
 // The tree path's two imports. `tree/nodes.ts` is plain constants and the root is framework-free, so
 // neither drags anything into a plugin's bundle — `tree/messages.ts`, which is the Zod half, is
 // deliberately not reached from here. See "The tree path" below.

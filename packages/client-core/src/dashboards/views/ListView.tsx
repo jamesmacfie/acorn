@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js'
-import { EmptyState, Row } from '../../ui/primitives'
+import { EmptyState, Row } from '../../kit/components/primitives'
 import { PANEL_SOURCE_FIELD_ID } from '../mapping'
 import { titleField } from '../shaping'
 import Cell from './Cell'

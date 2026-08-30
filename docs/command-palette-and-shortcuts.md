@@ -103,7 +103,7 @@ carries on to the next layer: the focused collection answers, or an ancestor doe
 layer does, or nothing does.
 
 **Focus is a property of the tree.** Each kit node has a fixed focus role
-(`client-core/ui/kit/focusRoles.ts`), and a plugin sets none of it: stops, collections with roving
+(`client-core/kit/tokens/focusRoles.ts`), and a plugin sets none of it: stops, collections with roving
 focus, items inside a collection, and the two traps. Every layout region is a focus group. F6 and
 Shift+F6 move between the regions of a pane, Ctrl+Option+Right and Ctrl+Option+Left move between
 panes, and each group remembers the node focus was last on, so coming back lands where you left.

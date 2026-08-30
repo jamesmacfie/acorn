@@ -1,11 +1,11 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { nodes } from '../infra/node/fleet'
-import Icon from '../ui/Icon'
-import { createDismissable } from '../ui/dismissable'
+import Icon from '../kit/components/Icon'
+import { createDismissable } from '../kit/lib/dismissable'
 import { pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'
 import { recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
 import './plugin-trust.css'
-import { Alert, Badge, Button, Kbd } from '../ui/primitives'
+import { Alert, Badge, Button, Kbd } from '../kit/components/primitives'
 
 // The consent surface for running code a node handed this device
 // (docs/plugins.md).

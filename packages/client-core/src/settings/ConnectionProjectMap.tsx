@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Integration, IntegrationMapping, IntegrationProject, Workspace } from '@acorn/protocol/api.ts'
 import { integrationMappingsKey, integrationMappingsOptions, integrationProjectsOptions, workspacesOptions } from '../infra/queries'
 import { setIntegrationMappings } from '../workspaces/mutations'
-import { Alert, Button, EmptyState, Select } from '../ui/primitives'
+import { Alert, Button, EmptyState, Select } from '../kit/components/primitives'
 
 // Settings → Integrations, under one connection: where that connection's external projects show up
 // (docs/integrations.md § Project sources). One connection often serves every workspace on the

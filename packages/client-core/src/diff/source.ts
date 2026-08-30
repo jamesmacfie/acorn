@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js'
-import type { CodeRow, DiffFile, DiffThread } from '../ui/diff/model'
+import type { CodeRow, DiffFile, DiffThread } from '../kit/diff/model'
 import type { DiffViewScope } from './viewState'
 
 /** Which column a comment is anchored to. The renderer's own vocabulary, matching buildRenderableRows. */

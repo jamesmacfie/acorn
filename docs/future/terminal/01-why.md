@@ -60,7 +60,7 @@ rectangle that defines an agent workspace, the PTY, is the one a terminal does b
 Honestly, in the order the phases pay it:
 
 - **A second component per kit node.** Seventy of them. Fifty-two are `full`, fourteen `reduced`,
-  three `absent`, one `fallback` (`packages/client-core/src/ui/kit/support.ts`). Each already has a
+  three `absent`, one `fallback` (`packages/client-core/src/kit/tokens/support.ts`). Each already has a
   sentence saying what it draws. This is volume, not design.
 - **Seven layout components.** Each has a written projection. Volume again.
 - **A focus and key story without a DOM.** `keys/regions.ts` and `keys/trap.ts` are DOM-deep. The

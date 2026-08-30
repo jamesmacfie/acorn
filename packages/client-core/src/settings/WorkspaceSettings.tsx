@@ -6,7 +6,7 @@ import type { Workspace } from '@acorn/protocol/api.ts'
 import { confirmWillEvent } from '../registries/willPhase'
 import { clientEvents } from '../registries/clientEvents'
 import { ProjectConfig } from './WorkspaceProjectSettings'
-import { Button } from '../ui/primitives'
+import { Button } from '../kit/components/primitives'
 
 // Settings → per-workspace page: workspace name + membership + delete.
 // Build/run/db/preview config is repo-level (docs/workspaces-and-tasks.md § Worktrees and setup): a

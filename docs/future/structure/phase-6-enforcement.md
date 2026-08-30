@@ -38,7 +38,7 @@ shape.
 
 Walk `README.md` and `CLAUDE.md` at the root in addition to `docs/`. Delete the `docs/reviews/`
 exclusion; the folder does not exist. Consider a second rule for extension-less citations of
-directories that this programme moved (`src/main/`, `src/app/client`, `client-core/src/ui`): a
+directories that this programme moved (`src/main/`, `src/app/client`, `client-core/src/kit`): a
 denylist of retired directory names that may only appear on a line with a `GONE` marker. It is
 cheap and it is exactly the rot the extension escape hatch lets through.
 

@@ -40,7 +40,7 @@ export { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 export type { SourceContribution, SourceRouteContribution } from '@acorn/client-core/registries/sources.ts'
 // Brand-mark registration. See docs/ui-design.md § Icons for the two feeders and the `brand:<id>`
 // glyph name they share.
-export { brandMarkRegistry, brandStyle } from '@acorn/client-core/ui/brandMarks.ts'
+export { brandMarkRegistry, brandStyle } from '@acorn/client-core/kit/lib/brandMarks.ts'
 // Core's own URL for a project. A plugin building its own routes on top of `/p/:projectId` needs a
 // way back to the bare project path, deselecting an item, a breadcrumb, without hardcoding a shape
 // core owns.
@@ -168,7 +168,7 @@ export { openRepoConfigTrust } from '@acorn/client-core/configTrust/configTrust.
 
 // ── Integrations, notifications, palette ──────────────────────────────────────────────────────
 export { createDeviceFlow } from '@acorn/client-core/integrations/deviceFlow.ts'
-export { renderMarkdown } from '@acorn/client-core/ui/markdown.ts'
+export { renderMarkdown } from '@acorn/client-core/kit/lib/markdown.ts'
 export { pushManagedAgentNotice, registerNoticeTargetHandler } from '@acorn/client-core/notifications/notifications.ts'
 // Transient feedback. Notices persist in the bell, and a toast says "that worked" then gets out of
 // the way.
@@ -180,22 +180,22 @@ export { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
 // ── Design-system helpers ─────────────────────────────────────────────────────────────────────
 // Plain functions, no component in sight, which is why they sit here rather than on ./ui. Tokens,
 // metrics, and the status/display vocabulary the shell renders by.
-export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/client-core/ui/appearance.ts'
+export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/client-core/kit/lib/appearance.ts'
 // `rowHeightSm` is on ./ui instead: the one thing that needs a density number is a frame's
 // virtualized grid.
-export { rowHeight, termFontSize } from '@acorn/client-core/ui/metrics.ts'
+export { rowHeight, termFontSize } from '@acorn/client-core/kit/lib/metrics.ts'
 // `railDotProps` is here beside CHECK_TONE because that is what it is for: the rail's dot
 // vocabulary is not the kit's, and this is the one translation between them.
-export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, railDotProps, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
+export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, railDotProps, summarizeFileStats } from '@acorn/client-core/kit/lib/displayMeta.ts'
 
 // ── Small helpers ─────────────────────────────────────────────────────────────────────────────
 export { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/infra/highlight/shiki.ts'
-export { debounce } from '@acorn/client-core/lib/debounce.ts'
-export { persistDraft, readDraft, writeDraft } from '@acorn/client-core/lib/draftState.ts'
-export { formatRelativeTime } from '@acorn/client-core/lib/formatRelativeTime.ts'
-export { bytesOf, formatSize } from '@acorn/client-core/lib/formatSize.ts'
-export { latestOnly } from '@acorn/client-core/lib/latestOnly.ts'
-export { onClosePaneWithin } from '@acorn/client-core/lib/onClosePaneWithin.ts'
+export { debounce } from '@acorn/client-core/kit/lib/debounce.ts'
+export { persistDraft, readDraft, writeDraft } from '@acorn/client-core/kit/lib/draftState.ts'
+export { formatRelativeTime } from '@acorn/client-core/kit/lib/formatRelativeTime.ts'
+export { bytesOf, formatSize } from '@acorn/client-core/kit/lib/formatSize.ts'
+export { latestOnly } from '@acorn/client-core/kit/lib/latestOnly.ts'
+export { onClosePaneWithin } from '@acorn/client-core/keys/onClosePaneWithin.ts'
 
 // Which sandboxed plugin, if any, draws a given agent tool call. Data, not a component: the component
 // that mounts it is `RemoteTree` on ./ui/host. See docs/plugins.md § The tree contract.

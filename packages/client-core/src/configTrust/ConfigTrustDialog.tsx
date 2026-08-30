@@ -3,9 +3,9 @@ import { diffLines } from 'diff'
 import { readJson, writeJson } from '../infra/node/apiClient'
 import { repoConfigTrustRoute, type RepoConfigTrustReview } from '@acorn/protocol/api.ts'
 import { closeRepoConfigTrust, configTrustRequest } from './configTrust'
-import { createDismissable } from '../ui/dismissable'
+import { createDismissable } from '../kit/lib/dismissable'
 import './config-trust.css'
-import { Alert, Button } from '../ui/primitives'
+import { Alert, Button } from '../kit/components/primitives'
 
 export default function ConfigTrustDialog() {
   const [review, setReview] = createSignal<RepoConfigTrustReview | null>(null)
