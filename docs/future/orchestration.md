@@ -14,19 +14,19 @@ than it looks.
 
 ## What is already built (verified 2026-08-21)
 
-`plugins/workflows` is a real orchestration engine, not a sketch. `main/workflowRunner.ts` owns
+`plugins/workflows` is a real orchestration engine, not a sketch. `server/workflowRunner.ts` owns
 validation, ordering, persistence, branching, cancellation, and restart reconciliation. Rows are the
 checkpoint, so a step interrupted by a restart is swept back to `pending` rather than repeated blind.
 
 | Primitive | Where | What it does |
 | --- | --- | --- |
-| `fan-out` step | `main/workflowBuiltins.ts` | An agent step emits a JSON task list. The runner creates one child task per item through `core.tasks.createChild()`, then runs a headless agent in each. Capped at `MAX_FAN_OUT_TASKS = 12`. |
+| `fan-out` step | `server/workflowBuiltins.ts` | An agent step emits a JSON task list. The runner creates one child task per item through `core.tasks.createChild()`, then runs a headless agent in each. Capped at `MAX_FAN_OUT_TASKS = 12`. |
 | `join` step | same | Collects every child's structured output and status, fails the run if any child failed, and writes the collection as a handoff. |
 | `decide` step | same | A one-shot structured call whose `verdict` string selects a branch. Prose cannot satisfy it. |
-| Concurrency | `main/workflowSemaphore.ts` | `MAX_CONCURRENT_HEADLESS = 4`. Queued children stay `pending` until they hold a slot. |
-| Budgets | `main/workflowRunner.ts` | Wall time, cost, input tokens, output tokens, and turns, intersected workflow over step, with a persisted-usage sum so a restart cannot reset the meter. |
-| Tool ceilings | `main/workflowTools.ts` | Passed to the child process as `ACORN_TOOL_CEILING`, intersected the same way. |
-| Value passing | `main/workflowValidation.ts` | `${steps.<name>.output}` renders an earlier step's output into a later prompt. Structured JSON is the only input to branching. |
+| Concurrency | `server/workflowSemaphore.ts` | `MAX_CONCURRENT_HEADLESS = 4`. Queued children stay `pending` until they hold a slot. |
+| Budgets | `server/workflowRunner.ts` | Wall time, cost, input tokens, output tokens, and turns, intersected workflow over step, with a persisted-usage sum so a restart cannot reset the meter. |
+| Tool ceilings | `server/workflowTools.ts` | Passed to the child process as `ACORN_TOOL_CEILING`, intersected the same way. |
+| Value passing | `server/workflowValidation.ts` | `${steps.<name>.output}` renders an earlier step's output into a later prompt. Structured JSON is the only input to branching. |
 | Handoffs | `node/index.ts` | Each step's result is appended to a task note, `workflow-handoffs-<runId>`, which is injected as context into later steps of the same run and de-included when the run ends. |
 | Sessions | `plugins/agents/src/server/sessions/sessionExecute.ts` | A step runs as a real managed agent session with a durable event ledger, so it appears in the task's Agents sidebar. |
 

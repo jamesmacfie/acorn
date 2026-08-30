@@ -22,7 +22,7 @@ In:
 - Seven layout components in `apps/tui/src/layouts/`, one per `PaneLayoutName`, each from its
   projection in `docs/panes.md § Layout model`, sharing `packages/client-core/src/host/layouts/state.ts`
   and `LayoutProps` from `layouts/regions.ts`.
-- `keys/host.ts` generic over the keymap's two type parameters; the TUI installs
+- `kit/keys/keymapHost.ts` generic over the keymap's two type parameters; the TUI installs
   `createDefaultOpenTuiKeymap`; the four tiers hold.
 - A TUI `regions.ts`: registration by layout, ordering by the layout's region list, first stop by
   focus role over the renderable tree, focus through the renderer.
@@ -43,7 +43,7 @@ in setup where the DOM one uses the directive. `list-detail` reads its own regio
 terminal's, to decide one column or two; the threshold is the style token the DOM layout uses. Split
 position moves by a chord on layer 5 and is stored in the same session signal.
 
-**Keys.** `keys/host.ts` today: `type AcornKeymap = Keymap<HTMLElement, HtmlKeymapEvent>`. It becomes
+**Keys.** `kit/keys/keymapHost.ts` today: `type AcornKeymap = Keymap<HTMLElement, HtmlKeymapEvent>`. It becomes
 `Keymap<Target, Event>` with the pair supplied at `setKeymap`. `bindIntents` and `registerIntentLayer`
 take a target rather than an `HTMLElement`. `isTerminalTarget` is supplied by the host at install:
 the DOM's asks `.closest`, the TUI's asks the focused renderable for its rectangle kind.

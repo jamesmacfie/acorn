@@ -290,7 +290,7 @@ live/refreshing/stale/offline/error vocabulary `docs/ui-design.md` § States des
 wants to say more about its own data draws it in its own header, where the query is already in scope.
 
 A pane button in the right rail can still carry status markers, and that is not the same seam. A
-marker comes from `registries/railMarkers.ts`, which asks a plugin about a target it names — a task, a
+marker comes from `features/tabs/railMarkers.ts`, which asks a plugin about a target it names — a task, a
 rail source, or a pane — and gets marker *data* back
 ([ui-design.md § Rail controls and status markers](./ui-design.md)). The callback runs inside the
 rail's own render, so it costs no subscription the plugin does not already hold, and it is for state

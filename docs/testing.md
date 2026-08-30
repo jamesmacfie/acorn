@@ -40,21 +40,21 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   checks machinery, not pixels: a contribution under test renders a `<span>` carrying its own id. The
   smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
   any of these;
-- the plugin invariants hold the closed kit closed at the call site. `ui/adoption.test.ts` fails on a
+- the plugin invariants hold the closed kit closed at the call site. `kit/lib/adoption.test.ts` fails on a
   raw `div` or `span` anywhere under `plugins/`, and two arch rules in `tools/arch/boundaries.test.ts`
   fail on a plugin stylesheet and on a plugin importing Solid's `render` in either spelling. These were
   a ledger of converted files until layout phase 9 finished the conversion; a ledger answers "has this
   file been done" and a rule answers "can this be written at all". All three exempt `.test.tsx` and
   assert their file lists are non-empty, because a rule over a list that came back empty is a rule
   that passes on nothing;
-- `ui/kit/hover.test.ts` reads the stylesheets rather than the code: a rule that reveals something on
+- `kit/tokens/hover.test.ts` reads the stylesheets rather than the code: a rule that reveals something on
   `:hover` has to reveal it on `:focus-within` too. Hover is never load-bearing, and jsdom computes no
   styles, so this is the only layer that can ask;
 - the three kit invariants hold the component set closed, and each one reads the contract rather
-  than the code that implements it. `ui/kit/support.test.ts` reads the `/ui` barrel and asserts that
+  than the code that implements it. `kit/tokens/support.test.ts` reads the `/ui` barrel and asserts that
   the nodes it exports and the rows in `NODE_SUPPORT` are the same list, each with a terminal level.
-  `ui/kit/roles.test.ts` asserts that every role token has a value on both hosts, and that the DOM
-  value names a token `tokenAxes.ts` declares. `ui/kit/props.test-d.ts` has nothing to run: it is a
+  `kit/tokens/roles.test.ts` asserts that every role token has a value on both hosts, and that the DOM
+  value names a token `tokenAxes.ts` declares. `kit/tokens/props.test-d.ts` has nothing to run: it is a
   type-level test that no node's props accept `class`, `className`, `style`, or an arbitrary string
   where a role is meant, and `tsc --noEmit` under `pnpm lint` is the pass that checks it. See
   [ui design](./ui-design.md) § The closed kit;
@@ -85,7 +85,10 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   ("deleted and `schedules.ts` added", "moved to …", "(new; exact placement may change)", "in git
   history").
   A path that names a live file and a line that admits a dead one both pass; a stale citation does
-  not;
+  not. The extension-less escape hatch is what let twelve source paths rot behind a folder rename, so
+  one narrow half of it is bought back: a denylist of the four directory names the 2026-08-30
+  reorganisation deleted — `src/main/`, `src/app/`, `src/wiring/`, `src/service/` — each of which may
+  appear only on a line that admits it is gone, as this one does;
 - loadability tests EXECUTE the two rules that keep the workspace bootable, because a rule about
   whether something loads is honestly checked only by loading it:
   `packages/plugin-api/src/entrypoints.test.ts` imports every node-safe facade entrypoint in a

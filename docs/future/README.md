@@ -23,8 +23,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [structure/](./structure/README.md) | Making the folder names say what the architecture doc says: retire `main/`, regroup client-core and node-core, one plugin shape, a docs index, then a full path sweep. Eight phases. | Proposal, 2026-08-30. Phases 0 (hygiene) and 1 (docs shape) shipped the same day; phase 2 is next. |
-| [structure-followup/](./structure-followup/README.md) | The three places the whiteboard drawing still lies after `structure/`: the custody package named for one host, core naming plugins, and a plugin context type that over-promises. Four phases, plus the facts that keep the cloud door open. | Proposal, 2026-08-30. Waits on `structure/` phases 5 to 7. |
+| [structure-followup/](./structure-followup/README.md) | The three places the whiteboard drawing still lies after the 2026-08-30 folder reorganisation: the custody package named for one host, core naming plugins, and a plugin context type that over-promises. Four phases, plus the facts that keep the cloud door open. | Proposal, 2026-08-30. Nothing blocks it: the folder reorganisation it waited on shipped 2026-08-30. |
 
 ## The single files
 
@@ -55,9 +54,17 @@ doc owns it and the others point.
 ## Retired folders
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` (replaced by
-the single `events.md` above on 2026-08-28 when all but three items shipped), `layout/`, and the
-single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour
-moved.
+the single `events.md` above on 2026-08-28 when all but three items shipped), `layout/`, `structure/`,
+and the single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its
+behaviour moved.
+
+`structure/` was eight phases that made the folder names say what the architecture doc says: `main/`
+retired everywhere, client-core regrouped into `kit/`, `host/`, `infra/`, and `features/`, one shape
+for every plugin, and a front door for the docs. Shipped and deleted 2026-08-30. Its rules live in
+[conventions.md](../conventions.md), the plugin shape in [plugins.md](../plugins.md) § Package shape,
+the package boundaries in [architecture-overview.md](../architecture-overview.md) § Package
+boundaries, the index in [README.md](../README.md), and the CI that runs the arch suite in
+[testing.md](../testing.md).
 
 `layout/` was the largest of them: eleven phases that made every pane a host-owned layout filled with
 a tree of closed-kit components, shipped and deleted 2026-08-30. Its behaviour lives in

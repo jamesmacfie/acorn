@@ -52,7 +52,7 @@ has no way to read core's connection roster, and it should not get one.
 
 Every value that reaches Postgres is parameterized. Identifiers (schema, table and column names)
 cannot be parameterized, so every identifier a route builds SQL from is checked against the live
-introspected schema (`assertTable`, `assertColumns` in `main/database.ts`) and double-quoted before
+introspected schema (`assertTable`, `assertColumns` in `server/database.ts`) and double-quoted before
 use. Arbitrary SQL typed into the editor runs verbatim: it is the reader's own database, and writes
 are the point of the pane.
 

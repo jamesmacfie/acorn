@@ -59,8 +59,8 @@ injects; there is no plugin-facing theme contract.
 
 | Omarchy | acorn today | Verdict |
 | --- | --- | --- |
-| `bar-widget` in a section | `topbar.right` slot (`registries/slots.ts`), `task.footer`, rail markers as data (`registries/railMarkers.ts`), `nodeStats` | Covered. acorn has no user-arranged sections in chrome; `pane.aside` is the user-arranged region and it holds dashboard panels, not chrome. Left alone. |
-| `panel` | panes (`registries/panes.ts`), `refPanels`, frames with `target: 'overlay'` for loaded plugins | Covered. |
+| `bar-widget` in a section | `topbar.right` slot (`registries/extensionPoints/slots.ts`), `task.footer`, rail markers as data (`features/tabs/railMarkers.ts`), `nodeStats` | Covered. acorn has no user-arranged sections in chrome; `pane.aside` is the user-arranged region and it holds dashboard panels, not chrome. Left alone. |
+| `panel` | panes (`registries/panes/panes.ts`), `refPanels`, frames with `target: 'overlay'` for loaded plugins | Covered. |
 | `overlay` | the `overlay` slot for compiled plugins; refused to loaded plugins because "a contribution there would paint over the very prompts asking whether to trust it" | Covered, and the refusal stands. |
 | `menu` | commands, `paletteRows`, `contextMenus`, keybindings | Covered. acorn's menu entries name command ids, not shell strings. |
 | `service` | a plugin's node half; a client plugin's `activate()` | Covered. |

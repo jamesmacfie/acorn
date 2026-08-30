@@ -79,7 +79,7 @@ On the TUI:
 - `pty` is native. The terminal plugin's pane and docker's exec both mount a PTY through a
   `Rectangle`; on the TUI the rectangle is a region OpenTUI hands the PTY's bytes to directly, with
   the same Enter-to-enter, Escape-to-leave contract and the same `isTerminalTarget` rule in
-  `keys/host.ts`. The TUI is drawing a terminal inside a terminal, and it does it with a real PTY
+  `kit/keys/keymapHost.ts`. The TUI is drawing a terminal inside a terminal, and it does it with a real PTY
   attached to a real cell region, not xterm.js.
 - `editor` is a read-only text view with search, and an action that hands the file to `$EDITOR` in a
   suspended TUI (the renderer releases the terminal, the editor runs, the renderer resumes). The
@@ -105,6 +105,6 @@ row, never as a crash.
   "am I narrow" of its own region, as the DOM layout asks its own element.
 - Draw a hover state. Hover is never load-bearing and a terminal has none.
 - Accept `class`, `style`, or a DOM attribute. There is no DOM; the type-level test
-  (`ui/kit/props.test-d.ts`) already refuses them and the tree protocol drops them on the wire.
+  (`kit/tokens/props.test-d.ts`) already refuses them and the tree protocol drops them on the wire.
 - Invent a node. A pane that needs something the kit lacks asks the kit, and the kit answers for both
   hosts or refuses for both.

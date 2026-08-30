@@ -1,6 +1,6 @@
 # Phase 0: the custody rename
 
-Status: not started. Waits on [structure/](../structure/README.md) phase 7.
+Status: not started. Nothing blocks it.
 
 ## Goal
 
@@ -12,20 +12,19 @@ for a process one host spawns. The package it composes is not the desktop's.
 
 ## Why this phase, and why now
 
-[structure/refused.md](../structure/refused.md) refused this rename on 2026-08-30 because the name
-appears in the bundle staging scripts, the Tauri sidecar config, and two docs, and the architecture
-doc already defines the package in one sentence. That was weighed against a better word. The argument
+The folder reorganisation refused this rename on 2026-08-30 because the name appears in the bundle
+staging scripts, the Tauri sidecar config, and two docs, and the architecture doc already defines the
+package in one sentence. That was weighed against a better word. The argument
 here is different: three programmes compose this box. [terminal/](../terminal/README.md) phase 3
 builds "one node, three supervisors" on it, [remote.md](../remote.md) calls its web shape a
 `WebBroker`, and [client-plugins/](../client-plugins/README.md) names its contract `PluginCustody`.
 Each of those will cite the package by name, and each citation of `desktop-helper` from a terminal or
 web host is a sentence a reader has to un-read. The owner overturned the refusal on 2026-08-30 on
-that basis; [structure/refused.md](../structure/refused.md) records the overturn so the argument
+that basis; [refused.md](./refused.md) records the refusal and the overturn together so the argument
 stays in one place.
 
-It goes first because the two unstarted programmes cite the package and have not been rewritten yet
-(structure phase 7 rewrites them against the moved tree). One rename before that sweep is cheaper
-than one after.
+It goes first because the two unstarted programmes cite the package by name, so every day it keeps
+the old name is another citation to fix later.
 
 ## Scope
 
@@ -84,8 +83,8 @@ every row.
 
 ## Done when
 
-- `rg 'desktop-helper' --glob '!docs/future/structure/**' --glob '!docs/future/structure-followup/**'`
-  returns nothing in source, config, or docs. The two structure folders keep their historical rows.
+- `rg 'desktop-helper' --glob '!docs/future/structure-followup/**'` returns nothing in source,
+  config, or docs. This folder keeps its historical rows.
 - `pnpm lint` and `pnpm test` are green, and `pnpm --filter @acorn/desktop test` is green, because the
   boot test stages the helper bundle and would be the first thing a broken sidecar path breaks.
 - `docs/architecture-overview.md` § Runtime topology draws the process and the package as two things.
@@ -96,4 +95,4 @@ every row.
 - The four `@acorn/desktop-helper` import sites above are still the only ones.
 - The bundle staging scripts and the Tauri config do or do not name the package; the refusal said they
   did, the 2026-08-30 grep said they did not.
-- [structure/refused.md](../structure/refused.md) still carries the refusal and its overturn line.
+- [refused.md](./refused.md) still carries the refusal and its overturn line.

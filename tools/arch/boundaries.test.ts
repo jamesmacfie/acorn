@@ -144,8 +144,8 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   }
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
-  // `entries` and `composition` are apps/node's two folders (docs/future/structure/phase-2-apps.md).
-  // `main` was a side until phase 4 of that programme merged it into `server`.
+  // `entries` and `composition` are apps/node's two folders (docs/architecture-overview.md).
+  // `main` was a side until it merged into `server` on 2026-08-30.
   if (['server', 'mcp', 'entries', 'composition'].includes(seg)) return 'node'
   return 'shared'
 }
@@ -986,7 +986,7 @@ describe('architecture boundaries', () => {
     // `main/` meant "the Electron main process". Electron is gone, and while the word survived it was
     // arbitrary which of `main/` or `server/` a module landed in: agentTools.ts sat under both in
     // different plugins. `service/` and `wiring/` were the same kind of non-word. They are retired
-    // (docs/future/structure/README.md), and this is what keeps them retired — including nested, so
+    // (docs/conventions.md § Folders), and this is what keeps them retired — including nested, so
     // `server/main/` cannot bring the word back one level down.
     const RETIRED = ['main', 'service', 'wiring']
     const dirs = (dir: string, out: string[] = []): string[] => {

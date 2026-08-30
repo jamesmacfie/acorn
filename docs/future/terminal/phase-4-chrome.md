@@ -23,7 +23,7 @@ In:
 - The topbar as one line: workspace, task count, branch, node state.
 - The pane row as one `Tabs`-shaped line.
 - The footer: active bindings from the keymap; PTY-entered text; node state when it is not `ready`.
-- The palette: `Modal` over `palette/model.ts`, the command chord, results as `Rows`.
+- The palette: `Modal` over `kit/lib/paletteModel.ts`, the command chord, results as `Rows`.
 - The overlay stack and traps from phase 2, now with more than one overlay.
 - Notifications as one-line `Alert`s above the footer.
 - The drawer's sources as rows under the rail's rule; choosing one opens the PTY as the pane.
@@ -38,12 +38,12 @@ Out: any replaceable-surface contract (the registry is used, the contracts are
 ## Design detail
 
 **Registry first.** The rail's task list already goes through `CORE_EXCLUSIVE_SLOTS` and
-`registries/exclusiveSlots.ts`. The TUI draws its default through the same registry so that when
+`registries/extensionPoints/exclusiveSlots.ts`. The TUI draws its default through the same registry so that when
 `pane.switcher`, `rail`, and `topbar` become slots, the TUI's defaults are providers and a plugin's
 offer replaces them with no TUI change. Until then the TUI's drawing of the pane row and topbar is
 bespoke and lives in `apps/tui/src/chrome/`.
 
-**Palette.** `palette/model.ts` is host-neutral; `PaletteSurface.tsx` is not. The TUI's
+**Palette.** `kit/lib/paletteModel.ts` is host-neutral; `PaletteSurface.tsx` is not. The TUI's
 `Palette.tsx` (new) is a `Modal` holding a `Field` and `Rows`, driven by the same model, opened by
 the same command. Results are the registry's, so plugin commands appear as they do on the desktop.
 

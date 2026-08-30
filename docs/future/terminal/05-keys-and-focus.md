@@ -25,14 +25,14 @@ exports `createDefaultOpenTuiKeymap(renderer)` from `@opentui/keymap/opentui`, t
 swap is the seam `install.ts` names in its own header ("its terminal adapter, which we do not use
 yet, is in the same package").
 
-`keys/host.ts` holds the keymap singleton and is typed to the DOM. It becomes generic over the two
+`kit/keys/keymapHost.ts` holds the keymap singleton and is typed to the DOM. It becomes generic over the two
 type parameters, with each host package supplying its pair at install. `isTerminalTarget` there asks
 `.closest('.ui-rect[data-kind="pty"]')`; its TUI sibling asks the focused renderable whether it is a
 PTY region. Same question, same caller, the kit's own rectangle so a plugin cannot opt out.
 
 ## Focus regions
 
-`keys/regions.ts` is the file that needs the most work, and the only one. It orders regions by
+`host/layouts/regions.ts` is the file that needs the most work, and the only one. It orders regions by
 `compareDocumentPosition`, finds a region's first stop with `querySelector`, focuses with
 `element.focus()`, and listens to `focusin` and `pointerdown`. None of that exists in a terminal.
 
@@ -41,7 +41,7 @@ The TUI's `regions.ts` keeps the contract and replaces the mechanism:
 - A region is registered by a layout with its id and its order, from the layout's own knowledge of its
   regions (`LAYOUT_REGIONS` in `packages/protocol/src/paneLayouts.ts`), not derived from position.
 - A region's first stop is the first renderable in its subtree whose focus role
-  (`ui/kit/focusRoles.ts`) is `stop`, `item`, `collection`, or `trap`. The walk is over OpenTUI's
+  (`kit/tokens/focusRoles.ts`) is `stop`, `item`, `collection`, or `trap`. The walk is over OpenTUI's
   renderable tree, which is retained and ordered.
 - Focus is OpenTUI's focus. There is one focused renderable at a time and the renderer owns it.
 - The pointer half is absent. Mouse support in the terminal, if it comes, clicks to focus and does

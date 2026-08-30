@@ -56,7 +56,7 @@ Detail in [sandbox.md](./sandbox.md). Do the spike before the seam.
       round-trip and the port story.
 - [ ] Add an execution target to the task: `host` or a sandbox id.
 - [ ] Build the resolver seam: map an execution target to a `(command, cwd, env)` transform, honored
-      by the broker (`core/exec/proc.ts`) and the PTY spawn (`plugins/terminal/src/server/terminal.ts:411`).
+      by the broker (`core/proc.ts`) and the PTY spawn (`plugins/terminal/src/server/terminal.ts:411`).
 - [ ] Docker Sandboxes backend, direct-mount only, reattach by task id, teardown on archive.
 - [ ] Linux backend (Landlock plus namespaces, or a container) for standalone nodes.
 - [ ] Preview and dev-server port publishing per task.

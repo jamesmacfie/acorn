@@ -27,7 +27,6 @@ it. Paths were checked on 2026-08-30. Phase 3 re-checks all of them.
 | `docs/github-integration.md` | Preferences | 1 | `github.diff-view` is github's slice. |
 | `docs/security.md` | The control plane, the trust store | 0 | Package name where the trust store is located. |
 | `docs/future/README.md` | Programmes table | 0 (row exists), 3 | Row added with this folder; moved to retired in phase 3. |
-| `docs/future/structure/refused.md` | Renaming `@acorn/desktop-helper` | 0 | Gains the overturn line dated 2026-08-30 with a link here. |
 | `docs/future/terminal/03-process-model.md`, `phase-0-host-switch-and-toy.md`, `phase-3-process-and-auth.md` | path hints | 0 | Package name. |
 | `docs/future/client-plugins/03-device-provenance.md`, `phase-0-device-held-bundles.md`, `phase-4-device-config.md` | path hints | 0 | Package name. |
 | `docs/future/remote.md` | Multi-node from a browser | 0 | `WebBroker` is described as the web host's composition of `@acorn/custody`. |
@@ -35,8 +34,7 @@ it. Paths were checked on 2026-08-30. Phase 3 re-checks all of them.
 ## By phase
 
 - Phase 0: `architecture-overview.md` (topology, custody paragraph), `shell.md`, `testing.md`,
-  `plugins.md`, `security.md`, the terminal and client-plugins hints, `remote.md`,
-  `structure/refused.md`.
+  `plugins.md`, `security.md`, the terminal and client-plugins hints, `remote.md`.
 - Phase 1: `architecture-overview.md` (product model), `workspaces-and-tasks.md`,
   `managed-agents.md`, `agent-tools.md`, `github-integration.md`.
 - Phase 2: `architecture-overview.md` (facade paragraph), `plugins.md` (three sections),

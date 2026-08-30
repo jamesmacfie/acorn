@@ -35,7 +35,7 @@ In:
 - `App.tsx` and the shell render `<ExclusiveSlotHost slot="rail" props={...} />` and the same for
   `topbar`, building props from the registries they read today.
 - Rail markers stay data: `RailMarker` is the existing marker description from
-  `registries/railMarkers.ts`, and a provider draws a marker with the kit's `StatusDot`, which is
+  `features/tabs/railMarkers.ts`, and a provider draws a marker with the kit's `StatusDot`, which is
   where the host's colour and spin rules live.
 - The Settings row for a provider that omits a nested slot says "hides the task list" or "hides
   plugin status items" before the user picks it.
@@ -50,7 +50,7 @@ contributed.
 
 ## Design detail
 
-**Sources are data.** `availableSources()` in `tabs/sources.ts` already applies four gates and an
+**Sources are data.** `availableSources()` in `features/tabs/railSources.ts` already applies four gates and an
 order. The host applies them and hands the provider the result, so a rail provider cannot show a
 source the user cannot open. `reorderSources` writes `PrefKeys.railOrder` through the host.
 

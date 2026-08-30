@@ -1,6 +1,6 @@
 # Phase 2: one context type per tier, one verb vocabulary
 
-Status: not started. Waits on [structure/](../structure/README.md) phase 5.
+Status: not started. Nothing blocks it.
 
 ## Goal
 
