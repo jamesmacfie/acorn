@@ -96,6 +96,20 @@
   min-width: 0;
   min-height: 0;
 }
+/* A panel's frame is a `Card`, and a card is a block. A panel is a column: a head that stays put and a
+   body that scrolls inside the rect the grid gave it. The kit takes no class, so the rule reaches the
+   card by position from the two places that place one. Without it `.dash-panel-body`'s `flex: 1` and
+   `min-height: 0` are inert, the body's height goes content-driven, `overflow: auto` on an auto-height
+   box never scrolls, and a 500-row table spills past the card's border instead of scrolling in it. */
+.dash-slot > .ui-card,
+.dash-preview > .ui-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  min-width: 0;
+  min-height: 0;
+}
 /* Out of flow, at the measured pixel box of its rect, gliding there so push-down and compaction read
    as a chain reaction rather than a reshuffle between frames. */
 .dash-grid:not([data-collapsed]) .dash-slot {

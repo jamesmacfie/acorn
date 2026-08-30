@@ -24,7 +24,7 @@ fn is_highlight_worker(path: &str) -> bool {
 const WORKER_CSP: &str = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'none'";
 
 /// A loaded plugin's bundle, run as a Web Worker instead of in a frame. See docs/shell.md, "The
-/// plugin worker", and docs/future/layout/06-remote-tree.md.
+/// plugin worker", and docs/plugins.md § The tree contract.
 ///
 /// Tighter than the highlighter's: no `wasm-unsafe-eval`, because a plugin bundle is a stranger's
 /// code and nothing it draws needs one. `connect-src 'none'` is the same load-bearing directive the

@@ -203,8 +203,12 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             />
 
             <TabPanel id="info" active={tab()} idPrefix="docker-detail">
+              {/* Rows, not tiles: half of these are a long mono string — an id, a command, a working
+                  directory — and this pane is often one narrow column of a task row, where a tile grid
+                  gives each of them 150px and wraps it to four lines. */}
               <Facts
                 size="sm"
+                grouping="rows"
                 items={[
                   { label: 'ID', value: d().id, mono: true },
                   { label: 'Command', value: d().command, mono: true },

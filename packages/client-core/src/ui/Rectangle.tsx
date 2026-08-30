@@ -2,7 +2,7 @@ import { createSignal, Show, type JSX } from 'solid-js'
 
 /* Rectangle: a box the kit owns and something else fills with pixels.
 
-   The kit's one admission of defeat, and a deliberate one (docs/future/layout/03-extension-kinds.md,
+   The kit's one admission of defeat, and a deliberate one (docs/plugins.md § Cooperative extension points,
    "does it own pixels, heavy typing, or a third-party library?"). A PTY, a webview and a plugin's own
    iframe are not trees of nodes and never will be; what the kit can still own is the box they sit in,
    and the keyboard contract for getting in and out of it.

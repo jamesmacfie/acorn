@@ -13,9 +13,9 @@ import { promotePullToTask } from '../pullTasks'
 
 // Which pull request the PR pane is showing, and the strip of related ones it can switch to.
 //
-// Held once per task, because the pane is a `tabs` layout and its three panels are three components
-// the host mounts one at a time. The pull the reader picked is the one thing all three have to agree
-// on, so it cannot live in any of them.
+// Held once per task rather than in the pane, because the strip is a subscription: it watches the
+// socket, the task's pull relations and the pane-intent mailbox, and re-resolving all three every
+// time the pane remounts would drop the pull the reader had chosen.
 
 export type PrTabsModel = ReturnType<typeof build>
 

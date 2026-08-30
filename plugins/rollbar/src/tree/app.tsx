@@ -146,7 +146,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   )
 
   // `split` with two column nodes rather than ListDetail's `list` prop: a tree's props are JSON on a
-  // message port, so an element cannot be one of them (docs/future/layout/06-remote-tree.md). The
+  // message port, so an element cannot be one of them (docs/plugins.md § The tree contract). The
   // column only appears when there is more than one linked item, as it did before.
   return (
     <Show when={linkedTargets().length > 1} fallback={body()}>

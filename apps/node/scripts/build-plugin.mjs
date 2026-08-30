@@ -47,7 +47,7 @@ const CONFIG_FILE = 'acorn-plugin.config.mjs'
 // The one client transform, applied to every loaded bundle. `generate: 'universal'` is what makes the
 // output a tree rather than a document: every element creation and property set in the plugin's JSX
 // compiles to a call into the module named below, which builds acorn's own node names instead of DOM
-// (docs/future/layout/06-remote-tree.md § The SDK).
+// (docs/plugins.md § Loaded plugins: the client half).
 //
 // This used to be a `framework` key each plugin named, with a map from it to a transform. Phase 9 of
 // the layout programme removed it: the remote adapter is the only target, so the key had one legal

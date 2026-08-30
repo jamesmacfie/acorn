@@ -181,9 +181,8 @@ having eight builtins forever. **Shipped 2026-08-28**, and not as `registerStepK
 "many plugins each add a step kind" is many-to-many, so granting it through the runner capability
 would have been the first of five private registries with slightly different lifecycles. The node
 grew the twin of the client's extension points instead
-(`docs/plugins.md § Node-side extension points`), and workflows was ported onto it. The
-[layout programme](./layout/08-hooks.md) generalises the same shape again as hooks, with observe,
-transform, and veto modes; `workflows:step-kind` stays a registry-shaped point and `before-step` is
+(`docs/plugins.md § Node-side extension points`), and workflows was ported onto it. Hooks
+(`docs/plugins.md § Hooks`) generalise the same shape again, with observe, transform, and veto modes; `workflows:step-kind` stays a registry-shaped point and `before-step` is
 the hook.
 
 Three points, opened by workflows and fillable by anyone: `workflows:step-kind`, `workflows:policy`,

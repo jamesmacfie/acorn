@@ -3,7 +3,7 @@
 // Every roving-focus list in the kit is this: `Rows`, `TreeRow` runs, `Tabs`, `Menu`, `ChipRow`,
 // `SegmentedControl`, `Timeline`, `Grid`. They differ in what they draw and in nothing else, which is
 // why the arrows, Home, End, page keys, type-ahead and `aria-activedescendant` are written once here
-// rather than eight times (docs/future/layout/07-focus-and-keys.md § Collection state is the host's).
+// rather than eight times (docs/command-palette-and-shortcuts.md § Focus and typing).
 //
 // A collection is one tab stop with roving focus inside, the React Aria and Kobalte shape. `active`
 // and `selected` live in `collectionState.ts` keyed by the item's own key, so a list rebuilt from a

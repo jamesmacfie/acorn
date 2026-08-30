@@ -4,10 +4,10 @@ import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Badge, Button, CodeBlock, Fold, Inline, Stack, StatusDot } from '@acorn/plugin-api/ui'
 
 // The file-tool card in an agent transcript, written entirely in the kit
-// (docs/future/layout/04-kit.md). Nothing here spells a class, a tag or a pixel, which is the whole
+// (docs/ui-design.md § The closed kit). Nothing here spells a class, a tag or a pixel, which is the whole
 // point: the same source draws directly in the shell today and, once a plugin is loaded rather than
 // compiled, through a worker and the remote root with no edit
-// (docs/future/layout/06-remote-tree.md § Two render paths, one API).
+// (docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels).
 //
 // What that cost: the disclosure was a hand-written `<details class="agent-tool ui-fold">` and the
 // input and output were bare `<pre>`s. Fold and CodeBlock draw both, and CodeBlock brings the copy

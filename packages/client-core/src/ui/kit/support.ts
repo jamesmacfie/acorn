@@ -4,7 +4,7 @@
 // Four levels, each with a defined behaviour, so an author can predict a host without running it:
 //
 //   full      same meaning, drawn natively
-//   reduced   drawn, with named things missing; the node's row in docs/future/layout/04-kit.md
+//   reduced   drawn, with named things missing; the node's row in docs/ui-design.md § The closed kit
 //             says what
 //   fallback  not drawn; the host draws a stated substitute, and the author does nothing
 //   absent    nothing is drawn, unless the node has a <Fallback> child

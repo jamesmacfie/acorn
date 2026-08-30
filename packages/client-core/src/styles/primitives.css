@@ -884,7 +884,15 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    the same rule `single` and `header-body-footer` apply to their bodies. */
 .ui-listdetail-list[data-scroll] { overflow-y: auto; padding-inline: var(--pane-pad); }
 .ui-listdetail-detail { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.ui-listdetail-detail[data-scroll] { display: block; overflow: auto; }
+/* `scroll` means this column is a page rather than a frame around one, so it takes the pane's inline
+   padding for the same reason the list column does: its children are content, and content that starts
+   at the border has nothing to sit off.
+
+   Except when it holds a split of its own, at any depth: that inner divider is two columns' shared
+   edge and has to reach this column's, and the inner columns pad themselves. Rollbar's occurrence
+   workbench is the case. */
+.ui-listdetail-detail[data-scroll] { display: block; overflow: auto; padding: var(--space-5) var(--pane-pad); }
+.ui-listdetail-detail[data-scroll]:has(.ui-listdetail) { padding: 0; }
 
 /* See docs/ui-design.md § Two-column panes for ListDetail's narrow-width behaviour. */
 
@@ -1217,7 +1225,10 @@ a.ui-row:hover { background: var(--bg-hover); }
    its own rather than the list, because the follow machinery watches the list grow and a scroller
    observing itself never resizes (ui/Timeline.tsx). */
 .ui-timeline-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.ui-timeline { display: flex; flex-direction: column; gap: var(--gap-stack); min-width: 0; }
+/* An `<ol>`, so the browser's own list padding and block margins have to go: unreset they indent every
+   turn by 40px and add a margin the `gap` above is already responsible for. `display: block` on the
+   turn is what drops the marker. */
+.ui-timeline { display: flex; flex-direction: column; gap: var(--gap-stack); min-width: 0; margin: 0; padding: 0; list-style: none; }
 .ui-timeline-turn { display: block; min-width: 0; }
 /* The rule between turns, not around them: a border on the turn itself would draw one under the
    last card too. */

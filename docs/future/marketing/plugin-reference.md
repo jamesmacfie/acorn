@@ -72,10 +72,11 @@ express).
 
 One page per contribution key. Nineteen keys, grouped in the sidebar by what they extend:
 
-- **Surfaces**: `frames` (32; sandboxed iframe targets — `pane`, `refPanel`, `settings`,
-  `importer`, `webview`, `overlay`, `coreSlot`; the `document` layouts for host-owned Monaco
-  regions), `sources` (8; rail sources), `routes` (8; client router paths inside a host-minted
-  prefix).
+- **Surfaces**: `frames` (32; the surfaces a plugin draws — `pane`, `refPanel`, `settings`,
+  `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, `refPanel` or `settings` names a host-owned
+  layout and fills its regions; a region is a remote tree, a host-drawn document, or a sandboxed
+  iframe for a surface that owns its pixels), `sources` (8; rail sources), `routes` (8; client router
+  paths inside a host-minted prefix).
 - **Chrome and commands**: `slots` (8; footer/topbar badges), `commands` (32), `keybindings`
   (32), `palette` (32; the legacy verb-union rows), `contextMenus` (8; host-drawn rows gated by
   a closed `when` vocabulary), `contentLinks` (16; host-linkified URL patterns), `themes` (8;

@@ -11,10 +11,10 @@ would mean eternally versioning a widget toolkit in the wire format. Dashboards 
 the host renders *its own* generic views over a record schema.
 
 The descriptor-versus-frame doctrine did change on 2026-08-28, and this refusal did not.
-[docs/future/layout/](../layout/README.md) adds a remote component tree: plugin code in a sandbox
-emits a tree of closed-kit node names and the host mounts its own components. That is not a widget
-toolkit in the wire format, because the vocabulary is the kit that already exists and the logic stays
-in the plugin ([layout/01-why.md](../layout/01-why.md) § One reversal). It is also **not a dashboard
+There is a remote component tree now: plugin code in a sandbox emits a tree of closed-kit node names
+and the host mounts its own components. That is not a widget toolkit in the wire format, because the
+vocabulary is the kit that already exists and the logic stays in the plugin
+([docs/plugins.md](../../plugins.md) § Descriptors for facts, trees for UI, rectangles for pixels). It is also **not a dashboard
 panel**: a panel is user-composed over a typed record contract and a plugin has zero say over its
 pixels; a remote tree is plugin-authored UI in a slot the owner opened. The two do not meet. When a
 plugin needs UI the field-type vocabulary cannot express, the overflow path is a remote tree in a

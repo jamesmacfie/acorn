@@ -4,7 +4,7 @@ import { LAYOUTS } from '.'
 import { _resetLayoutState } from './state'
 import type { LayoutProps, Region } from './regions'
 
-// The seven layouts, rendered with placeholder regions (docs/future/layout/05-layouts.md).
+// The seven layouts, rendered with placeholder regions (docs/panes.md § Layout model).
 //
 // What a render adds over the region table in @acorn/protocol/paneLayouts.ts is the part the table
 // cannot see: that each region ends up in the document, in the order the layout promises, and that a

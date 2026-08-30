@@ -3,7 +3,7 @@
 //
 // Here rather than in client-core because both ends compile against it. The node validates a bundle's
 // declared nodes at install; the client validates the stream at runtime; neither may reach for the
-// other's copy. See docs/future/layout/06-remote-tree.md § The wire format.
+// other's copy. See docs/plugins.md § The tree contract.
 //
 // The lists are duplicated from `client-core/src/ui/kit/{support,tokens}.ts`, which own them, and a
 // test over there fails the moment the two disagree. Protocol is a pure sink (tools/arch/boundaries.test.ts),

@@ -1,6 +1,6 @@
 // The keymap, installed once at the shell root.
 //
-// One engine for the whole app (docs/future/layout/07-focus-and-keys.md § Bindings are layers over
+// One engine for the whole app (docs/command-palette-and-shortcuts.md § Focus and typing, on layers over
 // the same tree). `@opentui/keymap` holds the layers, the command catalog and the diagnostics; its
 // HTML adapter turns DOM keydowns into keymap events and tracks targets with a MutationObserver, and
 // its terminal adapter, which we do not use yet, is in the same package. Nothing here is an adapter

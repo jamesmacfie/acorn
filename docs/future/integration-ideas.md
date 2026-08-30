@@ -391,7 +391,7 @@ collection, a tool. What the entries want from *other* plugins is narrower and r
 to an item somebody else draws (coverage on a diff line, a flag on an editor line, CI on a PR, a pod
 on a container), or act before something happens (scan before push, inject secrets before a run
 target starts, gate a workflow step). Those are the **annotation** and **hook** kinds in
-[docs/future/layout/03-extension-kinds.md](./layout/03-extension-kinds.md), and they exist because
+[docs/plugins.md](../plugins.md) § Cooperative extension points, and they exist because
 this catalogue kept asking for them. Very few entries need a box inside another plugin's pane.
 
 ## Four shapes, not two hundred plugins

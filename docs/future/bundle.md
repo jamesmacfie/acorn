@@ -63,8 +63,8 @@ satisfy a binding nothing uses, so `drizzleOverSqlite` assembles the session fro
 subpaths instead. `@types/better-sqlite3` stays a devDependency — Drizzle's declarations import from
 it, and types do not need a compiler.
 
-**node-pty is the only native module left**, and it builds against node-addon-api (N-API), so its
-binaries are ABI-stable across Node versions. It ships prebuilds for `darwin-arm64`,
+**node-pty is the only native module the node needs**, and it builds against node-addon-api (N-API), so
+its binaries are ABI-stable across Node versions. It ships prebuilds for `darwin-arm64`,
 `darwin-x64`, `win32-arm64` and `win32-x64` — **not Linux**, which compiles from source today. So
 Linux is the one platform needing a prebuild produced in CI, once. **The terminal client adds a
 second**: OpenTUI's render core is Zig, published as `@opentui/core-<triple>` packages with a prebuilt
@@ -149,7 +149,7 @@ at least an honest doc note that Windows does not get it.
 ## Whether to bundle a Node runtime
 
 Eventually yes, so the install stops being "first install Node 24". Costs roughly 50MB in the
-tarball. Not for a first release: requiring a modern Node is a reasonable ask of someone
+tarball. Not for a first node-only release: requiring a modern Node is a reasonable ask of someone
 deliberately installing a headless service, and it keeps the artifact small enough to iterate on.
 
 It is not a reasonable ask of someone who typed `acorn`. The terminal client inverts the argument, so

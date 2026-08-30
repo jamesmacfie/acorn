@@ -83,6 +83,12 @@ The keyboard is one engine, `@opentui/keymap`, installed on the shell root by
 targets with a `MutationObserver`; the same package carries a terminal adapter, which is what keeps a
 terminal renderer a matter of swapping the adapter rather than rewriting the keyboard.
 
+**There is no second keymap, and there will not be.** One engine, one command catalog, one adapter per
+host. No plugin and no first-party pane installs a key handler of its own outside an input and the
+inside of a rectangle. A pane that wants a chord registers a command and a binding, which is how it
+reaches Settings → Shortcuts, the palette, and the cheat sheet at once; a handler installed beside the
+engine reaches none of them and cannot be rebound, overridden, or shown to the reader in a conflict.
+
 **Keys become intents before a component sees one.** The closed set is in
 `client-core/keys/intents.ts`: `next`, `prev`, `first`, `last`, `pageNext`, `pagePrev`, `expand`,
 `collapse`, `activate`, `dismiss`, `commit`, `search`, `menu`, `delete`, and the four region and pane

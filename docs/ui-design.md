@@ -552,7 +552,14 @@ does not cross into its document.
 
 ## Two-column panes
 
-A pane that puts a list beside a detail uses the `ListDetail` primitive, not a hand-rolled grid. It
+`ListDetail` is a kit node, and it is not the same object as the `list-detail` *layout*. A pane's
+regions are its outer arrangement and the host draws them
+([docs/panes.md § Layout model](./panes.md#layout-model)); a split drawn *inside* one region is the
+pane's own, and this node is how it draws it. The PR pane is both at once: a `single` layout whose one
+region holds a `ListDetail`, because its two columns are one surface over one model rather than two
+regions the host mounts apart.
+
+A pane or a region that puts a list beside a detail uses that node, not a hand-rolled grid. It
 owns the split, the three column widths (`narrow` for an identifier switcher, the default for a browse
 list, `wide` for a column that holds a document rather than a picker), the `--chrome-divider` between
 them, and each column's flex/overflow behaviour. Its consumers are the Rollbar, Linear, API and
@@ -588,8 +595,9 @@ needs no CSS at all.
 
 `ListDetail` sets no narrow-width behaviour. Stacking the columns needs a container query rather
 than a media query, and `container-type` would make the element a containing block for
-`position: fixed` descendants, which silently mispositions any `Modal` rendered inside it. A pane
-that wants to stack declares it on its own class.
+`position: fixed` descendants, which silently mispositions any `Modal` rendered inside it. Narrowing
+is the layout's job, not a node's: the `list-detail` layout carries the narrow projection, and a pane
+that wants one names that layout instead of nesting this node.
 
 ## Chrome and overlays
 
@@ -667,8 +675,10 @@ shell, or a second copy of Solid, across that boundary.
 ## Drag-to-resize
 
 `ui/split.ts`'s `createSplitDrag` is the drag-resize hook behind the pane row divider, the terminal
-drawer's height handle, and the document surface's split. Three hand-rolled splitters existed
-before it, and none had a keyboard contract.
+drawer's height handle, and the splits the host layouts draw. Three hand-rolled splitters existed
+before it, and none had a keyboard contract. A plugin never calls it: where a split is between two
+*regions* the layout owns the handle ([docs/panes.md § Layout model](./panes.md#layout-model)), and
+where it is inside one region the `ListDetail` and `SplitHandle` nodes call this for the pane.
 
 It reports a pixel delta, not a value, because the three call sites model size differently: the
 pane row resizes two adjacent panes against each other by a delta, the drawer owns one absolute
@@ -678,6 +688,9 @@ capture, rAF coalescing, text-selection suppression during the drag, and `role="
 arrow/Home/End keys. Persistence stays with the caller, since only the caller knows what it is
 persisting: a preference, a layout weight, a fraction. It is the same idiom as `dismissable.ts`:
 behaviour as a hook, markup at the call site.
+
+A drag clamps against the element it is resizing, never against `window.innerWidth`. That is the
+never-do rule about reading the window, and it is what lets a mobile shell set its own breakpoints.
 
 A drag that outlives its component would keep moving panes that no longer exist, so cleanup runs on
 unmount. Clearing `document.body.style.userSelect` removes the property rather than restoring a

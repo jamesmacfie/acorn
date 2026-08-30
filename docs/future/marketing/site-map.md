@@ -12,8 +12,8 @@ Hand-authored Astro pages, outside the Starlight tree:
 
 - **`/`** — hero, the feature wall (one GIF + JPG poster per feature, assets in one predictable
   directory shared with the repo README), the extensibility story as a first-class section (not
-  a footnote — "two tiers, permanently" and "rectangles get frames; chrome gets descriptors"
-  are the differentiators), download CTA.
+  a footnote — "two tiers, permanently" and "descriptors for facts, trees for UI, rectangles for
+  pixels" are the differentiators), download CTA.
 - **`/download`** — per-platform install. Ships when a signed macOS build exists; until then the
   page is not linked from the nav.
 - **`/plugins`** — the plugin directory. A static list of the bundled and

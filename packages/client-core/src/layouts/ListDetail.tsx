@@ -33,7 +33,7 @@ export function ListDetail(props: LayoutProps) {
   let dragStart: number | null = null
   // The ceiling is this layout's own box, never the window. A pane is one column of a task row, so the
   // window is not what its list is allowed to fill, and no layout may read the window's width
-  // (shell.css § Layouts, docs/future/layout/09-doors-left-open.md, "never do these" item 12). Before
+  // (shell.css § Layouts, docs/ui-design.md § What the kit and layouts must never do, "never do these" item 12). Before
   // the element is measurable there is no ceiling to apply; the floor still holds.
   const ceiling = () => {
     const extent = root?.offsetWidth ?? 0

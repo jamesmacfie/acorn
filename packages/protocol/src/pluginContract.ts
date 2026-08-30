@@ -114,7 +114,7 @@ const documentRegion = z.object({
 //
 // `'frame'` is this plugin's own bundle in a sandboxed iframe: the plugin draws, and the host sees a
 // rectangle. A `remote` region is the same bundle running in a worker with no DOM, emitting a tree of
-// the host's own component names, which the host draws (docs/future/layout/06-remote-tree.md); `entry`
+// the host's own component names, which the host draws (docs/plugins.md § The tree contract); `entry`
 // is a key of the object the bundle passed to `mountTree`. A document region is host-drawn outright:
 // the plugin contributes routes and a language id, no code.
 //

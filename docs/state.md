@@ -110,7 +110,7 @@ place, and it is why the state sits outside the rows rather than inside them.
 `focusedPane` gets written and the one place the `runtime:focus-changed` event is emitted from.
 Neither is persisted. Where you are in a list is a reading posture, not a preference, and restoring
 one across a relaunch would need a scope and an eviction rule nobody has asked for. See
-[focus-and-keys.md](./future/layout/07-focus-and-keys.md).
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) § Focus and typing.
 
 **A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
 a second function that pulled the pre-scoped aggregate key the scoped keys replaced —
