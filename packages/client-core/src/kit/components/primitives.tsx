@@ -1299,7 +1299,7 @@ export function Table(props: {
 
    `children` stays `JSX.Element`: Solid types every JSX expression as `JSX.Element`, so a type that
    said "rows only" would be a lie the compiler cannot check. The rule is the kit-purity arch test
-   (docs/future/before-terminal-ui/phase-7-enforcement-and-docs.md). */
+   in tools/arch/boundaries.test.ts. */
 
 /** Where a cell's content sits in its column. A role, not a length. */
 type CellAlign = 'start' | 'center' | 'end'

@@ -17,7 +17,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | Folder | What it is | Status, 2026-08-30 |
 | --- | --- | --- |
 | [terminal/](./terminal/README.md) | `acorn` in a terminal: a second host for the same component tree and layouts, the process model, and the node + tui deployable beside the desktop. Nine phases. | Proposal, 2026-08-30. Not started; phase 0 blocks on nothing. Replaces the single file `terminal.md`. |
-| [before-terminal-ui/](./before-terminal-ui/README.md) | The prep the terminal's pane sweep assumes: the last raw DOM out of the plugin client tier (agents, github, editor, preview), table rows and a `Link` node into the kit, file dialogs behind the platform seam, Monaco replaced by CodeMirror with a `$EDITOR`-in-a-PTY mode, preview gated on the seam that backs it, and the purity rule as an arch test. Eight phases. | In progress, 2026-08-31. Phases 0 to 6 shipped; 7 remains. Terminal phase 0 does not wait on it, terminal phase 6 does. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [events.md](./events.md) | Node-emitted core events, plugin events on `plugin:<id>:*`, and cross-plugin subscription. | Shipped 2026-08-28; three items open (preview URL, `emits` on the settings page, connection deletion). |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
@@ -42,9 +41,8 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 Host-owned plugin UI is the seam most of the others lean on, and it shipped in 2026-08: the terminal
 client ([terminal/](./terminal/README.md)) is a second host for the same component tree and is the
-first programme to build one — with [before-terminal-ui/](./before-terminal-ui/README.md) as its
-prerequisite sweep, emptying the client tier of the raw DOM a second host cannot draw before the
-terminal's own pane sweep starts — the PWA is the layouts' narrow projections,
+first programme to build one, and its prerequisite sweep is done: the client tier holds no raw DOM
+for a second host to fail to draw. The PWA is the layouts' narrow projections,
 compiled-tier's component couplings dissolved into slots, rail-tab's slice 3 became the `core:task`
 annotation point, and the marketing plugin docs should be written against the tree rather than the
 frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
@@ -67,6 +65,17 @@ for every plugin, and a front door for the docs. Shipped and deleted 2026-08-30.
 the package boundaries in [architecture-overview.md](../architecture-overview.md) § Package
 boundaries, the index in [README.md](../README.md), and the CI that runs the arch suite in
 [testing.md](../testing.md).
+
+`before-terminal-ui/` was eight phases that emptied the plugin client tier of the raw DOM a second
+host cannot draw, shipped and deleted 2026-08-31. The kit grew four nodes and
+[ui-design.md](../ui-design.md) §§ The closed kit and Every node at 80 by 24 owns them; the file
+dialogs are two verbs on the platform seam in [frontend.md](../frontend.md), which also owns the
+`{ seam: … }` host requirement that replaced the preview pane's desktop gate; the editor is
+CodeMirror with an `$EDITOR`-in-a-PTY mode and [editor.md](../editor.md) owns both, with
+[first-party-plugins.md](../first-party-plugins.md) carrying the row. The survey that started it
+lives on in the corrected plugin table in [terminal/01-why.md](./terminal/01-why.md) and in the
+baseline comment on the client-tier purity rule in `tools/arch/boundaries.test.ts`, which is the
+programme's last deliverable and the reason none of it can leak back.
 
 `structure-followup/` was the three places the whiteboard drawing still lied once `structure/` had
 moved the folders, in three phases and a sweep, shipped and deleted 2026-08-31. The custody package is

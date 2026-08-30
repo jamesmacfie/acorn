@@ -46,7 +46,12 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   a ledger of converted files until layout phase 9 finished the conversion; a ledger answers "has this
   file been done" and a rule answers "can this be written at all". All three exempt `.test.tsx` and
   assert their file lists are non-empty, because a rule over a list that came back empty is a rule
-  that passes on nothing;
+  that passes on nothing. A second pair of rules scans for raw DOM directly, over both tiers a plugin
+  draws in: `plugins/*/src/tree`, where a raw element is markup the host cannot draw at all, and
+  `plugins/*/src/client`, where it works on a shell that draws to a document and is invisible to one
+  that draws to cells. They share one definition of raw DOM and differ in a single line, whether the
+  components barrel is banned or is the normal way to draw. The client half carries an empty baseline
+  and the test's comment says which seven files used to be in it;
 - `kit/tokens/hover.test.ts` reads the stylesheets rather than the code: a rule that reveals something on
   `:hover` has to reveal it on `:focus-within` too. Hover is never load-bearing, and jsdom computes no
   styles, so this is the only layer that can ask;

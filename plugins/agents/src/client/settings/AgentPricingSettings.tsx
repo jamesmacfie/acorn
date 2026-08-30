@@ -129,8 +129,7 @@ export default function AgentPricingSettings() {
     return [...new Set(observed)].filter((model) => !configured.has(model.toLowerCase())).sort()
   })
 
-  // Button-only submit: this page has no <form>, so Enter in a field does not save
-  // (docs/future/before-terminal-ui/phase-0-agents-dom-hygiene.md).
+  // Button-only submit: this page has no <form>, so Enter in a field does not save.
   const submit = async () => {
     const current = draft()
     if (!current || saving()) return

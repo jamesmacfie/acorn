@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Table, TableCell, TableHead, TableRow } from './primitives'
 
-// Table's rows as kit nodes (docs/future/before-terminal-ui/phase-1-kit-table-rows.md). Two things
+// Table's rows as kit nodes (docs/ui-design.md § Every node at 80 by 24). Two things
 // here are not obvious from reading the components: a `head` row is what `stickyHead`'s CSS pins, so
 // it has to come out inside a `<thead>`; and `onPress` carries the keyboard a table row otherwise
 // has no way to get, because a cell cannot be a `Row`.

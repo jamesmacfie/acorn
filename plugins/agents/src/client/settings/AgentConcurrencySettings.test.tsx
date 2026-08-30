@@ -2,8 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // Settings → Agent concurrency saves from its button and from nothing else. The page dropped its
-// `<form>` wrapper when the plugin's client half went kit-only
-// (docs/future/before-terminal-ui/phase-0-agents-dom-hygiene.md), which took Enter-to-submit with
+// `<form>` wrapper when the plugin's client half went kit-only, which took Enter-to-submit with
 // it. That is a deliberate behaviour change, so it is recorded here rather than left to be
 // rediscovered as a bug.
 
