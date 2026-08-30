@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import type { PluginFetchHandler } from '@acorn/plugin-api/node'
 import { makeTestNodeContext, validatePluginConfig } from '@acorn/plugin-api/testkit'
 import { describe, expect, it, vi } from 'vitest'
-import { rollbarPlugin } from './index'
+import { rollbarPlugin } from '../node/index'
 
 // Context comes from makeTestNodeContext, the same boot path the host uses (docs/plugins.md § The
 // plugin API), so the tier differences below are the host's decisions, not this test's.
