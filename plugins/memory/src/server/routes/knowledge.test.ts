@@ -7,7 +7,7 @@ import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Memory paths and the deprecated notes alias get validated bodies (the privileged-boundary
 // contract). Notes routing is characterized in plugins/notes/src/server/routes/notes.test.ts, and
-// store logic in main/notes.test.ts, memory.test.ts, and memoryProposals.test.ts. This file covers
+// store logic in ../memory.test.ts, ../memoryProposals.test.ts, and plugins/notes' notes.test.ts. This file covers
 // routing, auth, and validation.
 
 const req = (url: string, method = 'GET', body?: unknown) =>

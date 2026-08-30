@@ -58,7 +58,7 @@ export function memoryReviewProfile(): ProfileDef | null {
   )
 }
 
-export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
+export function registerKnowledgeChannel(db: PluginDatabase, dataRoot: string, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
   const proposals = new MemoryProposalStore(join(dataRoot, 'memory-proposals'), deps.emit)
 
   const guard = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
@@ -162,7 +162,7 @@ export function registerKnowledgeIpc(db: PluginDatabase, dataRoot: string, core:
     }
   }
 
-  // The renderer's notes and memory surface, exposed as the KnowledgeBridge behind the HTTP routes
+  // The client's notes and memory surface, exposed as the KnowledgeBridge behind the HTTP routes
   // (server/routes/knowledge.ts). This is the human-facing pane, distinct from the harness memory and
   // notes bridges that serve MCP. guard() keeps the `| { error }` contract the clients union on.
   const route: KnowledgeBridge = {
