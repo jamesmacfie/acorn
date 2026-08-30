@@ -141,7 +141,7 @@ two rules apply:
 - It does not build the remote root, the worker, or the `replace` arbitration. Those are layout
   phases 3 and 4 and this folder consumes them.
 - It does not build the PWA or the terminal host. [07-hosts.md](./07-hosts.md) says what each owes
-  the custody contract; `docs/future/remote.md` and `docs/future/terminal.md` own the hosts.
+  the custody contract; `docs/future/remote.md` and `docs/future/terminal/` own the hosts.
 - It does not change signing, discovery, or the marketplace stance. `docs/future/ecosystem/` owns
   those, and a device install from a URL is exactly as unsigned as a node install from one.
 - It does not build icon sets. It keeps the name.

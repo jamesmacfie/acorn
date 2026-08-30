@@ -51,21 +51,12 @@ this folder adds to that list:
 
 ## The terminal
 
-`docs/future/terminal.md` owns the host. Its isolation is a Node worker thread or child process
-under permission flags, speaking the same bridge over a pipe, and it says plainly that "receiving a
-bundle needs the same bytes-hash trust store the desktop has, but there is no desktop helper." What
-this folder adds:
-
-- **A `PluginCustody` implementation over files.** A cache directory and an acknowledgement file
-  beside the terminal host's own config, same schemas, same `(pluginId, hash)` key.
-- **Device is the natural provenance.** A terminal host talking to a remote node can still take node
-  bundles, but the person at a terminal installing a switcher is installing it here. Phase 0's
-  resolution rule (device wins) is what makes that predictable.
-- **Trust prompt in the terminal.** The three tiers and the diff render as a kit tree, because the
-  prompt is drawn from `trustModel.ts` lines and those are data. `terminal.md` notes the trust model
-  needs a third column between desktop and web; that column is the terminal's answer to "where do
-  bytes come from and where do they run", and provenance is half of it.
-- **The config file is theirs first.** Phase 4 is built for this host.
+`docs/future/terminal/` owns the host, and
+[06-isolation.md](../terminal/06-isolation.md) there owns what this section used to say: a
+`PluginCustody` over files beside the terminal's own config, device as the natural provenance with
+`{ path }` allowed, the trust prompt as a kit tree, and the terminal's column in the trust model.
+Phase 0's resolution rule (device wins) applies there unchanged, and phase 4 of this folder, the
+config file, is built for that host first.
 
 ## The checklist
 
