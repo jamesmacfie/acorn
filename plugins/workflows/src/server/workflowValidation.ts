@@ -4,7 +4,7 @@ import type {
   WorkflowBudget,
   WorkflowDef,
   WorkflowStepDef,
-} from '../contract/workflowContracts'
+} from '../shared/workflowContracts'
 import { intersectToolCeilings, narrowsToolCeiling } from './workflowTools'
 
 const TEMPLATE_RE = /\$\{steps\.([^}]+)\.output\}/g

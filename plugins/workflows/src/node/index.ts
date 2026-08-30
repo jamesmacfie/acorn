@@ -6,15 +6,15 @@ import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import { buildHeadlessArgv, buildSessionEnv, DEFAULT_PROFILE_ID, getProfile, type InternalEnvFactory, isDir, isRepoConfigTrustError, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { desc, eq, inArray, sum } from 'drizzle-orm'
-import { loadWorkflowFiles } from '../main/workflowFiles'
-import { WorkflowRunner, type WorkflowDef } from '../main/workflowRunner'
-import type { RunStatus } from '@acorn/protocol/runs.ts'
+import { loadWorkflowFiles } from '../server/workflowFiles'
+import { WorkflowRunner, type WorkflowDef } from '../server/workflowRunner'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
-import { encodeToolCeiling } from '../main/workflowTools'
-import { WorkflowValidationError } from '../main/workflowValidation'
+import { encodeToolCeiling } from '../server/workflowTools'
+import { WorkflowValidationError } from '../server/workflowValidation'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
+import { RUN_LIST_LIMIT, TERMINAL_WORKFLOW_STATUSES, toRunStatus } from '../shared/runStatus'
 import { workflowRuns, workflowSteps } from './schema'
 
 export type WorkflowsPluginDeps = {
@@ -30,23 +30,6 @@ export type WorkflowsPluginDeps = {
   // (no PR, no identity, no mirrored repo). The three-valued answer is load-bearing: the ci-loop step
   // treats null as a hard failure and '' as done.
   failingChecks: (taskId: string) => Promise<string | null>
-}
-
-// How many runs this plugin offers the merged list. It is a "what is happening on this node" surface,
-// not an archive: the owner's own workflow pane is where a full history is read, addressed by task.
-const RUN_LIST_LIMIT = 100
-
-// A workflow run has eight states and the merged list has five (@acorn/protocol/runs.ts). Both
-// `gated` and `cancelling` are waits — one on a person, one on a child process — and `safety-rail` is
-// a failure with a specific cause, which the row's `detail` carries.
-const TERMINAL_WORKFLOW_STATUSES = new Set(['done', 'failed', 'cancelled', 'safety-rail'])
-
-const toRunStatus = (status: string): RunStatus => {
-  if (status === 'done') return 'done'
-  if (status === 'cancelled') return 'cancelled'
-  if (status === 'failed' || status === 'safety-rail') return 'failed'
-  if (status === 'gated' || status === 'cancelling') return 'waiting'
-  return 'running'
 }
 
 export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
@@ -309,7 +292,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
 
       // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability
-      // (main/workflowRunner.ts explains the ordering).
+      // (server/workflowRunner.ts explains the ordering).
       ctx.capabilities.provide(WORKFLOWS_RUNNER, { reconcile: () => runner.reconcile() })
       ctx.capabilities.provide(WORKFLOWS_NOTICES, notices)
 

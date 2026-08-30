@@ -13,15 +13,15 @@ import type {
   WorkflowRunRow,
   WorkflowStepDef,
   WorkflowStepRow,
-} from '../contract/workflowContracts'
-import type { PolicyEvaluator, StepKindContribution } from '../contract/workflowContracts'
+} from '../shared/workflowContracts'
+import type { PolicyEvaluator, StepKindContribution } from '../shared/workflowContracts'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import { MAX_FAN_OUT_TASKS, MAX_STEP_TURNS, buildBuiltinWorkflowContributions } from './workflowBuiltins'
 import { Semaphore } from './workflowSemaphore'
 import { intersectToolCeilings } from './workflowTools'
 import { assertValidWorkflow, normalizePersistedWorkflow, renderWorkflowPrompt, type WorkflowValidationCatalog } from './workflowValidation'
 
-export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from '../contract/workflowContracts'
+export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
 
 export type FanOutTaskSeed = { title: string; branch: string; prompt?: string }
 export type RunStepOptions = HeadlessOpts & {

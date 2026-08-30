@@ -5,7 +5,7 @@ import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapabilit
 
 // Workflow control (docs/workflows.md): declared workflows for a task, start a run, list runs/steps,
 // resolve a human gate. Commands use HTTP while notices and live events use the shared WebSocket.
-// The routes need the main-process WorkflowRunner, so they return 503 under dev:node.
+// The routes need the node's WorkflowRunner, so they return 503 under dev:node.
 
 export type WorkflowBridge = {
   // Which task a run belongs to, for the ownership guard below. `/workflows/runs/:runId/*` names no

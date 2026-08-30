@@ -1,5 +1,5 @@
 import type { PaletteItem, PaletteRowSource } from '@acorn/plugin-api/client'
-import { workflowApi, type WorkflowDefSummary } from '../contract/workflowClient'
+import { workflowApi, type WorkflowDefSummary } from './workflowsClient'
 
 // The defs a `rows` fetch returned, so `invoke` can start the picked one without a second request.
 let lastDefs: { taskId: string; workflows: WorkflowDefSummary[] } | null = null
@@ -9,7 +9,7 @@ export const workflowsPaletteRowSource: PaletteRowSource = {
   // After terminal's run/layout rows, matching the order the palette produced when it composed all three
   // itself (run, layout, workflow).
   order: 20,
-  // Desktop-only: the runner is a main-process engine, so these routes 503 under dev:node.
+  // Desktop-only: the runner is a node engine, so these routes 503 under dev:node.
   requires: { plugin: 'terminal' },
   rows: async (taskId) => {
     if (!taskId) return { rows: [] }

@@ -3,7 +3,7 @@ import type { PaletteItem } from '@acorn/client-core/palette/model.ts'
 import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
 
 const mocks = vi.hoisted(() => ({ defs: vi.fn(), start: vi.fn() }))
-vi.mock('../contract/workflowClient', () => ({ workflowApi: { defs: mocks.defs, start: mocks.start } }))
+vi.mock('./workflowsClient', () => ({ workflowApi: { defs: mocks.defs, start: mocks.start } }))
 
 import { workflowsPaletteRowSource as source } from './paletteRowSource'
 
@@ -23,7 +23,7 @@ describe('workflow palette rows', () => {
 
   it('declares its place after terminal rows, and its desktop requirement', () => {
     // 20, behind terminal's 10, which reproduces the run → layout → workflow order the palette had when it built
-    // all three itself. `requires: { plugin: 'terminal' }` because the runner is a main-process engine.
+    // all three itself. `requires: { plugin: 'terminal' }` because the runner is a node engine.
     expect(source).toMatchObject({ id: 'workflows.defs', order: 20, requires: { plugin: 'terminal' } })
   })
 

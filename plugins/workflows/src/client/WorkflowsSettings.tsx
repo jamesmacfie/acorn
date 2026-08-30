@@ -1,6 +1,6 @@
 import { createResource, For, Show } from 'solid-js'
 import { activeTaskId, hasHostCapability } from '@acorn/plugin-api/client'
-import { workflowApi } from '../contract/workflowClient'
+import { workflowApi } from './workflowsClient'
 import { Alert, Button, EmptyState, Field, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 // Settings → Workflows (docs/workflows.md): a read-only inspector over the workflow definitions the
