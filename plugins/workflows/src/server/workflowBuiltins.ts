@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { DEFAULT_PROFILE_ID, type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
-import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator, WorkflowStepDef, WorkflowStepRow } from '../contract/workflowContracts'
+import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator, WorkflowStepDef, WorkflowStepRow } from '../shared/workflowContracts'
 import type { RunnerDeps, RunStepOptions } from './workflowRunner'
 import { intersectToolCeilings } from './workflowTools'
 import { renderWorkflowPrompt } from './workflowValidation'

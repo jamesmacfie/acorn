@@ -12,7 +12,7 @@ import type {
   WorkflowBudget,
   WorkflowDef,
   WorkflowStepDef,
-} from '../contract/workflowContracts'
+} from '../shared/workflowContracts'
 import { validateWorkflow, type WorkflowValidationCatalog } from './workflowValidation'
 
 export type WorkflowFileError = { source: string; message: string }

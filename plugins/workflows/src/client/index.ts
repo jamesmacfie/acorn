@@ -1,7 +1,7 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { WORKFLOW_CONTROL } from '@acorn/plugin-agents/contract/workflowControl.ts'
-import { workflowApi } from '../contract/workflowClient'
+import { workflowApi } from './workflowsClient'
 import { workflowsPaletteRowSource } from './paletteRowSource'
 
 const WorkflowsSettings = lazy(() => import('./WorkflowsSettings'))

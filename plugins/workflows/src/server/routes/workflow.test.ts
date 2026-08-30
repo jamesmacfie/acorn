@@ -7,7 +7,7 @@ import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation, auth, and
 // the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in
-// main/workflowRunner.test.ts.
+// ../workflowRunner.test.ts.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

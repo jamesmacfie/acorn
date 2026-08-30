@@ -1,6 +1,6 @@
 import { capabilityId } from '@acorn/plugin-api/node'
 
-// workflows.notices: the renderer's notification bell, and the per-step event stream behind the run
+// workflows.notices: the client's notification bell, and the per-step event stream behind the run
 // panel (docs/workflows.md).
 //
 // These two used to sit on `ctx.events`, the broadcast surface every plugin receives, which meant one
