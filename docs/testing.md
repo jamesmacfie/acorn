@@ -225,6 +225,19 @@ stylesheet; only a person can tell whether the result is usable.
 25. Scaffold the other shape with `--rectangle` and repeat the install. Its pane draws inside an
     iframe, and a network call from that iframe fails.
 
+The last item is older than the rest. `docs/next-review.md`, deleted in the 2026-08-30 hygiene pass,
+was a personal checklist with no inbound links. Every other line in it was already owned by this
+checklist, by [shell.md](./shell.md) § Signing gates and the updater, or by
+[caching.md](./caching.md). This one was not.
+
+26. Run the Rollbar pane against a live project rather than the recorded fixtures, and check that the
+    privacy allowlist holds on real payloads: no request header, cookie, or `person` field outside the
+    allowlist reaches the pane or the copied context
+    ([integrations.md](./integrations.md) § Rollbar). Then narrow the window to the smallest width the
+    context pane and the Notes pane still support, and make one context section answer slowly. Both
+    panes keep their layout, and the slow section reports itself without stalling the others
+    ([notes-and-memory.md](./notes-and-memory.md) § Context integration).
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes

@@ -15,10 +15,6 @@ catalog:
   hono: "^4.12.32"
   solid-js: "^1.9.13"
   zod: "^4.4.3"
-onlyBuiltDependencies:
-  - esbuild
-  - node-pty
-  - workerd
 overrides:
   "@hono/node-server": ">=2.0.11"
   dompurify: ">=3.4.12"

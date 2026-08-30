@@ -54,7 +54,7 @@ Paths were checked on 2026-08-30. Phase 7 re-checks all of them.
 
 ## By phase
 
-- Phase 0: `README.md` line 110, `docs/next-review.md`.
+- Phase 0: `README.md` line 110, and `docs/next-review.md`, deleted.
 - Phase 1: the index, conventions, the plugin docs, four renames, `docs/third-party/`, the three
   `refused.md` files, `CLAUDE.md`.
 - Phase 2: `shell.md`, `node-distribution.md`, `local-development.md`, `mcp.md`, `testing.md`,

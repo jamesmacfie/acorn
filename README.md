@@ -107,5 +107,5 @@ Start with [architecture-overview.md](./docs/architecture-overview.md), then use
   [node-distribution.md](./docs/node-distribution.md): build, test, and distribution workflows.
 
 Design and migration material lives under [docs/third-party/](./docs/third-party/README.md) (the
-loaded-plugin record), `docs/future/`, and `docs/smolforge/`. Runtime contracts live in the topic
-docs above and the code.
+loaded-plugin record and remaining work) and [docs/future/](./docs/future/README.md), whose README
+indexes every programme and single file. Runtime contracts live in the topic docs above and the code.
