@@ -191,6 +191,14 @@ Only the two UI barrels may re-export a `.tsx` module, so every other entrypoint
 plugin's node-environment test suite. `ui/` may import only pure or presentation modules, from an
 allowlist of destinations rather than a denylist of data modules.
 
+**Two context types per side, one per tier.** `NodePluginContext` and `ClientPluginContext` are what a
+plugin loaded from disk gets; `CompiledNodePluginContext` and `CompiledClientPluginContext` add the
+seams only a plugin compiled into the binary can have — a live Hono router, the WS channel and PTY
+stream slots, agent tools, context sections, model adapters, and the client registries that take a
+component. The tier line is in the types, so crossing it is a compile error rather than a runtime "not
+a function". [plugins.md](./plugins.md) § The two contexts, one per tier owns the pair, and
+[contribution-kinds.md](./contribution-kinds.md) says why each kind sits where it does.
+
 **Two spellings that must not drift.** `PLUGIN_ROUTE_SEGMENT` is declared in client-core and re-spelled
 as a literal in `node-core/server/plugins/manifest.ts`, because the client is downstream of the node and
 cannot share the constant. The test turns that edit into a failure rather than a route the device

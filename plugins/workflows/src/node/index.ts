@@ -62,9 +62,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // The three seams another plugin adds work through (../contract/extensions.ts). Opened before the
       // runner is built so a contribution filed during someone else's init is visible on the first
       // sweep; `entries` is resolved per call, so init order still does not matter.
-      ctx.extensionPoints.open(WORKFLOW_STEP_KIND, 'Workflow step kinds')
-      ctx.extensionPoints.open(WORKFLOW_POLICY, 'Workflow gate policies')
-      ctx.extensionPoints.open(WORKFLOW_TRIGGER, 'Workflow triggers')
+      ctx.extensionPoints.declare(WORKFLOW_STEP_KIND, 'Workflow step kinds')
+      ctx.extensionPoints.declare(WORKFLOW_POLICY, 'Workflow gate policies')
+      ctx.extensionPoints.declare(WORKFLOW_TRIGGER, 'Workflow triggers')
 
       // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks). A veto here is a
       // safety-rail, not a failure, which is why the point allows nothing else: a plugin that could

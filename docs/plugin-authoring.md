@@ -506,13 +506,16 @@ a mismatch means the package is internally inconsistent, and picking a winner si
 squatting starts.
 
 What a loaded plugin's `ctx` does **not** have, whatever the manifest says: `ctx.routes.register`
-(Hono), `ctx.events.channel` and `ctx.events.streams`. A Hono instance cannot cross a process
+(Hono), `ctx.tools`, `ctx.contextSections`, `ctx.providers.model`, `ctx.events.channel` and
+`ctx.events.streams`. You do not have to keep that list: it is the difference between two types,
+`NodePluginContext` and `CompiledNodePluginContext`, so reaching for one of them is an error your
+editor shows you (plugins.md § The two contexts, one per tier). A Hono instance cannot cross a process
 boundary; a `(Request, PluginRequestContext) => Response` function can, so `ctx.routes.fetch(handler)`
 is the door. The host strips the mount before calling you, so a request to
 `/v2/p/<id>/greeting` reaches your handler as `/greeting` — the same relative path a mounted router
-would see. `ctx.storage`, `ctx.core`, `ctx.tools`, `ctx.schedules`, `ctx.collections`,
-`ctx.taskChecks`, `ctx.contextSections`, `ctx.runs`, `ctx.audit`, `ctx.extensionPoints`,
-`ctx.providers`, `ctx.capabilities` and `ctx.events.send`/`status`/`on` are all present, shaped by the
+would see. `ctx.storage`, `ctx.core`, `ctx.schedules`, `ctx.collections`,
+`ctx.taskChecks`, `ctx.runs`, `ctx.audit`, `ctx.extensionPoints`, `ctx.hooks`,
+`ctx.capabilities` and `ctx.events.send`/`status`/`on` are all present, shaped by the
 manifest.
 
 Those registries are owner-bound: the host stamps your plugin id onto whatever you register, so a
@@ -530,9 +533,10 @@ Three of them are newer than the rest and worth naming:
   refuses a `record` naming one you did not declare. Record what a person reviewing this machine would
   want to see and could not otherwise: work done unattended, money spent, something leaving the node.
   Not every call your plugin makes.
-- **`ctx.extensionPoints`** — the node's many-to-many seam. `open` a point in your own namespace,
-  `contribute` into anyone's, `entries` to read your own. Reach for a capability when there is one
-  right answer and a point when there are many. See
+- **`ctx.extensionPoints`** — the node's many-to-many seam. `declare` a point in your own namespace,
+  `handle` anyone's, `handlers` to read your own — the same three words `ctx.hooks` uses, because it is
+  the same shape asked a different question. Reach for a capability when there is one right answer and a
+  point when there are many. See
   [plugins.md](./plugins.md) § Node-side extension points.
 
 **Node actions and harnesses have no `ctx` member at all.** The manifest is the only way in — a command

@@ -47,22 +47,25 @@ export type NodePlugin = {
   dispose?(): void | Promise<void>
 }
 
-/** Everything the host hands a loaded plugin.
+/** Everything the host hands a loaded plugin, and nothing it does not.
  *
- * This is the loaded tier's projection. A compiled plugin's context has three more members —
- * `routes.register`, `events.channel`, `events.streams` — which cannot survive a message-passing
- * boundary and are permanently first-party (docs/extensibility.md § Two tiers, permanently).
+ * This is the loaded tier's projection. A compiled plugin's context has six more members —
+ * `routes.register`, `tools`, `contextSections`, `providers.model`, `events.channel` and
+ * `events.streams` — each either a live object that cannot survive a message-passing boundary or a
+ * contribution kind with no manifest carrier yet (docs/contribution-kinds.md).
+ *
+ * The host's own declaration of this type is
+ * `packages/node-core/src/server/pluginHost/types.ts § NodePluginContext`, and a test holds the two
+ * equal member for member, so this file cannot quietly fall behind.
  *
  * A facet under `core` is present only if the manifest asked for it. Reaching for one it did not
  * declare is an immediate "not a function", which is the intended failure. */
 export type NodePluginContext<Conn = unknown, Items = unknown> = {
   readonly name: string
   routes: PluginRouteRegistry<Conn, Items>
-  tools: PluginToolRegistry
   schedules: PluginScheduleRegistry
   collections: PluginCollectionRegistry
   taskChecks: PluginTaskCheckRegistry
-  contextSections: PluginContextSectionRegistry
   runs: PluginRunRegistry
   audit: PluginAuditRegistry
   extensionPoints: PluginExtensionPointRegistry
@@ -147,12 +150,6 @@ export type PluginProviderRuntime<Conn = unknown, Items = unknown> = {
 
 // ── The registries ────────────────────────────────────────────────────────────────────────────────
 
-export type PluginToolRegistry = {
-  /** An agent tool. Its `input` is a Zod schema, which is why the contribution is opaque here: this
-   *  package promises no dependencies and Zod is one. */
-  register(tool: HostOwned<'node-core/server/agentTools/registry.AgentToolContribution'>): void
-}
-
 /** Periodic work the node runs, whether or not a client is attached (docs/schedules.md). A loaded
  *  plugin normally declares these in its manifest, which is what puts them in front of the owner at
  *  install; the host registers those through this same seam. Any `setInterval` in plugin code is a
@@ -201,17 +198,15 @@ export type PluginTaskCheck = {
   apply?(task: TaskRef, signal: AbortSignal): Promise<void>
 }
 
-export type PluginContextSectionRegistry = {
-  register(section: HostOwned<'node-core/server/agentTools/contextSections.PluginContextSection'>): void
-}
-
 export type PluginProviderRegistry = {
   integration(
     provider: HostOwned<'node-core/server/integrations/types.IntegrationProviderContribution'>,
     route?: PluginFetchHandler<never, never>,
   ): void
   connection(provider: HostOwned<'node-core/server/integrations/types.ConnectionProviderContribution'>): void
-  model(adapter: HostOwned<'node-core/server/modelProviders/types.ModelProviderAdapter'>): void
+  /** A provider that knows about nodes, and optionally can make and remove them
+   *  (docs/plugins.md § Node providers). */
+  nodes(provider: HostOwned<'node-core/server/nodeProviders/registry.NodeProviderContribution'>): void
   withConnection<T>(userId: string, providerId: string, visit: PluginProviderConnectionVisitor<T>): Promise<T | undefined>
 }
 
@@ -304,9 +299,15 @@ export type Extension<T> = {
  * is not an error and not a no-op forever: entries wait, and the owner sees them the moment it opens
  * the point, because init order is not a dependency contract. */
 export type PluginExtensionPointRegistry = {
-  open<T>(point: ExtensionPointId<T>, label: string): void
-  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
+  declare<T>(point: ExtensionPointId<T>, label: string): void
+  handle<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
   /** In declared order, ties broken by id. Resolve at call time, never at init. */
+  handlers<T>(point: ExtensionPointId<T>): Extension<T>[]
+  /** @deprecated Renamed to `declare`. Removed in the next major of the plugin API. */
+  open<T>(point: ExtensionPointId<T>, label: string): void
+  /** @deprecated Renamed to `handle`. Removed in the next major of the plugin API. */
+  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
+  /** @deprecated Renamed to `handlers`. Removed in the next major of the plugin API. */
   entries<T>(point: ExtensionPointId<T>): Extension<T>[]
 }
 

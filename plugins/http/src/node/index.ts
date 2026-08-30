@@ -25,7 +25,7 @@ export const httpPlugin = (): NodePlugin => ({
     //
     // Nothing happens on a node with workflows disabled — the point is never opened, so the entry is
     // never read — and nothing here throws if workflows inits after this plugin does.
-    ctx.extensionPoints.contribute(WORKFLOW_STEP_KIND, {
+    ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, {
       id: 'request',
       value: { handler: httpStepHandler(db, ctx.core, ctx.audit.record), validate: validateHttpStep },
     })

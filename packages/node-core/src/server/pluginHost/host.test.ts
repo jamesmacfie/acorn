@@ -17,7 +17,7 @@ import { pluginRouteContributions } from '../routeRegistry'
 import { AGENTS_HARNESS_REGISTRY, type ManifestHarness } from './harnesses'
 import { clearRegistrations, initPlugins } from './host'
 import type { NodePermissions } from '../plugins/manifest'
-import type { NodePlugin, NodePluginContext } from './types'
+import type { CompiledNodePluginContext, NodePlugin } from './types'
 import { defaultBudgets, externalIdsFor, publicProvider } from '../integrations/providerShared'
 import { integrationProviderRegistry } from '../integrations/registry'
 
@@ -405,8 +405,10 @@ describe('loaded plugins', () => {
       ),
     })
 
-  const ctxOf = async (permissions: Partial<NodePermissions>): Promise<NodePluginContext> => {
-    let captured!: NodePluginContext
+  // Typed as the compiled shape because that is what `NodePlugin.init` declares, and the point of these
+  // assertions is that a loaded plugin's object does not have the members the type promises a built-in.
+  const ctxOf = async (permissions: Partial<NodePermissions>): Promise<CompiledNodePluginContext> => {
+    let captured!: CompiledNodePluginContext
     await host([plugin('ntfy', { init: (ctx) => void (captured = ctx) })], { ntfy: permissions })
     return captured
   }
@@ -558,7 +560,7 @@ describe('loaded plugins', () => {
   it("ignores a loaded bundle's own migrationsModule, so the manifest chain always wins", async () => {
     // A loaded plugin's object comes out of a bundle the owner installed. Honouring its declaration
     // would let a package point the migrator at any directory it can name.
-    let captured!: NodePluginContext
+    let captured!: CompiledNodePluginContext
     await host(
       [plugin('ntfy', { migrationsModule: 'file:///tmp/not-my-chain/index.ts', init: (ctx) => void (captured = ctx) })],
       { ntfy: {} },
@@ -567,7 +569,7 @@ describe('loaded plugins', () => {
   })
 
   it('leaves a built-in with the full context', async () => {
-    let captured!: NodePluginContext
+    let captured!: CompiledNodePluginContext
     const core = createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() })
     await initPlugins([plugin('terminal', { init: (ctx) => void (captured = ctx) })], {
       capabilities: new CapabilityRegistry(),

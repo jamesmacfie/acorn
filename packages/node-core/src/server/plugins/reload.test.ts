@@ -20,7 +20,7 @@ import { PLUGIN_NAMESPACE, pluginRouteContributions } from '../routeRegistry'
 import { CapabilityRegistry, capabilityId } from '../pluginHost/capabilities'
 import { dispatchPluginFetch } from '../pluginHost/fetchRoute'
 import { clearRegistrations, initPlugins, type PluginReloadRequest } from '../pluginHost/host'
-import type { NodePlugin, NodePluginContext, PluginStorage } from '../pluginHost/types'
+import type { CompiledNodePluginContext, NodePlugin, PluginStorage } from '../pluginHost/types'
 
 const PLUGIN = 'acme'
 
@@ -47,8 +47,8 @@ const hostOptions = () => ({
 // One loaded plugin that contributes the three things a reload has to move: a route (mounted through the
 // portable carrier), an agent tool (a registry that rejects duplicates, which is what makes the candidate
 // buffer necessary) and a captured context (so the test can prove the old one is revoked).
-const acme = (body: string, extra?: Partial<NodePlugin>): { plugin: NodePlugin; context: () => NodePluginContext } => {
-  let captured: NodePluginContext | null = null
+const acme = (body: string, extra?: Partial<NodePlugin>): { plugin: NodePlugin; context: () => CompiledNodePluginContext } => {
+  let captured: CompiledNodePluginContext | null = null
   return {
     context: () => captured!,
     plugin: {

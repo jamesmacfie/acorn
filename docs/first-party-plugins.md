@@ -90,13 +90,16 @@ plugins: they cannot be disabled, so they cannot be optional, so they cannot be 
 **E. Registries with no manifest form** — `persistedStateSlices`, non-`footer` component slots, and
 the generic `ctx.contribute(registry, entry)` escape hatch. These take functions or components. Some
 are inherently first-party (B); others simply have no declarative equivalent yet, which is a gap
-rather than a law — noted per row where that is the case. `agentToolRenderers` was on this list and
+rather than a law — noted per row where that is the case. On both sides the line is a type rather than
+a paragraph: what a loaded plugin gets is `NodePluginContext` and `ClientPluginContext`, and everything
+in this reason sits on `CompiledNodePluginContext` or `CompiledClientPluginContext` beside them
+(docs/plugins.md § The two contexts, one per tier). `agentToolRenderers` was on this list and
 is not: a tool card is `agents:tool-card`, an ordinary `remote` point, so a loaded plugin declares
 one in its manifest like any other extension (docs/contribution-kinds.md).
 
 **F. Constructor arguments from the composition root** — the `NodePluginDeps` bag in
 `apps/node/src/composition/plugins.ts`. A loaded plugin is activated by the loader from its manifest and
-is handed one thing, its `NodePluginContext`. It is never called with arguments, so anything the
+is handed one thing, its `NodePluginContext` — the loaded one. It is never called with arguments, so anything the
 root passes positionally pins the plugin to the compiled tier no matter what else it uses. Four
 plugins take a dependency bag — **agents**, **notes**, **terminal**, and **workflows** — and three
 take the data root as a first argument — **agents**, **memory**, and **notes** — for the files they
