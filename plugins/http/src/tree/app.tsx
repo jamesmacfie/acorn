@@ -1,13 +1,16 @@
-import { createResource, createSignal, Match, Show, Switch } from 'solid-js'
+import { createResource, createSignal, Match, Show, Switch, type JSX } from 'solid-js'
 import { EmptyState, Heading, Select, Stack, Text } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { projectRoute, projectsRoute, type Project, type ProjectsResponse } from '@acorn/protocol/api.ts'
-import HttpPanel from './HttpPanel'
+import HttpDetail from './HttpDetail'
+import HttpList from './HttpList'
 import HttpVariables from './HttpVariables'
+import { httpPanelModel } from './panelModel'
 
-// Two renderers, three manifest surfaces (docs/http-client.md § Client). What a pane draws is decided
-// by the props the host mounted this slot with, which is the tree contract's version of what the frame
-// contract called `context`: the host says what this region was opened to look at.
+// Two regions and a settings renderer, over three manifest surfaces (docs/http-client.md § Client).
+// What a pane draws is decided by the props the host mounted this region with, which is the tree
+// contract's version of what the frame contract called `context`: the host says what this region was
+// opened to look at.
 //
 //   pane (task)     `taskId` + `projectId`.
 //   pane (project)  `projectId` and no task, mounted beside the rail list at /p/:projectId. Lets a rail
@@ -15,17 +18,24 @@ import HttpVariables from './HttpVariables'
 //   settings        neither. The settings modal only knows a workspace, so that surface picks a
 //                   project first, and it is a renderer of its own rather than a fourth branch here.
 //
-// A selection into an already-mounted project pane arrives as `onSelect`, because remounting per click
-// would throw away the draft the panel is holding.
+// The two panes are `list-detail`, so the host draws the split, the divider and the drag handle and
+// mounts each region separately (docs/panes.md § Layout model). Both regions run in one worker and
+// share ./panelModel.ts, which is what makes two renderers possible at all: the selection, the draft
+// and the send result are in module scope rather than in either component.
+//
+// A selection into an already-mounted project pane arrives as `onSelect`, which the model subscribes
+// to once, because remounting per click would throw away the draft the panel is holding.
 
 const nameOf = (project: Project | undefined): string => project?.name ?? ''
 
-/** What the host mounts a pane tree with: the surface's subject, minted by the shell per slot. */
+/** What the host mounts a pane region with: the surface's subject, minted by the shell per slot. */
 export type HttpPaneProps = { taskId?: string; projectId?: string; item?: string }
 
-export function HttpPaneApp(props: HttpPaneProps & { bridge: AcornBridge }) {
+/** The project a region was opened for, and the states in which there is nothing to draw. Both regions
+ *  ask this, so both answer a missing or unloadable project the same way. */
+function WithProject(props: HttpPaneProps & { bridge: AcornBridge; children: (model: ReturnType<typeof httpPanelModel>) => JSX.Element }) {
   // The project is read from core rather than carried in the mount props, which hold an id and not a
-  // name. One read, no refetch: a slot is remounted when its subject changes.
+  // name. One read, no refetch: a region is remounted when its subject changes.
   const [project] = createResource(
     () => props.projectId,
     (id) => props.bridge.api.get<Project>(projectRoute(id)),
@@ -51,18 +61,24 @@ export function HttpPaneApp(props: HttpPaneProps & { bridge: AcornBridge }) {
         </Stack>
       </Match>
       <Match when={project()}>
-        {(row) => (
-          <HttpPanel
-            bridge={props.bridge}
-            projectId={row().id}
-            projectName={row().name}
-            {...(props.taskId ? { taskId: props.taskId } : {})}
-            {...(props.item ? { initialRequestId: props.item } : {})}
-          />
-        )}
+        {(row) => props.children(httpPanelModel({
+          bridge: props.bridge,
+          projectId: row().id,
+          projectName: row().name,
+          ...(props.taskId ? { taskId: props.taskId } : {}),
+          ...(props.item ? { initialRequestId: props.item } : {}),
+        }))}
       </Match>
     </Switch>
   )
+}
+
+export function HttpListApp(props: HttpPaneProps & { bridge: AcornBridge }) {
+  return <WithProject {...props}>{(model) => <HttpList model={model} />}</WithProject>
+}
+
+export function HttpDetailApp(props: HttpPaneProps & { bridge: AcornBridge }) {
+  return <WithProject {...props}>{(model) => <HttpDetail model={model} />}</WithProject>
 }
 
 // The variables settings surface. A picker rather than an inferred project: variables belong to a

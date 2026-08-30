@@ -77,17 +77,21 @@ export default {
     // land somewhere. `openPane` needs a task and the rail often has none, so the answer is the same one
     // linear reached: a project-scoped pane, mounted beside the list, addressed by the route below.
     frames: [
-      // `single`, not `list-detail`, even though the panel is a split. The two columns share the
-      // selection, the draft and the send result, and two regions are two renderers with no way to hold
-      // one signal between them — so the split is a `ListDetail` inside the one tree.
+      // `list-detail`: the host draws the split, the divider and the drag handle, and the two regions
+      // are two entries in one bundle. They share the selection, the draft and the send result through
+      // module scope in that bundle (src/tree/panelModel.ts), which is what a loaded plugin has instead
+      // of the host's `model` seam (docs/panes.md § Layout model).
       {
         target: 'pane',
         id: 'http',
         label: 'API',
         glyph: 'send',
         order: 76,
-        layout: 'single',
-        regions: { body: { kind: 'remote', entry: 'pane' } },
+        layout: 'list-detail',
+        regions: {
+          list: { kind: 'remote', entry: 'list' },
+          detail: { kind: 'remote', entry: 'detail' },
+        },
       },
       {
         target: 'pane',
@@ -95,8 +99,11 @@ export default {
         label: 'API requests',
         glyph: 'send',
         scope: 'project',
-        layout: 'single',
-        regions: { body: { kind: 'remote', entry: 'pane' } },
+        layout: 'list-detail',
+        regions: {
+          list: { kind: 'remote', entry: 'list' },
+          detail: { kind: 'remote', entry: 'detail' },
+        },
       },
       {
         target: 'settings',
