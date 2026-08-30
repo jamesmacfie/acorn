@@ -1,13 +1,13 @@
 import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
-import { nodes, nodeStatus } from '../node/fleet'
-import { attachmentOf, createAttachments, detachNode } from '../node/attachment'
+import { nodes, nodeStatus } from '../infra/node/fleet'
+import { attachmentOf, createAttachments, detachNode } from '../infra/node/attachment'
 import ProvidedNodes from './ProvidedNodes'
-import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, renameNode } from '../node/fleetActions'
+import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, renameNode } from '../infra/node/fleetActions'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
-import NodeChip from '../node/NodeChip'
-import '../node/nodes.css'
+import NodeChip from '../infra/node/NodeChip'
+import '../infra/node/nodes.css'
 import { Alert, Button, ConfirmButton } from '../ui/primitives'
 
 // Settings → Nodes (docs/ui-design.md § Node management): add, rename, reconnect, unpair, revoke.

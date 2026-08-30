@@ -1,15 +1,15 @@
 import { QueryClient, QueryObserver } from '@tanstack/solid-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { prefsKey } from '@acorn/protocol/api.ts'
-import { persistedStateRegistry } from '../persistence/persistedState'
-import { mergePrefs } from '../persistence/devicePrefs'
+import { persistedStateRegistry } from '../infra/persistence/persistedState'
+import { mergePrefs } from '../infra/persistence/devicePrefs'
 
 const mocks = vi.hoisted(() => ({
   writeJson: vi.fn(),
   pushBackgroundError: vi.fn(),
 }))
 // savePref owns the pref write itself now, so stub the transport rather than a sibling module.
-vi.mock('../apiClient', () => ({ writeJson: mocks.writeJson }))
+vi.mock('../infra/node/apiClient', () => ({ writeJson: mocks.writeJson }))
 vi.mock('../notifications/notifications', () => ({ pushBackgroundError: mocks.pushBackgroundError }))
 
 import { savePref } from './savePref'

@@ -1,4 +1,4 @@
-import type { HostCapabilityRequirement } from '../hostCapabilities'
+import type { HostCapabilityRequirement } from '../infra/node/hostCapabilities'
 import type { PaletteItem } from '../palette/model'
 import { Registry } from './registry'
 

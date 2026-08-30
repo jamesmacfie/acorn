@@ -8,11 +8,11 @@ import {
   type BackupSuggestion,
   type NodeSecurityPosture,
 } from '@acorn/protocol/api.ts'
-import { readJson, writeJson } from '../apiClient'
-import { pushNotice } from '../notifications/notifications'
+import { readJson, writeJson } from './apiClient'
+import { pushNotice } from '../../notifications/notifications'
 import { readDevicePrefs } from '../persistence/devicePrefs'
 import { PrefKeys } from '../persistence/prefKeys'
-import { savePref } from '../settings/savePref'
+import { savePref } from '../../settings/savePref'
 
 // Settings → Security's reads, addressed at a named node (docs/security.md § Audit, § Filesystem and
 // backup). The audit trail and the disk-encryption answer are facts about one machine, so a fleet-wide

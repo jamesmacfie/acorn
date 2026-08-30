@@ -14,7 +14,7 @@ import {
   type PluginExtensionItem,
 } from '@acorn/protocol/extensionPoints.ts'
 import type { Component } from 'solid-js'
-import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
+import { hasHostCapability, type HostCapabilityRequirement } from '../infra/node/hostCapabilities'
 import { Registry } from './registry'
 
 export type { ArbitrationMode, ExtensionPointKind, ExtensionPointLocation }

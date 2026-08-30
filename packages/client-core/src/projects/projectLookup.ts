@@ -1,4 +1,4 @@
-import type { Project } from '../queries'
+import type { Project } from '../infra/queries'
 
 // The project list, from module-level code. Same shape and reason as tasks/taskLookup.ts, which states
 // the argument in full: `projectsOptions` is a TanStack query and `useQueryClient` is a hook, so a click

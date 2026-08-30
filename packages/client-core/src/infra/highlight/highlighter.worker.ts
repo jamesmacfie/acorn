@@ -8,7 +8,7 @@
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
 import { loadGrammar } from './langs'
-import type { HighlightLines, HighlightRequest, HighlightResponse } from './protocol'
+import type { HighlightLines, HighlightRequest, HighlightResponse } from './messages'
 
 const THEMES = { light: 'github-light', dark: 'github-dark' } as const
 

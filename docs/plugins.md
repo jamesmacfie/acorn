@@ -2615,7 +2615,7 @@ Plugins collaborate through four mechanisms:
 4. **Client registries and slots** — register UI contributions without importing another plugin's
    implementation. The host records disposables so disabling/reloading a plugin removes its entries.
 
-`packages/client-core/src/clientCapabilities.ts` mirrors capabilities (2) on the client: a typed
+`packages/client-core/src/infra/node/clientCapabilities.ts` mirrors capabilities (2) on the client: a typed
 `Map` keyed by `ClientCapabilityId<T>`, so one plugin's client half can call another's without an
 import edge between their packages. The motivating case was the agent task sidebar merging
 `plugins/workflows`' steps into its roster while `plugins/workflows`' node half already needed

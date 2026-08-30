@@ -10,11 +10,11 @@
 // for every other one. A second client, a paired device, or an agent creating a child task moved
 // nothing on screen until someone reconnected. One desktop and one node makes that an edge case; a
 // fleet makes it the normal case.
-import { activeCacheId } from '../node/activeNode'
-import { clientFor } from '../node/fleet'
-import { tasksKey } from '../queries'
+import { activeCacheId } from '../infra/node/activeNode'
+import { clientFor } from '../infra/node/fleet'
+import { tasksKey } from '../infra/queries'
 import { clientEvents } from '../registries/clientEvents'
-import { wsOnTasksChanged } from '../wsClient'
+import { wsOnTasksChanged } from '../infra/node/wsClient'
 
 /** Subscribe for the life of the shell. Returns the unsubscribe for symmetry with the other watchers;
  * the app never calls it. */

@@ -1,8 +1,8 @@
 import { For, Show } from 'solid-js'
 import { tasksKey, tasksRoute, type Task } from '@acorn/protocol/api.ts'
-import { readJson } from '../apiClient'
-import { formatNodeStat, nodeStatContributions } from '../registries/nodeStats'
-import { createAttentionInbox } from '../notifications/attentionInbox'
+import { readJson } from './apiClient'
+import { formatNodeStat, nodeStatContributions } from '../../registries/nodeStats'
+import { createAttentionInbox } from '../../notifications/attentionInbox'
 import { createFleetQuery } from './fanout'
 import { activeNodeId, setActiveNode } from './activeNode'
 import { nodes, nodeStatus } from './fleet'
@@ -10,7 +10,7 @@ import { reconnectNode } from './fleetActions'
 import { formatLastSeen } from './freshness'
 import NodeChip from './NodeChip'
 import './nodes.css'
-import { Alert, Button } from '../ui/primitives'
+import { Alert, Button } from '../../ui/primitives'
 
 // Fleet home: the landing view once more than one node is paired, a card per node with connection
 // state, counts, last-refresh, and the two actions that matter from here.

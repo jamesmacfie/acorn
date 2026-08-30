@@ -137,7 +137,7 @@ All three are reflected in the shipped system. Item 1 was **not** true when this
 it — a 2026-08-15 survey found the seam existed as a TypeScript type and nothing else — and it landed
 that day (`git history: docs/future/node-first/platform-seam.md`). Everything else here waits.
 
-1. **Platform adapter seam in client-core.** (Shipped — `packages/client-core/src/platform/`.)
+1. **Platform adapter seam in client-core.** (Shipped — `packages/client-core/src/infra/platform/`.)
    Everything that touches `window.acorn` (apiClient's nodeFetch, stream attach, plugin cache access,
    trust prompts) is behind capability-grouped interfaces with the desktop bridge as their only
    implementation, and `boundaries.test.ts` fails any file outside the seam that reads the global.

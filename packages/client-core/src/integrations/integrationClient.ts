@@ -1,4 +1,4 @@
-import { sendJson, writeJson } from '../apiClient'
+import { sendJson, writeJson } from '../infra/node/apiClient'
 import {
   type ConnectIntegrationRequest,
   type Integration,

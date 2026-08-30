@@ -6,7 +6,7 @@ import { createFrameBridge, postSelect, postSurfaceAction, type FrameBinding } f
 import { createFrameServices } from '../frames/frameServices'
 import { eligiblePlugins, isTaskPane } from '../contributions'
 import { recordSurfaceFailure } from '../surfaceFailures'
-import { activeNodeId } from '../../node/activeNode'
+import { activeNodeId } from '../../infra/node/activeNode'
 import { clientEvents, consumePaneIntent } from '../../registries/clientEvents'
 import { TreeHost } from './TreeHost'
 import type { RemoteContribution } from './registry'

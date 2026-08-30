@@ -18,10 +18,10 @@ import type { Disposable } from '../../registries/registry'
 // answers and each is asked again at draw time, because a trust decision can be withdrawn while the
 // pane is open.
 
-vi.mock('../../hostCapabilities', () => ({ hasHostCapability: () => true }))
+vi.mock('../../infra/node/hostCapabilities', () => ({ hasHostCapability: () => true }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
-vi.mock('../../queries', () => ({ prefsOptions: () => ({}) }))
-vi.mock('../../node/activeNode', () => ({ activeNodeId: () => 'node-1' }))
+vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({}) }))
+vi.mock('../../infra/node/activeNode', () => ({ activeNodeId: () => 'node-1' }))
 vi.mock('./register', () => ({ frameBindingFor: (pluginId: string) => ({ pluginId }) }))
 
 // The iframe itself is PluginFrame's to test; here it only has to be identifiable on screen.

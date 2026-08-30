@@ -8,7 +8,7 @@ import {
 } from '@acorn/protocol/api.ts'
 import type { SourcePromotion } from '../../registries/sources'
 import { addTaskLink, createTask } from '../../tasks/mutations'
-import { readJson } from '../../apiClient'
+import { readJson } from '../../infra/node/apiClient'
 import { ownsTaskOrigin } from './ownership'
 
 export type DescriptorPromotionServices = {

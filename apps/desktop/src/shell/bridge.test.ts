@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { SEAM_GROUPS, seamProblems, type SeamGroup } from '@acorn/client-core/platform/contract.ts'
+import { SEAM_GROUPS, seamProblems, type SeamGroup } from '@acorn/client-core/infra/platform/contract.ts'
 
 // The shell's half of the platform-seam contract (docs/testing.md § Test
 // layers).

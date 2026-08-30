@@ -1,5 +1,5 @@
-import type { HostCapabilityRequirement } from '../hostCapabilities'
-import { hasHostCapability } from '../hostCapabilities'
+import type { HostCapabilityRequirement } from '../infra/node/hostCapabilities'
+import { hasHostCapability } from '../infra/node/hostCapabilities'
 import { Registry, type Disposable } from './registry'
 
 export type CommandCategory = 'action' | 'navigation' | 'pane' | 'task' | 'terminal' | 'workspace'

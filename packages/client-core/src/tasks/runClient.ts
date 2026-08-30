@@ -1,6 +1,6 @@
 import { runDefaultUrlRoute, runStartRoute, runStatusRoute, runStopRoute, runTargetsRoute } from '@acorn/protocol/api.ts'
 import type { RunStatus, RunTargetInfo } from '@acorn/protocol/terminal.ts'
-import { ApiError, readJson, writeJson } from '../apiClient'
+import { ApiError, readJson, writeJson } from '../infra/node/apiClient'
 import { openRepoConfigTrust } from '../configTrust/configTrust'
 
 export type RunLayout = { id: string; panes: string[]; terminal?: string; browser?: string }

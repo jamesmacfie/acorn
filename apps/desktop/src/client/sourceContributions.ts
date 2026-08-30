@@ -1,10 +1,10 @@
 import { lazy } from 'solid-js'
-import { nodes } from '@acorn/client-core/node/fleet.ts'
+import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import type { SourceContribution } from '@acorn/client-core/registries/sources.ts'
 import { CREATE_TASK_ROUTE, PROJECT_ROUTE } from '@acorn/client-core/registries/corePaths.ts'
 
 const Home = lazy(() => import('@acorn/client-core/workspaces/Home.tsx'))
-const FleetHome = lazy(() => import('@acorn/client-core/node/FleetHome.tsx'))
+const FleetHome = lazy(() => import('@acorn/client-core/infra/node/FleetHome.tsx'))
 
 export const coreSourceContributions: SourceContribution[] = [
   {

@@ -144,7 +144,7 @@ the same rule inferred from a rendered tree.
 
 The shell imports no feature UI directly. `App.tsx`, `TaskView.tsx`, and `CommandPalette.tsx` consume
 registry entries and client-core contracts. A feature that needs native behavior goes through the
-platform seam (`client-core/src/platform/`), which `@acorn/plugin-api/client` re-exports the plugin-safe
+platform seam (`client-core/src/infra/platform/`), which `@acorn/plugin-api/client` re-exports the plugin-safe
 parts of; plugins do not name a shell binding and do not read the host global.
 
 The router is registry-driven. A source contributes path shapes with an explicit `order`, and the desktop
@@ -178,7 +178,7 @@ maximise state persisted per task, so the URL carries the intent, not the layout
 
 ## Node data access
 
-`packages/client-core/src/apiClient.ts` uses route builders and response types from
+`packages/client-core/src/infra/node/apiClient.ts` uses route builders and response types from
 `@acorn/protocol/api.ts`. In the desktop it calls the platform seam's `nodeTransport().fetch(nodeId,
 request)`, which the desktop helper sends through the pinned broker; with no transport it falls back to a
 same-origin `fetch`. The standalone server can be tested with a direct

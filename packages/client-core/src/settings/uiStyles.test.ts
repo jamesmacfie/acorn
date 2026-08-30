@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readStyleSheets, stripComments } from '../styles/readStyleSheets'
+import { readStyleSheets, stripComments } from '../infra/styles/readStyleSheets'
 import { STYLES } from './uiStyles'
 
 // Drift guard, mirroring themes.test.ts (docs/ui-design.md § Style packs): the Appearance styles

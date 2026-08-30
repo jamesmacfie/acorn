@@ -13,9 +13,9 @@ import {
   type PluginUninstallResult,
   type PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
-import { readJson, writeJson } from '../apiClient'
+import { readJson, writeJson } from './apiClient'
 import { activeNodeId } from './activeNode'
-import { onScopeEvicted } from '../registries/scopeEviction'
+import { onScopeEvicted } from '../../registries/scopeEviction'
 
 const [nodePlugins, setNodePlugins] = createSignal<NodePluginState | null>(null)
 

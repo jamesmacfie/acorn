@@ -2,8 +2,8 @@ import { createMemo, type Accessor } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { dashboardHistoryRoute, type DashboardHistoryResponse } from '@acorn/protocol/api.ts'
 import { TREND_DAYS, type MeasureSample } from '@acorn/dashboards-core/trend.ts'
-import { readJson } from '../apiClient'
-import { activeNodeId } from '../node/activeNode'
+import { readJson } from '../infra/node/apiClient'
+import { activeNodeId } from '../infra/node/activeNode'
 
 // A panel's recorded measure series, read from the node that stores it (docs/dashboards.md § Trends).
 //

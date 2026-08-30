@@ -15,7 +15,7 @@
 export { setProjectsLookup } from '@acorn/client-core/projects/projectLookup.ts'
 // The row shape those fixtures have to satisfy. A type, so it costs nothing at runtime, and it is the
 // difference between a fixture that fails when `Project` changes and one that silently drifts.
-export type { Project } from '@acorn/client-core/queries.ts'
+export type { Project } from '@acorn/client-core/infra/queries.ts'
 
 // The two registries a cooperative extension is registered through, for a test that renders one of
 // its own plugin's slots and needs somebody on the other side of it (docs/plugins.md § Cooperative

@@ -19,10 +19,10 @@ import {
   type ScheduleTargetOption,
   type ScheduleTargetsResponse,
 } from '@acorn/protocol/schedules.ts'
-import { readJson, sendJson, writeJson } from '../apiClient'
+import { readJson, sendJson, writeJson } from '../infra/node/apiClient'
 import { formatRelativeTime } from '../lib/formatRelativeTime'
-import { activeNodeId } from '../node/activeNode'
-import { nodes } from '../node/fleet'
+import { activeNodeId } from '../infra/node/activeNode'
+import { nodes } from '../infra/node/fleet'
 import { Alert, Badge, Button, Checkbox, ConfirmButton, Input, Row, Select, StatusDot } from '../ui/primitives'
 import './settings.css'
 

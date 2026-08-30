@@ -1,6 +1,6 @@
 // Workspace and Project writes (docs/workspaces-and-tasks.md). Core owns these, and callers invalidate
 // the core workspace/project keys after mutations.
-import { postJson, writeJson } from '../apiClient'
+import { postJson, writeJson } from '../infra/node/apiClient'
 import {
   integrationMappingsRoute,
   type IntegrationMapping,

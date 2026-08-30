@@ -6,27 +6,27 @@
  * other is irrelevant. That removes the old source-order fragility where every
  * :root[data-theme] block sat at the same (0,2,0) specificity as the prefers-color-scheme block.
  */
-@import './styles/fonts.css';
-@import './styles/tokens-invariant.css';
-@import './styles/tokens-style.css'; /* style defaults == the 'terminal' pack */
-@import './styles/tokens-theme.css';
-@import './styles/base.css';
-@import './styles/shell.css';
-@import './styles/primitives.css';
+@import './fonts.css';
+@import './tokens-invariant.css';
+@import './tokens-style.css'; /* style defaults == the 'terminal' pack */
+@import './tokens-theme.css';
+@import './base.css';
+@import './shell.css';
+@import './primitives.css';
 
 /* Style packs last: their token blocks and their few structural overrides both sit after
    everything they override. Specificity already guarantees this ((0,3,0) beats the (0,1,0)/(0,2,0)
    bases), so the order is for the reader, not the cascade. */
-@import './styles/style-modern.css';
-@import './styles/style-cozy.css';
-@import './styles/style-cute.css';
+@import './style-modern.css';
+@import './style-cozy.css';
+@import './style-cute.css';
 
-@import './styles/diff.css';
-@import './styles/topbar.css';
-@import './styles/overlays.css';
-@import './styles/integrations.css';
-@import './styles/copy.css';
-@import './styles/tabs.css';
+@import './diff.css';
+@import './topbar.css';
+@import './overlays.css';
+@import './integrations.css';
+@import './copy.css';
+@import './tabs.css';
 
 /* Hide scrollbars everywhere; scrolling still works. Electron/Chromium only. */
 *::-webkit-scrollbar {

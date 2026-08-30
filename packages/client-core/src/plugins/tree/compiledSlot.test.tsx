@@ -14,9 +14,9 @@ import type { Disposable } from '../../registries/registry'
 // context's own rows stay put beside it because the point stacks, and disabling memory leaves context
 // drawing exactly what it drew before anybody contributed.
 
-vi.mock('../../hostCapabilities', () => ({ hasHostCapability: () => true }))
+vi.mock('../../infra/node/hostCapabilities', () => ({ hasHostCapability: () => true }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
-vi.mock('../../queries', () => ({ prefsOptions: () => ({}) }))
+vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({}) }))
 // The worker path is not what this file is about, and mounting one in jsdom would need a Worker.
 vi.mock('./RemoteTree', () => ({ RemoteTree: () => <span>worker-tree</span> }))
 

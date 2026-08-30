@@ -1,8 +1,8 @@
 import { createSignal, Match, Show, Switch } from 'solid-js'
-import Acorn from '../Acorn'
+import Acorn from '../../Acorn'
 import { recoveryActions } from '../platform'
 import { nodeReadiness, selectActiveNode } from './activeNode'
-import { Button } from '../ui/primitives'
+import { Button } from '../../ui/primitives'
 
 export default function NodeGate() {
   const [showReason, setShowReason] = createSignal(false)

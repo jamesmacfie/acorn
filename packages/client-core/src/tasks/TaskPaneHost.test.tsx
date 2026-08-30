@@ -11,7 +11,7 @@ import TaskPaneHost from './TaskPaneHost'
 // are real rather than intended.
 
 const capabilities = vi.hoisted(() => ({ desktop: true, terminal: true }))
-vi.mock('../hostCapabilities', () => ({
+vi.mock('../infra/node/hostCapabilities', () => ({
   hasHostCapability: (requirement: 'none' | 'desktop' | 'terminal' = 'none') =>
     requirement === 'none' || capabilities[requirement],
 }))
@@ -26,9 +26,9 @@ vi.mock('./tasks', () => ({
   maximizedPane: () => maximized.pane,
   dispatchLayout: (_taskId: string, action: unknown) => void dispatched.push(action),
 }))
-vi.mock('../node/activeNode', () => ({ activeNodeId: () => 'node-1' }))
-vi.mock('../node/fleet', () => ({ nodeState: () => ({}) }))
-vi.mock('../node/freshness', () => ({ freshnessOf: () => 'live' }))
+vi.mock('../infra/node/activeNode', () => ({ activeNodeId: () => 'node-1' }))
+vi.mock('../infra/node/fleet', () => ({ nodeState: () => ({}) }))
+vi.mock('../infra/node/freshness', () => ({ freshnessOf: () => 'live' }))
 vi.mock('../registries/railMarkers', () => ({ markersFor: () => [] }))
 
 let host: HTMLElement

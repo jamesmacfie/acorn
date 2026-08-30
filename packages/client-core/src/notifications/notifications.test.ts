@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
-import { setActiveNode } from '../node/activeNode'
+import { setActiveNode } from '../infra/node/activeNode'
 import {
   _resetNotices,
   capNotices,

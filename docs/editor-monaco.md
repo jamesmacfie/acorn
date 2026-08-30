@@ -90,7 +90,7 @@ chose:
 | `applyMonacoTheme()` | `EditorPane.tsx` and `DatabasePane.tsx`, verbatim | the database copy is commented *"mirrored here to keep that pane untouched"* |
 | A Monaco theme named `app` | both, `defineTheme('app', …)` | the name is **global**. Two plugins write the same global and it works by luck; last writer wins |
 | `watchAppearance(applyMonacoTheme)` | both | two subscriptions doing identical work on every theme change |
-| extension → language id | `EditorPane.tsx` (`langFor`, falls back to `'plaintext'`) and `client-core/highlight/shiki.ts` (`langFor`, falls back to `'text'`) | two maps, two vocabularies, two fallbacks |
+| extension → language id | `EditorPane.tsx` (`langFor`, falls back to `'plaintext'`) and `client-core/infra/highlight/shiki.ts` (`langFor`, falls back to `'text'`) | two maps, two vocabularies, two fallbacks |
 
 That last row matters more than it looks — see § Naming.
 
@@ -199,7 +199,7 @@ The contract must not say "monaco", and the TUI is the weaker half of the argume
   and bound to host-owned meaning. A vendor name in that vocabulary is a vendor name in the wire
   format, permanently.
 - **There are already two implementations in this repo.** Diff rows highlight with **shiki**
-  (`client-core/highlight/shiki.ts`); the editor and database panes edit with **Monaco**. They are not
+  (`client-core/infra/highlight/shiki.ts`); the editor and database panes edit with **Monaco**. They are not
   interchangeable — shiki is a read-only highlighter — but a read-only document view backed by shiki is
   a real second implementation of the same contract, available today and much smaller. So this is not
   an interface with one implementation, which is the usual and correct objection to a neutral name.
@@ -481,7 +481,7 @@ grows without becoming Monaco's API in a trench coat.
    from day one, degenerate `document` template first.
 3. ~~Publish the language-id vocabulary.~~ **Done.** `@acorn/protocol/languageIds.ts`, LSP spellings,
    the union of the two extension maps, one fallback. The per-engine maps sit beside their engines —
-   `client-core/editor/language.ts` for Monaco, `client-core/highlight/shiki.ts` for shiki, each total
+   `client-core/editor/language.ts` for Monaco, `client-core/infra/highlight/shiki.ts` for shiki, each total
    over the vocabulary so a new id fails `tsc` until someone says what that engine does with it.
 4. ~~Build the contract.~~ **Done.** `layout` and `regions` on a `pane` surface, with a document
    region carrying `{ languageId, read, write? }`, host-owned dirty state, autosave, ⌘S, flush-on-unmount and view

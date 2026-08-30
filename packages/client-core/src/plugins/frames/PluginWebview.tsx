@@ -1,6 +1,6 @@
 import { createEffect, createResource, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import type { PluginFrameSurface } from '@acorn/protocol/api.ts'
-import { pluginWebviews } from '../../platform'
+import { pluginWebviews } from '../../infra/platform'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { displayHost, pluginWebviewKey, resolvePluginWebviewUrl } from './webviewModel'

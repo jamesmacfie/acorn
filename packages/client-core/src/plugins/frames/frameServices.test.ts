@@ -5,7 +5,7 @@ import type { FrameBinding } from './broker'
 import type { PluginFrameProps } from './frameServices'
 
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200, body: null }))
-vi.mock('../../apiClient', () => ({
+vi.mock('../../infra/node/apiClient', () => ({
   readJson: vi.fn(),
   sendRaw: (...args: unknown[]) => sendRaw(...args),
   writeJson: vi.fn(),
@@ -121,7 +121,7 @@ describe('subscribe', () => {
 
   it('attaches to the plugin\'s own live channel and hands over the frame minus its channel', async () => {
     const { _resetPluginChannels, onPluginPush } = await import('../pluginChannel')
-    const { routeWsFrame } = await import('../../wsChannels')
+    const { routeWsFrame } = await import('../../infra/node/wsChannels')
     // A push has to reach the bus for the frame to hear it, and `onPluginPush` is what claims the
     // prefix on the chrome side. The frame's own subscribe claims it too; either is enough.
     const stopPush = onPluginPush(() => {})

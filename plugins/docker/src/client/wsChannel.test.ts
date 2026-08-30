@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import { setActiveNode } from '@acorn/client-core/node/activeNode.ts'
+import { setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 
 // Core's test covers the transport, the reconnect edge, and the fleet filter. This one covers
 // docker's part: a stream routes by kind and id, and a live subscription re-attaches after a drop.
@@ -21,7 +21,7 @@ function installBridge(): Bridge {
   const acorn = {
     desktop: true,
     // `nodeFetch` is the "there is a broker" discriminator in client-core's platform seam
-    // (packages/client-core/src/platform/index.ts), so a fake that pushes frames has to answer
+    // (packages/client-core/src/infra/platform/index.ts), so a fake that pushes frames has to answer
     // requests too, even though this suite never sends one.
     nodeFetch: () => Promise.reject(new Error('this suite makes no requests')),
     nodeSend: (nodeId: string, frame: unknown) => sent.push({ nodeId, frame }),
@@ -44,11 +44,11 @@ function installBridge(): Bridge {
 
 let bridge: Bridge
 let channel: typeof import('./wsChannel')
-let client: typeof import('@acorn/client-core/wsClient.ts')
+let client: typeof import('@acorn/client-core/infra/node/wsClient.ts')
 
 beforeEach(async () => {
   bridge = installBridge()
-  client = await import('@acorn/client-core/wsClient.ts')
+  client = await import('@acorn/client-core/infra/node/wsClient.ts')
   channel = await import('./wsChannel')
   client._resetWsClient()
   channel._resetDockerWsChannel()

@@ -4,9 +4,9 @@
 // are focus-gated and deduped here.
 import { createSignal } from 'solid-js'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
-import { wsOnNotice } from '../wsClient'
-import { activeNodeId } from '../node/activeNode'
-import { homeNodeId } from '../node/fleet'
+import { wsOnNotice } from '../infra/node/wsClient'
+import { activeNodeId } from '../infra/node/activeNode'
+import { homeNodeId } from '../infra/node/fleet'
 import { noticeKindContribution } from '../registries/notices'
 
 export type NoticeKind = string

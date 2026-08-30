@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Task } from '../../queries'
+import type { Task } from '../../infra/queries'
 import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type PluginDocumentRegion, type PluginFrameSurface } from '@acorn/protocol/api.ts'
 
 const readJson = vi.fn()
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
 const writeJson = vi.fn()
-vi.mock('../../apiClient', () => ({
+vi.mock('../../infra/node/apiClient', () => ({
   readJson: (...args: unknown[]) => readJson(...args),
   sendRaw: (...args: unknown[]) => sendRaw(...args),
   writeJson: (...args: unknown[]) => writeJson(...args),
 }))
 
-const { setActiveNode } = await import('../../node/activeNode')
+const { setActiveNode } = await import('../../infra/node/activeNode')
 const { commandRegistry } = await import('../../registries/commands')
 const { keybindingRegistry } = await import('../../registries/keybindings')
 const { paneRegistry } = await import('../../registries/panes')

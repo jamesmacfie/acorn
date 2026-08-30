@@ -1,6 +1,6 @@
 import type { PluginChromeAction, PluginRailItem, Task } from '@acorn/protocol/api.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
-import { sendRaw } from '../../apiClient'
+import { sendRaw } from '../../infra/node/apiClient'
 import { pushNotice } from '../../notifications/notifications'
 import { toast as pushToast } from '../../notifications/toast'
 import { clientEvents, openPane } from '../../registries/clientEvents'

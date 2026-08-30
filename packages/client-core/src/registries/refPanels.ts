@@ -1,6 +1,6 @@
 import { createSignal, type Component } from 'solid-js'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
-import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
+import { hasHostCapability, type HostCapabilityRequirement } from '../infra/node/hostCapabilities'
 import { Registry } from './registry'
 import { onScopeEvicted } from './scopeEviction'
 

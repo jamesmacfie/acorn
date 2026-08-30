@@ -1,4 +1,4 @@
-import type { Task } from '../queries'
+import type { Task } from '../infra/queries'
 
 // One task, by id, from module-level code.
 //

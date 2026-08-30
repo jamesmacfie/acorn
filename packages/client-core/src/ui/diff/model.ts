@@ -3,12 +3,12 @@
 import { diffWordsWithSpace } from 'diff'
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from './synth'
-import type { getHighlighter } from '../../highlight/shiki'
-import { langFor } from '../../highlight/shiki'
+import type { getHighlighter } from '../../infra/highlight/shiki'
+import { langFor } from '../../infra/highlight/shiki'
 // Type-only, so the worker client's module graph, including its dynamic `?worker` import, stays out
 // of this module. Several plugin tests load it in a node environment where that import cannot
 // resolve.
-import type { TokenizeDocument } from '../../highlight/worker'
+import type { TokenizeDocument } from '../../infra/highlight/worker'
 
 // The renderer's own input contract, structural rather than named after one producer, so a PR file
 // from github and an uncommitted hunk from changes both satisfy it without either side importing

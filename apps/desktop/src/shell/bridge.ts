@@ -11,7 +11,7 @@ import {
 } from './wire'
 
 // The window's initialization script: it assembles the object the platform seam reads and installs
-// it before any page script runs. The seam (`packages/client-core/src/platform/index.ts`) is the only
+// it before any page script runs. The seam (`packages/client-core/src/infra/platform/index.ts`) is the only
 // module allowed to read it, which an arch rule enforces.
 //
 // Two transports feed it. Everything about nodes and plugins goes over one WebSocket to the desktop

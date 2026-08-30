@@ -4,11 +4,11 @@
 // and this turns it into one cache invalidation plus a re-emit on the client bus, exactly as
 // tasks/watchTaskChanges.ts does for tasks. It replaces the hand-invalidation onboarding did after
 // creating a project, which was right for that window and silent for every other one.
-import { activeCacheId } from '../node/activeNode'
-import { clientFor } from '../node/fleet'
-import { projectsKey } from '../queries'
+import { activeCacheId } from '../infra/node/activeNode'
+import { clientFor } from '../infra/node/fleet'
+import { projectsKey } from '../infra/queries'
 import { clientEvents } from '../registries/clientEvents'
-import { wsOnNodeEvent } from '../wsClient'
+import { wsOnNodeEvent } from '../infra/node/wsClient'
 
 /** Subscribe for the life of the shell. Returns the unsubscribe for symmetry with the other watchers;
  * the app never calls it. */

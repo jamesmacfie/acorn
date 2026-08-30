@@ -1,6 +1,6 @@
 import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
-import { tasksOptions, workspacesOptions } from '../queries'
+import { tasksOptions, workspacesOptions } from '../infra/queries'
 import { activeTaskId } from '../tasks/tasks'
 import { workspaceForProject } from './activeWorkspace'
 

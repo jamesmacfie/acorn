@@ -1,10 +1,10 @@
 import { For, Show, type JSX } from 'solid-js'
-import type { Task } from '../queries'
+import type { Task } from '../infra/queries'
 import { paneAvailable, paneContribution, paneContributions, type PaneContribution, type PaneId } from '../registries/panes'
-import { activeNodeId } from '../node/activeNode'
-import { nodeState } from '../node/fleet'
-import { freshnessOf, type Freshness } from '../node/freshness'
-import NodeChip from '../node/NodeChip'
+import { activeNodeId } from '../infra/node/activeNode'
+import { nodeState } from '../infra/node/fleet'
+import { freshnessOf, type Freshness } from '../infra/node/freshness'
+import NodeChip from '../infra/node/NodeChip'
 import { ContributionBoundary } from '../ui/ContributionBoundary'
 // Imported for `use:paneFocus` below. Solid compiles a directive to a bare reference to this
 // identifier, so without the import the first pane to render dies on "paneFocus is not defined".

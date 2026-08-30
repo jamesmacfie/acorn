@@ -1,7 +1,7 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
 import type { PairedDevice } from '@acorn/protocol/node.ts'
-import { nodeDevices, revokeNodeDevice } from '../node/fleetActions'
-import { formatLastSeen } from '../node/freshness'
+import { nodeDevices, revokeNodeDevice } from '../infra/node/fleetActions'
+import { formatLastSeen } from '../infra/node/freshness'
 import { Button } from '../ui/primitives'
 
 // Every client paired with one node, with a revoke per row (docs/security.md § Trust boundaries):

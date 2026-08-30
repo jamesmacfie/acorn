@@ -1,8 +1,8 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
 import { corePluginsRoute, type NodePluginState, type PluginApprovalRequest } from '@acorn/protocol/api.ts'
-import { readJson } from '../apiClient'
-import { activeNodeId } from '../node/activeNode'
-import { nodes } from '../node/fleet'
+import { readJson } from '../infra/node/apiClient'
+import { activeNodeId } from '../infra/node/activeNode'
+import { nodes } from '../infra/node/fleet'
 import {
   answerPluginRequest,
   installNodePlugin,
@@ -10,7 +10,7 @@ import {
   reloadNodePlugin,
   uninstallNodePlugin,
   updateNodePlugin,
-} from '../node/nodePlugins'
+} from '../infra/node/nodePlugins'
 import Icon from '../ui/Icon'
 import { createDismissable } from '../ui/dismissable'
 import { Alert, Badge, Button } from '../ui/primitives'

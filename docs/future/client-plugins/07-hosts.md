@@ -6,7 +6,7 @@ measured against, and it says which host owns what.
 
 ## The contract is `PluginCustody`
 
-`packages/client-core/src/platform/index.ts` declares it with four members: `state()`, `cachePut()`,
+`packages/client-core/src/infra/platform/index.ts` declares it with four members: `state()`, `cachePut()`,
 `trustRecord()`, `devGrant()`. Phase 0 adds provenance to its types and a device fill path to
 `cachePut`. After that, "a plugin installed on this device" means: this host's custody returned a
 cache entry with `source.kind === 'device'` and an accepted acknowledgement for its hash. Every host

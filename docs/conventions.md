@@ -21,7 +21,7 @@ runs in jsdom, so one subject may have both. There is no other infix. A test nam
 rather than a module is fine, and it lives in the folder of the module it exercises most; it never
 sits in a different folder from its subject.
 
-Not yet everywhere: `packages/client-core/src/persistence/startupRestore.integration.test.ts` and
+Not yet everywhere: `packages/client-core/src/infra/persistence/startupRestore.integration.test.ts` and
 `apps/desktop/test/integration/persistedState.conformance.test.ts` fold into the plain test, or take
 the behaviour's name, in phase 5.
 

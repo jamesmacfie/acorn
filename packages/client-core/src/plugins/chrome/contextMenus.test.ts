@@ -4,7 +4,7 @@ import type { PluginContextMenuDescriptor } from '@acorn/protocol/pluginContract
 import type { TaskRowTarget } from '../../registries/contextMenus'
 
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
-vi.mock('../../apiClient', () => ({
+vi.mock('../../infra/node/apiClient', () => ({
   readJson: vi.fn(),
   sendRaw: (...args: unknown[]) => sendRaw(...args),
   writeJson: vi.fn(),

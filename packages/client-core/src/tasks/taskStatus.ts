@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { taskBridge } from './taskBridge'
-import { wsOnStatus } from '../wsClient'
+import { wsOnStatus } from '../infra/node/wsClient'
 import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 import type { ClientScheduleContribution } from '../registries/schedules'
 import { latestOnly } from '../lib/latestOnly'

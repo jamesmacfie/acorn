@@ -1,5 +1,5 @@
 import { coreAttachmentRoute, type NodeAttachmentState } from '@acorn/protocol/api.ts'
-import { readJson, sendJson } from '../apiClient'
+import { readJson, sendJson } from './apiClient'
 import { createFleetQuery, type FleetResult } from './fanout'
 
 // Which control plane each node is attached to, for Settings → Nodes (docs/node-enrollment.md).

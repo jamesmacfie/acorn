@@ -1,6 +1,6 @@
 import { createEffect, onCleanup } from 'solid-js'
 import { render } from 'solid-js/web'
-import { isGrammar, langFor } from '../highlight/langs'
+import { isGrammar, langFor } from '../infra/highlight/langs'
 import { renderMarkdown, type MarkdownOptions } from './markdown'
 import CopyButton from './CopyButton'
 
@@ -88,7 +88,7 @@ export default function Markdown(props: {
       })
     if (!fences.length) return
     void (async () => {
-      const { getHighlighter } = await import('../highlight/shiki')
+      const { getHighlighter } = await import('../infra/highlight/shiki')
       const highlighter = await getHighlighter()
       await Promise.all([...new Set(fences.map((f) => f.grammar))].map((grammar) => getHighlighter(grammar)))
       if (!root || current !== generation) return

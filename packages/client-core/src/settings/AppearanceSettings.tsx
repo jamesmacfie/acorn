@@ -1,11 +1,11 @@
 import { Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { prefsOptions } from '../queries'
+import { prefsOptions } from '../infra/queries'
 import { savePref } from './savePref'
 import { resolveTheme, THEMES } from './themes'
 import { STYLES } from './uiStyles'
 import { Checkbox, Field, Select } from '../ui/primitives'
-import { PrefKeys } from '../persistence/prefKeys'
+import { PrefKeys } from '../infra/persistence/prefKeys'
 
 // Settings → Appearance. Two orthogonal axes (docs/ui-design.md § Token axes): style owns shape,
 // typography, spacing and density; theme owns colour. They compose freely, because the two token sets

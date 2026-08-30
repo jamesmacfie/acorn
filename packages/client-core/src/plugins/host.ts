@@ -1,4 +1,4 @@
-import { pluginCustody, type PluginDevGrantRequest, type PluginHostState, type PluginPutResult, type PluginTrustDecision } from '../platform'
+import { pluginCustody, type PluginDevGrantRequest, type PluginHostState, type PluginPutResult, type PluginTrustDecision } from '../infra/platform'
 
 // The client's platform adapter for third-party plugin bundles
 // (docs/plugins.md).

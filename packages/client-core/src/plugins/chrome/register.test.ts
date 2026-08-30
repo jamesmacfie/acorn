@@ -4,14 +4,14 @@ import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type Pl
 const readJson = vi.fn()
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
 const writeJson = vi.fn()
-vi.mock('../../apiClient', () => ({
+vi.mock('../../infra/node/apiClient', () => ({
   readJson: (...args: unknown[]) => readJson(...args),
   sendRaw: (...args: unknown[]) => sendRaw(...args),
   writeJson: (...args: unknown[]) => writeJson(...args),
 }))
 
 const { MAX_AGENT_CONTEXT_BYTES } = await import('@acorn/protocol/agentContext.ts')
-const { setActiveNode } = await import('../../node/activeNode')
+const { setActiveNode } = await import('../../infra/node/activeNode')
 const { agentContextRegistry } = await import('../../registries/agentContexts')
 const { attentionRegistry } = await import('../../registries/attention')
 const { collectionRegistry } = await import('../../registries/collections')

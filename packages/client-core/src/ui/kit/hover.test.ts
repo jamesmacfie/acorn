@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
 // same question, and nothing in a component test would ask it. The pointer-coarse and
 // prefers-reduced-motion blocks are the same shape and are checked with everything else.
 
-const STYLES = new URL('../../styles/', import.meta.url).pathname
+const STYLES = new URL('../../infra/styles', import.meta.url).pathname
 const UI = new URL('../', import.meta.url).pathname
 
 const sheets = (dir: string): string[] =>

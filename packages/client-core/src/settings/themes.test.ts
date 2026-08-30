@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readStyleSheets, stripComments } from '../styles/readStyleSheets'
+import { readStyleSheets, stripComments } from '../infra/styles/readStyleSheets'
 import { PLUGIN_THEME_PREFIX } from '../plugins/chrome/themes'
 import { THEMES } from './themes'
 

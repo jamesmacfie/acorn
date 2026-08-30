@@ -8,7 +8,7 @@ a plugin's bundle can come from the device itself, not only from a node. Phase 0
 Every piece a device-held plugin needs is already on the device, because the fleet model put it
 there.
 
-- **Custody.** `packages/client-core/src/platform/index.ts` declares `PluginCustody` with four
+- **Custody.** `packages/client-core/src/infra/platform/index.ts` declares `PluginCustody` with four
   members: `state()`, `cachePut()`, `trustRecord()`, `devGrant()`.
   `packages/client-core/src/plugins/host.ts` is the only client module that calls it, and its header
   already names the future: "today it fronts the desktop helper's content-addressed store, and a

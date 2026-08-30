@@ -10,11 +10,11 @@ import {
   providerFailures,
   runNodeLifecycle,
   type ProvidedNodeRow,
-} from '../node/providedNodes'
-import { nodes } from '../node/fleet'
-import { canPairNodes } from '../platform'
+} from '../infra/node/providedNodes'
+import { nodes } from '../infra/node/fleet'
+import { canPairNodes } from '../infra/platform'
 import { Alert, Badge, Button, ConfirmButton, Input } from '../ui/primitives'
-import '../node/nodes.css'
+import '../infra/node/nodes.css'
 
 // Settings → Nodes, second half: the nodes a plugin's node provider knows about, and the four
 // lifecycle verbs (docs/plugins.md § Node providers).

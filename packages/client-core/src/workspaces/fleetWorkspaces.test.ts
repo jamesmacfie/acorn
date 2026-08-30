@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import type { Workspace } from '@acorn/protocol/api.ts'
-import { activeNodeId, setActiveNode } from '../node/activeNode'
-import { refreshFleet, _resetFleet } from '../node/fleet'
+import { activeNodeId, setActiveNode } from '../infra/node/activeNode'
+import { refreshFleet, _resetFleet } from '../infra/node/fleet'
 import { selectFleetWorkspace, type FleetWorkspace } from './fleetWorkspaces'
 
 const node = (nodeId: string, label: string): NodeRecord => ({

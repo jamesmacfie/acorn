@@ -6,7 +6,7 @@
 export type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
 
 // ── Data toolkit: transport, queries, events ──────────────────────────────────────────────────
-export { postJson, readBytes, readJson, sendForm, writeJson } from '@acorn/client-core/apiClient.ts'
+export { postJson, readBytes, readJson, sendForm, writeJson } from '@acorn/client-core/infra/node/apiClient.ts'
 export {
   integrationsOptions,
   prefsOptions,
@@ -16,8 +16,8 @@ export {
   tasksOptions,
   workspacesKey,
   workspacesOptions,
-} from '@acorn/client-core/queries.ts'
-export type { Task, Workspace } from '@acorn/client-core/queries.ts'
+} from '@acorn/client-core/infra/queries.ts'
+export type { Task, Workspace } from '@acorn/client-core/infra/queries.ts'
 export {
   clientEvents,
   consumePaneIntent,
@@ -29,9 +29,9 @@ export { openTarget } from '@acorn/client-core/notifications/notifications.ts'
 export type { PaneIntent } from '@acorn/client-core/registries/clientEvents.ts'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
-export { wsAttach, wsConnect, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/wsClient.ts'
-export type { WorkflowNotice } from '@acorn/client-core/wsClient.ts'
-export { registerWsChannel } from '@acorn/client-core/wsChannels.ts'
+export { wsAttach, wsConnect, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/infra/node/wsClient.ts'
+export type { WorkflowNotice } from '@acorn/client-core/infra/node/wsClient.ts'
+export { registerWsChannel } from '@acorn/client-core/infra/node/wsChannels.ts'
 
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
 export { paneContribution } from '@acorn/client-core/registries/panes.ts'
@@ -135,10 +135,10 @@ export { createProject, createWorkspace, patchProject } from '@acorn/client-core
 export type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
 
 // ── The fleet: which node a request goes to ───────────────────────────────────────────────────
-export { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/node/activeNode.ts'
-export { createFleetQuery } from '@acorn/client-core/node/fanout.ts'
-export { nodes } from '@acorn/client-core/node/fleet.ts'
-export { closeTunnelsForTask, tunnelUrl } from '@acorn/client-core/node/tunnelUrl.ts'
+export { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
+export { createFleetQuery } from '@acorn/client-core/infra/node/fanout.ts'
+export { nodes } from '@acorn/client-core/infra/node/fleet.ts'
+export { closeTunnelsForTask, tunnelUrl } from '@acorn/client-core/infra/node/tunnelUrl.ts'
 
 // ── Agent context and references ──────────────────────────────────────────────────────────────
 export { contextSnapshot } from '@acorn/client-core/agent/contextSnapshot.ts'
@@ -148,21 +148,21 @@ export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHand
 // What the host provides, as opposed to what the node provides. A plugin gets the two groups it has
 // a legitimate use for: the native folder dialog and the host-owned preview view. Transport, fleet
 // and plugin custody stay core's business.
-export { canPickFolder, pickFolder, previewViews } from '@acorn/client-core/platform/index.ts'
-export type { PreviewState, PreviewViews } from '@acorn/client-core/platform/index.ts'
+export { canPickFolder, pickFolder, previewViews } from '@acorn/client-core/infra/platform/index.ts'
+export type { PreviewState, PreviewViews } from '@acorn/client-core/infra/platform/index.ts'
 
 // ── Capabilities, prefs, persisted state ──────────────────────────────────────────────────────
 // The host-side gate: is a desktop shell hosting this renderer, and does the node run a given plugin.
 // `requires` on a contribution is the declarative form and is what almost everything should use; this
 // is for a component that has to branch mid-render.
-export { hasHostCapability } from '@acorn/client-core/hostCapabilities.ts'
-export type { HostCapabilityRequirement, HostRequirement } from '@acorn/client-core/hostCapabilities.ts'
+export { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilities.ts'
+export type { HostCapabilityRequirement, HostRequirement } from '@acorn/client-core/infra/node/hostCapabilities.ts'
 // The other capability: a typed function another plugin published. Register through
 // `ctx.capabilities`; these two are for reading one from a component, which has no ctx in hand.
-export { clientCapability, clientCapabilityId, requireClientCapability } from '@acorn/client-core/clientCapabilities.ts'
-export { parseJson } from '@acorn/client-core/persistence/persistedState.ts'
-export type { PersistedStateSlice } from '@acorn/client-core/persistence/persistedState.ts'
-export { PersistedSliceKeys, PrefKeys } from '@acorn/client-core/persistence/prefKeys.ts'
+export { clientCapability, clientCapabilityId, requireClientCapability } from '@acorn/client-core/infra/node/clientCapabilities.ts'
+export { parseJson } from '@acorn/client-core/infra/persistence/persistedState.ts'
+export type { PersistedStateSlice } from '@acorn/client-core/infra/persistence/persistedState.ts'
+export { PersistedSliceKeys, PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
 export { saveJsonPref, savePref } from '@acorn/client-core/settings/savePref.ts'
 export { openRepoConfigTrust } from '@acorn/client-core/configTrust/configTrust.ts'
 
@@ -189,7 +189,7 @@ export { rowHeight, termFontSize } from '@acorn/client-core/ui/metrics.ts'
 export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, railDotProps, summarizeFileStats } from '@acorn/client-core/ui/displayMeta.ts'
 
 // ── Small helpers ─────────────────────────────────────────────────────────────────────────────
-export { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/highlight/shiki.ts'
+export { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/infra/highlight/shiki.ts'
 export { debounce } from '@acorn/client-core/lib/debounce.ts'
 export { persistDraft, readDraft, writeDraft } from '@acorn/client-core/lib/draftState.ts'
 export { formatRelativeTime } from '@acorn/client-core/lib/formatRelativeTime.ts'

@@ -1,7 +1,7 @@
 import type { Component } from 'solid-js'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
 import type { ProviderCapabilityName } from '@acorn/protocol/integrations.ts'
-import type { HostCapabilityRequirement } from '../hostCapabilities'
+import type { HostCapabilityRequirement } from '../infra/node/hostCapabilities'
 import { Registry } from './registry'
 
 export type SourcePromotionContext = {

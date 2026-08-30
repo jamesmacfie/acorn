@@ -1,8 +1,8 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
 import type { AuditEntry, NodeSecurityPosture } from '@acorn/protocol/api.ts'
-import { activeNodeId } from '../node/activeNode'
-import { nodes } from '../node/fleet'
-import { createNodeBackup, nodeAuditPage, nodeSecurityPosture, suggestedBackupPath } from '../node/nodeSecurity'
+import { activeNodeId } from '../infra/node/activeNode'
+import { nodes } from '../infra/node/fleet'
+import { createNodeBackup, nodeAuditPage, nodeSecurityPosture, suggestedBackupPath } from '../infra/node/nodeSecurity'
 import { Alert, Button, Input, Select } from '../ui/primitives'
 import './settings.css'
 

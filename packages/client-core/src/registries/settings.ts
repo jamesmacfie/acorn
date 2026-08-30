@@ -1,6 +1,6 @@
 import type { Component } from 'solid-js'
-import type { Workspace } from '../queries'
-import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
+import type { Workspace } from '../infra/queries'
+import { hasHostCapability, type HostCapabilityRequirement } from '../infra/node/hostCapabilities'
 import { Registry } from './registry'
 
 export type SettingsPageContext = {

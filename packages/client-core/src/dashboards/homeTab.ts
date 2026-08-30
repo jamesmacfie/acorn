@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
-import { PrefKeys } from '../persistence/prefKeys'
-import { appStateBinding, type PersistedStateSlice } from '../persistence/persistedState'
+import { PrefKeys } from '../infra/persistence/prefKeys'
+import { appStateBinding, type PersistedStateSlice } from '../infra/persistence/persistedState'
 import { MAX_TABS, type DashboardTab } from './persist'
 
 // The tab bar's own state and arithmetic. What a tab is lives in `persist.ts`: the placement scope

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
-vi.mock('../../apiClient', () => ({
+vi.mock('../../infra/node/apiClient', () => ({
   readJson: vi.fn(),
   sendRaw: (...args: unknown[]) => sendRaw(...args),
   writeJson: vi.fn(),
@@ -13,7 +13,7 @@ const { projectSurfaceRegistry } = await import('../../registries/projectSurface
 const { clientEvents, consumePaneIntent, evictPendingIntents } = await import('../../registries/clientEvents')
 const { setActiveTaskId, setSelectedSource } = await import('../../tasks/tasks')
 const { setTaskLookup } = await import('../../tasks/taskLookup')
-type Task = import('../../queries').Task
+type Task = import('../../infra/queries').Task
 const { closePluginOverlay, pluginOverlayOpen } = await import('../frames/overlays')
 
 // The two verbs that decide where a rail row's detail appears, which is the one thing the descriptor tier
