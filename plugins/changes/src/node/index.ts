@@ -1,7 +1,7 @@
 import { type NodePlugin } from '@acorn/plugin-api/node'
-import { localGitAgentTools } from '../main/agentTools'
-import { changesArchiveConcern } from '../main/archiveCheck'
-import { CHANGES_HOOKS, localGitBridge } from '../main/localGit'
+import { localGitAgentTools } from '../server/agentTools'
+import { changesArchiveConcern } from '../server/archiveCheck'
+import { CHANGES_HOOKS, localGitBridge } from '../server/localGit'
 import { localGit, LOCAL_GIT } from '../server/routes/localGit'
 import { reviewNotesRoutes } from '../server/routes/reviewNotes'
 

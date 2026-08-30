@@ -9,7 +9,7 @@ import type { CodeRow, DiffFile, DiffSource } from '@acorn/plugin-api/ui/diff'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { reviewNotesRoute, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
-import { localGitApi } from './localGitClient'
+import { localGitApi } from './changesClient'
 import { changeKey, groupChanges, pickSelected, stackFor, toPullFile } from './model'
 
 // Everything the Changes pane knows, held once per task and read by all four of its regions
@@ -182,7 +182,7 @@ export function createChangesModel(task: Task) {
   async function commit() {
     if (!commitMsg().trim()) return
     // The node runs the `changes:before-commit` chain inside this call; a veto comes back as a reason
-    // (plugins/changes/src/main/localGit.ts).
+    // (plugins/changes/src/server/localGit.ts).
     const res = await localGitApi.commit(task.id, commitMsg())
     if (!res.ok) return setActionError(res.reason ?? 'Commit failed.')
     setActionError('')

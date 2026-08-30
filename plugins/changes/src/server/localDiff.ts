@@ -1,6 +1,6 @@
 // Local diff source for uncommitted changes. Parses `git status --porcelain=v2` into unified patches
 // per file and scope, plus blob reads, all against a task's worktree. Patches carry only hunks, like
-// GitHub's per-file patch, so the renderer's diff.ts synth and gitdiff-parser path handle them
+// GitHub's per-file patch, so the client's diff.ts synth and gitdiff-parser path handle them
 // unchanged. Every git call uses execFile with an argument array, and repo-relative paths are
 // validated at this boundary: no `..` segments, no absolute paths.
 
@@ -95,7 +95,7 @@ export async function localChanges(worktree: string): Promise<LocalChange[]> {
   return changes
 }
 
-// Everything before the first hunk header is git's file header. The renderer re-synthesizes its
+// Everything before the first hunk header is git's file header. The client re-synthesizes its
 // own (client diff.ts synth), so this emits hunks-only, like GitHub's per-file patch.
 export const stripToHunks = (patch: string): string => {
   const i = patch.indexOf('\n@@')
