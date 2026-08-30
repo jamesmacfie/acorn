@@ -25,7 +25,7 @@ export {
   openPane,
   requestTerminalFocusIntent,
 } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
-export { openTarget } from '@acorn/client-core/notifications/notifications.ts'
+export { openTarget } from '@acorn/client-core/features/notifications/notifications.ts'
 export type { PaneIntent } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
@@ -53,7 +53,7 @@ export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } 
 // the tooltip legend. The registry itself stays off this surface; register through
 // `ctx.railMarkers`, which binds the contribution to the plugin's own name.
 export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'
-export type { RailMarker, RailMarkerDot, RailMarkerPosition, RailTone } from '@acorn/client-core/tabs/railMarkers.ts'
+export type { RailMarker, RailMarkerDot, RailMarkerPosition, RailTone } from '@acorn/client-core/features/tabs/railMarkers.ts'
 export type { PaletteRowSource } from '@acorn/client-core/host/registries/palette/paletteRows.ts'
 export type { ClientScheduleContribution } from '@acorn/client-core/host/registries/shell/schedules.ts'
 // See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does.
@@ -85,7 +85,7 @@ export type { ContentLinkContribution, InAppTarget } from '@acorn/client-core/ho
 // The project list from module-level code, for a content-link `path` resolver: the one caller with
 // no component scope that still has to ask which repos acorn tracks. Reader only.
 // `setProjectsLookup` belongs to the composition root and stays off this surface.
-export { allProjects } from '@acorn/client-core/projects/projectLookup.ts'
+export { allProjects } from '@acorn/client-core/features/projects/projectLookup.ts'
 // See docs/plugins.md § Loaded plugins: the client half for what a `refResolvers` entry answers.
 // The query options only: a plugin consumes resolutions here but contributes a resolver from a
 // manifest row, never from client code.
@@ -101,7 +101,7 @@ export { agentToolTone } from '@acorn/client-core/host/registries/shell/agentToo
 export { onScopeEvicted } from '@acorn/client-core/host/registries/shell/scopeEviction.ts'
 
 // ── Tasks, sessions, layout ───────────────────────────────────────────────────────────────────
-export { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
+export { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 export {
   activeTaskId,
   dispatchActiveLayout,
@@ -112,10 +112,10 @@ export {
   setRecipeBrowserUrl,
   setSelectedSource,
   setTerminalOpen,
-} from '@acorn/client-core/tasks/tasks.ts'
-export { isPaneId } from '@acorn/client-core/tasks/layout.ts'
-export type { TaskLayout } from '@acorn/client-core/tasks/layout.ts'
-export { createTask } from '@acorn/client-core/tasks/mutations.ts'
+} from '@acorn/client-core/features/tasks/tasks.ts'
+export { isPaneId } from '@acorn/client-core/features/tasks/layout.ts'
+export type { TaskLayout } from '@acorn/client-core/features/tasks/layout.ts'
+export { createTask } from '@acorn/client-core/features/tasks/mutations.ts'
 export {
   activeTerminal,
   addSession,
@@ -124,14 +124,14 @@ export {
   rememberActiveTerminal,
   requestTerminalFocus,
   sessions,
-} from '@acorn/client-core/tasks/agentSessions.ts'
-export { runApi } from '@acorn/client-core/tasks/runClient.ts'
-export { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
-export { taskStatus } from '@acorn/client-core/tasks/taskStatus.ts'
+} from '@acorn/client-core/features/tasks/agentSessions.ts'
+export { runApi } from '@acorn/client-core/features/tasks/runClient.ts'
+export { taskBridge } from '@acorn/client-core/features/tasks/taskBridge.ts'
+export { taskStatus } from '@acorn/client-core/features/tasks/taskStatus.ts'
 
 // ── Workspaces and projects ───────────────────────────────────────────────────────────────────
-export { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
-export { createProject, createWorkspace, patchProject } from '@acorn/client-core/workspaces/mutations.ts'
+export { workspaceForProject } from '@acorn/client-core/features/workspaces/activeWorkspace.ts'
+export { createProject, createWorkspace, patchProject } from '@acorn/client-core/features/workspaces/mutations.ts'
 export type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
 
 // ── The fleet: which node a request goes to ───────────────────────────────────────────────────
@@ -141,8 +141,8 @@ export { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 export { closeTunnelsForTask, tunnelUrl } from '@acorn/client-core/infra/node/tunnelUrl.ts'
 
 // ── Agent context and references ──────────────────────────────────────────────────────────────
-export { contextSnapshot } from '@acorn/client-core/agent/contextSnapshot.ts'
-export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHandler } from '@acorn/client-core/agent/reference.ts'
+export { contextSnapshot } from '@acorn/client-core/features/agent/contextSnapshot.ts'
+export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHandler } from '@acorn/client-core/features/agent/reference.ts'
 
 // ── The platform seam ─────────────────────────────────────────────────────────────────────────
 // What the host provides, as opposed to what the node provides. A plugin gets the two groups it has
@@ -163,16 +163,16 @@ export { clientCapability, clientCapabilityId, requireClientCapability } from '@
 export { parseJson } from '@acorn/client-core/infra/persistence/persistedState.ts'
 export type { PersistedStateSlice } from '@acorn/client-core/infra/persistence/persistedState.ts'
 export { PersistedSliceKeys, PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
-export { saveJsonPref, savePref } from '@acorn/client-core/settings/savePref.ts'
-export { openRepoConfigTrust } from '@acorn/client-core/configTrust/configTrust.ts'
+export { saveJsonPref, savePref } from '@acorn/client-core/features/settings/savePref.ts'
+export { openRepoConfigTrust } from '@acorn/client-core/features/settings/configTrust.ts'
 
 // ── Integrations, notifications, palette ──────────────────────────────────────────────────────
-export { createDeviceFlow } from '@acorn/client-core/integrations/deviceFlow.ts'
+export { createDeviceFlow } from '@acorn/client-core/features/integrations/deviceFlow.ts'
 export { renderMarkdown } from '@acorn/client-core/kit/lib/markdown.ts'
-export { pushManagedAgentNotice, registerNoticeTargetHandler } from '@acorn/client-core/notifications/notifications.ts'
+export { pushManagedAgentNotice, registerNoticeTargetHandler } from '@acorn/client-core/features/notifications/notifications.ts'
 // Transient feedback. Notices persist in the bell, and a toast says "that worked" then gets out of
 // the way.
-export { toast } from '@acorn/client-core/notifications/toast.ts'
+export { toast } from '@acorn/client-core/features/notifications/toast.ts'
 export { fuzzyScore } from '@acorn/client-core/kit/lib/paletteModel.ts'
 export type { PaletteItem } from '@acorn/client-core/kit/lib/paletteModel.ts'
 export { createOverlayPalette } from '@acorn/client-core/host/palette/overlay.ts'

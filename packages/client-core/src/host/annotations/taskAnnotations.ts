@@ -19,7 +19,7 @@ import { CORE_TASK_KEY, CORE_TASK_POINT, type AnnotationSeverity } from '@acorn/
 import { annotationsFor, requestAnnotations } from './annotations'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { railMarkerRegistry } from '../registries/rail/railMarkerFeed'
-import { RAIL_MARKER_CORNERS, type RailMarker, type RailMarkerDot, type RailTone } from '../../tabs/railMarkers'
+import { RAIL_MARKER_CORNERS, type RailMarker, type RailMarkerDot, type RailTone } from '../../features/tabs/railMarkers'
 
 extensionPointRegistry.register({
   id: CORE_TASK_POINT,

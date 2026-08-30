@@ -37,7 +37,7 @@ export const LANGS: Record<string, () => Promise<unknown>> = {
 
 export type GrammarName = keyof typeof LANGS
 
-// Canonical language id to shiki grammar, the twin of client-core/editor/language.ts. The vocabulary is
+// Canonical language id to shiki grammar, the twin of client-core/features/editor/language.ts. The vocabulary is
 // @acorn/protocol/languageIds.ts, and this map is where "shiki doesn't bundle that one" gets said: an id
 // with no grammar loaded here falls to `text` rather than throwing inside codeToTokens.
 //

@@ -15,8 +15,8 @@ import { paneRegistry } from './panes'
 import { activeRefPanel, closeRefPanel, refPanelRegistry } from './refPanels'
 import type { Disposable } from '../../../kit/lib/registry'
 import { sourceRegistry } from '../sources/sources'
-import { setTaskLookup } from '../../../tasks/taskLookup'
-import { selectedSource, setSelectedSource } from '../../../tasks/tasks'
+import { setTaskLookup } from '../../../features/tasks/taskLookup'
+import { selectedSource, setSelectedSource } from '../../../features/tasks/tasks'
 import type { Task } from '../../../infra/queries'
 
 // A target's pane has to be registered (registries/contentLinks.ts § openPluginContentTarget), so the

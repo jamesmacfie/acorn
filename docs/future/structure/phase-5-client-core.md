@@ -68,13 +68,13 @@ Re-point `packages/plugin-api/src/client/index.ts`.
 
 `git mv` `agent/`, `dashboards/`, `diff/`, `editor/`, `integrations/`, `notifications/`, `tabs/`,
 `tasks/`, `workspaces/`, `settings/`, `projects/` into `features/`. Fold `configTrust/` and
-`modelProviders/` into `features/settings/`. Move `packages/client-core/src/AccountMenu.tsx` into
+`modelProviders/` into `features/settings/`. Move `packages/client-core/src/features/settings/OverflowMenu.tsx` into
 `features/settings/` under the name its header says it should have. Fix the two cross-folder CSS
 imports (`settings/NodesSettings.tsx` importing `../node/nodes.css`,
-`packages/client-core/src/host/frames/ExtendedPane.tsx` importing `../chrome/extension-points.css`) by moving the
+`packages/client-core/src/host/chrome/ExtendedPane.tsx` importing `../chrome/extension-points.css`) by moving the
 stylesheet to the importer's folder or the importer to the stylesheet's. Rename
 `workspaces/useActiveWorkspaceId.ts` to `activeWorkspaceId.ts` with a `create*` export. Rename
-`createTaskPath` to `taskPath`.
+`newTaskPath` to `taskPath`.
 
 The seven three-line re-export shims in `dashboards/` (`chart.ts`, `compose.ts`, `format.ts`,
 `layout.ts`, `mapping.ts`, `model.ts`, `shaping.ts`) are documented in `docs/dashboards.md`. Either
@@ -83,7 +83,7 @@ consumers and delete them. Pick the second unless the import count is over 40.
 
 ### Deletions
 
-Delete `packages/client-core/src/Acorn.tsx` and its `Acorn` export from
+Delete `packages/client-core/src/kit/components/Acorn.tsx` and its `Acorn` export from
 `packages/plugin-api/src/ui/host.ts` (already marked prune candidate). Confirm
 `plugins/github` no longer mounts it; if it does, that is a github change in the same commit.
 

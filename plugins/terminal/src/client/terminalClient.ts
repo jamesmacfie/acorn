@@ -2,7 +2,7 @@
 // session commands, the WebSocket for every stream (PTY input/output/status, workflow notices).
 //
 // PTY verbs only. Task lifecycle, per-repo checkout/config, preview URLs and agent delivery are
-// platform concerns and live in client-core/tasks/taskBridge.ts.
+// platform concerns and live in client-core/features/tasks/taskBridge.ts.
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../shared/api'
 import { readJson, writeJson, wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite, type WorkflowNotice } from '@acorn/plugin-api/client'

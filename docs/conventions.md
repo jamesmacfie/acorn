@@ -57,8 +57,9 @@ plain function that builds a value is named for the value or for the verb, not `
 and `createProject` keep the prefix because they really do create the resource, and the query layer's
 matched `*Options` and `*Key` pair sits beside them. There is no `use*` prefix in this codebase.
 
-Not yet everywhere: `createTaskPath` becomes `taskPath` and `workspaces/useActiveWorkspaceId.ts`
-loses its prefix, both in phase 5.
+Two renames landed with phase 5 of the structure programme: `createTaskPath` became `newTaskPath`,
+because it builds the `/new` route rather than a task, and `workspaces/useActiveWorkspaceId.ts` became
+`activeWorkspaceId.ts` exporting `createActiveWorkspaceId`, a Solid primitive that reads the router.
 
 **Client state is `<thing>Store.ts`.** Two spellings survive that on purpose. `*Prefs.ts` is state
 persisted as a device preference, which is a different lifetime. `model.ts` is pure data shaping with

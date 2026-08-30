@@ -2,7 +2,7 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import Icon from './Icon'
 import { Kbd, StatusDot } from './primitives'
 import { railDotProps } from '../lib/displayMeta'
-import type { RailLegendItem } from '../../tabs/railMarkers'
+import type { RailLegendItem } from '../../features/tabs/railMarkers'
 import './tips.css'
 
 // The app's tooltip contract: four data attributes, honoured on any element anywhere. See

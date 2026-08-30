@@ -1,0 +1,240 @@
+import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
+import CopyButton from '../../kit/components/CopyButton'
+import Icon from '../../kit/components/Icon'
+import { brandStyle } from '../../kit/lib/brandMarks'
+import {
+  connectIntegration,
+  deleteIntegration,
+  rotateIntegration,
+  setIntegrationDisabled,
+  testIntegration,
+} from '../integrations/integrationClient'
+import { createDeviceFlow } from '../integrations/deviceFlow'
+import { integrationsKey, integrationsOptions } from '../../infra/queries'
+import ConnectionProjectMap from './ConnectionProjectMap'
+import { Alert, Button, Chip } from '../../kit/components/primitives'
+
+function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
+  // The tint comes off the mark the provider names, not off a rule keyed to its id, so a plugin that
+  // ships a mark ships the colour with it.
+  const glyph = () => props.provider?.glyph ?? props.provider?.label[0] ?? '?'
+  return (
+    <span class="integration-logo" style={brandStyle(glyph())}>
+      <span class="integration-logo-mono"><Icon name={glyph()} /></span>
+    </span>
+  )
+}
+
+export default function IntegrationsSettings() {
+  const qc = useQueryClient()
+  const status = createQuery(() => integrationsOptions(true))
+  const providers = () => status.data?.providers ?? []
+  const integrations = () => status.data?.integrations ?? []
+  const byId = createMemo(() => new Map(providers().map((provider) => [provider.id, provider])))
+  const connectionCount = (providerId: string) =>
+    integrations().filter((connection) => connection.providerId === providerId).length
+  const connectable = () => providers().filter((provider) =>
+    provider.connection.connectable &&
+    (provider.connection.maxConnections === undefined ||
+      connectionCount(provider.id) < provider.connection.maxConnections),
+  )
+
+  const [adding, setAdding] = createSignal(false)
+  const [rotationId, setRotationId] = createSignal<string | null>(null)
+  const [providerId, setProviderId] = createSignal('')
+  const selectedProvider = () => byId().get(providerId()) ?? connectable()[0]
+  const [credentials, setCredentials] = createSignal<Record<string, string>>({})
+  const [busy, setBusy] = createSignal(false)
+  const [error, setError] = createSignal('')
+
+  // --- Device authorization grant (RFC 8628), for a provider whose descriptor says `kind:
+  // 'device-flow'`. Currently only GitHub, and one branch here rather than a page of its own: this
+  // component is already descriptor-driven, so "how the credential is obtained" is one more thing the
+  // descriptor answers. The pacing itself lives in ../integrations/deviceFlow.ts because first-run
+  // onboarding runs the same grant.
+  const deviceFlow = createDeviceFlow(() => selectedProvider()?.id, async () => {
+    setAdding(false)
+    await refresh()
+  })
+
+  const refresh = () => qc.invalidateQueries({ queryKey: integrationsKey })
+  const valueFor = (id: string) => credentials()[id] ?? ''
+  const setValue = (id: string, value: string) => setCredentials((current) => ({ ...current, [id]: value }))
+  const complete = () => selectedProvider()?.connection.fields.every((field) => !field.required || !!valueFor(field.id).trim()) ?? false
+
+  const add = async () => {
+    const provider = selectedProvider()
+    if (!provider || !complete()) return
+    setBusy(true)
+    setError('')
+    try {
+      if (rotationId()) await rotateIntegration(rotationId()!, credentials())
+      else await connectIntegration(provider.id, credentials())
+      setCredentials({})
+      setRotationId(null)
+      setAdding(false)
+      await refresh()
+    } catch (cause) {
+      const code = (cause as Error).message
+      setError(code === 'provider_needs_auth' ? `Those credentials were rejected by ${provider.label}.` : 'Could not connect this provider.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const disconnect = async (id: string) => {
+    setBusy(true)
+    try {
+      await deleteIntegration(id)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const test = async (id: string) => {
+    setBusy(true)
+    try {
+      await testIntegration(id)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const setDisabled = async (id: string, disabled: boolean) => {
+    setBusy(true)
+    try {
+      await setIntegrationDisabled(id, disabled)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div class="integrations">
+      <div class="integrations-list">
+        <For each={integrations()}>
+          {(connection) => {
+            const provider = () => byId().get(connection.providerId)
+            return (
+              <div class="integration-entry">
+              <div class="integration-card">
+                <IntegrationLogo provider={provider()} />
+                <div class="integration-meta">
+                  <span class="integration-title">{connection.label}</span>
+                  <span class="integration-sub">
+                    {provider()?.label ?? connection.providerId}
+                    {connection.account?.label ? ` · ${connection.account.label}` : ''}
+                    {connection.status !== 'connected' ? ` · ${connection.status}` : ''}
+                  </span>
+                </div>
+                <div class="integration-actions">
+                  <Show when={provider()?.connection.disconnectable} fallback={<span class="integration-badge">Connected</span>}>
+                    <Button variant="ghost" tone="danger" onPress={() => void test(connection.id)} disabled={busy()}>Test</Button>
+                    {/* Rotation means "submit a new credential for this connection", which a device flow
+                        has no shape for — the owner never holds the token. Disconnect and connect again
+                        is the honest path, so the button is simply absent. */}
+                    <Show when={provider()?.connection.kind !== 'device-flow'}>
+                      <Button variant="ghost" tone="danger" onPress={() => { setProviderId(connection.providerId); setRotationId(connection.id); setCredentials({}); setAdding(true) }} disabled={busy()}>Rotate</Button>
+                    </Show>
+                    <Button variant="ghost" tone="danger" onPress={() => void setDisabled(connection.id, connection.status !== 'disabled')} disabled={busy()}>
+                      {connection.status === 'disabled' ? 'Enable' : 'Disable'}
+                    </Button>
+                    <Button variant="ghost" tone="danger" onPress={() => void disconnect(connection.id)} disabled={busy()}>Disconnect</Button>
+                  </Show>
+                </div>
+              </div>
+              {/* Only a provider that enumerates projects has a map to draw. A disabled connection
+                  keeps its map visible and editable: turning it off is a pause, not an unlink. */}
+              <Show when={provider()?.supportsProjects}>
+                <ConnectionProjectMap connection={connection} />
+              </Show>
+              </div>
+            )
+          }}
+        </For>
+      </div>
+
+      <Button onPress={() => setAdding((value) => !value)}>
+        <span class="integration-add-icon">+</span> Add or rotate integration
+      </Button>
+
+      <div class="integration-add-panel" classList={{ open: adding() }}>
+        <div class="integration-add-inner">
+          <div class="integration-provider-chips">
+            <For each={connectable()}>
+              {(provider) => (
+                <Chip
+                  leading={<span class="integration-logo-mono"><Icon name={provider.glyph} /></span>}
+                  onPress={() => { setProviderId(provider.id); setRotationId(null); setCredentials({}) }}
+                >
+                  {provider.label}
+                </Chip>
+              )}
+            </For>
+          </div>
+          <Show
+            when={selectedProvider()?.connection.kind === 'device-flow'}
+            fallback={
+              <>
+                <For each={selectedProvider()?.connection.fields ?? []}>
+                  {(field) => (
+                    <label class="integration-add-label">
+                      {field.label}
+                      <div class="integration-key-row">
+                        <input
+                          class="ui-input"
+                          type={field.type}
+                          placeholder={field.placeholder}
+                          value={valueFor(field.id)}
+                          onInput={(event) => setValue(field.id, event.currentTarget.value)}
+                          onKeyDown={(event) => event.key === 'Enter' && void add()}
+                        />
+                      </div>
+                      <Show when={field.hint}><p class="integration-add-hint muted">{field.hint}</p></Show>
+                    </label>
+                  )}
+                </For>
+                <Button onPress={() => void add()} disabled={busy() || !complete()}>
+                  {busy() ? 'Saving…' : rotationId() ? 'Rotate credentials' : 'Connect new'}
+                </Button>
+              </>
+            }
+          >
+            <Show
+              when={deviceFlow.device()}
+              fallback={
+                <Button onPress={() => void deviceFlow.start()} disabled={deviceFlow.busy()}>
+                  {deviceFlow.busy() ? 'Starting…' : `Connect ${selectedProvider()?.label ?? ''}`}
+                </Button>
+              }
+            >
+              {(started) => (
+                <div class="integration-device">
+                  <p class="integration-add-hint muted">Enter this code at the provider, then leave this page open.</p>
+                  <div class="integration-device-code copyable">
+                    <code>{started().userCode}</code>
+                    <CopyButton text={() => started().userCode} title="Copy the code" />
+                  </div>
+                  {/* A real link, not a fetch: main's setWindowOpenHandler routes it through
+                      isAllowedExternalUrl → shell.openExternal, so it opens in the owner's browser.
+                      CSP-safe because it is a navigation, not a frame or a connect-src. */}
+                  <a class="ui-btn" href={started().verificationUri} target="_blank" rel="noopener noreferrer">
+                    Open {new URL(started().verificationUri).host}
+                  </a>
+                  <p class="integration-add-hint muted">Waiting for approval…</p>
+                  <Button variant="ghost" tone="danger" onPress={deviceFlow.cancel}>Cancel</Button>
+                </div>
+              )}
+            </Show>
+          </Show>
+          <Show when={error() || deviceFlow.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+        </div>
+      </div>
+    </div>
+  )
+}

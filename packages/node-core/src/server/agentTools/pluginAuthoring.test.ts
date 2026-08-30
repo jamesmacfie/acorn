@@ -179,7 +179,7 @@ describe('the two doors', () => {
     // A text read, not an import: node must not import the client, and this is the only way a rename
     // here can go red over there. The seeded prompt is the entry point to the loop, so a stale tool
     // name fails the first thing a new plugin author's agent does.
-    const settings = join(dirname(fileURLToPath(import.meta.url)), '../../../../client-core/src/settings/PluginsSettings.tsx')
+    const settings = join(dirname(fileURLToPath(import.meta.url)), '../../../../client-core/src/features/settings/PluginsSettings.tsx')
     expect(readFileSync(settings, 'utf8')).toContain(`\`${PLUGIN_AUTHORING_TOOL}\``)
   })
 

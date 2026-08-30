@@ -2,7 +2,7 @@ import type { NodePluginPermissions, PluginContributions, PluginExtensionGrant, 
 import { isExtensionPointKind, isHookMode, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
 import { pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
-import { formatChord } from '../../tasks/paneShortcuts'
+import { formatChord } from '../../features/tasks/paneShortcuts'
 import { describeChannel } from '../frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from '../frames/scopes'
 

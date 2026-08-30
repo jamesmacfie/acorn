@@ -7,7 +7,7 @@ import { Route, Router } from '@solidjs/router'
 import App from './App'
 import '@acorn/client-core/infra/styles/styles.css'
 // Monaco's worker wiring, once, before any pane can construct an editor.
-import '@acorn/client-core/editor/monacoSetup.ts'
+import '@acorn/client-core/features/editor/monacoSetup.ts'
 import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
 import { activeCacheId, activeNodeId, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientFor } from '@acorn/client-core/infra/node/fleet.ts'
@@ -17,9 +17,9 @@ import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes/p
 import { syncPluginDistribution } from '@acorn/client-core/host/plugins/distribution.ts'
 import { syncPluginContributions } from '@acorn/client-core/host/plugins/syncContributions.ts'
 import { watchPluginChanges } from '@acorn/client-core/host/plugins/reload.ts'
-import { watchTaskChanges } from '@acorn/client-core/tasks/watchTaskChanges.ts'
-import { watchConnectionChanges } from '@acorn/client-core/integrations/watchConnectionChanges.ts'
-import { watchProjectChanges } from '@acorn/client-core/projects/watchProjectChanges.ts'
+import { watchTaskChanges } from '@acorn/client-core/features/tasks/watchTaskChanges.ts'
+import { watchConnectionChanges } from '@acorn/client-core/features/integrations/watchConnectionChanges.ts'
+import { watchProjectChanges } from '@acorn/client-core/features/projects/watchProjectChanges.ts'
 import { watchNodeEvents } from '@acorn/client-core/infra/node/watchNodeEvents.ts'
 
 const noop = () => null

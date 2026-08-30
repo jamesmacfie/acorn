@@ -166,8 +166,8 @@ Overlaps and misplacements:
 - `packages/client-core/src/host/components/ProviderHtml.tsx`, `RefPanelBox.tsx`, and
   `RefPanelTaskLink.tsx` are components filed under registries because `ui/` may not import a
   registry function. `packages/plugin-api/src/ui/host.ts` explains this in a comment.
-- `packages/client-core/src/AccountMenu.tsx` (its header says the name is wrong),
-  `packages/client-core/src/Acorn.tsx` (19 lines of ASCII art, marked prune candidate in
+- `packages/client-core/src/features/settings/OverflowMenu.tsx` (its header says the name is wrong),
+  `packages/client-core/src/kit/components/Acorn.tsx` (19 lines of ASCII art, marked prune candidate in
   `plugin-api/src/ui/host.ts`), and `packages/client-core/src/styles.css` beside `styles/`.
 - `packages/client-core/src/highlight/protocol.ts` shares a name with the `@acorn/protocol`
   dependency.
@@ -178,7 +178,7 @@ Overlaps and misplacements:
 - Exactly one `use*` file in 516: `workspaces/useActiveWorkspaceId.ts`. Everything else is Solid's
   `create*`.
 - 14 CSS files colocated in feature folders; `settings/NodesSettings.tsx` imports `../node/nodes.css`
-  and `packages/client-core/src/host/frames/ExtendedPane.tsx` imports `../chrome/extension-points.css`.
+  and `packages/client-core/src/host/chrome/ExtendedPane.tsx` imports `../chrome/extension-points.css`.
 - `configTrust`, `modelProviders`, `projects`, and `dashboards/views` have zero tests.
 
 ## The shared packages

@@ -82,7 +82,7 @@ status items."
 
 - `packages/protocol/src/extensionPoints.ts`: the two slots.
 - `packages/protocol/src/chrome.ts` (new): `RailProps`, `TopbarProps`, `SlotRef`.
-- `packages/client-core/src/tabs/TabRail.tsx`: over `RailProps`; registered as `core`.
+- `packages/client-core/src/features/tabs/TabRail.tsx`: over `RailProps`; registered as `core`.
 - `packages/client-core/src/chrome/Topbar.tsx` (new, from `App.tsx`): over `TopbarProps`.
 - `apps/desktop/src/client/App.tsx`: builds both props objects; renders two
   `ExclusiveSlotHost`s.
@@ -91,7 +91,7 @@ status items."
 - `packages/client-core/src/host/plugins/ExclusiveSlotHost.tsx`: fills `SlotRef`s.
 - `packages/client-core/src/host/registries/extensionPoints/slots.ts`: `topbar.right` gains a `SlotRef` path beside its
   `SlotHost`.
-- `packages/client-core/src/settings/PluginsSettings.tsx`: labels; the "hides" warnings.
+- `packages/client-core/src/features/settings/PluginsSettings.tsx`: labels; the "hides" warnings.
 - `packages/plugin-api/src/client/index.ts` and the surface snapshot: the two props types.
 
 ## Tests
@@ -134,11 +134,11 @@ write a selector.
 ## Verify before building
 
 - Phase 1 of this folder has shipped: core is a provider, `ExclusiveSlotHost` has no `core` prop.
-- `packages/client-core/src/tabs/TabRail.tsx` is the `<nav class="tabrail">` with `RailTab` children
+- `packages/client-core/src/features/tabs/TabRail.tsx` is the `<nav class="tabrail">` with `RailTab` children
   and one `ExclusiveSlotHost` for `rail.taskList`.
 - `apps/desktop/src/client/App.tsx` holds `<header class="topbar">` with `WorkspacePicker`, the
   project `Picker`, the breadcrumb, the node `Select`, `NodeChip`, and `AccountMenu`.
-- `packages/client-core/src/tabs/sources.ts` exports `availableSources()` with the four gates.
+- `packages/client-core/src/features/tabs/sources.ts` exports `availableSources()` with the four gates.
 - `packages/client-core/src/host/registries/extensionPoints/slots.ts` has `UiSlotId` with `topbar.right` hosted and
   `topbar.left` unhosted.
 - Layout phase 4's `Slot` node exists and supports a host-minted ref.

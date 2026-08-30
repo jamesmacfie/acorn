@@ -1,8 +1,8 @@
 import { createEffect, createSignal, onCleanup, untrack } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
-import { pushBackgroundError } from '../../notifications/notifications'
-import { savePref } from '../../settings/savePref'
+import { pushBackgroundError } from '../../features/notifications/notifications'
+import { savePref } from '../../features/settings/savePref'
 import {
   scopeIdFromStorageKey,
   storageKeyFor,

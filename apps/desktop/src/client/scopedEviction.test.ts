@@ -3,8 +3,8 @@ import { editorOpen, openFiles } from '@acorn/plugin-editor/testkit/client'
 import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from '@acorn/plugin-editor/testkit/client'
 import { editorViewState, rememberEditorViewState } from '@acorn/plugin-editor/testkit/client'
 import { prFilterFor, setPrFilter } from '@acorn/plugin-github/testkit/client'
-import { diffScroll, rememberDiffScroll } from '@acorn/client-core/diff/viewState.ts'
-import { activeTerminal, rememberActiveTerminal, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
+import { diffScroll, rememberDiffScroll } from '@acorn/client-core/features/diff/viewState.ts'
+import { activeTerminal, rememberActiveTerminal, sessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
 import { managedAgentStore } from '@acorn/plugin-agents/testkit/client'
 import {
   dispatchLayout,
@@ -21,10 +21,10 @@ import {
   setTerminalMax,
   setTerminalOpen,
   workspaceView,
-} from '@acorn/client-core/tasks/tasks.ts'
+} from '@acorn/client-core/features/tasks/tasks.ts'
 import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 import { activateScopedStateEviction } from './scopedEviction'
-import { completeTaskArchive } from '@acorn/client-core/tasks/archiveLifecycle.ts'
+import { completeTaskArchive } from '@acorn/client-core/features/tasks/archiveLifecycle.ts'
 
 describe('scoped lifecycle eviction', () => {
   it('clears every task-owned keyed collection on archive', () => {

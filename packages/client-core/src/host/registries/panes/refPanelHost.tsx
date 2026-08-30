@@ -2,7 +2,7 @@ import { Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { handlePluginContentLinkClick } from './contentLinks'
 import { activeRefPanel, closeRefPanel, refPanelFor } from './refPanels'
-import { activeTaskId } from '../../../tasks/tasks'
+import { activeTaskId } from '../../../features/tasks/tasks'
 
 // The one place a reference panel is drawn. Mounted once by the composition root, next to
 // `WillConfirmationHost` and for the same reason: the state is shell state (docs/panes.md § Not a

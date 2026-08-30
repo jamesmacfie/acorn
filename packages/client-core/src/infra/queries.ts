@@ -7,7 +7,7 @@
 import { readJson } from './node/apiClient'
 import { activeNodeId } from './node/activeNode'
 import { drainMigratedPrefs, mergePrefs, seedDevicePrefs } from './persistence/devicePrefs'
-import { setPref } from '../settings/savePref'
+import { setPref } from '../features/settings/savePref'
 import { integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, tasksKey, tasksRoute, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 
 export { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'

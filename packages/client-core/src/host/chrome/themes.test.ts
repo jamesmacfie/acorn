@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import type { PluginThemeDescriptor } from '@acorn/protocol/pluginContract.ts'
 import { themeRegistry } from '../registries/shell/themes'
-import { resolveTheme, THEMES } from '../../settings/themes'
+import { resolveTheme, THEMES } from '../../features/settings/themes'
 import { pluginThemeBlock, pluginThemeId, pluginThemeStyleSheet, registerPluginTheme } from './themes'
 
 // The one place in the client where a string that came out of a manifest is concatenated into CSS.

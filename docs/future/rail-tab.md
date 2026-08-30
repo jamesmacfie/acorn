@@ -18,7 +18,7 @@ git history: `git log --follow -- docs/future/rail-tab.md`.
 - One host-owned `RailTab` for every control in both rails: semantic `glyph`, `tone`, `accent`,
   `active`, `busy`, `sublabel`, and resolved `markers`. The 44px and 52px bottom-control mismatch is
   gone.
-- A pure marker model (`packages/client-core/src/tabs/railMarkers.ts`): stable ids, one of `icon`
+- A pure marker model (`packages/client-core/src/features/tabs/railMarkers.ts`): stable ids, one of `icon`
   or `dotTone`, an ordered placement preference, host priorities above a clamped plugin range,
   deterministic allocation, every unplaced marker kept in the tooltip legend.
 - A compiled registry (`ctx.railMarkers.register`) that core and docker publish through. The

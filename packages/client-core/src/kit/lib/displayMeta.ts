@@ -1,5 +1,5 @@
 import type { DiffFile } from '../diff/model'
-import { type RailMarkerDot } from '../../tabs/railMarkers'
+import { type RailMarkerDot } from '../../features/tabs/railMarkers'
 
 export type FileStatusTone = 'ok' | 'danger' | 'warn' | 'muted'
 

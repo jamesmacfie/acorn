@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest'
 import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
-import { THEMES } from '@acorn/client-core/settings/themes.ts'
-import { STYLES } from '@acorn/client-core/settings/uiStyles.ts'
+import { THEMES } from '@acorn/client-core/features/settings/themes.ts'
+import { STYLES } from '@acorn/client-core/features/settings/uiStyles.ts'
 import { coreSourceContributions } from '../../src/client/sourceContributions'
 import { clientPlugins } from '../../src/client/plugins'
 import { readGolden, writeGolden } from './golden'
@@ -127,7 +127,7 @@ const sourceOf = (relative: string): string =>
     .replace(/(^|\s)\/\/[^\n]*/g, '$1')
 
 describe('docs/ui-design.md § Parity — the shell chords', () => {
-  const tabRail = sourceOf('../../../../packages/client-core/src/tabs/TabRail.tsx')
+  const tabRail = sourceOf('../../../../packages/client-core/src/features/tabs/TabRail.tsx')
   const taskView = sourceOf('../../src/client/TaskView.tsx')
   const app = sourceOf('../../src/client/App.tsx')
 

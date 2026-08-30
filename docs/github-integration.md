@@ -6,7 +6,7 @@ integration credential and its repositories/PRs are a disposable local mirror.
 ## Connecting
 
 Settings → Integrations and the first-run wizard both run the OAuth device authorization flow through
-the same `createDeviceFlow` helper in `packages/client-core/src/integrations/deviceFlow.ts`, so the
+the same `createDeviceFlow` helper in `packages/client-core/src/features/integrations/deviceFlow.ts`, so the
 polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated once:
 
 1. `POST /v2/p/github/auth/device/start` asks GitHub for a device code.

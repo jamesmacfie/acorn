@@ -1,5 +1,5 @@
 import { createSignal, Match, Show, Switch } from 'solid-js'
-import Acorn from '../../Acorn'
+import Acorn from '../../kit/components/Acorn'
 import { recoveryActions } from '../platform'
 import { nodeReadiness, selectActiveNode } from './activeNode'
 import { Button } from '../../kit/components/primitives'

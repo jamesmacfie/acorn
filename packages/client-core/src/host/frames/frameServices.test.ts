@@ -27,10 +27,10 @@ vi.mock('../registries/commands/clientEvents', async (importOriginal) => ({
 }))
 
 const toast = vi.fn()
-vi.mock('../../notifications/toast', () => ({ toast: (...args: unknown[]) => toast(...args) }))
+vi.mock('../../features/notifications/toast', () => ({ toast: (...args: unknown[]) => toast(...args) }))
 
 const saveJsonPref = vi.fn(async (..._args: unknown[]) => undefined)
-vi.mock('../../settings/savePref', () => ({ saveJsonPref: (...args: unknown[]) => saveJsonPref(...args) }))
+vi.mock('../../features/settings/savePref', () => ({ saveJsonPref: (...args: unknown[]) => saveJsonPref(...args) }))
 
 const { createFrameServices } = await import('./frameServices')
 

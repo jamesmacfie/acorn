@@ -2,7 +2,7 @@
 
 The kit and the layouts cover every pane. They do not cover the shell around the panes, which on the
 desktop is bespoke DOM: the topbar (`apps/desktop/src/client/App.tsx`), the rail
-(`packages/client-core/src/tabs/TabRail.tsx`), the palette
+(`packages/client-core/src/features/tabs/TabRail.tsx`), the palette
 (`packages/client-core/src/host/palette/PaletteSurface.tsx`), and the overlay stack. None of it is kit, and
 none of it is designed anywhere for a terminal. This file is that design.
 
@@ -51,7 +51,7 @@ would need key handling. The TUI keeps them core-owned too, and draws them itsel
   results below, the same `palette/model.ts` behind it. Opened by the command chord, dismissed by
   Escape, owns the key layer while open ([05-keys-and-focus.md](./05-keys-and-focus.md) § Traps).
 - **The overlay stack** is a list of open modals, topmost owning the layer. Notifications
-  (`client-core/src/notifications/`) draw as one-line `Alert`s above the footer, dismiss on a key or
+  (`client-core/src/features/notifications/`) draw as one-line `Alert`s above the footer, dismiss on a key or
   a timeout, and never take focus.
 - **The pane row** (`tasks/TaskPaneHost.tsx` today) is one line of pane labels under the topbar,
   `Tabs`-shaped, until client-plugins phase 1 gives it a contract.

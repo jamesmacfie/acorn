@@ -7,23 +7,23 @@ import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
 import { Dynamic } from 'solid-js/web'
 import { clear } from 'idb-keyval'
 import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
-import { setProjectsLookup } from '@acorn/client-core/projects/projectLookup.ts'
-import { setTaskLookup } from '@acorn/client-core/tasks/taskLookup.ts'
+import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
+import { setTaskLookup } from '@acorn/client-core/features/tasks/taskLookup.ts'
 import Picker from '@acorn/client-core/kit/components/Picker.tsx'
 import { Button, Select } from '@acorn/client-core/kit/components/primitives.tsx'
 import WorkspacePicker from '@acorn/client-core/kit/components/WorkspacePicker.tsx'
-import { workspaceForProject } from '@acorn/client-core/workspaces/activeWorkspace.ts'
-import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/workspaces/fleetWorkspaces.ts'
-import { planWorkspaceViewTransition } from '@acorn/client-core/workspaces/workspaceViewTransition.ts'
-import AccountMenu from '@acorn/client-core/AccountMenu.tsx'
-import { initWorkflowNotices } from '@acorn/client-core/notifications/notifications.ts'
-import { initSessions, sessions } from '@acorn/client-core/tasks/agentSessions.ts'
-import TabRail from '@acorn/client-core/tabs/TabRail.tsx'
+import { workspaceForProject } from '@acorn/client-core/features/workspaces/activeWorkspace.ts'
+import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/features/workspaces/fleetWorkspaces.ts'
+import { planWorkspaceViewTransition } from '@acorn/client-core/features/workspaces/workspaceViewTransition.ts'
+import OverflowMenu from '@acorn/client-core/features/settings/OverflowMenu.tsx'
+import { initWorkflowNotices } from '@acorn/client-core/features/notifications/notifications.ts'
+import { initSessions, sessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
+import TabRail from '@acorn/client-core/features/tabs/TabRail.tsx'
 import Tips from '@acorn/client-core/kit/components/tips.tsx'
-import { ToastHost } from '@acorn/client-core/notifications/ToastHost.tsx'
-import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/tasks/tasks.ts'
+import { ToastHost } from '@acorn/client-core/features/notifications/ToastHost.tsx'
+import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorkspaceView, selectedSource, setMaximizedPane, setSelectedSource, setTerminalMax, setTerminalOpen, toggleFocusedPaneMax, workspaceView } from '@acorn/client-core/features/tasks/tasks.ts'
 import { isTerminalTarget } from '@acorn/client-core/host/keys/install.ts'
-import { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
+import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilities.ts'
 import { desktopExtras } from '@acorn/client-core/infra/platform/index.ts'
 import NodeGate from '@acorn/client-core/infra/node/NodeGate.tsx'
@@ -33,27 +33,27 @@ import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node/nodeSecurity.ts'
 import { applyNodePlugins } from './activate'
 import TaskView from './TaskView'
-import Acorn from '@acorn/client-core/Acorn.tsx'
+import Acorn from '@acorn/client-core/kit/components/Acorn.tsx'
 import { clientEvents } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
 import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
 import { CheatSheet } from '@acorn/client-core/host/keys/CheatSheet.tsx'
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
-import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
+import { taskBridge } from '@acorn/client-core/features/tasks/taskBridge.ts'
 import { RefPanelHost } from '@acorn/client-core/host/registries/panes/refPanelHost.tsx'
 import { startClientSchedules } from '@acorn/client-core/host/registries/shell/schedules.ts'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/infra/persistence/appStartup.ts'
-import { createTaskDeepLink } from '@acorn/client-core/tasks/taskDeepLink.ts'
+import { createTaskDeepLink } from '@acorn/client-core/features/tasks/taskDeepLink.ts'
 import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
-import { availableSources } from '@acorn/client-core/tabs/sources.ts'
-import { createSourceScope } from '@acorn/client-core/tabs/sourceScope.ts'
+import { availableSources } from '@acorn/client-core/features/tabs/sources.ts'
+import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so Monaco, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
 // compete with the first interactive paint.
-const SettingsModal = lazy(() => import('@acorn/client-core/settings/SettingsModal.tsx'))
+const SettingsModal = lazy(() => import('@acorn/client-core/features/settings/SettingsModal.tsx'))
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -432,7 +432,7 @@ export default function App() {
             {(nodeId) => <NodeChip nodeId={nodeId()} compact={nodes().length <= 1} query={{}} />}
           </Show>
           <SlotHost slot="topbar.right" context={slotContext()} />
-          <AccountMenu onSettings={() => openSettings()} onClearCache={clearCache} />
+          <OverflowMenu onSettings={() => openSettings()} onClearCache={clearCache} />
         </div>
       </header>
       <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}

@@ -30,7 +30,7 @@ export const pluginProjectRoutePrefix = (pluginId: string): string =>
   `${PROJECT_ROUTE}/${PLUGIN_ROUTE_SEGMENT}/${pluginId}/`
 
 export const projectPath = (projectId: string): string => `/p/${encodeURIComponent(projectId)}`
-export const createTaskPath = (projectId: string): string => `${projectPath(projectId)}/new`
+export const newTaskPath = (projectId: string): string => `${projectPath(projectId)}/new`
 export const taskPath = (taskId: string): string => `/t/${encodeURIComponent(taskId)}`
 
 export const isProjectPath = (path: string): boolean => path.startsWith(PROJECT_PATH_PREFIX)

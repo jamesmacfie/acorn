@@ -11,8 +11,8 @@ const { runChromeAction } = await import('./actions')
 const { paneRegistry } = await import('../registries/panes/panes')
 const { projectSurfaceRegistry } = await import('../registries/panes/projectSurfaces')
 const { clientEvents, consumePaneIntent, evictPendingIntents } = await import('../registries/commands/clientEvents')
-const { setActiveTaskId, setSelectedSource } = await import('../../tasks/tasks')
-const { setTaskLookup } = await import('../../tasks/taskLookup')
+const { setActiveTaskId, setSelectedSource } = await import('../../features/tasks/tasks')
+const { setTaskLookup } = await import('../../features/tasks/taskLookup')
 type Task = import('../../infra/queries').Task
 const { closePluginOverlay, pluginOverlayOpen } = await import('../frames/overlays')
 

@@ -114,7 +114,7 @@ export default {
       // state behind a client event with no descriptor form.
       //
       // It no longer offers to link projects either. The shell hides this source outright where the
-      // workspace links none (client-core/tabs/sources.ts), so the two empty lists left to explain are
+      // workspace links none (client-core/features/tabs/sources.ts), so the two empty lists left to explain are
       // followed projects with nothing active in them, and a repository its workspace follows Linear
       // for but which follows no Linear project of its own.
       emptyState: { message: 'No active issues in the Linear projects this repository follows.' },

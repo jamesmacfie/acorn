@@ -3,7 +3,7 @@ import { CORE_TASK_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { clearAnnotations } from './annotations'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
 import { markersFor } from '../registries/rail/railMarkerFeed'
-import { resolveRailMarkers } from '../../tabs/railMarkers'
+import { resolveRailMarkers } from '../../features/tabs/railMarkers'
 import type { Disposable } from '../../kit/lib/registry'
 import { requestTaskAnnotations } from './taskAnnotations'
 

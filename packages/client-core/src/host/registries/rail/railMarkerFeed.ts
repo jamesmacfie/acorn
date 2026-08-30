@@ -3,7 +3,7 @@
 //
 // JSX-free by design, like ./slots.ts: registries/plugin.ts imports this, and that file has to stay
 // importable in the Node-only client-core suite (docs/frontend.md § Registries and plugins).
-import { clampMarkerPriority, type RailMarker } from '../../../tabs/railMarkers'
+import { clampMarkerPriority, type RailMarker } from '../../../features/tabs/railMarkers'
 import { Registry } from '../../../kit/lib/registry'
 
 export type RailMarkerTarget =

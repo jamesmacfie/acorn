@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createSignal } from 'solid-js'
 import { markersFor, railMarkerRegistry, type RailMarkerContribution } from './railMarkerFeed'
-import { resolveRailMarkers, type RailMarker } from '../../../tabs/railMarkers'
+import { resolveRailMarkers, type RailMarker } from '../../../features/tabs/railMarkers'
 import { initClientPlugins } from '../extensionPoints/plugin'
 
 const running: RailMarker = { id: 'running', label: '2 running containers', icon: 'brand:docker', placements: ['top-start'] }

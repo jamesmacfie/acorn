@@ -64,7 +64,7 @@ is terminal-specific except the path.
 - `packages/client-core/src/infra/platform/{index.ts,contract.ts}`: a `config` group, nullable, so a host
   without a file (the PWA) has none and Settings hides the "Open config file" row.
 - `packages/client-core/src/infra/persistence/deviceConfig.ts` (new): apply a read; regenerate on write.
-- `packages/client-core/src/settings/`: "Open config file" and the parse-error notice.
+- `packages/client-core/src/features/settings/`: "Open config file" and the parse-error notice.
 - `packages/plugin-types/` or a sibling: the generated JSON schema.
 
 ## Tests
