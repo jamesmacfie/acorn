@@ -1,7 +1,10 @@
 # Layout: every pane as a host-owned layout filled with a component tree
 
-Status: **SHIPPED 2026-08-30.** All ten phases landed. This folder sequences and links; the owning
-docs under `docs/` describe the behaviour. Where they disagree, the owning doc wins.
+Status: **SHIPPED 2026-08-30.** All ten phases landed, and so did phase 10 of
+[review/](./review/README.md), which finished the code the phase files said had shipped and did not.
+Phase 11 of that folder rehomes what is left here and deletes this directory. This folder sequences
+and links; the owning docs under `docs/` describe the behaviour. Where they disagree, the owning doc
+wins.
 
 The deviations, in one place:
 
@@ -140,6 +143,7 @@ Supporting documents, readable in any order:
 | 7 ✅ | [phase-7-github.md](./phase-7-github.md) | The PR pane, browse, list, ref panel, and importer as layouts and trees | The largest regular pane proves the layouts hold |
 | 8 ✅ | [phase-8-agents.md](./phase-8-agents.md) | The transcript as a timeline of slots, the composer with slots, the sidebar, Agent Center | The pane the whole exercise pays for |
 | 9 ✅ | [phase-9-cleanup-and-docs.md](./phase-9-cleanup-and-docs.md) | Deleting the old paths, executing the docs migration, the full test pass | Done |
+| 10 ✅ | [review/phase-10-finish-the-implementation.md](./review/phase-10-finish-the-implementation.md) | The region seam, a slot tree's scope, `core:task`, and the tests three phase files promised | Phase 11, which deletes this folder |
 
 ## The order of work
 

@@ -8,8 +8,19 @@ Two phases remain, and they are sequenced so the folder is deleted at the end of
 
 | Phase | File | What it delivers |
 | --- | --- | --- |
-| 10 | [phase-10-finish-the-implementation.md](./phase-10-finish-the-implementation.md) | The code the phase files say shipped but did not, one dead hook, one scoping gap, the missing tests, and a decision on the unbuilt draw sites |
+| 10 ✅ | [phase-10-finish-the-implementation.md](./phase-10-finish-the-implementation.md) | The code the phase files say shipped but did not, one scoping gap, the missing tests, and the two decisions. Shipped 2026-08-30; its "what shipped" section records six places it differs from what this review expected |
 | 11 | [phase-11-rehome-the-design-and-delete.md](./phase-11-rehome-the-design-and-delete.md) | Move the design content that lives only in this folder into owning docs, fix the stale sections, repoint 70 inbound links, delete `docs/future/layout/` |
+
+Phase 10 changed three things this review says below, and the phase file's own record wins where they
+disagree:
+
+- **`terminal:before-run-target` was never dead.** `runtime.ts` has called it since phase 4. The
+  finding under "Still open, and code" is wrong; what was owed was a test.
+- **The region seam was built**, with the `model` key on a pane contribution, and the four hand-rolled
+  root maps are gone. The API pane moved to `list-detail`; linear and rollbar did not, because their
+  split is conditional on a task linking more than one item and a manifest cannot express that.
+- **`core:task` is a rail marker**, not an `AnnotationMarks` draw site. `editor:line` and `editor:path`
+  are struck from the docs.
 
 ## Verdict against the six goals
 

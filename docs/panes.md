@@ -91,10 +91,41 @@ its library column, and it is the same mechanism the narrow projections need.
 
 A region is a component, not an element, so a layout that draws one region at a time mounts only that
 one. Regions of the same pane are mounted independently, which means anything two of them share has to
-outlive either. Notes, Context, Changes and the PR pane each hold that shared state in a reactive root
-keyed by task, built on first ask and disposed when the task is evicted. Collapsing a library must not
-take the note being edited with it, and switching from Overview to Files must not lose the pull request
-the reader had chosen.
+outlive either. Collapsing a library must not take the note being edited with it, and switching from
+Overview to Files must not lose the pull request the reader had chosen.
+
+The host holds that shared thing. A compiled pane declares a `model` beside its regions, and the host
+builds it once per task inside its own reactive root, hands it to every region, and disposes it when
+the task is evicted (`client-core/src/registries/paneModels.ts`):
+
+```ts
+ctx.panes.register({
+  id: 'notes', label: 'Notes', order: 30,
+  layout: 'list-detail',
+  model: (task) => createNotesModel(task.id, task.projectId),
+  regions: { list: NotesList, detail: NoteBody },   // each region is handed { task, model }
+})
+```
+
+A loaded plugin needs nothing added for this. Its regions are entries in one bundle running in one
+worker, so module scope inside that bundle already is the shared thing: `mountTree({ list, detail })`,
+and a model held beside them. The API pane is the worked example
+(`plugins/http/src/tree/panelModel.ts`).
+
+The seam exists because four compiled panes had each hand-rolled the same per-task root map, which is
+the admission rule's own test. A pane whose regions share nothing omits `model` and its regions are
+handed `undefined`.
+
+Two panes still keep a map of their own, and both are keyed by something other than a task: the PR
+pane's is keyed by the pull request, because a task can be about several, and the tab strip's is keyed
+by the task but read from three panels of one `tabs` layout. Neither is a copy of this seam waiting to
+be deleted; if a third appears with a task-shaped key, it belongs here.
+
+**A split inside a region is the plugin's.** A pane's regions are its *outer* arrangement; a `ListDetail`
+drawn inside one region is a different object with a different owner, which is why `ListDetail` and
+`DocumentTabs` are kit nodes as well as layout names. The PR pane's Files tab is one panel of a `tabs`
+pane with a list-detail split inside it, and that is correct rather than a pane that should have been
+two layouts.
 
 A wizard is the one arrangement a non-pane surface can reach for. Onboarding is a component in the
 `overlay` slot rather than a pane, so it imports `Wizard` from `@acorn/plugin-api/ui/host` and fills its

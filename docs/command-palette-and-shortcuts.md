@@ -110,6 +110,16 @@ arrows, Home, End, the page keys and type-ahead come from `client-core/keys/coll
 than from the pane. `active` and `selected` live in the host's store keyed by the item's own key
 ([state.md](./state.md)), so a refetch keeps your place.
 
+`Grid` is the one documented exception, and it is a consequence of virtualisation rather than a
+shortcut. Most of its rows have no element, so roving focus cannot be DOM focus: the arrows move a
+`selected` index the caller owns and scroll it into view. The intents and the single tab stop are the
+same as every other collection's, which is the part the role promises; where the place is kept is not.
+
+`DiffPane` and `KeyValueEditor` are not collections at all, and the focus table says so. A diff is a
+scroller of text whose focusable parts — the per-line comment control, the toolbar — are ordinary stops,
+and finding a line is the `search` intent rather than a rove. A key-value grid is every cell a stop
+already, the same answer `Table` gives.
+
 **Scopes are layers.** The four `KeybindingScope` values map onto the engine's model, and priority is
 what decides which one wins, not how local a layer is:
 

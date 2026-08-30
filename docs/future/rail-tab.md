@@ -1,8 +1,9 @@
 # Rail controls and plugin-published status markers
 
-Status: slices 1 and 2 shipped 2026-08-27. Slice 3 is superseded, 2026-08-28; the mechanism that
-supersedes it shipped 2026-08-29 (docs/plugins.md § Cooperative extension points, the `annotation`
-kind). What is left is one draw site on the rail row, which lands with the pane it belongs to.
+Status: **done 2026-08-30.** Slices 1 and 2 shipped 2026-08-27. Slice 3 was superseded by the
+`annotation` kind (docs/plugins.md § Cooperative extension points), which shipped 2026-08-29, and the
+draw site it was waiting for shipped with layout phase 10: `core:task` is declared in
+`@acorn/protocol/extensionPoints.ts` and drawn by `client-core/src/tasks/taskAnnotations.ts`.
 
 The rail audit of 2026-08-27 planned three slices. Two shipped and their behaviour is owned by the
 docs, not by this file: [ui-design.md § Rail controls and status markers](../ui-design.md) for the
@@ -42,10 +43,18 @@ row, a diff line, and an editor gutter one mechanism rather than three. Every wi
 carries over to that point's row.
 
 The annotation kind itself shipped in phase 4 of the layout programme: the manifest key, the batched
-POST, the host-side sanitiser, the provenance stamp and the draw site on `DiffPane`. `core:task` is not
-declared yet, because a rail marker needs the allocator above and the rail row is not a phase-4 pane.
-When it is declared, nothing in the mechanism changes — it is one more `annotation` point with one more
-draw site.
+POST, the host-side sanitiser, the provenance stamp and the draw site on `DiffPane`. `core:task` waited
+for the allocator above, and phase 10 declared it. Nothing in the mechanism changed — it is one more
+`annotation` point — but the *drawing* is the rail's rather than `AnnotationMarks`': a 52-pixel square
+has no room for a line of text, so a mark becomes a rail marker with the icon in a free corner and the
+words in the hover legend, and the contributor's id goes in the legend line rather than beside the
+icon. That translation is the host's decision about its own surface, and it is why the mark shape
+carries a severity and an icon and no geometry.
+
+Core declares the point in `@acorn/protocol/extensionPoints.ts` because core has no manifest to declare
+it in, the same way `CORE_HOOK_POINTS` are named there. The wire constraints above carry over: one
+batched read per contributor for the whole visible list, display strings only, and provenance stamped
+by the host.
 
 ## Maintenance notes that survive
 

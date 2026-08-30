@@ -42,9 +42,14 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   any of these;
 - the plugin invariants hold the closed kit closed at the call site. `ui/adoption.test.ts` fails on a
   raw `div` or `span` anywhere under `plugins/`, and two arch rules in `tools/arch/boundaries.test.ts`
-  fail on a plugin stylesheet and on a plugin importing Solid's `render`. These were a ledger of
-  converted files until layout phase 9 finished the conversion; a ledger answers "has this file been
-  done" and a rule answers "can this be written at all";
+  fail on a plugin stylesheet and on a plugin importing Solid's `render` in either spelling. These were
+  a ledger of converted files until layout phase 9 finished the conversion; a ledger answers "has this
+  file been done" and a rule answers "can this be written at all". All three exempt `.test.tsx` and
+  assert their file lists are non-empty, because a rule over a list that came back empty is a rule
+  that passes on nothing;
+- `ui/kit/hover.test.ts` reads the stylesheets rather than the code: a rule that reveals something on
+  `:hover` has to reveal it on `:focus-within` too. Hover is never load-bearing, and jsdom computes no
+  styles, so this is the only layer that can ask;
 - the three kit invariants hold the component set closed, and each one reads the contract rather
   than the code that implements it. `ui/kit/support.test.ts` reads the `/ui` barrel and asserts that
   the nodes it exports and the rows in `NODE_SUPPORT` are the same list, each with a terminal level.
@@ -57,9 +62,16 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   worktrees, process/filesystem guards, routes, and WebSocket behavior;
 - plugin tests cover schemas, providers, route behavior, reconciliation, and client models using
   package-local fixtures. Every plugin's `vitest.config.ts` is one line re-exporting
-  `plugins/vitest.shared.ts` (node environment, `src/**/*.test.ts`, git config neutralized), and the
-  testkit resolves a plugin's migration chain from its id — `makeTestPluginDb('github')` and
-  `makeTestNodeContext({ plugin })` find `plugins/<id>/migrations` themselves;
+  `plugins/vitest.shared.ts`, and the testkit resolves a plugin's migration chain from its id —
+  `makeTestPluginDb('github')` and `makeTestNodeContext({ plugin })` find `plugins/<id>/migrations`
+  themselves. That shared config is the same two projects client-core has, split the same way:
+  `logic` is `.test.ts` in bare Node with git config neutralized, and `hosts` is `.test.tsx` under
+  jsdom with `vite-plugin-solid`. The second one is what lets a plugin test a region it ships where
+  the region lives — the PR pane through each of its tabs, the agents attachment slot handing a `.png`
+  to the plugin that declared it — which nothing could do before, because client-core does not have
+  those components and a plugin's own suite could not render one. A plugin test reaches the host
+  through `@acorn/plugin-api/testkit/client`, not by importing into `client-core` (`tools/arch/
+  boundaries.test.ts` § plugin tests holds the shrinking budget for that);
 - architecture tests scan the package graph for forbidden imports, undeclared dependencies, cycles,
   shell-binding leakage, protocol impurity, non-contract plugin edges, and route files that cast a
   request body instead of parsing it;

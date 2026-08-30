@@ -62,6 +62,13 @@ Run targets are resolved from trusted `.acorn/config.toml`, repo settings, and t
 run target is a terminal session; acorn does not allocate or proxy arbitrary ports. Preview uses the
 declared target/port configuration and the authenticated tunnel when necessary.
 
+Another plugin gets a turn before a process starts in a task's worktree. `terminal:before-run-target`
+runs in `RuntimeService.start`, after the repo-config trust gate and before the session is spawned
+(`plugins/terminal/src/main/runtime.ts`); a veto stops the start and the reason reaches the caller with
+the vetoing plugin's id in front of it. Observe and veto only, and no transform: the design sketched
+one over the target's environment, and a hook payload is scalars and arrays of scalars, so an
+environment map is not expressible in the declared vocabulary (`docs/plugins.md` § Hooks).
+
 ## Profiles
 
 Claude, Codex, and Aider launch specifications are registered by literal in
