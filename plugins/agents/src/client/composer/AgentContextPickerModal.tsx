@@ -1,6 +1,6 @@
 import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
-import { Alert, Button, Checkbox, Modal, Stack } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, Modal, Stack, Text } from '@acorn/plugin-api/ui'
 
 export default function AgentContextPickerModal(props: {
   contribution: AgentContextContribution
@@ -44,8 +44,11 @@ export default function AgentContextPickerModal(props: {
       onDismiss={props.onClose}
     >
       <Modal.Body>
-        <p class="muted">{props.contribution.description}</p>
-        <Show when={!options.loading} fallback={<p class="muted">Loading available context…</p>}>
+        <Text emphasis="muted" wrap>{props.contribution.description}</Text>
+        <Show
+          when={!options.loading}
+          fallback={<Text emphasis="muted" wrap>Loading available context…</Text>}
+        >
           <Show
             when={!options.error}
             fallback={<Alert>Unable to load available context.</Alert>}
@@ -53,18 +56,16 @@ export default function AgentContextPickerModal(props: {
             <Stack gap="row">
               <For
                 each={options() ?? []}
-                fallback={<p class="muted agent-context-option-empty">Nothing is currently available from this source.</p>}
+                fallback={
+                  <Text emphasis="muted" wrap>Nothing is currently available from this source.</Text>
+                }
               >
                 {(option) => (
                   <Checkbox
                     checked={selected().has(option.id)}
                     onChange={() => toggle(option.id)}
-                    label={
-                      <>
-                        <strong>{option.label}</strong>
-                        <Show when={option.description}><small>{option.description}</small></Show>
-                      </>
-                    }
+                    label={option.label}
+                    hint={option.description}
                   />
                 )}
               </For>

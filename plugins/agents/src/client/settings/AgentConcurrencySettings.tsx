@@ -36,8 +36,9 @@ export default function AgentConcurrencySettings() {
     setError('')
   }
 
-  const submit = async (event: Event) => {
-    event.preventDefault()
+  // Button-only submit: this page has no <form>, so Enter in a field does not save
+  // (docs/future/before-terminal-ui/phase-0-agents-dom-hygiene.md).
+  const submit = async () => {
     // The same validator the route runs, so a bad number is refused in the field rather than by a 400.
     const result = validateAgentConcurrency({
       provider: Number(provider()),
@@ -62,56 +63,54 @@ export default function AgentConcurrencySettings() {
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)}>
-      <Stack gap="section">
-        <Text emphasis="muted" wrap>
-          How many agent turns this Node runs at once. A session always runs one turn at a time, so
-          these ceilings only decide how many sessions can be working together. Turns over a ceiling
-          wait in the queue and start when there is room.
-        </Text>
+    <Stack gap="section">
+      <Text emphasis="muted" wrap>
+        How many agent turns this Node runs at once. A session always runs one turn at a time, so
+        these ceilings only decide how many sessions can be working together. Turns over a ceiling
+        wait in the queue and start when there is room.
+      </Text>
 
-        <Show when={limits.error}>
-          <Alert>
-            {limits.error instanceof Error ? limits.error.message : 'Agent concurrency could not be loaded.'}
-          </Alert>
-        </Show>
+      <Show when={limits.error}>
+        <Alert>
+          {limits.error instanceof Error ? limits.error.message : 'Agent concurrency could not be loaded.'}
+        </Alert>
+      </Show>
 
-        <Field
-          label="Turns at once per provider"
-          hint="Counted against one agent CLI across every task and workspace. This is what keeps a single provider account from running several turns at once."
-        >
-          <Input
-            type="number"
-            min="1"
-            max={MAX_AGENT_CONCURRENCY}
-            width="narrow"
-            value={provider()}
-            onInput={(value) => edit(setProvider)(value)}
-          />
-        </Field>
+      <Field
+        label="Turns at once per provider"
+        hint="Counted against one agent CLI across every task and workspace. This is what keeps a single provider account from running several turns at once."
+      >
+        <Input
+          type="number"
+          min="1"
+          max={MAX_AGENT_CONCURRENCY}
+          width="narrow"
+          value={provider()}
+          onInput={(value) => edit(setProvider)(value)}
+        />
+      </Field>
 
-        <Field
-          label="Turns at once per workspace"
-          hint="Counted across all providers in one workspace, so one workspace cannot take the machine."
-        >
-          <Input
-            type="number"
-            min="1"
-            max={MAX_AGENT_CONCURRENCY}
-            width="narrow"
-            value={workspace()}
-            onInput={(value) => edit(setWorkspace)(value)}
-          />
-        </Field>
+      <Field
+        label="Turns at once per workspace"
+        hint="Counted across all providers in one workspace, so one workspace cannot take the machine."
+      >
+        <Input
+          type="number"
+          min="1"
+          max={MAX_AGENT_CONCURRENCY}
+          width="narrow"
+          value={workspace()}
+          onInput={(value) => edit(setWorkspace)(value)}
+        />
+      </Field>
 
-        <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-        <Show when={saved()}>{(message) => <Alert tone="ok">{message()}</Alert>}</Show>
-        <Toolbar variant="actions">
-          <Button submit disabled={!dirty() || saving()}>
-            {saving() ? 'Saving…' : 'Save limits'}
-          </Button>
-        </Toolbar>
-      </Stack>
-    </form>
+      <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+      <Show when={saved()}>{(message) => <Alert tone="ok">{message()}</Alert>}</Show>
+      <Toolbar variant="actions">
+        <Button disabled={!dirty() || saving()} onPress={() => void submit()}>
+          {saving() ? 'Saving…' : 'Save limits'}
+        </Button>
+      </Toolbar>
+    </Stack>
   )
 }
