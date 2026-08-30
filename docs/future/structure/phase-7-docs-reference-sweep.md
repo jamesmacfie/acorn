@@ -52,7 +52,7 @@ marking it as gone. The list, from this programme:
 | `./main/index.ts` subpath | gone |
 | `docs/pg.md`, `docs/terminal-and-agents.md`, `docs/state.md`, `docs/release-notes-vnext.md` | phase 1 names |
 | `docs/third-party/` | `docs/loaded-plugin-migration.md`, `docs/editor-monaco.md` (new) |
-| `docs/plugin-map.html`, `plans/`, `docs/next-review.md` | gone |
+| `docs/plugin-map.html`, `plans/`, `docs/next-review.md` | deleted in phase 0 |
 | `frame/` as a plugin folder | `tree/` |
 
 Expected volume from the 2026-08-30 survey: about 170 `client-core/src` citations, 19 distinct
