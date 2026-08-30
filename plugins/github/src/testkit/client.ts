@@ -4,5 +4,5 @@
 //   apps/desktop/test/integration/persistedState.conformance.test.ts   prFiltersSlice
 //   apps/desktop/src/client/scopedEviction.test.ts                 prFilterFor, setPrFilter
 export { routeKey } from '../client/fileNavigation'
-export { prFiltersSlice } from '../client/pullList/filterSlice'
-export { prFilterFor, setPrFilter } from '../client/pullList/filterState'
+export { prFiltersSlice } from '../client/pullList/filterStore'
+export { prFilterFor, setPrFilter } from '../client/pullList/filterStore'

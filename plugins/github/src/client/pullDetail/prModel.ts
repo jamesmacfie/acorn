@@ -7,7 +7,7 @@ import {
 import {
   fileSummariesOptions, mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions,
 } from '../queries'
-import { pullPrefixKey, pullsPrefixKey, type Label } from '../../contract/api'
+import { pullPrefixKey, pullsPrefixKey, type Label } from '../../shared/api'
 import {
   addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel,
   removeReviewer, reopenPr, requestReviewer, rerunFailed, setDraft, setViewed, submitReview,

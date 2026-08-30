@@ -1,4 +1,4 @@
-import type { CompareCommit } from '../../contract/api'
+import type { CompareCommit } from '../../shared/api'
 
 // Branch name → human title: last path segment, dashes/underscores to spaces, first letter upper.
 // `feature/add-foo` → "Add foo".

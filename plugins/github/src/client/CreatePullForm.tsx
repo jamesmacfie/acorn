@@ -3,11 +3,11 @@ import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-que
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { branchesOptions, compareOptions, mentionsOptions } from './queries'
 import { projectsOptions } from '@acorn/plugin-api/client'
-import { pullsKey, type Branch } from '../contract/api'
+import { pullsKey, type Branch } from '../shared/api'
 import { Alert, Button, Checkbox, EmptyState, Field, Inline, Input, MentionTextarea, Picker, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
-import { githubBrowsePath } from './routes'
+import { githubBrowsePath } from './clientRoutes'
 
 // The navigator column in create mode: base and head pickers, title, body, draft and Create. base and
 // head live in the URL (?base=&head=) so they're shareable and reactive, and the compare query and the

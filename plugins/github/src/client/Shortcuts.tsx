@@ -2,11 +2,11 @@ import { createEffect, createMemo, onCleanup, onMount } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { useChangedFiles } from './changedFiles'
 import { createOverlayPalette, fuzzyScore, projectsOptions, registerCommands } from '@acorn/plugin-api/client'
-import type { PullFile } from '../contract/api'
+import type { PullFile } from '../shared/api'
 import { PaletteSurface, registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { Inline, Text } from '@acorn/plugin-api/ui'
 import { createQuery } from '@tanstack/solid-query'
-import { githubCreateRoute } from './routes'
+import { githubCreateRoute } from './clientRoutes'
 
 // Global keyboard shortcuts and the file finder. Mounted once in App. PullList owns j/k (next/prev
 // PR); those keys are untouched here. Global shortcut dispatch lives in the command registry; the

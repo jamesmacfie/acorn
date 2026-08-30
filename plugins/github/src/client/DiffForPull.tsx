@@ -1,7 +1,7 @@
 import { createMemo } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
-import { filesKey, filePatchKey, pullKey, type PullFile } from '../contract/api'
+import { filesKey, filePatchKey, pullKey, type PullFile } from '../shared/api'
 import { fetchFilePatches, fileBlobOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { DiffPane } from '@acorn/plugin-api/ui'

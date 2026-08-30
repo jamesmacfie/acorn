@@ -16,11 +16,11 @@ import { createSignal, lazy, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { forceRefreshPull } from './queries'
-import { filesKey, pullKey, pullsKey, pullsRoute, pullsPrefixKey, type Pull } from '../contract/api'
+import { filesKey, pullKey, pullsKey, pullsRoute, pullsPrefixKey, type Pull } from '../shared/api'
 import { projectsOptions, readJson } from '@acorn/plugin-api/client'
 import { Acorn } from '@acorn/plugin-api/ui/host'
 import PullList from './PullList'
-import { githubCreateRoute } from './routes'
+import { githubCreateRoute } from './clientRoutes'
 import { Button, DetailColumn, EmptyState, ListColumn, ListDetail, SectionHeader } from '@acorn/plugin-api/ui'
 
 // Heavy surfaces stay behind their navigation intent so Shiki, diff rendering and the create-pull

@@ -12,10 +12,10 @@ import {
 } from '@acorn/plugin-api/ui'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
-import { type Pull } from '../contract/api'
+import { type Pull } from '../shared/api'
 import { filterPulls } from './pullList/model'
-import { prFilterFor, setPrFilter } from './pullList/filterState'
-import { githubBrowsePath } from './routes'
+import { prFilterFor, setPrFilter } from './pullList/filterStore'
+import { githubBrowsePath } from './clientRoutes'
 import { promotePullToTask } from './pullTasks'
 
 // Draft / open / closed, as one glyph. The list route only ever reports `open` or `closed`: GitHub's

@@ -1,4 +1,4 @@
-import type { Pull } from '../../contract/api'
+import type { Pull } from '../../shared/api'
 
 // Client-side text filter over the loaded tab. This intentionally stays local to
 // the current PR list; older PR search/pagination belongs in the server workflow.

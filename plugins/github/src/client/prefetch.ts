@@ -4,7 +4,7 @@
 // writes with every open PR in a repo. Remaining rows are warmed on hover/focus instead.
 // Patch bodies stay intent-driven in DiffView. Open only; closed PRs stay on-demand.
 import type { QueryClient } from '@tanstack/solid-query'
-import { fileSummariesKey, pullKey, pullsBatchRoute, type PullBatchItem, type PullBatchRequest } from '../contract/api'
+import { fileSummariesKey, pullKey, pullsBatchRoute, type PullBatchItem, type PullBatchRequest } from '../shared/api'
 import { pullsOptions } from './queries'
 import { writeJson } from '@acorn/plugin-api/client'
 
