@@ -1,6 +1,9 @@
 import { createSignal, onMount, onCleanup, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import * as monaco from 'monaco-editor'
+import { basicSetup } from 'codemirror'
+import { EditorState, Prec, Text } from '@codemirror/state'
+import { EditorView, keymap } from '@codemirror/view'
+import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { PluginDocumentRegion } from '@acorn/protocol/api.ts'
 import { eventChord } from '@acorn/protocol/keybindings.ts'
@@ -22,21 +25,21 @@ import {
   type PluginCompletionRequest,
   type PluginDocumentBody,
 } from './documentModel'
-import { monacoLanguageFor } from './language'
-import { MONACO_THEME, watchMonacoTheme } from './theme'
+import { languageFor } from './language'
+import { editorTheme, watchEditorTheme } from './theme'
+import { applyViewState, captureViewState, type EditorViewState } from './viewState'
 import { Alert } from '../../kit/components/primitives'
 import { Rectangle } from '../../kit/components/content/Rectangle'
 
 // A host-owned document surface: the host draws the editor, the plugin supplies the document. See
-// docs/third-party/monaco.md.
+// docs/editor.md.
 //
 // This is the whole point of the design, so it is worth being blunt about what is where. The plugin
 // declared a language id and two routes and that is all it declared. Everything else on this screen, the
-// Monaco instance, the theme, the workers, the dirty model, the autosave debounce, cmd+S, the
+// editor instance, the theme, the dirty document, the autosave debounce, cmd+S, the
 // flush-before-unmount, the view state and its eviction, is the host's, which is why a plugin cannot get
-// any of it wrong. It also never sees a byte of Monaco: a frame that bundled its own would be 7.9 MiB and
-// would run without language services, because a plugin origin serves one file and the frame CSP has no
-// `worker-src`.
+// any of it wrong. It also never sees a byte of the editor: a frame that bundled its own would be
+// megabytes and would run without language services, because a plugin origin serves one file.
 //
 // Three of the things this file's first release deliberately left out have since arrived with their
 // consumer, the database pane, and they are the parts worth knowing about:
@@ -52,13 +55,13 @@ import { Rectangle } from '../../kit/components/content/Rectangle'
 //     learns the language, which is what lets the same mechanism serve SQL, GraphQL and YAML.
 //
 // There is also no abstraction layer, on purpose. One implementation behind an internal interface is
-// over-building; the name the plugin declares is neutral, the code below calls Monaco bluntly, and when
-// shiki backs a read-only variant that is a branch in this file rather than a strategy pattern.
+// over-building; the name the plugin declares is neutral, the code below calls CodeMirror bluntly, and
+// when shiki backs a read-only variant that is a branch in this file rather than a strategy pattern.
 //
-// Monaco is imported here at module scope and not in the frame registry, which is the file that registers
-// this pane: that one is evaluated on every shell boot, so it reaches this module through `lazy()`
-// instead. Monaco arrives when a document pane first opens, which is the only moment it is needed, and a
-// shell that never opens one never loads it.
+// The editor is imported here at module scope and not in the frame registry, which is the file that
+// registers this pane: that one is evaluated on every shell boot, so it reaches this module through
+// `lazy()` instead. The grammars arrive when a document pane first opens, which is the only moment they
+// are needed, and a shell that never opens one never loads them.
 
 export type DocumentSurfaceProps = {
   pluginId: string
@@ -73,15 +76,16 @@ export type DocumentSurfaceProps = {
   onHandle?: (handle: DocumentHandle | null) => void
 }
 
-// LSP's kind names onto Monaco's enum. Total over the vocabulary, so adding a kind fails `tsc` here until
-// someone says what this engine draws for it, the same rule language.ts follows.
-const COMPLETION_KIND: Record<NonNullable<PluginCompletionItem['kind']>, monaco.languages.CompletionItemKind> = {
-  text: monaco.languages.CompletionItemKind.Text,
-  keyword: monaco.languages.CompletionItemKind.Keyword,
-  field: monaco.languages.CompletionItemKind.Field,
-  class: monaco.languages.CompletionItemKind.Class,
-  function: monaco.languages.CompletionItemKind.Function,
-  value: monaco.languages.CompletionItemKind.Value,
+// LSP's kind names onto the ones CodeMirror draws an icon for. Total over the vocabulary, so adding a
+// kind fails `tsc` here until someone says what this engine draws for it, the same rule language.ts
+// follows.
+const COMPLETION_KIND: Record<NonNullable<PluginCompletionItem['kind']>, string> = {
+  text: 'text',
+  keyword: 'keyword',
+  field: 'property',
+  class: 'class',
+  function: 'function',
+  value: 'variable',
 }
 
 // One document per scope under the degenerate template, so the scope id is all the view-state key needs
@@ -103,44 +107,43 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   const writePath = props.region.write ? resolveDocumentRoute(props.region.write, props.scope) : null
   // A language id the manifest parser already checked, re-checked because the manifest reached this
   // device as a roster row, which is bytes a node sent (the rule chrome/data.ts states).
-  const language = monacoLanguageFor(isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext')
+  const language = languageFor(isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext')
 
   let host: HTMLElement | undefined
-  let editor: monaco.editor.IStandaloneCodeEditor | undefined
-  let model: monaco.editor.ITextModel | undefined
+  let view: EditorView | undefined
   let stopTheme: (() => void) | undefined
   let disposed = false
-  // The version id at the last successful load or save. Dirty is derived from it rather than tracked as a
-  // flag, so undoing back to the saved text clears the dot the way it should.
-  let savedVersion = 0
+  // The document at the last successful load or save. Dirty is derived from it rather than tracked as a
+  // flag, so undoing back to the saved text clears the dot the way it should. `Text.eq` is the direct
+  // equivalent of Monaco's version-id comparison and is exact rather than merely cheap.
+  let saved: Text = Text.empty
 
   const scheduleSave = debounce(() => void save(), 1500)
 
   const saveViewState = (): void => {
-    const state = editor?.saveViewState()
-    if (state) rememberDocumentViewState(nodeId, scope, uri, state)
+    if (view) rememberDocumentViewState(nodeId, scope, uri, captureViewState(view))
   }
 
   // No `disposed` guard on the way in. The last thing an unmounting pane does is flush, and everything up
-  // to the `await`, including reading the text out of the model, runs synchronously, so the value is
-  // captured before the model is disposed below. Only the state writes afterwards are guarded, because by
+  // to the `await`, including reading the text out of the view, runs synchronously, so the value is
+  // captured before the view is destroyed below. Only the state writes afterwards are guarded, because by
   // then the component may be gone.
   async function save(): Promise<void> {
-    if (!model || !writePath) return
-    const version = model.getAlternativeVersionId() // snapshot: the value we are about to write
-    if (version === savedVersion) return
-    const text = model.getValue()
-    savedVersion = version
+    if (!view || !writePath) return
+    const doc = view.state.doc // snapshot: the value we are about to write
+    if (doc.eq(saved)) return
+    const previous = saved
+    saved = doc
     try {
       await writeJson<unknown>(writePath, {
         method: 'PUT',
         nodeId,
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text } satisfies PluginDocumentBody),
+        body: JSON.stringify({ text: doc.toString() } satisfies PluginDocumentBody),
       })
       if (!disposed) setError('')
     } catch (cause) {
-      savedVersion = 0 // the write did not land, so the next change must try again
+      saved = previous // the write did not land, so the next change must try again
       if (!disposed) setError(cause instanceof Error ? cause.message : 'Save failed')
     }
   }
@@ -152,16 +155,17 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   }
 
   // A chord pressed with focus inside this editor. It cannot reach the shell's window dispatcher, since
-  // that one refuses scoped bindings while a typing target has focus and Monaco's input area is one, and
-  // it cannot reach the plugin's frame either, which is in a different document. So the host resolves it
-  // here, against the same registry and the same policy PluginFrame uses for chords a frame forwards.
+  // that one refuses scoped bindings while a typing target has focus and the editor's content area is
+  // one, and it cannot reach the plugin's frame either, which is in a different document. So the host
+  // resolves it here, against the same registry and the same policy PluginFrame uses for chords a frame
+  // forwards.
   //
   // Only pane-scoped bindings are taken. Global and task chords have already had their chance on `window`
-  // in the capture phase before Monaco saw the event, and taking them a second time here would fire them
-  // twice.
-  const onEditorKeyDown = (event: monaco.IKeyboardEvent): void => {
-    const chord = eventChord(event.browserEvent)
-    if (!chord) return
+  // in the capture phase before the editor saw the event, and taking them a second time here would fire
+  // them twice.
+  const onEditorKeyDown = (event: KeyboardEvent): boolean => {
+    const chord = eventChord(event)
+    if (!chord) return false
     const prefs = qc.getQueryData<Record<string, string>>(prefsKey) ?? {}
     const binding = resolveFrameKeybinding(chord, resolveKeybindings(keybindingRegistry.entries(), prefs), {
       pluginId: props.pluginId,
@@ -170,7 +174,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       // test is asking about.
       taskActive: true,
     })
-    if (binding?.when !== 'pane') return
+    if (binding?.when !== 'pane') return false
     event.preventDefault()
     event.stopPropagation()
     // Flush first, then run. This is the contract guarantee: a surface action never fires against a stale
@@ -178,69 +182,65 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     void flush()
       .then(() => executeCommand(binding.command))
       .catch((cause: unknown) => console.error(`[command:${binding.command}]`, cause))
+    return true
   }
 
-  // One provider per mounted surface, answering only for this model. Monaco's completion providers are
-  // registered per language and are global, so a second document pane in the same language would
-  // otherwise be offered this plugin's items.
-  const registerCompletions = (): monaco.IDisposable | null => {
-    const completions = props.region.completions
-    if (!completions) return null
-    const path = resolveDocumentRoute(completions.route, props.scope)
+  // The plugin's items, offered for this view only. CodeMirror's completion sources hang off the state
+  // rather than off a global per-language registry, so unlike Monaco there is nothing here that a second
+  // document pane in the same language could be offered by mistake.
+  type CompletionSource = (context: CompletionContext) => Promise<CompletionResult | null>
+  const completions = (): CompletionSource | null => {
+    const declared = props.region.completions
+    if (!declared) return null
+    const path = resolveDocumentRoute(declared.route, props.scope)
     if (!path) return null
-    return monaco.languages.registerCompletionItemProvider(language, {
-      triggerCharacters: [...(completions.triggerCharacters ?? [])],
-      provideCompletionItems: async (target, position) => {
-        if (!model || target.uri.toString() !== model.uri.toString()) return { suggestions: [] }
-        // The word under the cursor, so Monaco replaces it rather than inserting beside it.
-        const word = target.getWordUntilPosition(position)
-        const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn }
-        let items: PluginCompletionItem[]
-        try {
-          const body = await writeJson<{ items?: PluginCompletionItem[] }>(path, {
-            method: 'POST',
-            nodeId,
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              text: target.getValue(),
-              position: { line: position.lineNumber, column: position.column },
-            } satisfies PluginCompletionRequest),
-          })
-          items = Array.isArray(body?.items) ? body.items : []
-        } catch {
-          // A failed completion is not an error the reader needs told about; the popup simply has nothing
-          // in it. The document itself is unaffected, unlike a failed save.
-          return { suggestions: [] }
-        }
-        return {
-          suggestions: items.slice(0, MAX_COMPLETION_ITEMS).flatMap((item) => {
-            // Route output is bytes a node sent, so the shape is checked rather than believed.
-            if (typeof item?.label !== 'string' || !item.label) return []
-            return [{
-              label: item.label,
-              kind: COMPLETION_KIND[item.kind ?? 'text'] ?? COMPLETION_KIND.text,
-              insertText: typeof item.insertText === 'string' ? item.insertText : item.label,
-              ...(typeof item.detail === 'string' ? { detail: item.detail } : {}),
-              range,
-            }]
-          }),
-        }
-      },
-    })
+    const triggers = new Set(declared.triggerCharacters ?? [])
+    return async (context: CompletionContext): Promise<CompletionResult | null> => {
+      // The word under the cursor, so the accepted item replaces it rather than being inserted beside it.
+      const word = context.matchBefore(/[\w$.]*/)
+      const before = context.state.sliceDoc(Math.max(0, context.pos - 1), context.pos)
+      if (!context.explicit && !triggers.has(before) && (!word || word.from === word.to)) return null
+      const line = context.state.doc.lineAt(context.pos)
+      let items: PluginCompletionItem[]
+      try {
+        const body = await writeJson<{ items?: PluginCompletionItem[] }>(path, {
+          method: 'POST',
+          nodeId,
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            text: context.state.doc.toString(),
+            position: { line: line.number, column: context.pos - line.from + 1 },
+          } satisfies PluginCompletionRequest),
+        })
+        items = Array.isArray(body?.items) ? body.items : []
+      } catch {
+        // A failed completion is not an error the reader needs told about; the popup simply has nothing
+        // in it. The document itself is unaffected, unlike a failed save.
+        return null
+      }
+      const options = items.slice(0, MAX_COMPLETION_ITEMS).flatMap<Completion>((item) => {
+        // Route output is bytes a node sent, so the shape is checked rather than believed.
+        if (typeof item?.label !== 'string' || !item.label) return []
+        return [{
+          label: item.label,
+          type: COMPLETION_KIND[item.kind ?? 'text'] ?? COMPLETION_KIND.text,
+          ...(typeof item.insertText === 'string' ? { apply: item.insertText } : {}),
+          ...(typeof item.detail === 'string' ? { detail: item.detail } : {}),
+        }]
+      })
+      return { from: word?.from ?? context.pos, options }
+    }
   }
 
   onMount(() => {
-    let completionProvider: monaco.IDisposable | null = null
     onCleanup(() => {
       props.onHandle?.(null)
-      completionProvider?.dispose()
       saveViewState() // pane unmounting (task or workspace switch) — remember where we were
       scheduleSave.cancel()
-      void save() // reads the model before the dispose below; the request outlives the component
+      void save() // reads the document before the destroy below; the request outlives the component
       disposed = true
       stopTheme?.()
-      model?.dispose()
-      editor?.dispose()
+      view?.destroy()
     })
 
     void (async () => {
@@ -265,40 +265,46 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       setReady(true) // renders the host div synchronously
       if (!host) return
 
-      stopTheme = watchMonacoTheme()
-      model = monaco.editor.createModel(text, language)
-      savedVersion = model.getAlternativeVersionId()
-      editor = monaco.editor.create(host, {
-        automaticLayout: true,
-        theme: MONACO_THEME,
-        model,
-        readOnly: !writePath, // no write route declared is a real mode, not a degenerate one
-        minimap: { enabled: false },
+      const autocomplete = completions()
+      const state = EditorState.create({
+        doc: text,
+        extensions: [
+          basicSetup,
+          editorTheme(),
+          language,
+          // Highest precedence, so a surface action wins over whatever the editor would have done with
+          // the same chord.
+          Prec.highest(EditorView.domEventHandlers({ keydown: onEditorKeyDown })),
+          // A read route with no write route is a real mode, not a degenerate one.
+          ...(writePath ? [] : [EditorState.readOnly.of(true), EditorView.editable.of(false)]),
+          ...(autocomplete ? [EditorState.languageData.of(() => [{ autocomplete }])] : []),
+          ...(writePath
+            ? [
+              // Autosave, with cmd+S as an explicit flush rather than the only way to persist, the same
+              // semantics the editor pane has, now owned once instead of per plugin.
+              EditorView.updateListener.of((update) => { if (update.docChanged) scheduleSave() }),
+              EditorView.domEventHandlers({ blur: () => { scheduleSave.flush(); return false } }),
+              Prec.highest(keymap.of([{ key: 'Mod-s', run: () => { void flush(); return true } }])),
+            ]
+            : []),
+        ],
       })
-      const state = documentViewState(nodeId, scope, uri) as monaco.editor.ICodeEditorViewState | undefined
-      if (state) editor.restoreViewState(state)
-      completionProvider = registerCompletions()
-      // Surface actions before the read-only bail: a read-only document can still carry an action.
-      // "Apply this generated migration" is exactly that shape.
-      editor.onKeyDown(onEditorKeyDown)
-      if (!writePath) {
-        // A read-only surface still hands its frame a handle. `write` is the one that has nowhere to go,
-        // and it is a no-op rather than a throw: the plugin declared no write route, so it already knows.
-        props.onHandle?.({ read: () => model?.getValue() ?? '', write: () => {}, flush: async () => {} })
-        return
-      }
-      // Autosave, with cmd+S as an explicit flush rather than the only way to persist, the same semantics
-      // the editor pane has, now owned once instead of per plugin.
-      model.onDidChangeContent(() => scheduleSave())
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void flush())
-      editor.onDidBlurEditorText(() => scheduleSave.flush())
-      // The frame's view of this document. `write` goes through the model, so it lands in the undo stack
-      // and schedules the same autosave a keystroke would. Loading a saved query is an edit like any
-      // other, and cmd+Z after one is what a reader expects.
+      view = new EditorView({ state, parent: host })
+      saved = view.state.doc
+      stopTheme = watchEditorTheme(view)
+      const remembered = documentViewState(nodeId, scope, uri) as EditorViewState | undefined
+      if (remembered) applyViewState(view, remembered)
+      // The frame's view of this document. `write` goes through a transaction, so it lands in the undo
+      // stack and schedules the same autosave a keystroke would. Loading a saved query is an edit like
+      // any other, and cmd+Z after one is what a reader expects. A read-only surface still gets a handle;
+      // `write` is the one that has nowhere to go, and it is a no-op rather than a throw, because the
+      // plugin declared no write route and already knows.
       props.onHandle?.({
-        read: () => model?.getValue() ?? '',
-        write: (text) => model?.setValue(text),
-        flush,
+        read: () => view?.state.doc.toString() ?? '',
+        write: writePath
+          ? (next) => view?.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next } })
+          : () => {},
+        flush: writePath ? flush : async () => {},
       })
     })()
   })
@@ -309,7 +315,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     // a second `contain: layout paint` nobody needed. A region of a pane is not a pane.
     <section class="document-surface">
       <Show when={error()}><Alert>{error()}</Alert></Show>
-      {/* Monaco owns these pixels, so the box is a rectangle: the kit owns it and the way in and out
+      {/* The editor owns these pixels, so the box is a rectangle: the kit owns it and the way in and out
           of it with the keyboard, which is what stops a reader who tabs into an editor region from
           being stuck there (ui/Rectangle.tsx). */}
       <Show when={ready()}>

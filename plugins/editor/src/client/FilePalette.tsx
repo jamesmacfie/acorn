@@ -5,7 +5,7 @@ import { activeTaskId, createOverlayPalette, dispatchActiveLayout, fuzzyScore } 
 import { Inline, Text } from '@acorn/plugin-api/ui'
 import { PaletteSurface } from '@acorn/plugin-api/ui/host'
 
-// ⌘P quick-open: fuzzy-jump to a file in the active task's worktree. Monaco has no built-in file
+// ⌘P quick-open: fuzzy-jump to a file in the active task's worktree. An editor component has no file
 // finder, since that is a VS Code workbench feature rather than part of the editor core, so this
 // reuses the app's command-palette shell (PaletteSurface, fuzzyScore, createOverlayPalette) over
 // `git ls-files`. Selecting a file opens an ephemeral tab through editorState and reveals the editor

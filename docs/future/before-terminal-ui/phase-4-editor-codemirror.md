@@ -1,6 +1,6 @@
 # Phase 4: the editor moves to CodeMirror
 
-Status: not started. Waits on nothing.
+Status: SHIPPED 2026-08-31. `docs/editor.md` owns the result.
 
 ## Goal
 
@@ -41,8 +41,8 @@ In:
   the host-keybinding interception moves from Monaco's keyboard event hook to a highest-precedence
   CodeMirror keymap that defers to the window dispatcher, keeping the composed-pane chord contract
   (`docs/command-palette-and-shortcuts.md`) intact.
-- **The shared surface reshapes.** `packages/client-core/src/features/editor/monacoSetup.ts` is
-  deleted — CodeMirror has no worker environment to wire. `theme.ts` and `language.ts` keep their
+- **The shared surface reshapes.** `packages/client-core/src/features/editor/monacoSetup.ts` is deleted —
+  CodeMirror has no worker environment to wire. `theme.ts` and `language.ts` keep their
   jobs with CodeMirror types behind them; the ~25-language map now resolves to Lezer language
   packages. The `@acorn/plugin-api` `ui/editor` entrypoint keeps existing for the same reason it
   exists now — the editor stays out of every other pane's boot graph — with its exports renamed for
@@ -111,7 +111,7 @@ libraries, which defeats the point.
 
 ## Docs owed
 
-- `docs/editor-monaco.md` is rewritten for the new editor and renamed (`docs/editor.md` (new)); every
+- `docs/editor.md` is rewritten for the new editor, renamed from `editor-monaco.md` (deleted); every
   doc that links it repoints. See [docs-migration.md](./docs-migration.md).
 - `docs/first-party-plugins.md`'s editor row, if it names Monaco.
 
@@ -136,7 +136,7 @@ libraries, which defeats the point.
 - `EditorPane.tsx` still imports `monaco-editor` directly and mounts into a
   `Rectangle kind="editor"`; `DocumentSurface.tsx` is still the only other Monaco call site (grep
   `from 'monaco-editor'`).
-- `monacoSetup.ts` is still imported for side effect from the desktop client entry.
+- `monacoSetup.ts` is still imported for side effect from the desktop client entry (it is deleted now).
 - The `ui/editor` entrypoint still exports only the theme watcher, the theme, and the language
   mapper — if it grew exports, the migration surface grew.
 - The features `EditorPane.tsx` uses are still the list in [01-survey.md](./01-survey.md); anything

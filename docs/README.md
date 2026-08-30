@@ -40,7 +40,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [panes.md](./panes.md) | The layout model and the pane vocabulary. |
 | [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) | The palette, the keymap, focus, and typing. |
 | [diff-rendering.md](./diff-rendering.md) | The diff model, the virtualizer, hydration, and the find pass. |
-| [editor-monaco.md](./editor-monaco.md) | The host-owned document surface: why the host draws the editor and what it lends. |
+| [editor.md](./editor.md) | The host-owned document surface: why the host draws the editor and what it lends. |
 
 ## Features
 

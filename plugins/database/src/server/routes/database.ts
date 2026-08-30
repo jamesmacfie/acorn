@@ -152,7 +152,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json(await bridge.remove(id(c), p.data.schema, p.data.name, p.data.pk))
     })
 
-    // The document surface: docs/third-party/monaco.md. This plugin owns a column of text; the host
+    // The document surface: docs/editor.md. This plugin owns a column of text; the host
     // owns the editor, its theme, workers, autosave, and the flush before unmount.
     .get('/tasks/:taskId/scratch', async (c) => {
       const taskId = id(c)

@@ -13,7 +13,7 @@ applied. Where a row and the owning doc disagree after shipping, the owning doc 
 | `docs/frontend.md` | The platform seam's verb list, wherever `pickFolder` is documented | 3 | `pickFiles` and `saveFile`, both probe-only groups, bytes across the seam. |
 | `docs/frontend.md` | The desktop gate audit | 6 | The preview pane's row retires; the `{ seam: … }` variant is named as the replacement for capability-shaped gates. |
 | `docs/managed-agents.md` | Attachments, if the flow is narrated | 3 | The dialog goes through the platform seam; no file input. |
-| `docs/editor-monaco.md` | Whole document | 4 | Rewritten for CodeMirror and renamed `docs/editor.md` (new); linking docs repoint. The old name is deleted. |
+| `docs/editor.md` | Whole document | 4 | Rewritten for CodeMirror and renamed from `editor-monaco.md` (deleted); linking docs repoint. |
 | `docs/first-party-plugins.md` | The plugins | 4, 5 | The editor row stops naming Monaco; gains the two editing modes after phase 5. |
 | `docs/first-party-plugins.md` | The plugins | 7 | The workflows row stops claiming the plugin registers no UI. |
 | `docs/plugins.md` | The tree contract, if node names are enumerated | 1, 2 | The four new node names. |

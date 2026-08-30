@@ -1,7 +1,7 @@
 import type { PluginCompletionItem } from '@acorn/protocol/documentSurface.ts'
 import type { DbCatalogTable } from '../shared/database'
 
-// Table and column completions for the query editor: docs/third-party/monaco.md § Language smarts.
+// Table and column completions for the query editor: docs/editor.md § Language smarts.
 // Pure, and takes the catalog as an argument, because this is the part worth testing and a live
 // Postgres is not.
 

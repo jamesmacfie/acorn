@@ -156,7 +156,7 @@ describe('cross-axis selectors are banned', () => {
 })
 
 describe('canvas bridge tokens', () => {
-  // docs/ui-design.md § Token axes covers why xterm and Monaco read these by string via
+  // docs/ui-design.md § Token axes covers why xterm and the code editor read these by string via
   // getComputedStyle, and why renaming one breaks them with no type error anywhere.
   it('declares every bridge token somewhere in the axis sheets', () => {
     const declared = new Set(readAxisSheets().flatMap((f) => [...declaredIn(f.text)]))

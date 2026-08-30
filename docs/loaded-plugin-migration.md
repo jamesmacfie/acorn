@@ -19,7 +19,7 @@ been retired the same way rollbar's was: the summary lives in this file, the per
 `git log`, and the reasoning that must outlive the move sits beside the code it describes (each
 plugin's `acorn-plugin.config.mjs` carries its permission rationale). The `document-over-frame`
 contract that database's move built lives with its owner, `docs/plugins.md § Document surfaces`, with
-the design record in `docs/editor-monaco.md`.
+the design record in `docs/editor.md`.
 
 ## The Linear-migration review — closed
 
@@ -146,7 +146,7 @@ does not serve — not "a pane that would feel slow", but one whose runtime requ
 no-workers frame contract cannot express.
 
 **The way out has since been decided and designed**: a host-owned document surface
-(`docs/editor-monaco.md`) — the app owns one editor and lends it to plugins through a vendor-neutral,
+(`docs/editor.md`) — the app owns one editor and lends it to plugins through a vendor-neutral,
 LSP-vocabulary contract, so no plugin ships its own 7.9 MiB copy and the sandbox widens for no one.
 That document now carries the whole design: the composed-pane decision (region-addressed templates,
 `single` and `document-over-frame`), the bridge document API, the flush-before-action guarantee, the
@@ -184,7 +184,7 @@ instead of `'frame'`, so the host mounts its own components for what the bundle 
 went with it, and so did the plugin's copy of a virtualised grid.
 
 The contract it built lives with its owner (`docs/plugins.md § Document surfaces`), the design record
-is `docs/editor-monaco.md`, and the per-finding detail is in `git log`, like every move before it. Five
+is `docs/editor.md`, and the per-finding detail is in `git log`, like every move before it. Five
 findings, and three are about the tier:
 
 - **A command still needs an action.** Step 4's "surface actions needed no new manifest field" was true
@@ -244,7 +244,7 @@ It is on the verification list below.
   not**, and it is the last first-party plugin held by the Monaco finding. The layout programme answered
   the template half: both its surfaces are host layouts filled with kit nodes and it ships no stylesheet.
   What is left is Monaco's size, which no template fixes, and the open-document verb ⌘P needs
-  (`docs/editor-monaco.md § Sequence` step 7). The rollbar brief itself was not restored; this file
+  (`docs/editor.md § Sequence` step 7). The rollbar brief itself was not restored; this file
   plus `plugins/rollbar/` is the reference now.
 - **`agentContexts` has a manifest form** and now a real caller: http serves its options and capture
   from two of its own routes, with the redaction on the node and tested there.
@@ -266,7 +266,7 @@ There are no unblocked migrations left in this folder, and the three items that 
 — the `overlay` form, the `persistedState` decision and the find-in-files fold — have landed. What
 remains needs either a person in front of the running app or build work on a decided design:
 
-- **The editor plugin's move** (`docs/editor-monaco.md § Sequence`, step 7) — the last one held by
+- **The editor plugin's move** (`docs/editor.md § Sequence`, step 7) — the last one held by
   the Monaco finding, and the only step of that sequence left. Steps 1–6 have shipped: the
   consolidation, the language-id vocabulary, the region-addressed contract, `document-over-frame`, the
   bridge document API and completions. Layout phase 9 settled editor's template shape, so what step 7

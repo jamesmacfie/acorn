@@ -21,11 +21,6 @@ const PKG = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json')
 const BROWSER_REALM = new Set([
   './ui', // frame-safe presentation components, .tsx, so Solid-compiled
   './ui/host', // registration and connected shell surfaces, also .tsx
-  './ui/editor', // re-exports client-core/features/editor/theme.ts, which imports monaco-editor; monaco reads
-  //                `window` at module scope (monaco-editor/esm/vs/base/browser/window.js). Its own
-  //                header already explains that this is why it is a separate entrypoint; it is
-  //                therefore not a node-safe one, and a plugin test that needs a Monaco theme cannot
-  //                have it. Verified by loading it: it throws `window is not defined`.
 ])
 
 const nodeSafe = Object.keys(PKG.exports).filter((entry) => !BROWSER_REALM.has(entry))
@@ -43,7 +38,13 @@ describe('plugin-api entrypoints load in a node environment', () => {
     // components — and being loadable here is exactly why it is its own entrypoint.
     // `./ui/tree` is node-safe: it is the sandbox's own renderer, so it reaches Solid's isomorphic
     // core and the remote root and nothing that touches a document.
-    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './ui/diff', './ui/sdk', './ui/tokens', './ui/tree'])
+    //
+    // `./ui/editor` used to sit in BROWSER_REALM below: it re-exports the editor theme, and Monaco read
+    // `window` at module scope, so importing it here threw. CodeMirror does not, so the entrypoint is
+    // node-safe now and a plugin test that wants an editor theme can have one. It stays a separate
+    // entrypoint for the other reason its header gives — keeping the grammars out of every pane's boot
+    // graph — which is a bundling concern, not a realm one.
+    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './ui/diff', './ui/editor', './ui/sdk', './ui/tokens', './ui/tree'])
     expect([...BROWSER_REALM].every((entry) => entry in PKG.exports)).toBe(true)
   })
 

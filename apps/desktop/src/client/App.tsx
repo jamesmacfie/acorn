@@ -51,7 +51,7 @@ import { availableSources } from '@acorn/client-core/features/tabs/railSources.t
 import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
-// navigation intent so Monaco, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
+// navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
 // compete with the first interactive paint.
 const SettingsModal = lazy(() => import('@acorn/client-core/features/settings/SettingsModal.tsx'))
 

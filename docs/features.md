@@ -25,7 +25,7 @@ lazily when a task first needs filesystem/process access.
 - `changes` — uncommitted diff, staging, commit/push, and review notes.
 - `notes` — task, workspace, and global Markdown notes.
 - `context` — choose, preview, size, and send task context.
-- `editor` / `search` — worktree files, Monaco editing, and ripgrep search.
+- `editor` / `search` — worktree files, code editing, and ripgrep search.
 - `preview` — hardened browser preview. Agents get their own browser instead, from the `browser`
   plugin, which has no pane.
 - `database` — task-scoped PostgreSQL schema, rows, SQL, and project-scoped saved queries.

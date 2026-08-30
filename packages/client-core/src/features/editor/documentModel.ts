@@ -1,4 +1,4 @@
-// The parts of a host-owned document surface that are not a component (docs/third-party/monaco.md).
+// The parts of a host-owned document surface that are not a component (docs/editor.md).
 //
 // Everything here is pure or a plain module-level map, because vitest runs in node with no Solid
 // plugin (docs/testing.md), so the logic worth pinning has to live outside the .tsx.
@@ -27,7 +27,7 @@ export { MAX_DOCUMENT_BYTES }
 export type DocumentScope = { taskId?: string; projectId?: string }
 
 /** What a composed pane's frame may do to the document it shares the rectangle with. See
- * docs/third-party/monaco.md § Communication between regions. */
+ * docs/editor.md § Communication between regions. */
 export type DocumentHandle = {
   read(): string
   write(text: string): void
@@ -69,10 +69,10 @@ export const documentUri = (pluginId: string, surfaceId: string): string => `plu
 // ── View state ────────────────────────────────────────────────────────────────────────────────────
 //
 // Scroll and cursor, held as host state keyed by (node, scope, uri) rather than the plugin's own
-// Monaco blob. See docs/third-party/monaco.md § View state is the one type that must go opaque.
+// editor's own type. See docs/editor.md § View state.
 //
-// `unknown` rather than the Monaco type, because this module is storage, not the editor. The one
-// caller that knows what the blob is casts at the boundary.
+// `unknown` rather than `EditorViewState`, because this module is storage, not the editor. The one
+// caller that knows what the value is casts at the boundary.
 const viewStates = new Map<string, unknown>()
 
 const viewKey = (nodeId: string, scopeId: string, uri: string): string => `${nodeId}/${scopeId}:${uri}`

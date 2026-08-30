@@ -1,41 +1,64 @@
-// The Monaco theme, defined once. It used to be copied verbatim into EditorPane.tsx and
-// DatabasePane.tsx, both writing the same Monaco theme global and working only because the two
-// copies happened to agree (docs/third-party/monaco.md § What is already true).
+// The editor's look, defined once and shared by both instances (docs/editor.md § The shared surface).
 //
-// Monaco (like xterm) ignores CSS custom properties, so it gets an explicit theme: base vs/vs-dark
-// supplies the syntax colours, chrome colours come from the live app tokens (tokens-layout.css),
-// the same recipe terminal/theme.ts uses. Re-defining 'app' on a theme change updates it in place,
-// and because the name is global every editor instance follows.
-import * as monaco from 'monaco-editor'
+// CodeMirror, like Monaco before it and like xterm, does not read our CSS custom properties: it
+// builds its own stylesheet from a JS object. So the chrome colours are read out of the live app
+// tokens (tokens-theme.css) and handed over, the same recipe terminal/theme.ts uses. Syntax colours
+// come from a highlight style rather than a colour list, because CodeMirror colours by Lezer tag.
+//
+// The theme is per view, not global the way Monaco's named themes were. A compartment is what makes
+// it swappable in place, and one compartment instance serves every view: it is a key, and each
+// editor state stores its own contents under it.
+import { Compartment, type Extension } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
+import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark'
 import { isAppDark, token, watchAppearance } from '../../kit/tokens/appearance'
 
-export const MONACO_THEME = 'app'
+const appearance = new Compartment()
 
-export function applyMonacoTheme(): void {
-  monaco.editor.defineTheme(MONACO_THEME, {
-    base: isAppDark() ? 'vs-dark' : 'vs',
-    inherit: true,
-    rules: [],
-    colors: {
-      'editor.background': token('--bg'),
-      'editor.foreground': token('--text'),
-      'editorCursor.foreground': token('--text'),
-      'editorLineNumber.foreground': token('--text-faint'),
-      'editorLineNumber.activeForeground': token('--text-muted'),
-      'editor.lineHighlightBackground': token('--bg-hover'),
-      'editor.selectionBackground': token('--bg-selected'),
-    },
-  })
-  monaco.editor.setTheme(MONACO_THEME)
+function currentTheme(): Extension {
+  const dark = isAppDark()
+  return [
+    EditorView.theme({
+      '&': { color: token('--text'), backgroundColor: token('--bg') },
+      '.cm-content': { caretColor: token('--text'), fontFamily: token('--font-mono') },
+      '.cm-cursor, .cm-dropCursor': { borderLeftColor: token('--text') },
+      '.cm-selectionBackground, .cm-content ::selection': { backgroundColor: token('--bg-selected') },
+      '&.cm-focused .cm-selectionBackground': { backgroundColor: token('--bg-selected') },
+      '.cm-activeLine': { backgroundColor: token('--bg-hover') },
+      '.cm-gutters': { backgroundColor: token('--bg'), color: token('--text-faint'), borderRight: `1px solid ${token('--border')}` },
+      '.cm-activeLineGutter': { backgroundColor: token('--bg-hover'), color: token('--text-muted') },
+      '.cm-panels': { backgroundColor: token('--bg-subtle'), color: token('--text') },
+      '.cm-tooltip': { backgroundColor: token('--bg-subtle'), color: token('--text'), border: `1px solid ${token('--border-strong')}` },
+      '.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: token('--bg-selected'), color: token('--text') },
+    }, { dark }),
+    // `fallback: true` so the light default only paints tags the dark style did not, and vice versa;
+    // basicSetup registers the light default too and this keeps the two from fighting.
+    syntaxHighlighting(dark ? oneDarkHighlightStyle : defaultHighlightStyle, { fallback: true }),
+  ]
+}
+
+/** The theme extension, already carrying the appearance the app is wearing right now. */
+export const editorTheme = (): Extension => appearance.of(currentTheme())
+
+/**
+ * Re-read the tokens into a view that already has the extension.
+ *
+ * The pane needs this by hand because it caches a state per open file, and a state built while the
+ * app was light keeps its light theme in the compartment until something reconfigures it. Swapping
+ * to a stale tab is exactly that something.
+ */
+export const refreshEditorTheme = (view: EditorView): void => {
+  view.dispatch({ effects: appearance.reconfigure(currentTheme()) })
 }
 
 /**
- * Apply the theme now and again on every appearance change. Returns an unsubscribe.
+ * Keep a view's theme in step with the app's, and hand back an unsubscribe.
  *
- * The pair was always written out by hand at both call sites, which is one more place for one of them
- * to forget the initial apply and render a default-themed editor until the reader toggled something.
+ * `editorTheme()` above is the initial apply, so unlike the Monaco pair this one has no way to be
+ * half-wired: a view built without the extension has no compartment to reconfigure and a view built
+ * with it is already themed.
  */
-export function watchMonacoTheme(): () => void {
-  applyMonacoTheme()
-  return watchAppearance(applyMonacoTheme)
+export function watchEditorTheme(view: EditorView): () => void {
+  return watchAppearance(() => refreshEditorTheme(view))
 }

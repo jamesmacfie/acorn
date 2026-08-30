@@ -278,7 +278,7 @@ A layout naming a region it does not have, or missing one it requires, throws at
 than at render. The manifest parser refuses the same thing on the node, and the client repeats the
 check over the roster row, because a manifest reaches a device as bytes a node sent.
 
-Shared diff rendering, Monaco setup, markdown, grid, xterm, form, and wizard primitives live in
+Shared diff rendering, the editor surface, markdown, grid, xterm, form, and wizard primitives live in
 client-core. Feature panes use those primitives without importing another plugin's implementation.
 
 A pane contribution has no `freshness` hook of its own. A pane's query status can only be read
@@ -297,9 +297,9 @@ rail's own render, so it costs no subscription the plugin does not already hold,
 the plugin owns anyway rather than for the query status of the pane's own fetch.
 
 Find-in-files is backed by a ripgrep subprocess, not an editor feature, and that is not a stopgap.
-Monaco is an editor component with no filesystem or process access, so it provides find-within-a-file
-and nothing wider. Every editor that offers project-wide search, including the one Monaco was
-extracted from, implements it this way. There is no editor feature to replace the subprocess with.
+An editor component has no filesystem or process access, so it provides find-within-a-file and
+nothing wider. Every editor that offers project-wide search implements it this way. There is no
+editor feature to replace the subprocess with.
 
 The results are a panel in the editor pane's sidebar, beside the file tree. A result click opens a
 file in the editor, so a separate rail pane made one mental model ("find something in this project,

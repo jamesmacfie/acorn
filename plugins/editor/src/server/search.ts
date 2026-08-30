@@ -26,7 +26,7 @@ type RgEvent = {
   }
 }
 
-// ripgrep's submatch offsets are UTF-8 bytes, while JavaScript strings and Monaco columns use UTF-16
+// ripgrep's submatch offsets are UTF-8 bytes, while JavaScript strings and editor columns use UTF-16
 // code units. Convert on the node so every client consumer shares one column
 // contract. rg only reports code-point boundaries, so a partial character cannot occur, and the >=
 // check clamps a malformed offset to the next valid position.

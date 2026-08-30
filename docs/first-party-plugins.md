@@ -179,7 +179,7 @@ written before the loader existed.
 
 | Plugin | What it uses | Portable? |
 | --- | --- | --- |
-| **editor** | Monaco pane with find-in-files (ripgrep) folded into its sidebar, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. Both surfaces are host layouts filled with kit nodes and it ships no stylesheet. | **One blocker, and it is Monaco's size rather than a question.** A Monaco frame bundle measured 7.93 MiB against the 8.00 MiB cap with no editor UI in it, and its four language-service workers, another 14.58 MiB, cannot be delivered at all: a plugin origin serves one file and the frame CSP has no `worker-src`. So a Monaco frame would run with no TypeScript, JSON, CSS or HTML diagnostics, which for an editor is a different product rather than a degraded mode. Neither capability has an outside consumer. |
+| **editor** | A code pane on CodeMirror 6 with find-in-files (ripgrep) folded into its sidebar, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. Both surfaces are host layouts filled with kit nodes and it ships no stylesheet. | **One blocker, and it is the editor's size rather than a question.** It was Monaco's: a single-file Monaco frame measured 7.93 MiB against the 8.00 MiB cap with no editor UI in it, and its four language-service workers, another 14.58 MiB, could not be delivered at all, because a plugin origin serves one file and the frame CSP has no `worker-src`. CodeMirror is a few hundred kilobytes and needs no workers, so the arithmetic is worth re-running before this row is believed again. Neither capability has an outside consumer. |
 
 **http** used to head this table and has moved. It was the first table-owning plugin to go, which is why
 it was chosen: it is the only candidate that exercises the whole storage path, and the part nothing had
@@ -188,9 +188,9 @@ Read [docs/loaded-plugin-migration.md](./loaded-plugin-migration.md) for what it
 including two bugs that had nothing to do with the tier; the per-finding detail is in `git log`.
 
 **database** followed it, and it is the more interesting of the two. It was the entry that read "no, on
-the client half" here, because the pane embeds Monaco and Monaco does not fit a frame. The answer was
+the client half" here, because the pane embedded Monaco and Monaco does not fit a frame. The answer was
 not to widen the sandbox: the host now owns one editor and lends it through a declarative contract, so
-the pane still has a real editor while the plugin ships 156 KB and no Monaco at all
+the pane still has a real editor while the plugin ships 156 KB and no editor library at all
 ([docs/loaded-plugin-migration.md](./loaded-plugin-migration.md) § database has moved). Its `DATABASE` capability turned out to be
 an indirection with nothing on the other side of it and was deleted rather than ported.
 

@@ -75,10 +75,10 @@
 }
 .workspace-empty-term:hover { background: var(--bg-hover); }
 
-/* Editor pane: fills the content columns, like the preview pane below. Both boxes are the host's
-   because both are the pane's outer shape rather than anything about what the plugin draws; they were
-   the plugins' own stylesheets until phase 9 of the layout programme. */
-.editor-pane { grid-column: 1 / 3; display: flex; flex-direction: column; overflow: hidden; }
+/* The editor pane has no box rule of its own: its root is the kit's ListDetail, which already fills
+   the slot. The rule that used to be here was the last thing keeping `class="pane editor-pane"` on a
+   raw <section> inside a plugin (docs/future/before-terminal-ui/phase-4-editor-codemirror.md). The
+   preview pane below still has one, because a <webview> is not a kit node. */
 
 /* Browser-preview pane: the <webview> fills the content columns. */
 .workspace-preview { grid-column: 1 / 3; display: flex; flex-direction: column; overflow: hidden; padding: 0; }

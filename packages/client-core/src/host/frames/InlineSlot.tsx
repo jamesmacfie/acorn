@@ -14,7 +14,7 @@ import { frameBindingFor } from './register'
 //
 // The counterpart to `tree/Slot.tsx`, and the same arbitration module decides both: what differs is
 // what gets mounted. A remote slot grafts a tree of the host's own components; this places an iframe
-// whose pixels belong to the contributor, for the surfaces that own pixels — Monaco, xterm, a canvas,
+// whose pixels belong to the contributor, for the surfaces that own pixels — a code editor, xterm, a canvas,
 // a preview of arbitrary HTML.
 //
 // The two rectangles are siblings and the host sits between them. Neither can reach into the other:

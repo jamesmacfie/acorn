@@ -13,7 +13,7 @@ actually uses the family, so declaring all three costs nothing until a pack refe
 Terminal keeps `--font-mono` (Berkeley Mono → `ui-monospace` → …), which is not bundled: it is
 either installed locally or falls back through the system stack.
 
-Code surfaces — diffs, the terminal, Monaco, the SQL result grid, CI logs — stay on `--font-mono`
+Code surfaces — diffs, the terminal, the code editor, the SQL result grid, CI logs — stay on `--font-mono`
 in **every** pack. Their alignment is load-bearing and xterm measures cell width from the font.
 
 ## Licensing

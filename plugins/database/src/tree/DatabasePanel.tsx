@@ -26,7 +26,7 @@ import SaveQueryModal from './SaveQueryModal'
 // The Database pane's plugin half: a searchable table list, the button bar, a virtualized results grid,
 // and a row-detail panel that doubles as the edit/insert/delete surface.
 //
-// The SQL editor lives in the host, in the region above this frame (docs/third-party/monaco.md §
+// The SQL editor lives in the host, in the region above this frame (docs/editor.md §
 // Composed panes: decided). This file reaches it through three bridge methods: `document.read()`
 // behind Execute, `document.write()` when the picker or Generate loads a query in, and
 // `document.flush()`, which the host has already called by the time a surface action arrives.
@@ -258,7 +258,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
             />
             {/* The editor's content is on the other side of a port, so this cannot be
                 disabled-when-empty without polling it — an empty document just makes the click a
-                no-op. Same trade the compiled version made against a Monaco model that was not a signal. */}
+                no-op. Same trade the compiled version made against an editor document that was not a signal. */}
             <Button
               variant="solid"
               onPress={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}

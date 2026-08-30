@@ -6,8 +6,6 @@ import { PersistQueryClientProvider } from '@tanstack/solid-query-persist-client
 import { Route, Router } from '@solidjs/router'
 import App from './App'
 import '@acorn/client-core/infra/styles/styles.css'
-// Monaco's worker wiring, once, before any pane can construct an editor.
-import '@acorn/client-core/features/editor/monacoSetup.ts'
 import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
 import { activeCacheId, activeNodeId, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientFor } from '@acorn/client-core/infra/node/fleet.ts'
