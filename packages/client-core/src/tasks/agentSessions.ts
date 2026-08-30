@@ -19,9 +19,9 @@ import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 // here as literals because client-core is a shared library and may not import a plugin, which the
 // arch suite enforces. Two duplicated strings beat inventing a capability seam for a GET.
 const terminalSessionsRoute = '/v2/p/terminal/sessions'
-import { requestTerminalFocusIntent } from '../registries/clientEvents'
+import { requestTerminalFocusIntent } from '../host/registries/commands/clientEvents'
 import { latestOnly } from '../kit/lib/latestOnly'
-import { onScopeEvicted } from '../registries/scopeEviction'
+import { onScopeEvicted } from '../host/registries/shell/scopeEviction'
 
 const [sessions, setSessions] = createSignal<TerminalSession[]>([])
 export { sessions }

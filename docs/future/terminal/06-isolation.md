@@ -14,7 +14,7 @@ the realm moves, the choke point does not.
 
 `node:worker_threads`, started with `--permission` and no filesystem or network grants, loading the
 plugin's content-addressed bundle from the TUI's cache by path. The worker receives two ports in one
-handshake, exactly as the DOM worker does (`packages/client-core/src/plugins/tree/workerHost.ts`): the
+handshake, exactly as the DOM worker does (`packages/client-core/src/host/tree/workerHost.ts`): the
 bridge port carrying the SDK verbs and the three host pushes, and the tree port carrying `tree:mount`,
 `tree:batch`, and the rest.
 
@@ -55,7 +55,7 @@ members: `state`, `cachePut`, `trustRecord`, `devGrant`) over files:
   installing a plugin is installing it here. `docs/future/client-plugins/03-device-provenance.md`'s
   resolution rule (device wins) applies unchanged.
 
-No module outside `packages/client-core/src/plugins/host.ts` calls `pluginCustody()`. That is the
+No module outside `packages/client-core/src/host/plugins/host.ts` calls `pluginCustody()`. That is the
 rule the file states as its own reason for existing, and the TUI does not add a second caller.
 
 ## The trust prompt

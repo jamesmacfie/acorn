@@ -8,7 +8,7 @@ import { MAX_COLLECTION_ENUM_VALUES } from '@acorn/protocol/collections.ts'
 import { projectsRoute, tasksRoute, workspacesRoute, type Project, type ProjectsResponse, type Task, type Workspace } from '@acorn/protocol/api.ts'
 import { readJson } from '../infra/node/apiClient'
 import { activeNodeId } from '../infra/node/activeNode'
-import type { CollectionRegistration } from '../registries/collections'
+import type { CollectionRegistration } from '../host/registries/sources/collections'
 import { taskStatus } from './taskStatus'
 
 // The tasks of a workspace as a dashboard collection (docs/dashboards.md § Collections).

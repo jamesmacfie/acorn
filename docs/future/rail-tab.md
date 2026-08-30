@@ -3,7 +3,7 @@
 Status: **done 2026-08-30.** Slices 1 and 2 shipped 2026-08-27. Slice 3 was superseded by the
 `annotation` kind (docs/plugins.md § Cooperative extension points), which shipped 2026-08-29, and the
 draw site it was waiting for shipped with layout phase 10: `core:task` is declared in
-`@acorn/protocol/extensionPoints.ts` and drawn by `client-core/src/tasks/taskAnnotations.ts`.
+`@acorn/protocol/extensionPoints.ts` and drawn by `client-core/src/host/annotations/taskAnnotations.ts`.
 
 The rail audit of 2026-08-27 planned three slices. Two shipped and their behaviour is owned by the
 docs, not by this file: [ui-design.md § Rail controls and status markers](../ui-design.md) for the

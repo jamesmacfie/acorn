@@ -1,6 +1,6 @@
 import { For, Show, type JSX } from 'solid-js'
 import type { Task } from '../infra/queries'
-import { paneAvailable, paneContribution, paneContributions, type PaneContribution, type PaneId } from '../registries/panes'
+import { paneAvailable, paneContribution, paneContributions, type PaneContribution, type PaneId } from '../host/registries/panes/panes'
 import { activeNodeId } from '../infra/node/activeNode'
 import { nodeState } from '../infra/node/fleet'
 import { freshnessOf, type Freshness } from '../infra/node/freshness'
@@ -16,7 +16,7 @@ import { defaultLayout, type LayoutAction } from './layout'
 import { formatChord } from './paneShortcuts'
 import { Button, EmptyState } from '../kit/components/primitives'
 import { RailTab } from '../tabs/RailTab'
-import { markersFor } from '../registries/railMarkers'
+import { markersFor } from '../host/registries/rail/railMarkerFeed'
 import { createSplitDrag } from '../kit/lib/split'
 
 export default function TaskPaneHost(props: {

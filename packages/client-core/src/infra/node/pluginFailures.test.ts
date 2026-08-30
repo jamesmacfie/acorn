@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({ readJson: vi.fn() }))
 vi.mock('./apiClient', () => ({ readJson: mocks.readJson }))
 
 import { pluginFailureAttention } from './pluginFailures'
-import { clearSurfaceFailures, recordSurfaceFailure } from '../../plugins/surfaceFailures'
+import { clearSurfaceFailures, recordSurfaceFailure } from '../../host/plugins/surfaceFailures'
 
 const row = (over: Partial<NodePluginRow>): NodePluginRow =>
   ({ name: 'ntfy', required: false, disabled: false, running: true, state: 'active', ...over })

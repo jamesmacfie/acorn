@@ -21,7 +21,7 @@ export type { Project } from '@acorn/client-core/infra/queries.ts'
 // its own plugin's slots and needs somebody on the other side of it (docs/plugins.md § Cooperative
 // extension points). Production code never writes these — the chrome pass does, from a roster row —
 // which is exactly why they belong here rather than on ./client.
-export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/registries/extensionPoints.ts'
-export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/client-core/registries/extensionPoints.ts'
+export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 // What every registry hands back, so a suite can put its registrations away again.
-export type { Disposable } from '@acorn/client-core/registries/registry.ts'
+export type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'

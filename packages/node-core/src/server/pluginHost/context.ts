@@ -334,7 +334,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       // built-in. A built-in owns real prefixes through `channel` below and is compiled into this
       // binary. An unconfined `send` lets a loaded package post frames on `term:` or `workflow:` and
       // impersonate core's own streams. `plugin:<id>:*` is also the namespace its frames may subscribe
-      // to and the one a push invalidates its chrome from (client-core/plugins/pluginChannel.ts).
+      // to and the one a push invalidates its chrome from (client-core/host/plugins/pluginChannel.ts).
       //
       // A throw rather than a silent drop, because a broadcast that goes nowhere is invisible and leaves
       // the author debugging the renderer.

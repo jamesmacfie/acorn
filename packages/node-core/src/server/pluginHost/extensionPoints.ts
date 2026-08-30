@@ -1,5 +1,5 @@
 // The node-side twin of the client's extension points
-// (packages/client-core/src/registries/extensionPoints.ts, docs/plugins.md § Cooperative extension
+// (packages/client-core/src/host/registries/extensionPoints/extensionPoints.ts, docs/plugins.md § Cooperative extension
 // points), and the node's only many-to-many seam between plugins.
 //
 // Capabilities are the other one and they are deliberately single-provider: one named typed function,

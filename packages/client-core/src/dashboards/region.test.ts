@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PluginCollectionSchema } from '@acorn/protocol/collections.ts'
-import type { CollectionContribution } from '../registries/collections'
+import type { CollectionContribution } from '../host/registries/sources/collections'
 import type { PanelDefinition } from './model'
 import {
   panelRegion,

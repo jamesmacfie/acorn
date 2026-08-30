@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { clientEvents } from '../registries/clientEvents'
+import { clientEvents } from '../host/registries/commands/clientEvents'
 
 // Which tasks are mid-teardown. The guarded archive takes seconds and either the task pane's close
 // button or the rail row's menu can start it, so the flag lives here and both surfaces show the

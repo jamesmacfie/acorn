@@ -1,22 +1,22 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { agentContextRegistry } from '@acorn/client-core/registries/agentContexts.ts'
-import { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/registries/extensionPoints.ts'
-import { paletteRowRegistry } from '@acorn/client-core/registries/paletteRows.ts'
-import { attentionRegistry } from '@acorn/client-core/registries/attention.ts'
-import { collectionRegistry } from '@acorn/client-core/registries/collections.ts'
-import { nodeStatRegistry } from '@acorn/client-core/registries/nodeStats.ts'
-import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
-import { initClientPlugins, type ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
-import { clientScheduleRegistry } from '@acorn/client-core/registries/schedules.ts'
-import { railMarkerRegistry } from '@acorn/client-core/registries/railMarkers.ts'
-import { refPanelRegistry } from '@acorn/client-core/registries/refPanels.ts'
-import { settingsRegistry } from '@acorn/client-core/registries/settings.ts'
-import { uiSlotRegistry } from '@acorn/client-core/registries/slots.ts'
-import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
+import { agentContextRegistry } from '@acorn/client-core/host/registries/sources/agentContexts.ts'
+import { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+import { paletteRowRegistry } from '@acorn/client-core/host/registries/palette/paletteRows.ts'
+import { attentionRegistry } from '@acorn/client-core/host/registries/rail/attention.ts'
+import { collectionRegistry } from '@acorn/client-core/host/registries/sources/collections.ts'
+import { nodeStatRegistry } from '@acorn/client-core/host/registries/rail/nodeStats.ts'
+import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
+import { initClientPlugins, type ClientPlugin } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
+import { clientScheduleRegistry } from '@acorn/client-core/host/registries/shell/schedules.ts'
+import { railMarkerRegistry } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'
+import { refPanelRegistry } from '@acorn/client-core/host/registries/panes/refPanels.ts'
+import { settingsRegistry } from '@acorn/client-core/host/registries/shell/settings.ts'
+import { uiSlotRegistry } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { persistedStateRegistry } from '@acorn/client-core/infra/persistence/persistedState.ts'
-import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
+import { contentLinkRegistry } from '@acorn/client-core/host/registries/panes/contentLinks.ts'
 import { brandMarkRegistry } from '@acorn/client-core/kit/lib/brandMarks.ts'
-import { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
+import { projectImporterRegistry } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
 import { clientPlugins } from '../../src/client/plugins'
 import { readGolden, writeGolden } from './golden'
 
@@ -114,7 +114,7 @@ const REQUIRED = clientPlugins.filter((plugin) => plugin.required).map((plugin) 
 // change. It did: `github-pull` is github's own pull-request panel, so a PR link clicked inside
 // someone else's content can be glanced at instead of leaving the app. Linear's panel is still absent
 // from this ledger and still correct, because linear is a loaded package and its panel reaches the
-// registry through the manifest adapter in client-core/plugins/frames/register.ts rather than through
+// registry through the manifest adapter in client-core/host/frames/register.ts rather than through
 // a compiled roster line.
 //
 // Derived, but not therefore toothless: a snapshot you can regenerate looks like one you can launder a

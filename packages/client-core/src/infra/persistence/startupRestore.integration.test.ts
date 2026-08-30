@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   savePref: vi.fn(),
 }))
 vi.mock('solid-js', async () => vi.importActual('solid-js/dist/solid.js'))
-vi.mock('../../registries/clientEvents', () => ({ clientEvents: { emit: mocks.emit } }))
+vi.mock('../../host/registries/commands/clientEvents', () => ({ clientEvents: { emit: mocks.emit } }))
 vi.mock('../../notifications/notifications', () => ({ pushBackgroundError: mocks.pushBackgroundError }))
 vi.mock('../../settings/savePref', () => ({ savePref: mocks.savePref }))
 

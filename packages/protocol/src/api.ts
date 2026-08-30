@@ -488,7 +488,7 @@ export type InstalledPluginRow = {
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
   // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
   // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't
-  // claim another's mark. See client-core/kit/brandMarks.ts and docs/ui-design.md § Icons.
+  // claim another's mark. See client-core/kit/lib/brandMarks.ts and docs/ui-design.md § Icons.
   icon?: { d: string; color?: string }
   icons?: Record<string, { d: string; color?: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
@@ -564,7 +564,7 @@ export const corePluginUpdateRoute = (id: string) => `/v2/core/plugins/${encodeU
 export const corePluginReloadRoute = (id: string) => `/v2/core/plugins/${encodeURIComponent(id)}/reload`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
 // from a plugin frame: an approval a frame could post would turn the request/decision split back into
-// an install route the agent can reach (client-core/plugins/frames/scopes.ts).
+// an install route the agent can reach (client-core/host/frames/scopes.ts).
 export const corePluginRequestRoute = (requestId: string) => `/v2/core/plugins/requests/${encodeURIComponent(requestId)}`
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
 // task-scoped internal token can't reach it (server/index.ts mounts requireDevice over both forms).

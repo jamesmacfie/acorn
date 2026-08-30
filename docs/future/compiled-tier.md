@@ -108,7 +108,7 @@ true. Coupling 4, the projects row, is untouched by the layout programme.
 
 - **Dead slot ids** `topbar.left` and `task.switcher.extra` — zero consumers anywhere (the
   manifest slot enum grew to `footer | topbar` without them, which confirms nobody wants them). Still
-  present in `client-core/src/registries/slots.ts` on 2026-08-28, and they outlived the cleanup that
+  present in `client-core/src/host/registries/extensionPoints/slots.ts` on 2026-08-28, and they outlived the cleanup that
   would have taken them. Delete them the next time that file is opened.
 - ~~The `themes` registry~~ — resolved: manifest-declared token themes shipped
   (`docs/ui-design.md § Plugin themes`), so that registry now has its plugin feeder. `styles`

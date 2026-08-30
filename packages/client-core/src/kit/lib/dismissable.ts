@@ -1,5 +1,5 @@
 import { onCleanup } from 'solid-js'
-import { trapTab } from '../../keys/trap'
+import { trapTab } from '../keys/trap'
 
 // Dismissal plumbing for modal surfaces: Escape, backdrop click, and Tab focus containment. See
 // docs/ui-design.md § Chrome and overlays for why this exists and why the overlay palettes don't

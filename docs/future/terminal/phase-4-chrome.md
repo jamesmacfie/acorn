@@ -59,8 +59,8 @@ cheat sheet also uses.
 
 - `apps/tui/src/chrome/{Shell,Topbar,Rail,PaneRow,Footer,Palette,Overlays,Notifications}.tsx` (new).
 - `apps/tui/src/main.ts` (new in phase 0): mount the shell instead of one pane.
-- `packages/client-core/src/palette/model.ts`: no change expected; note anything DOM that leaks.
-- `packages/client-core/src/registries/exclusiveSlots.ts`: no change expected.
+- `packages/client-core/src/kit/lib/paletteModel.ts`: no change expected; note anything DOM that leaks.
+- `packages/client-core/src/host/registries/extensionPoints/exclusiveSlots.ts`: no change expected.
 
 ## Tests
 
@@ -96,5 +96,5 @@ folder.
 
 - `packages/protocol/src/extensionPoints.ts` still lists `rail.taskList` in `CORE_EXCLUSIVE_SLOTS`,
   and `docs/future/client-plugins/` still plans `pane.switcher`, `rail`, and `topbar`.
-- `packages/client-core/src/palette/model.ts` still has no DOM import.
+- `packages/client-core/src/kit/lib/paletteModel.ts` still has no DOM import.
 - `packages/client-core/src/tabs/TabRail.tsx` still calls `ExclusiveSlotHost` for the task list.

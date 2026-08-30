@@ -87,7 +87,7 @@ the database is trusted. That premise fails the moment a task token can write th
 ```
 
 **Why it is safe.** Project configuration is written only from the settings UI, through the frame
-scope at `packages/client-core/src/plugins/frames/scopes.ts:94` and `:99`, on a device principal. No
+scope at `packages/client-core/src/host/frames/scopes.ts:94` and `:99`, on a device principal. No
 agent tool writes it. If a future agent tool needs to read its own project's configuration, add a
 task-addressed read route under `/v2/core/tasks/:id/...` rather than widening this gate.
 

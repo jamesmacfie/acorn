@@ -57,7 +57,7 @@ Use the persistence scope that owns the state:
 
 Module-level signals or maps that reference a task or workspace must either include the Node ID or be
 cleared on a node switch. A state owner registers its OWN evictor beside the signal it clears, through
-`onScopeEvicted` (`client-core/registries/scopeEviction.ts`); the shell only maps runtime lifecycle
+`onScopeEvicted` (`client-core/host/registries/shell/scopeEviction.ts`); the shell only maps runtime lifecycle
 events onto scopes. It used to hold the list of evictors itself, which meant every new signal had to
 remember to add itself there, and forgetting was silent.
 
@@ -101,12 +101,12 @@ the eviction question above — so a signal keyed by task, workspace or node owe
 registration in the same file.
 
 **Where a list's place lives.** Two of those signals are the host's answer for the keyboard, and both
-are session-only by choice. `client-core/keys/collectionState.ts` holds `active`, `selected` and
+are session-only by choice. `client-core/kit/keys/collectionState.ts` holds `active`, `selected` and
 `offset` for every collection node, keyed by the collection's id and by each item's own key, never by
 its index: a list rebuilt from a fresh response is a new array of new objects, and an index into it
 points at whatever moved into that slot. Keying by the item's key is what makes a refetch keep your
 place, and it is why the state sits outside the rows rather than inside them.
-`client-core/keys/regions.ts` holds which region of which pane has focus, and it is the one place
+`client-core/host/keys/regions.ts` holds which region of which pane has focus, and it is the one place
 `focusedPane` gets written and the one place the `runtime:focus-changed` event is emitted from.
 Neither is persisted. Where you are in a list is a reading posture, not a preference, and restoring
 one across a relaunch would need a scope and an eviction rule nobody has asked for. See

@@ -1,8 +1,8 @@
 import { createEffect, on, type Accessor } from 'solid-js'
 import type { NavigateOptions } from '@solidjs/router'
-import { paneContribution } from '../registries/panes'
-import { openPane } from '../registries/clientEvents'
-import { taskPath } from '../registries/corePaths'
+import { paneContribution } from '../host/registries/panes/panes'
+import { openPane } from '../host/registries/commands/clientEvents'
+import { taskPath } from '../host/registries/commands/corePaths'
 
 // Deep-linking into a task's panes.
 //

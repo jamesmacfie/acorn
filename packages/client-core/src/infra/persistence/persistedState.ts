@@ -1,5 +1,5 @@
 import { activeNodeId } from '../node/activeNode'
-import { Registry } from '../../registries/registry'
+import { Registry } from '../../kit/lib/registry'
 
 export type PersistedStateScope = 'app' | 'workspace' | 'task' | 'pane'
 export type RestorePhase = 'workspace' | 'view' | 'panes'

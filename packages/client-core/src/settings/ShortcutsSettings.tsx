@@ -3,8 +3,8 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PluginKeyClaimGrant } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../infra/node/activeNode'
 import { nodes } from '../infra/node/fleet'
-import { installedByNode } from '../plugins/distribution'
-import { keyClaimGrants } from '../plugins/permissions'
+import { installedByNode } from '../host/plugins/distribution'
+import { keyClaimGrants } from '../host/trust/permissions'
 import { prefsOptions } from '../infra/queries'
 import { eventChord, formatChord } from '../tasks/paneShortcuts'
 import {
@@ -15,7 +15,7 @@ import {
   resolveKeybindings,
   type KeybindingContribution,
   type ResolvedKeybinding,
-} from '../registries/keybindings'
+} from '../host/registries/commands/keybindings'
 import { saveJsonPref } from './savePref'
 import { PrefKeys } from '../infra/persistence/prefKeys'
 import { orphanedPluginOverrideIds, removeOverrideIds, visibleShortcutBindings } from './shortcutSettingsModel'

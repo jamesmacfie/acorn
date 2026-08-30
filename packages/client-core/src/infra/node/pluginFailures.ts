@@ -1,7 +1,7 @@
 import { corePluginsRoute, type NodePluginRow, type NodePluginState } from '@acorn/protocol/api.ts'
 import { readJson } from './apiClient'
-import { surfaceFailures } from '../../plugins/surfaceFailures'
-import type { AttentionItem, AttentionSourceContribution } from '../../registries/attention'
+import { surfaceFailures } from '../../host/plugins/surfaceFailures'
+import type { AttentionItem, AttentionSourceContribution } from '../../host/registries/rail/attention'
 
 // "Plugin X failed to start", in the notification bell, so the owner learns about it without opening
 // Settings → Plugins (docs/plugins.md § Activation).

@@ -180,7 +180,7 @@ cannot share the constant. The test turns that edit into a failure rather than a
 refuses after the node accepted it.
 
 **Two renderer traps.** A contribution's props may not declare `ref` as data anywhere in
-`client-core/src/registries/`. Solid rewrites `ref={value}` on a component into a callback, so the
+`client-core/src/host/registries/`. Solid rewrites `ref={value}` on a component into a callback, so the
 panel reads `props.ref.displayId` as `undefined`, and TypeScript cannot see it because `ref` lives on
 `IntrinsicAttributes`. Second, a CSS class defined in a plugin's stylesheet may not be worn by markup
 outside that plugin, or a pane silently loses its styling when an unrelated plugin is switched off.

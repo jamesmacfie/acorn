@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import type { CollectionContribution } from '../registries/collections'
+import type { CollectionContribution } from '../host/registries/sources/collections'
 import { useActiveWorkspaceId } from '../workspaces/useActiveWorkspaceId'
 import { Button, Field, SegmentedControl } from '../kit/components/primitives'
 import { Modal } from '../kit/components/Modal'

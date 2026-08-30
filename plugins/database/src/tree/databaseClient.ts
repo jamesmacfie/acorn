@@ -3,7 +3,7 @@
 //
 // A frame has no network (`connect-src 'none'`), so there is no `readJson` and no CSRF envelope. Every
 // call is a message on the one MessagePort, and the host checks the path against this plugin's own
-// namespace before forwarding it (client-core/plugins/frames/scopes.ts).
+// namespace before forwarding it (client-core/host/frames/scopes.ts).
 //
 // `connect()` is awaited per call rather than threaded through every component, because it resolves
 // once per frame and memoizes.

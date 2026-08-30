@@ -1,8 +1,8 @@
 import { createEffect, createSignal, For, on, onCleanup } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { bindIntents } from '../../keys/host'
+import { bindIntents } from '../keys/host'
 import { watchAppearance } from '../lib/appearance'
-import type { Intent } from '../../keys/intents'
+import type { Intent } from '../keys/intents'
 import { rowHeightSm } from '../lib/metrics'
 
 /* Grid: Table for data that does not fit. Same meaning, virtualised rows, one sticky header.

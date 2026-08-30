@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from 'solid-js'
-import { collectionContribution, collectionContributions } from '../registries/collections'
+import { collectionContribution, collectionContributions } from '../host/registries/sources/collections'
 import { Button, SectionHeader } from '../kit/components/primitives'
 import { createArmedConfirm } from '../kit/lib/confirm'
 import Icon from '../kit/components/Icon'

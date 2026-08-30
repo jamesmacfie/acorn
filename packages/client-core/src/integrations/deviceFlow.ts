@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, type Accessor } from 'solid-js'
-import { integrationFlowRegistry, type DeviceFlowStart } from '../registries/integrationFlows'
+import { integrationFlowRegistry, type DeviceFlowStart } from '../host/registries/sources/integrationFlows'
 
 // Device authorization grant (RFC 8628) for a provider whose descriptor says `kind: 'device-flow'`.
 // The node performs the token exchange; this only paces the polling, which is the whole reason it

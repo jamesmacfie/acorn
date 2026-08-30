@@ -33,7 +33,7 @@ what lets one plugin fill another's slot whichever tier it ships in
 (`docs/plugins.md` § The client half of a loaded plugin).
 
 A pane registers either a `component` or a `layout` plus a `regions` record. The layouts are the
-host's, one per name in `client-core/src/layouts`, and the registry turns a declared one into the
+host's, one per name in `client-core/src/host/layouts`, and the registry turns a declared one into the
 component every consumer already expects, throwing at registration if the regions do not match the
 layout (`docs/panes.md` § Layout model).
 
@@ -53,7 +53,7 @@ one difference.
 **Three gates, three names, three answers.** `requires` on a contribution is the host question, and it
 has two forms: `'desktop'` asks whether a desktop shell is hosting this renderer, and `{ plugin: id }`
 asks whether the node runs that plugin. An array means all of them. Both are answered by
-`hasHostCapability()` in `client-core/src/hostCapabilities.ts`. `when` is a free predicate the
+`hasHostCapability()` in `client-core/src/infra/node/hostCapabilities.ts`. `when` is a free predicate the
 contribution supplies. A rail source's `requiresProvider` is a third question: given the integration
 behind `providerId` is connected, does it grant this capability. None of those is `ctx.capabilities`,
 which is a plugin publishing a typed function for another plugin to call. Two of the four were spelled
@@ -210,7 +210,7 @@ Overlays are shell-owned: command palette, settings, onboarding, notices, confir
 entry are not rendered by arbitrary pane content. The shell positions native preview views over a
 renderer pane host and hides them while overlays cover them.
 
-Focus is shell state too. `client-core/keys/regions.ts` holds which region of which pane the keyboard
+Focus is shell state too. `client-core/host/keys/regions.ts` holds which region of which pane the keyboard
 is in and what each region last had focused, and it is the one place `focusedPane` is written and the
 one place `runtime:focus-changed` is emitted from. Beside it, `keys/collectionState.ts` holds every
 list's `active`, `selected` and `offset` keyed by the item's own key. Both are module-level signals

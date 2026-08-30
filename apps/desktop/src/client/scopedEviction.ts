@@ -1,5 +1,5 @@
-import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
-import { evictScope } from '@acorn/client-core/registries/scopeEviction.ts'
+import { clientEvents } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
+import { evictScope } from '@acorn/client-core/host/registries/shell/scopeEviction.ts'
 import { dropNode } from '@acorn/client-core/infra/node/fleet.ts'
 
 // Maps runtime lifecycle events onto scope evictions. That is all it does now.
@@ -11,7 +11,7 @@ import { dropNode } from '@acorn/client-core/infra/node/fleet.ts'
 // (docs/architecture-overview.md § Client state and fleet behavior).
 //
 // Inverted: each state owner registers its own evictor beside the signal it clears
-// (client-core/registries/scopeEviction.ts). The shell no longer knows, or needs to know, who is
+// (client-core/host/registries/shell/scopeEviction.ts). The shell no longer knows, or needs to know, who is
 // listening, which is also ten fewer deep imports into plugin internals.
 export function activateScopedStateEviction(): () => void {
   const offTask = clientEvents.on('runtime:task-archived', ({ taskId }) => evictScope({ scope: 'task', taskId }))

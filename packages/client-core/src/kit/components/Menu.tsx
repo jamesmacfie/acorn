@@ -1,7 +1,7 @@
 import { createEffect, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { createDomCollection } from '../../keys/collection'
-import { restoreFocusOnCleanup, trapTab } from '../../keys/trap'
+import { createDomCollection } from '../keys/collection'
+import { restoreFocusOnCleanup, trapTab } from '../keys/trap'
 import { createAnchoredPopover, type AnchoredPopover, type Placement } from '../lib/anchor'
 
 // A dropdown menu: Popover plus menu semantics. See docs/ui-design.md § Menus and right-click for

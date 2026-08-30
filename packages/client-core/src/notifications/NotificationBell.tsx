@@ -3,13 +3,13 @@ import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, openTarg
 import { createAttentionInbox } from './attentionInbox'
 import { activeNodeId, setActiveNode } from '../infra/node/activeNode'
 import { nodes } from '../infra/node/fleet'
-import { noticeKindContribution } from '../registries/notices'
+import { noticeKindContribution } from '../host/registries/rail/notices'
 import Icon from '../kit/components/Icon'
 import { Alert, Button } from '../kit/components/primitives'
 import Popover from '../kit/components/Popover'
 import './notifications.css'
 import { openRepoConfigTrust } from '../configTrust/configTrust'
-import { openPluginApproval } from '../plugins/approval'
+import { openPluginApproval } from '../host/trust/approval'
 
 const relTime = (at: number): string => {
   const s = Math.max(0, Math.round((Date.now() - at) / 1000))

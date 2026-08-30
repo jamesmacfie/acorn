@@ -22,7 +22,7 @@ import {
   setTerminalOpen,
   workspaceView,
 } from '@acorn/client-core/tasks/tasks.ts'
-import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '@acorn/client-core/registries/clientEvents.ts'
+import { clientEvents, consumePaneIntent, openPane, requestTerminalFocusIntent, consumeTerminalFocusIntent } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 import { activateScopedStateEviction } from './scopedEviction'
 import { completeTaskArchive } from '@acorn/client-core/tasks/archiveLifecycle.ts'
 

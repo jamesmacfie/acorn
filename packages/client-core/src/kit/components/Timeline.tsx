@@ -1,5 +1,5 @@
 import { createEffect, on, onCleanup, type JSX } from 'solid-js'
-import { createDomCollection } from '../../keys/collection'
+import { createDomCollection } from '../keys/collection'
 import { nextFollowing } from '../lib/followScroll'
 
 /* Timeline: a sequence of turns. The agents transcript and github's PR conversation are the same

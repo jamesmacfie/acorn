@@ -309,7 +309,7 @@ export type PluginBroadcast = {
   // (docs/plugins.md § Hearing another plugin).
   on(event: NodeEventChannel | PluginEventChannel, listener: (frame: WsServerFrame) => void): Disposable
   // Claim a WS channel prefix, the token before the first ':' in a channel name. The client mirror is
-  // registerWsChannel (@acorn/client-core/wsChannels.ts). Disposal is the host's.
+  // registerWsChannel (@acorn/client-core/infra/node/wsChannels.ts). Disposal is the host's.
   channel(prefix: string, handler: WsChannelHandler): void
   // The PTY stream handlers: input, attach and detach, plus the task-scope check the hub applies before
   // it lets a socket drive a stream. Exactly one plugin may own these.

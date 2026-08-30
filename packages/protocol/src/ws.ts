@@ -9,7 +9,7 @@
 // touching this file.
 //
 // Register a channel with `ctx.events.channel(prefix, handler)` on the node (server/pluginHost/types.ts)
-// and `registerWsChannel(prefix, ...)` on the client (@acorn/client-core/wsChannels.ts).
+// and `registerWsChannel(prefix, ...)` on the client (@acorn/client-core/infra/node/wsChannels.ts).
 
 import { z } from 'zod'
 

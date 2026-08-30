@@ -67,7 +67,7 @@ export function activateManagedAgentNoticeTargets(): () => void {
 
 // The other way in: a dashboard row for a session, whose click the host resolves. It activates the row's
 // task, navigates there and opens this pane with the row's id as a selection intent
-// (client-core/plugins/chrome/actions.ts § openPane). All that's left is what the id means, which is the
+// (client-core/host/chrome/actions.ts § openPane). All that's left is what the id means, which is the
 // one thing the host can't know.
 //
 // A listener rather than a read inside the pane, because the selection lives in a module signal keyed by

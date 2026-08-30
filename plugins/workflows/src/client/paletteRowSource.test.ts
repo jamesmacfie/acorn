@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PaletteItem } from '@acorn/client-core/palette/model.ts'
+import type { PaletteItem } from '@acorn/client-core/kit/lib/paletteModel.ts'
 import type { WorkflowDefSummary } from '@acorn/protocol/workflow.ts'
 
 const mocks = vi.hoisted(() => ({ defs: vi.fn(), start: vi.fn() }))

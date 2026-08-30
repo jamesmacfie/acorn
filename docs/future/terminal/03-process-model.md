@@ -46,7 +46,7 @@ A terminal is one process, and it runs under Node, so it can set the upgrade hea
 broker (`NodeBroker`), the fleet store, and the device token store are imported directly and run in
 the TUI's own process. "The renderer never sees the token" stops being a structural fact and becomes a
 module boundary: the token lives in the broker's module and the kit components never receive it. That
-is the same discipline `packages/client-core/src/plugins/host.ts` already keeps for `pluginCustody()`, and
+is the same discipline `packages/client-core/src/host/plugins/host.ts` already keeps for `pluginCustody()`, and
 [06-isolation.md](./06-isolation.md) says what it means for the trust model.
 
 What this buys: the TUI can pin the node's certificate by fingerprint and authenticate the WebSocket

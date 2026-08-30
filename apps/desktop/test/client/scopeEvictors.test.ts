@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { scopeEvictorCount } from '@acorn/client-core/registries/scopeEviction.ts'
+import { scopeEvictorCount } from '@acorn/client-core/host/registries/shell/scopeEviction.ts'
 
 // An empty registry would make every eviction silently do nothing, which is precisely the bug class
 // this mechanism replaced, so the one thing worth asserting at the app level is that booting the

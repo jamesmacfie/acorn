@@ -6,7 +6,7 @@ import { Dynamic, Portal } from 'solid-js/web'
 import { createAnchoredPopover, type AnchoredPopover } from '../lib/anchor'
 import { createArmedConfirm } from '../lib/confirm'
 import type { SplitDrag } from '../lib/split'
-import { createCollection, createDomCollection, type ItemProps } from '../../keys/collection'
+import { createCollection, createDomCollection, type ItemProps } from '../keys/collection'
 import type { Size, Tone } from '../tokens/tokens'
 
 // The kit's nodes. Every prop on this page is the node's own: a role token, a string of content, a

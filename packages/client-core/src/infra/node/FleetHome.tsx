@@ -1,7 +1,7 @@
 import { For, Show } from 'solid-js'
 import { tasksKey, tasksRoute, type Task } from '@acorn/protocol/api.ts'
 import { readJson } from './apiClient'
-import { formatNodeStat, nodeStatContributions } from '../../registries/nodeStats'
+import { formatNodeStat, nodeStatContributions } from '../../host/registries/rail/nodeStats'
 import { createAttentionInbox } from '../../notifications/attentionInbox'
 import { createFleetQuery } from './fanout'
 import { activeNodeId, setActiveNode } from './activeNode'

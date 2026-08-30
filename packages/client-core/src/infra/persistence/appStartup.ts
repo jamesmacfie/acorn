@@ -4,8 +4,8 @@ import type { NavigateOptions } from '@solidjs/router'
 import type { Task } from '@acorn/protocol/api.ts'
 import type { Project } from '../queries'
 import { selectedSource, setActiveTaskId, setSelectedSource, activeTaskId } from '../../tasks/tasks'
-import { defaultSourceId } from '../../registries/sources'
-import { isProjectPath, projectIdFromPath, projectPath } from '../../registries/corePaths'
+import { defaultSourceId } from '../../host/registries/sources/sources'
+import { isProjectPath, projectIdFromPath, projectPath } from '../../host/registries/commands/corePaths'
 // Also the module that seeds the built-in twelve into the theme registry, which is what makes
 // `resolveTheme` able to answer at all before Settings → Appearance has ever been opened.
 import { resolveTheme } from '../../settings/themes'

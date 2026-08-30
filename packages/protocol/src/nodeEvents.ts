@@ -4,7 +4,7 @@ import type { IntegrationConnectionStatus } from './integrations'
 // (node-core/server/pluginHost/types.ts, docs/plugins.md § Hearing another plugin).
 //
 // A named list rather than "any channel", for the same reason the frame side has one
-// (client-core/plugins/frames/channels.ts): a grant the trust prompt cannot describe is a grant the
+// (client-core/host/frames/channels.ts): a grant the trust prompt cannot describe is a grant the
 // owner cannot consent to. Both lists are drawn from `permissions.events`, one grant vocabulary
 // across the two sides of the wire.
 //
@@ -21,7 +21,7 @@ import type { IntegrationConnectionStatus } from './integrations'
 //                      client and by any plugin's node half that declared the grant. This list.
 //   `runtime:*`        the shell talking to itself. "Something you were displaying is gone or moved."
 //                      Renderer-local, never on the wire, and the frame-facing list in
-//                      client-core/plugins/frames/channels.ts is where those live.
+//                      client-core/host/frames/channels.ts is where those live.
 //
 // A node-emitted fact reaches a frame too, so both lists name it; the split is about what the name
 // promises, not about which array it sits in.

@@ -1,4 +1,4 @@
-import { onScopeEvicted } from '../registries/scopeEviction'
+import { onScopeEvicted } from '../host/registries/shell/scopeEviction'
 
 // Session-only view position for a diff surface, so returning to one lands where you left it.
 // A task's diff is a different scope from the same files opened outside a task, even when both show

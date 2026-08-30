@@ -1,6 +1,6 @@
 import { createEffect, createMemo, For, on, onCleanup, Show, createSignal, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { createCollection, type CollectionItem, type ItemProps } from '../../keys/collection'
+import { createCollection, type CollectionItem, type ItemProps } from '../keys/collection'
 import { watchAppearance } from '../lib/appearance'
 import { rowHeight } from '../lib/metrics'
 

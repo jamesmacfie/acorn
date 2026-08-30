@@ -69,7 +69,7 @@ workaround in `apps/tui/`.
 - `packages/client-core/src/kit/tokens/support.ts`: `HOST` from a build-time define.
 - `packages/client-core/src/infra/node/fleet.ts`: persister chosen by capability.
 - `packages/client-core/src/infra/persistence/appStartup.ts`: host check.
-- `packages/client-core/src/keys/install.ts`, `keys/host.ts`: accept either adapter's types.
+- `packages/client-core/src/host/keys/install.ts`, `keys/host.ts`: accept either adapter's types.
 - `apps/tui/` (new): `package.json`, `src/main.ts`, `src/kit/components.ts`, `src/layouts/`.
 - `pnpm-workspace.yaml`: no change, `apps/*` is already a workspace glob.
 

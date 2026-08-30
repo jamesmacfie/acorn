@@ -62,7 +62,7 @@ export const githubClientPlugin: ClientPlugin = {
       defaultChord: 'meta+0',
       when: 'global',
     })
-    // The compiled feeder for collections (client-core/registries/collections.ts). A loaded plugin
+    // The compiled feeder for collections (client-core/host/registries/sources/collections.ts). A loaded plugin
     // declares this in its manifest and the host synthesises the same contribution over its own
     // reader; github ships no manifest, so it supplies the fetch itself.
     //

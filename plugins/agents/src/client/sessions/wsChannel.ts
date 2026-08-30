@@ -1,4 +1,4 @@
-// Agents' half of the WebSocket, moved out of @acorn/client-core/wsClient.ts with the open envelope
+// Agents' half of the WebSocket, moved out of @acorn/client-core/infra/node/wsClient.ts with the open envelope
 // (finding 2). Core routes on the `agent` prefix and never looks inside a frame.
 import { registerWsChannel, wsConnect } from '@acorn/plugin-api/client'
 import type { AgentServerFrame } from '../../shared/wsFrames'

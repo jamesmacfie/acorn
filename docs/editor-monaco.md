@@ -33,8 +33,8 @@ class names and the frame regions below are how the world looked in 2026-08.
 The contract lives in `docs/plugins.md § Document surfaces`; the code is
 `node-core/server/plugins/manifest.ts` (the `layout` block and the `surfaceAction` verb),
 `client-core/src/editor/` (the surface, its theme, its language map, its view state, the chord
-resolution and the completion provider), `client-core/layouts/DocumentSplit.tsx` (the composed
-layout) and `client-core/plugins/frames/layouts.ts` (the trust and confinement
+resolution and the completion provider), `client-core/host/layouts/DocumentSplit.tsx` (the composed
+layout) and `client-core/host/frames/layouts.ts` (the trust and confinement
 gate). The wire shapes both ends read are `@acorn/protocol/documentSurface.ts`.
 
 **Step 7 — the editor plugin's own move — is all that remains**, and it still waits on its consumer in
@@ -313,7 +313,7 @@ pre-emptively.
 
 The two regions share no DOM and no JavaScript realm — the editor is in the shell, the frame is in a
 sandboxed iframe. All traffic goes through the host over the bridge that already exists (the
-`MessagePort` request/reply channel in `client-core/src/plugins/frames/sdk.ts`), in two directions.
+`MessagePort` request/reply channel in `client-core/src/host/frames/sdk.ts`), in two directions.
 The host→frame push direction is also already established — `onSelect`, `events.on`, the webview
 listeners — so nothing below invents a channel; it adds message kinds to one.
 

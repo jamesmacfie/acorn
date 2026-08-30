@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js'
-import { createDomCollection } from '../../keys/collection'
+import { createDomCollection } from '../keys/collection'
 
 /* ChipRow: a wrapping strip of Chips. docker, linear, rollbar and the agents composer each wrote
    the same flex row for it.

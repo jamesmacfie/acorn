@@ -82,7 +82,7 @@ preferences persist locally; they do not depend on which Node is active.
 A plugin may contribute a **colour** theme, and only as data. `contributions.themes` in
 `acorn-plugin.json` is a map of theme-token values; the host validates it and generates the
 `:root[data-theme="plugin:<pluginId>:<themeId>"]` block itself
-(`client-core/src/plugins/chrome/themes.ts`). **No plugin-authored CSS ever reaches the shell.** The
+(`client-core/src/host/chrome/themes.ts`). **No plugin-authored CSS ever reaches the shell.** The
 theme cannot break shape, density or layout because it cannot express anything but colour, which is
 what makes this seam cheap: there is no stylesheet to parse and no selector to confine.
 

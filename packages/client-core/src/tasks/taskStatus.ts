@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js'
 import { taskBridge } from './taskBridge'
 import { wsOnStatus } from '../infra/node/wsClient'
 import type { TaskStatus } from '@acorn/protocol/terminal.ts'
-import type { ClientScheduleContribution } from '../registries/schedules'
+import type { ClientScheduleContribution } from '../host/registries/shell/schedules'
 import { latestOnly } from '../kit/lib/latestOnly'
 
 const [statuses, setStatuses] = createSignal<Record<string, TaskStatus>>({})

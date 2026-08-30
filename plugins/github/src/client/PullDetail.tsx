@@ -75,7 +75,7 @@ export default function PullDetail() {
                 </Show>
               </Stack>
               {/* No reference panel here. The shell owns both the registry and the invocation
-                  (client-core/registries/refPanels.ts and refPanelHost.tsx), so this only asks. */}
+                  (client-core/host/registries/panes/refPanels.ts and refPanelHost.tsx), so this only asks. */}
             </Show>
           )}
         </Show>

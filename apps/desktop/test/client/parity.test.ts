@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { paneRegistry } from '@acorn/client-core/registries/panes.ts'
-import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
-import { initClientPlugins } from '@acorn/client-core/registries/plugin.ts'
+import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
 import { THEMES } from '@acorn/client-core/settings/themes.ts'
 import { STYLES } from '@acorn/client-core/settings/uiStyles.ts'
 import { coreSourceContributions } from '../../src/client/sourceContributions'
@@ -36,7 +36,7 @@ for (const source of coreSourceContributions) sourceRegistry.register(source)
 // No `database` pane at 70 either, for a different reason: it left the compiled graph entirely. It is
 // a loaded package whose pane is a `document-over-frame` layout (the host draws the SQL editor, the
 // plugin's frame draws the grid), so it reaches the registry through the manifest adapter in
-// client-core/plugins/frames/register.ts. ⌘⏎ went with it, as a surface-scoped keybinding.
+// client-core/host/frames/register.ts. ⌘⏎ went with it, as a surface-scoped keybinding.
 //
 // Core Home is the stable default; Fleet is additive and gated on a second node. Provider browse
 // sources remain optional contributions.

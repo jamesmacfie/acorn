@@ -3,7 +3,7 @@
 // marks below.
 
 // ── The plugin contract itself ────────────────────────────────────────────────────────────────
-export type { ClientPlugin } from '@acorn/client-core/registries/plugin.ts'
+export type { ClientPlugin } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
 
 // ── Data toolkit: transport, queries, events ──────────────────────────────────────────────────
 export { postJson, readBytes, readJson, sendForm, writeJson } from '@acorn/client-core/infra/node/apiClient.ts'
@@ -24,9 +24,9 @@ export {
   consumeTerminalFocusIntent,
   openPane,
   requestTerminalFocusIntent,
-} from '@acorn/client-core/registries/clientEvents.ts'
+} from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 export { openTarget } from '@acorn/client-core/notifications/notifications.ts'
-export type { PaneIntent } from '@acorn/client-core/registries/clientEvents.ts'
+export type { PaneIntent } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
 export { wsAttach, wsConnect, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/infra/node/wsClient.ts'
@@ -34,40 +34,40 @@ export type { WorkflowNotice } from '@acorn/client-core/infra/node/wsClient.ts'
 export { registerWsChannel } from '@acorn/client-core/infra/node/wsChannels.ts'
 
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
-export { paneContribution } from '@acorn/client-core/registries/panes.ts'
-export type { PaneContribution, PaneLayoutContribution, PaneRegistration } from '@acorn/client-core/registries/panes.ts'
-export { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
-export type { SourceContribution, SourceRouteContribution } from '@acorn/client-core/registries/sources.ts'
+export { paneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
+export type { PaneContribution, PaneLayoutContribution, PaneRegistration } from '@acorn/client-core/host/registries/panes/panes.ts'
+export { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+export type { SourceContribution, SourceRouteContribution } from '@acorn/client-core/host/registries/sources/sources.ts'
 // Brand-mark registration. See docs/ui-design.md § Icons for the two feeders and the `brand:<id>`
 // glyph name they share.
 export { brandMarkRegistry, brandStyle } from '@acorn/client-core/kit/lib/brandMarks.ts'
 // Core's own URL for a project. A plugin building its own routes on top of `/p/:projectId` needs a
 // way back to the bare project path, deselecting an item, a breadcrumb, without hardcoding a shape
 // core owns.
-export { projectPath } from '@acorn/client-core/registries/corePaths.ts'
+export { projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
 // One slot registry, two component shapes: the slot id picks which (docs/frontend.md § Registries and
 // plugins). `UiSlotContribution` is the union both arms satisfy.
-export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/registries/slots.ts'
+export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
 // Rail status markers (docs/plugins.md § Rail markers). A plugin publishes marker data next to the
 // state that owns it and the host draws the pixels: it picks the corner, the colour, the spin, and
 // the tooltip legend. The registry itself stays off this surface; register through
 // `ctx.railMarkers`, which binds the contribution to the plugin's own name.
-export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/registries/railMarkers.ts'
+export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'
 export type { RailMarker, RailMarkerDot, RailMarkerPosition, RailTone } from '@acorn/client-core/tabs/railMarkers.ts'
-export type { PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
-export type { ClientScheduleContribution } from '@acorn/client-core/registries/schedules.ts'
+export type { PaletteRowSource } from '@acorn/client-core/host/registries/palette/paletteRows.ts'
+export type { ClientScheduleContribution } from '@acorn/client-core/host/registries/shell/schedules.ts'
 // See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does.
-export { closeRefPanel, openRefPanel } from '@acorn/client-core/registries/refPanels.ts'
+export { closeRefPanel, openRefPanel } from '@acorn/client-core/host/registries/panes/refPanels.ts'
 // The props a first-party reference panel receives. The registry value itself stays off this
 // surface; a plugin registers through `ctx.refPanels`, which binds the provider to the plugin's own
 // name.
-export type { RefPanelProps, RefPanelTarget } from '@acorn/client-core/registries/refPanels.ts'
+export type { RefPanelProps, RefPanelTarget } from '@acorn/client-core/host/registries/panes/refPanels.ts'
 // The registry value, not just the props type: first-run onboarding hosts whichever importers are
 // registered rather than importing another plugin's component.
-export { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
-export type { ProjectImporterProps } from '@acorn/client-core/registries/projectImporters.ts'
-export type { IntegrationFlowContribution } from '@acorn/client-core/registries/integrationFlows.ts'
-export { registerCommands } from '@acorn/client-core/registries/commands.ts'
+export { projectImporterRegistry } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
+export type { ProjectImporterProps } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
+export type { IntegrationFlowContribution } from '@acorn/client-core/host/registries/sources/integrationFlows.ts'
+export { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
 // See docs/dashboards.md § Provenance, and what a row may not claim for what `openInAppUrl`
 // answers and how a URL's destination gets resolved.
 export {
@@ -80,8 +80,8 @@ export {
   REF_LINK_CLASS,
   scanContentRefs,
   splitRefTokens,
-} from '@acorn/client-core/registries/contentLinks.ts'
-export type { ContentLinkContribution, InAppTarget } from '@acorn/client-core/registries/contentLinks.ts'
+} from '@acorn/client-core/host/registries/panes/contentLinks.ts'
+export type { ContentLinkContribution, InAppTarget } from '@acorn/client-core/host/registries/panes/contentLinks.ts'
 // The project list from module-level code, for a content-link `path` resolver: the one caller with
 // no component scope that still has to ask which repos acorn tracks. Reader only.
 // `setProjectsLookup` belongs to the composition root and stays off this surface.
@@ -89,16 +89,16 @@ export { allProjects } from '@acorn/client-core/projects/projectLookup.ts'
 // See docs/plugins.md § Loaded plugins: the client half for what a `refResolvers` entry answers.
 // The query options only: a plugin consumes resolutions here but contributes a resolver from a
 // manifest row, never from client code.
-export { refResolutionsOptions } from '@acorn/client-core/registries/refResolvers.ts'
+export { refResolutionsOptions } from '@acorn/client-core/host/registries/panes/refResolvers.ts'
 export type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
 // Put a named collection's item in view, for a pane answering "show me this one" from somewhere else.
 // The host owns scroll, the same way it owns selection, so a pane never selects a row out of the DOM.
-export { revealCollectionItem } from '@acorn/client-core/keys/collection.ts'
-export { agentContextContributions } from '@acorn/client-core/registries/agentContexts.ts'
+export { revealCollectionItem } from '@acorn/client-core/kit/keys/collection.ts'
+export { agentContextContributions } from '@acorn/client-core/host/registries/sources/agentContexts.ts'
 // The tone of a tool call's status dot. Shared because two plugins draw that dot: agents owns the
 // `agents:tool-card` point and changes fills it.
-export { agentToolTone } from '@acorn/client-core/registries/agentToolTone.ts'
-export { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
+export { agentToolTone } from '@acorn/client-core/host/registries/shell/agentToolTone.ts'
+export { onScopeEvicted } from '@acorn/client-core/host/registries/shell/scopeEviction.ts'
 
 // ── Tasks, sessions, layout ───────────────────────────────────────────────────────────────────
 export { activateTaskSignals, pathForTask } from '@acorn/client-core/tasks/activate.ts'
@@ -173,9 +173,9 @@ export { pushManagedAgentNotice, registerNoticeTargetHandler } from '@acorn/clie
 // Transient feedback. Notices persist in the bell, and a toast says "that worked" then gets out of
 // the way.
 export { toast } from '@acorn/client-core/notifications/toast.ts'
-export { fuzzyScore } from '@acorn/client-core/palette/model.ts'
-export type { PaletteItem } from '@acorn/client-core/palette/model.ts'
-export { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
+export { fuzzyScore } from '@acorn/client-core/kit/lib/paletteModel.ts'
+export type { PaletteItem } from '@acorn/client-core/kit/lib/paletteModel.ts'
+export { createOverlayPalette } from '@acorn/client-core/host/palette/overlay.ts'
 
 // ── Design-system helpers ─────────────────────────────────────────────────────────────────────
 // Plain functions, no component in sight, which is why they sit here rather than on ./ui. Tokens,
@@ -195,8 +195,8 @@ export { persistDraft, readDraft, writeDraft } from '@acorn/client-core/kit/lib/
 export { formatRelativeTime } from '@acorn/client-core/kit/lib/formatRelativeTime.ts'
 export { bytesOf, formatSize } from '@acorn/client-core/kit/lib/formatSize.ts'
 export { latestOnly } from '@acorn/client-core/kit/lib/latestOnly.ts'
-export { onClosePaneWithin } from '@acorn/client-core/keys/onClosePaneWithin.ts'
+export { onClosePaneWithin } from '@acorn/client-core/host/keys/onClosePaneWithin.ts'
 
 // Which sandboxed plugin, if any, draws a given agent tool call. Data, not a component: the component
 // that mounts it is `RemoteTree` on ./ui/host. See docs/plugins.md § The tree contract.
-export type { RemoteContribution } from '@acorn/client-core/plugins/tree/registry.ts'
+export type { RemoteContribution } from '@acorn/client-core/host/tree/registry.ts'

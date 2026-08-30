@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRoot } from 'solid-js'
 import { createDeviceFlow, type DeviceFlowController } from './deviceFlow'
-import { integrationFlowRegistry, type DeviceFlowPoll, type DeviceFlowStart } from '../registries/integrationFlows'
+import { integrationFlowRegistry, type DeviceFlowPoll, type DeviceFlowStart } from '../host/registries/sources/integrationFlows'
 
 const STARTED: DeviceFlowStart = {
   deviceCode: 'device-code',

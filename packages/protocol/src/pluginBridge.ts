@@ -11,7 +11,7 @@
 // addressing a request has.
 //
 // Types rather than Zod schemas, unlike the HTTP wire: the parsing here is hand-rolled in the broker
-// (client-core/plugins/frames/broker.ts) because the trust boundary is inverted. An HTTP route
+// (client-core/host/frames/broker.ts) because the trust boundary is inverted. An HTTP route
 // validates a body it will act on; the broker's job is to decide whether to act at all, which is a
 // permission check against a route table rather than a shape check. A schema in front of it would
 // validate the shape of a request it is about to deny anyway.

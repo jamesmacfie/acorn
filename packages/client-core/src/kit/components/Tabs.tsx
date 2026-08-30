@@ -1,5 +1,5 @@
 import { For, Show, type JSX } from 'solid-js'
-import { createCollection } from '../../keys/collection'
+import { createCollection } from '../keys/collection'
 
 export type TabDef = { id: string; label: string; count?: number }
 

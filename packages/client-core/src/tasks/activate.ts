@@ -2,8 +2,8 @@ import type { Task } from '../infra/queries'
 import { markTaskRead } from '../notifications/notifications'
 import { dispatchLayout, layoutForTask, setActiveTaskId, setSelectedSource } from './tasks'
 import type { PaneId } from './layout'
-import { taskPathFromSources } from '../registries/sources'
-import { taskPath } from '../registries/corePaths'
+import { taskPathFromSources } from '../host/registries/sources/sources'
+import { taskPath } from '../host/registries/commands/corePaths'
 
 // Where a task lives in the router. A source may claim it, as GitHub puts a PR-backed task at its PR
 // URL, and everything else lands on the generic task route. Core used to encode the PR case itself; the

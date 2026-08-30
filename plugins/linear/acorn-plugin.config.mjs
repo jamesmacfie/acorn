@@ -124,7 +124,7 @@ export default {
     //
     // Naming a pane here says an item can land in that pane; the `linear-ref` panel above says an
     // item can also be shown on its own, over whatever the reader was looking at. The clicking
-    // surface picks which (client-core/registries/contentLinks.ts § ContentLinkPresentation). A
+    // surface picks which (client-core/host/registries/panes/contentLinks.ts § ContentLinkPresentation). A
     // plugin with items but no task pane would omit `openPane` and get the panel alone.
     //
     // Two entries for one URL shape. The pattern grammar is exact-arity by design, a bounded

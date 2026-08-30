@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { paneRegistry } from '../registries/panes'
+import { paneRegistry } from '../host/registries/panes/panes'
 import { parseTaskDeepLink } from './taskDeepLink'
 
 const pane = (id: string) => paneRegistry.register({

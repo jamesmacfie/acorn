@@ -23,7 +23,7 @@ In:
 - `contributions.styles: [{ id, label, description?, tokens }]` in `pluginContract.ts`, with the
   per-family validator from [05-appearance-and-icons.md](./05-appearance-and-icons.md) as one
   function in `@acorn/protocol`.
-- - `packages/client-core/src/plugins/chrome/styles.ts` (new) beside `themes.ts`: `pluginStyleId`,
+- - `packages/client-core/src/host/registries/shell/styles.ts` (new) beside `themes.ts`: `pluginStyleId`,
   `pluginStyleBlock`, `registerPluginStyle`, `pluginStyleStyleSheet`.
 - The node validates on install; the device validates on manifest read; both call the one function.
 - `styleRegistry` entries from plugins; Settings → Appearance lists them under the plugin's label.
@@ -67,8 +67,8 @@ projection reads computed values.
 - `packages/client-core/src/kit/lib/tokenAxes.ts`: `STYLE_TOKEN_FAMILIES`, `DERIVED_STYLE_TOKENS`.
 - `packages/client-core/src/infra/styles/tokenAxes.test.ts`: every style token has a family; the cap is
   first-party only; the shadow-colour indirection invariant.
-- `packages/client-core/src/plugins/chrome/styles.ts` (new).
-- `packages/client-core/src/plugins/contributions.ts` and `frames/register.ts`: register styles per
+- `packages/client-core/src/host/registries/shell/styles.ts` (new).
+- `packages/client-core/src/host/plugins/contributions.ts` and `frames/register.ts`: register styles per
   plugin, gated on trust like themes.
 - `packages/node-core/src/server/plugins/manifest.ts`: the validator on install.
 - `packages/client-core/src/settings/AppearanceSettings.tsx` (or wherever the style picker lives;
@@ -107,9 +107,9 @@ function with no DOM dependency, so the terminal host can validate a pack it wil
 
 ## Verify before building
 
-- `packages/client-core/src/registries/styles.ts` exports `styleRegistry` with `StyleContribution =
+- `packages/client-core/src/host/registries/shell/styles.ts` exports `styleRegistry` with `StyleContribution =
   { id, label, description? }` and no writer other than `settings/uiStyles.ts`.
-- `packages/client-core/src/plugins/chrome/themes.ts` exports `pluginThemeId`, `pluginThemeBlock`,
+- `packages/client-core/src/host/chrome/themes.ts` exports `pluginThemeId`, `pluginThemeBlock`,
   `registerPluginTheme`, `pluginThemeStyleSheet`; copy its shape.
 - `packages/client-core/src/kit/lib/tokenAxes.ts` exports `STYLE_TOKENS` as a list with `--radius-*`,
   `--space-*`, `--font-*`, `--shadow-*`, `--fs-*`, `--lh*`, `--fw-*`, `--*-transform`,

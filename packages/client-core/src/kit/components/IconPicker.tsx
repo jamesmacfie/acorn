@@ -1,6 +1,6 @@
 import Picker from './Picker'
 import Icon, { ICON_NAMES } from './Icon'
-import { fuzzyScore } from '../../palette/model'
+import { fuzzyScore } from '../lib/paletteModel'
 
 const MAX_RESULTS = 200
 

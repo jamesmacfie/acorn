@@ -1,4 +1,4 @@
-import { Registry } from '../../registries/registry'
+import { Registry } from './registry'
 
 // A brand logo, as one SVG path's `d` attribute in a 24x24 box, not an SVG document. See
 // docs/ui-design.md § Icons for why, and docs/future/icons.md (git history) for the alternatives
