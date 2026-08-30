@@ -210,7 +210,7 @@ Overlays are shell-owned: command palette, settings, onboarding, notices, confir
 entry are not rendered by arbitrary pane content. The shell positions native preview views over a
 renderer pane host and hides them while overlays cover them.
 
-Focus is shell state too. `client-core/host/keys/regions.ts` holds which region of which pane the keyboard
+Focus is shell state too. `client-core/host/keys/focusRegions.ts` holds which region of which pane the keyboard
 is in and what each region last had focused, and it is the one place `focusedPane` is written and the
 one place `runtime:focus-changed` is emitted from. Beside it, `keys/collectionState.ts` holds every
 list's `active`, `selected` and `offset` keyed by the item's own key. Both are module-level signals

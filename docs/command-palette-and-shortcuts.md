@@ -107,7 +107,7 @@ layer does, or nothing does.
 focus, items inside a collection, and the two traps. Every layout region is a focus group. F6 and
 Shift+F6 move between the regions of a pane, Ctrl+Option+Right and Ctrl+Option+Left move between
 panes, and each group remembers the node focus was last on, so coming back lands where you left.
-`client-core/host/keys/regions.ts` holds that, writes `focusedPane`, and emits `runtime:focus-changed`
+`client-core/host/keys/focusRegions.ts` holds that, writes `focusedPane`, and emits `runtime:focus-changed`
 with the task, pane and region.
 
 **Collection state is the host's.** A run of `Row`s inside a `Rows`, a tab strip, a menu, a chip row,

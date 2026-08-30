@@ -84,7 +84,7 @@ and this list only points.
   removes it.
 - **`nodeCreateRequestSchema.options` stays an opaque record of strings.** Core has no business
   knowing a provider's catalogue, and the create form the host draws today takes only a label
-  (`packages/client-core/src/features/settings/ProvidedNodes.tsx`). When a provider needs a real
+  (`packages/client-core/src/features/settings/nodes/ProvidedNodes.tsx`). When a provider needs a real
   form, the carrier is a descriptor the provider declares, not a core field per option.
 
 The related material is `docs/node-enrollment.md`, `docs/plugins.md` § Node providers,

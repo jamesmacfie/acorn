@@ -102,7 +102,7 @@ node's data root belongs to the TUI, and nothing in the TUI's directory is read 
 ## Signals and exit
 
 `Ctrl+C` at the shell prompt is the TUI's, not the PTY's; inside a focused PTY rectangle keys belong to
-the PTY until Escape, per the Rectangle contract (`packages/client-core/src/kit/components/Rectangle.tsx`).
+the PTY until Escape, per the Rectangle contract (`packages/client-core/src/kit/components/content/Rectangle.tsx`).
 `SIGTERM` to the TUI drains the child it started. `SIGWINCH` re-lays out; nothing in a layout reads the
 terminal width, so the resize is the renderer's alone.
 

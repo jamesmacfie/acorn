@@ -1,4 +1,4 @@
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, notInArray } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'

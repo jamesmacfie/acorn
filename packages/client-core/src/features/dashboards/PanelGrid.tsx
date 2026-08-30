@@ -2,8 +2,8 @@ import { createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } fro
 import { collectionContribution, collectionContributions } from '../../host/registries/sources/collections'
 import { Button, SectionHeader } from '../../kit/components/primitives'
 import { createArmedConfirm } from '../../kit/lib/confirm'
-import Icon from '../../kit/components/Icon'
-import { Menu } from '../../kit/components/Menu'
+import Icon from '../../kit/components/content/Icon'
+import { Menu } from '../../kit/components/overlays/Menu'
 import {
   applyMove,
   applyResize,

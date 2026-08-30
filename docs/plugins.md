@@ -139,7 +139,7 @@ style rule: a manifest's `apiVersion` range is checked at plugin load, at instal
 resolution, so a plugin built against a surface that has since lost a name does not degrade gracefully, it
 fails to resolve a symbol at run time in someone else's process with no version having said so. Bumping
 without regenerating fails the same test, so the pair cannot drift apart in either direction. Bumping
-means editing `packages/protocol/src/pluginApiVersion.ts` and rebuilding every loaded package
+means editing `packages/protocol/src/plugin/apiVersion.ts` and rebuilding every loaded package
 (`pnpm --filter @acorn/node build:plugin <id>` per package, plus
 `pnpm --filter @acorn/desktop run build:bundled-plugins`) — a stale package keeps the old number and stops
 loading. The major went to `2` on 2026-08-14, when the facade shed seventy-one names, and to `3` on
@@ -187,7 +187,7 @@ publishing converts from an internal invariant into something owed to someone el
 invariant the snapshot already enforced — a removal requires the major to move.
 
 A manifest's `apiVersion` is a **range over majors**, not a single number: `"3"`, `"2 || 3"`, or a span
-like `"2-4"`. `speaksApiVersion` in `packages/protocol/src/pluginApiVersion.ts` is the one comparison,
+like `"2-4"`. `speaksApiVersion` in `packages/protocol/src/plugin/apiVersion.ts` is the one comparison,
 used by both loader paths, the installer, and the client's bundle resolution. It was an exact string
 match until 2026-08-28, which meant a plugin could not support two majors and the day the number moved
 every out-of-tree package stopped loading with no version an author could ship that worked on both
@@ -248,7 +248,7 @@ renders and the registries read. Anything else in the file is ignored, which is 
 written for a newer acorn load on an older one and contribute less.
 
 `packages/plugin-types/acorn-plugin.schema.json` is the JSON Schema for `acorn-plugin.json`,
-**generated** from `packages/protocol/src/pluginContract.ts` and committed beside the declarations.
+**generated** from `packages/protocol/src/plugin/contract.ts` and committed beside the declarations.
 `pluginSchema.test.ts` regenerates it and fails when the committed bytes differ; regenerate with
 `UPDATE_PLUGIN_SCHEMA=1 pnpm test`.
 
@@ -259,7 +259,7 @@ prose cannot: an author gets completion and inline errors on every contribution 
 is ever loaded. The scaffold writes the `$schema` key, so a scaffolded plugin has it from the first
 line.
 
-`PLUGIN_BRIDGE_VERSION` (`packages/protocol/src/pluginBridge.ts`) is not part of that published
+`PLUGIN_BRIDGE_VERSION` (`packages/protocol/src/plugin/bridge.ts`) is not part of that published
 surface. A frame never compares it itself: `connect()` does, and refuses a hello it does not
 recognize. Exporting the number would invite a plugin to branch on it and claim it supports two
 protocol versions, which is not a promise acorn makes.
@@ -383,7 +383,7 @@ that matters and when it will have to.
 
 A Node can also load a plugin's node half from disk, from `<dataRoot>/plugins/<id>/` — a directory
 holding an `acorn-plugin.json` manifest and an ESM bundle that default-exports a `NodePlugin`. The
-manifest's shape is declared once, in `packages/protocol/src/pluginContract.ts`, because the client
+manifest's shape is declared once, in `packages/protocol/src/plugin/contract.ts`, because the client
 registers contributions from the same shape and neither side may import the other;
 `packages/node-core/src/server/plugins/manifest.ts` adds the cross-field rules that need `id` — route
 confinement, surface reachability — and reads the file. Loaded plugins join the same
@@ -1391,7 +1391,7 @@ them together would let `openPane` accept an id it must not: `panes` (task-scope
 task's layout can hold, and the `openPane` allowlist itself), `projectPanes` (a rail source's detail
 view, addressed by URL rather than held in a task's layout), and `overlays` (full-screen pickers that
 belong to no task at all). The task-scoped predicate is re-exported from
-`@acorn/protocol/pluginContract.ts` rather than written a third time here, because the node's manifest
+`@acorn/protocol/plugin/contract.ts` rather than written a third time here, because the node's manifest
 parser checks the same thing when it validates that an `openPane` names a pane the manifest declares.
 
 ## Descriptors for facts, trees for UI, rectangles for pixels
@@ -1452,7 +1452,7 @@ directly against the same API, the two paths produce the same tree, so slots and
 both, and making a first-party plugin loadable stays a later per-plugin decision.
 
 That is why the `slots` enum is two names rather than the client's six, and why the refusals are
-recorded next to it in `@acorn/protocol/pluginContract.ts`:
+recorded next to it in `@acorn/protocol/plugin/contract.ts`:
 
 | Manifest slot | Host slot | Why |
 | --- | --- | --- |

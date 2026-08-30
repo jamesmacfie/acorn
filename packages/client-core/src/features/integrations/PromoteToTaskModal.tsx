@@ -5,7 +5,7 @@ import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
 import { projectsOptions } from '../../infra/queries'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../../host/registries/sources/sources'
-import { Tabs } from '../../kit/components/Tabs'
+import { Tabs } from '../../kit/components/layout/Tabs'
 import { createDismissable } from '../../kit/lib/dismissable'
 import { Alert, Button, Select } from '../../kit/components/primitives'
 

@@ -1,4 +1,4 @@
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { homedir } from 'node:os'
 import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.ts'
 import { AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'

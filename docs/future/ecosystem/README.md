@@ -71,7 +71,7 @@ code rather than described in prose — the scaffold's drift lock
 (`packages/create-acorn-plugin/index.test.ts`), the published declaration's
 (`packages/plugin-sdk/src/contract.test.ts`), the testkit deep-import ceiling (`MAX_DEEP_IMPORTS` in
 `tools/arch/boundaries.test.ts`), the three `// prune candidate` markers in
-`packages/plugin-api/src/client/index.ts`, and the unverified-chrome items in the smoke checklist
+`packages/plugin-api/src/client.ts`, and the unverified-chrome items in the smoke checklist
 (`docs/testing.md § The smoke checklist`, items 11 to 16).
 
 ## The bar for plugin DX

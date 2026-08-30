@@ -4,7 +4,7 @@ import type { UiSlotContribution } from '@acorn/client-core/host/registries/exte
 const NotificationBell = lazy(() => import('@acorn/client-core/features/notifications/NotificationBell.tsx'))
 const CommandPalette = lazy(() => import('@acorn/client-core/host/palette/CommandPalette.tsx'))
 const WorkspacePalette = lazy(() => import('@acorn/client-core/host/palette/WorkspacePalette.tsx'))
-const ConfigTrustDialog = lazy(() => import('@acorn/client-core/features/settings/ConfigTrustDialog.tsx'))
+const ConfigTrustDialog = lazy(() => import('@acorn/client-core/features/settings/trust/ConfigTrustDialog.tsx'))
 const PluginTrustDialog = lazy(() => import('@acorn/client-core/host/trust/PluginTrustDialog.tsx'))
 const PluginApprovalDialog = lazy(() => import('@acorn/client-core/host/trust/PluginApprovalDialog.tsx'))
 

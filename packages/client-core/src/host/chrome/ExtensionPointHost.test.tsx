@@ -23,7 +23,7 @@ const rows = vi.hoisted(() => new Map<string, PluginExtensionItem[]>())
 vi.mock('../../infra/node/fanout', () => ({
   createFleetQuery: (key: () => readonly unknown[]) => [() => ({ rows: [{ data: rows.get(String(key()[1])) ?? [] }] })],
 }))
-vi.mock('./data', () => ({ chromeDeps: () => 0, chromeKey: (pluginId: string, id: string) => ['chrome', id, pluginId] }))
+vi.mock('./chromeData', () => ({ chromeDeps: () => 0, chromeKey: (pluginId: string, id: string) => ['chrome', id, pluginId] }))
 
 let host: HTMLElement
 let dispose: () => void

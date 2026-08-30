@@ -66,7 +66,7 @@ channel. The TUI is a second terminal emulator for it, this time a real one.
 ## Code touched
 
 - `apps/tui/src/layouts/*.tsx` (new, seven files), `apps/tui/src/keys/{regions,collection,install}.ts` (new).
-- `packages/client-core/src/kit/keys/host.ts`, `install.ts`: generic types, host-supplied
+- `packages/client-core/src/kit/keys/keymapHost.ts`, `install.ts`: generic types, host-supplied
   `isTerminalTarget`.
 - `packages/client-core/src/kit/keys/collection.ts`, `collectionIntents.ts` (new).
 - `packages/client-core/src/host/layouts/regions.ts`: `regionFocus` as a function beside the directive.
@@ -102,7 +102,7 @@ they do on the desktop in every collection.
 
 ## Verify before building
 
-- `packages/client-core/src/kit/keys/host.ts` still types the keymap to `HTMLElement`.
+- `packages/client-core/src/kit/keys/keymapHost.ts` still types the keymap to `HTMLElement`.
 - `packages/client-core/src/host/layouts/regions.ts` still exports `LayoutProps` with `Region` as a thunk.
 - `plugins/terminal/src/client/TerminalSurface.tsx` still mounts through `Rectangle`'s `mount`.
 - `docs/panes.md § Layout model` still has a projection row per layout.

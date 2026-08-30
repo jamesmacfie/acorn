@@ -2,7 +2,7 @@
 // taxonomy onto BridgeError statuses: refs the daemon doesn't know → 404, state conflicts → 409,
 // daemon down/CLI missing → 409 docker_unavailable (info() reports availability for UI gating),
 // anything else → 422 with the stderr tail.
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { existsSync } from 'node:fs'
 import { BridgeError, type CoreServices } from '@acorn/plugin-api/node'
 import type { DockerBridge } from '../server/routes/docker'

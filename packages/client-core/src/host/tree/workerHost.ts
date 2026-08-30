@@ -9,7 +9,7 @@
 // Trust is unchanged from the frame path. The bundle hash is what the device accepted, the prompt is
 // the same prompt, and a withheld bundle mounts nothing. A worker is the same bytes with a different
 // host, which is why nothing here asks a second question.
-import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
+import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/plugin/bridge.ts'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { TREE_LIMITS, batchBytes, sandboxMessage } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'

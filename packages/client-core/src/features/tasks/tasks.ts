@@ -2,13 +2,13 @@
 // the rail has selected, a Source browse view or an active task, plus each task's pane layout.
 // Signals-only, like ../terminal/sessions.ts. The terminal drawer and topbar key off activeTaskId.
 import { createSignal } from 'solid-js'
-import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './layout'
+import { applyLayoutAction, defaultLayout, type LayoutAction, type PaneId, type TaskLayout } from './taskLayout'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { defaultSourceId, sourceRegistry } from '../../host/registries/sources/sources'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 
-export type { PaneId, TaskLayout } from './layout'
+export type { PaneId, TaskLayout } from './taskLayout'
 export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 
 // Which browse Source is selected, or null when a task is the active view. The live selection

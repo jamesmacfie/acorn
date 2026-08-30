@@ -1,4 +1,4 @@
-import { isCodeRow, type CodeRow, type Row } from './model'
+import { isCodeRow, type CodeRow, type Row } from './diffModel'
 
 // In-diff find (Cmd+F). The diff list is virtualized, so off-screen lines aren't in the DOM and the
 // native find can't see them. This searches the row model instead: every code row's raw text,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { collectMatches, markTokens } from './find'
-import type { CodeRow, Row } from './model'
+import type { CodeRow, Row } from './diffModel'
 
 const code = (raw: string): CodeRow => ({ kind: 'normal', path: 'a', oldNo: 1, newNo: 1, toks: [], raw })
 

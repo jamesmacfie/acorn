@@ -62,7 +62,7 @@ feature-local. Resolve the duplicate basenames: `registries/railMarkers.ts` vers
 `tabs/railMarkers.ts`, `registries/sources.ts` versus `tabs/sources.ts`; one of each pair renames to
 say what differs.
 
-Re-point `packages/plugin-api/src/client/index.ts`.
+Re-point `packages/plugin-api/src/client.ts`.
 
 ### features/
 
@@ -83,7 +83,7 @@ consumers and delete them. Pick the second unless the import count is over 40.
 
 ### Deletions
 
-Delete `packages/client-core/src/kit/components/Acorn.tsx` and its `Acorn` export from
+Delete `packages/client-core/src/kit/components/content/Acorn.tsx` and its `Acorn` export from
 `packages/plugin-api/src/ui/host.ts` (already marked prune candidate). Confirm
 `plugins/github` no longer mounts it; if it does, that is a github change in the same commit.
 
@@ -101,8 +101,8 @@ relative path and does not name the palette, so it needs no change.
 
 ### The shared packages
 
-- `packages/protocol/src/plugin/` (new) for `pluginContract.ts`, `pluginBridge.ts`,
-  `pluginState.ts`, `pluginGrants.ts`, `pluginApiVersion.ts`. Update the five lines in
+- `packages/protocol/src/plugin/` (new) for `plugin/contract.ts`, `plugin/bridge.ts`,
+  `pluginState.ts`, `plugin/grants.ts`, `plugin/apiVersion.ts`. Update the five lines in
   `packages/protocol/package.json`; the arch test checks every declared target exists.
 - `packages/plugin-api`: rename `src/node/index.ts` to `src/node.ts`, `src/client/index.ts` to
   `src/client.ts`, `src/testkit/index.ts` to `src/testkit.ts`; `src/testkit/client.ts` stays. Update

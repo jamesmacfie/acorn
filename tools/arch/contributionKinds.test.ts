@@ -35,7 +35,7 @@ const members = (source: string, typeName: string): string[] => {
 
 describe('the contribution-kind table is complete', () => {
   it('names every manifest contribution kind', () => {
-    const contract = read('packages/protocol/src/pluginContract.ts')
+    const contract = read('packages/protocol/src/plugin/contract.ts')
     const shape = /const contributionsShape = z\.looseObject\(\{(.*?)\n\}\)/s.exec(contract)![1]!
     const kinds = [...shape.matchAll(/^ {2}([a-zA-Z]+):/gm)].map((match) => match[1]!)
     expect(kinds.length).toBeGreaterThan(15) // anti-vacuity: the regex still finds the schema

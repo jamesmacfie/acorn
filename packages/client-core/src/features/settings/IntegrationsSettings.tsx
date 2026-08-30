@@ -1,9 +1,9 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
-import CopyButton from '../../kit/components/CopyButton'
-import Icon from '../../kit/components/Icon'
-import { brandStyle } from '../../kit/lib/brandMarks'
+import CopyButton from '../../kit/components/inputs/CopyButton'
+import Icon from '../../kit/components/content/Icon'
+import { brandStyle } from '../../kit/tokens/brandMarks'
 import {
   connectIntegration,
   deleteIntegration,

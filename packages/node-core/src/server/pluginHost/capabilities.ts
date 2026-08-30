@@ -12,8 +12,8 @@ export type Disposable = { dispose(): void }
 
 // The id and its brand live in @acorn/protocol so a plugin's contract/ can mint one without importing
 // this package; re-exported here for the registry's own callers.
-import { type CapabilityId } from '@acorn/protocol/pluginIds.ts'
-export { capabilityId, type CapabilityId } from '@acorn/protocol/pluginIds.ts'
+import { type CapabilityId } from '@acorn/protocol/plugin/ids.ts'
+export { capabilityId, type CapabilityId } from '@acorn/protocol/plugin/ids.ts'
 
 export class CapabilityRegistry {
   readonly #impls = new Map<string, unknown>()

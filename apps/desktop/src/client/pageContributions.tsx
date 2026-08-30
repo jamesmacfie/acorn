@@ -8,7 +8,7 @@ const McpSettings = lazy(() => import('@acorn/client-core/features/settings/McpS
 const AgentToolsSettings = lazy(() => import('@acorn/client-core/features/settings/AgentToolsSettings.tsx'))
 const AppearanceSettings = lazy(() => import('@acorn/client-core/features/settings/AppearanceSettings.tsx'))
 const ShortcutsSettings = lazy(() => import('@acorn/client-core/features/settings/ShortcutsSettings.tsx'))
-const NodesSettings = lazy(() => import('@acorn/client-core/features/settings/NodesSettings.tsx'))
+const NodesSettings = lazy(() => import('@acorn/client-core/features/settings/nodes/NodesSettings.tsx'))
 const PluginsSettings = lazy(() => import('@acorn/client-core/features/settings/PluginsSettings.tsx'))
 const SecuritySettings = lazy(() => import('@acorn/client-core/features/settings/SecuritySettings.tsx'))
 const SchedulesSettings = lazy(() => import('@acorn/client-core/features/settings/SchedulesSettings.tsx'))

@@ -1,4 +1,4 @@
-import type { PluginBridgeRequest } from '@acorn/protocol/pluginBridge.ts'
+import type { PluginBridgeRequest } from '@acorn/protocol/plugin/bridge.ts'
 import type { FrameServices } from './broker'
 import type { AcornBridge } from './sdk'
 
@@ -6,7 +6,7 @@ import type { AcornBridge } from './sdk'
 // (docs/plugins.md § Loaded plugins: the client half, the paragraph on the bridge's `api` surface).
 //
 // A sandboxed frame's whole ability to affect the world is a small set of verbs, and until now each
-// one had to be written into five modules by hand: the wire union (@acorn/protocol/pluginBridge.ts),
+// one had to be written into five modules by hand: the wire union (@acorn/protocol/plugin/bridge.ts),
 // the author-facing type and its implementation (sdk.ts), the host-side contract (`FrameServices`)
 // and the host-side implementation (PluginFrame.tsx). TypeScript stitches some of those pairs together
 // (the sdk's `api` literal is typed `AcornBridge`, so it cannot be short), but never the chain end to

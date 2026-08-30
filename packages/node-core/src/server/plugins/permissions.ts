@@ -8,7 +8,7 @@ import type { PrefService } from '../core/prefs'
 import type { ProjectService } from '../core/projectRefs'
 import type { CapabilityId, CapabilityRegistry } from '../pluginHost/capabilities'
 import type { NodePermissions } from './manifest'
-import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
+import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import { connectionProviderRegistry } from '../integrations/connectionRegistry'
 
 // What `projects:read` grants (docs/security.md § Rung 1, on why `checkouts()` needs its own

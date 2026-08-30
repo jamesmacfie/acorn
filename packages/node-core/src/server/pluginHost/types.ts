@@ -21,7 +21,7 @@ import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { StreamHandlers, WsChannelHandler } from '../transport/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
-import type { PluginEmit } from '@acorn/protocol/pluginContract.ts'
+import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 
 // Another plugin's live channel, by shape. Validated at subscribe time against the producer's `emits`.

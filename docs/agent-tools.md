@@ -115,7 +115,7 @@ the two closed action-verb sets, the frame targets, the host slots, and the comm
 come out of `z.toJSONSchema(pluginManifestShape)`. The `permissions.node` blocks come from the same
 schema, and its `core` facet list from `server/plugins/permissions.ts`. The frame bridge's message kinds,
 `ui` ops, document ops, webview ops, and HTTP methods are read off the wire union in
-`@acorn/protocol/pluginBridge.ts` through `satisfies`, so a new message kind is a compile error here
+`@acorn/protocol/plugin/bridge.ts` through `satisfies`, so a new message kind is a compile error here
 rather than a silent omission. Only process is hand-written, because no schema states it, and
 `pluginAuthoring.test.ts` re-derives every list and asserts it reached the rendered text.
 

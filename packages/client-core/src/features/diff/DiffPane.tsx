@@ -40,7 +40,7 @@ import {
   type Row,
   type SplitBand,
   type ViewMode,
-} from '../../kit/diff/model'
+} from '../../kit/diff/diffModel'
 import { createDiffScrollRestoration } from './scrollRestoration'
 import type { CommentSide, DiffSource } from './source'
 import { createDiffStickyFile } from './stickyFile'

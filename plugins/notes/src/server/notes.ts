@@ -7,7 +7,7 @@ import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Note, NoteAuthor, NoteKind, NoteLocation, NoteSummary } from '@acorn/protocol/notes.ts'
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
 // Canonical wire shapes live in @acorn/protocol/notes.ts, imported by the client too. Re-exported
 // here so main-side callers keep one import point.

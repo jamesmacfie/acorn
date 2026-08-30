@@ -7,7 +7,7 @@
 // the same recipe terminal/theme.ts uses. Re-defining 'app' on a theme change updates it in place,
 // and because the name is global every editor instance follows.
 import * as monaco from 'monaco-editor'
-import { isAppDark, token, watchAppearance } from '../../kit/lib/appearance'
+import { isAppDark, token, watchAppearance } from '../../kit/tokens/appearance'
 
 export const MONACO_THEME = 'app'
 

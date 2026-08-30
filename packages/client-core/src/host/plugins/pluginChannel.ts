@@ -4,7 +4,7 @@
 // Core claims the one `plugin` prefix and routes by the plugin id inside the channel name. A
 // subscribed frame gets every frame; chrome gets a coalesced nudge, because a rail row costs a
 // network read per node. Core reads the channel and nothing else in the payload.
-import { parsePluginChannel, PLUGIN_CHANNEL_PREFIX } from '@acorn/protocol/pluginState.ts'
+import { parsePluginChannel, PLUGIN_CHANNEL_PREFIX } from '@acorn/protocol/plugin/state.ts'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import { registerWsChannel, type Disposable } from '../../infra/node/wsChannels'
 import { wsConnect } from '../../infra/node/wsClient'

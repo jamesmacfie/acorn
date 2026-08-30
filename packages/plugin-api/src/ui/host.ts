@@ -5,11 +5,11 @@ export { registerWillHandler } from '@acorn/client-core/host/registries/shell/wi
 export type { Concern } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
 // The ASCII splash. A kit node in substance (no imports, props in), kept on the host surface because the
 // onboarding overlay is its one plugin consumer.
-export { default as Acorn } from '@acorn/client-core/kit/components/Acorn.tsx'
+export { default as Acorn } from '@acorn/client-core/kit/components/content/Acorn.tsx'
 // The app's one bottom dock. Host-only, and not a kit node: where the rails are and how tall the top
 // bar is are the shell's own geography, and its height is a pixel the drag handle produced, which is
 // exactly what a kit node's props may not be (docs/ui-design.md § The closed kit).
-export { Drawer } from '@acorn/client-core/kit/components/Drawer.tsx'
+export { Drawer } from '@acorn/client-core/kit/components/overlays/Drawer.tsx'
 // The palette chrome, deduped ×4. Host-only: palettes use the shell's focus machinery, and a
 // sandboxed frame cannot open one.
 export { PaletteSurface } from '@acorn/client-core/host/palette/PaletteSurface.tsx'

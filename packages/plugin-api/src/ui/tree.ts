@@ -32,4 +32,4 @@ export type { KitNodeProps } from '@acorn/client-core/host/frames/remoteSolid.ts
 export { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
 // Which model a connection starts on, for a tree that draws a `ModelConnectionPicker` node and has to
 // seed it. A pure function, and its own module for exactly this reason.
-export { defaultModelIdFor } from '@acorn/client-core/features/settings/defaultModel.ts'
+export { defaultModelIdFor } from '@acorn/client-core/features/settings/models/defaultModel.ts'

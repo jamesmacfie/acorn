@@ -34,7 +34,7 @@ Starlight supports it; acorn has no second-language audience
 ## No separate repository for the site
 
 The point of `apps/site/` is that the manifest reference is generated from
-`packages/protocol/src/pluginContract.ts` in the same build, with a CI check that regenerated output
+`packages/protocol/src/plugin/contract.ts` in the same build, with a CI check that regenerated output
 matches committed output. A separate repo turns that into a publish-and-consume pipeline for no
 benefit ([README.md](./README.md) § The decisions).
 

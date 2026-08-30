@@ -15,7 +15,7 @@ import { uiSlotRegistry } from '@acorn/client-core/host/registries/extensionPoin
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { persistedStateRegistry } from '@acorn/client-core/infra/persistence/persistedState.ts'
 import { contentLinkRegistry } from '@acorn/client-core/host/registries/panes/contentLinks.ts'
-import { brandMarkRegistry } from '@acorn/client-core/kit/lib/brandMarks.ts'
+import { brandMarkRegistry } from '@acorn/client-core/kit/tokens/brandMarks.ts'
 import { projectImporterRegistry } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
 import { clientPlugins } from '../../src/client/plugins'
 import { readGolden, writeGolden } from './golden'

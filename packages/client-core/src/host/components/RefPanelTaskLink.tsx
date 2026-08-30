@@ -5,7 +5,7 @@ import type { Task } from '../../infra/queries'
 import { projectsOptions, tasksKey, tasksOptions } from '../../infra/queries'
 import { taskTracksRef } from '../registries/sources/sources'
 import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
-import { createTask } from '../../features/tasks/mutations'
+import { createTask } from '../../features/tasks/taskMutations'
 import { Button, Select, Toolbar } from '../../kit/components/primitives'
 import type { RefPanelTarget } from '../registries/panes/refPanels'
 

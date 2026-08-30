@@ -11,7 +11,7 @@ import {
   uninstallNodePlugin,
   updateNodePlugin,
 } from '../../infra/node/nodePlugins'
-import Icon from '../../kit/components/Icon'
+import Icon from '../../kit/components/content/Icon'
 import { createDismissable } from '../../kit/lib/dismissable'
 import { Alert, Badge, Button } from '../../kit/components/primitives'
 import { closePluginApproval, describePluginRequest, pluginApprovalTask, pluginRequestOutcomeMessage } from './approval'

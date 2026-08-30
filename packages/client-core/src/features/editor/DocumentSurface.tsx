@@ -25,7 +25,7 @@ import {
 import { monacoLanguageFor } from './language'
 import { MONACO_THEME, watchMonacoTheme } from './theme'
 import { Alert } from '../../kit/components/primitives'
-import { Rectangle } from '../../kit/components/Rectangle'
+import { Rectangle } from '../../kit/components/content/Rectangle'
 
 // A host-owned document surface: the host draws the editor, the plugin supplies the document. See
 // docs/third-party/monaco.md.

@@ -1,7 +1,7 @@
 // `acorn-plugin.json`, the file at the root of an installed plugin package and the only thing the
 // loader trusts about it (docs/plugins.md).
 //
-// The structure is declared once, in @acorn/protocol/pluginContract.ts, because the client needs the
+// The structure is declared once, in @acorn/protocol/plugin/contract.ts, because the client needs the
 // same shape to register contributions from a roster row and neither side may import the other. What
 // stays here is the half that is the node's alone: the cross-field rules below, which need `id` and the
 // frame list, and the reader that turns a directory into a manifest or into nothing.
@@ -32,13 +32,13 @@ import {
   pluginManifestShape,
   CONTRIBUTION_KINDS,
   type PluginChromeAction,
-} from '@acorn/protocol/pluginContract.ts'
+} from '@acorn/protocol/plugin/contract.ts'
 
 // Re-exported so this file stays the one import for everything manifest-shaped. The declarations
 // themselves live in @acorn/protocol: the node uses them to decide what to load, the client to decide
 // which of a fleet's bundles it can run (client-core/host/trust/resolveBundles.ts), and one compatibility
 // contract cannot live on one side.
-export { PLUGIN_API_MAJOR, speaksApiVersion } from '@acorn/protocol/pluginApiVersion.ts'
+export { PLUGIN_API_MAJOR, speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
 export type {
   NodePermissions,
   PluginAgentContextDescriptor,
@@ -57,7 +57,7 @@ export type {
   PluginRefResolverDescriptor,
   PluginScheduleDescriptor,
   PluginTaskCheckDescriptor,
-} from '@acorn/protocol/pluginContract.ts'
+} from '@acorn/protocol/plugin/contract.ts'
 
 // Cross-field checks, which is why they are here and not on the fields: every one of them needs either
 // `id` or the frame list, and neither is visible from inside a nested schema.
@@ -92,7 +92,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // loaded plugins cannot land on the same prefix either.
   const ownPath = `/p/:projectId/x/${manifest.id}/`
   // Classified by the contract's own predicates, which the client also uses to build the runtime
-  // `openPane` allowlist (@acorn/protocol/pluginContract.ts). This used to be a third hand-spelling of the
+  // `openPane` allowlist (@acorn/protocol/plugin/contract.ts). This used to be a third hand-spelling of the
   // same rule, excused by a comment saying the node could not import the client's, true when the shape
   // lived in two places and false since the manifest became one declaration both sides read.
   //

@@ -7,8 +7,8 @@
 // at all delivers nothing and errors nothing: it may be uninstalled, disabled, failed, or simply not
 // initialised yet, since init order is not a dependency contract, and payloads carry state, so a
 // consumer that starts hearing later ends up correct.
-import { parsePluginChannel } from '@acorn/protocol/pluginState.ts'
-import type { PluginEmit } from '@acorn/protocol/pluginContract.ts'
+import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
+import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 
 const producers = new Map<string, readonly PluginEmit[]>()
 

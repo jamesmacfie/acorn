@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
+import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
 import { CapabilityRegistry, capabilityId } from '../pluginHost/capabilities'
 import { AGENTS_HARNESS_REGISTRY } from '../pluginHost/harnesses'
 import type { CoreServices } from '../core'

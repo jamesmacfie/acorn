@@ -82,7 +82,7 @@ the tree.
 - `packages/client-core/src/host/frames/register.ts`: props forwarding for `coreSlot`.
 - `packages/client-core/src/host/keys/install.ts`: the pane chords call the slot verb.
 - `packages/client-core/src/features/settings/PluginsSettings.tsx`: the label and the failure reason.
-- `packages/plugin-api/src/client/index.ts`: `PaneSwitcherProps` re-exported; the surface snapshot
+- `packages/plugin-api/src/client.ts`: `PaneSwitcherProps` re-exported; the surface snapshot
   gains the name.
 - `plugins/*/acorn-plugin.config.mjs`: none. The test plugin lives in the fixture.
 
@@ -137,5 +137,5 @@ And against the layout programme's list: no key event reaches the provider (inte
 - `packages/client-core/src/host/plugins/ExclusiveSlotHost.tsx` takes a `core` render prop.
 - `packages/client-core/src/host/keys/install.ts` owns the `meta+1`–`meta+9` bindings for the tabs layout
   and the pane row.
-- `packages/protocol/src/pluginContract.ts` has `coreSlot: z.enum(CORE_EXCLUSIVE_SLOTS)`.
+- `packages/protocol/src/plugin/contract.ts` has `coreSlot: z.enum(CORE_EXCLUSIVE_SLOTS)`.
 - Phase 0 of this folder has shipped and its fixture plugin exists.

@@ -1,6 +1,6 @@
 // Database pane backing: docs/data-layer.md § Database plugin: the Postgres pane. The DatabaseBridge
 // behind the HTTP routes in server/routes/database.ts. Pure Node, on pg.
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'

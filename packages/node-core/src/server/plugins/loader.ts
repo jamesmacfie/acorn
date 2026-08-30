@@ -278,7 +278,7 @@ let importGeneration = 0
 
 // ── Declared dependencies ─────────────────────────────────────────────────────────────────────────
 //
-// `requires.plugins` in the manifest (@acorn/protocol/pluginContract.ts). Two things come out of it, and
+// `requires.plugins` in the manifest (@acorn/protocol/plugin/contract.ts). Two things come out of it, and
 // the first is the one worth having: a package that consumes another plugin's capability used to fail at
 // whichever route reached for it first, with a message about a missing capability and nothing naming the
 // package that was supposed to provide it.

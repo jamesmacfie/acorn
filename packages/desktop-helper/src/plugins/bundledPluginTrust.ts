@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
+import { pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 import { readPluginManifest } from '@acorn/node-core/server/plugins/manifest.ts'
 import type { PluginCache } from './pluginCache'

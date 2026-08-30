@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
-import type { DiffFile } from './model'
-import type { ParsedFile } from './model'
+import type { DiffFile } from './diffModel'
+import type { ParsedFile } from './diffModel'
 
 export type DiffHydrationStatus = 'idle' | 'queued' | 'loading' | 'loaded' | 'error'
 

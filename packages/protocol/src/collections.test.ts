@@ -7,7 +7,7 @@ import {
   pluginCollectionResponseSchema,
   type PluginCollectionRowAction,
 } from './collections.ts'
-import type { PluginCommandAction } from './pluginContract.ts'
+import type { PluginCommandAction } from './plugin/contract.ts'
 
 // What a loaded plugin's collection route may answer. The vocabularies are the design
 // (docs/dashboards.md § The two vocabularies), so what is worth pinning is their size and the two rules

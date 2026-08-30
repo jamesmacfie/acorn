@@ -1,5 +1,5 @@
 import type { InstalledPluginRow, NodePluginRow, PluginContributions } from '@acorn/protocol/api.ts'
-import { isOverlaySurface, isProjectPaneSurface, isTaskPaneSurface } from '@acorn/protocol/pluginContract.ts'
+import { isOverlaySurface, isProjectPaneSurface, isTaskPaneSurface } from '@acorn/protocol/plugin/contract.ts'
 import { namespaceContributions } from './contributionIds'
 import { activeBundles, bundleAccepted, installedByNode } from './distribution'
 
@@ -70,9 +70,9 @@ export const hasWithheldCode = (entry: EligiblePlugin): boolean => entry.install
  *
  * Re-exported rather than written here: the node's manifest parser asks the same question when it
  * checks that an `openPane` names a pane the manifest declares, so the predicate lives in the contract
- * both sides read (@acorn/protocol/pluginContract.ts).
+ * both sides read (@acorn/protocol/plugin/contract.ts).
  */
-export { isTaskPaneSurface as isTaskPane } from '@acorn/protocol/pluginContract.ts'
+export { isTaskPaneSurface as isTaskPane } from '@acorn/protocol/plugin/contract.ts'
 
 export type DeclaredSurfaces = {
   // Task-scoped panes: the `openPane` allowlist (docs/plugins.md § One shared eligibility and trust check).

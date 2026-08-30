@@ -19,8 +19,8 @@ import type {
   PluginFrameContext,
   PluginWebviewBlocked,
   PluginWebviewNavigated,
-} from '@acorn/protocol/pluginBridge.ts'
-import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/pluginBridge.ts'
+} from '@acorn/protocol/plugin/bridge.ts'
+import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/plugin/bridge.ts'
 import { eventChord, hasCommandModifier, isBrowserEditingChord, isNormalizedChord, isPluginKeyClaim, isTypingTarget } from '@acorn/protocol/keybindings.ts'
 // The one import from outside this directory, safe for the same reason the protocol imports are:
 // ui/frameTips.ts is framework-free with no imports of its own, so it carries none of the shell into a

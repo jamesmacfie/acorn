@@ -17,7 +17,7 @@ plugin may offer to fill instead. Phases 1 and 2 build it.
   error boundary and falls back to `core` on a throw.
 - `TabRail.tsx:347` is the one call site. `PluginsSettings.tsx:430` has the one label.
 - A loaded plugin offers through a frame with `target: 'coreSlot'` and `coreSlot: 'rail.taskList'`
-  (`pluginContract.ts:122`, `:143`). A compiled plugin registers a provider directly.
+  (`plugin/contract.ts:122`, `:143`). A compiled plugin registers a provider directly.
 - The rule: "Registering seizes nothing." Nobody chosen, plugin absent, disabled, untrusted, or its
   surface threw, all draw core.
 

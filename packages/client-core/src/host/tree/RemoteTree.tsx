@@ -1,7 +1,7 @@
 import { createEffect, createMemo, on, onCleanup } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { useQueryClient } from '@tanstack/solid-query'
-import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
+import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import { createFrameBridge, postSelect, postSurfaceAction, type FrameBinding } from '../frames/broker'
 import { createFrameServices } from '../frames/frameServices'
 import { eligiblePlugins, isTaskPane } from '../plugins/contributions'
@@ -9,7 +9,7 @@ import { recordSurfaceFailure } from '../plugins/surfaceFailures'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { TreeHost } from './TreeHost'
-import type { RemoteContribution } from './registry'
+import type { RemoteContribution } from './treeRegistry'
 import { acquireTreeWorker } from './workerHost'
 
 // One tree from one plugin, drawn where the owner asked for it.

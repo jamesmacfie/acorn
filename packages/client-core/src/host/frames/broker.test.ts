@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { projectConfigRoute, projectRunTargetsRoute, projectsRoute, tasksRoute } from '@acorn/protocol/api.ts'
-import type { PluginBridgeMessage } from '@acorn/protocol/pluginBridge.ts'
-import { MAX_DOCUMENT_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
-import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
+import type { PluginBridgeMessage } from '@acorn/protocol/plugin/bridge.ts'
+import { MAX_DOCUMENT_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/plugin/bridge.ts'
+import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
 import { createFrameBridge, type FrameBinding, type FrameServices } from './broker'
 
 // Over a real MessageChannel, not a hand-rolled fake pair: the thing under test is what happens when

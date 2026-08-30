@@ -1,4 +1,4 @@
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import {

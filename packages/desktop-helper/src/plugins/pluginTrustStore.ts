@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
+import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
 
@@ -70,7 +70,7 @@ const ackSchema = z.strictObject({
   nodeId: z.string().min(1),
   version: z.string().min(1),
   // Parsed, not cast. This is the disclosure the owner consents to, so it has to be provably the
-  // same shape the node parsed off disk. See @acorn/protocol/pluginContract.ts.
+  // same shape the node parsed off disk. See @acorn/protocol/plugin/contract.ts.
   permissions: pluginPermissionsSchema,
   // Default keeps version-1 trust files written before webviews readable. An old acknowledgement
   // says the accepted bundle had no recorded webview grant.

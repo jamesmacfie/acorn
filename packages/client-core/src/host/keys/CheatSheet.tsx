@@ -2,8 +2,8 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { registerCommands } from '../registries/commands/commands'
 import { registerKeybindings } from '../registries/commands/keybindings'
 import { Kbd, Table } from '../../kit/components/primitives'
-import { Modal } from '../../kit/components/Modal'
-import { keymap } from '../../kit/keys/host'
+import { Modal } from '../../kit/components/overlays/Modal'
+import { keymap } from '../../kit/keys/keymapHost'
 
 // The cheat sheet: what the keyboard will do right now.
 //

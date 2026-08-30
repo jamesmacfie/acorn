@@ -8,7 +8,7 @@ import { defaultSourceId } from '../../host/registries/sources/sources'
 import { isProjectPath, projectIdFromPath, projectPath } from '../../host/registries/commands/corePaths'
 // Also the module that seeds the built-in twelve into the theme registry, which is what makes
 // `resolveTheme` able to answer at all before Settings → Appearance has ever been opened.
-import { resolveTheme } from '../../features/settings/themes'
+import { resolveTheme } from '../../features/settings/builtInThemes'
 import { PrefKeys } from './prefKeys'
 import { appStateBinding, persistedStateRegistry, type PersistedStateSlice } from './persistedState'
 import { createStartupRestore } from './startupRestore'

@@ -1,4 +1,4 @@
-import { speaksApiVersion } from '@acorn/protocol/pluginApiVersion.ts'
+import { speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
 // Which client bundle wins when a fleet disagrees (docs/plugins.md).
 //
 // Two nodes may carry different versions of one plugin. Contribution IDs are not namespaced (`pr`,

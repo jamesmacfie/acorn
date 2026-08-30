@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { pluginPermissionsSchema } from '@acorn/protocol/pluginContract.ts'
+import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
 
@@ -47,7 +47,7 @@ export const decisionSchema = z.object({
 
 // The snapshot, kept only so a later update can show what changed. Parsed, not cast, because it is
 // the disclosure the owner consents to and has to be provably the shape the node parsed off disk. See
-// @acorn/protocol/pluginContract.ts.
+// @acorn/protocol/plugin/contract.ts.
 //
 // Parsed separately, because a node running a newer manifest schema than this shell can produce a
 // grant this schema refuses. With one combined schema the whole handler threw, so neither accept nor

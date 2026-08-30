@@ -2,8 +2,8 @@
 // vocabulary below is derived rather than written, and what it leaves out, see docs/agent-tools.md
 // § plugin_authoring, docs/plugins.md § Teaching the agent, and docs/plugin-authoring.md.
 import { z } from 'zod'
-import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
-import { pluginManifestShape } from '@acorn/protocol/pluginContract.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
+import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import {
   PLUGIN_BRIDGE_VERSION,
   type PluginBridgeApiRequest,
@@ -11,8 +11,8 @@ import {
   type PluginBridgeRequest,
   type PluginBridgeUiRequest,
   type PluginBridgeWebviewRequest,
-} from '@acorn/protocol/pluginBridge.ts'
-import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/pluginState.ts'
+} from '@acorn/protocol/plugin/bridge.ts'
+import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
 import { NODE_CORE_FACETS } from '../plugins/permissions.ts'
 import { registerContextSection, type ContextSectionContribution } from './contextSections.ts'
 import type { AgentToolContribution } from './registry.ts'
@@ -50,7 +50,7 @@ const verbs = (schema: JsonSchema | undefined): string[] =>
 // ── Derived from the bridge wire union ────────────────────────────────────────────────────────────
 //
 // `satisfies Record<Union, string>` is the guard: add a message kind to
-// `@acorn/protocol/pluginBridge.ts` and this file stops compiling until it is described here. A type
+// `@acorn/protocol/plugin/bridge.ts` and this file stops compiling until it is described here. A type
 // has no runtime value to read, so no test can catch this drift.
 const BRIDGE_KINDS = {
   api: "an HTTP call against this frame's node, checked against the manifest's `permissions.api` scopes; your own /v2/p/<id>/ namespace always passes",

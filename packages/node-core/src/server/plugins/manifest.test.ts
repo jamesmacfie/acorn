@@ -999,7 +999,7 @@ describe('slots', () => {
 
   it('refuses every client slot id that is not one of them', () => {
     // Each of these is a real member of the client's own slot union, and each is refused for its own reason
-    // (@acorn/protocol/pluginContract.ts, slotDescriptor). A parse error is the point: a manifest naming
+    // (@acorn/protocol/plugin/contract.ts, slotDescriptor). A parse error is the point: a manifest naming
     // one would otherwise install and never appear.
     for (const name of ['overlay', 'drawer', 'topbar.left', 'topbar.right', 'task.footer']) {
       expect(manifest({ slots: [slot({ slot: name })] }).success, name).toBe(false)

@@ -126,7 +126,7 @@ const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
 
 // Test scaffolding by location, not filename: a `.test.ts` suffix, a package's test/ or e2e/ tree, or
 // its testkit/, whose helpers are test-only but deliberately unsuffixed.
-const isTestCode = (file: string): boolean => /\.test\.tsx?$/.test(file) || /\/(test|e2e|testkit)\//.test(rel(file))
+const isTestCode = (file: string): boolean => /\.test\.tsx?$/.test(file) || /\/(test|e2e|testkit)(\/|\.ts$)/.test(rel(file))
 
 // Which side of the client/node split a file sits on, from its path inside its package.
 function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
@@ -137,7 +137,8 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   // to 'shared' and a renderer importing @acorn/plugin-api/node drags node code into the bundle with no
   // rule firing. `testkit` counts as node; `testkit/client.ts` is the client seam and counts as client.
   if (pkg.name === '@acorn/plugin-api') {
-    const seg = segment(pkg, file)
+    // Bare entrypoint files (`node.ts`, `client.ts`, `testkit.ts`) classify like the folders they replaced.
+    const seg = segment(pkg, file).replace(/\.ts$/, '')
     if (seg === 'testkit') return file.endsWith('/client.ts') ? 'client' : 'node'
     return seg === 'node' ? 'node' : 'client'
   }
@@ -320,6 +321,7 @@ describe('architecture boundaries', () => {
       '@acorn/client-core/features/settings',
       '@acorn/client-core/features/tasks',
       '@acorn/client-core/kit/lib',
+      '@acorn/client-core/kit/tokens',
       '@acorn/node-core/server',
       '@acorn/node-core/server/core',
       '@acorn/node-core/server/integrations',
@@ -354,7 +356,7 @@ describe('architecture boundaries', () => {
     // ends up shipped. Any package's testkit/, not just node-core's: the rule immediately found the
     // same shape in plugins/github.
     const offenders = EDGES.filter((e) => !isTestCode(e.fromFile))
-      .filter((e) => e.target.file?.includes('/src/testkit/'))
+      .filter((e) => e.target.file?.includes('/src/testkit/') || e.target.file?.endsWith('/src/testkit.ts'))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     expect([...new Set(offenders)].sort()).toEqual([])
   })
@@ -604,7 +606,7 @@ describe('architecture boundaries', () => {
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     // Re-exports only: no plain imports, and no declarations. `export … from` is the whole file.
     const DECLARES = /^\s*(import\s|export\s+(const|let|var|function|class|default|async)\b)/m
-    // Deliberately not isTestCode(), which would also exempt src/testkit/index.ts: the entrypoint a
+    // Deliberately not isTestCode(), which would also exempt src/testkit.ts: the entrypoint a
     // plugin's node-environment suite imports, and the one that most needs the no-components rule below.
     const entrypoints = walk(api.src).filter((f) => !/\.test\.tsx?$/.test(f))
     const declaring = entrypoints.filter((f) => DECLARES.test(readFileSync(f, 'utf8'))).map(rel)

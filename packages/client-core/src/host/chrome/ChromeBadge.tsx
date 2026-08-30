@@ -3,9 +3,9 @@ import type { PluginSlotDescriptor } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { createFleetQuery } from '../../infra/node/fanout'
 import { Badge, Button } from '../../kit/components/primitives'
-import Icon from '../../kit/components/Icon'
+import Icon from '../../kit/components/content/Icon'
 import { runChromeAction } from './actions'
-import { chromeDeps, chromeKey, readBadge } from './data'
+import { chromeDeps, chromeKey, readBadge } from './chromeData'
 
 // The generic slot badge. It has to be live when no plugin frame is mounted anywhere, so its data comes
 // from the plugin's node half rather than from plugin UI code.
