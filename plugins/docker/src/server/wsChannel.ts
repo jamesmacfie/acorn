@@ -16,7 +16,7 @@ const MAX_EXECS_PER_CONN = 8
 // Try bash, fall back to sh. Works across alpine/debian-ish images.
 const EXEC_SHELL = 'command -v bash >/dev/null && exec bash || exec sh'
 
-// `events` rather than a direct main/wsHub import: the hub is reached through the plugin context
+// `events` rather than a direct wsHub import: the hub is reached through the plugin context
 // (server/pluginHost/types.ts § PluginBroadcast), which is what lets the host take the registration back
 // on a re-init.
 export function registerDockerWsChannel(events: PluginBroadcast): void {

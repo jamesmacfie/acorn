@@ -9,7 +9,7 @@ import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Transport contract for the docker routes: auth, ref validation so nothing dash-leading reaches
 // argv, body validation, BridgeError passthrough, and bridge-unavailable. The CLI and daemon
-// behaviours live in main/ and are covered by parse.test.ts and the live pass.
+// behaviours live in server/ and are covered by parse.test.ts and the live pass.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

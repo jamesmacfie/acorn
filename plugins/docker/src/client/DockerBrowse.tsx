@@ -17,7 +17,7 @@ import {
   SectionHeader, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
-import { containerTone } from './dockerViewState'
+import { containerTone } from './dockerViewStore'
 
 type SectionId = 'containers' | 'images' | 'volumes' | 'networks'
 const SECTIONS: { id: SectionId; label: string }[] = [
