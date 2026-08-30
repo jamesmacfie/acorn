@@ -2,4 +2,4 @@
 // boundaries). This package contributes nothing a node test needs, so there is no ./index.ts.
 //
 //   apps/desktop/test/integration/persistedState.conformance.test.ts   contextSelectionSlice
-export { contextSelectionSlice } from '../client/selectionSlice'
+export { contextSelectionSlice } from '../client/selectionStore'

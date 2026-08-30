@@ -3,7 +3,7 @@ import { taskContextRoute, type TaskContext } from '@acorn/protocol/api.ts'
 import type { AgentContextContribution, AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { contextRevisionFor } from './contextRevision'
 import { assembleBlockFrom } from './model'
-import { selectionFor } from './selectionState'
+import { selectionFor } from './selectionStore'
 
 const byteSize = (value: string): number => new TextEncoder().encode(value).byteLength
 
