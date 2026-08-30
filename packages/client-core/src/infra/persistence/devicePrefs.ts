@@ -22,6 +22,7 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.homeTab,
   PrefKeys.agentToolFold,
   PrefKeys.dockerPrefs,
+  PrefKeys.editorMode,
   PrefKeys.diskWarningAcked,
   PrefKeys.exclusiveSlots,
   PrefKeys.remoteSlots,

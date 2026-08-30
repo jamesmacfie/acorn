@@ -1,5 +1,6 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
 import { editorBridge } from '../server/editor'
+import { registerEditorWsChannel } from '../server/wsChannel'
 import { searchBridge } from '../server/search'
 import { editor, EDITOR } from '../server/routes/editor'
 import { search, SEARCH } from '../server/routes/search'
@@ -24,6 +25,10 @@ export const editorPlugin = (): NodePlugin => {
         ctx.capabilities.provide(EDITOR, editorBridge(ctx.core, ctx.events.status, ctx.hooks)),
         ctx.capabilities.provide(SEARCH, searchBridge(ctx.core)),
       ]
+      // `$EDITOR` in a throwaway PTY, for a reader who edits in terminal mode. It rides the one
+      // authenticated WebSocket, so it is part of this plugin's surface: drop it and the routes keep
+      // working while terminal mode opens onto a box that never fills.
+      registerEditorWsChannel(ctx.events, ctx.core)
       ctx.routes.register(search, { prefix: '/tasks', note: '/:id/search' })
       ctx.routes.register(editor, { prefix: '/tasks', note: '/:id/editor/*' })
     },

@@ -8,7 +8,7 @@ import { wsChannelPrefixes } from '@acorn/client-core/infra/node/wsChannels.ts'
 //
 // Importing activate.ts boots the graph; the assertion is on what claimed a prefix.
 describe('registered ws channel prefixes', () => {
-  it('are exactly the twelve the app expects', async () => {
+  it('are exactly the thirteen the app expects', async () => {
     await import('../../src/client/activate')
     // term, workflow, plugins, tasks, connection, head, run, agent-session and project are core's
     // (client-core/infra/node/wsClient.ts): term is transport on both ends, workflow:notice feeds core's
@@ -16,8 +16,8 @@ describe('registered ws channel prefixes', () => {
     // (docs/plugins.md § Hearing a core event). `agent-session` rather than `agent` because the latter is
     // the agents plugin's own prefix. `plugin` — singular,
     // one letter from `plugins` and deliberately distinct — is the namespace core claims for every
-    // loaded plugin's own live channel (client-core/host/plugins/pluginChannel.ts). docker and agent are
-    // their plugins'.
-    expect(wsChannelPrefixes()).toEqual(['agent', 'agent-session', 'connection', 'docker', 'head', 'plugin', 'plugins', 'project', 'run', 'tasks', 'term', 'workflow'])
+    // loaded plugin's own live channel (client-core/host/plugins/pluginChannel.ts). docker, editor and agent are
+    // their plugins'. `editor` is the editor pane's `$EDITOR`-in-a-PTY handoff.
+    expect(wsChannelPrefixes()).toEqual(['agent', 'agent-session', 'connection', 'docker', 'editor', 'head', 'plugin', 'plugins', 'project', 'run', 'tasks', 'term', 'workflow'])
   })
 })

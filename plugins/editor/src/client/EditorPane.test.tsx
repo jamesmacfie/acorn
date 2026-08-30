@@ -1,7 +1,10 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { EditorView } from '@codemirror/view'
+import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
+import { Rectangle } from '@acorn/plugin-api/ui'
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
@@ -35,25 +38,47 @@ vi.mock('./editorClient', () => ({
 // The sidebar's two panels fetch a tree and run ripgrep. Neither is this file's subject.
 vi.mock('./FileTree', () => ({ default: () => null }))
 vi.mock('./search/SearchPanel', () => ({ default: () => null }))
+// Terminal mode's half. The real one is xterm over a websocket, which jsdom cannot give it; what this
+// file is about is which box the pane mounts and what it does when the process ends, so the stand-in
+// draws the same rectangle and hands the exit callback back to the test.
+let quitEditor: ((code: number) => void) | undefined
+vi.mock('./EditorTerminal', () => ({
+  default: (props: { taskId: string; path: string; onExit: (code: number) => void }) => {
+    quitEditor = props.onExit
+    return <Rectangle kind="pty" label={`Editing ${props.path}`} />
+  },
+}))
 
 const { default: EditorPane } = await import('./EditorPane')
 const { editorOpen, openFiles } = await import('./editorState')
+const { saveEditorMode } = await import('./editorPrefs')
 
 const task = { id: 't1' } as unknown as Task
 
 const cleanups: (() => void)[] = []
+let queryClient = new QueryClient()
 afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   write.mockClear()
+  quitEditor = undefined
+  localStorage.clear()
 })
 
+// The pane reads the editor-mode preference off the prefs query, so it needs a client with the cache
+// seeded — the fetch behind it has no node to reach here, and `savePref` writes the cache directly.
 const mount = () => {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+  queryClient.setQueryData(prefsKey, {})
   const host = document.createElement('div')
   document.body.append(host)
-  cleanups.push(render(() => <EditorPane task={task} />, host))
+  cleanups.push(render(() => (
+    <QueryClientProvider client={queryClient}><EditorPane task={task} /></QueryClientProvider>
+  ), host))
   cleanups.push(() => host.remove())
   return host
 }
+
+const rectangle = (host: HTMLElement, kind: 'editor' | 'pty') => host.querySelector(`.ui-rect[data-kind="${kind}"]`)
 
 const editor = async (host: HTMLElement): Promise<EditorView> =>
   vi.waitFor(() => {
@@ -103,6 +128,41 @@ describe('the editor pane', () => {
     await vi.waitFor(() => expect(write).toHaveBeenCalled())
     expect(disk.get('a.ts')).toContain('// edited')
     await vi.waitFor(() => expect(openFiles('t1').find((f) => f.path === 'a.ts')?.dirty).toBe(false))
+  })
+
+  it('mounts the reader\'s own editor instead of CodeMirror when the preference says terminal', async () => {
+    const host = mount()
+    await editor(host)
+    editorOpen('t1', 'a.ts', false)
+
+    await saveEditorMode(queryClient, 'terminal')
+    await vi.waitFor(() => expect(rectangle(host, 'pty')).toBeTruthy())
+    expect(rectangle(host, 'editor')).toBeNull()
+
+    // And back: the graphical editor returns, showing the file.
+    await saveEditorMode(queryClient, 'graphical')
+    await vi.waitFor(() => expect(rectangle(host, 'editor')).toBeTruthy())
+    expect(rectangle(host, 'pty')).toBeNull()
+  })
+
+  it('re-reads the file when the reader quits their editor, and says so on a non-zero exit', async () => {
+    const host = mount()
+    await editor(host)
+    editorOpen('t1', 'a.ts', false)
+    await saveEditorMode(queryClient, 'terminal')
+    await vi.waitFor(() => expect(quitEditor).toBeTruthy())
+
+    // What `$EDITOR` did to the file while the pane was not looking.
+    disk.set('a.ts', 'const a = 99\n')
+    quitEditor!(0)
+    const view = await editor(host)
+    await showing(() => view, 'const a = 99')
+
+    // A refusal is reported rather than passed off as a save.
+    await saveEditorMode(queryClient, 'terminal')
+    await vi.waitFor(() => expect(quitEditor).toBeTruthy())
+    quitEditor!(3)
+    await vi.waitFor(() => expect(host.textContent).toContain('exited with status 3'))
   })
 
   it('flushes a pending autosave when the editor loses focus', async () => {

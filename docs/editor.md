@@ -502,6 +502,35 @@ widgets, decorations and inline UI cannot, and the answer to those requests stay
 any proposed addition is "is this an LSP method". As long as every addition passes it, the contract
 grows without becoming an editor library's API in a trench coat.
 
+## Editing in your own editor
+
+Shipped 2026-08-31 (`docs/future/before-terminal-ui/` phase 5). Some people have spent fifteen years
+in vim and are not going to stop for a pane. The editor pane's file view can hold their editor
+instead of CodeMirror: one device preference, `editor_mode`, and when it says `terminal` the pane
+mounts a PTY rectangle over `$EDITOR <file>` (then `$VISUAL`, then `vi`) in the task's worktree.
+Graphical is the default and stays it. It is the desktop twin of what the TUI will do by suspending
+its renderer and handing the file over.
+
+**The PTY is throwaway.** Its own short-lived channel on the one authenticated socket
+(`editor:pty:*`, `plugins/editor/src/shared/editorPty.ts`), a client-minted id, and a spawn that dies
+with the panel — no terminal-plugin session row, no tmux binding, no drawer tab. A
+`create({ command })` session would have worked and would have bought all three. The channel spawns
+through a login shell, like the terminal plugin's own command override, because `$EDITOR` is set in a
+shell profile, may carry flags, and PATH is where nvm puts things. The file reaches the shell as `$1`
+rather than interpolated into the command line, and the path is confined to the worktree by the same
+`resolveInRoot` every editor route uses.
+
+**Exit is the save signal, and the only one.** The pane does no dirty tracking in terminal mode: the
+editor in the PTY owns the buffer. When the process exits, the pane drops what it had cached for that
+file and the graphical view reads it back off disk — the same refresh reload-on-focus performs. A
+non-zero exit says so in an `Alert` instead of pretending a save happened. Leaving mid-edit, by
+flipping the preference back or switching tabs, drops the cache the same way, because whatever is on
+disk now is the truth and the pane never guessed at it.
+
+**Two doors left open.** The TUI sharing this preference key, so a person's choice follows them
+between hosts; and attaching to a still-running editor process instead of spawning a second one. The
+ephemeral channel dying with the panel is what makes the simple thing correct first.
+
 ## What this does not fix
 
 - **The editor plugin still cannot move, but this is now its ONLY blocker.** Its other two are
@@ -574,6 +603,11 @@ grows without becoming an editor library's API in a trench coat.
    and are global, so the surface had to filter every request down to its own model; CodeMirror hangs
    a source off the state, so a second document pane in the same language cannot be offered another
    plugin's items and there is nothing to filter.
+
+9. ~~Let a person edit in their own editor.~~ **Done** on 2026-08-31, also out of order
+   (`docs/future/before-terminal-ui/` phase 5) — § Editing in your own editor. It waited on step 8
+   only because the preference it adds chooses between two editors and one of them was being
+   replaced.
 
 ## Related
 

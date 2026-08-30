@@ -1,6 +1,6 @@
 # Phase 5: your own editor, in a PTY, on the desktop
 
-Status: not started. Waits on phase 4.
+Status: shipped 2026-08-31. `docs/editor.md` § Editing in your own editor owns it now.
 
 ## Goal
 

@@ -1,16 +1,21 @@
-import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, Show } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { basicSetup } from 'codemirror'
 import { EditorState, Prec, type Extension, type Text } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
-import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Rectangle, TabPanel, Tabs } from '@acorn/plugin-api/ui'
+import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, prefsOptions, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
+import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Rectangle, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi } from './editorClient'
+import { readEditorMode, saveEditorMode } from './editorPrefs'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import { editorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import SearchPanel from './search/SearchPanel'
+
+// Only ever mounted in terminal mode, and it drags xterm in with it.
+const EditorTerminal = lazy(() => import('./EditorTerminal'))
 
 // The extension-to-language map and the editor theme live in the host (docs/editor.md § Status).
 
@@ -18,6 +23,10 @@ import SearchPanel from './search/SearchPanel'
 // on the right. Single-click opens an ephemeral (italic) preview tab; editing or double-click
 // promotes it. Cmd+S saves; a dirty dot marks the tab; reload-on-focus with a dirty guard, since the
 // agent and the human share the worktree.
+//
+// A reader who lives in vim can have the same box hold `$EDITOR` in a throwaway PTY instead
+// (docs/editor.md § Editing in your own editor). One device preference switches it, graphical is the
+// default, and everything to the left of the box is untouched either way.
 export default function EditorPane(props: { task: Task }) {
   const api = editorApi()
   const taskId = props.task.id
@@ -28,7 +37,6 @@ export default function EditorPane(props: { task: Task }) {
   const [side, setSide] = createSignal<'files' | 'search'>('files')
   let treeRevealRevision = 0
 
-  let host: HTMLElement | undefined
   let view: EditorView | undefined
   let stopTheme: (() => void) | undefined
   // One CodeMirror instance reused across tab switches, with the current path tracked explicitly
@@ -110,35 +118,75 @@ export default function EditorPane(props: { task: Task }) {
     Prec.highest(keymap.of([{ key: 'Mod-s', run: () => { void save(path); return true } }])),
   ]
 
+  // An empty read-only state until a file is opened: the view always has one, so "no file" is a
+  // document with nothing in it rather than a special case in every handler below.
+  const emptyState = () => EditorState.create({ extensions: [basicSetup, editorTheme(), EditorState.readOnly.of(true)] })
+
+  // The graphical editor is built and torn down with its rectangle, because terminal mode replaces
+  // that rectangle rather than hiding it. Nothing is lost across the swap: the per-file states stay in
+  // the cache, so coming back restores the text, the undo history and the cursor.
+  const mountEditor = (element: HTMLElement) => {
+    view = new EditorView({ state: emptyState(), parent: element })
+    stopTheme = watchEditorTheme(view)
+    const restore = active()
+    if (restore) void show(restore)
+    onCleanup(() => {
+      scheduleSave.flush()
+      saveViewState()
+      if (view && currentPath) states.set(currentPath, view.state)
+      currentPath = null
+      stopTheme?.()
+      stopTheme = undefined
+      view?.destroy()
+      view = undefined
+    })
+  }
+
   onMount(() => {
     onCleanup(() => {
-      saveViewState() // pane unmounting (task/workspace switch), remember where we were
       disposed = true
       scheduleSave.flush()
-      stopTheme?.()
       states.clear()
       saved.clear()
-      view?.destroy()
       window.removeEventListener('focus', onFocus)
     })
     void (async () => {
       if (!api) return setRoot(null)
       const r = await api.root(taskId)
       if (disposed) return
-      setRoot(r) // renders the host div synchronously when truthy
-      if (!r || !host) return
-      // An empty read-only state until a file is opened: the view always has one, so "no file" is a
-      // document with nothing in it rather than a special case in every handler below.
-      view = new EditorView({
-        state: EditorState.create({ extensions: [basicSetup, editorTheme(), EditorState.readOnly.of(true)] }),
-        parent: host,
-      })
-      stopTheme = watchEditorTheme(view)
+      setRoot(r) // renders the rectangle synchronously when truthy, and `mountEditor` builds the view
+      if (!r) return
       window.addEventListener('focus', onFocus)
-      const restore = active()
-      if (restore) void show(restore)
     })()
   })
+
+  // Which editor draws an open file, and the one it is drawing right now. `on` re-fires on identity
+  // rather than value, so its source is a memo and not an inline getter.
+  const queryClient = useQueryClient()
+  const prefs = createQuery(() => prefsOptions(true))
+  const mode = createMemo(() => readEditorMode(prefs.data))
+  const wantsTerminal = createMemo(() => (mode() === 'terminal' ? active() : null))
+  const [ptyPath, setPtyPath] = createSignal<string | null>(null)
+
+  // Whatever `$EDITOR` was pointed at is no longer what this pane has cached, so the cached state goes
+  // and the graphical view reads the file back off disk when it next shows it. That is the whole
+  // refresh contract: the editor in the PTY owned the buffer, and the pane never guessed at it.
+  const forget = (path: string) => {
+    states.delete(path)
+    saved.delete(path)
+    editorSetDirty(taskId, path, false)
+  }
+
+  createEffect(on(wantsTerminal, (path, previous) => {
+    if (previous) forget(previous) // left mid-edit: the pref was flipped, or the reader changed tabs
+    setPtyPath(path)
+  }))
+
+  const onEditorExit = (path: string, code: number) => {
+    forget(path)
+    setPtyPath(null)
+    setSaveErr(code ? `Your editor exited with status ${code}.` : '')
+  }
 
   async function stateFor(relPath: string): Promise<EditorState | null> {
     if (disposed) return null
@@ -269,7 +317,7 @@ export default function EditorPane(props: { task: Task }) {
       else if (!next) {
         if (currentPath) states.set(currentPath, view.state)
         currentPath = null
-        view.setState(EditorState.create({ extensions: [basicSetup, editorTheme(), EditorState.readOnly.of(true)] }))
+        view.setState(emptyState())
       }
     }, { defer: true }),
   )
@@ -324,6 +372,13 @@ export default function EditorPane(props: { task: Task }) {
             }))}
             actions={
               <>
+                <ToggleButton
+                  variant="bare"
+                  size="sm"
+                  tip="Edit in $EDITOR, in a terminal inside this pane"
+                  pressed={mode() === 'terminal'}
+                  onPressedChange={(pressed) => void saveEditorMode(queryClient, pressed ? 'terminal' : 'graphical')}
+                >$EDITOR</ToggleButton>
                 <Show when={active()}>
                   <Button
                     variant="bare"
@@ -350,8 +405,11 @@ export default function EditorPane(props: { task: Task }) {
           />
           {/* CodeMirror owns these pixels — its own DOM, its own keyboard, its own scrolling — so the
               pane hands it a box rather than a tree. `mount` is the element it attaches to, drawn by
-              the host (ui/Rectangle.tsx). */}
-          <Rectangle kind="editor" label="Editor" mount={(element) => { host = element }} />
+              the host (ui/Rectangle.tsx). In terminal mode the same box holds the reader's own editor
+              instead, keyed on the path so switching tabs starts a new one. */}
+          <Show when={ptyPath()} fallback={<Rectangle kind="editor" label="Editor" mount={mountEditor} />} keyed>
+            {(path) => <EditorTerminal taskId={taskId} path={path} onExit={(code) => onEditorExit(path, code)} />}
+          </Show>
         </ListDetail>
       </Show>
     </Show>
