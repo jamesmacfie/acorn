@@ -233,16 +233,16 @@ describe('architecture boundaries', () => {
       'apps/node/src/composition/runtime.ts',
       'packages/desktop-helper/src/supervision/serviceHost.ts',
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
-      'plugins/terminal/src/main/terminal.ts', // PTYs
+      'plugins/terminal/src/server/terminal.ts', // PTYs
       'plugins/agents/src/main/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
       'plugins/agents/src/main/drivers/acpDriver.ts', // the generic ACP driver, one process per session
       'plugins/agents/src/main/drivers/codexDriver.ts',
       'plugins/agents/src/main/drivers/authProbe.ts',
       'plugins/agents/src/main/usage/codexUsage.ts',
-      'plugins/docker/src/main/cli.ts',
-      'plugins/docker/src/main/dockerService.ts', // `docker logs -f` / `stats` streams
-      'plugins/database/src/main/database.ts',
-      'plugins/editor/src/main/search.ts', // ripgrep, streamed
+      'plugins/docker/src/server/cli.ts',
+      'plugins/docker/src/server/dockerService.ts', // `docker logs -f` / `stats` streams
+      'plugins/database/src/server/database.ts',
+      'plugins/editor/src/server/search.ts', // ripgrep, streamed
       'plugins/http/src/server/send.ts',
     ])
     const importers = [...new Set(

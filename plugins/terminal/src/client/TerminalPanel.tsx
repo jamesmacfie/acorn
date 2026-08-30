@@ -187,7 +187,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     return ctx ? `${label} · ${ctx}` : label
   }
 
-  // Spawn into the active task. `checkout` is the base repo path; the main process derives the
+  // Spawn into the active task. `checkout` is the base repo path; the node derives the
   // task's lazy worktree from it and cwds the session there (docs/workspaces-and-tasks.md).
   async function spawn(profileId: string) {
     const taskId = ws()?.id

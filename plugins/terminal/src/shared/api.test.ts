@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from './routes'
+import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from './api'
 
 describe('terminal contract routes', () => {
   it('keeps the plugin namespace and encodes session ids', () => {

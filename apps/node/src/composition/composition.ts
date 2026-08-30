@@ -10,7 +10,7 @@ import { reconcileBundledPlugins } from '@acorn/node-core/server/plugins/bundled
 import { bundledPluginStatePath, userManagedPluginIds } from '@acorn/node-core/server/plugins/bundledState.ts'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
-import { reconcileTmux } from '@acorn/plugin-terminal/main/index.ts'
+import { reconcileTmux } from '@acorn/plugin-terminal/node/index.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
 import { nodePlugins, type NodePluginDeps } from './plugins'
 

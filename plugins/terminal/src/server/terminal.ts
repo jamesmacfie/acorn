@@ -6,7 +6,7 @@ import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
 import { buildSessionEnv, childEnv, type CoreServices, getProfile, type InternalEnvFactory, type Launcher, launcherSpec, listProfileDefs, listProfiles, type PluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
 import { terminalSessions } from '../node/schema'
-import type { TerminalBridge } from '../server/routes/terminal'
+import type { TerminalBridge } from './routes/terminal'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
 import type { SendSubmit } from '../shared/send'
 import { AgentSender } from './agentSend'
@@ -25,7 +25,7 @@ import {
   trimRing,
 } from './terminalUtils'
 import { fileURLToPath } from 'node:url'
-import type { RunSessionGlue } from './runIpc'
+import type { RunSessionGlue } from './runChannel'
 import { TerminalDisplay } from './terminalDisplay'
 
 // PTYs live in the node utility service. Sessions run on one of two backends:
@@ -59,7 +59,7 @@ const sessions = new Map<string, Session>()
 
 // What this engine needs from core, now that it can't read core's tables: resolve a taskId to a row and
 // to the cwd its commands run in, and read the project's setup script. `proc` and
-// `projects.assertConfigTrusted` are for the run-target service built over this engine (runIpc.ts).
+// `projects.assertConfigTrusted` are for the run-target service built over this engine (runChannel.ts).
 export type TerminalCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'proc'>
 
 // This engine is a process singleton by construction (one PTY table, one idle watch, one session map
@@ -141,7 +141,7 @@ function emit(s: Session, msg: ServerMsg) {
 }
 
 // Buffer PTY output. The raw ring feeds transcript-tail analysis, while the display emulator owns
-// canonical renderer restoration, and the live wire frame is coalesced onto the next tick.
+// canonical client restoration, and the live wire frame is coalesced onto the next tick.
 function queueOutput(s: Session, data: string) {
   appendRing(s, data)
   s.display.write(data)
@@ -308,7 +308,7 @@ function startIdleWatch() {
         // An idle session showing an input prompt in its tail is blocked, not done.
         s.meta.agentState = matchBlockedPrompt(s.ring.slice(-4000)) ? 'blocked' : 'idle'
         agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
-        // The OS toast lives in the renderer now, focus-gated with cooldown and dedup there.
+        // The OS toast lives in the client now, focus-gated with cooldown and dedup there.
         statusBroadcast()
       }
     }
@@ -333,7 +333,7 @@ async function maybeRunSetup(t: TaskRef, cwd: string): Promise<void> {
 }
 
 async function create(opts: CreateOpts): Promise<TerminalSession> {
-  // The renderer passes the base checkout as opts.cwd, validated at the boundary, and the worktree is
+  // The client passes the base checkout as opts.cwd, validated at the boundary, and the worktree is
   // derived from it. Lazy worktree on first terminal, reused after. A first-ever worktree fires the
   // onWorktreeCreated hook inside resolveTaskCwd, which runs maybeRunSetup.
   const baseCheckout = rendererBaseCheckout(opts.cwd)
@@ -431,12 +431,9 @@ export function configureTerminalMcp(name: string, launcher: Launcher): void {
   configuredMcp = { name, launcher }
 }
 
-// `defaultApp` is an Electron addition to the Node `process` globals, true for an unpackaged run. This
-// module is service-owned and also compiles inside @acorn/node's plain-Node program, so read it
-// defensively rather than widening this package's type surface.
-const isDefaultApp = (): boolean => (process as { defaultApp?: boolean }).defaultApp === true
-
-const mcpName = () => configuredMcp?.name ?? serverName(!isDefaultApp() && !process.env.ELECTRON_IS_DEV)
+// The fallback name is the packaged one: a plain Node process has no build flavour of its own, and the
+// composition root passes the real one through configureTerminalMcp before any session spawns.
+const mcpName = () => configuredMcp?.name ?? serverName(true)
 const mcpLauncher = () => configuredMcp?.launcher ?? launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
 
 // Boot-time MCP re-registration (docs/mcp.md § Configuration). Session spawn already re-registers;
@@ -496,12 +493,12 @@ export async function reconcileTmux() {
       console.warn('[terminal] tmux reconcile failed for session', row.id, e)
     }
   }
-  // This runs after the window, so the renderer's initial term:list has already fired. Ping it to
+  // This runs after the window, so the client's initial term:list has already fired. Ping it to
   // re-list, or resurrected sessions stay invisible until some unrelated broadcast.
   if (reattached) statusBroadcast()
 }
 
-// The session-engine glue the run-target service (runIpc) needs: spawn a target's command as a terminal
+// The session-engine glue the run-target service (runChannel) needs: spawn a target's command as a terminal
 // session in the task worktree, and observe or kill it. Exported so the plugin's init can build the
 // RuntimeService without this engine importing the run domain.
 export function terminalRunGlue(): RunSessionGlue {
@@ -521,7 +518,7 @@ export function terminalRunGlue(): RunSessionGlue {
   }
 }
 
-export type TerminalIpcDeps = {
+export type TerminalChannelDeps = {
   internalEnv: InternalEnvFactory
   launchInjector: (taskId: string, sessionId: string) => Promise<void>
   memoryReviewTrigger: (taskId: string, transcriptTail: string) => Promise<void>
@@ -533,7 +530,7 @@ export type TerminalIpcDeps = {
   streams?: (handlers: Parameters<PluginBroadcast['streams']>[0]) => void
 }
 
-// Release everything registerTerminalIpc installed. Called from the plugin's dispose
+// Release everything registerTerminalChannel installed. Called from the plugin's dispose
 // (node/index.ts), which runs before the data root's lock is dropped. Idempotent, so it's safe after
 // a partial boot that never started the idle watch.
 //
@@ -563,14 +560,14 @@ export function disposeTerminal(): void {
   statusBroadcast = () => {}
 }
 
-export type TerminalIpcRegistrations = {
+export type TerminalChannelRegistrations = {
   terminal: TerminalBridge
   taskSessions: TaskSessionsBridge
   taskCreated: TaskCreatedHook
   worktreeCreated: (taskId: string, cwd: string) => Promise<void>
 }
 
-export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalIpcDeps): TerminalIpcRegistrations {
+export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalChannelDeps): TerminalChannelRegistrations {
   store = pluginDb
   core = coreServices
   internalEnv = deps.internalEnv

@@ -2,7 +2,7 @@
 // browse right pane and the task pane. One component, two hosts, the same split as RollbarItemPanel.
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import { requestTerminalFocusIntent, toast, writeJson } from '@acorn/plugin-api/client'
-import { terminalSessionsRoute } from '@acorn/plugin-terminal/contract/routes.ts'
+import { terminalSessionsRoute } from '@acorn/plugin-terminal/contract/api.ts'
 import { wsDockerAttach } from './wsChannel'
 import type { DockerStatsSample } from '../shared/wsFrames'
 import type { DockerContainerAction, DockerPort } from '../shared/model'

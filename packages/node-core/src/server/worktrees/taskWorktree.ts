@@ -17,7 +17,7 @@ import { broadcastHeadChanged, broadcastTasksChanged } from '../notify'
 import { runHook } from '../pluginHost/hooks'
 import { BridgeError } from '../bridge'
 
-// Set once by registerTerminalIpc, where workspace worktrees are created (docs/workspaces-and-tasks.md).
+// Set once by registerTerminalChannel, where workspace worktrees are created (docs/workspaces-and-tasks.md).
 let worktreesRoot = ''
 export const setWorktreesRoot = (dir: string): void => {
   worktreesRoot = dir

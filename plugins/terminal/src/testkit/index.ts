@@ -3,4 +3,4 @@
 // own testkit: one barrel carrying both halves puts DOM types into a node-only program.
 //
 //   apps/node/test/integration/coreTools.test.ts   runAgentTools
-export { runAgentTools } from '../main/agentTools'
+export { runAgentTools } from '../server/agentTools'

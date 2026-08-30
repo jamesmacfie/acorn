@@ -17,7 +17,7 @@ import { setWorktreesRoot } from '@acorn/node-core/server/worktrees/taskWorktree
 import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { launcherSpec, serverName } from '@acorn/node-core/server/mcpRegister.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
-import { configureTerminalMcp, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/main/index.ts'
+import { configureTerminalMcp, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/node/index.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
 import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from './composition'

@@ -1,4 +1,4 @@
-// Pure terminal helpers: no electron or node-pty imports, so they are unit-testable under plain Node
+// Pure terminal helpers: no node-pty imports, so they are unit-testable under plain Node
 // (terminalUtils.test.ts). The PTY and IPC wiring that needs those lives in terminal.ts. Helpers that
 // are not terminal-specific live in core: path and checkout guards in core/server/worktrees/pathGuards.ts, the
 // task-scoped child environment in core/server/taskEnv.ts.
@@ -8,7 +8,7 @@ export const RING_CAP = 256 * 1024 // bytes of recent raw output kept for prompt
 // Keep only the last RING_CAP bytes of raw output used by non-display consumers.
 export const trimRing = (ring: string): string => (ring.length > RING_CAP ? ring.slice(ring.length - RING_CAP) : ring)
 
-// Sanitize cols/rows from the (less-trusted) renderer to a sane integer (docs/security.md).
+// Sanitize cols/rows from the (less-trusted) client to a sane integer (docs/security.md).
 export const clampDim = (n: unknown, fallback: number): number =>
   Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 2000 ? (n as number) : fallback
 
@@ -37,7 +37,7 @@ export const tmuxNewSessionArgs = (name: string, cwd: string, command: string, e
   cwd,
   command,
 ]
-// -u: force UTF-8 output even when a GUI-launched Electron process has no locale environment.
+// -u: force UTF-8 output even when a GUI-launched process has no locale environment.
 // Without it tmux replaces smart punctuation and box-drawing glyphs before xterm sees the stream.
 // -T RGB: declare the attach client truecolor-capable. TERM=xterm-256color carries no RGB
 // capability in terminfo and the user's terminal-features may not add it, so without this tmux

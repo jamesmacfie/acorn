@@ -95,19 +95,19 @@ describe('HeadlessTerminalScreen', () => {
     screen.dispose()
   })
 
-  it('resets a stale renderer before restoring the serialized snapshot', async () => {
+  it('resets a stale client before restoring the serialized snapshot', async () => {
     const source = new HeadlessTerminalScreen(20, 5)
-    const renderer = new HeadlessTerminalScreen(20, 5)
+    const client = new HeadlessTerminalScreen(20, 5)
     source.write('canonical')
-    renderer.write('stale-client-history')
+    client.write('stale-client-history')
 
-    renderer.write(`${DISPLAY_RESET}${await source.snapshot()}`)
-    const restored = await renderer.snapshot()
+    client.write(`${DISPLAY_RESET}${await source.snapshot()}`)
+    const restored = await client.snapshot()
 
     expect(restored).toContain('canonical')
     expect(restored).not.toContain('stale-client-history')
     source.dispose()
-    renderer.dispose()
+    client.dispose()
   })
 })
 
@@ -132,7 +132,7 @@ describe('TerminalDisplay', () => {
     ])
   })
 
-  it('cancels a pending snapshot when the renderer detaches', async () => {
+  it('cancels a pending snapshot when the client detaches', async () => {
     const screen = new DeferredScreen()
     const display = new TerminalDisplay(20, 5, screen)
     const frames: ServerMsg[] = []
