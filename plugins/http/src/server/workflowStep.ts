@@ -8,7 +8,7 @@
 import type { StepHandler, StepValidator } from '@acorn/plugin-workflows/contract/extensions.ts'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import { httpMethods, type HttpSendInput, type KeyValue } from '../shared/model'
-import { send, SendError } from '../server/send'
+import { send, SendError } from './send'
 
 /** `ctx.audit.record`, narrowed to what this module calls. Passed in rather than taking the whole
  *  context, so the step handler stays testable without a node. */
