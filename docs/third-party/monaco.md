@@ -2,7 +2,7 @@
 
 Design notes from the http-migration session (2026-08-11), when measuring Monaco against the plugin
 frame contract ended two migrations; extended the same day when the composed-pane question was worked
-through and decided. Companion to [terminal.md](../future/terminal.md) and [remote.md](../future/remote.md): this is
+through and decided. Companion to [terminal/01-why.md](../future/terminal/01-why.md) and [remote.md](../future/remote.md): this is
 the concrete instance of the "one host-owned template" conclusion those two reach in the abstract.
 It began life in `docs/future/` as a design to build; with steps 1–6 shipped it lives here as the
 design record of the document surface, beside the migration record it belongs to.
@@ -256,7 +256,7 @@ Three candidates were on the table:
 one, and the first release carries exactly one degenerate template — a single document filling the
 pane. `document-over-frame` lands when database actually moves.** That gets option 3's sequencing
 (surface first, learn from the editor-shaped consumer) without option 3's one-way door, and it is
-where the rest of the record already points — `terminal.md` reached "one host-owned list/detail
+where the rest of the record already points — `docs/future/terminal/01-why.md` (then the single file `terminal.md`) reached "one host-owned list/detail
 template fed by plugin routes, never a per-plugin layout language" independently, and the entire
 descriptor philosophy in these docs is the same move at different scales: the host draws the pixels,
 the plugin supplies the data.
@@ -286,7 +286,7 @@ and each of those plugins already draws its own. The moment the host renders a p
 data*, someone has to design and eternally version a descriptor vocabulary for rows, icons, badges,
 grouping, selection, empty states and context menus. A document with language-service workers is
 *impossible* in the sandbox, measured at the top of this file, and a live terminal would be too
-(`terminal.md`). Those earn host surfaces; nothing else does.
+(`docs/future/terminal/01-why.md`). Those earn host surfaces; nothing else does.
 
 The other thing worth keeping is why the button bar in a composed pane is the plugin's. Database's bar
 holds a searchable saved-queries picker with per-row delete chips, a Save button that opens a modal, a
@@ -512,6 +512,6 @@ grows without becoming Monaco's API in a trench coat.
   `git log --follow -- docs/third-party/editor.md`.
 - `docs/third-party/README.md § database has moved` — the outcome record of steps 5 and 6: that
   plugin's move built `document-over-frame`, and the findings from doing so live there.
-- `docs/future/terminal.md` — the tier-1 "one host-owned template" conclusion this instantiates.
+- `docs/future/terminal/01-why.md` — the tier-1 "one host-owned template" conclusion this instantiates.
 - `docs/future/remote.md` — `formFactor`, and why descriptors render on other shells for free.
 - `docs/plugins.md` — the frame contract, the CSP, and what a frame can and cannot do.

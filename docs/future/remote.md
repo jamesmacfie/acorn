@@ -2,6 +2,9 @@
 
 Design notes from the third-party-plugins session (2026-08-08). Nothing here is scheduled; this
 records the analysis so a future project starts from conclusions instead of re-deriving them.
+The terminal client is the third non-desktop surface and has its own programme in
+[terminal/](./terminal/README.md); it shares this file's reasoning about auth and custody and none of
+its browser constraints.
 The three cheap preparation items at the bottom ARE worth doing early — they are annotated in
 the plugin docs (`docs/plugins.md`, `docs/security.md`).
 
