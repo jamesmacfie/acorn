@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { rendererBaseCheckout } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
 
-describe('terminal renderer cwd boundary', () => {
+describe('terminal client cwd boundary', () => {
   const dirs: string[] = []
   afterEach(() => dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })))
 

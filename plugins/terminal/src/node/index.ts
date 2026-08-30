@@ -3,15 +3,15 @@ import { NOTES_SEED_TASK } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
 import { TERMINAL_SESSIONS } from '../contract/sessions'
-import { runAgentTools } from '../main/agentTools'
-import { createRuntimeService } from '../main/runIpc'
-import { disposeTerminal, registerTerminalIpc, sendToAgent, sessionControl, terminalRunGlue, type TerminalIpcDeps } from '../main/terminal'
+import { runAgentTools } from '../server/agentTools'
+import { createRuntimeService } from '../server/runChannel'
+import { disposeTerminal, registerTerminalChannel, sendToAgent, sessionControl, terminalRunGlue, type TerminalChannelDeps } from '../server/terminal'
 import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
 
-// The four hooks this plugin cannot resolve for itself. TerminalIpcDeps in main/terminal.ts states each
+// The four hooks this plugin cannot resolve for itself. TerminalChannelDeps in server/terminal.ts states each
 // one's blocker: one closes over the listener origin and the internal signing key, neither of which
 // exists at init, and three belong to plugins/memory, whose capability id is not in a contract/.
-export type TerminalPluginDeps = Omit<TerminalIpcDeps, 'seedTaskNotes'>
+export type TerminalPluginDeps = Omit<TerminalChannelDeps, 'seedTaskNotes'>
 
 export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
@@ -22,14 +22,14 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
     // open/migrate/close from there (@acorn/node-core/server/plugins/storage.ts).
     migrationsModule: import.meta.url,
     init: (ctx) => {
-      // Opened and migrated by the host before init returns: registerTerminalIpc installs the handle into
+      // Opened and migrated by the host before init returns: registerTerminalChannel installs the handle into
       // the engine and fills the route's bridge in the same call, so no request and no PTY spawn can
       // reach an unmigrated database.
       const db = ctx.storage.open()
       // Fills the terminal bridge, the WS stream handlers (including streamTaskId, which the task-scope
       // guard in server/transport/wsHub.ts refuses attachment without), core's archive-time task-sessions bridge and
       // its on-task-created hook, and the worktree-created hook that runs a repo's setup script.
-      const registrations = registerTerminalIpc(db, ctx.core, {
+      const registrations = registerTerminalChannel(db, ctx.core, {
         ...deps,
         seedTaskNotes: (task) => ctx.capabilities.get(NOTES_SEED_TASK)?.(task) ?? Promise.resolve(),
         status: ctx.events.status,
@@ -71,7 +71,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       ctx.routes.register(terminal, { prefix: '', note: '/sessions, /profiles — PTY control only' })
 
       // Run targets are terminal sessions in the task worktree, so the service can only be built where
-      // the session map is. Two projections consume it: the harness RunBridge, behind the renderer's
+      // the session map is. Two projections consume it: the harness RunBridge, behind the client's
       // run pane and preview home, and the capability, which is how the agent-tool and workflow
       // projections in apps/node/src/wiring/ reach it without a mutable global.
       // `run:changed` is a core event (@acorn/protocol/nodeEvents.ts) sent from here because terminal
@@ -125,3 +125,8 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
     },
   }
 }
+
+// The composition hooks apps/node calls around plugin init: the MCP launcher, the boot-time MCP
+// re-registration, and the tmux reconcile pass. Exported from the entrypoint because they are
+// cross-package by definition and the engine that implements them must stay out of contract/.
+export { configureTerminalMcp, reconcileTmux, refreshAcornMcpRegistrations } from '../server/terminal'

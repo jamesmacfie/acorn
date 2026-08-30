@@ -2,7 +2,7 @@
 // text to an agent).
 //
 // Lives in shared/ because four sides of this plugin need the same union and contract/ is one of them.
-// A contract may import shared/ but never main/ or server/ (tools/arch/boundaries.test.ts), so
+// A contract may import shared/ but never server/ (tools/arch/boundaries.test.ts), so
 // declaring it in the engine and re-exporting it from the contract is not an option.
 //
 //   'now'         → paste, then submit after a short settle delay
