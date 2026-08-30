@@ -50,20 +50,46 @@ it('emits a manifest the host parses, cross-field rules and all', () => {
   expect(result.ok ? null : result.reason).toBe(null)
 })
 
-it('emits a tree plugin the host parses too, under --remote', () => {
-  // The second render path (docs/future/layout/06-remote-tree.md). Same node half, same permissions,
-  // a different client half and a `remote` contribution instead of a frame.
-  const files = scaffoldFiles('my-widget', 'My widget', { remote: true }) as Record<string, string>
+it('emits a tree plugin by default, filling a slot and an annotation point', () => {
+  // The default render path since phase 9 of the layout programme, and both halves of the cooperative
+  // seam: one contribution draws, the other only says something true (docs/future/layout/06-remote-tree.md).
+  const files = scaffoldFiles('my-widget', 'My widget') as Record<string, string>
   const manifest = JSON.parse(files['acorn-plugin.json']) as { contributions: Record<string, unknown> }
   expect(manifest.contributions.frames).toBeUndefined()
-  expect(manifest.contributions.remote).toEqual([
-    { target: 'agentToolRenderer', id: 'my-widget.tool-card', entry: 'toolCard', tools: ['execute'] },
+  expect(manifest.contributions.extensions).toEqual([
+    {
+      id: 'my-widget.tool-card',
+      point: 'agents:tool-card',
+      label: 'My widget tool calls',
+      remote: 'toolCard',
+      matches: ['execute'],
+    },
+    {
+      id: 'my-widget.diff-note',
+      point: 'changes:diff-line',
+      label: 'My widget notes',
+      items: '/v2/p/my-widget/marks',
+    },
   ])
-  const result = parsePluginManifest(manifest)
-  expect(result.ok ? null : result.reason).toBe(null)
   // The entry the manifest names has to be one the bundle announces, or the host draws a placeholder
-  // and the author's first run is a mystery.
+  // and the author's first run is a mystery. The annotation route has to exist for the same reason.
   expect(files['client.js']).toContain("entries: ['toolCard']")
+  expect(files['node/routes.js']).toContain("pathname === '/marks'")
+})
+
+it('emits a rectangle plugin under --rectangle, as a layout with a frame region', () => {
+  // The other path: an iframe whose pixels are the author's. Same node half, same permissions, and a
+  // `single` layout whose one region is the frame — the only way a surface asks for pixels now.
+  const files = scaffoldFiles('my-widget', 'My widget', { rectangle: true }) as Record<string, string>
+  const manifest = JSON.parse(files['acorn-plugin.json']) as { contributions: Record<string, unknown> }
+  expect(manifest.contributions.extensions).toBeUndefined()
+  expect(manifest.contributions.frames).toEqual([
+    {
+      target: 'pane', id: 'my-widget', label: 'My widget', glyph: 'puzzle', order: 800,
+      layout: 'single', regions: { body: 'frame' },
+    },
+  ])
+  expect(parsePluginManifest(manifest).ok).toBe(true)
 })
 
 it('emits a node half that loads and satisfies the structural plugin check', async () => {

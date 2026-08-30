@@ -24,9 +24,7 @@ export { Menu } from '@acorn/client-core/ui/Menu.tsx'
 // to come) uses this rather than its own button, so the affordance sits in the same place and
 // reveals on the same rules in a plugin's list as in a first-party one.
 export { RowActions } from '@acorn/client-core/ui/RowActions.tsx'
-// `Fold` is the kit's name for it; `CollapsibleSection` is the same component and goes away in
-// phase 9 of the layout programme.
-export { CollapsibleSection, Fold } from '@acorn/client-core/ui/Fold.tsx'
+export { Fold } from '@acorn/client-core/ui/Fold.tsx'
 export { Composer } from '@acorn/client-core/ui/Composer.tsx'
 export { DocumentTabs } from '@acorn/client-core/ui/DocumentTabs.tsx'
 export { FindBar } from '@acorn/client-core/ui/FindBar.tsx'

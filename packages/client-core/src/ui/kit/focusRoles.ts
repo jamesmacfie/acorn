@@ -23,7 +23,6 @@ export const NODE_FOCUS = {
   Inline: 'none',
   Section: 'conditional',
   Fold: 'stop',
-  CollapsibleSection: 'stop',
   Card: 'conditional',
   Timeline: 'collection',
   Tabs: 'collection',
@@ -103,7 +102,7 @@ export const NODE_FOCUS = {
 } as const satisfies Record<KitNode, FocusRole>
 
 /** The three nodes that own their keys while focused: everything typed reaches them, and only the
- *  typing-exempt intents get past. `lib/isTypingTarget.ts` is the DOM host's form of this. */
+ *  typing-exempt intents get past. `isTypingTarget` in @acorn/protocol/keybindings.ts is the DOM host's form of this. */
 export const OWNS_KEYS: readonly KitNode[] = ['Input', 'Textarea', 'Composer', 'MentionTextarea']
 
 export const focusRole = (node: KitNode): FocusRole => NODE_FOCUS[node]

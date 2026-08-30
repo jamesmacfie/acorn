@@ -21,7 +21,6 @@ export const NODE_SUPPORT = {
   Inline: { dom: 'full', tui: 'full' },
   Section: { dom: 'full', tui: 'full' },
   Fold: { dom: 'full', tui: 'full' },
-  CollapsibleSection: { dom: 'full', tui: 'full' },
   Card: { dom: 'full', tui: 'full' },
   Timeline: { dom: 'full', tui: 'full' },
   Tabs: { dom: 'full', tui: 'full' },

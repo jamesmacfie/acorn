@@ -9,11 +9,21 @@
 import { onCleanup, onMount } from 'solid-js'
 import type { Binding, Keymap, TargetMode } from '@opentui/keymap'
 import type { HtmlKeymapEvent } from '@opentui/keymap/html'
-import { isTypingTarget } from '../lib/isTypingTarget'
+import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import { BARE_KEYS, intentKeys } from './keymap'
 import type { Intent } from './intents'
 
 export type AcornKeymap = Keymap<HTMLElement, HtmlKeymapEvent>
+
+/** xterm focuses a hidden textarea, so a terminal reads as a typing target, but Cmd chords are never
+ *  terminal input on macOS (xterm leaves them to the browser), so chord shortcuts may fire there.
+ *  Bare-key shortcuts must still stay off: those keystrokes are terminal input.
+ *
+ *  Asked of the kit's own PTY rectangle, not of a plugin's class. Every terminal in the app is inside
+ *  one — the drawer's and docker's exec both — and a plugin that drew its own box would be a plugin
+ *  that could quietly opt out of this rule (ui/Rectangle.tsx). */
+export const isTerminalTarget = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && !!target.closest('.ui-rect[data-kind="pty"]')
 
 let installed: AcornKeymap | null = null
 

@@ -27,10 +27,10 @@ last consumer leaves.
 |---|---|---|---|
 | onboarding | Nothing structural — it is a first-run gate that must exist before plugin distribution settles. | — | Honestly core shell, not a plugin. Leave it; costs one line. |
 | notes | `protocol/notes.ts` location type is core addressing; node half writes `.md` files in the data root. | — | Movable when a seam wants it. |
-| changes | Renders inside the agents transcript via `agentToolRenderers` — an in-realm component on a core surface. | `agentToolRenderers` (compiled) plus `contributions.remote` (loaded) | **Could move** since layout phase 3: the tool card is a slot a remote tree can fill. Stays compiled by preference — it is one of the four panes a task always has. See coupling 3. |
+| changes | Renders inside the agents transcript. | An `extensions` entry on `agents:tool-card`, with either carrier | **Settled, 2026-08-30 (layout phase 9).** Nothing keeps it compiled. The private renderer registry is gone and the card is an ordinary contribution to a `remote` point, which a loaded plugin fills the same way. Stays compiled by preference: it is one of the four panes a task always has. See coupling 3. |
 | context | Hosts the tray that memory renders into (receiving half of the same coupling). | — | Movable only together with memory, and coupling 1 below says why that is now a redesign, not a seam swap. |
 | preview | Drives a shell-owned child webview. | — | **Stays first-party** (desktop extra behind the platform seam). |
-| editor | Monaco in-realm; the host document surface already exists. The remaining move is the `frame-beside-document` layout, owned by `docs/future/layout/05-layouts.md` (phase 1) rather than by `docs/third-party/editor.md`. | — | Waits on the layout programme's phase 1. |
+| editor | Monaco in-realm; the host document surface already exists. | — | **Settled, 2026-08-30 (layout phase 9).** Both surfaces are host layouts filled with kit nodes and the plugin ships no stylesheet. What keeps it compiled is Monaco's size: a frame bundle measures 7.93 MiB against an 8.00 MiB cap with no editor UI in it, and its language-service workers cannot be served at all (docs/first-party-plugins.md, the editor row). |
 | docker | Owns the `docker` WS channel + exec streams. Its rail-row marker is compiled-only: `ctx.railMarkers` has no manifest form yet (docs/future/rail-tab.md, slice 3). | rail markers | Closest to movable of the stream owners; its footer badge already has a descriptor twin. |
 | memory | Renders inside context's tray — editable inputs and accept/reject gates, a component in another plugin's surface; `MEMORY_KNOWLEDGE` capability named by the composition root. | client `contextSections` | **Stays first-party while the tray is a component** — the cooperative-seam conversion was attempted and correctly refused (coupling 1 below). |
 | workflows | Publishes `WORKFLOW_CONTROL`, an in-realm function capability consumed by agents' sidebar. | — | Movable once that capability becomes a descriptor/route seam (below). |
@@ -84,17 +84,19 @@ true. Coupling 4, the projects row, is untouched by the layout programme.
    frame. Either removes the last in-realm function passing between plugins — but heed coupling 1:
    if the controls turn out to be component-shaped (live inputs, not rows-with-verbs), the honest
    answer is "stays first-party", not a wider wire format.
-3. **changes → agents (`agentToolRenderers`).** **Settled, 2026-08-29 (layout phase 3).** The
-   argument below was that an inline transcript renderer is a component on a core surface, so the
-   tier line refuses it permanently. The remote tree removed the premise: a loaded plugin declares
-   `contributions.remote` with `target: 'agentToolRenderer'` and the tool names it draws, its worker
-   emits a tree of the host's own components, and `AgentToolCallCard` grafts it in place of the card
-   body. Nothing about the card requires first-party status any more.
+3. **changes → agents (the tool card).** **Settled, 2026-08-29 (layout phase 3), finished 2026-08-30
+   (phase 9).** The argument below was that an inline transcript renderer is a component on a core
+   surface, so the tier line refuses it permanently. The remote tree removed the premise, and phase 9
+   removed the registry: `agents:tool-card` is an ordinary `remote` point, a contributor names the tool
+   kinds it draws in `matches`, and the two carriers are a compiled component and a worker's tree.
+   `AgentToolCallCard` is a `Slot` with the built-in card as its child. Nothing about the card requires
+   first-party status any more.
 
    changes itself stayed compiled, and that is now a preference rather than a constraint — it is one
    of the four panes a task always has, so it ships with the app. Its renderer was rewritten in the
-   kit for the phase, which is the work that would have to happen either way. The registry stays for
-   the compiled tier, and a compiled renderer still wins over a remote one on the same call.
+   kit for the phase, which is the work that would have to happen either way. Phase 9 finished it: the
+   private registry is gone, so a compiled card and a remote one reach the point the same way and the
+   host arbitrates between them like any other `replace` slot.
 4. **github → the projects row.** `github: { owner, name, repoId }` is a first-class core column
    family, and core renders PR affordances from it. The move is generalizing "a project's linked
    external repo/item" into core vocabulary that any provider plugin can fill (the task-origin

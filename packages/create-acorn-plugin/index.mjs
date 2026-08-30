@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url'
  * published standalone and can't import the constant; see docs/plugin-authoring.md § Start from the
  * scaffold for how index.test.ts keeps the copy honest.
  */
-export const API_VERSION = '6'
+export const API_VERSION = '7'
 
 /**
  * Where the manifest JSON Schema is published. Same reason as the constant above: this package is
@@ -40,17 +40,20 @@ export function toDisplayName(id) {
 /** The whole package, as a path → contents map. Exported so the repository's own suite can parse the
  * manifest with the host's parser instead of trusting this file. */
 export function scaffoldFiles(id, name = toDisplayName(id), options = {}) {
-  const remote = options.remote === true
+  // A tree unless the author asked for pixels. The default is what most plugins want and the one that
+  // gets the shell's keyboard handling, focus, ARIA and style pack for free; a rectangle is the
+  // deliberate choice you make when the surface owns its own pixels.
+  const rectangle = options.rectangle === true
   return {
-    'acorn-plugin.json': manifest(id, name, remote),
+    'acorn-plugin.json': manifest(id, name, rectangle),
     'node/index.js': nodeIndex(id),
     'node/routes.js': nodeRoutes(),
-    'client.js': remote ? remoteClient(id, name) : client(id, name),
+    'client.js': rectangle ? client(id, name) : remoteClient(id, name),
     'README.md': readme(id, name),
   }
 }
 
-function manifest(id, name, remote = false) {
+function manifest(id, name, rectangle = false) {
   return (
     JSON.stringify(
       {
@@ -72,15 +75,38 @@ function manifest(id, name, remote = false) {
           events: [],
           node: { core: ['tasks'], capabilities: [], secrets: false, exec: false, net: [] },
         },
-        contributions: remote
+        contributions: rectangle
           ? {
-            // A tree rather than a rectangle: your code runs in a worker and names acorn's own
-            // components, so what the reader gets has the shell's keyboard handling, focus and style
-            // pack. `entry` is the key you registered with `mountTree` in client.js.
-            remote: [{ target: 'agentToolRenderer', id: `${id}.tool-card`, entry: 'toolCard', tools: ['execute'] }],
+            // A rectangle: an iframe whose pixels are yours. `single` with a `frame` region is how a
+            // surface says "the host draws the box, I draw the inside".
+            frames: [{
+              target: 'pane', id, label: name, glyph: 'puzzle', order: 800,
+              layout: 'single', regions: { body: 'frame' },
+            }],
           }
           : {
-            frames: [{ target: 'pane', id, label: name, glyph: 'puzzle', order: 800 }],
+            // Two of the five extension kinds, so the scaffold shows both halves of the cooperative
+            // seam working (docs/plugins.md § Cooperative extension points).
+            //
+            // A `remote` contribution draws: your worker emits a tree of acorn's own components into a
+            // slot the agents plugin opened, and `remote` is the key you registered with `mountTree`.
+            // An `annotation` contribution says something true about a row somebody else drew: no UI,
+            // a route the host batches keys to. Both name the owner out loud, which is the disclosure.
+            extensions: [
+              {
+                id: `${id}.tool-card`,
+                point: 'agents:tool-card',
+                label: `${name} tool calls`,
+                remote: 'toolCard',
+                matches: ['execute'],
+              },
+              {
+                id: `${id}.diff-note`,
+                point: 'changes:diff-line',
+                label: `${name} notes`,
+                items: `/v2/p/${id}/marks`,
+              },
+            ],
           },
       },
       null,
@@ -140,6 +166,19 @@ export async function handle(request, context, core) {
     return Response.json({
       text: task ? \`Hello from \${task.title}\` : 'Hello from the node',
       who: context.userId,
+    })
+  }
+
+  // The annotation half of the scaffold's manifest: what this plugin has to say about lines of the
+  // changes pane's diff. The host POSTs the keys on screen — a batch, not one call per row — and
+  // wants a mark back for the ones you know something about, keyed the way the owner declared.
+  // Silence is a real answer: return no items and nothing is drawn.
+  if (request.method === 'POST' && pathname === '/marks') {
+    const body = /** @type {{ keys?: { file: string; line: number; side: string }[] }} */ (await request.json())
+    return Response.json({
+      items: (body.keys ?? [])
+        .filter((key) => key.line % 10 === 0)
+        .map((key) => ({ key, severity: 'info', text: 'Every tenth line, from the scaffold.' })),
     })
   }
 
@@ -299,16 +338,16 @@ client.js           one file, plain JS, no imports
 
 ## Two ways to draw
 
-This scaffold's \`client.js\` is a **frame**: a sandboxed iframe whose pixels are yours. You write the
-markup and the CSS, and you get a rectangle.
+This scaffold's \`client.js\` is a **tree**, which is the default and what most plugins want. Your code
+runs in a Web Worker with no DOM at all and names acorn's own components, which the host mounts. You
+give up drawing your own pixels and you get the shell's keyboard handling, focus, ARIA and the
+reader's chosen style pack, for free and forever.
 
-\`npm create acorn-plugin ${id} -- --remote\` emits the other one: a **tree**. Your code runs in a Web
-Worker with no DOM at all and names acorn's own components, which the host mounts. You give up drawing
-your own pixels and you get the shell's keyboard handling, focus, ARIA and the reader's chosen style
-pack, for free and forever.
+\`npm create acorn-plugin ${id} -- --rectangle\` emits the other one: a **frame**, a sandboxed iframe
+whose pixels are yours. You write the markup and the CSS, and you get a rectangle.
 
-Pick the frame when the surface owns its pixels — a chart, an image editor, a canvas. Pick the tree
-for everything else.
+Pick the rectangle when the surface owns its pixels — a chart, an image editor, a canvas. Pick the
+tree for everything else.
 
 ## Types, if you want them
 
@@ -339,9 +378,10 @@ wants its node half in one file.
 
 ## Change it
 
-- **A pane is one entry in \`contributions.frames\`.** Everything smaller than a rectangle — a chip, a
-  badge, a menu row, a palette entry — is a descriptor you declare and the host draws, and it stays
-  live when no frame of yours is mounted. Descriptors for chrome, frames for rectangles.
+- **Descriptors for facts, trees for UI, rectangles for pixels.** A chip, a badge, a menu row or a
+  palette entry is a descriptor you declare and the host draws, and it stays live when nothing of
+  yours is mounted. A pane, a panel body or a settings page is a tree. A frame is for pixels the host
+  cannot draw.
 - **Your routes are confined to \`/v2/p/${id}/\`**, at parse time and again at runtime.
 - **The id is permanent.** It is the route namespace, the renderer route prefix, the persisted layout
   key and the SQLite filename. Renaming is "new plugin, plus a data migration, plus a tombstone".
@@ -464,8 +504,9 @@ function mount(slot, props) {
 // ── CLI ───────────────────────────────────────────────────────────────────────────────────────────
 
 async function main(argv) {
-  // One flag, and it picks the render path. See docs/plugin-authoring.md § Two ways to draw.
-  const remote = argv.includes('--remote')
+  // One flag, and it picks the render path. A tree by default; see docs/plugin-authoring.md § Two ways
+  // to draw for when a rectangle is the right answer.
+  const rectangle = argv.includes('--rectangle')
   let requested = argv.find((arg) => !arg.startsWith('--'))
   if (!requested) {
     const { createInterface } = await import('node:readline/promises')
@@ -489,7 +530,7 @@ async function main(argv) {
     return
   }
 
-  const files = scaffoldFiles(id, toDisplayName(id), { remote })
+  const files = scaffoldFiles(id, toDisplayName(id), { rectangle })
   for (const [path, contents] of Object.entries(files)) {
     const target = join(dir, path)
     mkdirSync(dirname(target), { recursive: true })

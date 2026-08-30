@@ -200,6 +200,11 @@ occluded and has no interactive children that could trap focus against it. `calc
 allowed on top of a rung, for a surface that stacks one step above it. The same file holds
 `--brand-fg`, what sits on top of a brand colour, and `--tabular` (`tabular-nums`), which every pack needs for diff gutters, line counts, and timestamps.
 
+`match` is the one text role that describes a run inside a line rather than the line. It means "this
+is what you searched for", and it is here because the diff's find bar and the editor's find-in-files
+both highlight a hit, and both used to spell the host class `.ui-find-mark` directly. On a terminal it
+is reverse video.
+
 ### Roles, and what each host makes of them
 
 The role tokens are the plugin-facing half of the same system. A plugin picks a role, and the host
@@ -327,14 +332,19 @@ by position, as in `.ui-code-wrap > .ui-btn`. Nothing exported accepts a class, 
 and a pane that wants a control to look different asks for that in the kit rather than in its own
 stylesheet.
 
-**One node is a box, and admits it.** `Rectangle kind="pty" | "webview" | "frame"` is what the kit
-offers a surface that owns its own pixels: a PTY, a webview, a plugin's iframe. The node owns the box
-and the keyboard contract, one tab stop from outside, Enter to hand the keys to whatever is inside and
-Escape to take them back. What draws inside it is not the kit's business. Three kinds and no fourth,
-because the name says what is in there and a kind a host does not know is a rectangle nobody can
-project: on a terminal `pty` is native and the other two draw their `<Fallback>` child. The two
-consumers are the terminal drawer and Docker's exec tab, and both used to hand-roll the box and neither
-had a way out with the keyboard.
+**One node is a box, and admits it.** `Rectangle kind="pty" | "webview" | "frame" | "editor"` is what
+the kit offers a surface that owns its own pixels: a PTY, a webview, a plugin's iframe, a code editor.
+The node owns the box and the keyboard contract, one tab stop from outside, Enter to hand the keys to
+whatever is inside and Escape to take them back. What draws inside it is not the kit's business. Four
+kinds and no fifth, because the name says what is in there and a kind a host does not know is a
+rectangle nobody can project: on a terminal `pty` and `editor` are native and the other two draw their
+`<Fallback>` child.
+
+`mount` is how the thing inside gets its element. Everything a rectangle holds wants a DOM node of its
+own, and each of the five sites used to write its own `<div ref={host}>` beside a stylesheet giving it
+a size. The host draws the element and hands it over, which is why the terminal drawer, Docker's exec
+tab, the browser preview, the editor pane and the host's document surface now spell no element and
+ship no CSS between them.
 
 `Only` and `Fallback` are the two host wrappers. `Only hosts={['dom']}` draws its children on the
 named hosts and nowhere else. `Fallback forNode="Grid"` draws its children where the matrix says
@@ -389,10 +399,18 @@ a variant selector adds an attribute, `(0,2,0)`; a style pack's override adds a
 `:root[data-style="x"]` prefix, `(0,3,0)`. A pack wins because it is more specific, never because its
 stylesheet loads last.
 
-`ui/adoption.test.ts` is what remains of the migration ledger that ran before the kit closed. Its
-`CONVERTED` list may only grow, and every file on it avoids raw buttons, selects, textareas, and the
-retired shared classes. The two checks around raw `div`s in a plugin's tree stay until phase 9 of the
-layout programme inverts them; see [layout](./future/layout/README.md).
+`ui/adoption.test.ts` was a migration ledger: a list of files someone had converted, each checked for
+raw controls. Phase 9 of the layout programme finished the conversion and inverted it, so what is left
+are rules rather than a list. **No plugin draws a raw `div` or `span`.** A plugin's tree is kit nodes,
+and a raw element is how a plugin used to reach a class in the host's stylesheet. It is also the one
+thing that cannot cross to a worker, so a plugin that emits one has written something a loaded plugin
+could not. The rule names those two tags and not `section`, `table` or `input`, which are markup with
+meaning rather than markup with a class. Two arch rules in `tools/arch/boundaries.test.ts` hold the
+rest: **no plugin ships a stylesheet**, and **no plugin mounts a Solid root of its own**, because a
+root the host does not know about sits outside every focus group and no intent reaches it.
+
+The CSS clash and Checkbox checks stay, for the host's own code. Core still writes elements and
+stylesheets and can still lose a rule to a primitive's own attribute selector.
 
 ## Icons
 
@@ -534,6 +552,13 @@ fixed-height drawer column: asking for `height: 100%` there would mean 100% of t
 overflow past the header, so the frame takes the drawer's remaining space instead, matching what the
 enclosing flex column already implies.
 
+`Drawer` is the app's one bottom dock. It is a host component rather than a kit node, because where
+the icon rails are and how tall the top bar is are the shell's own geography, and because its height
+is a pixel the resize grip produced, which is exactly what a kit node's props may not be. It reaches
+plugins through `@acorn/plugin-api/ui/host` beside `PaletteSurface`. The terminal is its only caller.
+Nothing behind a drawer goes inert, there is no backdrop, and Escape does not dismiss it: a drawer is
+a second place to work rather than an interruption.
+
 The toast stack sits above `--term-drawer-h`, the terminal drawer's published height (set on
 `documentElement` by the terminal plugin, with a fallback for a window where that plugin is not
 mounted), so a toast never renders behind the drawer. The stack itself ignores pointer events so it
@@ -545,8 +570,9 @@ near-duplicate `.palette-*` and `.finder-*` rule sets that used to exist side by
 Modal dismissal (Escape, backdrop click, Tab focus containment) is `ui/dismissable.ts`, a hook
 returning handlers rather than a component; markup stays at the call site. Nine call sites
 hand-wrote this before it existed, five of them with only a backdrop click and nothing else, so Tab
-walked straight out of the dialog into the page behind it and Escape did nothing. `Modal` and
-`Drawer` both use it verbatim, which is what keeps them purely cosmetic and safely reviewable.
+walked straight out of the dialog into the page behind it and Escape did nothing. `Modal` uses it
+verbatim, which is what keeps it purely cosmetic and safely reviewable. The bottom `Drawer` above
+does not, because it is not modal.
 
 Escape is handled twice on purpose: once on the dialog element, and once on the document. The
 element handler alone only fires while focus sits inside the dialog, and focus drops back to the

@@ -1,6 +1,4 @@
-# plugin API major: 6
-client: AgentToolRendererContribution
-client: AgentToolRendererProps
+# plugin API major: 7
 client: CHECK_TONE
 client: ClientPlugin
 client: ClientScheduleContribution
@@ -52,7 +50,6 @@ client: activeTerminal
 client: addSession
 client: agentContextContributions
 client: agentSessionsFor
-client: agentToolRendererRegistry
 client: agentToolTone
 client: allProjects
 client: brandMarkRegistry
@@ -369,6 +366,7 @@ ui/editor: watchMonacoTheme
 ui/host: Acorn
 ui/host: AnnotationMarks
 ui/host: Concern
+ui/host: Drawer
 ui/host: InlineSlot
 ui/host: PaletteSurface
 ui/host: ProviderHtml
@@ -432,7 +430,6 @@ ui/tree: Checkbox
 ui/tree: Chip
 ui/tree: ChipRow
 ui/tree: CodeBlock
-ui/tree: CollapsibleSection
 ui/tree: Composer
 ui/tree: ConfirmButton
 ui/tree: CopyButton
@@ -520,7 +517,6 @@ ui: Checkbox
 ui: Chip
 ui: ChipRow
 ui: CodeBlock
-ui: CollapsibleSection
 ui: Composer
 ui: ConfirmButton
 ui: CopyButton

@@ -207,12 +207,15 @@ describe('declared frame contributions', () => {
     manifest('board', { client: './dist/client.js', contributions: { frames } })
 
   it('defaults a surface to a desktop pane at order 500', async () => {
-    install('board', withFrames([{ target: 'pane', id: 'board', label: 'Board' }]), BUNDLE('board'), 'export default {}')
+    // `layout` and `regions` are not defaulted: a pane has to say how it is drawn, and the plainest
+    // true answer is still a sentence the author writes (pluginManifest.ts).
+    const declared = { target: 'pane', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' } }
+    install('board', withFrames([declared]), BUNDLE('board'), 'export default {}')
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
     expect(installedPluginInfo(installed[0]).contributions.frames).toEqual([
       // `scope: 'task'` is part of the default set: a pane written before the field existed is a pane
       // in a task's layout, which is the only thing a pane has ever been.
-      { target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, scope: 'task', formFactor: ['desktop'], claimsKeys: [] },
+      { ...declared, glyph: 'puzzle', order: 500, scope: 'task', formFactor: ['desktop'], claimsKeys: [] },
     ])
   })
 

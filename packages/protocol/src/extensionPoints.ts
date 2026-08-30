@@ -19,6 +19,8 @@
 // did not declare simply has nothing delivered into it. See docs/plugins.md § Cooperative extension
 // points and § There is no uncooperative extension.
 
+import type { AgentToolCall } from './managedAgents'
+
 /**
  * What a point lets somebody else bring. Five kinds, one manifest key, the same four rules
  * (docs/plugins.md § Cooperative extension points).
@@ -159,7 +161,7 @@ export type PluginAnnotationMarks = { items: PluginAnnotationMark[] }
  * fields land on the same item however else they differ.
  */
 export const annotationKeyOf = (fields: readonly string[], key: PluginAnnotationKey): string =>
-  fields.map((field) => String(key[field] ?? '')).join(' ')
+  fields.map((field) => String(key[field] ?? '')).join('\0')
 
 // ── The hook half ─────────────────────────────────────────────────────────────────────────────────
 //
@@ -272,6 +274,19 @@ export const CORE_SLOT_PROVIDER = 'core'
  *  a literal per call site. A plugin's point never appears in this list; it is minted from its
  *  manifest like any other. */
 export const AGENT_TOOL_CARD_POINT = 'agents:tool-card'
+
+/** What a contributor to `agents:tool-card` is handed. JSON, because the same props reach a compiled
+ *  component in this realm and a worker's tree over a port, and the two must be handed the same thing.
+ *  That is why there is no "the reader toggled me" callback here: `defaultOpen` seeds the disclosure
+ *  and the owner's own card is the one that teaches the setting. */
+export type AgentToolCardProps = {
+  tool: AgentToolCall
+  taskId: string
+  /** Whether this card's disclosure should start open, resolved from the reader's setting. Seed a
+   *  signal with it and leave it alone: read reactively, it would shut a card the moment its call
+   *  finished, which is when somebody is most likely to be reading it. */
+  defaultOpen: boolean
+}
 
 /** Room in the agent composer's own action bar, beside Attach and the two pickers. A `stack` point,
  *  because "everyone with something to offer this draft" is a real answer for a toolbar. */

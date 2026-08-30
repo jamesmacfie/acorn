@@ -60,7 +60,6 @@ component: a tree names one, and the host mounts its own.
 | Brand marks | Both | `ctx.brandMarks` / manifest `icon` and `icons` | The `brand:` glyph namespace |
 | Client schedules | Compiled | `ctx.schedules` | The device-local scheduler. **Direction: stays compiled.** A loaded plugin's periodic work belongs on the node, which runs whether or not a client is open (docs/schedules.md § Why the node, and only the node). The client registry exists for work that has no meaning without a window. |
 | Integration flows | Compiled | `ctx.integrationFlows` | The connect-a-provider wizard. **Direction: gains a manifest twin.** Named as a blocker on moving `github` out of tree ([compiled-tier.md](./future/compiled-tier.md)); the flow is already a sequence of steps rather than a component, so the descriptor is a shape question, not a seam question. |
-| Agent tool renderers | Both | `ctx.agentToolRenderers` / an `extensions` entry on `agents:tool-card` | The agent transcript. The compiled tier hands the host a component; the loaded tier names the tool names it draws in `matches` and emits a tree of the host's own components from a worker ([06-remote-tree.md](./future/layout/06-remote-tree.md)). An ordinary `remote` point since the five kinds landed, so the arbitration and the settings picker are the same ones every slot gets. A compiled renderer still wins where both claim a call. |
 | Rail markers | Compiled | `ctx.railMarkers` | A status dot on a rail control. **Direction: gains a manifest twin,** in rail-tab slice 3 ([rail-tab.md](./future/rail-tab.md)). Data only, no click verb, so the descriptor is a route plus a colour. Not landed as of 2026-08-28. |
 | Persisted state slices | Compiled | `ctx.persistedStateSlices` | Device-local persisted state. **Direction: stays compiled.** A loaded plugin has `plugin:<id>:*` prefs through `ctx.core.prefs` and its frame's own `state` verb, which is the same capability with the namespace bound by the host. A second mechanism would be a second namespace to police. |
 | Client capabilities | Compiled | `ctx.capabilities` | Plugin-to-plugin function calls in the renderer. **Direction: stays compiled, permanently.** A live function cannot cross the iframe boundary. The loaded tier's equivalent is a route, and that is the right shape for it. |
@@ -90,6 +89,12 @@ Run by the node, with or without a client attached.
 | Broadcasts | Both | `ctx.events` | The WebSocket hub. A loaded plugin sends on `plugin:<id>:*` only, and hears core events by manifest grant |
 
 ## The slot vocabulary
+
+There is no separate agent tool renderer row above, and there was one until phase 9 of the layout
+programme. A tool card is a contribution to `agents:tool-card`, an ordinary `remote` point, and the
+changes plugin fills it with a `component` carrier the same way a loaded plugin fills it with a tree.
+Both render paths, one kind, one arbitration, one settings picker. That is the pattern for anything
+that looks like a private renderer registry: open a point instead.
 
 Two spellings, deliberately, and this is where they meet. The manifest's `slots[].slot` is a short
 enum a descriptor may name; `UiSlotId` is the full set of places the shell draws a slot, most of

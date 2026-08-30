@@ -42,6 +42,7 @@
       "github:summary-badges"
     ],
     "extensions": [
+      "changes.tool-card",
       "memory.section"
     ],
     "refPanels": [
@@ -55,9 +56,6 @@
       "acorn-task-context",
       "acorn-docker",
       "acorn-terminals"
-    ],
-    "agentToolRenderers": [
-      "changes.agent-file-tool"
     ],
     "schedules": [
       "docker.task-containers"
@@ -106,8 +104,8 @@
       "extensionPoints": [
         "changes:diff-line"
       ],
-      "agentToolRenderers": [
-        "changes.agent-file-tool"
+      "extensions": [
+        "changes.tool-card"
       ]
     },
     "context": {

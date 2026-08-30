@@ -173,7 +173,7 @@ reason.
 `DocumentTabs` over a raw div Monaco mounts into. The file palette is a `PaletteSurface` overlay.
 
 **As a tree.** `frame-beside-document`, the document being the host editor and the beside region
-the plugin's tree of tabs. This is the template `docs/third-party/editor.md` names as its one
+the plugin's tree of tabs. This is the template the editor plugin named as its one
 blocker.
 
 **Rectangle left.** Monaco. On a terminal the document region is a host text view, read-only in a

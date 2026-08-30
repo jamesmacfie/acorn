@@ -1,6 +1,41 @@
 # Layout: every pane as a host-owned layout filled with a component tree
 
-Status: proposal, 2026-08-28. Nothing here has started.
+Status: **SHIPPED 2026-08-30.** All ten phases landed. This folder sequences and links; the owning
+docs under `docs/` describe the behaviour. Where they disagree, the owning doc wins.
+
+The deviations, in one place:
+
+1. **`ListDetail` and `DocumentTabs` stayed kit nodes.** Phase 9 was written to delete them, on the
+   grounds that they are layouts. Phases 5 to 8 proved otherwise: a pane's regions are the *outer*
+   arrangement, and a split *inside* one region is a different object. Ten plugins split inside a
+   region, github nests two splits in one, and http's own comment records the choice. Keeping them
+   is the finding, not the shortcut.
+2. **`overlay`, `importer` and `coreSlot` still take no layout.** Phase 9 was written to delete the
+   iframe path for those three as well. Each is a rectangle by construction, with no arrangement to
+   name and no second region, so giving them a layout key would add a manifest field whose only legal
+   value is `single` over `frame`. `pane`, `refPanel` and `settings` do require one, and that is where
+   the implicit "no layout means all of it is my iframe" path died.
+3. **`lib/isTypingTarget.ts` went, but not as dead code.** Its callers were the keymap engine phase 2
+   built, which is the right owner. `isTerminalTarget` moved into `keys/host.ts` and asks the kit's own
+   PTY rectangle rather than a plugin's class, and `isTypingTarget` comes from the protocol directly.
+4. **A fourth `Rectangle` kind, and a `mount` prop.** `editor` joined `pty`, `webview` and `frame`,
+   with the editor pane's Monaco and the host's document surface as its two consumers. `mount` hands
+   the caller an element the host drew, which is what let the last five `<div ref={host}>` sites and
+   their stylesheets go.
+5. **`Drawer` is a host component, not a kit node.** The terminal drawer's outer box had to stop being
+   the plugin's stylesheet, and its height is a pixel the resize grip produced, which a kit node's
+   props may not be. It sits beside `PaletteSurface` on `@acorn/plugin-api/ui/host`.
+6. **The plugin API major went to 7.** Removing `agentToolRendererRegistry` and the
+   `CollapsibleSection` alias shrinks the published surface, and the snapshot test refuses that under
+   an unchanged number.
+7. **A tool card matches on kind, not on a predicate.** The changes plugin's card matched "did this
+   call touch a path"; as an `agents:tool-card` contribution it matches `['read', 'edit', 'delete',
+   'move']`. A point's arbitration has to be decidable without running a contributor's code, so a
+   predicate was never on offer. It also lost its `onOpenChange`, because a function does not cross a
+   port and both render paths get the same props.
+8. **The editor plugin was converted here.** No phase scheduled it, and phase 9's "no `.css` under
+   `plugins/*/src`" could not be met without it. Its file tree is a flat `Rows tree` now, which is how
+   it gained arrow keys, and `docs/third-party/editor.md` is deleted.
 
 This folder is the plan for changing how acorn draws plugin UI. Today a first-party plugin draws
 with Solid components and its own CSS inside the shell, and a loaded plugin draws inside a
@@ -104,7 +139,7 @@ Supporting documents, readable in any order:
 | 6 ✅ | [phase-6-small-compiled-panes.md](./phase-6-small-compiled-panes.md) | context, memory, notes, changes, docker, workflows settings, onboarding as layouts and trees | Memory and changes stop being first-party-only |
 | 7 ✅ | [phase-7-github.md](./phase-7-github.md) | The PR pane, browse, list, ref panel, and importer as layouts and trees | The largest regular pane proves the layouts hold |
 | 8 ✅ | [phase-8-agents.md](./phase-8-agents.md) | The transcript as a timeline of slots, the composer with slots, the sidebar, Agent Center | The pane the whole exercise pays for |
-| 9 | [phase-9-cleanup-and-docs.md](./phase-9-cleanup-and-docs.md) | Deleting the old paths, executing the docs migration, the full test pass | Done |
+| 9 ✅ | [phase-9-cleanup-and-docs.md](./phase-9-cleanup-and-docs.md) | Deleting the old paths, executing the docs migration, the full test pass | Done |
 
 ## The order of work
 

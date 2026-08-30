@@ -5,6 +5,10 @@ export { registerWillHandler } from '@acorn/client-core/registries/willPhase.tsx
 export type { Concern } from '@acorn/client-core/registries/willPhase.tsx'
 // prune candidate: GitHub still mounts the whole shell while its source migration is completed.
 export { default as Acorn } from '@acorn/client-core/Acorn.tsx'
+// The app's one bottom dock. Host-only, and not a kit node: where the rails are and how tall the top
+// bar is are the shell's own geography, and its height is a pixel the drag handle produced, which is
+// exactly what a kit node's props may not be (docs/ui-design.md § The closed kit).
+export { Drawer } from '@acorn/client-core/ui/Drawer.tsx'
 // The palette chrome, deduped ×4. Host-only: palettes use the shell's focus machinery, and a
 // sandboxed frame cannot open one.
 export { PaletteSurface } from '@acorn/client-core/palette/PaletteSurface.tsx'

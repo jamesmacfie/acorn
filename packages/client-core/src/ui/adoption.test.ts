@@ -165,134 +165,34 @@ describe('primitive adoption', () => {
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
-  // Files fully converted to the primitive components. Add a file when you migrate it; the list
-  // may only grow, and it is not every file.
-  const CONVERTED = [
-    'packages/client-core/src/settings/AppearanceSettings.tsx',
-    'plugins/changes/src/client/agentToolRenderer.tsx',
-    'plugins/agents/src/client/AgentCenter.tsx',
-    'plugins/agents/src/client/AgentComposer.tsx',
-    'plugins/agents/src/client/AgentContextPickerModal.tsx',
-    'plugins/agents/src/client/AgentEventCard.tsx',
-    'plugins/agents/src/client/AgentPane.tsx',
-    'plugins/agents/src/client/AgentRequestCard.tsx',
-    'plugins/agents/src/client/AgentTaskSidebar.tsx',
-    'plugins/agents/src/client/AgentTranscript.tsx',
-    'plugins/agents/src/client/AgentUsageIndicator.tsx',
-    'plugins/agents/src/client/AgentUsageSection.tsx',
-    'plugins/agents/src/client/ManagedAgentMarkdown.tsx',
-    'plugins/agents/src/client/QueuedAgentTurns.tsx',
-    'plugins/agents/src/client/sourceContribution.tsx',
-    'plugins/agents/src/client/toolRendererRegistry.tsx',
-    // Tier 1 (see docs/ui-design.md § The three kit invariants).
-    'packages/client-core/src/editor/DocumentSurface.tsx',
-    'packages/client-core/src/node/NodeChip.tsx',
-    'packages/client-core/src/settings/AgentToolsSettings.tsx',
-    'packages/client-core/src/settings/PluginsSettings.tsx',
-    'packages/client-core/src/settings/SecuritySettings.tsx',
-    'packages/client-core/src/ui/tips.tsx',
-    'plugins/docker/src/client/DockerSettings.tsx',
-    'plugins/github/src/client/ComparePreview.tsx',
-    'plugins/github/src/client/DiffForPull.tsx',
-    'plugins/github/src/client/DiffView.tsx',
-    'plugins/github/src/client/GithubImporter.tsx',
-    'plugins/github/src/client/Shortcuts.tsx',
-    // Tier 2 (see docs/ui-design.md § The three kit invariants).
-    'packages/client-core/src/plugins/frames/PluginFrame.tsx',
-    'packages/client-core/src/ui/Fold.tsx',
-    'packages/client-core/src/ui/Popover.tsx',
-    'plugins/docker/src/client/DockerTaskPane.tsx',
-    // Tier 3 (see docs/ui-design.md § The three kit invariants).
-    'apps/desktop/src/app/client/CommandPalette.tsx',
-    'packages/client-core/src/palette/WorkspacePalette.tsx',
-    'packages/client-core/src/layouts/DocumentSplit.tsx',
-    'packages/client-core/src/layouts/ListDetail.tsx',
-    'packages/client-core/src/layouts/StackSplit.tsx',
-    'packages/client-core/src/layouts/Wizard.tsx',
-    'packages/client-core/src/ui/Composer.tsx',
-    'packages/client-core/src/ui/Drawer.tsx',
-    'packages/client-core/src/ui/FindBar.tsx',
-    'packages/client-core/src/ui/KeyValueEditor.tsx',
-    'plugins/editor/src/client/EditorPane.tsx',
-    'plugins/editor/src/client/FilePalette.tsx',
-    'plugins/editor/src/client/FileTree.tsx',
-    'packages/client-core/src/diff/DiffToolbar.tsx',
-    'plugins/onboarding/src/client/OnboardingWizard.tsx',
-    // Tier 4 (see docs/ui-design.md § The three kit invariants).
-    'apps/desktop/src/app/client/App.tsx',
-    'apps/desktop/src/app/client/TaskView.tsx',
-    'packages/client-core/src/configTrust/ConfigTrustDialog.tsx',
-    'packages/client-core/src/modelProviders/ModelConnectionPicker.tsx',
-    'packages/client-core/src/node/FleetHome.tsx',
-    'packages/client-core/src/node/NodeGate.tsx',
-    'packages/client-core/src/plugins/PluginApprovalDialog.tsx',
-    'packages/client-core/src/plugins/PluginTrustDialog.tsx',
-    'packages/client-core/src/plugins/chrome/ChromeSourcePanel.tsx',
-    'packages/client-core/src/plugins/frames/PluginOverlay.tsx',
-    'packages/client-core/src/plugins/frames/PluginWebview.tsx',
-    'packages/client-core/src/registries/willPhase.tsx',
-    'packages/client-core/src/settings/McpSettings.tsx',
-    'packages/client-core/src/settings/NodeDevices.tsx',
-    'packages/client-core/src/settings/SchedulesSettings.tsx',
-    'packages/client-core/src/settings/ShortcutsSettings.tsx',
-    'packages/client-core/src/settings/ConnectionProjectMap.tsx',
-    'packages/client-core/src/tasks/TaskPaneHost.tsx',
-    'packages/client-core/src/ui/ContributionBoundary.tsx',
-    'packages/client-core/src/workspaces/WorkspaceProjectAssignments.tsx',
-    'plugins/agents/src/client/AgentPricingSettings.tsx',
-    'plugins/context/src/client/ContextPane.tsx',
-    'plugins/github/src/client/CreatePullForm.tsx',
-    'plugins/onboarding/src/client/GithubConnect.tsx',
-    'plugins/preview/src/client/PreviewPane.tsx',
-    'plugins/terminal/src/client/TerminalPanel.tsx',
-    'plugins/terminal/src/client/TerminalSettings.tsx',
-    'plugins/workflows/src/client/WorkflowsSettings.tsx',
-    // Phase 6 of the layout programme: the small compiled panes, as layouts and kit trees. Each of
-    // these lost its stylesheet in the same change (docs/future/layout/phase-6-small-compiled-panes.md).
-    'packages/client-core/src/ui/Rectangle.tsx',
-    'plugins/changes/src/client/ChangesPane.tsx',
-    'plugins/changes/src/client/changesModel.tsx',
-    'plugins/docker/src/client/ContainerDetail.tsx',
-    'plugins/docker/src/client/DockerBrowse.tsx',
-    'plugins/docker/src/client/DockerExecTerminal.tsx',
-    'plugins/docker/src/client/DockerFooterBadge.tsx',
-    'plugins/docker/src/client/DockerTaskPane.tsx',
-    'plugins/memory/src/client/MemorySection.tsx',
-    'plugins/notes/src/client/NotesPane.tsx',
-    'plugins/onboarding/src/client/OnboardingWizard.tsx',
-    // Phase 7: github's five surfaces, as layouts and kit trees. Its four stylesheets went in the
-    // same change (docs/future/layout/phase-7-github.md).
-    'packages/client-core/src/registries/ProviderHtml.tsx',
-    'packages/client-core/src/registries/RefPanelBox.tsx',
-    'packages/client-core/src/ui/Rows.tsx',
-    'plugins/github/src/client/GithubBrowse.tsx',
-    'plugins/github/src/client/PullDetail.tsx',
-    'plugins/github/src/client/PullList.tsx',
-    'plugins/github/src/client/PullRefPanel.tsx',
-    'plugins/github/src/client/checks/ChecksPanel.tsx',
-    'plugins/github/src/client/pullDetail/Conversation.tsx',
-    'plugins/github/src/client/pullDetail/PrFiles.tsx',
-    'plugins/github/src/client/pullDetail/PrOverview.tsx',
-    'plugins/github/src/client/pullDetail/PrPane.tsx',
-    // Phase 8: the agents surfaces, as layouts and kit trees. Its six stylesheets went in the same
-    // change, and the plugin has none left (docs/future/layout/phase-8-agents.md).
-    'packages/client-core/src/ui/Icon.tsx',
-    'packages/client-core/src/ui/MentionTextarea.tsx',
-    'packages/client-core/src/ui/Timeline.tsx',
-    'plugins/agents/src/client/AgentTaskSidebar.tsx',
-    'plugins/agents/src/client/AgentUsageIndicator.tsx',
-  ]
+  // ── The invariants, inverted ────────────────────────────────────────────────────────────────
+  //
+  // This file was a ledger: a growing list of files someone had converted, each checked for raw
+  // controls. Phase 9 of the layout programme finished the conversion, so the list is gone and the
+  // rules below hold for everything. A ledger only ever answers "has this file been done"; a rule
+  // answers "can this be written at all", which is the question that stays useful.
 
-  it.each(CONVERTED)('%s uses primitives, not raw controls', (file) => {
-    const text = readFileSync(join(SRC, file), 'utf8')
-    expect(text, 'raw <button>').not.toMatch(/<button(?:\s|>)/)
-    expect(text, 'raw <select>').not.toMatch(/<select(?:\s|>)/)
-    expect(text, 'raw <textarea>').not.toMatch(/<textarea(?:\s|>)/)
-    expect(text, 'raw class="ui-input"').not.toMatch(/class="ui-input"/)
+  const pluginTsx = () => tsx().filter((file) => rel(file).startsWith('plugins/'))
+
+  it('no plugin draws a raw div or span', () => {
+    // The one that took the whole programme. A plugin's tree is kit nodes: `Stack` and `Inline` for
+    // grouping, `Text` for a run of words, `Rectangle` for pixels somebody else owns. A raw element is
+    // how a plugin used to reach a class in the host's stylesheet, and it is the one thing that cannot
+    // cross to a worker — so a plugin that emits one has written something a loaded plugin could not.
+    //
+    // `div` and `span` only. A `section`, a `table` or an `input` inside a host component is markup
+    // with meaning; a div is markup with a class.
+    const raw = /<(?:div|span)[\s>/]/
+    const offenders = pluginTsx().filter((file) => raw.test(readFileSync(file, 'utf8'))).map(rel)
+    expect(offenders).toEqual([])
   })
+
+  // The other two halves of the same rule — no plugin stylesheet, and no plugin mounting a Solid root
+  // of its own — are arch rules, in `tools/arch/boundaries.test.ts`. They belong there because they are
+  // about what a package may contain rather than about what a call site writes.
 
   // The class-passthrough invariant that used to live here is gone with the passthrough itself: no
   // kit node takes a `class` any more, and `ui/kit/props.test-d.ts` is what holds that now. The
-  // CSS_CLASH and Checkbox checks above stay because raw tags in a plugin can still carry a class,
-  // and they go when phase 9 of the layout programme inverts this ledger.
+  // CSS_CLASH and Checkbox checks above stay for the host's own code, which still writes elements and
+  // stylesheets and can still lose a rule to a primitive's own attribute selector.
 })

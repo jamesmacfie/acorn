@@ -200,7 +200,7 @@ const frameSurface = z.object({
 // Everything below is static data or a path into the plugin's own namespace; the host draws the pixels
 // from a route on the plugin's always-running node half. The confinement check lives in the
 // manifest-level refinement, because it needs `id`.
-// See docs/plugins.md § Descriptors for chrome, frames for rectangles.
+// See docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels.
 
 // The closed verb set the host executes for a descriptor. `invoke`, an RPC into the plugin's frame,
 // isn't here: it needs a headless frame lifecycle the shell doesn't have.

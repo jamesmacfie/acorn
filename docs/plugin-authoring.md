@@ -37,17 +37,20 @@ build step. It is the same package as the worked example at the end of this file
 document is what to change and why.
 
 ```sh
-npm create acorn-plugin my-widget -- --remote
+npm create acorn-plugin my-widget -- --rectangle
 ```
 
-The same package, drawing the other way. The default `client.js` is a **frame**: a sandboxed iframe
-whose pixels are yours, which is what the rest of this document describes. `--remote` emits a **tree**
-instead: your code runs in a Web Worker with no DOM and names acorn's own components, and the host
-mounts them. You give up drawing your own pixels; you get the shell's keyboard handling, focus, ARIA
-and the reader's chosen style pack, and you keep them through every appearance change acorn ever
-ships. Reach for the frame when the surface owns its pixels — a chart, an image editor, a canvas —
-and for the tree otherwise. `docs/plugins.md` section Loaded plugins: the client half has both
-contracts.
+The same package, drawing the other way. The default `client.js` is a **tree**: your code runs in a Web
+Worker with no DOM and names acorn's own components, and the host mounts them. You give up drawing your
+own pixels; you get the shell's keyboard handling, focus, ARIA and the reader's chosen style pack, and
+you keep them through every appearance change acorn ever ships. `--rectangle` emits a **frame** instead:
+a sandboxed iframe whose pixels are yours. Reach for the rectangle when the surface owns its pixels, such
+as a chart, an image editor or a canvas, and for the tree otherwise. `docs/plugins.md` section Loaded
+plugins: the client half has both contracts.
+
+The default scaffold fills two extension points, one of each kind that draws and one that only says
+something true: a card in the agents transcript through `agents:tool-card`, and a note on a diff line
+through `changes:diff-line`. Delete whichever you do not want.
 
 It is published standalone, which means it carries a **copy** of three things this repository owns: the
 API major it stamps into `apiVersion`, the URL of the manifest schema, and the handshake.
@@ -97,7 +100,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `id` | yes | Matches `/^[a-z][a-z0-9-]{1,31}$/` — 2 to 32 characters, lowercase, no dots. The dot ban is what keeps `<dataRoot>/plugins/<id>/` and `<dataRoot>/plugins/<id>.sqlite` in one directory without colliding. |
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
-| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'4'` today (`packages/protocol/src/pluginApiVersion.ts`). Write `"4"` unless you have checked your plugin against another major too, in which case `"3 || 4"` or `"2-4"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
+| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'7'` today (`packages/protocol/src/pluginApiVersion.ts`). Write `"7"` unless you have checked your plugin against another major too, in which case `"6 || 7"` or `"5-7"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -164,15 +167,17 @@ one rather than failing to parse — with twenty-one named keys, each capped. Th
 each one is the point past which a contribution stops being an integration and starts being an app
 inside someone else's chrome.
 
-The rule that decides which key you want: **descriptors for chrome, frames for rectangles.** A frame is
-for a rectangle with real UI inside it. Everything smaller — a chip, a badge, a menu row, a palette
-entry — is a descriptor you declare and the host draws. A descriptor costs no document, looks native
-because it *is* the host's own components, and stays live when no frame of yours is mounted anywhere,
-because its data comes from a route on your always-running node half.
+The rule that decides which key you want: **descriptors for facts, trees for UI, rectangles for
+pixels.** Ask which of the three a surface is, in that order, and take the first that fits. A chip, a
+badge, a menu row or a palette entry is a descriptor you declare and the host draws: it costs no
+document, it looks native because it *is* the host's own components, and it stays live when nothing of
+yours is mounted, because its data comes from a route on your always-running node half. A pane, a
+panel body, a settings page or a card in somebody else's list is a tree. A frame is for pixels the
+host cannot draw.
 
 | Key | Cap | What it declares |
 | --- | --- | --- |
-| `frames` | 32 | A rectangle your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. Also where a pane declares a host-owned `layout` (document surface) and its `claimsKeys`, and where a `coreSlot` surface names which core surface it offers to replace. |
+| `frames` | 32 | A surface your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, a `refPanel` and a `settings` surface **must** name a `layout` and its `regions`; a region is a tree (`{ "kind": "remote", "entry": "…" }`), a rectangle (`"frame"`), or a host-drawn document. Also where a pane declares its `claimsKeys`, and where a `coreSlot` surface names which core surface it offers to replace. |
 | `sources` | 8 | A rail source. Rows come from a route on your node half; the host draws them and executes the `onSelect` verb. |
 | `slots` | 8 | A badge in an enumerated host slot: `footer` (the **task** footer, so it is invisible until a task is open) or `topbar` (the topbar's right end — the app's status bar). Nothing else is open, and `docs/plugins.md § Descriptors for chrome` records why each refused slot is refused. |
 | `palette` | 32 | The pre-`commands` spelling of a palette row, still parsed as an alias for a command with `palette: true`. Prefer `commands`: this key takes the *full* verb union rather than the narrow one, which is a legacy inconsistency and not a capability worth reaching for. |
@@ -187,10 +192,10 @@ because its data comes from a route on your always-running node half.
 | `collections` | 8 | A typed set of records a user can compose a dashboard panel over: `{ id, name, items, params?, schema?, refresh? }`. `items` is a GET on your own namespace answering `{ schema, rows }`, in seven field types and five roles. The `schema` here is the *static* promise so an editor can offer views before any data exists; omit it and the response describes itself, at the cost of nothing being configurable until the collection has been read once. See `docs/dashboards.md`. |
 | `themes` | 8 | A **colour** theme: `{ id, label, dark?, tokens }`, where `tokens` is the complete palette. You write no CSS — the host generates the block. See below. |
 | `contextMenus` | 8 | A row on a host-drawn right-click menu: `{ id, location, label, icon?, order?, when?, action }`. `location` is from a closed list (`task.row` today); `when` is a map of literals that must all equal the target's facts; `action` takes the narrow verb set and receives the id of what was right-clicked. |
-| `extensionPoints` | 4 | A strip inside one of **your** panes that other plugins may fill: `{ id, label, location, surface }`. `location` is from a closed list (`pane.footer` today) and `surface` must be a `pane` this manifest declares. You write no code for it — the host draws the strip. |
+| `extensionPoints` | 4 | A place inside one of **your** surfaces that other plugins may fill: `{ id, label, kind, … }`. `kind` picks which of the five a point takes and which other fields it reads: `rows` and `annotation` take a `location` or a `key`, `remote` and `rectangle` take a `mode`, and `hook` takes a `payload` and an `allows` list. The host mints the id as `<yourId>:<pointId>`. You write no code for a `rows` or `annotation` point — the host draws it. |
 | `schedules` | 4 | Work the node runs on a timer: `{ id, name, run, cadence, timeout? }`. `run` is a POST on your own namespace, called with `{ scheduleId }`, and its response is ignored beyond ok or error. `timeout` is seconds, defaulting to 60. The host mints the key from your plugin id, which is what opts the schedule into the 300-second plugin cadence floor. See `docs/schedules.md`. |
 | `taskChecks` | 4 | What you have to say when the owner archives a task, and the cleanup you offer to do: `{ id, check, apply?, timeout? }`. `check` is a GET answering `{ concern }`; `apply` is a POST the archive runs if the owner leaves your checkbox ticked. See below. |
-| `extensions` | 8 | Rows **you** put inside another plugin's point: `{ id, point, label, order?, items, onSelect?, refresh? }`. `point` is `<ownerPluginId>:<pointId>`, `items` is a GET on your own namespace, `onSelect` takes the narrow verb set. |
+| `extensions` | 8 | What **you** bring to another plugin's point: `{ id, point, label, order?, … }`. `point` is `<ownerPluginId>:<pointId>`, and naming the owner out loud is the disclosure. Exactly one carrier says what you bring: `items` is a GET on your own namespace, for rows and annotations; `remote` is a key of the object your bundle passed to `mountTree`, for a tree; `frame` is an `inline` surface of yours, for a rectangle; `route` is a POST on your own namespace, for a hook handler. `matches` narrows a tree or a rectangle to the key values it draws, and `onSelect` takes the narrow verb set. |
 | `auditActions` | 8 | A verb you write onto the node's audit trail: `{ id, label }`. The host qualifies it as `<yourId>:<id>` and refuses a `ctx.audit.record` naming one you did not declare, so the trail stays enumerable. Record what a person reviewing this machine would want to see, not every call you make. |
 | `harnesses` | 4 | A managed agent acorn starts, drives and draws a transcript for: `{ id, label, glyph?, spawn, envPassthrough?, quirks?, probes?, terminal? }`. The only contribution that names a program acorn will run, and the only node-side one that needs no bundle at all. See [§ Harnesses](#harnesses). |
 
@@ -554,12 +559,13 @@ handling from the host, and a stylesheet of your own to keep in step. See
 
 ### Drawing a tree
 
-Point your JSX preset at the remote adapter and every element and property in your components compiles
-into acorn's tree instead of into a document:
+The builder points your JSX preset at the remote adapter, so every element and property in your
+components compiles into acorn's tree instead of into a document. Your config names the entry and
+nothing else:
 
 ```js
 // acorn-plugin.config.mjs
-client: { entry: './src/tree/index.tsx', framework: 'solid' }
+client: { entry: './src/tree/index.tsx' }
 ```
 
 ```tsx
@@ -588,8 +594,9 @@ fills its `regions`; `single` is the trivial one, for a surface that is one tree
 ```
 
 A pane may name any layout ([docs/panes.md](./panes.md) § Layout model). A reference panel and a
-settings page may name `single` and nothing else, because the host already draws everything around
-them.
+settings page name `single` and nothing else, because the host already draws everything around them.
+All three have to name one: a surface that wants its own pixels says `"regions": { "body": "frame" }`,
+and there is no way to leave the layout out and mean the same thing.
 
 **Four rules follow from the tree being data on a message port**, and each one is checked on arrival
 rather than trusted:
@@ -759,8 +766,9 @@ paths (up to three, then "and N more"), and `stage` distinguishes `'load'` — a
 
 ## A complete example
 
-A plugin with a node half in two files and one vanilla pane. Every symbol in it is checked against the
-contracts above.
+A plugin with a node half in two files and one vanilla pane. It takes the frame path, because a
+hand-written package with no bundler cannot import the SDK and so cannot build a tree. Every symbol in
+it is checked against the contracts above.
 
 ### `acorn-plugin.json`
 
@@ -769,7 +777,7 @@ contracts above.
   "id": "hello-acorn",
   "name": "Hello Acorn",
   "version": "0.1.0",
-  "apiVersion": "4",
+  "apiVersion": "7",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {
@@ -779,14 +787,20 @@ contracts above.
   },
   "contributions": {
     "frames": [
-      { "target": "pane", "id": "hello-acorn", "label": "Hello", "glyph": "hand", "order": 800 }
+      {
+        "target": "pane", "id": "hello-acorn", "label": "Hello", "glyph": "hand", "order": 800,
+        "layout": "single", "regions": { "body": "frame" }
+      }
     ]
   }
 }
 ```
 
 `api: []` is correct and not an omission: the frame calls only this plugin's own namespace, which
-needs no scope. `core: ["tasks"]` is there because the route below resolves a task.
+needs no scope. `core: ["tasks"]` is there because the route below resolves a task. `layout: "single"`
+over a `"frame"` region is how a pane says "the host draws the box, I draw the inside": every `pane`,
+`refPanel` and `settings` surface has to say which of the three it is, and omitting the layout is no
+longer a way to mean "all of it is my iframe".
 
 ### `node/index.js`
 

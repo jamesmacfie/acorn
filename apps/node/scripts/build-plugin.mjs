@@ -44,16 +44,17 @@ const ROOT = resolve(NODE_APP, '../..')
 const PLUGINS_DIR = join(ROOT, 'plugins')
 const CONFIG_FILE = 'acorn-plugin.config.mjs'
 
-// A loaded bundle's framework choice is its own, and this maps it to the Vite transforms that choice
-// needs; a bundle that needs none omits the key, and adding a framework is one line here.
+// The one client transform, applied to every loaded bundle. `generate: 'universal'` is what makes the
+// output a tree rather than a document: every element creation and property set in the plugin's JSX
+// compiles to a call into the module named below, which builds acorn's own node names instead of DOM
+// (docs/future/layout/06-remote-tree.md § The SDK).
 //
-// `generate: 'universal'` is what makes the output a tree rather than a document: every element
-// creation and property set in the plugin's JSX compiles to a call into the module named below, which
-// builds acorn's own node names instead of DOM (docs/future/layout/06-remote-tree.md § The SDK). A
-// bundle that still wants an iframe writes no JSX at all, or brings its own transform.
-const FRAMEWORKS = {
-  solid: () => [solid({ solid: { generate: 'universal', moduleName: '@acorn/plugin-api/ui/tree' } })],
-}
+// This used to be a `framework` key each plugin named, with a map from it to a transform. Phase 9 of
+// the layout programme removed it: the remote adapter is the only target, so the key had one legal
+// value. A bundle drawing a rectangle instead writes no JSX and is unaffected — the transform has
+// nothing to rewrite — and a tree built through the SDK's own node functions rather than JSX is in the
+// same position.
+const treeTransform = () => solid({ solid: { generate: 'universal', moduleName: '@acorn/plugin-api/ui/tree' } })
 
 const buildable = () =>
   readdirSync(PLUGINS_DIR).filter((dir) => existsSync(join(PLUGINS_DIR, dir, CONFIG_FILE)))
@@ -128,17 +129,13 @@ try {
   })
 
   if (spec.client) {
-    const framework = spec.client.framework ? FRAMEWORKS[spec.client.framework] : null
-    if (spec.client.framework && !framework) {
-      throw new Error(`unknown client framework '${spec.client.framework}' — this builder knows: ${Object.keys(FRAMEWORKS).join(', ')}`)
-    }
     await build({
       // The node app's vite.config.ts intentionally externalizes every bare dependency for its SSR
       // artifact. A frame is one self-contained browser file, so it must not inherit that config.
       configFile: false,
       root: NODE_APP,
       logLevel: 'warn',
-      plugins: framework ? framework() : [],
+      plugins: [treeTransform()],
       build: {
         target: 'es2022',
         // The node bundle is built first in this process. Be explicit that this second build is a

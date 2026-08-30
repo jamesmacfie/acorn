@@ -13,11 +13,6 @@ export default {
   factory: 'rollbarPlugin',
   client: {
     entry: './src/tree/index.tsx',
-    // The bundle runs in a worker and emits a tree of acorn's own component names; the builder maps
-    // this key to the Vite transforms that compile JSX into that tree rather than into a document.
-    // The seam stays framework-agnostic: a React/Vue/vanilla bundle names its own framework (or none)
-    // here instead.
-    framework: 'solid',
   },
   permissions: {
     api: ['core.tasks:read'],

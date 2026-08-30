@@ -1,6 +1,6 @@
 import { createMemo, createResource, Index, Show } from 'solid-js'
 import { Alert, Button, Field, Input, SectionHeader, SegmentedControl, Select } from '../ui/primitives'
-import { CollapsibleSection } from '../ui/Fold'
+import { Fold } from '../ui/Fold'
 import Icon from '../ui/Icon'
 import { chartAxisFields, type ChartShape } from './chart'
 import type { PanelDraft } from './draft'
@@ -431,7 +431,7 @@ export function MappingSection(props: { draft: PanelDraft }) {
 
       {/* Folded, because the role pre-fill is right almost always and a matrix nobody needs to touch
           should not be the first thing they see. */}
-      <CollapsibleSection level="sub" label="Fields" persistKey="dashboards.field-mapping">
+      <Fold level="sub" label="Fields" persistKey="dashboards.field-mapping">
         {/* A `<details>` lays its children out in plain block flow, so everything inside a fold stacks
             at zero gap however carefully the rows themselves are spaced. One stack, and the fold reads
             like the rest of the form. */}
@@ -496,7 +496,7 @@ export function MappingSection(props: { draft: PanelDraft }) {
             )}
           </Index>
         </div>
-      </CollapsibleSection>
+      </Fold>
     </Show>
   )
 }

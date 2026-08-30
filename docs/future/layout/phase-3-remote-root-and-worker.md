@@ -90,7 +90,8 @@ otherwise today's built-in card. changes registers its renderer both ways in thi
 - `packages/client-core/src/plugins/contributions.ts` and `frames/register.ts`: register remote
   contributions per plugin, gated on trust like frames.
 - `plugins/agents/src/client/toolRendererRegistry.tsx` and `AgentToolCallCard`: the slot.
-- `plugins/changes/src/client/agentToolRenderer.tsx`: rewritten against the kit.
+- `agentToolRenderer.tsx` in the changes plugin: rewritten against the kit. Phase 9 renamed it
+  `ToolCard.tsx` and moved it onto the `agents:tool-card` point.
 - `apps/desktop/src-tauri/src/app_scheme.rs`: `worker-src`; a Rust test pins it.
 - `packages/create-acorn-plugin/index.mjs`: a `--remote` template (default flips in phase 9).
 
@@ -202,8 +203,8 @@ Owed and not done: the manual check that changes' card renders through a worker 
   roles the survey describes; `verbs.ts` is the one list both sides compile against.
 - `plugins/agents/src/client/toolRendererRegistry.tsx` resolves renderers by tool and
   `AgentToolCallCard` passes `defaultOpen` and `onOpenChange` (per `docs/managed-agents.md`).
-- `plugins/changes/src/client/agentToolRenderer.tsx` exists and is registered through
-  `ctx.agentToolRenderers`.
+- `agentToolRenderer.tsx` in the changes plugin exists and is registered through
+  `ctx.agentToolRenderers`. Phase 9 deleted that registry and the file is `ToolCard.tsx` now.
 - `apps/desktop/src-tauri/src/app_scheme.rs` builds the shell CSP and has a test asserting
   `frame-src app-plugin:`.
 - `packages/plugin-sdk/src/public.ts` declares `mountFrame` and `connect`; confirm how the published

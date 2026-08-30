@@ -71,7 +71,8 @@ Files: `plugins/rollbar/src/frame/{index.tsx,app.tsx,RollbarItemView.tsx}` and i
 - Each plugin's manifest: `frames[].layout` and `regions`, with `regions.*` naming `remote:` entries.
   The `document-over-frame` entry for database keeps its `routes`.
 - The package builder (`acorn-plugin.config.mjs`, `framework: 'solid'`) targets the remote adapter;
-  the `framework` key stays for phase 9 to reconsider.
+  the `framework` key stays for phase 9 to reconsider. Phase 9 deleted it: the remote adapter is the
+  only target, so the key had one legal value.
 - Ref panels: `refPanel` frames for linear and rollbar become `remote` contributions with target
   `refPanel`; `PluginRefPanel.tsx` mounts a `TreeHost` in the box it already draws.
 - The iframe path is not deleted here; a manifest without `layout` still gets a frame. That is the

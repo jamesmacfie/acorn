@@ -1,6 +1,6 @@
 import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
-import { Alert, Button, Checkbox, Modal } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, Modal, Stack } from '@acorn/plugin-api/ui'
 
 export default function AgentContextPickerModal(props: {
   contribution: AgentContextContribution
@@ -50,7 +50,7 @@ export default function AgentContextPickerModal(props: {
             when={!options.error}
             fallback={<Alert>Unable to load available context.</Alert>}
           >
-            <div class="agent-context-option-list">
+            <Stack gap="row">
               <For
                 each={options() ?? []}
                 fallback={<p class="muted agent-context-option-empty">Nothing is currently available from this source.</p>}
@@ -68,7 +68,7 @@ export default function AgentContextPickerModal(props: {
                   />
                 )}
               </For>
-            </div>
+            </Stack>
           </Show>
         </Show>
       </Modal.Body>

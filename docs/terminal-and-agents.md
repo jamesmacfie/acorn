@@ -109,6 +109,9 @@ profile `Menu`, the "+" and the close control in its actions slot. `SplitHandle`
 The session itself is a `Rectangle kind="pty"`: the kit owns the box and the keyboard contract, so a
 reader who tabs into a terminal can press Escape to get back out, and xterm owns the pixels.
 
-The drawer is a `drawer` slot rather than a pane, so no host layout owns its outer box. That geometry
-stays in `plugins/terminal/src/client/terminal.css`, written in shell tokens: where the drawer sits
-between the two rails, how tall it is, and what maximizing does.
+The drawer is a `drawer` slot rather than a pane, so no pane layout owns its outer box. The `Drawer`
+host component does. It draws the dock between the two icon rails and above the task footer, and it
+takes a height and a maximized flag from the plugin, which owns the resize grip that produced them.
+That geometry was the plugin's own stylesheet until phase 9 of the layout programme. Where the rails
+are and how tall the top bar is are the shell's facts, and a plugin that writes them down is one
+shell change away from being wrong.

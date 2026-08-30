@@ -175,6 +175,18 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     if (frame.scope === 'project' && frame.target !== 'pane') {
       ctx.addIssue({ code: 'custom', path: [...at, 'scope'], message: 'only a pane surface can be project-scoped' })
     }
+    // A pane, a reference panel and a settings page say how they are drawn, always. Until phase 9 of
+    // the layout programme `layout` was optional and omitting it meant "the whole surface is my
+    // iframe"; that implicit path is gone, and a surface that wants pixels says so out loud with a
+    // `frame` region. One rule, and it is the same rule for the plugin, the trust prompt and the
+    // register pass (docs/panes.md § Layout model).
+    if (!frame.layout && (frame.target === 'pane' || frame.target === 'refPanel' || frame.target === 'settings')) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'layout'],
+        message: `a ${frame.target} surface says how it is drawn: name a layout, and a region of 'frame' if its body is your own rectangle`,
+      })
+    }
     if (frame.layout) {
       // A layout arranges a pane rectangle, so a pane may name any of them.
       //

@@ -14,7 +14,7 @@ import DockerExecTerminal from './DockerExecTerminal'
 import { STATS_BESIDE_POINT } from './extensionPoints'
 import {
   Alert, Button, Checkbox, Chip, ChipRow, ConfirmButton, EmptyState, Facts, FindBar, Heading, Inline,
-  Log, Meter, Rectangle, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar,
+  Log, Meter, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 
@@ -311,11 +311,8 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             </TabPanel>
 
             <TabPanel id="terminal" active={running() ? tab() : ''} idPrefix="docker-detail">
-              {/* A PTY is pixels, so it is a rectangle rather than a tree. The kit owns the box and
-                  the way in and out of it; xterm owns everything inside. */}
-              <Rectangle kind="pty" label={`${d().name} shell`}>
-                <DockerExecTerminal containerRef={d().name} />
-              </Rectangle>
+              {/* The exec session draws its own `Rectangle kind="pty"` (./DockerExecTerminal.tsx). */}
+              <DockerExecTerminal containerRef={d().name} label={`${d().name} shell`} />
             </TabPanel>
 
             <TabPanel id="stats" active={tab()} idPrefix="docker-detail">

@@ -14,7 +14,7 @@ import type { TextRole, Tone } from './kit/tokens'
    strong danger line are both ordinary, and neither is expressible if the two share an axis.
 
    At 80×24: plain text; `mono` is a no-op, `muted` is dim, `strong` and `heading` are bold, `eyebrow`
-   is dim uppercase. */
+   is dim uppercase, `match` is reverse video. */
 export function Text(props: {
   emphasis?: TextRole
   tone?: Tone

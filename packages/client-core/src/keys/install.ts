@@ -22,17 +22,17 @@
 import { createEffect, onCleanup } from 'solid-js'
 import { createDefaultHtmlKeymap, type HtmlKeymapEvent } from '@opentui/keymap/html'
 import type { Binding } from '@opentui/keymap'
-import { isTerminalTarget, isTypingTarget } from '../lib/isTypingTarget'
+import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import { commandAvailable, commandRegistry, commandTitle, executeCommand } from '../registries/commands'
 import type { ResolvedKeybinding } from '../registries/keybindings'
-import { setKeymap } from './host'
+import { isTerminalTarget, setKeymap } from './host'
 import { intentKeys, toKeymapKey } from './keymap'
 import type { Intent } from './intents'
 import { moveRegion, movePane } from './regions'
 
 // The engine and the intent binder live in `host.ts`, which the kit may import; this module reads the
 // command and keybinding registries and so may not be imported from `ui/`.
-export { keymap, keysFor, registerIntentLayer, type AcornKeymap } from './host'
+export { isTerminalTarget, keymap, keysFor, registerIntentLayer, type AcornKeymap } from './host'
 
 export type ScopeContext = {
   prefs: () => { taskActive: boolean; focusedPane?: string }
@@ -54,7 +54,7 @@ const scopeActive = (binding: ResolvedKeybinding, context: ScopeContext, event: 
   if (binding.chord === 'escape' && target instanceof Element && target.closest('[role="dialog"], [role="alertdialog"]')) return false
   if (!isTypingTarget(target)) return true
   // xterm focuses a hidden textarea, so a terminal reads as a typing target; a command chord there is
-  // never terminal input on macOS, so it still fires. See lib/isTypingTarget.ts.
+  // never terminal input on macOS, so it still fires. See `isTerminalTarget` in ./host.ts.
   if (scope !== 'global' && !(event()?.super && isTerminalTarget(target))) return false
   return scope !== 'typing-exempt'
 }

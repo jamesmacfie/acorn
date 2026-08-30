@@ -1290,14 +1290,26 @@ belong to no task at all). The task-scoped predicate is re-exported from
 `@acorn/protocol/pluginContract.ts` rather than written a third time here, because the node's manifest
 parser checks the same thing when it validates that an `openPane` names a pane the manifest declares.
 
-### Descriptors for chrome, frames for rectangles
+### Descriptors for facts, trees for UI, rectangles for pixels
 
-The rule of thumb, and it is a refusal as much as a guideline. **A frame is for a rectangle with real
-UI inside it. Everything smaller is a descriptor.** A status chip, a footer badge, a menu row, a
-palette entry — each of those as an iframe would cost a process-isolated document, could never look
-native, and would be dead whenever no frame of that plugin happened to be mounted. So none of the
-small surfaces are open to frames, and the answer to "I want a chip in the topbar" is to grow the
-descriptor vocabulary rather than to open a slot id to an iframe.
+The rule of thumb, and it is a refusal as much as a guideline. **A descriptor is a fact the host
+draws. A tree is UI, written in the host's own components. A rectangle is pixels the host cannot
+draw.** Ask which of the three a surface is, in that order, and take the first that fits.
+
+A status chip, a footer badge, a menu row, a palette entry: each is a fact, and each as an iframe
+would cost a process-isolated document, could never look native, and would be dead whenever no frame
+of that plugin happened to be mounted. So none of the small surfaces are open to frames, and the
+answer to "I want a chip in the topbar" is to grow the descriptor vocabulary rather than to open a
+slot id to an iframe.
+
+A pane, a reference panel body, a settings page, a card in somebody else's list: those are UI, and
+they are trees. The plugin's bundle names the host's own components and the host draws them, so the
+result has the shell's keyboard handling, focus, ARIA and the reader's chosen style pack, and the
+same source runs compiled in this process or sandboxed in a worker.
+
+A PTY, a webview, a canvas, a code editor: those are pixels, and they are rectangles. The rule used
+to be "descriptors for chrome, frames for rectangles", which had only two answers and pushed every
+pane into an iframe by default. The middle answer is the one the layout programme added.
 
 That is why the `slots` enum is two names rather than the client's six, and why the refusals are
 recorded next to it in `@acorn/protocol/pluginContract.ts`:
@@ -1309,8 +1321,8 @@ recorded next to it in `@acorn/protocol/pluginContract.ts`:
 
 Refused, deliberately: `overlay` is the full-window layer that draws the config-trust gate, the plugin
 trust dialog and the command palette — a contribution there would paint over the very prompts asking
-whether to trust it. `drawer` is a rectangle with real UI in it, which is what a frame is for, and its
-slot context carries shell callbacks a descriptor cannot receive. `topbar.left` and
+whether to trust it. `drawer` is a dock with real UI in it, and its slot context carries shell
+callbacks a descriptor cannot receive. `topbar.left` and
 `task.switcher.extra` are members of the client's slot union with no host rendering them at all, so a
 manifest naming one would parse and never appear.
 
@@ -2019,17 +2031,17 @@ deliveries nor contribute to one.
 
 ### Client authoring and the UI kit
 
-A loaded bundle's framework is its choice. The repository package builder keeps the client Vite
-transform opt-in per plugin: the plugin's `acorn-plugin.config.mjs` names a `framework` (`solid`
-today) that the builder maps to the right transforms, a bundle that needs none omits the key, and
-adding a framework is one line in the builder's map. A direct `solid-js` dependency is intentional and
-is not the duplicate-Solid-in-one-realm hazard the shell dependency rules prevent: a frame's origin and
+The repository package builder applies one client transform, and it compiles for the tree path: the
+Solid preset is told `generate: 'universal'` with `@acorn/plugin-api/ui/tree` as its module, so JSX
+becomes acorn's own node names rather than DOM. A direct `solid-js` dependency is intentional and is
+not the duplicate-Solid-in-one-realm hazard the shell dependency rules prevent: a frame's origin and
 document are a separate reactive realm, and a tree's worker is a separate thread.
 
-**`framework: 'solid'` compiles for the tree path**, which is what every loaded plugin acorn ships
-uses: the preset is told `generate: 'universal'` with `@acorn/plugin-api/ui/tree` as its module, so
-JSX becomes acorn's own node names rather than DOM. A plugin that wants a Solid *frame* brings its own
-transform, because nothing in the repository does any more.
+Each plugin used to name a `framework` key that the builder mapped to a transform. Phase 9 of the
+layout programme deleted it, because the remote adapter is the only target and the key had one legal
+value. A bundle drawing a rectangle is unaffected: it writes no JSX, so the transform has nothing to
+rewrite, and a tree built through the SDK's own node functions rather than JSX is in the same
+position.
 
 A tree imports its nodes from `@acorn/plugin-api/ui/tree` and **must not** import
 `@acorn/plugin-api/ui`: that barrel is components compiled for a document, and a tree bundle's own
@@ -2039,12 +2051,22 @@ package location; the kit will be published separately for external plugins late
 import name is expected to change. Do not copy the primitives or hand-roll replacements while
 packaging catches up.
 
+A tree needs none of this, and that is the point: the host draws the nodes, so the reader's theme,
+style pack and density are already applied and there is nothing to bridge. What follows is the frame
+path only.
+
 The shell owns the frame document and links `/ui.css`, a stylesheet assembled at build time from
 the same presentation-only primitive, tabs, picker, modal, copy, diff, and style-pack CSS the shell
-uses. The appearance bridge applies the complete theme/style/invariant token projection to the frame
-root. Plugins may add feature-owned CSS for their layout, but they neither bundle nor version a copy
-of acorn's UI-kit CSS. Non-Solid frames can use the same emitted class contract without sharing a
-JavaScript framework.
+uses. The appearance bridge applies the complete theme, style and invariant token projection to the
+frame root. A frame may add its own CSS for its own markup, but it neither bundles nor versions a copy
+of acorn's UI-kit CSS. A frame written without Solid can use the same emitted class contract without
+sharing a JavaScript framework.
+
+No plugin in this repository has a stylesheet, and an arch rule holds that: a plugin draws kit nodes,
+which take no `class` and no `style`, and a plugin that ships CSS has written an element to hang it
+on. Two more rules go with it. No plugin draws a raw `div` or `span`, checked by
+`ui/adoption.test.ts`, and no plugin mounts a Solid root of its own, because a root the host does not
+know about sits outside every focus group and no intent reaches it.
 
 Loaded-plugin commands and shortcuts are host-bound manifest data. A command id `search` becomes
 `plugin.<plugin-id>.search`; plugin code cannot claim a first-party command id. `palette` controls
@@ -2210,8 +2232,8 @@ persisted layout keys and two versions registering at once would collide on them
 
 Client initialization for compiled-in plugins is synchronous registration. The host exposes contribution
 points for panes, sources, settings pages, slots, extension points, extensions, provider reference
-panels, palette rows, agent contexts, agent-tool renderers, schedules, persisted-state slices, Node
-statistics, attention sources, brand marks, and content links. `slots` is one point for both shapes: the
+panels, palette rows, agent contexts, schedules, persisted-state slices, Node statistics, attention
+sources, brand marks, and content links. `slots` is one point for both shapes: the
 slot id decides whether the component receives the shell context or only a task id (`docs/frontend.md §
 Registries and plugins`). `schedules` is the same word the node half uses for the same idea, taking a
 raw `intervalMs` because a renderer poll is not a node cadence (`docs/schedules.md § Cadence`).

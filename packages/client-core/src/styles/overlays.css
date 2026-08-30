@@ -161,40 +161,29 @@
 .ui-toast-close:hover { color: var(--text); }
 
 /* ── Drawer ─────────────────────────────────────────────────────────────────────────────────
-   Modal's sibling: same backdrop, same dismissal hook, edge-anchored geometry. */
+   The app's one drawer: a bottom dock between the two icon rails, above the task footer. Not a modal
+   sibling — nothing behind it is inert and there is no backdrop — which is why the geometry is written
+   in rail and footer tokens rather than in viewport units. The `Drawer` component (ui/Drawer.tsx) is
+   the only thing that spells these classes; before phase 9 of the layout programme they were the
+   terminal plugin's own stylesheet, which is how a plugin came to own where the shell's rails are. */
 .ui-drawer {
   position: fixed;
-  z-index: var(--z-modal);
+  /* Between the two icon rails (left TabRail, right pane switcher, both --tabrail-w wide) rather than
+     over either. A drawer only shows in the Task view, where the right rail is present. */
+  left: var(--tabrail-w);
+  right: var(--tabrail-w);
+  bottom: var(--task-footer-h);
+  min-height: 160px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
-  border: var(--surface-border);
-  box-shadow: var(--elev-modal);
-  animation: ui-drawer-in var(--dur-med) var(--ease-out);
-}
-.ui-drawer[data-side='right'] { inset: 0 0 0 auto; width: min(420px, 92vw); }
-.ui-drawer[data-side='left'] { inset: 0 auto 0 0; width: min(420px, 92vw); }
-.ui-drawer[data-side='bottom'] { inset: auto 0 0 0; height: min(60vh, 520px); }
-.ui-drawer[data-side='right'][data-size='sm'],
-.ui-drawer[data-side='left'][data-size='sm'] { width: min(320px, 92vw); }
-.ui-drawer[data-side='right'][data-size='lg'],
-.ui-drawer[data-side='left'][data-size='lg'] { width: min(640px, 96vw); }
-.ui-drawer[data-side='bottom'][data-size='sm'] { height: min(40vh, 360px); }
-.ui-drawer[data-side='bottom'][data-size='lg'] { height: min(80vh, 720px); }
-@keyframes ui-drawer-in { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .ui-drawer { animation: none; } }
-.ui-drawer-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  min-height: var(--pane-head-h);
-  padding: 0 var(--pane-pad);
-  border-bottom: var(--chrome-divider);
   background: var(--bg-subtle);
+  color: var(--text);
+  border-top: var(--chrome-divider);
+  z-index: var(--z-drawer);
 }
-.ui-drawer-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Maximized: from just under the top bar to the bottom, filling the region between the two rails. A
+   top plus a bottom, with no inline height, is what makes the flex column fill. */
+.ui-drawer[data-maximized] { top: var(--topbar-h); }
 
 /* The palette's hints line (PaletteSurface footer). */
 .palette-foot { padding: var(--space-3) var(--space-6); font-size: var(--fs-2xs); border-top: var(--chrome-divider); }

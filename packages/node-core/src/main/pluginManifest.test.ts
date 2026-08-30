@@ -17,7 +17,9 @@ const permissionManifest = (permissions: Record<string, unknown>) =>
 const messages = (result: ReturnType<typeof manifest>) =>
   result.success ? [] : result.error.issues.map((issue) => issue.message)
 
-const PANE = { target: 'pane', id: 'board', label: 'Board' }
+// A pane says how it is drawn. `single` over a `frame` region is the plainest true answer and what
+// almost every case here wants: the host draws the box, the plugin's own bundle draws the inside.
+const PANE = { target: 'pane', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' } }
 
 // A webview needs a client bundle to steer it, so every webview case declares one. `manifest()` stays
 // bundle-less because most surfaces do not need one.
@@ -235,7 +237,8 @@ describe('pane layouts', () => {
       .toContain("layout 'single' has no sidebar region")
     expect(messages(manifest({ frames: [{ ...PANE, layout: 'list-detail', regions: { list: 'frame' } }] })))
       .toContain("layout 'list-detail' needs a detail region")
-    expect(messages(manifest({ frames: [{ ...PANE, regions: { body: 'frame' } }] })))
+    const { layout: _dropped, ...noLayout } = PANE
+    expect(messages(manifest({ frames: [{ ...noLayout, regions: { body: 'frame' } }] })))
       .toContain('regions need a layout to name them')
   })
 
@@ -373,7 +376,7 @@ describe('chrome descriptors', () => {
 
   it('rejects a settings surface being used as an openPane target', () => {
     const bad = manifest({
-      frames: [{ target: 'settings', id: 'board-settings', label: 'Board' }],
+      frames: [{ target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } }],
       palette: [{ id: 'p', title: 'P', action: { verb: 'openPane', pane: 'board-settings' } }],
     })
     expect(bad.success).toBe(false)
@@ -753,7 +756,7 @@ describe('chrome descriptors', () => {
     // The panel is addressed by provider, and a refPanel's provider is already the plugin id, so declaring
     // one is the whole declaration.
     expect(manifest({
-      frames: [{ target: 'refPanel', id: 'board-ref', label: 'Card', providerId: 'board' }],
+      frames: [{ target: 'refPanel', id: 'board-ref', label: 'Card', providerId: 'board', layout: 'single', regions: { body: 'frame' } }],
       contentLinks: [{ id: 'board.card', match: 'https://board.example/cards/{key}', item: 'key' }],
     }).success).toBe(true)
   })
@@ -770,7 +773,7 @@ describe('chrome descriptors', () => {
 
 // A project-scoped pane plus the route that addresses it and the source that mounts it. Written out once
 // because every case below is a mutation of exactly one of the three.
-const PROJECT_PANE = { target: 'pane', id: 'board-card', label: 'Card', scope: 'project' }
+const PROJECT_PANE = { target: 'pane', id: 'board-card', label: 'Card', scope: 'project', layout: 'single', regions: { body: 'frame' } }
 const PROJECT_ROUTE = { id: 'board.card-route', path: '/p/:projectId/x/board/cards/:key', surface: 'board-card', item: 'key' }
 const PROJECT_SOURCE = { id: 'board', label: 'Board', order: 60, items: '/v2/p/board/rail-items', onSelect: { verb: 'navigate', surface: 'board-card' } }
 
@@ -867,7 +870,7 @@ describe('project-scoped surfaces and their routes', () => {
   })
 
   it('allows only a pane to be project-scoped, and folds routes into the duplicate-id sweep', () => {
-    expect(messages(manifest({ frames: [{ target: 'settings', id: 'board-settings', label: 'Board', scope: 'project' }] })))
+    expect(messages(manifest({ frames: [{ target: 'settings', id: 'board-settings', label: 'Board', scope: 'project', layout: 'single', regions: { body: 'frame' } }] })))
       .toContain('only a pane surface can be project-scoped')
     expect(messages(manifest({
       frames: [PROJECT_PANE],
@@ -1086,7 +1089,7 @@ describe('extension points', () => {
     // A settings page, importer, overlay, refPanel or webview is chrome the host already draws around a
     // frame; there is nowhere in one to reserve a strip.
     expect(manifest({
-      frames: [{ target: 'settings', id: 'board-settings', label: 'Board' }],
+      frames: [{ target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } }],
       extensionPoints: [point({ surface: 'board-settings' })],
     }).success).toBe(false)
   })
