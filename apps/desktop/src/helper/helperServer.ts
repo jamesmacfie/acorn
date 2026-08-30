@@ -16,9 +16,9 @@ import {
 import { coreNodeAdoptRoute } from '@acorn/protocol/api.ts'
 import { nodeAdoptResultSchema } from '@acorn/protocol/nodeProviders.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
-import type { Helper } from '@acorn/desktop-helper/index.ts'
-import { toNodeRecord } from '@acorn/desktop-helper/broker/fleetStore.ts'
-import { pairWithNode, probeNode } from '@acorn/desktop-helper/broker/nodePairing.ts'
+import type { Helper } from '@acorn/custody/index.ts'
+import { toNodeRecord } from '@acorn/custody/broker/fleetStore.ts'
+import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
 import { decodeBytes, encodeBytes, type HelperMessage, type HelperMethod, type HelperPush, type HelperRequest, type WireFetchRequest } from '../shell/wire'
 import {
   decisionSchema,
@@ -27,11 +27,11 @@ import {
   NO_DISCLOSURE,
   putSchema,
   type PluginsState,
-} from '@acorn/desktop-helper/plugins/pluginRequests.ts'
+} from '@acorn/custody/plugins/pluginRequests.ts'
 
 // The renderer's projection of the custody stack, over one loopback WebSocket. This is the Tauri half
 // of what Electron's `nodeBrokerIpc.ts` and `pluginIpc.ts` were: same
-// vocabulary, same Zod parsing, same "every decision lives in @acorn/desktop-helper and this file only
+// vocabulary, same Zod parsing, same "every decision lives in @acorn/custody and this file only
 // validates and forwards" rule. Read those two files for why each decision is where it is; this one
 // deliberately restates none of it.
 //

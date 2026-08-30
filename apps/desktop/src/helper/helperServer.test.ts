@@ -1,7 +1,7 @@
 import { WebSocket } from 'ws'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { FleetNode } from '@acorn/desktop-helper/broker/fleetStore.ts'
-import type { Helper } from '@acorn/desktop-helper/index.ts'
+import type { FleetNode } from '@acorn/custody/broker/fleetStore.ts'
+import type { Helper } from '@acorn/custody/index.ts'
 import type { HelperMethod, HelperReply } from '../shell/wire'
 
 // The fleet's second door, end to end through the socket the renderer actually speaks.
@@ -17,7 +17,7 @@ const VOUCHED = 'a'.repeat(64)
 const SUBSTITUTED = 'b'.repeat(64)
 
 const probeNode = vi.fn()
-vi.mock('@acorn/desktop-helper/broker/nodePairing.ts', () => ({
+vi.mock('@acorn/custody/broker/nodePairing.ts', () => ({
   probeNode: (endpoint: string) => probeNode(endpoint),
   pairWithNode: () => {
     throw new Error('not used')

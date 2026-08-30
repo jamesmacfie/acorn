@@ -24,7 +24,7 @@ unit tests, so the boot test always exercises fresh artifacts.
 
 Suites that do that kind of real work carry a 20-second test and hook timeout instead of Vitest's
 5-second default, set in `packages/node-core/vitest.config.ts`,
-`packages/desktop-helper/vitest.config.ts`, `apps/node/vitest.config.ts`, and
+`packages/custody/vitest.config.ts`, `apps/node/vitest.config.ts`, and
 `plugins/vitest.shared.ts`. A genuine hang still fails; it takes longer to say so.
 
 ## Test layers

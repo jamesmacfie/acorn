@@ -1,6 +1,6 @@
 # Phase 0: the custody rename
 
-Status: not started. Nothing blocks it.
+Status: shipped 2026-08-31. What shipped differently is at the bottom.
 
 ## Goal
 
@@ -96,3 +96,22 @@ every row.
 - The bundle staging scripts and the Tauri config do or do not name the package; the refusal said they
   did, the 2026-08-30 grep said they did not.
 - [refused.md](./refused.md) still carries the refusal and its overturn line.
+
+## What shipped differently
+
+- **The inner `custody/` folder stayed.** `packages/custody/src/custody/` holds `deviceTokenStore.ts`
+  and `legacyCustody.ts`, and `legacyCustody.ts` copies the fleet file and the trust store as well as
+  the tokens, so `tokens/` would name it wrong. The stutter is one path segment; the wrong word would
+  be in every reader's way.
+- **The release path was already clear.** Neither `apps/desktop/src-tauri/tauri.conf.json`, nor the
+  staging scripts under `apps/desktop/scripts/`, nor `vite.helper.config.ts` names the package. The
+  2026-08-30 grep was right and the refusal's cost argument was wrong. Only
+  `apps/desktop/package.json` and the Rust doc comment carried it.
+- **Three client-core comments named the package, not two.** `host/plugins/distribution.ts`,
+  `host/trust/trustModel.ts`, and `host/trust/PluginTrustDialog.tsx`.
+- **`docs/security.md` needed no edit.** It calls the process "the helper" everywhere and never names
+  the package or a path inside it, so its row in [docs-migration.md](./docs-migration.md) is a no-op.
+- **The package description changed too.** It said "What a desktop needs around the service"; it now
+  says "What a host needs", which is the whole point of the rename.
+- **The stale Rust path is fixed.** `apps/desktop/src-tauri/src/lib.rs` pointed `legacyCustody.ts` at
+  a folder structure retired; it now points at `packages/custody/src/custody/legacyCustody.ts`.

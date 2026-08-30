@@ -23,7 +23,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [structure-followup/](./structure-followup/README.md) | The three places the whiteboard drawing still lies after the 2026-08-30 folder reorganisation: the custody package named for one host, core naming plugins, and a plugin context type that over-promises. Four phases, plus the facts that keep the cloud door open. | Proposal, 2026-08-30. Nothing blocks it: the folder reorganisation it waited on shipped 2026-08-30. |
+| [structure-followup/](./structure-followup/README.md) | The three places the whiteboard drawing still lies after the 2026-08-30 folder reorganisation: the custody package named for one host, core naming plugins, and a plugin context type that over-promises. Four phases, plus the facts that keep the cloud door open. | In progress, 2026-08-31. Phase 0 (the custody rename) shipped; phases 1-3 remain. |
 
 ## The single files
 

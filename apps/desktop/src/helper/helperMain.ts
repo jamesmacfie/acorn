@@ -1,9 +1,9 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { z } from 'zod'
-import { createHelper, type Helper } from '@acorn/desktop-helper/index.ts'
-import type { TokenCipher } from '@acorn/desktop-helper/custody/deviceTokenStore.ts'
-import { adoptLegacyCustody } from '@acorn/desktop-helper/custody/legacyCustody.ts'
+import { createHelper, type Helper } from '@acorn/custody/index.ts'
+import type { TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
+import { adoptLegacyCustody } from '@acorn/custody/custody/legacyCustody.ts'
 import { startHelperServer, type HelperServer } from './helperServer'
 import { HELPER_PROTOCOL } from '../shell/wire'
 
@@ -43,7 +43,7 @@ const handshakeSchema = z.strictObject({
   appOrigin: z.string().min(1),
   // An Electron build's custody root and the safeStorage password its device tokens are under, when
   // the shell found both. Adopted once, on a first launch that has no fleet of its own. See
-  // @acorn/desktop-helper/custody/legacyCustody.ts.
+  // @acorn/custody/custody/legacyCustody.ts.
   legacy: z.strictObject({ userDataDir: z.string().min(1), safeStorageKey: z.string().min(1) }).optional(),
 })
 type Handshake = z.infer<typeof handshakeSchema>

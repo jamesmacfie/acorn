@@ -12,7 +12,8 @@ Desktop app (Tauri)
   Rust shell: app:// scheme, window, child webviews, dialogs, the data key
        │ one loopback WebSocket
        ▼
-desktop helper (Node): connection broker, fleet, tokens, plugin custody, supervision
+desktop helper (Node): the process the Rust shell spawns and supervises
+  @acorn/custody: connection broker, fleet, tokens, plugin custody, supervision
        │ pinned HTTPS + device bearer, one WebSocket per Node
        ├──────────────► bundled local Node
        └──────────────► paired Node
@@ -77,7 +78,7 @@ its map enumerates its 40 modules one per line. That buys two things over the wi
 not importable from another package, and a new module is public only when someone adds the line, which
 is the decision the map exists to record.
 
-The other four library packages, `client-core`, `node-core`, `dashboards-core`, and `desktop-helper`,
+The other four library packages, `client-core`, `node-core`, `dashboards-core`, and `custody`,
 still export `"./*": "./src/*"`, which gives the module system no encapsulation, and their boundaries
 stay tests. Closing them is a bigger job than closing the plugins was, because every production import
 into a plugin already went through an entrypoint and the same is not true one level up.
@@ -159,11 +160,12 @@ Nothing imports `electron`, a flat ban that covers manifests too.
 The composition-root suites under `apps/node/test/integration/` are the durable check: they boot
 every plugin's `node/index.ts` in a plain Node process, which is the runtime that has to boot.
 
-**The custody stack stays shell-free.** `@acorn/desktop-helper` is the broker, the fleet, the device
+**The custody stack stays shell-free.** `@acorn/custody` is the broker, the fleet, the device
 tokens, the plugin cache and trust store, the tunnels, and the supervised node service, composed by
-its `src/index.ts`. It runs as its own process under the bundled Node, so it names no shell binding
-and the encryption is injected rather than imported. See the shell process in
-[the shell doc](./shell.md).
+its `src/index.ts`. It names no shell binding and the encryption is injected rather than imported, so
+it is not the desktop's: the desktop runs it in a helper process under the bundled Node, and other
+hosts are free to compose it their own way. The process is the desktop's and is called the helper;
+the package is not. See the shell process in [the shell doc](./shell.md).
 
 **The client stays portable.** `window.acorn` is read only inside `packages/client-core/src/infra/platform/`.
 The global is read rather than imported, so this is a source scan rather than a graph edge. Tests are
@@ -172,7 +174,7 @@ permanently exempt: stubbing `globalThis.window` is how the platform implementat
 **Core seams are not reachable around.** The raw identity store is confined to `packages/node-core`
 plus the two composition roots that construct it. The node's identity used to be written by
 `plugins/github`, which made "who is the user" a side effect of connecting one provider. The plugin
-trust and bundle stores are confined to `@acorn/desktop-helper`, because trust binds to a hash the
+trust and bundle stores are confined to `@acorn/custody`, because trust binds to a hash the
 host process computed and the renderer must stay inert. A plugin's production code never imports
 core's `db` module. Every child process goes through the process broker, with a written list of
 considered exceptions: a PTY, a long-lived agent driver, a `docker logs -f` stream, and a pg client

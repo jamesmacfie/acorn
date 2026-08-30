@@ -71,8 +71,9 @@ a browser.
 Fan-out itself is just N fetch targets + N WebSockets; a browser does that fine. The per-node
 query caches are already node-scoped, built for N from day one. Two architectures:
 
-- **Browser-side fan-out** (recommended): the client platform adapter grows a `WebBroker` —
-  endpoint records + tokens in IndexedDB, one WS per node, same node-scoped caches. Truest to
+- **Browser-side fan-out** (recommended): the client platform adapter grows a `WebBroker` — the web
+  host's composition of `@acorn/custody`, which is a package rather than the desktop's, with endpoint
+  records + tokens in IndexedDB, one WS per node, and the same node-scoped caches. Truest to
   the existing model: nodes stay independent peers, zero new server-side machinery. Costs: the
   token-custody downgrade above, per-node TLS/CORS setup, N sockets on a phone (fine for the
   foreground-brief mobile subset).

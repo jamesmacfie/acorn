@@ -61,7 +61,7 @@
   },
   "devDependencies": {
     "@acorn/client-core": "workspace:*",
-    "@acorn/desktop-helper": "workspace:*",
+    "@acorn/custody": "workspace:*",
     "@acorn/node": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
