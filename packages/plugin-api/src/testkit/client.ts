@@ -16,3 +16,12 @@ export { setProjectsLookup } from '@acorn/client-core/projects/projectLookup.ts'
 // The row shape those fixtures have to satisfy. A type, so it costs nothing at runtime, and it is the
 // difference between a fixture that fails when `Project` changes and one that silently drifts.
 export type { Project } from '@acorn/client-core/queries.ts'
+
+// The two registries a cooperative extension is registered through, for a test that renders one of
+// its own plugin's slots and needs somebody on the other side of it (docs/plugins.md § Cooperative
+// extension points). Production code never writes these — the chrome pass does, from a roster row —
+// which is exactly why they belong here rather than on ./client.
+export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/registries/extensionPoints.ts'
+export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/client-core/registries/extensionPoints.ts'
+// What every registry hands back, so a suite can put its registrations away again.
+export type { Disposable } from '@acorn/client-core/registries/registry.ts'

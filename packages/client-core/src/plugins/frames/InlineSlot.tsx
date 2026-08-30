@@ -32,11 +32,21 @@ export function InlineSlot(props: {
 }) {
   const prefs = createQuery(() => prefsOptions(true))
 
-  const occupants = createMemo(() => {
+  const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
-    if (!point || point.kind !== 'rectangle') return []
+    if (!point || point.kind !== 'rectangle') return null
     const choices = slotChoices(prefs.data?.[PrefKeys.remoteSlots])
-    const outcome = resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key))
+    return resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key))
+  })
+
+  // How many the owner's own ceiling left out. Read here for the same reason `Slot` reads it: each
+  // occupant of a rectangle point is a whole iframe, so `max` is a real limit and a point past it was
+  // dropping contributors with nothing on screen to say so.
+  const overflow = () => (resolved()?.why === 'match' ? resolved()!.overflow : 0)
+
+  const occupants = createMemo(() => {
+    const outcome = resolved()
+    if (!outcome) return []
     // Each occupant is resolved back to its own plugin's roster row here rather than carried on the
     // registration, because the row holds the scopes, the event channels and the accepted bundle, and
     // all three are the contributor's own. An occupant whose plugin is no longer eligible on this node,
@@ -53,7 +63,7 @@ export function InlineSlot(props: {
   })
 
   return (
-    <Show when={occupants().length}>
+    <Show when={occupants().length || overflow()}>
       <For each={occupants()}>
         {(occupant) => (
           <div class="inline-slot" data-plugin={occupant.entry.pluginId}>
@@ -68,6 +78,12 @@ export function InlineSlot(props: {
           </div>
         )}
       </For>
+      {/* A count and no names, exactly as the remote slot's disclosure does it: the owner set the
+          ceiling because it is the owner's screen, and listing who was left out would be inviting a
+          person to fix somebody else's arithmetic. */}
+      <Show when={overflow()}>
+        {(count) => <span class="muted">{count()} more from other plugins</span>}
+      </Show>
     </Show>
   )
 }

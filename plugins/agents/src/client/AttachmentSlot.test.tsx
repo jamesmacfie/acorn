@@ -5,9 +5,9 @@ import type { AgentAttachment } from '@acorn/protocol/managedAgents.ts'
 import {
   extensionPointRegistry,
   extensionRegistry,
+  type Disposable,
   type ExtensionContribution,
-} from '@acorn/client-core/registries/extensionPoints.ts'
-import type { Disposable } from '@acorn/client-core/registries/registry.ts'
+} from '@acorn/plugin-api/testkit/client'
 import { AttachmentSlot } from './AttachmentSlot'
 
 // The composer's one extension point, rendered where it lives (docs/plugins.md § Cooperative
@@ -18,14 +18,16 @@ import { AttachmentSlot } from './AttachmentSlot'
 // The first test in this package's jsdom tier, which is what made it possible to test a region a
 // plugin ships at all (plugins/vitest.shared.ts).
 
-vi.mock('@acorn/client-core/hostCapabilities.ts', () => ({ hasHostCapability: () => true }))
+// The one thing a slot reads that needs a shell behind it: the reader's arbitration preference. Every
+// other mock this test could have grown was avoidable, and avoiding them is what keeps the deep
+// imports into core down to the two registries a contribution is registered through
+// (tools/arch/boundaries.test.ts § plugin tests).
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
-vi.mock('@acorn/client-core/queries.ts', () => ({ prefsOptions: () => ({}) }))
 
-// The worker path itself is client-core's to test; here it only has to be identifiable on screen.
-vi.mock('@acorn/client-core/plugins/tree/RemoteTree.tsx', () => ({
-  RemoteTree: (props: { contribution: { pluginId: string } }) => <span>drawn by {props.contribution.pluginId}</span>,
-}))
+// A compiled contributor rather than a worker one, so the tree host stays out of this. Which render
+// path answers is the point's business and client-core's to test (`plugins/tree/Slot.test.tsx`); what
+// is the agents plugin's own is the key it hands the slot, and both paths are keyed the same way.
+const Contributor = () => <span>drawn by images</span>
 
 const registered: Disposable[] = []
 
@@ -49,9 +51,8 @@ const contributor = (pluginId: string, matches: string[]) =>
     point: AGENT_ATTACHMENT_POINT,
     label: `${pluginId} viewer`,
     order: 500,
-    carrier: 'remote',
-    entry: 'attachment',
-    hash: 'abc',
+    carrier: 'component',
+    component: Contributor,
     matches,
   } as ExtensionContribution))
 

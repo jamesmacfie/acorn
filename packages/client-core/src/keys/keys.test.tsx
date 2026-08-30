@@ -78,6 +78,19 @@ describe('a run of rows is a collection', () => {
     expect([...list.querySelectorAll('.ui-row')].map((row) => row.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
   })
 
+  it('renders a tree, with the same collection behind it, when the rows are nested', () => {
+    dispose = render(() => (
+      <Rows tree id="files" ariaLabel="Files" items={PULLS}>
+        {(item, itemProps, selected) => <Row item={itemProps} selected={selected()}>{item.label}</Row>}
+      </Rows>
+    ), host)
+    const list = host.querySelector<HTMLElement>('.ui-rows')!
+    // `tree` is what a file tree and a request tree are; the roles differ because a screen reader
+    // announces "expandable" for one and not the other, and nothing else about the collection does.
+    expect(list.getAttribute('role')).toBe('tree')
+    expect(list.getAttribute('aria-activedescendant')).toBe('files-item-0')
+  })
+
   it('walks with the arrows, j and k, Home and End, without the pane doing anything', () => {
     const list = mountRows()
     list.querySelector<HTMLElement>('.ui-row')!.focus()
@@ -227,6 +240,49 @@ describe('layout regions are focus groups', () => {
     host.querySelector<HTMLElement>('[data-region="top"]')!.focus()
     moveRegion(1)
     expect(document.activeElement?.getAttribute('data-region')).toBe('bottom')
+  })
+
+  // Every layout, not just the one the phase happened to write a test for. A hole in the cycle is a
+  // region a keyboard can leave and not come back to, and it is a property of the layout rather than
+  // of whatever pane declared it (docs/future/layout/07-focus-and-keys.md § Rules with tests behind
+  // them, "every focus group has an entry and an exit").
+  //
+  // `regions` is what the layout is mounted with; `groups` is how many focus groups it actually draws,
+  // which is not the same number. `header-body-footer` fills three regions and is one group, because
+  // the header and the footer join the body unless they hold a stop of their own; `tabs` draws one
+  // panel at a time. A layout with one group is a cycle of one, closed by construction, and
+  // `moveRegion` says so by refusing to move rather than by wrapping onto itself.
+  const WALKS: [keyof typeof LAYOUTS, string[], number][] = [
+    ['single', ['body'], 1],
+    ['list-detail', ['list', 'detail'], 2],
+    ['header-body-footer', ['header', 'body', 'footer'], 1],
+    ['tabs', ['panel:one'], 1],
+    ['document-over-frame', ['document', 'frame'], 2],
+    ['frame-beside-document', ['document', 'frame'], 2],
+    ['stack-split', ['top', 'bottom'], 2],
+    ['wizard', ['step'], 1],
+  ]
+
+  it.each(WALKS)('walks %s and comes back where it started', (layout, names, groups) => {
+    mount(layout, {
+      regions: Object.fromEntries(names.map((name) => [name, text(name)])),
+      ...(layout === 'tabs' ? { tabs: [{ id: 'one', label: 'One' }] } : {}),
+      ...(layout === 'wizard' ? { steps: [{ id: 'one', label: 'One' }], current: 'one' } : {}),
+    })
+    host.querySelector<HTMLElement>(`[data-region="${names[0]}"]`)!.focus()
+    const start = focusedRegion()
+    expect(start).not.toBeNull()
+    if (groups < 2) {
+      expect(moveRegion(1)).toBe(false)
+      expect(focusedRegion()).toEqual(start)
+      return
+    }
+    for (let step = 0; step < groups; step++) expect(moveRegion(1)).toBe(true)
+    expect(focusedRegion()).toEqual(start)
+    // And the other way, which is a separate question: `prevRegion` walking the same ring backwards
+    // is what makes a region reachable from either side.
+    for (let step = 0; step < groups; step++) expect(moveRegion(-1)).toBe(true)
+    expect(focusedRegion()).toEqual(start)
   })
 })
 
