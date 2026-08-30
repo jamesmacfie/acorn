@@ -1,7 +1,7 @@
 # Phase 10: finish the implementation
 
-Status: not started. Follows phase 9. Everything here was found by checking the phase files' own
-"owed" comments against the code on 2026-08-30; nothing is new design.
+Status: **shipped 2026-08-30.** What changed on the way is at the end. Everything here was found by
+checking the phase files' own "owed" comments against the code on 2026-08-30; nothing is new design.
 
 ## Goal
 
@@ -125,3 +125,62 @@ and the docs work, which is phase 11 and depends on the decisions in items 6 and
   `KeyValueEditor` as `collection`.
 - `plugins/vitest.shared.ts:12-14` still sets `environment: 'node'` and includes only `.test.ts`.
 - `grep -rn "core:task\|editor:line\|editor:path" packages plugins` still finds nothing.
+
+## What shipped, and where it differs
+
+**Item 1 was already done, and the review was wrong about it.** `plugins/terminal/src/main/runtime.ts`
+does call `hooks.run('before-run-target', …)` and honours the verdict, at `RuntimeService.start`, and
+has since phase 4. What was owed was the test that a veto stops a run, and the spread. Both landed.
+
+**Item 5 took neither option as written.** Giving `KeyValueEditor` roving focus would have bought
+nothing: every cell of a row is already a stop, and the bare arrow keys are held off typing targets by
+design, so a rove from the cell a reader is actually in would never fire. So the table says what the
+code does instead — `Grid` keeps `collection` with the exception written down, `DiffPane` and
+`KeyValueEditor` are `none`, and `DiffLine` went with `DiffPane`.
+
+**Item 6's draw site is a rail marker, not `AnnotationMarks`.** The phase file called it three lines
+next to the row. A rail row is a 52-pixel square with no room for a line of text, so `core:task` is a
+rail-marker contribution that reads the marks and hands the allocator an icon and a legend line
+(`client-core/src/tasks/taskAnnotations.ts`). `docs/future/rail-tab.md` § Slice 3 always said this was
+the shape; the phase file had not read it.
+
+**Item 7 took the first outcome, and stopped short of two of the three loaded plugins.** The `model`
+seam shipped and the four hand-rolled root maps are gone. The API pane moved to `list-detail`, which is
+the proof that a loaded plugin needs no seam of its own: two entries in one worker bundle sharing
+module scope. Linear and rollbar stayed on `single`, and that is a finding rather than a shortcut —
+their split is the rare case where a task links more than one item, and a manifest has no way to say
+"a list column only when there are two", which is what a compiled pane's `hidden` callback does. A
+third and fourth root map survive in github (`prModel.ts`, `prTabs.ts`); both are keyed by the pull
+request rather than by the task, so the seam does not fit them.
+
+**Item 9's third test was already there.** `aria-modal` is asserted in `keys.test.tsx`, and so is
+`role="tablist"`. What was missing was `role="tree"`, which is now beside the `listbox` case.
+
+**Item 9's hover test reads CSS.** "Every kit node with actions operable with hover disabled" cannot be
+rendered: jsdom computes no styles. The invariant is a stylesheet rule instead — anything a `:hover`
+rule reveals, a `:focus-within` rule reveals too — which is the thing that was actually being got
+wrong, and it catches the next stylesheet as well as the seven that exist
+(`client-core/src/ui/kit/hover.test.ts`).
+
+**Item 10 found the gap it predicted.** `InlineSlot` never read `overflow`, so a rectangle point past
+its ceiling drew the first contributor and said nothing about the rest. It discloses the count now, the
+way a remote slot already did, and has a render test.
+
+**Item 11 needed a new export, not just a config.** A plugin test rendering a region reaches host
+registries, and the arch suite's shrinking budget refuses a deep import into `client-core` from a
+plugin test. The two extension registries moved onto `@acorn/plugin-api/testkit/client`, which is what
+the seam is for, and the budget stayed where it was.
+
+**Item 12 grew a third rule.** The `div`/`span` and plugin-root rules both had to exempt `.test.tsx`:
+a test in the new jsdom tier stubs a neighbour with a `<span>` and renders a region with Solid's
+`render`, and neither reaches a user.
+
+**Item 8's fixture is two tests, not one.** The five kinds split across two client passes — descriptors
+ride the chrome pass, code-carrying contributions ride the frames pass — so the client half calls both
+and pins the split. The node half loads the same shape from disk. The `create-acorn-plugin` template
+was left as it is: it is a starting point somebody edits, and five extensions nobody asked for is not
+one.
+
+**Not done, and deliberately.** The `inline` branch of `frames/register.ts` still has no test of its
+own; the drawing half is covered by `InlineSlot.test.tsx` and the registration half is one `continue`.
+The smoke checklist is still the owner's, on `docs/next-review.md`.

@@ -102,9 +102,15 @@ Display strings only, the same rule `PluginExtensionItem` has. Batched, so a plu
 marks answers one request. Provenance is stamped on every mark. Refresh happens on the owner's own
 invalidation and on the contributor's `plugin:<id>:*` channel.
 
-First draw sites: `changes:diff-line`, `github:diff-line` (both through `DiffPane`), `editor:line`
-(gutter), `editor:path` (file tree row), `docker:container`, and `core:task` (the rail row; this
-supersedes the unbuilt Slice 3 of `docs/future/rail-tab.md`).
+Draw sites, as built: `changes:diff-line` and `github:diff-line` (both through `DiffPane`),
+`docker:container`, and `core:task` (the rail row, which supersedes Slice 3 of
+`docs/future/rail-tab.md`; a mark there is drawn as a rail marker rather than as a line of text,
+because 52 pixels has no room for words).
+
+Two more were named here and are struck until a plugin asks for them. `editor:line` (the gutter) is
+Monaco's, and a mark in Monaco's gutter is a decoration rather than a kit draw site — a different
+mechanism wearing the same name. `editor:path` (the file tree row) has no consumer and no argument for
+one that `changes:diff-line` does not already answer.
 
 ## Remote tree
 

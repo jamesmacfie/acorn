@@ -1663,6 +1663,19 @@ the contributor's code has exactly the permissions its own manifest declares —
 grants it nothing of A's. **One level only**: a contributor's tree is a stream of kit node names, and
 `Slot` is not one of them, so a grafted subtree has no way to open a slot of its own.
 
+**What a slot's tree may reach.** The host hands the contributor's tree the owner's `taskId` and
+`projectId`, read-only, as its scope — the same two the host gives a rectangle occupant. Without them a
+card drawn in somebody else's pane is inert: `openPane`, in-app `openUrl` and task-scoped key bindings
+are all questions about a task, and a tree with no task gets `undefined` from every one of them.
+
+They are the owner's, not the shell's. A project-scoped pane and a reference panel are not looking at a
+task even while one is selected in the rail behind them, so reading the ambient task would push a pane
+into a background task's layout, where the reader is not. It is the same rule a frame's bridge follows.
+
+The scope is not data. What the owner wants the contributor to *know* goes in the slot's props, where
+the owner writes the names; the scope is the host's answer to "where am I", it reaches the bridge and
+nowhere else, and the contributor never reads it directly.
+
 #### Rectangles
 
 After remote trees exist, rectangles are for surfaces that own pixels: Monaco, xterm, a canvas, a chart
@@ -1887,7 +1900,7 @@ exists is the owner's decision: the hook says no, and the owner says what no mea
 | changes | `changes:before-commit` | observe, transform, veto | commit lint, message helpers |
 | changes | `changes:before-push` | observe, veto | secret scanning, changesets |
 | agents | `agents:before-send` | observe, transform, veto | prompt policy, redaction, context injectors |
-| terminal | `terminal:before-run-target` | observe, veto | change freezes, environment checks |
+| terminal | `terminal:before-run-target` | observe, veto | change freezes, environment checks. Runs in `RuntimeService.start`, after the repo-config trust gate and before the session is spawned |
 | workflows | `workflows:before-step` | observe, veto | "no deploys today" from an incident tool |
 | editor | `editor:before-save` | observe, transform, veto | format on save, lint on save |
 
