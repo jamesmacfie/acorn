@@ -6,7 +6,6 @@
   "exports": {
     "./node/index.ts": "./src/node/index.ts",
     "./client/index.ts": "./src/client/index.ts",
-    "./main/index.ts": "./src/main/index.ts",
     "./contract/*": "./src/contract/*",
     "./testkit": "./src/testkit/index.ts",
     "./testkit/client": "./src/testkit/client.ts"

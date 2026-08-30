@@ -10,10 +10,10 @@ import type {
   PluginCollectionRow,
   PluginCollectionSchema,
 } from '@acorn/protocol/collections.ts'
-import { sessionModelLabel } from './agentConfigOptions'
-import { managedAgentApi } from './managedClient'
+import { sessionModelLabel } from './settings/agentConfigOptions'
+import { managedAgentApi } from './sessions/managedClient'
 import { AGENT_PANE_ID } from './paneContribution'
-import { runtimeIcon, runtimeTone } from './stateTone'
+import { runtimeIcon, runtimeTone } from './sessions/stateTone'
 
 export const SESSIONS_COLLECTION_ID = 'sessions'
 

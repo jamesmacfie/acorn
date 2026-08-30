@@ -6,7 +6,7 @@
 import { BridgeError } from '@acorn/plugin-api/node'
 import type { AgentRuntimeState } from '@acorn/protocol/managedAgents.ts'
 import type { RunStatus } from '@acorn/protocol/runs.ts'
-import type { ManagedAgentRuntime } from '../../main/runtime'
+import type { ManagedAgentRuntime } from '../sessions/runtime'
 import type { ManagedAgentsBridge } from './managed'
 
 // The runtime throws plain Errors and has no idea it is behind HTTP, so the mapping goes by message
@@ -92,7 +92,7 @@ export function managedAgentsBridge(runtime: ManagedAgentRuntime): ManagedAgents
     artifactContent: (artifactId) => guarded(() => runtime.artifacts.read(artifactId)),
     // A device needs the durable row so it can select the conversation while the provider connects.
     // Workflow execution bypasses this HTTP bridge and keeps runtime.createSession's ready-on-return
-    // contract (main/sessionExecute.ts).
+    // contract (../sessions/sessionExecute.ts).
     createSession: (input, idempotencyKey) => guarded(() => runtime.acceptSession(input, idempotencyKey)),
     importTranscript: (input) => guarded(() => runtime.importTranscript(input)),
     verifyImportedResume: (sessionId) => guarded(() => runtime.verifyImportedResume(sessionId)),

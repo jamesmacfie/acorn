@@ -1,14 +1,14 @@
 import { lazy } from 'solid-js'
-import { createAgentPaneModel, type AgentPaneModel } from './agentPaneModel'
+import { createAgentPaneModel, type AgentPaneModel } from './sessions/agentPaneModel'
 import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
 
 /** The pane id, spelled once: the collection's row action and the pane-intent listener both name it
  *  (collectionContribution.ts, managedSelection.ts). */
 export const AGENT_PANE_ID = 'agents'
 
-const AgentPaneDetail = lazy(() => import('./AgentPane'))
-const AgentTaskSidebar = lazy(() => import('./AgentTaskSidebar'))
-const AgentSidebarHeader = lazy(async () => ({ default: (await import('./AgentTaskSidebar')).AgentSidebarHeader }))
+const AgentPaneDetail = lazy(() => import('./sessions/AgentPane'))
+const AgentTaskSidebar = lazy(() => import('./sessions/AgentTaskSidebar'))
+const AgentSidebarHeader = lazy(async () => ({ default: (await import('./sessions/AgentTaskSidebar')).AgentSidebarHeader }))
 
 // `list-detail`, with the sessions in this task on the left and the open one on the right
 // (docs/panes.md § Layout model). The header over the list is its own region so it stays put while

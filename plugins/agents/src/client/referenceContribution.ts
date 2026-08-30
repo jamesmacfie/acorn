@@ -1,7 +1,7 @@
 import { setManagedAgentReferenceHandler } from '@acorn/plugin-api/client'
-import { appendManagedDraft } from './managedDrafts'
-import { managedAgentStore } from './managedStore'
-import { openManagedSession } from './managedSelection'
+import { appendManagedDraft } from './sessions/managedDrafts'
+import { managedAgentStore } from './sessions/managedStore'
+import { openManagedSession } from './sessions/managedSelection'
 
 export function activateManagedAgentReferences(): void {
   setManagedAgentReferenceHandler(async (taskId, reference) => {
