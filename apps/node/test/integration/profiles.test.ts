@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 registerBuiltInProfiles() // register the built-in profiles into the registry under test
-import { agentProfileRegistry, type AgentProfileContribution } from '@acorn/node-core/main/agentProfiles/index.ts'
-import { listProfileDefs } from '@acorn/node-core/main/profiles.ts'
+import { agentProfileRegistry, type AgentProfileContribution } from '@acorn/node-core/server/agentProfiles/index.ts'
+import { listProfileDefs } from '@acorn/node-core/server/profiles.ts'
 
 describe('agent profile registry', () => {
   it('declares each built-in spawn/resume/MCP/stream/one-shot capability explicitly', () => {

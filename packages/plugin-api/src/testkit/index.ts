@@ -8,7 +8,7 @@
 // suite.
 
 // ── A real plugin context ─────────────────────────────────────────────────────────────────────────
-// Not a mock: calls the same server/plugin/context.ts the host calls at boot, over a temp data root
+// Not a mock: calls the same server/pluginHost/context.ts the host calls at boot, over a temp data root
 // (docs/plugins.md § The plugin API). Pass `permissions` for the loaded tier, omit it for the
 // built-in tier.
 export { makeTestNodeContext, makeTestRequestContext } from '@acorn/node-core/testkit/pluginContext.ts'

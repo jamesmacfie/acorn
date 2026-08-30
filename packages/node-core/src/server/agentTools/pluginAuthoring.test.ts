@@ -8,7 +8,7 @@ import { CONTEXT_MENU_LOCATIONS } from '@acorn/protocol/contextMenus.ts'
 import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS } from '@acorn/protocol/extensionPoints.ts'
 import { pluginManifestShape } from '@acorn/protocol/pluginContract.ts'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
-import { NODE_CORE_FACETS, scopeCore } from '../../main/pluginPermissions.ts'
+import { NODE_CORE_FACETS, scopeCore } from '../plugins/permissions.ts'
 import { getContextSections } from './contextSections.ts'
 import {
   PLUGIN_AUTHORING_SECTION,
@@ -18,7 +18,7 @@ import {
   pluginAuthoringVocabulary,
   renderPluginAuthoring,
 } from './pluginAuthoring.ts'
-import type { CoreServices } from '../../main/core/index.ts'
+import type { CoreServices } from '../core/index.ts'
 
 // This file is about drift: every test below re-derives an answer from the source of truth and
 // compares, rather than pinning a hand-written list (docs/agent-tools.md § plugin_authoring).

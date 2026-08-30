@@ -56,7 +56,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   // The bell and the step stream, this plugin's own vocabulary rather than a member of the broadcast
   // surface every plugin receives (../contract/notices.ts). Both go out on core's `workflow:` channels,
   // which is why they are written as frames here rather than reaching for a core helper: `ctx.events`
-  // is the seam, and a plugin does not deep-import main/notify.ts.
+  // is the seam, and a plugin does not deep-import server/notify.ts.
   const buildNotices = (ctx: Parameters<NonNullable<NodePlugin['init']>>[0]): WorkflowNotices => ({
     notice: (taskId, kind, title) => {
       ctx.events.send({ channel: 'workflow:notice', notice: { taskId, kind, title } })
@@ -67,7 +67,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   return {
     name: 'workflows',
     // This module's own URL: the chain sits at plugins/workflows/migrations beside it, and the host
-    // owns open, migrate, and close from there (@acorn/node-core/main/pluginStorage.ts).
+    // owns open, migrate, and close from there (@acorn/node-core/server/plugins/storage.ts).
     migrationsModule: import.meta.url,
     init: (ctx) => {
       // Opened and migrated by the host before init returns. The runner and the bridge below both

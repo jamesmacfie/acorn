@@ -203,7 +203,7 @@ do not cross into the renderer.
 Every outbound provider call, for a connection test, a mirrored resource, a project list, or a route
 handler's own fetch, runs inside `secrets.use`'s callback rather than after it returns the plaintext.
 A provider that echoes its own credential back in an error body has it scrubbed at that boundary,
-before the failure is logged or reaches the client (`main/core/secrets.ts`).
+before the failure is logged or reaches the client (`server/core/secrets.ts`).
 
 A provider failure that is not a deliberate `ProviderOperationError` is flattened to
 `provider_unavailable` before it reaches the client (`integrations/respondProvider.ts`), shared by

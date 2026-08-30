@@ -28,7 +28,7 @@ const [acceptedBundles, setAcceptedBundles] = createSignal<ReadonlySet<string>>(
 export { installedByNode, pendingTrust, activeBundles }
 
 /** Has this device agreed to run these exact bytes? Keyed on the pair, because consent was given to a
- * hash and not to a name (@acorn/desktop-helper/main/pluginTrustStore.ts). */
+ * hash and not to a name (@acorn/desktop-helper/plugins/pluginTrustStore.ts). */
 export const bundleAccepted = (pluginId: string, hash: string): boolean => acceptedBundles().has(`${pluginId} ${hash}`)
 
 /** Called by the trust dialog once main has stored the decision, so a just-accepted plugin's surfaces can

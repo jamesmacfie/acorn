@@ -10,7 +10,7 @@ export default function TerminalSettings() {
   const prefs = createQuery(() => prefsOptions(true))
   const railDefault = () => prefs.data?.[PrefKeys.terminalRailDefault] ?? 'empty'
   const fontSize = () => resolveTerminalFontSize(prefs.data?.[PrefKeys.terminalFontSize], termFontSize())
-  // Opt-out: absent pref means on (matches contextInjectionEnabled in core/main/taskWorktree.ts).
+  // Opt-out: absent pref means on (matches contextInjectionEnabled in core/server/worktrees/taskWorktree.ts).
   const injectContext = () => (prefs.data?.[PrefKeys.startupContextInjection] ?? 'true') !== 'false'
 
   return (

@@ -6,8 +6,9 @@ workspace production dependencies, and native modules.
 
 ## Runtime
 
-The standalone entry uses `ACORN_DATA_DIR` or a local `.acorn` root, binds HTTPS/TLS 1.3, and prints
-one JSON handshake line. The line contains `nodeId`, endpoint, certificate fingerprint and PEM, and a
+`apps/node/src/entries/` holds all three build entries — `standalone.ts`, `service.ts`, and the MCP
+server — and `apps/node/src/composition/` holds what any two of them share. The standalone entry uses
+`ACORN_DATA_DIR` or a local `.acorn` root, binds HTTPS/TLS 1.3, and prints one JSON handshake line. The line contains `nodeId`, endpoint, certificate fingerprint and PEM, and a
 device token for the launcher/first client. It also runs plugin initialization, reconciliation,
 WebSocket/tunnel listeners, and bounded shutdown.
 
@@ -59,14 +60,14 @@ management are unavailable. The standalone composition wires the terminal, manag
 workflow engines when their dependencies are present. Unsupported native adapters report an explicit
 unavailable state.
 
-Standalone and desktop-supervised Node hosts use the same `apps/node/src/server/composition.ts` graph,
+Standalone and desktop-supervised Node hosts use the same `apps/node/src/composition/composition.ts` graph,
 post-listener reconciliation sequence, and bounded drain order. The host difference is supervision and
 native capability injection, not a second plugin assembly.
 
 ## Plugins
 
 Both hosts build the `PLUGIN_STATE` bridge, meaning the roster, the installer, and the owner's
-disabled list, through one builder: `apps/node/src/server/pluginState.ts`. One thing differs on
+disabled list, through one builder: `apps/node/src/composition/pluginState.ts`. One thing differs on
 purpose. Bundled packages have nothing to be reconciled from. The desktop ships every built plugin as
 app resources and copies them into the writable data root before discovery. A standalone node has no
 `resourcesPath`, so the step does nothing and plugins arrive only through the owner-authenticated

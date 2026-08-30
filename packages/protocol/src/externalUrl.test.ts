@@ -15,7 +15,7 @@ describe('isPluginOpenableUrl', () => {
   })
 
   it('refuses http, deliberately narrower than the shell’s own external allowlist', () => {
-    // main/urlGuards.ts permits http and mailto because a person clicking a link in a GitHub body
+    // server/urlGuards.ts permits http and mailto because a person clicking a link in a GitHub body
     // legitimately reaches both. Plugin code handing the machine a URL unprompted is a different
     // question, and a silent downgrade is not a choice a plugin gets to make for the owner.
     expect(isPluginOpenableUrl('http://internal.example/')).toBe(false)

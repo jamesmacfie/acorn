@@ -9,7 +9,7 @@ import { wsChannelPrefixes } from '@acorn/client-core/wsChannels.ts'
 // Importing activate.ts boots the graph; the assertion is on what claimed a prefix.
 describe('registered ws channel prefixes', () => {
   it('are exactly the twelve the app expects', async () => {
-    await import('../../src/app/client/activate')
+    await import('../../src/client/activate')
     // term, workflow, plugins, tasks, connection, head, run, agent-session and project are core's
     // (client-core/wsClient.ts): term is transport on both ends, workflow:notice feeds core's
     // notification pipeline, and the rest are the node announcing one of its own facts moved

@@ -1,7 +1,6 @@
 {
-  // Node types only. This package is the custody stack a desktop shell supervises: it runs in a Node
-  // process (Electron main today, the Tauri helper as well), never in a renderer, so it must not be
-  // able to reach for a DOM global.
+  // Node types only. This package is the custody stack a desktop shell supervises: it runs in the
+  // helper's Node process, never in a renderer, so it must not be able to reach for a DOM global.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["node"]

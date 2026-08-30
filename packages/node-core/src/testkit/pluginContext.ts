@@ -5,18 +5,18 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
-import type { Env } from '../main/bindings'
-import { memoryIdentityStore } from '../main/activeIdentity'
-import { createCoreServices, SecretService, type CoreServices } from '../main/core'
-import type { NodePermissions } from '../main/pluginManifest'
-import { openPluginDb, type PluginDatabase } from '../main/pluginStorage'
+import type { Env } from '../server/bindings'
+import { memoryIdentityStore } from '../server/activeIdentity'
+import { createCoreServices, SecretService, type CoreServices } from '../server/core'
+import type { NodePermissions } from '../server/plugins/manifest'
+import { openPluginDb, type PluginDatabase } from '../server/plugins/storage'
 import type { AppDatabase } from '../server/db'
 import type { AppEnv, Principal } from '../server/middleware/auth'
-import { CapabilityRegistry } from '../server/plugin/capabilities'
-import { buildPluginContext } from '../server/plugin/context'
-import { clearRegistrations } from '../server/plugin/host'
-import { pluginRequestContext } from '../server/plugin/requestContext'
-import type { NodePlugin, NodePluginContext, PluginProviderRuntime, PluginRequestContext, PluginStorage } from '../server/plugin/types'
+import { CapabilityRegistry } from '../server/pluginHost/capabilities'
+import { buildPluginContext } from '../server/pluginHost/context'
+import { clearRegistrations } from '../server/pluginHost/host'
+import { pluginRequestContext } from '../server/pluginHost/requestContext'
+import type { NodePlugin, NodePluginContext, PluginProviderRuntime, PluginRequestContext, PluginStorage } from '../server/pluginHost/types'
 import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations } from './db'
 
 // Nothing granted. A loaded plugin's manifest block is all-defaulted (protocol/pluginContract.ts), so
@@ -69,7 +69,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   const secrets = new SecretService(TEST_ENCRYPTION_KEY)
   const services: CoreServices = createCoreServices({ secrets, db: core.db, activeIdentity: memoryIdentityStore() })
 
-  // The same lazy, one-handle-per-boot shape the host builds for both tiers (server/plugin/host.ts): one
+  // The same lazy, one-handle-per-boot shape the host builds for both tiers (server/pluginHost/host.ts): one
   // file named for the plugin id under the data root, migrated with the plugin's own chain on first open.
   let opened: PluginDatabase | null = null
   const storage: PluginStorage = {
@@ -85,7 +85,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
 
   // What `clearRegistrations` cannot reach: the WS hub's two slots, which are module singletons with
   // no duplicate guard, and any schedule the plugin declared, which lives in a scheduler the host owns
-  // (server/plugin/context.ts). Without this, a test whose plugin claims a channel prefix or registers
+  // (server/pluginHost/context.ts). Without this, a test whose plugin claims a channel prefix or registers
   // a schedule leaves it claimed for the whole file.
   const undos: (() => void)[] = []
 
@@ -97,7 +97,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     env,
     onUndo: (undo) => void undos.push(undo),
     // Both tiers get storage passed the same way as in production: the caller derives the handle and
-    // the binding carries the loader's raw one (server/plugin/context.ts).
+    // the binding carries the loader's raw one (server/pluginHost/context.ts).
     ...(permissions ? { loaded: { permissions, storage } } : {}),
     storage,
   })

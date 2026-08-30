@@ -73,7 +73,7 @@ const packageRootIndex = args.indexOf('--package-root')
 const packageRoot = packageRootIndex === -1 ? null : args[packageRootIndex + 1]
 if (packageRootIndex !== -1 && !packageRoot) throw new Error('--package-root requires a directory')
 
-// Matches main/serverPaths.ts's dev root, and honours the same override the node itself reads.
+// Matches server/storage/paths.ts's dev root, and honours the same override the node itself reads.
 const dataRoot = process.env.ACORN_DATA_DIR || join(NODE_APP, '.acorn')
 const outDir = join(packageRoot ? resolve(packageRoot) : join(dataRoot, 'plugins'), id)
 // Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/api.ts,
@@ -162,7 +162,7 @@ try {
 
 // A table-owning plugin's DDL chain travels INSIDE the package, because that is the only copy the
 // loader will look at: `ctx.storage.open()` migrates from the manifest-declared directory, confined to
-// the installed package (node-core/main/pluginLoader.ts). Copied rather than bundled — Drizzle reads
+// the installed package (node-core/server/plugins/loader.ts). Copied rather than bundled — Drizzle reads
 // `meta/_journal.json` and the `.sql` files off disk at migrate time, so there is nothing for Vite to
 // inline.
 //
@@ -183,7 +183,7 @@ writeFileSync(
   `${JSON.stringify({
     id,
     name: spec.name,
-    // Brand marks, passed through untouched — node-core/main/pluginManifest.ts is the only thing
+    // Brand marks, passed through untouched — node-core/server/plugins/manifest.ts is the only thing
     // that validates them and client-core/ui/Icon.tsx the only thing that renders them.
     ...(spec.icon ? { icon: spec.icon } : {}),
     ...(spec.icons ? { icons: spec.icons } : {}),
@@ -207,7 +207,7 @@ writeFileSync(
 //
 // Deliberately NOT written under `--package-root`: that output is the distribution path, and a marker
 // travelling into application resources would tell every user's node that its bundled plugins are
-// somebody's dev build. The name is duplicated in node-core/main/bundledPlugins.ts § DEV_BUILD_MARKER;
+// somebody's dev build. The name is duplicated in node-core/server/plugins/bundled.ts § DEV_BUILD_MARKER;
 // one string in two places beats making this script depend on a built package.
 if (!packageRoot) writeFileSync(join(outDir, '.acorn-dev-build'), `${new Date().toISOString()}\n`)
 

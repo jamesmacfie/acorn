@@ -491,7 +491,7 @@ export type CoreProcService = {
   brokerEnv(spec: Pick<ProcSpec, 'env' | 'passthrough'>, parent?: Record<string, string | undefined>): Record<string, string>
   runProcess(spec: ProcSpec): Promise<ProcResult>
   runProcessOrThrow(spec: ProcSpec): Promise<ProcResult>
-  ProcessError: HostOwned<'node-core/main/core/exec/proc.ProcessError'>
+  ProcessError: HostOwned<'node-core/server/core/exec/proc.ProcessError'>
 }
 
 export type ProcSpec = {
@@ -528,7 +528,7 @@ export type ProcResult = {
 
 /** Use-scoped credential access. There is no "read this secret" call on this surface, and there will
  *  not be one: the plaintext is scoped to a callback and scrubbed out of anything thrown from it. */
-export type CoreSecretService = HostOwned<'node-core/main/core/security/secrets.SecretService'> & {
+export type CoreSecretService = HostOwned<'node-core/server/core/security/secrets.SecretService'> & {
   use<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T>
   useOptional<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T | null>
   seal(plaintext: string): Promise<string>
@@ -565,7 +565,7 @@ export type CoreTaskService = {
     baseCheckout: string | undefined,
     userId?: string | null,
   ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
-  runConfig(taskId: string): Promise<HostOwned<'node-core/main/core/tasks/service.TaskRunConfig'>>
+  runConfig(taskId: string): Promise<HostOwned<'node-core/server/core/tasks/service.TaskRunConfig'>>
   active(): Promise<TaskRef[]>
   /** Throws when the task or its workspace membership is missing. */
   workspaceId(taskId: string): Promise<string>
@@ -630,7 +630,7 @@ export type CoreContextService = {
  *  credential resolution and the provider adapters. */
 export type CoreModelService = {
   generateText(
-    request: HostOwned<'node-core/main/core/models/text.GenerateTextRequest'>,
+    request: HostOwned<'node-core/server/core/models/text.GenerateTextRequest'>,
   ): Promise<HostOwned<'node-core/server/modelProviders/types.GenerateTextResult'>>
   /** Which connections this owner could generate with: ids and labels only. */
   available(userId: string): Promise<Array<HostOwned<'protocol/modelProviders.AvailableModelConnection'>>>

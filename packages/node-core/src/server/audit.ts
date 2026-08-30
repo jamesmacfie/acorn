@@ -77,7 +77,7 @@ export type DeclaredAuditAction = { action: PluginAuditAction; pluginId: string;
 
 // A module singleton, like the route, collection, node-action and task-check registries beside it, with
 // the same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (server/plugin/host.ts § clearRegistrations).
+// (server/pluginHost/host.ts § clearRegistrations).
 const declared = new Map<string, DeclaredAuditAction>()
 
 /** Declare one verb for a plugin. The host binds `pluginId`; a plugin never passes it. */

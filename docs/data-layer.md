@@ -127,7 +127,7 @@ than cached in `plugins/database.sqlite`.
 without persisting it, trying in order: a committed `.acorn/config.toml [database].url_script`
 (run inside the worktree), then `<worktree>/.env`'s `DATABASE_URL`, then `process.env.DATABASE_URL`.
 A committed `url_script` is executable content from the checkout, so resolving it goes through the
-same repo-config trust gate as other repo-authored run targets (`core/main/repoConfigTrust.ts`).
+same repo-config trust gate as other repo-authored run targets (`server/repoConfigTrust.ts`).
 Cloning a repo, or checking out a PR that adds the script, must not be enough to run it. A script the
 user or the database authored (`dbUrlFromRepo` false) is the user's own input and is not gated.
 
@@ -272,7 +272,7 @@ Native SQLite access is centralized, and both plugin tiers reach it the same way
 returns a migrated handle whose filename the host bound to the plugin id. Only the source of the
 chain differs: a loaded plugin's manifest names a directory confined to its package, and a built-in
 declares `migrationsModule: import.meta.url` on its `NodePlugin` so the host walks from there.
-`packages/node-core/src/main/pluginMigrations.ts` covers all three runtime layouts.
+`packages/node-core/src/server/plugins/migrations.ts` covers all three runtime layouts.
 
 A built-in's chain lives in one of three places depending on how the node was run: a source checkout
 (`plugins/<name>/migrations/`), a built desktop app before packaging
@@ -289,7 +289,7 @@ and `pluginMigrationsChain` only validates that a Drizzle chain exists there.
 The host opens each file lazily on first use, hands out one handle per boot, and closes it
 immediately after that plugin's `dispose()`, so a plugin's dispose is about the resources the plugin
 itself owns and a plugin whose only resource was the database needs no dispose at all. Both tiers use
-`CoreServices` for core-owned operations. `apps/node/test/integration/httpLoaded.test.ts` covers what
+`CoreServices` for core-owned operations. `apps/node/test/integration/plugins/httpLoaded.test.ts` covers what
 happens when a loaded plugin's chain grows between versions, where the update applies at the next
 boot against a database that already has rows, along with a broken chain failing contained and
 uninstall-without-purge keeping the file.

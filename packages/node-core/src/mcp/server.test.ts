@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ensureCert } from '../main/tls'
+import { ensureCert } from '../server/transport/tls'
 
 // Integration test over real stdio JSON-RPC (docs/mcp.md, docs/agent-tools.md § Projections). This
 // test stubs the loopback surface the server proxies to and asserts the projection: list mirrors the
@@ -14,10 +14,13 @@ import { ensureCert } from '../main/tls'
 // is covered at the registry/route layer.
 //
 // The stub is HTTPS with a real acorn certificate, and the child gets ACORN_DATA_DIR and
-// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/service/runtime.ts): resolve
+// NODE_EXTRA_CA_CERTS exactly as the service gives them (apps/node/src/composition/runtime.ts): resolve
 // the port from node.json, trust the node's certificate as a CA, and validate fully.
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+// The executable entry lives with the app that builds it (docs/mcp.md); this package keeps the
+// library half. cwd stays node-core's root so `--import tsx` and the certificate helper resolve here.
+const MCP_ENTRY = resolve(appRoot, '../../apps/node/src/entries/mcp.ts')
 
 // A tiny fixture manifest, two tools, one with args, projected as JSON schema by the registry.
 const MANIFEST = {
@@ -46,7 +49,7 @@ class McpClient {
     const ambient = Object.fromEntries(
       Object.entries(process.env).filter(([key]) => !key.startsWith('ACORN_') && key !== 'NODE_EXTRA_CA_CERTS'),
     )
-    this.child = spawn(process.execPath, ['--import', 'tsx', 'src/mcp/main.ts'], { cwd: appRoot, env: { ...ambient, ...env }, stdio: ['pipe', 'pipe', 'pipe'] })
+    this.child = spawn(process.execPath, ['--import', 'tsx', MCP_ENTRY], { cwd: appRoot, env: { ...ambient, ...env }, stdio: ['pipe', 'pipe', 'pipe'] })
     this.child.stdout!.on('data', (chunk: Buffer) => {
       this.buffer += chunk.toString()
       let i: number

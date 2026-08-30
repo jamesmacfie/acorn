@@ -8,10 +8,10 @@ import { deviceService } from '@acorn/node-core/server/auth/deviceTokens.ts'
 import { idempotencyStore } from '@acorn/node-core/server/auth/idempotency.ts'
 import { mintInternalToken } from '@acorn/node-core/server/auth/internalTokens.ts'
 import { pairingCodes } from '@acorn/node-core/server/auth/pairingCodes.ts'
-import { openDataRoot, readNodeAttachment, recordNodeAttachment, type DataRoot } from '@acorn/node-core/main/dataRoot.ts'
+import { openDataRoot, readNodeAttachment, recordNodeAttachment, type DataRoot } from '@acorn/node-core/server/storage/dataRoot.ts'
 import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // The attachment surface over the assembled app (docs/node-enrollment.md § Detaching).
 //

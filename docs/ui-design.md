@@ -545,7 +545,7 @@ A mark is one SVG path's `d` attribute in a 24x24 box, not a full SVG document. 
 allow `<script>`, `<use href>`, `<image href>`, `<foreignObject>`, `on*` handlers, and CSS
 `@import`, which would need an allowlist parser and a new trust boundary for what is only a logo.
 There is nothing in `d`'s grammar to sanitise, so a manifest-supplied mark needs only a
-character-class check (`node-core/main/pluginManifest.ts`) and renders through the same `<path>`
+character-class check (`node-core/server/plugins/manifest.ts`) and renders through the same `<path>`
 machinery `Icon.tsx` already had. `Icon` fills it with `currentColor`, so a plugin's mark themes
 across every theme exactly as a first-party one does, which a data-URI `<img>` could not, since CSS
 does not cross into its document.

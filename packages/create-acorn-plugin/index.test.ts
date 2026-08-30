@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/pluginApiVersion.ts'
-import { parsePluginManifest } from '@acorn/node-core/main/pluginManifest.ts'
+import { parsePluginManifest } from '@acorn/node-core/server/plugins/manifest.ts'
 // @ts-expect-error: the scaffold is published standalone with zero dependencies, so it's plain
 // JavaScript with no declarations. This suite is the only thing in the repository that imports it.
 import { API_VERSION, SCHEMA_URL, scaffoldFiles, toPluginId } from './index.mjs'

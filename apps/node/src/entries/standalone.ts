@@ -1,0 +1,223 @@
+// The entry for `pnpm dev:node` and the packaged standalone Node (docs/node-distribution.md). See
+// docs/architecture-overview.md § Runtime topology for how this differs from the supervised node the
+// desktop shell starts.
+import { join } from 'node:path'
+import { closeListener, devDataDir, makeRuntime, startListener } from '@acorn/node-core/server/transport/listener.ts'
+import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/server/transport/advertise.ts'
+import { openDataRoot } from '@acorn/node-core/server/storage/dataRoot.ts'
+import { enrollNode } from '@acorn/node-core/server/enrollment.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
+import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
+import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
+import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
+import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
+import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
+import { disabledPluginsStore } from '@acorn/node-core/server/plugins/disabled.ts'
+import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost/state.ts'
+import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
+import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
+import { buildPluginDeps } from '../composition/pluginDeps'
+import { buildPluginStateBridge, effectiveDisabled } from '../composition/pluginState'
+import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from '../composition/composition'
+import { setWorktreesRoot } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
+
+// ACORN_DATA_DIR names the data root (docs/data-layer.md § Data root); service/runtime.ts's
+// internalApiEnv hands this node's own child processes the same variable, so one spelling of "which
+// root" covers the whole process tree. Opening it takes the root's exclusive lock, which is why a
+// standalone node and a running desktop app cannot share one.
+const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
+// Asked once, before anything else prints (docs/node-distribution.md § Reaching a node from another
+// machine); silent under a service manager (server/transport/advertise.ts).
+await confirmAdvertiseHost(root)
+const capabilities = new CapabilityRegistry()
+const runtime = makeRuntime(root, undefined, capabilities)
+const disabledPlugins = disabledPluginsStore(root.dir)
+// The disabled-plugin list a standalone node reads (docs/node-distribution.md § Plugins). There is
+// no start-config override here: only the supervised host passes one.
+const disabled = effectiveDisabled(disabledPlugins)
+// Audit retention and the idempotency sweep run as node-owned schedules, not boot-time calls
+// (docs/data-layer.md § Retention).
+setWorktreesRoot(join(root.dir, 'worktrees'))
+
+// Same reporter as the supervised host, before the loader scans the install directory
+// (docs/node-distribution.md § Plugins).
+const bundledRoot = process.env.ACORN_BUNDLED_PLUGINS_DIR
+const development = process.env.NODE_ENV !== 'production'
+// Looks like a bug and is not one: `dev:node` with no bundled root reconciles nothing, so a
+// `build:plugin` copy in the data root keeps running and a newer bundled package never arrives. That
+// is the right answer for a service-managed node. Only a developer needs
+// `ACORN_BUNDLED_PLUGINS_DIR` set.
+if (development && !bundledRoot) {
+  console.log('[plugins] ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled. Whatever is in the data root keeps running.')
+}
+reconcileBundledPackages({ dataDir: root.dir, bundledRoot, development })
+
+// The same deps the supervised composition root supplies (service/runtime.ts explains each one). A
+// standalone node runs a real terminal engine, not a stub, because terminal is a required plugin
+// (docs/plugins.md § Activation) and this node answers /v2/core/tasks/:id/archive for a task's live
+// sessions.
+let apiUrl = ''
+const internalEnv: InternalEnvFactory = (claims) => ({
+  ACORN_API_URL: apiUrl,
+  ACORN_API_TOKEN: mintInternalToken(runtime.INTERNAL_TOKEN, claims),
+  ACORN_DATA_DIR: root.dir,
+  NODE_EXTRA_CA_CERTS: join(root.dir, 'tls', 'cert.pem'),
+})
+let finishReconcile!: () => void
+const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
+const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
+
+// Same plugin list, through the same builder, as the desktop-supervised root
+// (docs/node-distribution.md § Runtime). Nothing in the bag differs between the two.
+const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, core, internalEnv, reconciled }))
+// The node's one scheduler (docs/schedules.md § Why the node, and only the node).
+const scheduler = createScheduler(runtime.DB, { env: runtime })
+const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
+const plugins = await initPlugins(graph.plugins, { capabilities, core, env: runtime, dataDir: root.dir, disabled: disabled(), loaded: graph.loaded })
+const pluginStateCapability = capabilities.provide(
+  PLUGIN_STATE,
+  buildPluginStateBridge({
+    dataDir: root.dir,
+    db: runtime.DB,
+    roster: () => plugins.roster,
+    booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
+    loadFailures: () => graph.failures,
+    disabled,
+    setDisabled: (names) => disabledPlugins.set(names),
+    reloadHost: plugins,
+  }),
+)
+
+// Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure
+// functions over the database; neither needs a window.
+wireAgentTools({ db: runtime.DB })
+
+// Awaited, not fire-and-forget: there is nothing to hand back until the listener has bound, and a
+// listen failure now exits non-zero with its reason instead of leaving a process alive that answers
+// nothing.
+const listener = await startListener(runtime, root)
+apiUrl = listener.endpoint.origin
+await scheduler.start()
+
+// Re-attach sessions, repair worktree state, and sweep workflow/agent records through the shared
+// post-listener sequence (server/composition.ts's reconcileNode; docs/node-distribution.md §
+// Runtime). The listener is already live because resumed work calls the node's own authenticated
+// routes.
+const reconcileTask = reconcileNode({ db: runtime.DB, dataDir: root.dir, capabilities }).finally(() => finishReconcile())
+await reconcileTask
+
+// Unattended enrollment, if and only if the provisioner set both environment variables
+// (docs/node-enrollment.md). With neither set this returns before it reads a file, so a node nobody
+// provisioned behaves exactly as it did before this line existed.
+//
+// Here rather than earlier because it needs the endpoint and the fingerprint, which only exist once
+// the listener has bound. Before the device count below on purpose: a node that just handed its
+// control plane a credential is a paired node, and printing a pairing code for a machine nobody is
+// standing at would be an unrequested window left open.
+//
+// The endpoint it enrolls with is the advertised one, not `listener.endpoint.origin`. That value is
+// deliberately loopback whatever `advertiseHost` says, because every child process this node spawns
+// dials it (server/transport/listener.ts), and a control plane handed `https://127.0.0.1:<port>` would vouch for an
+// address no other machine can reach. With no advertised host the loopback origin is still what goes,
+// which is right for a control plane running on this same machine and useless for one that is not —
+// the operator's exposure decision either way (docs/node-distribution.md § Reaching a node from
+// another machine).
+await enrollNode({
+  dataDir: root.dir,
+  nodeId: root.nodeId,
+  endpoint: enrollmentEndpoint(),
+  fingerprint: listener.fingerprint,
+  devices: runtime.DEVICES,
+  db: runtime.DB,
+})
+
+// Counted before the handshake below, which issues a launcher device of its own when
+// ACORN_DEVICE_TOKEN is unset. After that, every node looks paired.
+const alreadyPaired = (await runtime.DEVICES.list()).filter((device) => device.revokedAt === null).length
+
+// SIGINT and SIGTERM run the same bounded drain as a desktop-supervised node
+// (docs/node-distribution.md § Operations).
+let stopping = false
+const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+  if (stopping) return
+  stopping = true
+  console.log(`[node] ${signal} — draining`)
+  const outcome = await drainNode({
+    listener: () => closeListener(listener.server),
+    reconciliation: async () => await reconcileTask,
+    schedules: async () => {
+      schedulerCapability.dispose()
+      await scheduler.stop()
+    },
+    pluginState: async () => pluginStateCapability.dispose(),
+    plugins: () => plugins.dispose(),
+    sqlite: async () => runtime.DB.close(),
+    dataRoot: async () => root.release(),
+  })
+  if (outcome === 'timeout') console.warn('[node] drain exceeded its deadline; exiting anyway')
+  process.exit(0)
+}
+
+// Signals are wired before anything announces readiness, and the order matters: until
+// `process.once('SIGTERM')` runs, SIGTERM keeps its default disposition, so the kernel kills the
+// process outright, with no drain and no lock release. A supervisor, or the shutdown integration
+// test, acts the instant it sees the handshake line, so anything printed before this point risks
+// being killed mid-boot.
+//
+// SIGUSR1 reopens the pairing window (docs/node-distribution.md § Runtime): no token, no second
+// port, and it needs shell access on this machine, the same "the owner is present" property pairing
+// itself relies on.
+process.on('SIGUSR1', () => printPairingBanner(runtime.PAIRING_CODES.issue()))
+process.once('SIGINT', (signal) => void shutdown(signal))
+process.once('SIGTERM', (signal) => void shutdown(signal))
+
+console.log(
+  JSON.stringify({
+    nodeId: root.nodeId,
+    // The handshake's protocol number (docs/api-reference.md § Versioning): a launcher can refuse a
+    // node it cannot drive without pairing to it first.
+    protocolVersion: NODE_PROTOCOL_VERSION,
+    endpoint: listener.endpoint.origin,
+    fingerprint: listener.fingerprint,
+    certPem: listener.certPem,
+    deviceToken: await resolveDeviceToken(runtime.DEVICES, process.env.ACORN_DEVICE_TOKEN, 'Standalone node launcher'),
+  }),
+)
+
+// The first advertised host, or the loopback origin when there is none. One line, beside the banner
+// that makes the same choice for the same reason.
+function enrollmentEndpoint(): string {
+  const host = advertisedHosts(root)[0]
+  return host ? `https://${host}:${listener.endpoint.port}` : listener.endpoint.origin
+}
+
+// Prints the pairing banner the owner compares against the client's screen
+// (docs/node-distribution.md § Runtime). Opens automatically only while nothing is paired yet, so a
+// restart of a working node does not leave an unrequested window live.
+function printPairingBanner(code: string | null): void {
+  const port = listener.endpoint.port
+  const reachable = advertisedHosts(root).map((host) => `https://${host}:${port}`)
+  console.log('')
+  console.log('  acorn node ready')
+  console.log('')
+  if (reachable.length > 0) console.log(`    Connect to    ${reachable.join('\n                  ')}`)
+  else console.log(`    Connect to    https://127.0.0.1:${port}  (this machine only)`)
+  console.log(`    Identity      ${fingerprintPhrase(listener.fingerprint) ?? listener.fingerprint}`)
+  if (code) console.log(`    Pairing code  ${code}   (valid 10 minutes)`)
+  console.log('')
+  if (code) {
+    console.log('  In acorn: Settings → Nodes → add a node. Paste the address, check the identity')
+    console.log('  words match what acorn shows you, then paste the code.')
+  } else {
+    console.log(`  ${alreadyPaired} device(s) already paired. For another, run:  kill -USR1 ${process.pid}`)
+  }
+  if (reachable.length === 0) {
+    console.log('  To reach this node from another machine, set advertiseHost in this data root\'s')
+    console.log('  node.json (or ACORN_ADVERTISE_HOST) and restart.')
+  }
+  console.log('')
+}
+
+printPairingBanner(alreadyPaired === 0 ? runtime.PAIRING_CODES.issue() : null)
+

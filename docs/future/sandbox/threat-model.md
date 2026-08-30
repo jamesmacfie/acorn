@@ -17,9 +17,9 @@ story. [api-gates.md](./api-gates.md) is the deliberate one.
 ## Ambient authority: already careful, still wide
 
 The child environment hygiene is better than most. `childEnv`
-(`packages/node-core/src/main/taskEnv.ts:10`) is a nine-name allowlist, no parent spread, no
+(`packages/node-core/src/server/taskEnv.ts:10`) is a nine-name allowlist, no parent spread, no
 `SESSION_ENC_KEY`, no provider credentials. The process broker
-(`packages/node-core/src/main/core/exec/proc.ts`) refuses a bare `*` passthrough rather than trust
+(`packages/node-core/src/server/core/proc.ts`) refuses a bare `*` passthrough rather than trust
 that no caller writes it. That is the part most systems get wrong, and acorn got it right.
 
 But `HOME` is on the allowlist, and it has to be, because agent CLIs read their configuration from
@@ -30,7 +30,7 @@ it. So a task terminal is a real shell with the full user account behind it:
 - acorn's own data root, including `core.sqlite` (workspaces, projects, tasks, audit, device rows)
   and every plugin's SQLite file.
 
-The filesystem confinement policy (`packages/node-core/src/main/core/filesystem/confinement.ts`)
+The filesystem confinement policy (`packages/node-core/src/server/core/fs.ts`)
 does not help here. It confines acorn's own file service, symlink-aware, against the data root and
 worktree. It has no reach over a shell acorn spawned. A shell reads whatever the user can read.
 
@@ -75,7 +75,7 @@ Borrowed from `docs/security.md` § Threat model, narrowed to the agent case:
 3. **The data root on disk.** `core.sqlite` and plugin databases. Reachable by the shell (ambient),
    closed by the sandbox.
 4. **Provider secrets.** Encrypted at rest, decrypted only in node memory through `SecretService.use`
-   (`packages/node-core/src/main/core/secrets.ts`). Not in the child environment. The strongest asset
+   (`packages/node-core/src/server/core/secrets.ts`). Not in the child environment. The strongest asset
    already, and the model to copy, not fix.
 
 Items 1 and 2 are API-reachable and are the subject of [api-gates.md](./api-gates.md). Item 3 is the

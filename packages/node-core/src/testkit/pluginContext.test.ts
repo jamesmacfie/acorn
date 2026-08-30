@@ -3,7 +3,7 @@ import { schema } from '../server/db'
 import { makeTestNodeContext, makeTestRequestContext } from './pluginContext'
 
 // The testkit's own suite: what it asserts is that a test context and the boot context are the
-// same object, so these expectations break when server/plugin/context.ts changes. A plugin's
+// same object, so these expectations break when server/pluginHost/context.ts changes. A plugin's
 // forged literal never could.
 const plugin = { name: 'testkit-probe' }
 
@@ -35,7 +35,7 @@ describe('makeTestNodeContext', () => {
       expect(ctx.events.channel).toBeUndefined()
       expect(ctx.events.streams).toBeUndefined()
       // Granted, and gated by omission: `secrets: false` and no `exec` mean those facets are absent
-      // rather than throwing (main/pluginPermissions.ts).
+      // rather than throwing (server/plugins/permissions.ts).
       expect(ctx.core.projects.byId).toBeTypeOf('function')
       expect(ctx.core.secrets).toBeUndefined()
       expect(ctx.core.proc).toBeUndefined()

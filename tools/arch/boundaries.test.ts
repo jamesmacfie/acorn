@@ -143,7 +143,9 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   }
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
-  if (seg === 'server' || seg === 'main' || seg === 'service' || seg === 'mcp' || seg === 'wiring') return 'node'
+  // `entries` and `composition` are apps/node's two folders (docs/future/structure/phase-2-apps.md);
+  // `service` and `main` are the names phases 3 and 4 retire.
+  if (['server', 'main', 'mcp', 'entries', 'composition'].includes(seg)) return 'node'
   return 'shared'
 }
 
@@ -221,15 +223,15 @@ describe('architecture boundaries', () => {
     // configuration controls.
     const CHILD_PROCESS_OK = new Set([
       // Core, and the broker itself.
-      'packages/node-core/src/main/core/exec/proc.ts', // IS the broker
-      'packages/node-core/src/main/archive.ts', // bounded git archive
-      'packages/node-core/src/main/headless.ts', // one-shot agent run, streams stdout as it goes
-      'packages/node-core/src/main/mcpRegister.ts', // registers the MCP server with a CLI
-      'packages/node-core/src/main/profiles.ts', // probes whether an agent CLI is installed
-      'packages/node-core/src/main/tls.ts', // openssl, at first boot only
+      'packages/node-core/src/server/core/proc.ts', // IS the broker
+      'packages/node-core/src/server/storage/archive.ts', // bounded git archive
+      'packages/node-core/src/server/headless.ts', // one-shot agent run, streams stdout as it goes
+      'packages/node-core/src/server/mcpRegister.ts', // registers the MCP server with a CLI
+      'packages/node-core/src/server/profiles.ts', // probes whether an agent CLI is installed
+      'packages/node-core/src/server/transport/tls.ts', // openssl, at first boot only
       // Composition roots: a login-shell PATH probe, and the supervised node's own child.
-      'apps/node/src/service/runtime.ts',
-      'packages/desktop-helper/src/main/serviceHost.ts',
+      'apps/node/src/composition/runtime.ts',
+      'packages/desktop-helper/src/supervision/serviceHost.ts',
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/main/terminal.ts', // PTYs
       'plugins/agents/src/main/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
@@ -250,7 +252,7 @@ describe('architecture boundaries', () => {
         .map((e) => rel(e.fromFile)),
     )].sort()
     // Anti-vacuity: the broker itself must always be in the result, or the matcher has stopped matching.
-    expect(importers).toContain('packages/node-core/src/main/core/exec/proc.ts')
+    expect(importers).toContain('packages/node-core/src/server/core/proc.ts')
     expect(importers.filter((f) => !CHILD_PROCESS_OK.has(f))).toEqual([])
   })
 
@@ -320,12 +322,13 @@ describe('architecture boundaries', () => {
       '@acorn/client-core/tasks',
       '@acorn/client-core/ui',
       '@acorn/client-core/wsClient.ts',
-      '@acorn/node-core/main',
-      '@acorn/node-core/main/core',
       '@acorn/node-core/server',
+      '@acorn/node-core/server/core',
       '@acorn/node-core/server/integrations',
       '@acorn/node-core/server/middleware',
+      '@acorn/node-core/server/plugins',
       '@acorn/node-core/server/routes',
+      '@acorn/node-core/server/worktrees',
     ]
     // 167 across 48 files the day before the testkit landed; 147 across 37 once the first eleven moved;
     // 110 across 36 once the three roots the facade already re-exported were swapped for it
@@ -359,11 +362,11 @@ describe('architecture boundaries', () => {
   })
 
   it('plugins broadcast through the plugin context (shrinking baseline)', () => {
-    // Plugins used to deep-import main/wsHub.ts and main/notify.ts because NodePluginContext had no
+    // Plugins used to deep-import the hub and the notifier directly because NodePluginContext had no
     // `events` member. Keep this ratchet empty: a new direct import is a regression, not an item to
     // append here.
     const BROADCAST_BASELINE: string[] = []
-    const HUB = ['@acorn/node-core/main/wsHub.ts', '@acorn/node-core/main/notify.ts']
+    const HUB = ['@acorn/node-core/server/transport/wsHub.ts', '@acorn/node-core/server/notify.ts']
     const offenders = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && !e.isTest)
       .filter((e) => HUB.includes(e.spec))
       .map((e) => rel(e.fromFile))
@@ -446,7 +449,7 @@ describe('architecture boundaries', () => {
     const client = byName.get('@acorn/client-core')!
     const node = byName.get('@acorn/node-core')!
     const corePaths = readFileSync(join(client.src, 'registries/corePaths.ts'), 'utf8')
-    const manifest = readFileSync(join(node.src, 'main/pluginManifest.ts'), 'utf8')
+    const manifest = readFileSync(join(node.src, 'server/plugins/manifest.ts'), 'utf8')
     const segment = /export const PLUGIN_ROUTE_SEGMENT = '([^']+)'/.exec(corePaths)?.[1]
     expect(segment).toBe('x')
     expect(manifest).toContain(`\`/p/:projectId/${segment}/\${manifest.id}/\``)
@@ -543,7 +546,7 @@ describe('architecture boundaries', () => {
 
   it('the Tauri surface stays inside the shell', () => {
     // The renderer's one door to a host is the platform seam, and the bridge that fills it is the only
-    // file that may name a Tauri binding (docs/testing.md § Test layers). `src/app/client` is the
+    // file that may name a Tauri binding (docs/testing.md § Test layers). `src/client` is the
     // renderer and shares this package with the shell, so the rule names the shell folder rather than
     // the package.
     const SHELL = join(ROOT, 'apps', 'desktop', 'src', 'shell') + '/'

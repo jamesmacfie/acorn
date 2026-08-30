@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import '../registerProviders'
+import '../helpers/registerProviders'
 import type { TaskContext } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
@@ -15,11 +15,11 @@ import {
   type ContextMemorySource,
   type ContextNotesSource,
 } from '@acorn/node-core/server/agentTools/contextSections.ts'
-import { taskContext } from '@acorn/node-core/server/routes/taskContext.ts'
+import { taskContext } from '@acorn/node-core/server/routes/projects/taskContext.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
 import { mirroredPullRequest } from '@acorn/plugin-github/testkit'
 import { pullRequests, prFiles, repos } from '@acorn/plugin-github/testkit'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@acorn/node-core/server/db/index.ts')>()
@@ -44,7 +44,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
     gh = makeTestPluginDb('github')
     notesSource = async () => []
     memorySource = async () => []
-    // Sections are registered per owner now (server/plugin/types.ts § PluginContextSectionRegistry), so the
+    // Sections are registered per owner now (server/pluginHost/types.ts § PluginContextSectionRegistry), so the
     // fixture registers them the way production does: core's `issues` under 'core', and the three
     // plugin-owned ones under the plugin that owns their rows. `PluginContextSection.assemble` takes no `db`,
     // which is why these three read only what their source gives them.

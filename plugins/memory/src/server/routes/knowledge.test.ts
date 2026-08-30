@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { knowledge, setKnowledgeBridge, type KnowledgeBridge } from './knowledge'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Memory paths and the deprecated notes alias get validated bodies (the privileged-boundary
 // contract). Notes routing is characterized in plugins/notes/src/server/routes/notes.test.ts, and

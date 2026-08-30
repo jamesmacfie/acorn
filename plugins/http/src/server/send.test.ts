@@ -4,13 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, makeTestPluginDb, schema } from '@acorn/plugin-api/testkit'
-import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
-import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
+import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
+import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import type { HttpSendInput } from '../shared/model'
 import { httpVariables } from '../node/schema'
 import { SendError, buildRequest, describeFetchFailure, readCapped, referencedVariableNames, resolveVars, send, type SendCoreServices } from './send'
 import { protectHttpValue } from './storage'
-import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
+import { SecretService } from '@acorn/node-core/server/core/secrets.ts'
 
 // buildRequest is where interpolation, auth compilation and the scheme check land: the parts that
 // would silently send the wrong thing. The fetch call itself and the DB read around it are thin.

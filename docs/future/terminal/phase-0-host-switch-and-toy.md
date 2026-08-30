@@ -24,7 +24,7 @@ In:
   The desktop says `dom`. The TUI says `tui`.
 - `apps/tui/` (new), a workspace package with one entry that sets `globalThis.acorn` from Node,
   imports client-core, and mounts one pane through OpenTUI's Solid reconciler.
-- A `transport` implementation over `NodeBroker` from `packages/desktop-helper/src/main/nodeBroker.ts`,
+- A `transport` implementation over `NodeBroker` from `packages/desktop-helper/src/broker/nodeBroker.ts`,
   imported directly, authenticated with a device token from an env var. No fleet, no pairing, no
   custody: the other seam groups are null.
 - A file-backed persister behind the per-node query cache in `packages/client-core/src/node/fleet.ts`,
@@ -103,7 +103,7 @@ Enter, and can read it at 80 by 24. The findings list exists, even if empty.
 
 - `packages/client-core/src/ui/kit/support.ts` still exports `HOST` and only `Only` and `Fallback`
   read it.
-- `packages/desktop-helper/src/main/nodeBroker.ts` still has no shell binding and still sets the
+- `packages/desktop-helper/src/broker/nodeBroker.ts` still has no shell binding and still sets the
   bearer on the upgrade header.
 - `packages/client-core/src/node/fleet.ts` still imports `idb-keyval` in one place.
 - `@opentui/keymap/opentui` still exports `createDefaultOpenTuiKeymap`; `@opentui/solid` is

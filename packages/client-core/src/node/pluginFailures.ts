@@ -39,7 +39,7 @@ export const pluginFailureAttention: AttentionSourceContribution = {
         id: `core.pluginFailures:${row.name}`,
         title: titleFor(row),
         // A loaded plugin's own thrown message crossing into the owner's UI. Interpolated as text,
-        // never markup, and the node caps its length (node-core/server/plugin/pluginState.ts).
+        // never markup, and the node caps its length (node-core/server/pluginHost/state.ts).
         //
         // No restart advice, because a plugin that threw during init runs the same code again.
         detail: row.reason ?? FALLBACK_DETAIL,

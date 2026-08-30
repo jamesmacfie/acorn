@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory'
-import type { Env } from '../../main/bindings'
+import type { Env } from '../bindings'
 import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'
 
 // The authenticated caller. A device is a paired owner client. An internal principal is a Node-owned
@@ -27,7 +27,7 @@ export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; 
 
 // Internal loopback auth (docs/mcp.md): a child process holds no device token; it presents a scoped
 // internal token instead (server/auth/internalTokens.ts). The identity is the machine's single owner,
-// resolved from the explicit active-identity binding, minted at boot (main/core/identity/identity.ts),
+// resolved from the explicit active-identity binding, minted at boot (server/core/identity.ts),
 // so after first boot it is always present. The fail-closed null stays for the one context that can
 // still see an unbound store: a bare test Env built without ensureBoundIdentity.
 //

@@ -141,14 +141,14 @@ registerWsChannel('plugins', (frame) => {
 })
 
 // And its fourth. A task was created, patched, archived, cancelled, or had its links change on the
-// node — from this window, from another one, or from an agent (node-core/main/notify.ts). Content-free
+// node — from this window, from another one, or from an agent (node-core/server/notify.ts). Content-free
 // again: the subscriber invalidates the task-list query and refetches.
 registerWsChannel('tasks', (frame) => {
   if (frame.channel === 'tasks:changed') tasksSubs.forEach((cb) => cb())
 })
 
 // And its fifth. A connection was made, rotated, tested, disabled, or demoted to `needs-auth` because
-// its credential stopped working (node-core/main/notify.ts). The only core frame with a payload, so it
+// its credential stopped working (node-core/server/notify.ts). The only core frame with a payload, so it
 // is the only one that reads its own fields — narrowed here rather than at each subscriber, because a
 // frame off the wire is `Record<string, unknown>` and every consumer would otherwise repeat the check.
 registerWsChannel('connection', (frame) => {

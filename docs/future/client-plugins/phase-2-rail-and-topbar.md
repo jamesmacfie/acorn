@@ -84,7 +84,7 @@ status items."
 - `packages/protocol/src/chrome.ts` (new): `RailProps`, `TopbarProps`, `SlotRef`.
 - `packages/client-core/src/tabs/TabRail.tsx`: over `RailProps`; registered as `core`.
 - `packages/client-core/src/chrome/Topbar.tsx` (new, from `App.tsx`): over `TopbarProps`.
-- `apps/desktop/src/app/client/App.tsx`: builds both props objects; renders two
+- `apps/desktop/src/client/App.tsx`: builds both props objects; renders two
   `ExclusiveSlotHost`s.
 - `packages/client-core/src/registries/exclusiveSlots.ts`: per-slot props typing for the two new
   slots; nested-slot minting.
@@ -136,7 +136,7 @@ write a selector.
 - Phase 1 of this folder has shipped: core is a provider, `ExclusiveSlotHost` has no `core` prop.
 - `packages/client-core/src/tabs/TabRail.tsx` is the `<nav class="tabrail">` with `RailTab` children
   and one `ExclusiveSlotHost` for `rail.taskList`.
-- `apps/desktop/src/app/client/App.tsx` holds `<header class="topbar">` with `WorkspacePicker`, the
+- `apps/desktop/src/client/App.tsx` holds `<header class="topbar">` with `WorkspacePicker`, the
   project `Picker`, the breadcrumb, the node `Select`, `NodeChip`, and `AccountMenu`.
 - `packages/client-core/src/tabs/sources.ts` exports `availableSources()` with the four gates.
 - `packages/client-core/src/registries/slots.ts` has `UiSlotId` with `topbar.right` hosted and

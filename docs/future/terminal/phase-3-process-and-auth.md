@@ -68,7 +68,7 @@ kit component or pane module imports the token store.
   `pairing`, `recovery`.
 - `packages/desktop-helper/src/main/`: export the supervise and drain functions the wire handlers
   call, if they are not already exported.
-- `packages/node-core/src/main/dataRoot.ts` or wherever `openDataRoot` lives: expose "is locked"
+- `packages/node-core/src/server/storage/dataRoot.ts` or wherever `openDataRoot` lives: expose "is locked"
   without taking the lock, if it is not already.
 - `tools/arch/boundaries.test.ts`: the TUI token-store rule.
 
@@ -107,9 +107,9 @@ server's workspace. The boot test passes in CI.
 
 ## Verify before building
 
-- `apps/node/src/server/standalone.ts` still prints one JSON handshake line with `deviceToken`, and
+- `apps/node/src/entries/standalone.ts` still prints one JSON handshake line with `deviceToken`, and
   `resolveDeviceToken` still reuses `ACORN_DEVICE_TOKEN`.
-- `packages/desktop-helper/src/main/nodePairing.ts` still has `probeNode` and `pairWithNode`.
-- `packages/node-core/src/main/wsHub.ts` still reads the bearer from the upgrade request's headers.
+- `packages/desktop-helper/src/broker/nodePairing.ts` still has `probeNode` and `pairWithNode`.
+- `packages/node-core/src/server/transport/wsHub.ts` still reads the bearer from the upgrade request's headers.
 - `apps/desktop/test/boot.test.ts` still exists and still asks `/v2/node`.
 - `openDataRoot` still takes an exclusive lock.

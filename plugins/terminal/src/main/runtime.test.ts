@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { RunTarget } from '@acorn/node-core/main/runConfig.ts'
+import type { RunTarget } from '@acorn/node-core/server/runConfig.ts'
 import { parseUrlOutput, resolveTargetUrl, RuntimeService, type RuntimeDeps } from './runtime'
 
 const execP = promisify(execFile)

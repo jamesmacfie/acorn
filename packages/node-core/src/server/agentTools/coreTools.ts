@@ -4,8 +4,8 @@ import { pluginAuthoringTool } from './pluginAuthoring.ts'
 import { pluginRequestTool } from './pluginRequests.ts'
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from './registry.ts'
 import type { AppDatabase } from '../db/index.ts'
-import { broadcastPluginApprovalNotice } from '../../main/notify.ts'
-import { loadTask, projectForTask } from '../../main/taskWorktree.ts'
+import { broadcastPluginApprovalNotice } from '../notify.ts'
+import { loadTask, projectForTask } from '../worktrees/taskWorktree.ts'
 
 // The owner id for the core-owned contributions. Registration is idempotent across service boots.
 const OWNER = 'core'

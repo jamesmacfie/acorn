@@ -3,7 +3,7 @@ import { testSecretEnv } from '../../testkit/db'
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 import { authMiddleware, type AppEnv } from './auth'
-import type { Env } from '../../main/bindings'
+import type { Env } from '../bindings'
 
 const ENC_KEY = '0'.repeat(64)
 

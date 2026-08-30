@@ -22,7 +22,7 @@ export function closePluginApproval(): void {
 }
 
 /** One line naming where a package would come from. The node has its own copy of this for the settings
- * row (main/pluginInstaller.ts `describeSource`); this one runs on a source nothing has fetched yet. */
+ * row (server/plugins/installer.ts `describeSource`); this one runs on a source nothing has fetched yet. */
 export const describePluginSource = (source: PluginInstallSource | undefined): string =>
   !source
     ? ''

@@ -90,7 +90,7 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   whether something loads is honestly checked only by loading it:
   `packages/plugin-api/src/entrypoints.test.ts` imports every node-safe facade entrypoint in a
   node-environment vitest worker (the same shape a plugin's own suite runs in), and
-  `apps/node/test/integration/mainBarrelLoad.test.ts` imports every plugin main barrel in a plain Node
+  `apps/node/test/integration/pluginSystem/mainBarrelLoad.test.ts` imports every plugin main barrel in a plain Node
   child. The arch suite's text checks stay as a fast, precise first line, but they are no longer the
   only line — and neither owns a file allowlist any more;
 - the platform-seam contract suite is one checker run from both ends: `client-core/platform/contract.ts`
@@ -258,6 +258,14 @@ Tests that require populated plugin registries belong under `apps/node/test/inte
 desktop integration tree. Route protection must be tested through the real `createApp()` factory,
 not by mounting middleware only in the test. Standalone parity tests ensure `dev:node` wires the same
 pure-Node feature capabilities as the supervised Node.
+
+That integration tree is grouped by what a suite boots, because the whole directory used to be one
+flat list of 25 files and the only way to find the sibling of the test you were reading was to open
+it. `lifecycle/` starts and stops a node (spawn, shutdown, standalone parity, enrolment), `auth/`
+covers pairing and the token principals, `pluginSystem/` covers the loader, the disable path, the
+manifests and the main barrels, and `plugins/` holds the suites named for one plugin. Anything that
+belongs to none of the four stays flat. Helpers that are not themselves tests live in
+`apps/node/test/helpers/`, and the one shell fixture in `apps/node/test/__fixtures__/`.
 
 ## Testkit
 

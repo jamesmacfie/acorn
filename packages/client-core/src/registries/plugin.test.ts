@@ -6,7 +6,7 @@ import { sourceRegistry, type SourceContribution } from './sources'
 import { integrationFlowRegistry } from './integrationFlows'
 import { uiSlotRegistry } from './slots'
 
-// The client half of packages/node-core/src/server/plugin/host.test.ts. Registration itself is
+// The client half of packages/node-core/src/server/pluginHost/host.test.ts. Registration itself is
 // verified end to end by the e2e suite (S1 asserts the rail's four Source labels in order, S3 the
 // nine pane labels a local task offers), because vitest here runs in a bare Node environment with no
 // Solid transform and the plugin entrypoints import .tsx components. What vitest can reach is the

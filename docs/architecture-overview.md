@@ -53,7 +53,9 @@ The Node owns:
 The desktop shell owns:
 
 - The window, child webviews, dialogs, menus, navigation policy, and the data key in the OS keychain.
-- The injected renderer bridge, and the helper process behind it.
+- The injected renderer bridge, and the helper process behind it. Three folders, one per process:
+  `apps/desktop/src/client/` is the renderer, `apps/desktop/src/shell/` is the Tauri side, and
+  `apps/desktop/src/helper/` is the Node process Rust supervises.
 - Node endpoint records, certificate pins, device-token custody, fleet membership, and service
   supervision.
 
@@ -137,14 +139,15 @@ disappears rather than shrinking. The exit is a plugin whose suite compiles agai
 only, which is also the condition for moving that plugin out of the repository.
 
 **The node stays bootable.** Nothing in the tree imports a shell binding it should not. Tauri's
-`invoke` and its event API are confined to `apps/desktop/src/shell/`, the bridge the window injects.
+`invoke` and its event API are confined to `apps/desktop/src/shell/`, the bridge the window injects;
+the helper next door names none of them.
 Nothing imports `electron`, a flat ban that covers manifests too.
-`apps/node/test/integration/mainBarrelLoad.test.ts` is the durable check: it loads every plugin's main
+`apps/node/test/integration/pluginSystem/mainBarrelLoad.test.ts` is the durable check: it loads every plugin's main
 barrel in a plain Node process, which is the runtime that has to boot.
 
 **The custody stack stays shell-free.** `@acorn/desktop-helper` is the broker, the fleet, the device
 tokens, the plugin cache and trust store, the tunnels, and the supervised node service, composed by
-its `main/index.ts`. It runs as its own process under the bundled Node, so it names no shell binding
+its `src/index.ts`. It runs as its own process under the bundled Node, so it names no shell binding
 and the encryption is injected rather than imported. See the shell process in
 [the shell doc](./shell.md).
 
@@ -173,7 +176,7 @@ plugin's node-environment test suite. `ui/` may import only pure or presentation
 allowlist of destinations rather than a denylist of data modules.
 
 **Two spellings that must not drift.** `PLUGIN_ROUTE_SEGMENT` is declared in client-core and re-spelled
-as a literal in `node-core/main/pluginManifest.ts`, because the client is downstream of the node and
+as a literal in `node-core/server/plugins/manifest.ts`, because the client is downstream of the node and
 cannot share the constant. The test turns that edit into a failure rather than a route the device
 refuses after the node accepted it.
 
@@ -234,7 +237,7 @@ Every response has an `X-Request-Id`. Errors use the single envelope
 
 **Zod at every mutation boundary.** A route that accepts a body parses it with a Zod schema and
 returns 400 on failure, using `safeParse` against a module-level schema, as
-`server/routes/worktree.ts` does. Reads are not validated, because the client is TypeScript compiled
+`server/routes/projects/worktree.ts` does. Reads are not validated, because the client is TypeScript compiled
 against the same types and a response schema would restate the type.
 
 The rule exists because the alternative was drift. Roughly ten route files parsed with Zod while

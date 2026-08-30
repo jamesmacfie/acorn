@@ -2,7 +2,7 @@
 // manifest declared. See docs/managed-agents.md § Harnesses.
 //
 // The host already minted the runtime id, resolved the adapter entry inside the plugin's package, and
-// turned each probe route into a call (node-core/server/plugin/harnesses.ts). What is left is the
+// turned each probe route into a call (node-core/server/pluginHost/harnesses.ts). What is left is the
 // translation into the launch spec a built-in harness uses, so nothing downstream can tell the two
 // apart. One registration, up to three effects, all released together:
 //

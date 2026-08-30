@@ -64,7 +64,7 @@ the first-party/loaded asymmetry is to confine compiled plugins too, not to unco
 
 Worth stating, because the hard parts are the ones that went well:
 
-- **The dogfood test is green again.** `apps/node/test/integration/pluginLoader.test.ts` passes,
+- **The dogfood test is green again.** `apps/node/test/integration/pluginSystem/pluginLoader.test.ts` passes,
   and Rollbar is now the only Rollbar contribution rather than a disk copy shadowing a built-in.
   `pnpm test` is back to the three documented environmental failures (`serviceSpawn` ×2,
   `standaloneShutdown`); `pnpm lint` is green.
@@ -94,7 +94,7 @@ persisted layout key and `<dataRoot>/plugins/http.sqlite` all carry over. It was
 owns tables, and that reason held: the manifest carrier, `ctx.storage.open()` and the loader's
 confinement all existed, but **`build-plugin.mjs` never staged the migrations directory into the
 package** — so the first plugin to declare one would have died on first open. Nine lines in the
-builder, and `apps/node/test/integration/httpLoaded.test.ts` now covers the thing nothing had: a
+builder, and `apps/node/test/integration/plugins/httpLoaded.test.ts` now covers the thing nothing had: a
 migration arriving through an installer update, applied at the next boot, against a database with
 real rows in it. Plus a broken chain failing contained, and uninstall-without-purge keeping the file.
 

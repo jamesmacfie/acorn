@@ -1,6 +1,6 @@
 // The one thing this file guards: a committed `.acorn/config.toml [database].url_script` is a shell
 // script from the checkout, so resolving the Database pane's connection must not run it until the repo
-// config has been reviewed (core/main/repoConfigTrust.ts; docs/data-layer.md § Database plugin: the
+// config has been reviewed (core/server/repoConfigTrust.ts; docs/data-layer.md § Database plugin: the
 // Postgres pane). Cloning a repo, or checking out a PR that adds the file, must not be enough to
 // execute its commands.
 //
@@ -14,10 +14,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestDb, schema, type TestDb } from '@acorn/plugin-api/testkit'
-import * as coreFs from '@acorn/node-core/main/core/fs.ts'
-import { createProjectService } from '@acorn/node-core/main/core/projects.ts'
-import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
-import { RepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
+import * as coreFs from '@acorn/node-core/server/core/fs.ts'
+import { createProjectService } from '@acorn/node-core/server/core/projectRefs.ts'
+import { createTaskService } from '@acorn/node-core/server/core/tasks.ts'
+import { RepoConfigTrustError } from '@acorn/node-core/server/repoConfigTrust.ts'
 import { resolveDbUrl, type DatabaseCoreServices } from './database'
 
 describe('resolveDbUrl: repo-authored url_script trust gate', () => {

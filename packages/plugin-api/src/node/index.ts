@@ -13,7 +13,7 @@
 // ── The plugin contract itself ────────────────────────────────────────────────────────────────
 // `PluginHook*` are named here for the same reason `TaskConcern` below is: a plugin that opens a hook
 // passes `ctx.hooks` into the module that runs it, and a parameter needs a type to name
-// (server/plugin/hooks.ts, docs/plugins.md § Hooks).
+// (server/pluginHost/hooks.ts, docs/plugins.md § Hooks).
 export type {
   NodePlugin,
   PluginBroadcast,
@@ -23,30 +23,30 @@ export type {
   PluginHookRegistry,
   PluginProviderResourceRequest,
   PluginRequestContext,
-} from '@acorn/node-core/server/plugin/types.ts'
+} from '@acorn/node-core/server/pluginHost/types.ts'
 export type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 // What `ctx.taskChecks.register` answers with. Here because a check worth writing is a function, not
-// an inline literal, and a function needs a return type to name (server/plugin/taskChecks.ts).
-export type { TaskConcern } from '@acorn/node-core/server/plugin/taskChecks.ts'
+// an inline literal, and a function needs a return type to name (server/pluginHost/taskChecks.ts).
+export type { TaskConcern } from '@acorn/node-core/server/pluginHost/taskChecks.ts'
 // The major this build of the API speaks. docs/plugins.md § The plugin API covers what it guards, and
 // why it is the one name kept without a consumer.
 //
 // The context types are not here: a plugin keeps `ctx` inside `init`/`activate` and passes `ctx.core`
 // onward, so `NodePluginContext` never has to be named.
-export { PLUGIN_API_MAJOR } from '@acorn/node-core/main/pluginManifest.ts'
-export { capabilityId } from '@acorn/node-core/server/plugin/capabilities.ts'
-export type { Disposable } from '@acorn/node-core/server/plugin/capabilities.ts'
+export { PLUGIN_API_MAJOR } from '@acorn/node-core/server/plugins/manifest.ts'
+export { capabilityId } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+export type { Disposable } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 // The many-provider seam beside capabilities (docs/plugins.md § Cooperative extension points). Only
 // the id minter and the entry type: `open`, `contribute` and `entries` arrive on
 // `ctx.extensionPoints`, and a plugin that imported the registry directly would get its own copy of
 // the maps, since a loaded bundle inlines every @acorn/* import it makes.
-export { extensionPointId } from '@acorn/node-core/server/plugin/extensionPoints.ts'
-export type { Extension, ExtensionPointId } from '@acorn/node-core/server/plugin/extensionPoints.ts'
+export { extensionPointId } from '@acorn/node-core/server/pluginHost/extensionPoints.ts'
+export type { Extension, ExtensionPointId } from '@acorn/node-core/server/pluginHost/extensionPoints.ts'
 // The managed agent harness seam (docs/managed-agents.md § Harnesses). The capability id and its
 // shape live in node-core rather than in the agents plugin, because the host delivers a
 // manifest-declared harness and neither package may import the other.
-export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/plugin/harnesses.ts'
-export type { HarnessProbe, HarnessRegistry, ManifestHarness, ManifestHarnessSpawn } from '@acorn/node-core/server/plugin/harnesses.ts'
+export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/pluginHost/harnesses.ts'
+export type { HarnessProbe, HarnessRegistry, ManifestHarness, ManifestHarnessSpawn } from '@acorn/node-core/server/pluginHost/harnesses.ts'
 
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
@@ -54,7 +54,7 @@ export { isTaskConfined, mayActOnTask, ownerId, requireDevice, requireUser } fro
 export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
 // The portable carrier a loaded plugin uses to run its own Hono router through
 // `ctx.routes.fetch` (docs/plugins.md § Loaded plugins).
-export { portableCarrier } from '@acorn/node-core/server/plugin/portable.ts'
+export { portableCarrier } from '@acorn/node-core/server/pluginHost/portable.ts'
 export { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 // `Env`, core's runtime bindings, is not here. A plugin reads its env off `ctx`. Where it needs a
@@ -64,40 +64,40 @@ export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 // ── Storage ───────────────────────────────────────────────────────────────────────────────────
 // The handle type only. See docs/data-layer.md and docs/plugins.md § Data ownership for
 // `ctx.storage.open()` and how a plugin declares its migrations.
-export type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+export type { PluginDatabase } from '@acorn/node-core/server/plugins/storage.ts'
 
 // ── Core services ─────────────────────────────────────────────────────────────────────────────
 // The type only; the object arrives on `ctx.core`, and a plugin never constructs one or deep-imports
 // the implementation. See docs/plugins.md § The plugin API for why `ProjectRef` and `TaskRef` are
 // projections rather than the drizzle row.
-export type { CoreFsService, CoreGitService, CoreProcService, CoreServices, ProjectRef, TaskRef, GenerateTextRequest, ModelService } from '@acorn/node-core/main/core/index.ts'
-export { SecretUnavailableError } from '@acorn/node-core/main/core/secrets.ts'
-export type { SecretService } from '@acorn/node-core/main/core/secrets.ts'
-export type { PrefService } from '@acorn/node-core/main/core/prefs.ts'
-export { confineExistingFile } from '@acorn/node-core/main/core/fs.ts'
-export { git, gitOrThrow, gitText } from '@acorn/node-core/main/core/git.ts'
-export { brokerEnv } from '@acorn/node-core/main/core/proc.ts'
+export type { CoreFsService, CoreGitService, CoreProcService, CoreServices, ProjectRef, TaskRef, GenerateTextRequest, ModelService } from '@acorn/node-core/server/core/index.ts'
+export { SecretUnavailableError } from '@acorn/node-core/server/core/secrets.ts'
+export type { SecretService } from '@acorn/node-core/server/core/secrets.ts'
+export type { PrefService } from '@acorn/node-core/server/core/prefs.ts'
+export { confineExistingFile } from '@acorn/node-core/server/core/fs.ts'
+export { git, gitOrThrow, gitText } from '@acorn/node-core/server/core/git.ts'
+export { brokerEnv } from '@acorn/node-core/server/core/proc.ts'
 
 // ── Task, worktree and run configuration ──────────────────────────────────────────────────────
-export { buildSessionEnv, childEnv } from '@acorn/node-core/main/taskEnv.ts'
-export type { SessionTaskInfo } from '@acorn/node-core/main/taskEnv.ts'
+export { buildSessionEnv, childEnv } from '@acorn/node-core/server/taskEnv.ts'
+export type { SessionTaskInfo } from '@acorn/node-core/server/taskEnv.ts'
 // Takes a `TaskRef` (above), not the `tasks` row; see docs/plugins.md § The plugin API for why a
 // column rename in core would otherwise be a silent plugin break.
-export { isDir, rendererBaseCheckout, taskContext } from '@acorn/node-core/main/taskWorktree.ts'
-export { loadRepoConfig } from '@acorn/node-core/main/runConfig.ts'
-export type { LayoutRecipe, RunTarget } from '@acorn/node-core/main/runConfig.ts'
-export { isRepoConfigTrustError } from '@acorn/node-core/main/repoConfigTrust.ts'
-export { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/main/archive.ts'
-export { TASK_CREATED, TASK_SESSIONS } from '@acorn/node-core/server/routes/worktree.ts'
-export type { TaskCreatedHook, TaskSessionsBridge } from '@acorn/node-core/server/routes/worktree.ts'
-export { RUN_TARGETS } from '@acorn/node-core/server/routes/harness.ts'
+export { isDir, rendererBaseCheckout, taskContext } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
+export { loadRepoConfig } from '@acorn/node-core/server/runConfig.ts'
+export type { LayoutRecipe, RunTarget } from '@acorn/node-core/server/runConfig.ts'
+export { isRepoConfigTrustError } from '@acorn/node-core/server/repoConfigTrust.ts'
+export { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/server/storage/archive.ts'
+export { TASK_CREATED, TASK_SESSIONS } from '@acorn/node-core/server/routes/projects/worktree.ts'
+export type { TaskCreatedHook, TaskSessionsBridge } from '@acorn/node-core/server/routes/projects/worktree.ts'
+export { RUN_TARGETS } from '@acorn/node-core/server/routes/plugins/harness.ts'
 
 // ── Agents: profiles, headless runs, MCP registration ─────────────────────────────────────────
-export { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/node-core/main/agentProfiles/index.ts'
-export { lineDelimitedJsonAdapter } from '@acorn/node-core/main/agentProfiles/streamJson.ts'
-export type { AgentProfileContribution } from '@acorn/node-core/main/agentProfiles/types.ts'
-export { buildHeadlessArgv, HEADLESS_TIMEOUT_MS, runHeadless } from '@acorn/node-core/main/headless.ts'
-export type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/main/headless.ts'
+export { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/node-core/server/agentProfiles/index.ts'
+export { lineDelimitedJsonAdapter } from '@acorn/node-core/server/agentProfiles/streamJson.ts'
+export type { AgentProfileContribution } from '@acorn/node-core/server/agentProfiles/types.ts'
+export { buildHeadlessArgv, HEADLESS_TIMEOUT_MS, runHeadless } from '@acorn/node-core/server/headless.ts'
+export type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/server/headless.ts'
 export {
   getProfile,
   listProfileDefs,
@@ -106,10 +106,10 @@ export {
   requireProfile,
   resolveCommand,
   tmuxAvailable,
-} from '@acorn/node-core/main/profiles.ts'
-export type { ProfileDef } from '@acorn/node-core/main/profiles.ts'
-export { launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/main/mcpRegister.ts'
-export type { Launcher } from '@acorn/node-core/main/mcpRegister.ts'
+} from '@acorn/node-core/server/profiles.ts'
+export type { ProfileDef } from '@acorn/node-core/server/profiles.ts'
+export { launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
+export type { Launcher } from '@acorn/node-core/server/mcpRegister.ts'
 
 // ── Agent tools ───────────────────────────────────────────────────────────────────────────────
 export { ToolError } from '@acorn/node-core/server/agentTools/registry.ts'
@@ -139,7 +139,7 @@ export type { StoredConnection } from '@acorn/node-core/server/integrations/conn
 export { providerCredential } from '@acorn/node-core/server/integrations/credential.ts'
 export { providerError } from '@acorn/node-core/server/integrations/respondProvider.ts'
 export { providerRequestScheduler } from '@acorn/node-core/server/integrations/budgetRuntime.ts'
-export { defaultBudgets, externalIdsFor, publicConnectionProvider, publicProvider } from '@acorn/node-core/server/integrations/providers/shared.ts'
+export { defaultBudgets, externalIdsFor, publicConnectionProvider, publicProvider } from '@acorn/node-core/server/integrations/providerShared.ts'
 export type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders/types.ts'
 // The node-provider contract (docs/plugins.md § Node providers). Types only: the provider arrives on
 // `ctx.providers.nodes`, and a plugin that imported the registry directly would get its own copy of

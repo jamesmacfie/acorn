@@ -69,7 +69,7 @@ integrations use their own allowlisted clients.
 ## Other outbound consumers in the Node
 
 There is one more, and it is deliberately not built on anything shared: the plugin installer
-(`packages/node-core/src/main/pluginInstaller.ts`) fetches release metadata and a package archive when
+(`packages/node-core/src/server/plugins/installer.ts`) fetches release metadata and a package archive when
 an owner installs a plugin. It keeps its `fetch` usage inside its own module, with its own scheme guard
 (https everywhere, http only on loopback, re-checked after redirects), a 32 MiB archive cap, and a
 60-second timeout. Same posture as the send path above, and for the same reason: a general client

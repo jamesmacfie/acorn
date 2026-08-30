@@ -113,7 +113,7 @@ The rule it enforces is: never answer a plugin API question from memory. Everyth
 wrong by remembering is derived at call time. The manifest key list, the cap on each contribution,
 the two closed action-verb sets, the frame targets, the host slots, and the command categories all
 come out of `z.toJSONSchema(pluginManifestShape)`. The `permissions.node` blocks come from the same
-schema, and its `core` facet list from `main/pluginPermissions.ts`. The frame bridge's message kinds,
+schema, and its `core` facet list from `server/plugins/permissions.ts`. The frame bridge's message kinds,
 `ui` ops, document ops, webview ops, and HTTP methods are read off the wire union in
 `@acorn/protocol/pluginBridge.ts` through `satisfies`, so a new message kind is a compile error here
 rather than a silent omission. Only process is hand-written, because no schema states it, and

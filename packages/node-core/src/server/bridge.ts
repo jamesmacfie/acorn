@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { AppEnv } from './middleware/auth'
 import { respondError } from './respond'
-import { capabilityId, type CapabilityId } from './plugin/capabilities'
+import { capabilityId, type CapabilityId } from './pluginHost/capabilities'
 
 // Route handlers resolve their provider from the per-runtime registry carried by c.env. Keeping this
 // helper in the historical bridge module makes the migration mechanical for existing route families;

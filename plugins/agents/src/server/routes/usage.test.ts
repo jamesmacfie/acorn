@@ -2,9 +2,9 @@ import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
-import { SecretService } from '@acorn/node-core/main/core/secrets.ts'
-import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
-import { createCoreServices } from '@acorn/node-core/main/core/index.ts'
+import { SecretService } from '@acorn/node-core/server/core/secrets.ts'
+import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
+import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { makeTestDb } from '@acorn/plugin-api/testkit'
 import type { AgentUsageSnapshot } from '../../shared/usage'
 import { emptyAgentPricingPreferences, type AgentPricingPreferences } from '../../shared/pricing'
@@ -17,7 +17,7 @@ import {
 } from '../../shared/sessionDefaults'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../../main/sessionDefaultsStore'
 import { agentUsage, setAgentUsageBridge } from './usage'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 const snapshot: AgentUsageSnapshot = { providers: [], refreshedAt: 123 }
 

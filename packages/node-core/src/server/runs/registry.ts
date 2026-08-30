@@ -1,6 +1,6 @@
 import { runsResponseSchema, type RunRow } from '@acorn/protocol/runs.ts'
-import type { Env } from '../../main/bindings'
-import { dispatchPluginRoute } from '../plugin/dispatch'
+import type { Env } from '../bindings'
+import { dispatchPluginRoute } from '../pluginHost/dispatch'
 
 // The unified run list's node half (@acorn/protocol/runs.ts explains why this is a registry and what
 // would justify a core table instead).

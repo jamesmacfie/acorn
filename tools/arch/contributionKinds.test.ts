@@ -49,7 +49,7 @@ describe('the contribution-kind table is complete', () => {
   })
 
   it('names every node context member', () => {
-    const node = members(read('packages/node-core/src/server/plugin/types.ts'), 'NodePluginContext')
+    const node = members(read('packages/node-core/src/server/pluginHost/types.ts'), 'NodePluginContext')
     expect(node.length).toBeGreaterThan(8)
     expect(node.filter((name) => name !== 'name' && !TABLE.includes(`ctx.${name}`))).toEqual([])
   })

@@ -50,8 +50,8 @@ export type DeviceService = {
 
 // The token a node's own launcher should use: reuse the one it remembered when it still
 // authenticates, and issue a fresh one otherwise (first run, a reset data root, or a device the owner
-// revoked). Shared by the two things that boot a node, the Electron supervisor, which passes the
-// token back from the OS keychain (apps/node/src/service/runtime.ts), and the standalone entry, which
+// revoked). Shared by the two things that boot a node: the desktop supervisor, which passes the token
+// back from the OS keychain (apps/node/src/composition/runtime.ts), and the standalone entry, which
 // takes it from ACORN_DEVICE_TOKEN. Without the reuse each launch would add a device row.
 export async function resolveDeviceToken(devices: DeviceService, remembered: string | undefined, name: string): Promise<string> {
   if (remembered && (await devices.authenticate(remembered))) return remembered

@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { makeTestPluginDb, testGate, testSecretEnv, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import type { ProjectRef } from '@acorn/node-core/main/core/index.ts'
+import type { ProjectRef } from '@acorn/node-core/server/core/index.ts'
 import { repos } from '../../node/schema'
 import { githubImport } from './import'
 

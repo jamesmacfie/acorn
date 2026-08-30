@@ -242,7 +242,7 @@ Each step is shippable alone and each leaves the previous one useful without it.
 
 ## Verify before building
 
-- `packages/node-core/src/main/core/index.ts` still exposes `CoreServices` with `tasks`, `context`,
+- `packages/node-core/src/server/core/index.ts` still exposes `CoreServices` with `tasks`, `context`,
   and `projects` as the pattern to copy for `findings`.
 - `plugins/notes` still distinguishes kind `'scratch'` from `'finding'`, and `plugins/workflows`
   still writes `workflow-handoffs-<runId>` notes.

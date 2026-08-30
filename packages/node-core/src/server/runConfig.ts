@@ -1,0 +1,258 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { parse as parseToml } from 'smol-toml'
+import type { BrowserRule, PreviewMode } from '@acorn/protocol/api.ts'
+
+export type RunTarget = {
+  id: string
+  command: string
+  stop?: string
+  restart?: string // explicit restart command; when absent run_restart falls back to stop+start
+  url?: string
+  urlCommand?: string // url_command in TOML
+  icon?: string
+  default?: boolean
+}
+
+export type LayoutRecipe = {
+  id: string
+  panes: string[] // panes split equally, there is no ratio field
+  terminal?: string // run.<id> to auto-start in the drawer
+  browser?: string // 'run:<id>', points the browser at that target's resolved URL
+}
+
+export type ConfigError = { source: string; message: string }
+
+export type RepoConfig = {
+  runTargets: RunTarget[]
+  copy: string[]
+  layouts: LayoutRecipe[]
+  // Database-pane connection resolver + browser-preview URL config. db/preview may come from committed
+  // repo config; browserRules stays DB-only because autofill selectors are machine/personal.
+  dbUrlScript: string | null
+  // True when dbUrlScript's winning layer is the committed repo config, the same provenance signal
+  // repoTargetIds carries for the same reason: dbUrlScript runs as a shell script, so the trust
+  // gate must apply when the checkout authored it and must not apply when the user did.
+  dbUrlFromRepo: boolean
+  preview: { mode: PreviewMode | null; value: string | null }
+  browserRules: BrowserRule[]
+  errors: ConfigError[]
+  // Resolved target ids whose winning layer is the committed repo config. Execution uses this
+  // provenance to apply the trust gate without penalising user/DB-authored targets.
+  repoTargetIds: string[]
+}
+
+// The DB columns the file layers override: the project config row (project-level settings,
+// formerly per-workspace columns). The `dev` run button comes from the dev script or explicit
+// config; see the layering comment in loadRepoConfig below.
+export type DbConfigFallback = {
+  devScript?: string | null // "run dev" command → a base `dev` target (repo config overrides)
+  devRestartScript?: string | null // restart command for the base `dev` target
+  runTargetsJson?: string | null // projects.run_targets (JSON column)
+  dbUrlScript?: string | null // projects.db_url_script
+  previewMode?: PreviewMode | null // projects.preview_mode
+  previewValue?: string | null // projects.preview_value
+  browserRules?: BrowserRule[] // projects.browser_rules (parsed; DB-only, no toml layer)
+}
+
+const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+
+// One parsed [scripts.run.<id>] table → a validated RunTarget (or an error).
+function parseRunTarget(id: string, v: unknown, source: string, errors: ConfigError[]): RunTarget | null {
+  if (!v || typeof v !== 'object') {
+    errors.push({ source, message: `run.${id} must be a table` })
+    return null
+  }
+  const o = v as Record<string, unknown>
+  const command = str(o.command)
+  if (!command) {
+    errors.push({ source, message: `run.${id} is missing 'command'` })
+    return null
+  }
+  const url = str(o.url)
+  const urlCommand = str(o.url_command)
+  if (url && urlCommand) {
+    errors.push({ source, message: `run.${id} declares both 'url' and 'url_command' — pick one` })
+    return null
+  }
+  return {
+    id,
+    command,
+    stop: str(o.stop),
+    restart: str(o.restart),
+    url,
+    urlCommand,
+    icon: str(o.icon),
+    default: o.default === true || undefined,
+  }
+}
+
+type Layer = {
+  run: Map<string, RunTarget>
+  copy?: string[]
+  layouts: Map<string, LayoutRecipe>
+  dbUrlScript?: string
+  previewMode?: PreviewMode
+  previewValue?: string
+}
+
+function parseLayer(text: string, source: string, errors: ConfigError[]): Layer | null {
+  let doc: Record<string, unknown>
+  try {
+    doc = parseToml(text) as Record<string, unknown>
+  } catch (e) {
+    errors.push({ source, message: e instanceof Error ? e.message : 'invalid TOML' })
+    return null
+  }
+  const layer: Layer = { run: new Map(), layouts: new Map() }
+  const scripts = doc.scripts
+  if (scripts && typeof scripts === 'object') {
+    const s = scripts as Record<string, unknown>
+    // `[scripts] setup` and `[scripts] archive` are not read. They were parsed and merged over the
+    // project row for a while and nothing ever consumed the result: the setup script comes from
+    // `projects.setup_script` through projectSetup(), and the archive script from
+    // `projects.teardown_script` through server/storage/archive.ts. A repo could declare either and watch it do
+    // nothing.
+    //
+    // Reported rather than wired. Wiring them would make a committed file run a command on worktree
+    // creation and on archive, and neither path asks the repo-config trust gate first, so it would be
+    // a new execution surface rather than a fix. Reported rather than dropped in silence, because the
+    // whole complaint was a declaration that quietly did nothing, and the palette already draws these.
+    for (const key of ['setup', 'archive'] as const) {
+      if (s[key] !== undefined) {
+        errors.push({ source, message: `[scripts] ${key} is not read. Set the ${key === 'setup' ? 'setup' : 'teardown'} script in the project's settings.` })
+      }
+    }
+    const run = s.run
+    if (run && typeof run === 'object') {
+      for (const [id, v] of Object.entries(run as Record<string, unknown>)) {
+        const target = parseRunTarget(id, v, source, errors)
+        if (target) layer.run.set(id, target)
+      }
+    }
+  }
+  // [database] url_script: the Database pane's connection resolver (docs/pg.md).
+  const database = doc.database
+  if (database && typeof database === 'object') layer.dbUrlScript = str((database as Record<string, unknown>).url_script)
+  // [preview] mode and value: how the browser-preview pane resolves its URL (docs/panes.md).
+  const preview = doc.preview
+  if (preview && typeof preview === 'object') {
+    const pv = preview as Record<string, unknown>
+    const mode = str(pv.mode)
+    if (mode) {
+      if (mode !== 'url' && mode !== 'port' && mode !== 'script') errors.push({ source, message: `preview.mode must be 'url' | 'port' | 'script'` })
+      else layer.previewMode = mode
+    }
+    const value = str(pv.value)
+    if (value) {
+      if (layer.previewMode === 'port' && !/^\d{1,5}$/.test(value)) errors.push({ source, message: `preview.value must be a bare port 1-65535` })
+      else layer.previewValue = value
+    }
+  }
+  const copy = doc.copy
+  if (Array.isArray(copy)) layer.copy = copy.filter((c): c is string => typeof c === 'string' && !!c.trim()).map((c) => c.trim())
+  else if (copy !== undefined) errors.push({ source, message: `'copy' must be an array of paths` })
+  const layout = doc.layout
+  if (layout && typeof layout === 'object') {
+    for (const [id, v] of Object.entries(layout as Record<string, unknown>)) {
+      if (!v || typeof v !== 'object') {
+        errors.push({ source, message: `layout.${id} must be a table` })
+        continue
+      }
+      const o = v as Record<string, unknown>
+      const panes = Array.isArray(o.panes) ? o.panes.filter((p): p is string => typeof p === 'string') : []
+      if (!panes.length) {
+        errors.push({ source, message: `layout.${id} needs a non-empty 'panes' array` })
+        continue
+      }
+      layer.layouts.set(id, {
+        id,
+        panes,
+        terminal: str(o.terminal),
+        browser: str(o.browser),
+      })
+    }
+  }
+  return layer
+}
+
+// The projects.run_targets JSON column, converted to RunTarget[] (the per-project DB fallback
+// surface). Malformed JSON yields no targets. The pre-0017 scalar runCommand/devPort columns are
+// gone: migration 0017 folded them into this JSON column, and 0018 dropped them.
+export function projectRunTargets(db: DbConfigFallback): RunTarget[] {
+  if (!db.runTargetsJson) return []
+  try {
+    const arr = JSON.parse(db.runTargetsJson) as unknown
+    if (!Array.isArray(arr)) return []
+    const out: RunTarget[] = []
+    for (const v of arr) {
+      if (v && typeof v === 'object' && str((v as Record<string, unknown>).id) && str((v as Record<string, unknown>).command)) {
+        const o = v as Record<string, unknown>
+        out.push({
+          id: (o.id as string).trim(),
+          command: (o.command as string).trim(),
+          stop: str(o.stop),
+          url: str(o.url),
+          urlCommand: str(o.urlCommand),
+          icon: str(o.icon),
+          default: o.default === true || undefined,
+        })
+      }
+    }
+    return out
+  } catch {
+    return [] // malformed JSON column → no targets
+  }
+}
+
+// Read + merge the layers. Repo overrides user overrides DB; run targets and layouts merge by id
+// (repo's id wins), scripts/copy are per-field.
+export function loadRepoConfig(repoDir: string | null, userConfigDir: string | null, db: DbConfigFallback): RepoConfig {
+  const errors: ConfigError[] = []
+  const readLayer = (dir: string | null, label: string): Layer | null => {
+    if (!dir) return null
+    const file = join(dir, '.acorn', 'config.toml')
+    if (!existsSync(file)) return null
+    let text: string
+    try {
+      text = readFileSync(file, 'utf8')
+    } catch (e) {
+      errors.push({ source: label, message: e instanceof Error ? e.message : 'unreadable config' })
+      return null
+    }
+    return parseLayer(text, label, errors)
+  }
+  const repo = readLayer(repoDir, 'repo')
+  const user = readLayer(userConfigDir, 'user')
+
+  const run = new Map<string, RunTarget>()
+  // The `dev` target's layering: docs/workspaces-and-tasks.md § Worktrees and setup covers why.
+  // The merge order below makes toml win by inserting later:
+  //   1. workspaces.devScript/devRestartScript → a base `dev` target (lowest precedence)
+  //   2. projects.run_targets JSON (per-project Settings surface)
+  //   3. ~/.acorn/config.toml (personal defaults)
+  //   4. ./.acorn/config.toml (committed, always wins)
+  if (db.devScript?.trim()) run.set('dev', { id: 'dev', command: db.devScript.trim(), restart: db.devRestartScript?.trim() || undefined })
+  for (const t of projectRunTargets(db)) run.set(t.id, t)
+  for (const t of user?.run.values() ?? []) run.set(t.id, t)
+  for (const t of repo?.run.values() ?? []) run.set(t.id, t)
+
+  const layouts = new Map<string, LayoutRecipe>()
+  for (const l of user?.layouts.values() ?? []) layouts.set(l.id, l)
+  for (const l of repo?.layouts.values() ?? []) layouts.set(l.id, l)
+
+  return {
+    runTargets: [...run.values()],
+    copy: repo?.copy ?? user?.copy ?? [],
+    layouts: [...layouts.values()],
+    dbUrlScript: repo?.dbUrlScript ?? user?.dbUrlScript ?? (db.dbUrlScript?.trim() || null),
+    dbUrlFromRepo: repo?.dbUrlScript != null,
+    preview: {
+      mode: repo?.previewMode ?? user?.previewMode ?? (db.previewMode ?? null),
+      value: repo?.previewValue ?? user?.previewValue ?? (db.previewValue?.trim() || null),
+    },
+    browserRules: db.browserRules ?? [],
+    errors,
+    repoTargetIds: [...(repo?.run.keys() ?? [])],
+  }
+}

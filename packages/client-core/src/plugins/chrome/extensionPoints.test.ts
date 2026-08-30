@@ -234,7 +234,7 @@ describe('cooperative extension points', () => {
   })
 
   // One plugin, all five kinds, on the client side of the same seam. The node's half of this fixture
-  // is `node-core/src/main/fiveKinds.test.ts`, which loads the same shape from disk; this is what the
+  // is `node-core/src/server/plugins/fiveKinds.test.ts`, which loads the same shape from disk; this is what the
   // chrome pass does with the roster row that comes out of it.
   //
   // The interesting one is the hook. It registers here like the rest so the developer view can list it

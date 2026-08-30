@@ -10,7 +10,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { REPOS_STALE_AFTER_MS } from '../syncPolicy'
 import { repos } from './repos'
 import { seedGithubIntegration } from '../../testkit/githubToken'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 // Aliased away from the `repos` router imported above because the table and route factory share a name.
 import { repos as reposTable, syncState } from '../../node/schema'
 

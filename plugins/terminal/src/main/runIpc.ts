@@ -1,5 +1,5 @@
 // Builds the RuntimeService over the session engine's glue. Run targets are exposed as the harness
-// RunBridge over HTTP (server/routes/harness.ts), replacing the old run:* IPC channels, and as the
+// RunBridge over HTTP (server/routes/plugins/harness.ts), replacing the old run:* IPC channels, and as the
 // `terminal.runTargets` capability for the agent-tool and workflow projections
 // (contract/runTargets.ts). The service stays dependency-injected so it's unit-testable under plain
 // Node.

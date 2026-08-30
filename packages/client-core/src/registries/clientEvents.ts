@@ -71,7 +71,7 @@ export type ClientEventMap = {
   // The exception to the empty payload above, and the reason is the audience. Every integration plugin
   // hears this one, and almost all of them are looking at a different provider, so three fields let a
   // listener drop the frame without a round trip. Still state rather than a delta: `status` is what the
-  // connection now is (node-core/main/notify.ts § broadcastConnectionChanged).
+  // connection now is (node-core/server/notify.ts § broadcastConnectionChanged).
   'connection:changed': ConnectionChangedEvent
   // The rest of the core catalogue (docs/plugins.md § Hearing a core event), each carrying the state it is
   // about rather than a delta, for the same reason `connection:changed` does.

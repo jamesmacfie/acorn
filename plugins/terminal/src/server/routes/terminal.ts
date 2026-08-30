@@ -8,7 +8,7 @@ import type { SendSubmit } from '../../shared/send'
 export type { SendSubmit }
 export type TerminalBridge = {
   // Which task owns a session, for the ownership check every /sessions/:sid route below runs.
-  // Answers from the same session map that main/wsHub.ts reads through StreamHandlers.streamTaskId,
+  // Answers from the same session map that server/transport/wsHub.ts reads through StreamHandlers.streamTaskId,
   // not re-derived from list(), so the HTTP and WS halves cannot disagree about who owns a session
   // (docs/security.md § Transport and auth). Null means no such session.
   taskIdFor(sessionId: string): string | null

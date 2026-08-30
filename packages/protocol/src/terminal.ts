@@ -66,7 +66,7 @@ export type ArchiveOpts = {
   skipTeardown?: boolean
   // Qualified concern ids whose checkbox the owner left ticked in the archive dialog. Matched against
   // the node's own task-check registry before anything runs, never treated as a route
-  // (node-core/server/plugin/taskChecks.ts).
+  // (node-core/server/pluginHost/taskChecks.ts).
   applyChecks?: string[]
 }
 
