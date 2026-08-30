@@ -9,11 +9,11 @@
 // resolves capabilities and the synthesized GitHub row on top of the stored one, so patching a status
 // into the cache would leave the rest of that projection behind. The payload is for the plugin bus,
 // where a listener uses it to ignore a provider it does not own.
-import { integrationsKey } from '../queries'
-import { activeCacheId } from '../node/activeNode'
-import { clientFor } from '../node/fleet'
+import { integrationsKey } from '../infra/queries'
+import { activeCacheId } from '../infra/node/activeNode'
+import { clientFor } from '../infra/node/fleet'
 import { clientEvents } from '../registries/clientEvents'
-import { wsOnConnectionChanged } from '../wsClient'
+import { wsOnConnectionChanged } from '../infra/node/wsClient'
 
 /** Subscribe for the life of the shell. Returns the unsubscribe for symmetry with the other watchers;
  * the app never calls it. */

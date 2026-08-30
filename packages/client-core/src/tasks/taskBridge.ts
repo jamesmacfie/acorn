@@ -9,7 +9,7 @@ import {
   taskStatusesRoute,
 } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch, ProjectConfigResponse } from '@acorn/protocol/api.ts'
-import { readJson, writeJson } from '../apiClient'
+import { readJson, writeJson } from '../infra/node/apiClient'
 
 // plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are duplicated
 // here as literals because client-core is a shared library and may not import a plugin, which the

@@ -1,8 +1,8 @@
 import type { ApiError as ApiErrorBody } from '@acorn/protocol/api.ts'
 import type { NodeFetchBody, NodeFetchResponse } from '@acorn/protocol/broker.ts'
-import { nodeTransport } from './platform'
-import { activeNodeId } from './node/activeNode'
-import { nodeState } from './node/fleet'
+import { nodeTransport } from '../platform'
+import { activeNodeId } from './activeNode'
+import { nodeState } from './fleet'
 
 // The renderer's only HTTP surface. Every request goes through the desktop helper's connection broker
 // (docs/architecture-overview.md § Node API and client flow), which owns the endpoint, the pinned

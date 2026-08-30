@@ -115,5 +115,5 @@ literal query value do not. A `{{VAR}}` reference in a URL is kept, because a re
 its resolved value never exists at capture time.
 
 Legacy `http-draft:*` keys from releases that persisted unsaved drafts in `localStorage` are swept by
-the shell at renderer activation (`client-core/persistence/legacyStorage.ts`), not by the plugin. A
+the shell at renderer activation (`client-core/infra/persistence/legacyStorage.ts`), not by the plugin. A
 frame's storage area is its own and could never have reached them.

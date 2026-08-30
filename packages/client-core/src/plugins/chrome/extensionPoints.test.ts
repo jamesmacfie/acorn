@@ -4,13 +4,13 @@ import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions } from '
 const readJson = vi.fn()
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
 const writeJson = vi.fn()
-vi.mock('../../apiClient', () => ({
+vi.mock('../../infra/node/apiClient', () => ({
   readJson: (...args: unknown[]) => readJson(...args),
   sendRaw: (...args: unknown[]) => sendRaw(...args),
   writeJson: (...args: unknown[]) => writeJson(...args),
 }))
 
-const { setActiveNode } = await import('../../node/activeNode')
+const { setActiveNode } = await import('../../infra/node/activeNode')
 const { extensionDeliveries, extensionPointFor, extensionPointRegistry, extensionRegistry } =
   await import('../../registries/extensionPoints')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../distribution')

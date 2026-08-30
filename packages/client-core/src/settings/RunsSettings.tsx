@@ -1,10 +1,10 @@
 import { createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { coreRunsRoute, isTerminalRunStatus, type RunRow, type RunStatus } from '@acorn/protocol/runs.ts'
-import { readJson } from '../apiClient'
+import { readJson } from '../infra/node/apiClient'
 import { formatRelativeTime } from '../lib/formatRelativeTime'
-import { activeNodeId } from '../node/activeNode'
-import { nodes } from '../node/fleet'
+import { activeNodeId } from '../infra/node/activeNode'
+import { nodes } from '../infra/node/fleet'
 import { Alert, Badge, Button, Row, Select, StatusDot } from '../ui/primitives'
 import './settings.css'
 

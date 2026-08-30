@@ -1,6 +1,6 @@
 import type { PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
-import { readJson } from '../../apiClient'
+import { readJson } from '../../infra/node/apiClient'
 import { ownsRoute } from '../chrome/data'
 import type { FrameBinding } from './broker'
 

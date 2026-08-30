@@ -1,10 +1,10 @@
 import { createMemo, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { agentToolsCatalogRoute, type AgentToolCatalogEntry, type ToolRisk } from '@acorn/protocol/api.ts'
-import { readJson } from '../apiClient'
-import { prefsOptions } from '../queries'
+import { readJson } from '../infra/node/apiClient'
+import { prefsOptions } from '../infra/queries'
 import { saveJsonPref } from './savePref'
-import { PrefKeys } from '../persistence/prefKeys'
+import { PrefKeys } from '../infra/persistence/prefKeys'
 import { TOOL_TIER_DEFAULTS, toolPermissionsSchema, type ToolPermissions } from '@acorn/protocol/toolPermissions.ts'
 import { Checkbox } from '../ui/primitives'
 

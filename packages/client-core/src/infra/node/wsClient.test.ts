@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import { setActiveNode } from './node/activeNode'
+import { setActiveNode } from './activeNode'
 import { registerWsChannel } from './wsChannels'
 
 // The renderer no longer owns a socket, so this fakes the broker rather than a WebSocket: the

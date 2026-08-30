@@ -55,7 +55,7 @@ desktop.
 
 ## Booting client-core under Node
 
-The client shell reads the host through one seam, `packages/client-core/src/platform/`, which reads a
+The client shell reads the host through one seam, `packages/client-core/src/infra/platform/`, which reads a
 global (`window.acorn`) that the desktop's initialization script sets. Nothing outside that folder may
 read the global (`tools/arch/boundaries.test.ts`, the platform-seam rule). A Node process sets
 `globalThis.acorn` before importing client-core, and the seam's own check is `typeof window`, which
@@ -73,8 +73,8 @@ The groups the TUI provides, and with what:
 | `desktop`, `desktopExtras`, `folderPicker`, `preview`, `webviews` | null | Absent by design. The affordances they gate disappear, which the seam already supports as a product state. A folder picker is a text field in a terminal and phase 4 draws one where a pane needs it. |
 
 Two browser assumptions sit on the boot path and both are one file each: the per-node query caches
-persist through `idb-keyval` (`packages/client-core/src/node/fleet.ts`), and appearance boot writes
-`document.documentElement.dataset` (`packages/client-core/src/persistence/appStartup.ts`). Phase 0
+persist through `idb-keyval` (`packages/client-core/src/infra/node/fleet.ts`), and appearance boot writes
+`document.documentElement.dataset` (`packages/client-core/src/infra/persistence/appStartup.ts`). Phase 0
 puts a file persister behind the first and a host check in front of the second. Everything else on
 the path is guarded (`localStorage`, `window`) or lazy behind a pane (Monaco, xterm, the highlighter
 worker).

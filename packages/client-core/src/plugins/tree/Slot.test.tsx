@@ -11,9 +11,9 @@ import type { Disposable } from '../../registries/registry'
 // the facts a person would see: the owner's default draws when nobody matches and while a tie is
 // undecided, and a stack past `max` says how many were left out.
 
-vi.mock('../../hostCapabilities', () => ({ hasHostCapability: () => true }))
+vi.mock('../../infra/node/hostCapabilities', () => ({ hasHostCapability: () => true }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
-vi.mock('../../queries', () => ({ prefsOptions: () => ({}) }))
+vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({}) }))
 
 // The tree itself is the worker path, tested in TreeHost/workerHost. Here it only has to be
 // identifiable on screen.

@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { nodes } from '../node/fleet'
+import { nodes } from '../infra/node/fleet'
 import Icon from '../ui/Icon'
 import { createDismissable } from '../ui/dismissable'
 import { pendingTrust, resolvePendingTrust, type PluginTrustRequest } from './distribution'

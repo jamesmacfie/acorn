@@ -2,7 +2,7 @@
 // the known candidate files, parsed + secret-masked in main. Backed by the terminal engine's
 // worktree resolution, so it 503s in dev:node.
 import { taskMcpRoute, taskMcpStarterRoute } from '@acorn/protocol/api.ts'
-import { readJson, writeJson } from '../apiClient'
+import { readJson, writeJson } from '../infra/node/apiClient'
 import type { McpServerSummary } from '@acorn/protocol/mcp.ts'
 
 export const mcpApi = {

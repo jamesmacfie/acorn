@@ -3,10 +3,10 @@ import type { NodePluginRow, NodePluginState } from '@acorn/protocol/api.ts'
 
 const mocks = vi.hoisted(() => ({ readJson: vi.fn() }))
 // The roster is the whole input, so stub the transport and nothing else.
-vi.mock('../apiClient', () => ({ readJson: mocks.readJson }))
+vi.mock('./apiClient', () => ({ readJson: mocks.readJson }))
 
 import { pluginFailureAttention } from './pluginFailures'
-import { clearSurfaceFailures, recordSurfaceFailure } from '../plugins/surfaceFailures'
+import { clearSurfaceFailures, recordSurfaceFailure } from '../../plugins/surfaceFailures'
 
 const row = (over: Partial<NodePluginRow>): NodePluginRow =>
   ({ name: 'ntfy', required: false, disabled: false, running: true, state: 'active', ...over })

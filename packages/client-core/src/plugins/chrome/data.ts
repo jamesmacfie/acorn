@@ -25,8 +25,8 @@ import {
   type PluginRefResolution,
 } from '@acorn/protocol/refResolvers.ts'
 import { emptyCollectionPage } from '../../registries/collections'
-import { readJson, writeJson } from '../../apiClient'
-import { wsOnStatus } from '../../wsClient'
+import { readJson, writeJson } from '../../infra/node/apiClient'
+import { wsOnStatus } from '../../infra/node/wsClient'
 import { onPluginPush } from '../pluginChannel'
 import { ownsTaskOrigin } from './ownership'
 

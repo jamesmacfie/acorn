@@ -65,7 +65,7 @@ projection reads computed values.
 - `packages/protocol/src/pluginContract.ts`: `contributions.styles`.
 - `packages/protocol/src/styleValues.ts` (new): the family predicates.
 - `packages/client-core/src/ui/tokenAxes.ts`: `STYLE_TOKEN_FAMILIES`, `DERIVED_STYLE_TOKENS`.
-- `packages/client-core/src/styles/tokenAxes.test.ts`: every style token has a family; the cap is
+- `packages/client-core/src/infra/styles/tokenAxes.test.ts`: every style token has a family; the cap is
   first-party only; the shadow-colour indirection invariant.
 - `packages/client-core/src/plugins/chrome/styles.ts` (new).
 - `packages/client-core/src/plugins/contributions.ts` and `frames/register.ts`: register styles per
@@ -114,7 +114,7 @@ function with no DOM dependency, so the terminal host can validate a pack it wil
 - `packages/client-core/src/ui/tokenAxes.ts` exports `STYLE_TOKENS` as a list with `--radius-*`,
   `--space-*`, `--font-*`, `--shadow-*`, `--fs-*`, `--lh*`, `--fw-*`, `--*-transform`,
   `--*-tracking` entries; check the exact list before writing the families.
-- `packages/client-core/src/styles/tokenAxes.test.ts` has the 25-selector cap.
+- `packages/client-core/src/infra/styles/tokenAxes.test.ts` has the 25-selector cap.
 - The built-in packs' shadows reference a theme token for colour. If any uses a literal, fix that
   first or the alphabet's shadow rule is a lie about the built-ins.
 - Phase 0 of this folder has shipped.

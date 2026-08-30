@@ -4,7 +4,7 @@
 // than a line.
 import { getHighlighter } from './shiki'
 import { langFor } from './langs'
-import type { HighlightLines, HighlightRequest, HighlightResponse } from './protocol'
+import type { HighlightLines, HighlightRequest, HighlightResponse } from './messages'
 
 /** Tokenize a whole document. `path` only picks the grammar; `code` is newline-separated source. */
 export type TokenizeDocument = (path: string, code: string) => Promise<HighlightLines>

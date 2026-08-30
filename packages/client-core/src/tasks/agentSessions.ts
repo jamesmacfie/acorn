@@ -9,9 +9,9 @@
 // `hasHostCapability({ plugin: 'terminal' })` is the same probe taskBridge() and terminalApi() use (pinned by
 // ./taskBridge.test.ts), so off-desktop this is an empty list and no subscription.
 import { createSignal } from 'solid-js'
-import { hasHostCapability } from '../hostCapabilities'
-import { readJson } from '../apiClient'
-import { wsOnStatus } from '../wsClient'
+import { hasHostCapability } from '../infra/node/hostCapabilities'
+import { readJson } from '../infra/node/apiClient'
+import { wsOnStatus } from '../infra/node/wsClient'
 import { trackSessionEdges } from '../notifications/notifications'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 

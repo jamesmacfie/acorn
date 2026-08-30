@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 const readJson = vi.fn()
-vi.mock('../../apiClient', () => ({
+vi.mock('../../infra/node/apiClient', () => ({
   readJson: (...args: unknown[]) => readJson(...args),
   writeJson: vi.fn(),
 }))

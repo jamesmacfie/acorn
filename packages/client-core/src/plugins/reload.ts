@@ -5,8 +5,8 @@
 // registration mechanism here because there does not need to be one: the frame and chrome registries
 // dispose-then-register, and a plugin frame is an iframe keyed by bundle hash as its origin, so a new
 // hash is a new origin and a new document with nothing carried over from the old one.
-import { refreshNodePlugins } from '../node/nodePlugins'
-import { wsOnPluginsChanged } from '../wsClient'
+import { refreshNodePlugins } from '../infra/node/nodePlugins'
+import { wsOnPluginsChanged } from '../infra/node/wsClient'
 import { syncPluginDistribution } from './distribution'
 import { syncPluginContributions } from './syncContributions'
 

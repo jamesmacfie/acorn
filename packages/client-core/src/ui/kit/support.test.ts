@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { workspaceRoot } from '../../styles/readStyleSheets'
+import { workspaceRoot } from '../../infra/styles/readStyleSheets'
 import { NODE_SUPPORT } from './support'
 
 // The kit is closed, and this is what closes it: the node set a plugin can reach and the support

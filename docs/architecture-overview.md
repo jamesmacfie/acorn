@@ -150,7 +150,7 @@ its `src/index.ts`. It runs as its own process under the bundled Node, so it nam
 and the encryption is injected rather than imported. See the shell process in
 [the shell doc](./shell.md).
 
-**The client stays portable.** `window.acorn` is read only inside `packages/client-core/src/platform/`.
+**The client stays portable.** `window.acorn` is read only inside `packages/client-core/src/infra/platform/`.
 The global is read rather than imported, so this is a source scan rather than a graph edge. Tests are
 permanently exempt: stubbing `globalThis.window` is how the platform implementation gets exercised.
 
@@ -218,7 +218,7 @@ on screen means. Client-core re-exports every module it moved, so the components
 `./model`, and the node imports it directly. Like protocol it declares no DOM and no node types,
 which keeps the standalone node's graph clean.
 
-The renderer reaches the host through one seam, `packages/client-core/src/platform/`. It groups what
+The renderer reaches the host through one seam, `packages/client-core/src/infra/platform/`. It groups what
 a host provides, namely node transport, fleet membership, plugin custody, and the native extras, into
 separate nullable capabilities. The thin client in `packages/client-core` calls the transport group.
 Nothing else in the client may read the injected `window.acorn` global, and `boundaries.test.ts`

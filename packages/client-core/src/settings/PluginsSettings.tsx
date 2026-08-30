@@ -2,17 +2,17 @@ import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { NodePluginRow, NodePluginState, PluginInstallSource } from '@acorn/protocol/api.ts'
 import { sendReferenceToAgent } from '../agent/reference'
-import { activeNodeId } from '../node/activeNode'
-import { nodes } from '../node/fleet'
-import { restartLocalNode } from '../node/fleetActions'
+import { activeNodeId } from '../infra/node/activeNode'
+import { nodes } from '../infra/node/fleet'
+import { restartLocalNode } from '../infra/node/fleetActions'
 import {
   installNodePlugin,
   refreshNodePlugins,
   saveDisabledNodePlugins,
   uninstallNodePlugin,
   updateNodePlugin,
-} from '../node/nodePlugins'
-import { canPickFolder, pickFolder } from '../platform'
+} from '../infra/node/nodePlugins'
+import { canPickFolder, pickFolder } from '../infra/platform'
 import { readPluginHostState, setPluginDevGrant } from '../plugins/host'
 import { syncPluginDistribution } from '../plugins/distribution'
 import { Alert, Button, Checkbox, Field, Input, Select } from '../ui/primitives'
@@ -20,8 +20,8 @@ import Icon from '../ui/Icon'
 import { activeTaskId } from '../tasks/tasks'
 import { nextDisabledList, pluginPending } from './pluginToggle'
 import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
-import { prefsOptions } from '../queries'
-import { PrefKeys } from '../persistence/prefKeys'
+import { prefsOptions } from '../infra/queries'
+import { PrefKeys } from '../infra/persistence/prefKeys'
 import { savePref } from './savePref'
 import ExtensionPointsDev from './ExtensionPointsDev'
 import {

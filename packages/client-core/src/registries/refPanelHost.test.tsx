@@ -12,7 +12,7 @@ import { RefPanelHost } from './refPanelHost'
 // shipped as a blank panel title with every guard on the way in holding.
 
 const capabilities = vi.hoisted(() => ({ desktop: true, terminal: true }))
-vi.mock('../hostCapabilities', () => ({
+vi.mock('../infra/node/hostCapabilities', () => ({
   hasHostCapability: (requirement: 'none' | 'desktop' | 'terminal' = 'none') =>
     requirement === 'none' || capabilities[requirement],
 }))

@@ -1,11 +1,11 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PluginKeyClaimGrant } from '@acorn/protocol/api.ts'
-import { activeNodeId } from '../node/activeNode'
-import { nodes } from '../node/fleet'
+import { activeNodeId } from '../infra/node/activeNode'
+import { nodes } from '../infra/node/fleet'
 import { installedByNode } from '../plugins/distribution'
 import { keyClaimGrants } from '../plugins/permissions'
-import { prefsOptions } from '../queries'
+import { prefsOptions } from '../infra/queries'
 import { eventChord, formatChord } from '../tasks/paneShortcuts'
 import {
   keybindingConflict,
@@ -17,7 +17,7 @@ import {
   type ResolvedKeybinding,
 } from '../registries/keybindings'
 import { saveJsonPref } from './savePref'
-import { PrefKeys } from '../persistence/prefKeys'
+import { PrefKeys } from '../infra/persistence/prefKeys'
 import { orphanedPluginOverrideIds, removeOverrideIds, visibleShortcutBindings } from './shortcutSettingsModel'
 import { Alert, Button } from '../ui/primitives'
 

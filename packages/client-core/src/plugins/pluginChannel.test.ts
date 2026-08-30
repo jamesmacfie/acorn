@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { _resetPluginChannels, ensurePluginChannel, onPluginFrame, onPluginPush } from './pluginChannel'
-import { routeWsFrame, wsChannelPrefixes } from '../wsChannels'
+import { routeWsFrame, wsChannelPrefixes } from '../infra/node/wsChannels'
 
 // The prefix core claims for every loaded plugin's live channel (docs/plugins.md § The live channel).
 // A subscribed frame gets every frame, chrome gets a coalesced nudge.
 //
 // `wsClient` is stubbed because `wsConnect()` would open a socket from a unit test.
-vi.mock('../wsClient', () => ({ wsConnect: () => {} }))
+vi.mock('../infra/node/wsClient', () => ({ wsConnect: () => {} }))
 
 afterEach(() => {
   _resetPluginChannels()

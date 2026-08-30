@@ -1,6 +1,6 @@
 import { createMemo } from 'solid-js'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
-import { createFleetQuery, type FleetUnavailable } from '../node/fanout'
+import { createFleetQuery, type FleetUnavailable } from '../infra/node/fanout'
 import { attentionSources, compareAttention, type AttentionItem } from '../registries/attention'
 
 // The fleet-wide attention list, merged across every source and every node.

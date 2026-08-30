@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { NodeConnectionState, NodeRecord } from '@acorn/protocol/broker.ts'
 import { ApiError, readJson, writeJson } from './apiClient'
-import { setActiveNode } from './node/activeNode'
-import { refreshFleet, _resetFleet } from './node/fleet'
+import { setActiveNode } from './activeNode'
+import { refreshFleet, _resetFleet } from './fleet'
 
 // The offline-mutation contract (docs/ui-design.md § Connection and staleness vocabulary): "reads come from
 // cache with badges; mutations fail fast with a clear 'node offline' error and keep the user's input as a

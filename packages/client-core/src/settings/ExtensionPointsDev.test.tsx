@@ -11,12 +11,12 @@ import type { Disposable } from '../registries/registry'
 // adds over the registry's own unit tests is that all three cases reach the page — a point that is
 // filled, a point that nobody fills, and a contribution whose point nobody declared.
 
-vi.mock('../hostCapabilities', () => ({ hasHostCapability: () => true }))
+vi.mock('../infra/node/hostCapabilities', () => ({ hasHostCapability: () => true }))
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ data: {} }),
   useQueryClient: () => ({}),
 }))
-vi.mock('../queries', () => ({ prefsOptions: () => ({}) }))
+vi.mock('../infra/queries', () => ({ prefsOptions: () => ({}) }))
 vi.mock('./savePref', () => ({ savePref: vi.fn() }))
 
 let host: HTMLElement

@@ -6,8 +6,8 @@
 // network read per node. Core reads the channel and nothing else in the payload.
 import { parsePluginChannel, PLUGIN_CHANNEL_PREFIX } from '@acorn/protocol/pluginState.ts'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
-import { registerWsChannel, type Disposable } from '../wsChannels'
-import { wsConnect } from '../wsClient'
+import { registerWsChannel, type Disposable } from '../infra/node/wsChannels'
+import { wsConnect } from '../infra/node/wsClient'
 
 // Caps chrome at two passes a second per plugin. A plugin sampling every 2s never touches the limit.
 const COALESCE_MS = 500

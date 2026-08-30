@@ -13,7 +13,7 @@ import { SlotHost, TaskSlotHost, uiSlotRegistry } from './uiSlots'
 // because the question this file answers is "did the host draw it", never "did it look right".
 
 const capabilities = vi.hoisted(() => ({ desktop: true, terminal: true }))
-vi.mock('../hostCapabilities', () => ({
+vi.mock('../infra/node/hostCapabilities', () => ({
   hasHostCapability: (requirement: 'none' | 'desktop' | 'terminal' = 'none') =>
     requirement === 'none' || capabilities[requirement],
 }))

@@ -11,16 +11,16 @@ import ExtensionPointHost from './ExtensionPointHost'
 // was, and every delivered group carries the contributor's id on screen.
 
 const capabilities = vi.hoisted(() => ({ desktop: true, terminal: true }))
-vi.mock('../../hostCapabilities', () => ({
+vi.mock('../../infra/node/hostCapabilities', () => ({
   hasHostCapability: (requirement: 'none' | 'desktop' | 'terminal' = 'none') =>
     requirement === 'none' || capabilities[requirement],
 }))
-vi.mock('../../node/activeNode', () => ({ activeNodeId: () => 'node-1' }))
+vi.mock('../../infra/node/activeNode', () => ({ activeNodeId: () => 'node-1' }))
 
 // The fan-out is the node-fetch machinery, not this host's decision. Stub it to whatever the
 // contribution's own `fetch` answers, synchronously, so the assertions are about the rows.
 const rows = vi.hoisted(() => new Map<string, PluginExtensionItem[]>())
-vi.mock('../../node/fanout', () => ({
+vi.mock('../../infra/node/fanout', () => ({
   createFleetQuery: (key: () => readonly unknown[]) => [() => ({ rows: [{ data: rows.get(String(key()[1])) ?? [] }] })],
 }))
 vi.mock('./data', () => ({ chromeDeps: () => 0, chromeKey: (pluginId: string, id: string) => ['chrome', id, pluginId] }))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultSourceId, sourceIsProjectScoped, sourceRegistry, sourceRouteContributions, taskPathFromSources, taskTracksRef, type SourceContribution } from './sources'
-import type { Task } from '../queries'
+import type { Task } from '../infra/queries'
 
 const source = (id: string, order: number, isDefault?: boolean): SourceContribution => ({
   id,

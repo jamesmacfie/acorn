@@ -1,4 +1,4 @@
-import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
+import { hasHostCapability, type HostCapabilityRequirement } from '../infra/node/hostCapabilities'
 import { Registry } from './registry'
 
 // Periodic work in the renderer. The same word as the node's `ctx.schedules` for the same idea, and

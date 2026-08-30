@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { hasHostCapability } from '@acorn/client-core/hostCapabilities.ts'
-import { canPickFolder, pickFolder } from '@acorn/client-core/platform/index.ts'
+import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilities.ts'
+import { canPickFolder, pickFolder } from '@acorn/client-core/infra/platform/index.ts'
 import { taskBridge } from '@acorn/client-core/tasks/taskBridge.ts'
 import { terminalApi } from '@acorn/plugin-terminal/testkit/client'
 

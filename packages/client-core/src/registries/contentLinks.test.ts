@@ -17,7 +17,7 @@ import type { Disposable } from './registry'
 import { sourceRegistry } from './sources'
 import { setTaskLookup } from '../tasks/taskLookup'
 import { selectedSource, setSelectedSource } from '../tasks/tasks'
-import type { Task } from '../queries'
+import type { Task } from '../infra/queries'
 
 // A target's pane has to be registered (registries/contentLinks.ts § openPluginContentTarget), so the
 // suite registers one before asserting on it.

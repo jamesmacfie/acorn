@@ -5,10 +5,10 @@ import type {
   PluginCollectionRow,
   PluginCollectionSchema,
 } from '@acorn/protocol/collections.ts'
-import { activeNodeId } from '../node/activeNode'
-import { createFleetQuery } from '../node/fanout'
-import { clientFor } from '../node/fleet'
-import type { Freshness } from '../node/freshness'
+import { activeNodeId } from '../infra/node/activeNode'
+import { createFleetQuery } from '../infra/node/fanout'
+import { clientFor } from '../infra/node/fleet'
+import type { Freshness } from '../infra/node/freshness'
 import { collectionContribution, emptyCollectionPage, type CollectionContribution } from '../registries/collections'
 import { panelSchema, unionRows, type PanelSourcePage } from './mapping'
 import { panelRefreshSeconds, type PanelDefinition, type PanelQuery } from './model'

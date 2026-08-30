@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginPermissions, type NodePluginRow, type PluginContributions } from '@acorn/protocol/api.ts'
-import type { PluginAckRecord } from '../platform'
+import type { PluginAckRecord } from '../infra/platform'
 
 const recordPluginTrust = vi.fn(async (..._args: unknown[]) => undefined)
 vi.mock('./host', () => ({
@@ -13,7 +13,7 @@ vi.mock('./host', () => ({
 const syncPluginContributions = vi.fn()
 vi.mock('./syncContributions', () => ({ syncPluginContributions: () => syncPluginContributions() }))
 
-vi.mock('../apiClient', () => ({ readJson: vi.fn(), sendRaw: vi.fn(), writeJson: vi.fn() }))
+vi.mock('../infra/node/apiClient', () => ({ readJson: vi.fn(), sendRaw: vi.fn(), writeJson: vi.fn() }))
 
 const { bundleAccepted, pendingTrust, _resetPluginDistribution, _seedPendingTrust } = await import('./distribution')
 const { recordTrustDecision, trustTiers } = await import('./trustModel')

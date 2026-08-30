@@ -1,6 +1,6 @@
 import { clientEvents } from '@acorn/client-core/registries/clientEvents.ts'
 import { evictScope } from '@acorn/client-core/registries/scopeEviction.ts'
-import { dropNode } from '@acorn/client-core/node/fleet.ts'
+import { dropNode } from '@acorn/client-core/infra/node/fleet.ts'
 
 // Maps runtime lifecycle events onto scope evictions. That is all it does now.
 //

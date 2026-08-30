@@ -92,7 +92,7 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   node-environment vitest worker (the same shape a plugin's own suite runs in), and
   the composition-root suites under `apps/node/test/integration/` boot every plugin's `node/index.ts`. The arch suite's text checks stay as a fast, precise first line, but they are no longer the
   only line — and neither owns a file allowlist any more;
-- the platform-seam contract suite is one checker run from both ends: `client-core/platform/contract.ts`
+- the platform-seam contract suite is one checker run from both ends: `client-core/infra/platform/contract.ts`
   states what a live capability group looks like, `platform/contract.test.ts` drives it against a mock
   host, and the shell's own suite drives it against the real object the shell installs
   (`apps/desktop/src/shell/bridge.test.ts`, under stub Tauri bindings). The seam's groups are

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { wsChannelPrefixes } from '@acorn/client-core/wsChannels.ts'
+import { wsChannelPrefixes } from '@acorn/client-core/infra/node/wsChannels.ts'
 
 // A wrong prefix is a silent drop now, where the old if/else chain in wsClient.ts at least had a dead
 // branch to read. This pins the set after the shell's plugins have registered, so a channel that stops

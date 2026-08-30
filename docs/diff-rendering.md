@@ -79,7 +79,7 @@ Syntax highlighting is performed with Shiki on demand. Visible files and lines a
 viewer does not parse or highlight every file before first paint. Virtualizers keep long diffs within
 the renderer budget.
 
-Highlighting runs in `highlighter.worker.ts` (`client-core/src/highlight/`), off the thread that
+Highlighting runs in `highlighter.worker.ts` (`client-core/src/infra/highlight/`), off the thread that
 draws. Tokenizing a 45-file diff on the main thread cost about 2 seconds, in unbroken per-file blocks
 of up to 325ms.
 

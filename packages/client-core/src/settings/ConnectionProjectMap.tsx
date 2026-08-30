@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Integration, IntegrationMapping, IntegrationProject, Workspace } from '@acorn/protocol/api.ts'
-import { integrationMappingsKey, integrationMappingsOptions, integrationProjectsOptions, workspacesOptions } from '../queries'
+import { integrationMappingsKey, integrationMappingsOptions, integrationProjectsOptions, workspacesOptions } from '../infra/queries'
 import { setIntegrationMappings } from '../workspaces/mutations'
 import { Alert, Button, EmptyState, Select } from '../ui/primitives'
 

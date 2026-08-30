@@ -83,9 +83,9 @@ uses for fields added after rows were written.
   `PluginHostState.cached`; `eligiblePlugins()` merge.
 - `packages/client-core/src/plugins/trustModel.ts`: provenance line; empty `declared` tier.
 - `packages/client-core/src/plugins/host.ts`: `installPluginOnDevice`, `removePluginFromDevice`.
-- `packages/client-core/src/platform/{index.ts,contract.ts}`: `PluginCustody.install`, `remove`; the
+- `packages/client-core/src/infra/platform/{index.ts,contract.ts}`: `PluginCustody.install`, `remove`; the
   `plugins` group's member list.
-- `packages/client-core/src/persistence/devicePrefs.ts`: prefix rule for device plugin state;
+- `packages/client-core/src/infra/persistence/devicePrefs.ts`: prefix rule for device plugin state;
   `devicePluginsDisabled`.
 - `packages/client-core/src/plugins/frames/broker.ts`: `state` verb routes by `source`.
 - `packages/client-core/src/settings/PluginsSettings.tsx`: the device section.
@@ -146,7 +146,7 @@ Against [07-hosts.md](./07-hosts.md):
 
 ## Verify before building
 
-- `packages/client-core/src/platform/index.ts` declares `PluginCustody` with exactly `state`,
+- `packages/client-core/src/infra/platform/index.ts` declares `PluginCustody` with exactly `state`,
   `cachePut`, `trustRecord`, `devGrant`, and `contract.ts` lists the same four in `SEAM_GROUPS`.
 - `packages/desktop-helper/src/plugins/pluginCache.ts` has `putFromNode` and `MAX_BUNDLE_BYTES`;
   `pluginTrustStore.ts` keys `decisionFor` on `(pluginId, hash)` and carries `nodeId` on rows.
@@ -156,7 +156,7 @@ Against [07-hosts.md](./07-hosts.md):
   `server/plugins/installer.ts` resolves it.
 - `apps/desktop/src/shell/wire.ts` lists `plugins-state`, `plugins-cache-put`,
   `plugins-trust-record`, `plugins-dev-grant`.
-- `packages/client-core/src/persistence/devicePrefs.ts` has `DEVICE_KEYS` as a literal set and
+- `packages/client-core/src/infra/persistence/devicePrefs.ts` has `DEVICE_KEYS` as a literal set and
   `isDevicePref` as exact match.
 - `packages/client-core/src/settings/PluginsSettings.tsx` exists and draws the per-node roster.
 - `tools/arch/boundaries.test.ts` has the rule that only `platform/` names `window.acorn`.

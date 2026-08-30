@@ -1,10 +1,10 @@
 import { createMemo } from 'solid-js'
 import { workspacesKey, workspacesRoute, type Workspace } from '@acorn/protocol/api.ts'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
-import { readJson } from '../apiClient'
-import { activeNodeId, setActiveNode } from '../node/activeNode'
-import { createFleetQuery, type FleetUnavailable } from '../node/fanout'
-import { nodes } from '../node/fleet'
+import { readJson } from '../infra/node/apiClient'
+import { activeNodeId, setActiveNode } from '../infra/node/activeNode'
+import { createFleetQuery, type FleetUnavailable } from '../infra/node/fanout'
+import { nodes } from '../infra/node/fleet'
 import { projectPath } from '../registries/corePaths'
 
 export type FleetWorkspace = {

@@ -1,5 +1,5 @@
-import { isDesktopHost } from './platform'
-import { disabledNodePlugins } from './node/nodePlugins'
+import { isDesktopHost } from '../platform'
+import { disabledNodePlugins } from './nodePlugins'
 
 // What the surroundings offer a contribution: is a desktop shell hosting this renderer, and does the
 // node behind it run the plugin this surface is built on. "Host" rather than "client" because the word

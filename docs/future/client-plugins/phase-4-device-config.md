@@ -61,9 +61,9 @@ is terminal-specific except the path.
 - `packages/desktop-helper/src/main/deviceConfig.ts` (new): read, watch, write.
 - `apps/desktop/src/shell/{wire.ts,bridge.ts,helperServer.ts}`: `config-read`, `config-write`,
   `config-changed`.
-- `packages/client-core/src/platform/{index.ts,contract.ts}`: a `config` group, nullable, so a host
+- `packages/client-core/src/infra/platform/{index.ts,contract.ts}`: a `config` group, nullable, so a host
   without a file (the PWA) has none and Settings hides the "Open config file" row.
-- `packages/client-core/src/persistence/deviceConfig.ts` (new): apply a read; regenerate on write.
+- `packages/client-core/src/infra/persistence/deviceConfig.ts` (new): apply a read; regenerate on write.
 - `packages/client-core/src/settings/`: "Open config file" and the parse-error notice.
 - `packages/plugin-types/` or a sibling: the generated JSON schema.
 
@@ -100,11 +100,11 @@ is nullable so the PWA is not a half-built host.
 ## Verify before building
 
 - A terminal host exists that reads config from a path. If not, this phase is not yet due.
-- `packages/client-core/src/persistence/devicePrefs.ts` has the setter every covered key goes
+- `packages/client-core/src/infra/persistence/devicePrefs.ts` has the setter every covered key goes
   through, and the write-order rule holds in it.
 - `packages/desktop-helper/src/broker/fleetStore.ts` shows how the helper owns a `0600` file; copy its
   shape for `acorn.json` (which is not secret and needs no `0600`, but the read and write pattern is
   the same).
-- `packages/client-core/src/platform/contract.ts` lists groups as `members<T>()([...])`; add
+- `packages/client-core/src/infra/platform/contract.ts` lists groups as `members<T>()([...])`; add
   `config` the same way.
 - Phase 0 of this folder has shipped, so `plugins` entries have an install path to call.

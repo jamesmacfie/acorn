@@ -1,7 +1,7 @@
 import { coreNodeLifecycleRoute, coreNodeProvidersRoute } from '@acorn/protocol/api.ts'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import type { NodeLifecycleVerb, NodeProviderDescriptor, NodeProvidersResponse, ProvidedNode } from '@acorn/protocol/nodeProviders.ts'
-import { readJson, sendJson } from '../apiClient'
+import { readJson, sendJson } from './apiClient'
 import { fleetBridge } from '../platform'
 import { createFleetQuery, type FleetResult } from './fanout'
 import { refreshFleet } from './fleet'

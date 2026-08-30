@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import { parsePluginChannel } from '@acorn/protocol/pluginState.ts'
-import { sendRaw } from '../../apiClient'
+import { sendRaw } from '../../infra/node/apiClient'
 import { toast } from '../../notifications/toast'
 import { clientEvents, openPane } from '../../registries/clientEvents'
 import { executeCommand } from '../../registries/commands'

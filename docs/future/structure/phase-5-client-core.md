@@ -26,10 +26,10 @@ group, so the tree compiles at every commit.
 ### infra/
 
 `git mv` `platform/`, `persistence/`, `styles/`, `highlight/`, `node/` into `infra/`. Move
-`packages/client-core/src/styles.css` into `infra/styles/`. Move `queries.ts` and `mutations.ts` from
-the root into `infra/queries/`. Rename `packages/client-core/src/highlight/protocol.ts` to
+`packages/client-core/src/infra/styles/styles.css` into `infra/styles/`. Move `queries.ts` and `mutations.ts` from
+the root into `infra/queries/`. Rename `packages/client-core/src/infra/highlight/messages.ts` to
 `messages.ts`. The `window.acorn` rule in `tools/arch/boundaries.test.ts` (around line 556) names
-`client-core/src/platform/`; update it.
+`client-core/src/infra/platform/`; update it.
 
 ### kit/
 

@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js'
 import { isRecord, parsePanelDefinition, parsePanels } from '@acorn/dashboards-core/definition.ts'
-import { PrefKeys } from '../persistence/prefKeys'
-import { appStateBinding, parseJson, type PersistedStateSlice } from '../persistence/persistedState'
+import { PrefKeys } from '../infra/persistence/prefKeys'
+import { appStateBinding, parseJson, type PersistedStateSlice } from '../infra/persistence/persistedState'
 import { COLS, firstFit, normalize, readingOrder, sizeFor, type PanelLayout, type Rect } from './layout'
 import type { PanelDefinition, PanelId } from './model'
 

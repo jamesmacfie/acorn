@@ -2,8 +2,8 @@ import { createSignal, ErrorBoundary, Show, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import type { CoreExclusiveSlot } from '@acorn/protocol/extensionPoints.ts'
-import { PrefKeys } from '../persistence/prefKeys'
-import { prefsOptions } from '../queries'
+import { PrefKeys } from '../infra/persistence/prefKeys'
+import { prefsOptions } from '../infra/queries'
 import {
   exclusiveSlotChoices,
   noteExclusiveSlotFailure,

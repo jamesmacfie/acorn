@@ -61,23 +61,23 @@ const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple })
 // active theme and style axes, not from here.
 //
 // The order is the cascade, so it is the list rather than a directory scan.
-// packages/client-core/src/styles/cssHygiene.test.ts reads this array and checks that what a frame is
+// packages/client-core/src/infra/styles/cssHygiene.test.ts reads this array and checks that what a frame is
 // served covers every class primitives.css styles.
 const FRAME_STYLES = [
-  'styles/base.css',
-  'styles/primitives.css',
-  'styles/overlays.css',
-  'styles/copy.css',
-  'styles/tabs.css',
+  'infra/styles/base.css',
+  'infra/styles/primitives.css',
+  'infra/styles/overlays.css',
+  'infra/styles/copy.css',
+  'infra/styles/tabs.css',
   // The delegated tooltip bubble. A frame mounts its own listener, `mountFrameTips` from
   // client-core/ui/frameTips.ts, because the shell's singleton cannot see into another document. It
   // lives apart from ui/tips.tsx so a frame bundle does not pull Solid and the primitives in with it.
   'ui/tips.css',
-  'styles/topbar.css',
-  'styles/diff.css',
-  'styles/style-modern.css',
-  'styles/style-cozy.css',
-  'styles/style-cute.css',
+  'infra/styles/topbar.css',
+  'infra/styles/diff.css',
+  'infra/styles/style-modern.css',
+  'infra/styles/style-cozy.css',
+  'infra/styles/style-cute.css',
 ]
 const frameStyles = FRAME_STYLES.map((rel) => readFileSync(resolve(ROOT, 'packages/client-core/src', rel), 'utf8'))
 mkdirSync(resolve(PKG, 'dist/bridge'), { recursive: true })

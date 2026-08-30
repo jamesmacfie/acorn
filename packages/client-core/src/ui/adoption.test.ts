@@ -99,7 +99,7 @@ describe('primitive adoption', () => {
     const strip = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '')
     const declared = (body: string) => new Set([...body.matchAll(/(?:^|;)\s*([a-z-]+)\s*:/g)].map((d) => d[1]))
     const attrRules: { base: string; needs: [string, string | undefined][]; props: Set<string> }[] = []
-    const primitives = strip(readFileSync(join(SRC, 'packages/client-core/src/styles/primitives.css'), 'utf8'))
+    const primitives = strip(readFileSync(join(SRC, 'packages/client-core/src/infra/styles/primitives.css'), 'utf8'))
     for (const rule of primitives.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
       const props = declared(rule[2])
       for (const selector of rule[1].split(',')) {

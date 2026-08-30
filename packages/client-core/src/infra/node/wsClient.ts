@@ -12,8 +12,8 @@
 import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
-import { nodeTransport } from './platform'
-import { activeNodeId } from './node/activeNode'
+import { nodeTransport } from '../platform'
+import { activeNodeId } from './activeNode'
 import { registerWsChannel, routeWsFrame, wsReattachFrames, _resetWsChannels } from './wsChannels'
 
 type OutputCb = (m: ServerMsg) => void

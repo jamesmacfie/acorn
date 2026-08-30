@@ -19,8 +19,8 @@ vi.mock('@tanstack/solid-query', () => ({
     },
   }),
 }))
-vi.mock('../queries', () => ({ prefsOptions: () => ({}) }))
-vi.mock('../persistence/prefKeys', () => ({ PrefKeys: { exclusiveSlots: 'core.exclusive-slots' } }))
+vi.mock('../infra/queries', () => ({ prefsOptions: () => ({}) }))
+vi.mock('../infra/persistence/prefKeys', () => ({ PrefKeys: { exclusiveSlots: 'core.exclusive-slots' } }))
 
 let host: HTMLElement
 let dispose: () => void

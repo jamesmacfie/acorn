@@ -78,7 +78,7 @@ should this outlive the tab?":
 | Module-level signal | The client owns it and it is session-only | a live roster, a scroll position, a draft |
 
 A persisted state slice is a shape, not a location. Where its value lands is decided by one set,
-`DEVICE_KEYS` in `client-core/persistence/devicePrefs.ts`: listed keys go to `localStorage`, and
+`DEVICE_KEYS` in `client-core/infra/persistence/devicePrefs.ts`: listed keys go to `localStorage`, and
 everything else — including every scoped slice — goes to the owning Node through `savePref`. Unknown
 means Node, deliberately, so a new per-task or per-repo slice is portable by default. The cost is
 honest: editing a layout while its Node is offline stalls the write until reconnect, where

@@ -1,9 +1,9 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
-import { writeJson } from '../apiClient'
+import { writeJson } from '../infra/node/apiClient'
 import { pushBackgroundError } from '../notifications/notifications'
-import { isDevicePref, writeDevicePref } from '../persistence/devicePrefs'
-import { persistedStateRegistry, utf8Bytes } from '../persistence/persistedState'
+import { isDevicePref, writeDevicePref } from '../infra/persistence/devicePrefs'
+import { persistedStateRegistry, utf8Bytes } from '../infra/persistence/persistedState'
 
 // The active node, which is apiClient's default target, not a home node. What survives in this store
 // after the device migration all describes one node's resources: a task's pane layout, its open files,

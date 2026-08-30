@@ -2,8 +2,8 @@ import type { NodePairRequest, NodeProbeResult, NodeRecord } from '@acorn/protoc
 import { canPairNodes, fleetBridge } from '../platform'
 import type { DevicesResponse, PairedDevice } from '@acorn/protocol/node.ts'
 import { coreDeviceRoute, coreDevicesRoute } from '@acorn/protocol/api.ts'
-import { readJson, sendJson } from '../apiClient'
-import { clientEvents } from '../registries/clientEvents'
+import { readJson, sendJson } from './apiClient'
+import { clientEvents } from '../../registries/clientEvents'
 import { selectActiveNode } from './activeNode'
 import { refreshFleet } from './fleet'
 

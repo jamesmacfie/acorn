@@ -12,7 +12,7 @@ import {
   testIntegration,
 } from '../integrations/integrationClient'
 import { createDeviceFlow } from '../integrations/deviceFlow'
-import { integrationsKey, integrationsOptions } from '../queries'
+import { integrationsKey, integrationsOptions } from '../infra/queries'
 import ConnectionProjectMap from './ConnectionProjectMap'
 import { Alert, Button, Chip } from '../ui/primitives'
 

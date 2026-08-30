@@ -1,4 +1,4 @@
-import type { Task } from '../queries'
+import type { Task } from '../infra/queries'
 import { markTaskRead } from '../notifications/notifications'
 import { dispatchLayout, layoutForTask, setActiveTaskId, setSelectedSource } from './tasks'
 import type { PaneId } from './layout'

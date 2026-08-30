@@ -12,7 +12,7 @@ import { appendSample, hourBucket } from './history'
 // One pass of `core:sample-measures`. See docs/schedules.md for why it is one core schedule rather
 // than a row per panel, and docs/dashboards.md § Sampling and retention for what a pass does.
 
-/** The prefs key the dashboards slice writes under (client-core/persistence/prefKeys.ts § dashboards).
+/** The prefs key the dashboards slice writes under (client-core/infra/persistence/prefKeys.ts § dashboards).
  *  An `app`-scoped slice is stored unqualified, so this is the whole key. It duplicates the client's
  *  own constant, because the client is downstream of the node and cannot be imported here. */
 const DASHBOARDS_PREF_KEY = 'dashboards'

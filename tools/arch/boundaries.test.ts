@@ -315,13 +315,12 @@ describe('architecture boundaries', () => {
     // Shrinking baseline (docs/architecture-overview.md § Package boundaries). Migrate a test as you
     // touch it; never add a root. Lower MAX_DEEP_IMPORTS below when you migrate a file.
     const TESTKIT_BASELINE = [
-      '@acorn/client-core/node',
+      '@acorn/client-core/infra/node',
       '@acorn/client-core/palette',
       '@acorn/client-core/registries',
       '@acorn/client-core/settings',
       '@acorn/client-core/tasks',
       '@acorn/client-core/ui',
-      '@acorn/client-core/wsClient.ts',
       '@acorn/node-core/server',
       '@acorn/node-core/server/core',
       '@acorn/node-core/server/integrations',
@@ -564,7 +563,7 @@ describe('architecture boundaries', () => {
     const READS_GLOBAL = /\bwindow\s*(?:\.\s*acorn\b|\?\.\s*acorn\b|\[\s*['"]acorn['"]\s*\])/
     const readsHostGlobal = (source: string): boolean =>
       READS_GLOBAL.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
-    const SEAM = join(ROOT, 'packages', 'client-core', 'src', 'platform') + '/'
+    const SEAM = join(ROOT, 'packages', 'client-core', 'src', 'infra', 'platform') + '/'
     // The bridge writes the global rather than reading it, so it doesn't match. Named here so the
     // next implementation knows where the other end of this contract lives.
     const files = PACKAGES.flatMap((p) => walk(p.src))
@@ -651,7 +650,7 @@ describe('architecture boundaries', () => {
       if (!p.startsWith('packages/client-core/src/')) return false
       const inner = p.slice('packages/client-core/src/'.length)
       if (inner === 'keys/install.ts' || inner === 'keys/regions.ts') return false
-      return inner.startsWith('ui/') || inner.startsWith('lib/') || inner.startsWith('highlight/')
+      return inner.startsWith('ui/') || inner.startsWith('lib/') || inner.startsWith('infra/highlight/')
         || inner.startsWith('keys/')
         || inner === 'palette/model.ts' || inner === 'registries/registry.ts'
     }

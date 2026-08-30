@@ -1,8 +1,8 @@
 import { createComponent, lazy, type Component } from 'solid-js'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { Region } from '../layouts'
-import type { Task } from '../queries'
-import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
+import type { Task } from '../infra/queries'
+import { hasHostCapability, type HostCapabilityRequirement } from '../infra/node/hostCapabilities'
 import { paneModel } from './paneModels'
 import { Registry, type Disposable } from './registry'
 

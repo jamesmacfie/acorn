@@ -27,10 +27,10 @@ In:
 - A `transport` implementation over `NodeBroker` from `packages/desktop-helper/src/broker/nodeBroker.ts`,
   imported directly, authenticated with a device token from an env var. No fleet, no pairing, no
   custody: the other seam groups are null.
-- A file-backed persister behind the per-node query cache in `packages/client-core/src/node/fleet.ts`,
+- A file-backed persister behind the per-node query cache in `packages/client-core/src/infra/node/fleet.ts`,
   chosen when `idb-keyval` has no IndexedDB to talk to.
 - A host check in front of the `document.documentElement` writes in
-  `packages/client-core/src/persistence/appStartup.ts`.
+  `packages/client-core/src/infra/persistence/appStartup.ts`.
 - OpenTUI components for the nodes `list-detail` and `header-body-footer` need for these two panes:
   `Stack`, `Inline`, `Section`, `Text`, `Heading`, `Rows`, `Row`, `Badge`, `Button`, `Field`,
   `Toolbar`, `Alert`, `ListDetail`, `ListColumn`, `DetailColumn`, `Tabs`, `TabPanel`, and the
@@ -67,8 +67,8 @@ workaround in `apps/tui/`.
 ## Code touched
 
 - `packages/client-core/src/ui/kit/support.ts`: `HOST` from a build-time define.
-- `packages/client-core/src/node/fleet.ts`: persister chosen by capability.
-- `packages/client-core/src/persistence/appStartup.ts`: host check.
+- `packages/client-core/src/infra/node/fleet.ts`: persister chosen by capability.
+- `packages/client-core/src/infra/persistence/appStartup.ts`: host check.
 - `packages/client-core/src/keys/install.ts`, `keys/host.ts`: accept either adapter's types.
 - `apps/tui/` (new): `package.json`, `src/main.ts`, `src/kit/components.ts`, `src/layouts/`.
 - `pnpm-workspace.yaml`: no change, `apps/*` is already a workspace glob.
@@ -105,7 +105,7 @@ Enter, and can read it at 80 by 24. The findings list exists, even if empty.
   read it.
 - `packages/desktop-helper/src/broker/nodeBroker.ts` still has no shell binding and still sets the
   bearer on the upgrade header.
-- `packages/client-core/src/node/fleet.ts` still imports `idb-keyval` in one place.
+- `packages/client-core/src/infra/node/fleet.ts` still imports `idb-keyval` in one place.
 - `@opentui/keymap/opentui` still exports `createDefaultOpenTuiKeymap`; `@opentui/solid` is
   published at the version the keymap pins.
 - `plugins/http` and `plugins/linear` still declare `list-detail` and `header-body-footer`.

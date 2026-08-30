@@ -1,5 +1,5 @@
 import { onCleanup, onMount } from 'solid-js'
-import { desktopExtras } from '../platform'
+import { desktopExtras } from '../infra/platform'
 
 // Cmd/Ctrl+W → close the focused thing *inside* a surface. The shell takes the accelerator as a menu
 // item so it never closes the window, and pings the renderer; each subscriber acts only when

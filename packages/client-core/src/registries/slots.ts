@@ -3,8 +3,8 @@
 // (docs/frontend.md § Registries and plugins), which is what lets registries/plugin.ts have a unit
 // test.
 import type { Component } from 'solid-js'
-import type { HostCapabilityRequirement } from '../hostCapabilities'
-import type { Task } from '../queries'
+import type { HostCapabilityRequirement } from '../infra/node/hostCapabilities'
+import type { Task } from '../infra/queries'
 import { Registry } from './registry'
 
 export type TaskSlotId = 'task.footer'
