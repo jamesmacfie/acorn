@@ -30,7 +30,7 @@ interactive terminal use without a managed driver behind it, and `aider` is that
 There are two driver tiers, permanently.
 
 **Tier 1 is the generic ACP driver, and a harness is data.** One driver
-(`plugins/agents/src/main/drivers/acpDriver.ts`), built from a launch spec: a command or a
+(`plugins/agents/src/server/drivers/acpDriver.ts`), built from a launch spec: a command or a
 package-relative adapter entry, arguments, an environment passthrough list, and a small block of
 declared quirks. Everything downstream is shared, including the normalizer, the durable event ledger,
 the transcript, and permission plumbing. This is the default path for a new agent and the only path a
@@ -140,7 +140,7 @@ the root itself, from a child thread. An unknown method from a child goes to the
 release that adds a notification degrades to "the parent sees it" rather than to silent loss.
 
 Both routing tables are pinned against real captures in
-`plugins/agents/src/main/drivers/testFixtures/`, not hand-written shapes: an extension field can only
+`plugins/agents/src/server/drivers/__fixtures__/`, not hand-written shapes: an extension field can only
 be tested against what the harness actually sent.
 
 ## Client surfaces
@@ -416,6 +416,6 @@ provider messages and transcripts is therefore collected as sessions start rathe
 
 ## Source map
 
-The main implementation is in `plugins/agents/src/node`, `src/main`, `src/server/routes`, and
-`src/client`. `plugins/agents/src/main/index.ts` and the terminal plugin supply the process and
+The main implementation is in `plugins/agents/src/node`, `src/server`, `src/server/routes`, and
+`src/client`. `plugins/agents/src/server/profiles/index.ts` and the terminal plugin supply the process and
 profile boundaries.

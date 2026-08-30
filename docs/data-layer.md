@@ -95,7 +95,7 @@ These plugins own SQLite files and migrations:
 Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and the built-in agents
 profiles use core services or provider registries without their own database file. Notes has no
 database either: task, workspace, and global notes are markdown files under `<data-root>/notes`, in
-`plugins/notes/src/main/notes.ts`. The row this table used to carry for `plugins/notes.sqlite`
+`plugins/notes/src/server/notes.ts`. The row this table used to carry for `plugins/notes.sqlite`
 described a store that no longer exists, and [notes and memory](./notes-and-memory.md) still repeats
 the old claim.
 
@@ -123,7 +123,7 @@ task's dev database. That connection is not part of acorn's own data root: it is
 database, reached over `pg`, and everything the pane shows is re-derived from it per call rather
 than cached in `plugins/database.sqlite`.
 
-`resolveDbUrl` (`plugins/database/src/main/database.ts`) resolves the connection URL for a task
+`resolveDbUrl` (`plugins/database/src/server/database.ts`) resolves the connection URL for a task
 without persisting it, trying in order: a committed `.acorn/config.toml [database].url_script`
 (run inside the worktree), then `<worktree>/.env`'s `DATABASE_URL`, then `process.env.DATABASE_URL`.
 A committed `url_script` is executable content from the checkout, so resolving it goes through the
@@ -301,7 +301,7 @@ the Drizzle schema. The schema file still declares the backing columns the trigg
 one there is a signal to update the migration, but the thing that actually catches a missed rename is
 a schema-drift test that opens the migrated database and checks the virtual table's shape against the
 schema, because the trigger body is plain SQL text with no type checker over it
-(`plugins/agents/src/node/ftsSchema.test.ts` is the pattern to copy).
+(`plugins/agents/src/server/ftsSchema.test.ts` is the pattern to copy).
 
 ## Backup and import
 

@@ -10,12 +10,10 @@
 
 export type Disposable = { dispose(): void }
 
-// A capability id that remembers its own signature. `__signature` is never read at runtime and is
-// optional so the brand cannot be constructed by accident. It makes `get(AGENTS_SESSION_EXECUTE)`
-// return the provider's type rather than `unknown`, with no registry-wide type parameter to thread.
-export type CapabilityId<T> = string & { readonly __signature?: (value: T) => void }
-
-export const capabilityId = <T>(id: string): CapabilityId<T> => id as CapabilityId<T>
+// The id and its brand live in @acorn/protocol so a plugin's contract/ can mint one without importing
+// this package; re-exported here for the registry's own callers.
+import { type CapabilityId } from '@acorn/protocol/pluginIds.ts'
+export { capabilityId, type CapabilityId } from '@acorn/protocol/pluginIds.ts'
 
 export class CapabilityRegistry {
   readonly #impls = new Map<string, unknown>()

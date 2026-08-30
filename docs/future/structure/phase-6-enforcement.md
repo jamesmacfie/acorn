@@ -68,7 +68,7 @@ architecture doc already records it as a bigger job; this programme does not tak
 
 ## Done when
 
-- A scratch `plugins/agents/src/main/x.ts` (new) fails `tools/arch`.
+- A scratch `plugins/agents/src/server/x.ts` (new) fails `tools/arch`.
 - A scratch `plugins/github/src/contract/x.test.ts` (new) fails `tools/arch`.
 - A scratch `docs/nope/` citation in root `README.md` fails `docPaths`.
 - A pull request against `main` shows a lint and a test check.

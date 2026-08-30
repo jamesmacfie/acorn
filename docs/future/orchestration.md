@@ -28,7 +28,7 @@ checkpoint, so a step interrupted by a restart is swept back to `pending` rather
 | Tool ceilings | `main/workflowTools.ts` | Passed to the child process as `ACORN_TOOL_CEILING`, intersected the same way. |
 | Value passing | `main/workflowValidation.ts` | `${steps.<name>.output}` renders an earlier step's output into a later prompt. Structured JSON is the only input to branching. |
 | Handoffs | `node/index.ts` | Each step's result is appended to a task note, `workflow-handoffs-<runId>`, which is injected as context into later steps of the same run and de-included when the run ends. |
-| Sessions | `plugins/agents/src/main/sessionExecute.ts` | A step runs as a real managed agent session with a durable event ledger, so it appears in the task's Agents sidebar. |
+| Sessions | `plugins/agents/src/server/sessions/sessionExecute.ts` | A step runs as a real managed agent session with a durable event ledger, so it appears in the task's Agents sidebar. |
 
 One route deserves calling out, because it is the piece everybody assumes is missing:
 

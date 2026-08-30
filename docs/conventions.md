@@ -21,13 +21,12 @@ runs in jsdom, so one subject may have both. There is no other infix. A test nam
 rather than a module is fine, and it lives in the folder of the module it exercises most; it never
 sits in a different folder from its subject.
 
-Not yet everywhere: the one `.integration.test.ts` in node-core and the two `.conformance.test.ts`
-files fold into the plain test, or take the behaviour's name, in phase 3.
+Not yet everywhere: `packages/client-core/src/persistence/startupRestore.integration.test.ts` and
+`apps/desktop/test/integration/persistedState.conformance.test.ts` fold into the plain test, or take
+the behaviour's name, in phase 5.
 
 **Fixtures live in `__fixtures__/`.** A helper that is not itself a test takes a `.helper.ts` suffix
 or lives in `test/helpers/`.
-
-Not yet everywhere: the agents plugin spells it `testFixtures/`; phase 4 renames it.
 
 **Scripts are kebab-case `.mjs`.** A `.ts` script is camelCase like any other TypeScript module.
 
@@ -43,10 +42,9 @@ or the importer.
 not a re-export list.** This holds in the plugins, where barrels exist only at the documented
 subpaths, and nearly holds in client-core, which has two barrels across 516 files.
 
-Not yet everywhere: three plugin entrypoints are really vendor clients
-(`plugins/linear/src/server/index.ts`, `plugins/rollbar/src/server/index.ts`,
-`plugins/github/src/server/index.ts`). Phase 4 renames them to what they are, such as `linearApi.ts`,
-wherever the `vi.mock` constraint the arch test records allows it.
+Not yet everywhere: two plugin entrypoints are really vendor clients
+(`plugins/linear/src/server/index.ts`, `plugins/rollbar/src/server/index.ts`). They keep the name for
+the `vi.mock` constraint the arch test records; github's became `server/githubApi.ts` in phase 4.
 
 **A published entrypoint is a bare file, not a folder holding one file.**
 
@@ -66,13 +64,14 @@ loses its prefix, both in phase 5.
 persisted as a device preference, which is a different lifetime. `model.ts` is pure data shaping with
 no reactive state in it at all.
 
-Not yet everywhere: `*Slice`, `*State`, and `*ViewState` also appear; phase 5 folds them into
-`*Store`.
+Not yet everywhere: `*Slice`, `*State`, and `*ViewState` still appear in agents, context, editor, and
+notes; phase 5 folds them into `*Store`.
 
 **A client HTTP wrapper is `<plugin>Client.ts` in `client/`.** If another package needs the wrapper it
 moves to `contract/` and keeps the name.
 
-Not yet everywhere: eight spellings today, two of them already in `contract/`; phase 4 settles them.
+Two exceptions stay: agents keeps one wrapper per feature folder, and editor keeps
+`client/search/searchClient.ts` beside the panel it serves.
 
 ## Contributions
 
@@ -91,13 +90,10 @@ lives in `shared/`, unless another package imports it, in which case it lives in
 read.** The arch test enforces the first half and the file headers say it. A test file never sits under
 `contract/`.
 
-Not yet everywhere: eight modules move from `contract/` to `shared/` in phase 4, and phase 6 adds the
-arch rule that keeps tests out.
+Not yet everywhere: phase 6 adds the arch rule that keeps tests out of `contract/`.
 
 **A plugin's `src/` children are drawn from seven names**: `node`, `server`, `client`, `tree`,
 `contract`, `shared`, `testkit`. `node/` holds `index.ts` and `schema.ts` and nothing else.
-
-Not yet everywhere: ten plugins still have a `main/`, which merges into `server/` in phase 4.
 
 **A folder is plural for a collection of peers and singular for a layer.** `routes/`, `plugins/`,
 `registries/`, and `features/` are collections. `server/`, `client/`, `kit/`, and `host/` are layers.
@@ -126,6 +122,3 @@ required, because `docs/` owns the prose.
 Not yet everywhere: none have one; phase 6 adds them.
 
 **A dependency only the tests use is a `devDependency`.**
-
-Not yet everywhere: 13 plugins list `@acorn/node-core` or `@acorn/client-core` as runtime
-dependencies and import them from no production file at all.

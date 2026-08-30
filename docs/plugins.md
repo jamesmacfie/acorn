@@ -14,9 +14,7 @@ in the frame — with a complete worked example.
 
 ## Package shape
 
-Every plugin, either tier, has the same shape and declares only the parts it has. This is the
-target: `main/` still exists in ten plugins today and merges into `server/` in phase 4 of
-[docs/future/structure/](./future/structure/README.md).
+Every plugin, either tier, has the same shape and declares only the parts it has.
 
 ```text
 plugins/<name>/
@@ -25,7 +23,7 @@ plugins/<name>/
   src/
     node/       index.ts, the NodePlugin factory, and schema.ts. Nothing else.
     server/     routes/*.ts Hono routers, engines, stores, drivers, the vendor client
-    client/     index.ts(x), components, <plugin>Client.ts, *Store.ts, contributions
+    client/     index.ts, components, <plugin>Client.ts, *Store.ts, contributions
     tree/       loaded tier only: the remote component tree the host draws
     contract/   only what another package imports. No tests.
     shared/     wire types, api.ts route builders, anything both halves read
@@ -54,17 +52,17 @@ because TypeScript resolves a relative path against the file that declares it, s
 seventeen packages typechecking nothing. `package.json` is not hoistable — npm has no `extends` — and
 its identical `exports`/`scripts` blocks stay copied rather than generated.
 
-"Shell-free" in `main/` is about what loads, not about taste: a plugin's main barrel is imported by
-`apps/node`, and a barrel evaluates every module on it, so one module that reaches for something only
-the desktop bundle has kills the standalone node at link time, before a line of it runs.
-`apps/node/test/integration/pluginSystem/mainBarrelLoad.test.ts` loads every `plugins/*/src/main/index.ts` in a
-plain Node child to catch that at the commit that causes it. Nothing in `main/` reaches for a shell
-any more: the folder picker the terminal plugin used to own is a Tauri command, and the preview pane
+"Shell-free" in `node/` and `server/` is about what loads, not about taste: `apps/node` imports every
+plugin's `node/index.ts`, and an entrypoint evaluates every module behind it, so one module that
+reaches for something only the desktop bundle has kills the standalone node at link time, before a
+line of it runs. The composition-root suites under `apps/node/test/integration/` boot that graph, so
+the commit that breaks it fails there. Nothing in `server/` reaches for a shell: the folder picker the terminal plugin used to own is a Tauri command, and the preview pane
 is a child webview the shell drives (`docs/shell.md` § Host-owned webviews).
 
 Not every plugin has every directory. The built-in Claude, Codex, and Aider profiles are registered
 by `plugins/agents`; there are no separate profile packages. Onboarding is a client overlay with
-core setup support. The loaded Linear and Rollbar packages are integration providers that use core's
+core setup support; its client entry is a plain `index.ts` like every other plugin's, because a module
+that only registers a lazy component builds it with `createComponent` and needs no JSX. The loaded Linear and Rollbar packages are integration providers that use core's
 generic external-item store rather than owning a plugin database; a loaded plugin's UI lives in
 `tree/` rather than `client/`, because it is a bundle for a sandboxed document and not a
 `ClientPlugin`.

@@ -34,6 +34,7 @@
     "./pluginBridge.ts": "./src/pluginBridge.ts",
     "./pluginContract.ts": "./src/pluginContract.ts",
     "./pluginGrants.ts": "./src/pluginGrants.ts",
+    "./pluginIds.ts": "./src/pluginIds.ts",
     "./pluginState.ts": "./src/pluginState.ts",
     "./projectColor.ts": "./src/projectColor.ts",
     "./refResolvers.ts": "./src/refResolvers.ts",

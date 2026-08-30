@@ -143,9 +143,9 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   }
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
-  // `entries` and `composition` are apps/node's two folders (docs/future/structure/phase-2-apps.md);
-  // `service` and `main` are the names phases 3 and 4 retire.
-  if (['server', 'main', 'mcp', 'entries', 'composition'].includes(seg)) return 'node'
+  // `entries` and `composition` are apps/node's two folders (docs/future/structure/phase-2-apps.md).
+  // `main` was a side until phase 4 of that programme merged it into `server`.
+  if (['server', 'mcp', 'entries', 'composition'].includes(seg)) return 'node'
   return 'shared'
 }
 
@@ -383,7 +383,7 @@ describe('architecture boundaries', () => {
     // reopen every path at once and break no build. That is what this checks. It also checks that
     // every declared target exists, because a map entry pointing at a moved file fails only for
     // whoever imports it next.
-    const KINDS = /^\.\/(node\/index\.ts|client\/index\.ts|main\/index\.ts|contract\/\*|testkit|testkit\/client)$/
+    const KINDS = /^\.\/(node\/index\.ts|client\/index\.ts|contract\/\*|testkit|testkit\/client)$/
     const problems: string[] = []
     for (const pkg of PACKAGES.filter((p) => p.kind === 'plugin')) {
       const manifest = JSON.parse(readFileSync(join(pkg.dir, 'package.json'), 'utf8')) as {
@@ -764,9 +764,9 @@ describe('architecture boundaries', () => {
 
   it('a plugin contract/ never re-exports its own internals', () => {
     // A contract file must not smuggle the internals back in. Transitively, not just the direct edge:
-    // `contract/x.ts -> shared/y.ts -> main/heavy.ts` reaches the implementation in one extra hop, and
+    // `contract/x.ts -> shared/y.ts -> server/heavy.ts` reaches the implementation in one extra hop, and
     // `side()` classifies `shared` as 'shared', so no other rule stops it.
-    const internal = (pkg: Pkg, file: string) => ['client', 'server', 'main'].includes(segment(pkg, file))
+    const internal = (pkg: Pkg, file: string) => ['client', 'server'].includes(segment(pkg, file))
     const withinPkg = new Map<string, { file: string; spec: string }[]>()
     for (const e of firstParty) {
       if (e.target.pkg!.name !== e.fromPkg.name) continue

@@ -248,7 +248,7 @@ Each step is shippable alone and each leaves the previous one useful without it.
   still writes `workflow-handoffs-<runId>` notes.
 - `plugins/memory/src/shared/api.ts` still has `memoryProposalsRoute` and
   `memoryResolveProposalRoute`; the `memories` schema still has `supersededBy` and `originSessionId`.
-- `plugins/workflows/src/main/workflowBuiltins.ts` still dispatches `gate-human` on posture alone and
+- `plugins/workflows/src/server/workflowBuiltins.ts` still dispatches `gate-human` on posture alone and
   `BUILTIN_POLICIES` is still `['checks-green']`.
 - `TOOL_TIER_DEFAULTS` in `@acorn/protocol/toolPermissions.ts` still allows `write` by default.
 - `packages/protocol/src/nodeEvents.ts` still lists seven `<noun>:changed` entries.

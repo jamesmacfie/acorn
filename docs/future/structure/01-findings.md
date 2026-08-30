@@ -236,13 +236,13 @@ is the marker of a loaded plugin.
 loaded plugins use `tree/`, and `tools/arch/boundaries.test.ts` hardcodes those four paths.
 `testkit/` (13 plugins) and `node/schema.ts` (nine plugins, each paired with `migrations/`) are not in
 the documented shape. A seventh export kind, `./server/index.ts`, exists on linear and rollbar; those
-files are the vendor HTTP clients, not barrels, and `plugins/github/src/server/index.ts` is the same
+files are the vendor HTTP clients, not barrels, and `plugins/github/src/server/githubApi.ts` is the same
 thing unexported. Zero of 19 plugins declare all six subpaths.
 
 ### `main/` versus `server/`
 
 `node/` is consistent (`index.ts` plus `schema.ts`) with two exceptions:
-`plugins/http/src/node/workflowStep.ts` is an engine, and `plugins/workflows/src/node/index.ts` is
+`plugins/http/src/server/workflowStep.ts` is an engine, and `plugins/workflows/src/node/index.ts` is
 355 lines with `toRunStatus`, status sets, and list limits in the activation entrypoint. `main/` is
 engines and stores; `server/` is Hono routers and vendor clients. But `tools/arch/boundaries.test.ts`
 around line 146 collapses them, only agents and terminal have a `main/index.ts`, and only terminal's
@@ -251,16 +251,16 @@ is imported outside the package (from `apps/node/src/service/runtime.ts` and
 
 - `agentTools.ts` is under `main/` in changes, github, memory, notes, terminal and under `server/` in
   browser.
-- Process-spawning engines: `plugins/docker/src/main/dockerService.ts`,
-  `plugins/editor/src/main/search.ts`, `plugins/database/src/main/database.ts`, but
+- Process-spawning engines: `plugins/docker/src/server/dockerService.ts`,
+  `plugins/editor/src/server/search.ts`, `plugins/database/src/server/database.ts`, but
   `plugins/http/src/server/send.ts`.
-- `plugins/github/src/main/` holds two files (`agentTools.ts` and its test). That is the whole reason
+- `plugins/github/src/server/` holds two files (`agentTools.ts` and its test). That is the whole reason
   github has a `main/`.
 
 Electron residue: `plugins/preview/src/node/index.ts` lines 3 to 6 describe a `main/` folder preview
-does not have and a lazy electron import the arch test bans. `plugins/editor/src/main/search.ts`
+does not have and a lazy electron import the arch test bans. `plugins/editor/src/server/search.ts`
 lines 18 to 24 rewrite `app.asar` to `app.asar.unpacked`, with `search.test.ts` asserting it.
-`plugins/memory/src/main/knowledgeIpc.ts` and `plugins/terminal/src/main/runIpc.ts` are named for
+`plugins/memory/src/server/knowledgeChannel.ts` and `plugins/terminal/src/server/runChannel.ts` are named for
 IPC over what is loopback HTTP. 13 files still say "main process" or "renderer" in prose.
 
 ### `contract/` versus `shared/`
@@ -268,18 +268,18 @@ IPC over what is loopback HTTP. 13 files still say "main process" or "renderer" 
 External importers per contract module: `notes/contract/store.ts` 4, `workflows/contract/extensions.ts`
 3, `terminal/contract/sessionsClient.ts` 2, `github/contract/mirror.ts` 2,
 `context/contract/contextBlock.ts` 2, eleven others 1 each, and zero for
-`plugins/github/src/contract/api.ts`, `plugins/github/src/contract/collections.ts`,
-`plugins/github/src/contract/pullRef.ts`, `plugins/workflows/src/contract/workflowContracts.ts`,
-`plugins/workflows/src/contract/workflowClient.ts`. `github/contract/api.ts` line 4 justifies itself
+`plugins/github/src/shared/api.ts`, `plugins/github/src/shared/collections.ts`,
+`plugins/github/src/shared/pullRef.ts`, `plugins/workflows/src/shared/workflowContracts.ts`,
+`plugins/workflows/src/client/workflowsClient.ts`. `github/contract/api.ts` line 4 justifies itself
 with "plugins/changes types its local diff rows against `PullFile`"; changes has its own
 `toPullFile` in `plugins/changes/src/client/model.ts` and imports nothing from github.
 
 Route builders and wire types are `shared/api.ts` in changes, memory, notes, linear, rollbar and
 `contract/api.ts` in github and editor. 12 contract modules import `@acorn/plugin-api/node`. Five
 test files sit under `contract/`, which every plugin exports as a wildcard:
-`plugins/context/src/contract/contextBlock.test.ts`, `plugins/github/src/contract/api.test.ts`,
-`plugins/github/src/contract/collections.test.ts`, `plugins/github/src/contract/pullRef.test.ts`,
-`plugins/terminal/src/contract/routes.test.ts`. `plugins/github/src/testkit/githubToken.ts` is not in
+`plugins/context/src/shared/contextBlock.test.ts`, `plugins/github/src/shared/api.test.ts`,
+`plugins/github/src/shared/collections.test.ts`, `plugins/github/src/shared/pullRef.test.ts`,
+`plugins/terminal/src/shared/api.test.ts`. `plugins/github/src/testkit/githubToken.ts` is not in
 github's exports map and is reached by relative import from three route tests.
 
 ### Size and shape
@@ -297,7 +297,7 @@ six files across four directories with zero tests.
 
 `plugins/linear/src/shared/rail.ts` and `plugins/rollbar/src/shared/rail.ts` are both 44 lines with
 names swapped. `plugins/agents/src/shared/wsFrames.ts` and `plugins/docker/src/shared/wsFrames.ts`
-share the pattern. `plugins/database/src/main/formatSchema.test.ts` has no `formatSchema.ts`.
+share the pattern. `plugins/database/src/server/formatSchema.test.ts` has no `formatSchema.ts`.
 `linear`, `rollbar`, `http`, and `database` import `hono` in `server/routes/*.ts` although
 `docs/first-party-plugins.md` says the loaded tier uses the portable `fetch` carrier.
 

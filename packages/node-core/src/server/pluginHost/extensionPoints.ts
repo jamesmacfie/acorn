@@ -16,15 +16,11 @@
 import { parseExtensionPointRef } from '@acorn/protocol/extensionPoints.ts'
 import type { Disposable } from './capabilities'
 
-// A point id that remembers what its entries are. Same phantom-brand trick as CapabilityId, for the
-// same reason: two packages agree on a type without an import edge between their implementations.
-// The owner's contract/ entrypoint exports the constant, and that is the only thing a contributor
-// imports.
-export type ExtensionPointId<T> = string & { readonly __entry?: (value: T) => void }
-
-/** `<ownerPluginId>:<pointId>`, the same shape the client's points take. The owner half is checked
- *  against the declaring plugin at `open`, so a package cannot open a point under a stranger's name. */
-export const extensionPointId = <T>(id: string): ExtensionPointId<T> => id as ExtensionPointId<T>
+// The id and its brand live in @acorn/protocol so a plugin's contract/ can mint one without importing
+// this package. The owner's contract/ entrypoint exports the constant, and that is the only thing a
+// contributor imports.
+import { type ExtensionPointId } from '@acorn/protocol/pluginIds.ts'
+export { extensionPointId, type ExtensionPointId } from '@acorn/protocol/pluginIds.ts'
 
 export type ExtensionPoint = {
   id: string

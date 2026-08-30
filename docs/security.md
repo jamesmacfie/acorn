@@ -235,7 +235,7 @@ nothing consumed the result, so a repo could declare a setup script and watch it
 not wired instead of dropped because wiring them would make a committed file run a command on worktree
 creation and on archive, and neither path asks this gate first — that is a new execution surface, not a
 fix. The `[docker]` table is still read without the gate; the comment on
-`plugins/docker/src/main/dockerConfig.ts` now names the two invariants that make that safe, which are
+`plugins/docker/src/server/dockerConfig.ts` now names the two invariants that make that safe, which are
 that exec is ref-addressed rather than matcher-addressed and that the WebSocket hub refuses docker
 channels to a task-confined socket. If either changes, that table needs the gate.
 

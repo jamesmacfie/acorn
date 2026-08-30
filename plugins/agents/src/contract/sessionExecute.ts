@@ -1,4 +1,5 @@
-import { capabilityId, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
+import { type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
+import { capabilityId } from '@acorn/protocol/pluginIds.ts'
 import type { ToolCeiling } from '@acorn/protocol/workflow.ts'
 
 export type AgentSessionExecuteRequest = {

@@ -1,4 +1,4 @@
-import { capabilityId } from '@acorn/plugin-api/node'
+import { capabilityId } from '@acorn/protocol/pluginIds.ts'
 import type { CreateOpts, TerminalSession } from '@acorn/protocol/terminal.ts'
 
 export type TerminalSessions = {

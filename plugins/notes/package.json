@@ -14,8 +14,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/client-core": "workspace:*",
-    "@acorn/node-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@tanstack/solid-query": "^5.101.0",
@@ -24,6 +22,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

@@ -59,7 +59,7 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
       const webgl = new WebglAddon()
       webgl.onContextLoss(() => webgl.dispose())
       term.loadAddon(webgl)
-    } catch { /* no WebGL context (rare in Electron) — DOM renderer still works, just fuzzier */ }
+    } catch { /* no WebGL context (rare on a desktop) — DOM renderer still works, just fuzzier */ }
     // fit() reaches into xterm's render service, which is torn down on dispose and momentarily
     // absent between a resize and the next paint. Guard so a ResizeObserver tick that lands during
     // teardown (or before the first paint) can't throw "reading 'dimensions' of undefined".

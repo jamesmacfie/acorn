@@ -74,7 +74,7 @@ exists before any plugin is trusted.
 What has no sanctioned alternative, ever, is the *uncooperative* half — B reaching into A without A
 saying so. See [plugins.md](./plugins.md) § There is no uncooperative extension.
 
-**C. Code that runs in the desktop shell itself** — a `src/main/` half that names a shell binding.
+**C. Code that runs in the desktop shell itself** — a plugin half that names a shell binding.
 The shell surface is enumerated and boundary-tested; a loaded plugin has no presence there at all.
 
 This category is empty. Showing a web page stopped being an instance of it when the view service
