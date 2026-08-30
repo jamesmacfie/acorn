@@ -12,7 +12,7 @@ import { Alert, Button, Textarea, Toolbar } from './primitives'
 //
 // The live text is held here, not by the caller, and `onSubmit` carries it. That is what makes the
 // composer usable from a remote tree, where a per-keystroke `onInput` cannot cross — every key would
-// be a message hop, so the kit refuses to send one (docs/future/layout/06-remote-tree.md § Inputs,
+// be a message hop, so the kit refuses to send one (docs/plugins.md § The tree contract,
 // state, and the message hop). A caller that wants each keystroke still gets `onInput`; a caller that
 // only wants the text on submit can leave it unset and read the argument.
 export function Composer(props: {

@@ -110,7 +110,7 @@
    overflow below wins over its `auto`.
 
    Nothing here reads the window width. Breakpoints are style tokens, so a narrower host can set
-   them differently without touching a layout (docs/future/layout/09-doors-left-open.md). */
+   them differently without touching a layout (docs/ui-design.md § What the kit and layouts must never do). */
 .layout-single,
 .layout-hbf,
 .layout-tabs,
@@ -150,6 +150,14 @@
 }
 .layout-tabs-panel:has(> .ui-listdetail) { padding-inline: 0; }
 
+/* `header-body-footer`'s two pinned strips. The body already takes the pane's inline padding; these
+   did not, so a chip row or a summary line sat flush against the pane's border with the scrolling
+   content below it inset — the mismatch read as a bug rather than as a design. The header carries the
+   rule under it, which is what a strip above a scroller is for. */
+.layout-hbf-header,
+.layout-hbf-footer { flex: none; min-width: 0; padding-inline: var(--pane-pad); }
+.layout-hbf-header { padding-block: var(--space-3); border-bottom: var(--chrome-divider); }
+
 /* `header-body-footer`. The body is the scroller and the other two are pinned, which is the whole
    difference between this layout and `single`. Same `padding-inline` rule and the same reason. */
 .layout-hbf-body {
@@ -184,6 +192,18 @@
 /* The regions a drag sizes take an inline pixel length; their sibling takes what is left. */
 .layout-region-document,
 .layout-region-bottom { flex: none; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* The detail column holds a pane's content rather than a list, so it takes the pane's inline padding
+   the same way every scrolling body above does. Chrome takes it back: a `Toolbar` and a `Tabs` strip
+   carry that padding themselves and have a background that has to reach the pane's edge, so they are
+   pulled back out by the same amount rather than being inset twice. */
+.layout-region-detail { padding-inline: var(--pane-pad); }
+.layout-region-detail > .ui-toolbar,
+.layout-region-detail > .ui-tabs { margin-inline: calc(-1 * var(--pane-pad)); }
+/* Two children are edge-to-edge by nature and opt the whole column out: a split, whose divider is its
+   columns' shared edge and whose columns pad themselves, and a diff, which is a canvas. */
+.layout-region-detail:has(> .ui-listdetail),
+.layout-region-detail:has(> .diff-toolbar) { padding-inline: 0; }
 
 /* `list-detail`. The list column's width is a style token until someone drags the handle, which
    writes a pixel value onto the container. The divider is the handle's, so the column carries no

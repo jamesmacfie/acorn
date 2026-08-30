@@ -3,7 +3,7 @@
 //
 // Two columns, from the day the kit exists. `dom` is implemented; `tui` is written down and read by
 // nothing, so that a node cannot be added without someone deciding what it does on a host with no
-// pixels. See docs/future/layout/04-kit.md for the table this mirrors.
+// pixels. See docs/ui-design.md § The closed kit for the table this mirrors.
 import type { Border, Radius, RoleName, Size, Space, TextRole, Tone } from './tokens'
 
 /** What a role means to a terminal. `ignored` is an answer; missing is not. */

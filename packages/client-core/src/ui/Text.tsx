@@ -4,7 +4,7 @@ import type { TextRole, Tone } from './kit/tokens'
 /* Text: a run of words with a role.
 
    The kit table has named this node since the layout programme was written
-   (docs/future/layout/04-kit.md § Showing) and nothing built it, because inside the shell a `<span>`
+   (docs/ui-design.md § Every node at 80 by 24) and nothing built it, because inside the shell a `<span>`
    with a class was always to hand. A remote tree has no such thing: `class` and `style` never cross,
    so without this node a plugin's only way to say "this line is dim" is a raw element it is not
    allowed to emit. Four plugins wanted it on the first day of the move.

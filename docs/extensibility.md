@@ -99,25 +99,40 @@ direction. So:
 - **Nothing a Node pushes runs automatically.** Rejected or undecided bundles register nothing —
   not frames, not chrome.
 
-## Rectangles get frames; chrome gets descriptors
+## Data, code, and pixels
 
-Plugin UI splits two ways, and the split is not about effort.
+Plugin UI splits three ways, and the split is not about effort. Ask in this order and take the first
+that fits.
 
-A **frame** is a sandboxed iframe on its own origin with no network of its own. It is for surfaces
-the plugin draws itself, and inside one the plugin can use any framework it likes.
+A **descriptor** is data — a rail row, a badge, a palette entry, a mark under somebody else's diff
+line — that the host renders with its own components, fetching content from the plugin's own routes.
+Descriptors exist because an iframe for a 20-pixel badge is absurd, but the real reason is that
+**chrome has to be live when no plugin UI is mounted anywhere**. A badge cannot depend on plugin UI
+code running, so its data comes from the plugin's Node half, which always is.
 
-A **descriptor** is data — a rail row, a badge, a palette entry — that the host renders with its
-own components, fetching content from the plugin's own routes. Descriptors exist because an iframe
-for a 20-pixel badge is absurd, but the real reason is that **chrome has to be live when no plugin
-frame is mounted anywhere**. A badge cannot depend on plugin UI code running, so its data comes
-from the plugin's Node half, which always is.
+A **tree** is the plugin's own code, running in a sandbox with no DOM, emitting names of the host's
+own components. The host draws them, so the result has the shell's focus handling, keyboard model,
+ARIA and the reader's chosen style pack — none of which an iframe can borrow. This is where a pane, a
+reference panel, a settings page and a card in somebody else's list live. Every loaded plugin acorn
+ships draws this way.
 
-That split has a cost, and it is worth taking rather than designing around. Descriptors cannot
-express arbitrary UI, and the first real migration hit exactly that: Rollbar's rail lost its
-connection, level and environment filters because a descriptor row cannot express them. The
-response was to move that exploration into the frame and say so — not to grow the action
-vocabulary until it became a UI framework. **The closed verb set stays closed**; every time it is
-widened for one plugin's convenience, every future plugin inherits a larger thing to get wrong.
+A **rectangle** is a sandboxed iframe on its own origin with no network of its own, for the surfaces
+whose pixels are the product: a canvas, a charting library, a rich editor, a page of arbitrary HTML.
+Inside one the plugin can use any framework it likes, and it is priced honestly as DOM-only.
+
+For a long time there were only two answers, "descriptors for chrome, frames for rectangles", and that
+pushed every pane into an iframe by default. The middle answer is what changed. It also un-stuck the
+thing the two-answer split kept costing: Rollbar's rail lost its connection, level and environment
+filters on migration, because a descriptor row cannot express a filter. The old response was to move
+that exploration into a frame and accept it looking foreign. Now it is a tree, drawn from the host's
+own controls.
+
+What did **not** change is why descriptors stay small. **The closed verb set stays closed**; every
+time it is widened for one plugin's convenience, every future plugin inherits a larger thing to get
+wrong. When somebody asks for a conditional in a descriptor row, the answer is a tree, not a bigger
+descriptor. [docs/plugins.md](./plugins.md) § Descriptors for facts, trees for UI, rectangles for
+pixels carries the argument, including why a component tree is not the static widget schema this
+project has refused twice.
 
 The furthest that tier goes today is a **collection**: a plugin declares a typed set of records —
 seven semantic field types, five roles — and the host composes user-owned panels over it
@@ -135,10 +150,14 @@ one's under every appearance pack.
 
 ## Plugins may extend each other, and only by invitation
 
-The same split applied one level up. A plugin can declare, in its manifest, a strip inside one of its
-own panes that other plugins may fill; another plugin declares — also in its manifest, also by id —
-what it puts there. The host carries the descriptors from one to the other, stamps whose they are, and
-draws them with its own components ([plugins.md](./plugins.md) § Cooperative extension points).
+The same split applied one level up, and it kept all three answers. A plugin declares, in its
+manifest, a place inside one of its own surfaces that other plugins may fill; another plugin declares
+— also in its manifest, also by id — what it puts there. What it puts there is one of five kinds, and
+the kind is a field on the point: **rows** and **annotations** are descriptors, **remote** is a tree,
+**rectangle** is an iframe the host places as a sibling, and **hook** is not a drawing at all but a
+turn in a decision before it happens ([plugins.md](./plugins.md) § Cooperative extension points). The
+host carries whatever it is from one plugin to the other, stamps whose it is, and draws or runs it
+itself.
 
 Three things about that are the design rather than the implementation:
 
@@ -151,8 +170,10 @@ Three things about that are the design rather than the implementation:
   absence of a boundary, and it makes every plugin part of every other plugin's attack surface. DOM
   access into another realm, patching another plugin's registrations and reading another plugin's
   routes are all refused, permanently. **If a real need cannot be expressed as a cooperative point,
-  the answer is to widen the descriptor vocabulary, not to open the realm** — and sometimes the answer
-  is that it stays in the compiled tier, which is a cost paid on purpose rather than a gap.
+  the answer is a wider vocabulary, not an open realm** — and which vocabulary depends on which of the
+  three tiers the need is. Memory's editable section inside context's tray was the case that used to be
+  cited as a permanent cost; it is a `context:section` contribution now, drawn from kit nodes, because
+  the tier between a descriptor and an iframe arrived.
 - **Registering never seizes anything.** The related pattern for *core's* surfaces — a plugin offering
   to draw acorn's own rail task list — is an offer, not a claim. The user arbitrates in settings, and
   core is what draws whenever the chosen provider is missing, disabled or broken. bb's exclusive slot
@@ -177,19 +198,26 @@ waits for a case that wants it.
 ## Plugins get building blocks, not just a boundary
 
 A sandbox that isolates a plugin and then leaves it to rebuild a button is a sandbox nobody enjoys
-writing against. The intent is that a plugin author gets acorn's own Solid UI components — buttons,
-fields, badges, pickers, the diff model — so a plugin looks and behaves like the rest of the app
-without effort, and so the work of making a plugin is the plugin's own logic rather than its
-chrome.
+writing against. A plugin author gets acorn's own components — buttons, fields, badges, pickers, the
+diff viewer — so a plugin looks and behaves like the rest of the app without effort, and so the work
+of making a plugin is the plugin's own logic rather than its chrome.
+
+The kit is **closed**, and that is the part that turned out to matter most. Every component a plugin
+may draw with is in one list; a node's props are role tokens, content, counts, booleans and handlers,
+and never `class`, `style` or a DOM attribute passed through
+([docs/ui-design.md § The closed kit](./ui-design.md#the-closed-kit)). Closing it is what lets the
+same source render two ways — compiled in this process, or in a worker with no DOM at all — and it is
+what keeps a second host, a phone or a terminal, from being a rewrite.
 
 Two earlier decisions are what make this possible, and neither was made for this reason:
 
-- **A frame is a separate realm.** A second Solid instance inside one is not the failure the shell
-  guards against — different document, different bundle, no shared reactive graph. The hazard only
-  exists when two Solids share one realm.
+- **A sandbox is a separate realm.** A second Solid instance inside one is not the failure the shell
+  guards against — a frame has a different document and a different bundle, a worker is a different
+  thread, and neither shares a reactive graph with the shell. The hazard only exists when two Solids
+  share one realm.
 - **The design system is enforced-pure.** `client-core/src/ui/` is props-in, DOM-out with no
   data-layer imports, checked by the boundaries test. That rule was written for contract hygiene;
-  its payoff is that those components drop into a frame with no query client, no shell context and
+  its payoff is that those components drop into a sandbox with no query client, no shell context and
   no host services.
 
 Today the components are reachable as `@acorn/plugin-api/ui`, which is a workspace dependency —
@@ -209,11 +237,15 @@ gap is smaller than it sounds in the meantime: the host already serves `/ui.css`
 so an external frame gets acorn's own chrome from `class="ui-btn"` with no JavaScript, no types and no
 package at all.
 
-The host-generated frame document now links `/ui.css`, assembled from the same presentation-only
+The host-generated frame document links `/ui.css`, assembled from the same presentation-only
 stylesheets as the shell, and the appearance bridge projects the complete theme and style token axes.
-Rollbar is the reference implementation: its frame opts into Solid at build time and consumes the UI
-entrypoint directly. The transform is per-package, so this ergonomic default does not constrain a
-different framework.
+That is the answer for a rectangle, which is the only thing that still draws its own pixels.
+
+For a tree the question does not arise: a plugin writes JSX against
+`@acorn/plugin-api/ui/tree`, the builder compiles it to node names rather than DOM, and the styling is
+the host's because the host is what draws. Every plugin acorn ships draws that way now, and none of
+them ships a stylesheet — an arch rule refuses one. The `framework` key each plugin used to name is
+gone with them.
 
 ## The host binds every namespace
 

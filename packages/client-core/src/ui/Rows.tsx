@@ -6,7 +6,7 @@ import { rowHeight } from './metrics'
 
 // Rows: the run of `Row`s or `TreeRow`s, as a node.
 //
-// `Row` has always been "an item in a collection" (docs/future/layout/04-kit.md), and until now the
+// `Row` has always been "an item in a collection" (docs/ui-design.md § The closed kit), and until now the
 // collection was whatever `<div>` the pane happened to wrap it in — which is why arrow keys worked in
 // three lists and nowhere else. This is that container, and it is the only thing a pane has to write
 // to get arrows, Home, End, the page keys, type-ahead, `aria-activedescendant` and a selection that

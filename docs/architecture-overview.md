@@ -80,6 +80,12 @@ still export `"./*": "./src/*"`, which gives the module system no encapsulation,
 stay tests. Closing them is a bigger job than closing the plugins was, because every production import
 into a plugin already went through an entrypoint and the same is not true one level up.
 
+**The UI kit is closed as well**, and by a third mechanism again: by type. Every component a plugin
+may draw with is one row in `packages/client-core/src/ui/kit/support.ts`, a node's props are role
+tokens rather than DOM attributes, and a type-level test refuses `class`, `className` and `style` on
+any of them ([ui design](./ui-design.md) § The closed kit). Two arch rules hold the rest — no plugin
+ships a stylesheet, and no plugin mounts a Solid root of its own.
+
 Test files follow the same rules as production files unless a rule names an exception, and several
 rules carry a **shrinking baseline**: a list of survivors that may only get shorter. Adding to one is a
 decision someone has to write down.
@@ -419,11 +425,10 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
   written first: [first-party plugins](./first-party-plugins.md).
 - Review findings from moving Rollbar out of the binary onto the loaded-plugin path:
   [third-party](./third-party/).
-- How plugin UI came to be host-owned layouts, a closed component kit, remote component trees, five
-  extension kinds and host-owned keyboard navigation: [layout](./future/layout/README.md). Shipped
-  2026-08-30. The folder sequences and links; the owning docs above describe the behaviour. The kit is
-  in [ui design](./ui-design.md) § The closed kit, the layouts in [panes](./panes.md) § Layout model,
-  the keyboard in [command palette and shortcuts](./command-palette-and-shortcuts.md), the five kinds
-  in [plugins](./plugins.md) § Cooperative extension points, and the two render paths in
+- Plugin UI is host-owned layouts, a closed component kit, remote component trees, five extension
+  kinds and host-owned keyboard navigation, all shipped 2026-08-30. The kit is in
+  [ui design](./ui-design.md) § The closed kit, the layouts in [panes](./panes.md) § Layout model, the
+  keyboard in [command palette and shortcuts](./command-palette-and-shortcuts.md), the five kinds in
+  [plugins](./plugins.md) § Cooperative extension points, and the two render paths in
   [plugins](./plugins.md) § Loaded plugins: the client half.
 - Runtime and development: [shell](./shell.md) and [local development](./local-development.md).

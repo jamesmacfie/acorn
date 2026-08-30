@@ -2,7 +2,7 @@
 //
 // The same pattern as `support.ts` and `tokenAxes.ts`: the answer is data with a test behind it, so a
 // node cannot join the kit without someone deciding whether a keyboard can land on it. See
-// docs/future/layout/07-focus-and-keys.md § Focus is a property of the tree for the four values.
+// docs/command-palette-and-shortcuts.md § Focus and typing for the four values.
 //
 //   stop        one tab stop
 //   collection  one tab stop with roving focus inside; the host owns `active`, `selected`, `offset`

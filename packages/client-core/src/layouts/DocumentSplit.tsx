@@ -32,7 +32,7 @@ import type { LayoutProps } from './regions'
 // row of its own region.
 //
 // One component and two names, because the axis is in the name and never in a prop
-// (docs/future/layout/05-layouts.md § Adding a seventh).
+// (docs/panes.md § Layout model, on adding a ninth).
 //
 // Narrow: the frame region collapses to a sheet the document can summon. Terminal: the document region
 // is a host text view, read-only in a first version, and the frame region draws its tree.
@@ -49,7 +49,7 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
   let dragStart: number | null = null
   // The ceiling is this layout's own box, never the window. A pane is one column of a task row, so the
   // window is not what it is allowed to fill, and no layout may read the window's width (shell.css §
-  // Layouts, docs/future/layout/09-doors-left-open.md, "never do these" item 12). Before the element is
+  // Layouts, docs/ui-design.md § What the kit and layouts must never do, "never do these" item 12). Before the element is
   // measurable there is no ceiling to apply, which is the honest answer: the floor still holds.
   const ceiling = () => {
     const extent = axis === 'x' ? (root?.offsetWidth ?? 0) : (root?.offsetHeight ?? 0)

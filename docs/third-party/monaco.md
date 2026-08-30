@@ -22,6 +22,14 @@ surface-action delivery and the completions capability. **The acceptance test th
 itself passes: database's ⌘Enter runs the query when the plugin no longer owns the editor.** That
 plugin's frame bundle is 156 KB against the 7.93 MiB a bundled Monaco measured.
 
+**What is still true, and what is a record.** The contract, the litmus test and the language-smarts
+growth rule below are live. The layout vocabulary this file invented is owned by
+[docs/panes.md § Layout model](../panes.md#layout-model) now, and the "descriptor vocabulary" refusal
+in § The template vocabulary was aimed at a static schema and still holds against one — what it did
+not foresee is the remote component tree, which is argued in
+[docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels](../plugins.md). The
+class names and the frame regions below are how the world looked in 2026-08.
+
 The contract lives in `docs/plugins.md § Document surfaces`; the code is
 `node-core/main/pluginManifest.ts` (the `layout` block and the `surfaceAction` verb),
 `client-core/src/editor/` (the surface, its theme, its language map, its view state, the chord
@@ -222,11 +230,13 @@ editor's real shape is also a template — `frame-beside-document`, or host-draw
 surface's document-list route — which is one more reason region addressing ships from day one rather
 than as a database-only afterthought.
 
-It does **not** replace **"an editor is one resizable region inside my pane"**, and that is
-`plugins/database`. Its Monaco host is `.db-editor-host`, inside `.db-editor` at a user-draggable
-pixel height (`editorH()`, with a `.db-split` pointer handle), inside `.db-main`, beside
-`.db-sidebar`, above `.db-result` and its virtualized grid. The editor is a region in a layout the
-plugin composes and the user resizes — and the plugin cannot compose a host surface into it.
+It does **not** replace **"an editor is one resizable region inside my pane"**, and in 2026-08 that
+was `plugins/database`. Its Monaco host was a `.db-editor-host` div, inside `.db-editor` at a
+user-draggable pixel height (an `editorH()` signal with a `.db-split` pointer handle), inside
+`.db-main`, beside `.db-sidebar`, above `.db-result` and its virtualized grid. The editor was a region
+in a layout the plugin composed and the user resized — and the plugin could not compose a host surface
+into it. Every one of those classes is gone: the layout is the host's now and the plugin ships no
+stylesheet. The problem they describe is what this section decided.
 
 Three candidates were on the table:
 
@@ -273,10 +283,9 @@ else is reversible.
 
 ## The template vocabulary, and document-over-frame concretely
 
-Both sections folded into
-[docs/future/layout/05-layouts.md](../future/layout/05-layouts.md), which owns the layout names, their
-regions, and each one's narrow and terminal projection. `docs/panes.md` § Layout model has the shipped
-list. What survives from here is the litmus test, because it is what keeps that list short:
+Both sections folded into [docs/panes.md § Layout model](../panes.md#layout-model), which owns the
+layout names, their regions, and each one's narrow and terminal projection. What survives from here is
+the litmus test, because it is what keeps that list short:
 
 **A region is host-owned only when the sandbox cannot serve its content. Common is not the bar;
 impossible is.**
@@ -361,7 +370,10 @@ frames: [{
         triggerCharacters: ['.'],
       },
     },
-    frame: 'frame',                          // this plugin's own bundle
+    // As designed in 2026-08. When database actually moved, this region became
+    // `{ kind: 'remote', entry: 'results' }` — a tree of the host's own components rather than the
+    // plugin's own iframe. `'frame'` is still legal and is what a region that owns its pixels says.
+    frame: 'frame',
   },
 }],
 commands: [{ id: 'execute', title: 'Database: run query', palette: false }],

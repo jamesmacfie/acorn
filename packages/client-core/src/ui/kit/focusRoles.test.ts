@@ -4,7 +4,7 @@ import { NODE_SUPPORT } from './support'
 
 // The focus table and the support matrix are the same list, for the same reason the support matrix
 // and the barrel are: a node that joined the kit without anyone deciding whether a keyboard can land
-// on it is a node that ships unreachable. See docs/future/layout/07-focus-and-keys.md.
+// on it is a node that ships unreachable. See docs/command-palette-and-shortcuts.md § Focus and typing.
 
 describe('the kit focus table', () => {
   it('gives every node in the support matrix a role', () => {

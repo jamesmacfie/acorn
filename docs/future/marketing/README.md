@@ -65,10 +65,11 @@ The internal docs are unusually honest and the public docs must not launder that
 - The compatibility promise is exactly the `PLUGIN_API_MAJOR` promise (`4` at the time of writing,
   exact string match; read it from `packages/protocol/src/pluginApiVersion.ts`): a plugin that loads
   under a major keeps loading under it. Nothing more is promised, and the compatibility page says so.
-- The plugin story this site describes is about to change shape. [docs/future/layout/](../layout/README.md)
-  replaces "rectangles get frames; chrome gets descriptors" with layouts, a closed kit, remote
-  component trees, and five extension kinds. Do not write the plugin docs against the frame model if
-  that programme has started; write them once and against the tree.
+- The plugin story changed shape in 2026-08, and this file predates it. "Rectangles get frames;
+  chrome gets descriptors" is gone, replaced by host-owned layouts, a closed kit, remote component
+  trees, and five extension kinds ([docs/plugins.md](../../plugins.md),
+  [docs/ui-design.md](../../ui-design.md), [docs/panes.md](../../panes.md)). Write the plugin pages
+  against the tree; the frame is the rectangle now, and it is the exception rather than the default.
 
 A public page never says something the owning internal doc doesn't. Internal docs stay the
 source of truth; public pages are splits and distillations of them, per the mapping in

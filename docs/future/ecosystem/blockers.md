@@ -82,10 +82,9 @@ tidy-up; it is a claim of provenance the source cannot support.
   points, exclusive slots), which is the model: one designed addition at a time.
 - **Plugin-to-plugin interop.** Capabilities, content links, ref resolvers, and the now-shipped
   cooperative extension points (`docs/plugins.md § Cooperative extension points`) cover it
-  host-mediated, and [docs/future/layout/](../layout/README.md) grows the cooperative half into five
-  kinds (rows, annotations, remote trees, rectangles, hooks). bb-style uncooperative extension is
-  refused on the record and stays refused (`docs/plugins.md § There is no uncooperative extension`,
-  [layout/refused.md](../layout/refused.md)).
+  host-mediated, in five kinds (rows, annotations, remote trees, rectangles, hooks). bb-style
+  uncooperative extension is refused on the record and stays refused
+  (`docs/plugins.md § There is no uncooperative extension`).
 
 ## Verify before building
 

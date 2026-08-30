@@ -1,6 +1,6 @@
 // The intents. A kit node handles one of these; it never reads a key.
 //
-// Closed on purpose (docs/future/layout/07-focus-and-keys.md § Keys become intents before anyone
+// Closed on purpose (docs/command-palette-and-shortcuts.md § Focus and typing, on keys becoming intents before anyone
 // sees them). A host maps its own keys onto this set, so a terminal renderer teaches `j` and `k` in
 // one table rather than in every component, and a plugin that only ever sees `onActivate` cannot
 // grow a keyboard opinion of its own.

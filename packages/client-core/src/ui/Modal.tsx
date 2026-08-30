@@ -13,7 +13,7 @@ import { createDismissable } from './dismissable'
 export function Modal(props: {
   /** `onDismiss` rather than `onClose` because dismissal is one of the kit's eleven events, and only
    *  a name in that list can carry a handler across the remote root
-   *  (docs/future/layout/06-remote-tree.md § The wire format). */
+   *  (docs/plugins.md § The tree contract). */
   onDismiss: () => void
   title?: string
   size?: 'sm' | 'md' | 'lg' | 'wide'

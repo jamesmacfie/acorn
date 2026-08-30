@@ -4,7 +4,7 @@ import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protoco
 import { ownsRoute } from '../chrome/data'
 
 // Which declared layouts the host draws, and whether the routes inside them are ones this device will
-// fetch (docs/panes.md § Layout model, docs/future/layout/05-layouts.md).
+// fetch (docs/panes.md § Layout model, docs/panes.md § Layout model).
 //
 // A plain module rather than lines inside register.ts, because the decision below is the trust gate for
 // a whole class of surface and deserves to be named and tested as one. It was extracted when

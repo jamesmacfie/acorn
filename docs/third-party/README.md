@@ -130,7 +130,7 @@ frame's `localStorage` could never have reached them.
 **The premise below has been overtaken twice, and both are worth reading in order.** The finding was
 about a *frame* — one file, no workers, its own origin — and it is still true of one. What changed is
 that a loaded plugin no longer has to be a frame: it draws a tree of the host's own components in a
-worker instead (phase 5 of `docs/future/layout/`), so nothing it draws ships a copy of anything. The
+worker instead, so nothing it draws ships a copy of anything. The
 host-owned document surface below is what carried database over in the meantime, and it is still the
 right answer for an editor: one Monaco, lent out, rather than one per plugin.
 
@@ -178,7 +178,7 @@ measured. It ships `document-over-frame`: the host draws the SQL editor and the 
 draws the button bar, the table sidebar, the result grid and its modals below. `⌘Enter` still runs
 the query, which was the acceptance test the whole design set for itself.
 
-**The lower half is a tree now, not a frame** (phase 5 of `docs/future/layout/`). Same bytes, same trust
+**The lower half is a tree now, not a frame.** Same bytes, same trust
 prompt, same `document-over-frame` layout; what changed is that the region names a `remote` entry
 instead of `'frame'`, so the host mounts its own components for what the bundle emits. The stylesheet
 went with it, and so did the plugin's copy of a virtualised grid.

@@ -154,6 +154,8 @@ test, and each entrypoint exists because of what it can and cannot be loaded int
 | `@acorn/plugin-api/ui/diff` | The diff toolkit's model, virtualizer, and find pass |
 | `@acorn/plugin-api/ui/editor` | The Monaco theme and language mapping. Compiled panes only, so 30 MB of editor stays out of other boot graphs |
 | `@acorn/plugin-api/ui/sdk` | The sandbox bridge and both render paths: `connect`, `mountFrame`, `mountTree`, the remote root, `openLinkOnClick` |
+| `@acorn/plugin-api/ui/tree` | The kit as nodes a tree writes in JSX, plus the Solid adapter the builder's `generate: 'universal'` transform compiles against. **A tree imports this and never the `/ui` barrel**: `/ui` is Solid components for a DOM, a tree emits node names for a worker, and pulling the barrel into a worker bundle drags in a DOM that is not there |
+| `@acorn/plugin-api/ui/tokens` | The role enums and the support matrix as data, with no components on them, so a node-environment test can read them |
 | `@acorn/plugin-api/testkit` | Node-side test scaffolding: `makeTestNodeContext`, `validatePluginConfig` |
 | `@acorn/plugin-api/testkit/client` | The client-side half of the same |
 

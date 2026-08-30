@@ -25,7 +25,7 @@ data. The four loaded ones, `database`, `http`, `linear`, and `rollbar`, are dec
 offered whenever the plugin is running on the node the window is talking to. All four draw **trees**:
 their code runs in a worker and emits a tree of the host's own components, which the host mounts, so
 they inherit its focus behaviour, keys, ARIA and appearance pack and ship no stylesheet of their own
-(`docs/future/layout/06-remote-tree.md`). A `frame` region is still available for a surface that owns
+([docs/plugins.md § The tree contract](./plugins.md)). A `frame` region is still available for a surface that owns
 its pixels; none of the four needs one. A task
 pane whose manifest also names a `providerId` (`linear` and `rollbar` do) is a linked-items view, and
 the host hides it on tasks with no link from that provider. `database` and `http` are useful with
@@ -59,32 +59,62 @@ does not rewrite the durable row.
 **Inside a pane** the host owns the arrangement. A pane names one of the layouts below and supplies a
 component per region; it never draws the split, the divider, or the drag handle itself. The names and
 each layout's region set are in
-[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts), the components are in
-`client-core/src/layouts`, and the desktop rendering plus the narrow and terminal projections are in
-[docs/future/layout/05-layouts.md](./future/layout/05-layouts.md).
+[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts) and the components are in
+`client-core/src/layouts`.
 
-| Layout | Regions |
-| --- | --- |
-| `single` | `body` |
-| `list-detail` | `list`, `detail`, and optionally `list-header` and `list-footer` |
-| `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer |
-| `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar |
-| `document-over-frame` | `document`, `frame` |
-| `frame-beside-document` | the same two, with the axis flipped by the name rather than by a prop |
-| `stack-split` | `top`, `bottom` |
-| `wizard` | `step`; the host draws the indicator and the back and next controls |
+**Eight names, seven components**, and the mismatch is deliberate: `document-over-frame` and
+`frame-beside-document` are the same two regions with the axis flipped, so one component draws both.
+Position is in the name rather than in a prop precisely so that it is never a knob a plugin turns.
+Counts elsewhere in the docs are of the eight names.
 
-Position is in the name, never in a knob. A surface that needs an arrangement none of these expresses
-gets a new named layout, and it has to state its regions and both projections before it lands.
+Each layout carries three renderings: the desktop one, which is built, plus a **narrow** projection
+for a mobile PWA and a **terminal** projection, both written down and neither built. Writing them is
+the layout's half of the kit's admission rule
+([docs/ui-design.md § The closed kit](./ui-design.md#the-closed-kit)): a layout earns a name when two
+or more surfaces need it and cannot be expressed in the ones that exist, its regions are semantic
+names rather than positions, and both projections are on this page before it lands. A knob is never
+the answer; a new named layout is.
+
+| Layout | Regions | Desktop | Narrow | Terminal |
+| --- | --- | --- | --- | --- |
+| `single` | `body` | one region, the pane's padding and focus group | unchanged | unchanged |
+| `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups |
+| `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer | body scrolls, header and footer pinned | unchanged; the footer stays pinned | the same |
+| `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar | the bar, then one panel at a time | the bar scrolls horizontally | the bar is one line |
+| `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | the document is a host text view, read-only in a first version; the frame region draws its tree |
+| `frame-beside-document` | the same two, with the axis flipped by the name rather than by a prop | side by side | as `document-over-frame` | the same |
+| `stack-split` | `top`, `bottom` | two stacked regions with a handle | `bottom` becomes a full-height sheet | native, as on desktop |
+| `wizard` | `step`; the host draws the indicator and the back and next controls | one step at a time | unchanged | unchanged |
+
+Every region is a focus group: one chord moves between them, focus inside one is roving, and each
+remembers the node it was last on
+([docs/command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)). The task layout row is
+the outermost group.
+
+A region may hold a `Slot` node, and a region may itself be a slot. The one layout rule that adds:
+**a rectangle slot is a sibling region, never a child of another region's iframe**, and its position
+is the region name — `pane.inline-below` is a `header-body-footer` footer, `pane.inline-beside` is a
+`list-detail` detail ([docs/plugins.md § Cooperative extension points](./plugins.md)).
+
+**Nothing in a layout reads the window width.** Breakpoints are style tokens so a mobile shell can set
+them, and a drag clamps against the layout's own element (`shell.css` § Layouts).
+
+**The host owns a region's inset.** A region's contents are a plugin's tree, and the kit takes no
+`class`, so a chip row or a composer sitting flush against the pane's border is the one thing a plugin
+cannot fix from inside. Every region that holds content takes the pane's inline padding: the scrolling
+bodies of `single`, `header-body-footer` and `tabs`, both pinned strips of `header-body-footer`, and
+`list-detail`'s detail column. Three kinds of child take it back, because they are edge-to-edge by
+nature: a `Toolbar` or a `Tabs` strip, which carry that padding themselves and have a background that
+has to reach the pane's edge; a `ListDetail`, whose divider is its columns' shared edge and whose
+columns pad themselves; and a diff, which is a canvas.
 
 The host keeps the per-pane state a layout needs, under the pane ID: which tab a `tabs` pane is
 showing, where a `list-detail` or `stack-split` handle sits. It is session-only, because it is a
 reading posture rather than a preference.
 
 A pane whose panels point at each other can say which tab it means, through `selectPaneTab` on
-`@acorn/plugin-api/ui/host`. The PR pane's conversation uses it: "view in diff" scrolls the diff and
-shows the Files tab. That is the only door to the selection, so a pane still never keeps a second copy
-of it.
+`@acorn/plugin-api/ui/host`. That is the only door to the selection, so a pane still never keeps a
+second copy of it.
 
 A pane may also hide a region, which drops it and gives the space to what is left. Notes uses this for
 its library column, and it is the same mechanism the narrow projections need.
@@ -116,16 +146,17 @@ The seam exists because four compiled panes had each hand-rolled the same per-ta
 the admission rule's own test. A pane whose regions share nothing omits `model` and its regions are
 handed `undefined`.
 
-Two panes still keep a map of their own, and both are keyed by something other than a task: the PR
-pane's is keyed by the pull request, because a task can be about several, and the tab strip's is keyed
-by the task but read from three panels of one `tabs` layout. Neither is a copy of this seam waiting to
-be deleted; if a third appears with a task-shaped key, it belongs here.
+The PR pane still keeps two maps of its own. One is keyed by the pull request, because a task can be
+about several; the other is keyed by the task but holds a live subscription that must outlive the
+pane's own mounts. Neither is a copy of this seam waiting to be deleted; if a third appears with a
+task-shaped key and nothing to subscribe to, it belongs here.
 
 **A split inside a region is the plugin's.** A pane's regions are its *outer* arrangement; a `ListDetail`
 drawn inside one region is a different object with a different owner, which is why `ListDetail` and
-`DocumentTabs` are kit nodes as well as layout names. The PR pane's Files tab is one panel of a `tabs`
-pane with a list-detail split inside it, and that is correct rather than a pane that should have been
-two layouts.
+`DocumentTabs` are kit nodes as well as layout names. The PR pane is a `single` layout whose one region
+is a kit `ListDetail` — the navigator beside the diff, the same pair the GitHub browse surface draws —
+and that is correct rather than a pane that should have named `list-detail`. The two columns are one
+surface over one model, not two regions the host mounts apart.
 
 A wizard is the one arrangement a non-pane surface can reach for. Onboarding is a component in the
 `overlay` slot rather than a pane, so it imports `Wizard` from `@acorn/plugin-api/ui/host` and fills its

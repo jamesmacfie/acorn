@@ -1,5 +1,5 @@
 // The tree path's rendering half: Solid compiled into acorn's own components instead of into a
-// document, and the kit as nodes a plugin writes in JSX (docs/future/layout/06-remote-tree.md).
+// document, and the kit as nodes a plugin writes in JSX (docs/plugins.md § The tree contract).
 //
 // Its own entrypoint, beside ./ui/sdk rather than on it, for the reason ./ui/sdk states about
 // frameworks: the bridge must stay loadable with no framework installed, and a Solid import on that

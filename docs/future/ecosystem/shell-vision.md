@@ -48,9 +48,9 @@ produces exactly the right shape:
 
 One line of the tier list moved on 2026-08-28. "Components rendered inside the shell's own tree" was
 the reason changes, memory, docker's chrome, and onboarding could never leave. The
-[layout programme](../layout/README.md) replaces that component with a remote component tree the
-host mounts from a closed kit, so the reason dissolves without the sandbox widening: code still does
-not cross, a tree of kit node names does. Stream ownership and shell-process code stay on the list.
+remote component tree ([docs/plugins.md](../../plugins.md) § The tree contract) replaces that
+component with a tree the host mounts from a closed kit, so the reason dissolves without the sandbox
+widening: code still does not cross, a tree of kit node names does. Stream ownership and shell-process code stay on the list.
 
 Call it what it is: **a fat, opinionated core with a plugin ecosystem around it** — closer to
 VS Code's actual shape than to its "everything is an extension" folklore. Users still get the

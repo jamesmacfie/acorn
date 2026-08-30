@@ -1,4 +1,4 @@
-// One Web Worker per plugin bundle, and the lifecycle around it (docs/future/layout/06-remote-tree.md
+// One Web Worker per plugin bundle, and the lifecycle around it (docs/plugins.md § The tree contract
 // § The sandbox: one worker per bundle).
 //
 // What the worker has: the plugin's bundle, whatever framework it brought, and the bridge. What it
