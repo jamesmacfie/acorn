@@ -10,7 +10,7 @@ folder is deleted with `docs/future/README.md` saying where its behaviour went.
 
 ## Why this phase, and why now
 
-Same reason as [structure/phase-7](../structure/phase-7-docs-reference-sweep.md): the path checker
+Same reason as the 2026-08-30 reorganisation's own closing sweep: the path checker
 catches rooted paths and relative links, and nothing catches prose that names a package by its old
 name, a verb by its old spelling, or an origin enum that no longer exists. One pass at the end is
 cheaper than three partial ones.

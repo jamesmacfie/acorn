@@ -4,16 +4,17 @@ The shared diff viewer is in client-core and is used by the GitHub PR pane and C
 renders provider patches and local Git diffs through the same row model.
 
 It arrives in two layers, and the split is enforced (`tools/arch/boundaries.test.ts`, "client-core
-ui/ is pure presentation"):
+kit/ is pure presentation"):
 
-- `ui/diff/` is the toolkit: the row model, the row components, the virtualizer, the find pass, the
+- `kit/diff/` is the toolkit: the row model, the row components, the virtualizer, the find pass, the
   hydrator. Props in, DOM out, no application state, so a plugin can reach for a piece of it to build
   a simpler surface. The compare preview does exactly that.
-- `diff/` is the viewer: `DiffPane` and the parts only it uses. This layer reads preferences,
-  registers a command and a keybinding, and keeps session scroll state, none of which `ui/` may do.
+- `features/diff/` is the viewer: `DiffPane` and the parts only it uses. This layer reads
+  preferences, registers a command and a keybinding, and keeps session scroll state, none of which
+  `kit/` may do.
 
 `DiffPane` is the whole viewer as one component, and a caller drives it through a `DiffSource`
-(`diff/source.ts`). Both are on the plugin API, `DiffPane` on `@acorn/plugin-api/ui` and the port
+(`features/diff/source.ts`). Both are on the plugin API, `DiffPane` on `@acorn/plugin-api/ui` and the port
 type on `@acorn/plugin-api/ui/diff`.
 
 ## The source port
@@ -65,10 +66,10 @@ the staging area in `DiffFile.sha`, which the viewer never reads and hands strai
 `fileText`. A deleted file gets a null `sha`, which is how its gaps render inert: there is no new side
 of a file that is gone.
 
-The row types (`DiffFile`, `DiffThread`, and their siblings, in `ui/diff/model.ts`) are structural
+The row types (`DiffFile`, `DiffThread`, and their siblings, in `kit/diff/diffModel.ts`) are structural
 rather than named after either plugin's wire types. GitHub's `PullFile` and `Thread` and Changes'
 local rows all satisfy them without either plugin importing the other, so the renderer describes what
-it needs rather than one caller's type. `ui/diff/synth.ts` follows the same reasoning. A GitHub
+it needs rather than one caller's type. `kit/diff/synth.ts` follows the same reasoning. A GitHub
 per-file patch is hunks-only, so it synthesizes a header for gitdiff-parser, and it lives here
 because both GitHub's PR file payloads and local `git diff` output reach that parser.
 
@@ -85,15 +86,15 @@ of up to 325ms.
 
 The worker also solves a content security policy problem. Shiki's fast path compiles Oniguruma to
 WebAssembly, and `WebAssembly.instantiate` is gated by `script-src`. The renderer's policy is
-`'self'` with no `wasm-unsafe-eval` (`main/appScheme.ts`), so the WASM engine throws at startup there
-and Shiki falls back to its JavaScript regex engine, measured at 4.6x slower on the same input. A
-worker loaded from a same-origin URL takes its policy from that script's own response headers rather
-than from the document, so `appScheme.ts` serves `highlighter.worker.ts`, and only that file, with
-`wasm-unsafe-eval` added. Nothing else widens: the worker's own policy is stricter than the
-document's in every other direction (`default-src 'none'`, `connect-src 'none'`), because it has no
-DOM, no bridge to main, and no network, and it only takes strings and returns colours. Keep
-`shiki/wasm` on the inlined build (622 KB of base64 inside the module); a build that fetches its
-`.wasm` at runtime would need a network permission the worker is better off without.
+`'self'` with no `wasm-unsafe-eval` (`apps/desktop/src-tauri/src/app_scheme.rs`), so the WASM engine
+throws at startup there and Shiki falls back to its JavaScript regex engine, measured at 4.6x slower
+on the same input. A worker loaded from a same-origin URL takes its policy from that script's own
+response headers rather than from the document, so `app_scheme.rs` serves `highlighter.worker.ts`,
+and only that file, with `wasm-unsafe-eval` added. Nothing else widens: the worker's own policy is
+stricter than the document's in every other direction (`default-src 'none'`, `connect-src 'none'`),
+because it has no DOM, no bridge to the shell, and no network, and it only takes strings and returns
+colours. Keep `shiki/wasm` on the inlined build (622 KB of base64 inside the module); a build that
+fetches its `.wasm` at runtime would need a network permission the worker is better off without.
 
 Every call into the worker sends a whole document, never a line. A `postMessage` per line is roughly
 2,600 round trips for a 45-file diff, slower than the main-thread code it replaces. Batching by
@@ -115,7 +116,7 @@ see.
 Grammars load lazily. They total about 1.7 MB across the set, and a given diff touches two or three,
 so a TypeScript-only pull request does not pay for the C++ grammar (419 KB, the largest single one).
 `protocol.ts` defines the wire format the worker and the main thread share, and imports nothing from
-either side. The worker must not pull in `ui/diff/model.ts`, which would drag `diff` and
+either side. The worker must not pull in `kit/diff/diffModel.ts`, which would drag `diff` and
 `gitdiff-parser` into the worker bundle, and the client must not pull in the worker's Shiki imports,
 which would put the WASM engine back on the main thread.
 

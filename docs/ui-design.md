@@ -30,7 +30,7 @@ active accent on the right edge instead of the left.
 ### Rail controls and status markers
 
 `RailTab` is presentation only. It takes a `label` (which becomes both the tooltip title and the
-accessible name), a `glyph` resolved through `ui/Icon.tsx`, and explicit `active`, `tone`, `accent`,
+accessible name), a `glyph` resolved through `kit/components/content/Icon.tsx`, and explicit `active`, `tone`, `accent`,
 `busy`, `sublabel`, and `markers` props. It never reads task state, asks a registry anything, or
 knows which rail it is in. `children` stays as an escape hatch for a genuinely compound centre;
 prefer `glyph` plus `sublabel`.
@@ -60,7 +60,7 @@ chrome may hide an icon; it must never hide a state. `bottom-center` is reserved
 and activity, because it sits under the main glyph rather than in a corner.
 
 Core's markers come from `tasks/railStatus.ts`. Plugins publish theirs through
-`registries/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)); contributed priorities are
+`features/tabs/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)); contributed priorities are
 clamped below core's, so a plugin can order its own markers among themselves but can never push a
 core lifecycle state out of its corner. Placement requests are preferences, never guarantees.
 
@@ -180,7 +180,7 @@ Some tokens are read from JavaScript instead of CSS, because a canvas cannot rea
 `--bg`, `--bg-subtle`, `--bg-hover`, `--bg-selected`, `--text`, `--text-muted`, and `--text-faint` are
 read with `getComputedStyle` by the xterm and Monaco bridges; `--term-fs` is read the same way by
 `TerminalSurface`, because xterm measures its cell width from the font. These are `BRIDGE_TOKENS` in
-`ui/tokenAxes.ts`, and the test asserts they exist, because renaming one breaks the terminal or the
+`kit/tokens/tokenAxes.ts`, and the test asserts they exist, because renaming one breaks the terminal or the
 editor with no type error anywhere. `--font-mono` cannot be repointed by a style pack for the same
 reason on the type side: code, diffs, the terminal, and the SQL grid stay monospace in every pack
 because xterm measures cell width from the font. `--font-glyph` keeps the same protection for the
@@ -209,7 +209,7 @@ is reverse video.
 
 The role tokens are the plugin-facing half of the same system. A plugin picks a role, and the host
 maps it: on the DOM to a custom property from the two axes above, on a terminal to a cell, a colour,
-or nothing. `ui/kit/roles.ts` holds both columns and `ui/kit/roles.test.ts` holds them to it.
+or nothing. `kit/tokens/roles.ts` holds both columns and `kit/tokens/roles.test.ts` holds them to it.
 
 | Role | DOM token | Terminal |
 | --- | --- | --- |
@@ -331,11 +331,11 @@ Three things follow from closing it, and each has a test.
 
 **A node takes a meaning, not a value.** `tone="danger"`, `gap="section"`, `size="sm"`. A plugin
 never names a pixel, a colour, or a class, so the same tree can be drawn by a host with no pixels.
-`ui/kit/tokens.ts` declares the six enums and `ui/kit/roles.ts` maps each role to a CSS custom
+`kit/tokens/tokens.ts` declares the six enums and `kit/tokens/roles.ts` maps each role to a CSS custom
 property and to a terminal value. That mapping is the only place outside a stylesheet that names a
 custom property.
 
-**A node says which hosts can draw it.** `ui/kit/support.ts` holds a row per node with a `dom`
+**A node says which hosts can draw it.** `kit/tokens/support.ts` holds a row per node with a `dom`
 column and a `tui` column, at one of four levels: `full` draws it natively, `reduced` draws it with
 named things missing, `fallback` draws a stated substitute, and `absent` draws nothing unless the
 node has a `<Fallback>` child. Only `dom` is implemented. The `tui` column is documentation with a
@@ -399,23 +399,23 @@ actually used.
 Modelled on `styles/tokenAxes.test.ts`, which reads the stylesheets and asserts they agree with the
 declared axes:
 
-- `ui/kit/support.test.ts` reads the `/ui` barrel and asserts that the nodes it exports and the rows
+- `kit/tokens/support.test.ts` reads the `/ui` barrel and asserts that the nodes it exports and the rows
   in `NODE_SUPPORT` are the same list, with a `tui` level on every row.
-- `ui/kit/roles.test.ts` asserts that every role in every enum has a DOM value and a terminal value,
+- `kit/tokens/roles.test.ts` asserts that every role in every enum has a DOM value and a terminal value,
   and that each DOM value names a token `tokenAxes.ts` declares.
-- `ui/kit/props.test-d.ts` is a type-level test: no exported node's props accept `class`,
+- `kit/tokens/props.test-d.ts` is a type-level test: no exported node's props accept `class`,
   `className`, `style`, or `classList`, and no role-typed prop accepts an arbitrary string. It has
   nothing to run. `tsc --noEmit` across every package is the check, which `pnpm lint` already makes.
 
 ### How the kit is built
 
-`primitives.css` holds the shared CSS for the components in `ui/primitives.tsx` and the component
+`primitives.css` holds the shared CSS for the components in `kit/components/primitives.tsx` and the component
 files beside it. Specificity is layered by convention: a node's base rule is a bare class, `(0,1,0)`;
 a variant selector adds an attribute, `(0,2,0)`; a style pack's override adds a
 `:root[data-style="x"]` prefix, `(0,3,0)`. A pack wins because it is more specific, never because its
 stylesheet loads last.
 
-`ui/adoption.test.ts` was a migration ledger: a list of files someone had converted, each checked for
+`kit/lib/adoption.test.ts` was a migration ledger: a list of files someone had converted, each checked for
 raw controls. Phase 9 of the layout programme finished the conversion and inverted it, so what is left
 are rules rather than a list. **No plugin draws a raw `div` or `span`.** A plugin's tree is kit nodes,
 and a raw element is how a plugin used to reach a class in the host's stylesheet. It is also the one
@@ -453,7 +453,7 @@ the rule templates set before there were layouts.
 
 **Anything that depends on hover.** Hover exists on a DOM host with a pointer and nowhere else. The
 kit uses it for affordance only, and everything reachable on hover is reachable by focus.
-`ui/kit/hover.test.ts` reads the stylesheets and fails if a `:hover` rule reveals something no
+`kit/tokens/hover.test.ts` reads the stylesheets and fails if a `:hover` rule reveals something no
 `:focus-within` rule reveals. A `RowActions` that appears only on hover is a bug, not a style.
 
 **Controlled and uncontrolled selection mixed on one node.** The host owns `selected` by default; a
@@ -462,9 +462,9 @@ one node is a steady source of bugs in every library that has tried it.
 
 ## Icons
 
-`ui/Icon.tsx` takes a **name string** and resolves it against two families, in this order:
+`kit/components/content/Icon.tsx` takes a **name string** and resolves it against two families, in this order:
 
-1. A **`brand:`-prefixed name** is a brand mark from `ui/brandMarks.ts`: one SVG path's `d`
+1. A **`brand:`-prefixed name** is a brand mark from `kit/tokens/brandMarks.ts`: one SVG path's `d`
    attribute in a 24 box, drawn as a single `<path fill="currentColor">`.
 2. Any **other name** is a Lucide glyph from `lucide-static/icon-nodes.json`, drawn stroked and
    unfilled in the same box, node by node through `<Dynamic>` and never `innerHTML`.
@@ -481,7 +481,7 @@ unlike `.spin`: on a state icon the turn is the whole signal that something is r
 rotation is not the motion that setting exists to stop.
 
 The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
-names before and will again) and so brand marks stay out of `ICON_NAMES`, which `ui/IconPicker.tsx`
+names before and will again) and so brand marks stay out of `ICON_NAMES`, which `kit/components/inputs/IconPicker.tsx`
 enumerates for user-chosen task icons. Putting them in that picker is then a
 deliberate one-line decision rather than something that happens by accident.
 
@@ -514,7 +514,7 @@ The alternative, a `--brand-<name>` token in `tokens-invariant.css` paired with 
 to write the rule, so a fourth provider needs a core change, and any surface without a matching rule
 falls back to `--accent` whoever the provider is.
 
-`brandStyle(name)` in `ui/brandMarks.ts` turns an icon name into two custom properties on the element
+`brandStyle(name)` in `kit/tokens/brandMarks.ts` turns an icon name into two custom properties on the element
 that renders the mark: `--brand` for the fill, and `--brand-on` for whatever sits on top of it, which
 is `--brand-fg`. A surface reads them with a fallback, so a mark with no colour and a plain Lucide name
 both keep the surface's own look:
@@ -623,7 +623,7 @@ never swallows a click on the app behind it, and each toast re-enables its own.
 The command palette and the file finder share one surface, `PaletteSurface`, rather than the
 near-duplicate `.palette-*` and `.finder-*` rule sets that used to exist side by side.
 
-Modal dismissal (Escape, backdrop click, Tab focus containment) is `ui/dismissable.ts`, a hook
+Modal dismissal (Escape, backdrop click, Tab focus containment) is `kit/lib/dismissable.ts`, a hook
 returning handlers rather than a component; markup stays at the call site. Nine call sites
 hand-wrote this before it existed, five of them with only a backdrop click and nothing else, so Tab
 walked straight out of the dialog into the page behind it and Escape did nothing. `Modal` uses it
@@ -666,7 +666,7 @@ the edge. A legend entry mirrors one active rail status marker, placed or crowde
 both reports current state and teaches what each glyph on the rail means.
 
 A sandboxed plugin frame has its own document, so the shell's tooltip singleton cannot see elements
-inside it and `data-tip` would otherwise be silently inert there. `ui/frameTips.ts` mounts the same
+inside it and `data-tip` would otherwise be silently inert there. `kit/lib/frameTips.ts` mounts the same
 delegated listener and bubble markup into a frame's document, the way frames already mount their
 own copy of the shared CSS. It stays framework-free and importless on purpose: it is reached from
 `@acorn/plugin-api/ui/sdk`, which bundles into a plugin's frame and must not drag a slice of the
@@ -674,7 +674,7 @@ shell, or a second copy of Solid, across that boundary.
 
 ## Drag-to-resize
 
-`ui/split.ts`'s `createSplitDrag` is the drag-resize hook behind the pane row divider, the terminal
+`kit/lib/split.ts`'s `createSplitDrag` is the drag-resize hook behind the pane row divider, the terminal
 drawer's height handle, and the splits the host layouts draw. Three hand-rolled splitters existed
 before it, and none had a keyboard contract. A plugin never calls it: where a split is between two
 *regions* the layout owns the handle ([docs/panes.md § Layout model](./panes.md#layout-model)), and
@@ -724,16 +724,16 @@ set, and the layer priorities are in
 
 ### Menus and right-click
 
-There is one menu. `ui/Menu.tsx` owns the surface — `role="menu"`/`menuitem`, close-on-select, Escape,
+There is one menu. `kit/components/overlays/Menu.tsx` owns the surface — `role="menu"`/`menuitem`, close-on-select, Escape,
 outside-click, and focus returning to where it came from — and both ways of opening it mount that same
-surface (`MenuSurface`) over the same hook (`ui/anchor.ts`). The roving focus is not its own: a menu is
+surface (`MenuSurface`) over the same hook (`kit/lib/anchor.ts`). The roving focus is not its own: a menu is
 a collection, so the arrows, Home, End, the page keys and `j`/`k` arrive as intents from
 `keys/collection.ts`, the same ones a list of rows gets. A
 button anchors it to a rect; a right-click anchors it to a point, which is the only difference. A
 right-click menu with its own markup would be a second place for the accessibility to be wrong.
 
 **Right-click is never the only door.** The rows come from the context-menu registry
-(`registries/contextMenus.ts`), and the button menu on the same row renders the identical list, so
+(`registries/panes/contextMenus.ts`), and the button menu on the same row renders the identical list, so
 nothing is mouse-only. It is also keyboard-reachable directly: `contextmenu` is what the platform
 dispatches for Shift+F10 and the menu key as well as for the right button, and the surface focuses its
 first item on mount, so the menu is operable the moment it appears rather than something to Tab into.
@@ -761,7 +761,7 @@ plus the button's own `aria-expanded`. The last one is not redundant: the surfac
 while the menu is open, `:focus-within` on the row is false and the trigger would otherwise fade out
 from under the menu it opened.
 
-Both `Menu.tsx` and its anchoring hook (`ui/anchor.ts`) replaced hand-rolled implementations that
+Both `Menu.tsx` and its anchoring hook (`kit/lib/anchor.ts`) replaced hand-rolled implementations that
 had each solved less of the problem: TabRail's task menu had neither outside-click nor Escape nor
 roles, terminal's profile menu had no portal at all so an overflow ancestor clipped it, and
 AccountMenu and NotificationBell each hand-rolled their own outside-click listener. `anchor.ts` owns
@@ -778,7 +778,7 @@ sandboxed plugin frame, where the "viewport" is just the frame.
 their own semantics and forcing every clickable through one shared component would blur that.
 `Menu.Item`'s `onSelect` closes the menu, with one exception: `closeOnSelect={false}` exists for
 arm-to-confirm items, whose first press has to survive to show its armed label
-(`createArmedConfirm`, `ui/confirm.ts`) rather than close under it.
+(`createArmedConfirm`, `kit/lib/confirm.ts`) rather than close under it.
 
 An `AnchorTarget` can be a point as well as an element; a point is a zero-size rect, so everything
 downstream of the positioning math already works unchanged, which is what lets `ContextMenu` reuse
@@ -815,7 +815,7 @@ client-core primitives. Dense layouts must preserve readable line height and a v
 style packs may compress spacing but must not hide status or action affordances.
 
 Keyboard traversal comes from the tree rather than from each pane. Each kit node's focus role is fixed
-in `ui/kit/focusRoles.ts` and a plugin sets none of it, and the ARIA follows from the role: a `Rows`
+in `kit/tokens/focusRoles.ts` and a plugin sets none of it, and the ARIA follows from the role: a `Rows`
 renders `listbox` or `tree` with `aria-activedescendant`, a tab strip renders `tablist`, a modal
 renders `dialog` with `aria-modal` and hands focus back to its opener. Hover is never load-bearing:
 anything a pointer can reach, focus can reach, so a `RowActions` that appears on hover appears on
@@ -896,7 +896,7 @@ column can be filled in honestly rather than guessed.
 
 A node's props are its exported type in `@acorn/plugin-api/ui` and are not restated here, because a
 second copy would be wrong within a release and nothing would catch it. The focus column is
-`ui/kit/focusRoles.ts`, and `tools/arch/kitTable.test.ts` fails if this table and those two files
+`kit/tokens/focusRoles.ts`, and `tools/arch/kitTable.test.ts` fails if this table and those two files
 disagree about which nodes exist or what each one does with focus.
 
 ### Grouping

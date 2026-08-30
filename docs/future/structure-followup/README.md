@@ -1,10 +1,11 @@
 # Structure follow-up: the three places the drawing still lies
 
-Status: proposal, 2026-08-30. Waits on [structure/](../structure/README.md) phases 5 to 7.
+Status: proposal, 2026-08-30. Nothing blocks it: the folder reorganisation it waited on shipped
+2026-08-30 (`docs/future/structure/`, in git history).
 
-[structure/](../structure/README.md) makes the folder names say what
-`docs/architecture-overview.md` says. An architecture review on 2026-08-30, run after structure phase
-4 shipped, asked a different question: if someone drew acorn on a whiteboard from the docs alone,
+The folder reorganisation that shipped on 2026-08-30 made the folder names say what
+`docs/architecture-overview.md` says. An architecture review taken part-way through it asked a
+different question: if someone drew acorn on a whiteboard from the docs alone,
 where would the drawing be wrong? The runtimes, the plugin tiers, and the control-plane seams
 (`ctx.providers.nodes`, enrollment, adopt, the first-party rule) all drew correctly. Three things did
 not, and none of them is a folder move, which is why they are not a structure phase. A fourth candidate,
@@ -22,9 +23,10 @@ custody, plugin trust, and node supervision. Nothing in it is desktop-specific: 
 keeps it shell-free, [terminal/](../terminal/README.md) needs the same box ("one node, three
 supervisors"), [remote.md](../remote.md) needs it as a `WebBroker`, and
 [client-plugins/](../client-plugins/README.md) names its contract `PluginCustody`. Three hosts, one
-package, named for the first host. [structure/refused.md](../structure/refused.md) refused the rename
-on release-path cost. The owner overturned that on 2026-08-30 because the argument is new: the cost
-was weighed against a better word, and it is a better word for three programmes.
+package, named for the first host. The reorganisation refused the rename on release-path cost. The
+owner overturned that on 2026-08-30 because the argument is new: the cost was weighed against a
+better word, and it is a better word for three programmes ([refused.md](./refused.md) keeps both
+halves).
 
 **Core still names plugins.** The task-origin enum in the architecture doc is a comment on a text
 column (`packages/node-core/src/server/db/schema.ts:158`) and one built-in row in
@@ -93,9 +95,8 @@ The related material is `docs/node-enrollment.md`, `docs/plugins.md` § Node pro
 
 ## How this relates
 
-[structure/](../structure/README.md) is the parent; this folder starts when its phase 7 deletes it,
-except phase 2 here, which only needs structure phase 5 because it edits the facade that phase
-re-points. [terminal/](../terminal/README.md) phase 3 and [client-plugins/](../client-plugins/README.md)
+The folder reorganisation is the parent, and it finished on 2026-08-30, so nothing here waits on
+anything. [terminal/](../terminal/README.md) phase 3 and [client-plugins/](../client-plugins/README.md)
 phase 0 both compose the custody package and should be written against the phase 0 name.
 [compiled-tier.md](../compiled-tier.md) is the standing map of what moves tiers and is untouched.
 Nothing in this folder designs the cloud; the section above says what it keeps open.

@@ -58,9 +58,9 @@ is terminal-specific except the path.
 ## Code touched
 
 - `packages/protocol/src/deviceConfig.ts` (new): the schema.
-- `packages/desktop-helper/src/main/deviceConfig.ts` (new): read, watch, write.
-- `apps/desktop/src/shell/{wire.ts,bridge.ts,helperServer.ts}`: `config-read`, `config-write`,
-  `config-changed`.
+- `packages/desktop-helper/src/config/deviceConfig.ts` (new): read, watch, write.
+- `apps/desktop/src/shell/{wire.ts,bridge.ts}` and `apps/desktop/src/helper/helperServer.ts`:
+  `config-read`, `config-write`, `config-changed`.
 - `packages/client-core/src/infra/platform/{index.ts,contract.ts}`: a `config` group, nullable, so a host
   without a file (the PWA) has none and Settings hides the "Open config file" row.
 - `packages/client-core/src/infra/persistence/deviceConfig.ts` (new): apply a read; regenerate on write.

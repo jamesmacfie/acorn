@@ -47,7 +47,7 @@ export function scaffoldFiles(id, name = toDisplayName(id), options = {}) {
   return {
     'acorn-plugin.json': manifest(id, name, rectangle),
     'node/index.js': nodeIndex(id),
-    'node/routes.js': nodeRoutes(),
+    'server/routes.js': nodeRoutes(),
     'client.js': rectangle ? client(id, name) : remoteClient(id, name),
     'README.md': readme(id, name),
   }
@@ -69,7 +69,7 @@ function manifest(id, name, rectangle = false) {
         client: './client.js',
         // `api: []` is correct, not an omission: a frame's own `/v2/p/<id>/` namespace needs no scope.
         // Add one of the six grantable scopes only when you call a core route. `core: ['tasks']` is
-        // here because node/routes.js resolves a task.
+        // here because server/routes.js resolves a task.
         permissions: {
           api: [],
           events: [],
@@ -116,7 +116,7 @@ function manifest(id, name, rectangle = false) {
 }
 
 function nodeIndex(id) {
-  return `import { handle } from './routes.js'
+  return `import { handle } from '../server/routes.js'
 
 // Relative paths and \`node:\` builtins only. An installed plugin is a bare directory with no
 // node_modules beside it. A bare specifier that resolves in a dev checkout (Node walks ancestor
@@ -332,7 +332,7 @@ An acorn plugin. No build step: these files are what runs.
 \`\`\`text
 acorn-plugin.json   the manifest — the only file the loader trusts about this directory
 node/index.js       default-exports the NodePlugin
-node/routes.js      imported with a relative specifier
+server/routes.js    imported with a relative specifier
 client.js           one file, plain JS, no imports
 \`\`\`
 
@@ -373,7 +373,7 @@ each device asks its own owner before running client bytes, keyed by \`(pluginId
 If an **agent** is writing this plugin, it never reaches the install route: it asks with the
 \`plugin_request\` tool and you approve in the shell. Approving with \`dev: true\` turns the loop into
 edit → reload instead of edit → prompt → restart. Note that a reload re-evaluates **only the entry
-module**, so a change in \`node/routes.js\` still needs a restart — a plugin being iterated on hard
+module**, so a change in \`server/routes.js\` still needs a restart — a plugin being iterated on hard
 wants its node half in one file.
 
 ## Change it

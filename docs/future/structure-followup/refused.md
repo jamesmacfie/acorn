@@ -52,9 +52,22 @@ list compiled-only kinds without saying, per row, why each has not become a desc
 `tools/arch/contributionKinds.test.ts` fails a single-tier row without one. Refused as a phase because
 the work exists. Phase 3's re-read of the table is the only residue.
 
-## Folding this into `structure/`
+## Renaming `@acorn/desktop-helper`, and the overturn
 
-Four more phases on the parent programme would have kept one folder. Refused because
-[structure/README.md](../structure/README.md) promises that nothing in it changes behaviour, and
-phases 1 and 2 here change what code does: a source declares its default pane, a loaded plugin's type
+The 2026-08-30 folder reorganisation refused this. The name says who spawns the package, not what it
+does; "broker" or "custody" would be truer. It refused on release-path cost: the name appears in the
+bundle staging scripts, the Tauri sidecar config, `docs/shell.md`, and
+`docs/architecture-overview.md`, and the architecture doc already defines the package in one
+sentence. A rename buys a better word at the cost of a release-path change.
+
+Overturned by the owner on 2026-08-30, and [phase-0-custody-rename.md](./phase-0-custody-rename.md)
+is the result. The argument that overturned it is new rather than louder: three programmes compose
+this box from three hosts, so the better word is worth more than it was when one host composed it.
+Both halves stay here so a later session argues with the reasoning rather than with silence.
+
+## Folding this into the parent programme
+
+Four more phases on the folder reorganisation would have kept one folder. Refused because that
+programme promised that nothing in it changes behaviour, and phases 1 and 2 here change what code
+does: a source declares its default pane, a loaded plugin's type
 loses members, verbs are renamed under a major bump. Keeping the promise is worth a second folder.

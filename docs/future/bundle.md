@@ -174,13 +174,14 @@ client ships a node, and you can also download one" a packaging decision rather 
 A related trap, found the hard way and worth keeping as a rule even though the module that caused it
 is gone: **a barrel reachable from a node composition root must not re-export a desktop-only
 module.** A barrel evaluates every module on it, so a folder-picker helper that statically imported
-the desktop shell made `@acorn/plugin-terminal/main/index.ts` unloadable in a plain-Node process, and
+the desktop shell made `@acorn/plugin-terminal/node/index.ts` unloadable in a plain-Node process, and
 the standalone node died at boot. Desktop-only exports import from their module directly; anything
 reachable from a node composition root stays loadable in bare Node. `boundaries.test.ts` enforces the
 shell-binding half of this today. The terminal client has the mirror rule: **a barrel reachable from
-the TUI composition root must not re-export a DOM-only module.** Client-core's `ui/` is DOM-out by
-design and that is fine, because the TUI imports the kit's contract (`ui/kit/`) and its own components,
-never `ui/primitives.tsx`; the same arch test grows the second rule when `apps/tui/` exists.
+the TUI composition root must not re-export a DOM-only module.** Client-core's `kit/` is DOM-out by
+design and that is fine, because the TUI imports the kit's contract (`kit/tokens/`) and its own
+components, never `kit/components/primitives.tsx`; the same arch test grows the second rule when
+`apps/tui/` exists.
 
 ## Ordering
 

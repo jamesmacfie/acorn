@@ -42,7 +42,7 @@ composing a dashboard to name something they think of as temporary, which is the
 wrong six weeks later without anybody having done anything wrong.
 
 **A connection string stored on the project row.** Refused, and this is the one worth being explicit
-about. `main/database.ts` resolves the URL per connect and *never persists it* — that is a stated
+about. `server/database.ts` resolves the URL per connect and *never persists it* — that is a stated
 property of the pane, not an accident. A dashboard panel is not a good enough reason to start keeping
 database credentials at rest.
 

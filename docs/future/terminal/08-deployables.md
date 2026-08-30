@@ -38,9 +38,9 @@ plausible and is not promised; phase 7 decides after the tarball ships.
   sixth artifact.
 - **The barrel rule** ("a barrel reachable from a node composition root must not re-export a
   desktop-only module") gains a mirror: a barrel reachable from the TUI composition root must not
-  re-export a DOM-only module. Client-core's `ui/` is DOM-out by design and that is fine, because the
-  TUI imports the kit's *contract* (`ui/kit/`) and its own components, not `ui/primitives.tsx`. The
-  arch test that holds the first rule holds the second.
+  re-export a DOM-only module. Client-core's `kit/` is DOM-out by design and that is fine, because
+  the TUI imports the kit's *contract* (`kit/tokens/`) and its own components, not
+  `kit/components/primitives.tsx`. The arch test that holds the first rule holds the second.
 - **The Windows pairing snag** (`SIGUSR1` does not exist there) gets a second answer: a TUI attached
   to the local node can offer "open a pairing window" as a command. Noted in `bundle.md`, designed in
   phase 3's doors left open.

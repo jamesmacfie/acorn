@@ -271,7 +271,7 @@ as every action any plugin ships does.
 
 `openUrl` is not automatically a trip to the browser. Before opening one, the dispatcher asks the
 content-link registry whether the URL names something acorn has its own surface for (`openInAppUrl`
-in `registries/contentLinks.ts`). The URL stays the row's identity and the plugin still declares the
+in `registries/panes/contentLinks.ts`). The URL stays the row's identity and the plugin still declares the
 same verb. Only the destination is resolved late, by whoever owns the pattern.
 
 There are three destinations and a provider gets whichever it declared, in this order:
@@ -303,7 +303,7 @@ unavailable. No task means no pane, no installed plugin means no panel, and no n
 declared `path` means no route, so a surface never has to know which of the three a provider shipped.
 
 Taking a route also selects the rail source that owns it (`sourceIdForPath` in
-`registries/sources.ts`). The shell draws from the rail selection rather than from the location:
+`registries/sources/sources.ts`). The shell draws from the rail selection rather than from the location:
 every contributed route mounts as a `noop` and the surface comes off the rail, so navigating from a
 dashboard to another source's route without that step moves the address bar and leaves the dashboard
 on screen. A path no source claims leaves the rail alone, and core's own routes are not rail sources.

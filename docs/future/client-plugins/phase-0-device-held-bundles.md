@@ -75,7 +75,7 @@ uses for fields added after rows were written.
 
 ## Code touched
 
-- `packages/protocol/src/pluginBundles.ts` (new): `BundleSource`, `bundleSourceSchema`,
+- `packages/protocol/src/plugin/bundles.ts` (new): `BundleSource`, `bundleSourceSchema`,
   `hasNodeHalf(manifest)`.
 - `packages/client-core/src/host/trust/resolveBundles.ts`: `source` on candidates and winners; the
   device-wins sort key.
@@ -92,7 +92,8 @@ uses for fields added after rows were written.
 - `packages/desktop-helper/src/plugins/pluginCache.ts`: `putFromSource`, `remove`, `source` on entries.
 - `packages/desktop-helper/src/plugins/pluginTrustStore.ts`: `source` on rows and grants, with the read
   default.
-- `apps/desktop/src/shell/{wire.ts,bridge.ts,helperServer.ts}`: the two verbs.
+- `apps/desktop/src/shell/{wire.ts,bridge.ts}` and `apps/desktop/src/helper/helperServer.ts`: the two
+  verbs.
 - `apps/desktop/src/shell/bridge.test.ts`: the seam check covers the new members.
 - `packages/node-core/src/server/plugins/installer.ts` and the new `packages/plugin-source/`: the
   extraction.

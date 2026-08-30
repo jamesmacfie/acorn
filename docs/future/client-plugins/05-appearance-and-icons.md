@@ -16,7 +16,7 @@ sets; this file holds the door open.
   `packages/client-core/src/host/chrome/chromeThemes.ts`. No plugin CSS reaches the shell.
 - `data-style` selects shape, typography, space, density, chrome, and motion: `tokens-style.css`
   plus one of three packs. `STYLE_TOKENS` in `packages/client-core/src/kit/tokens/tokenAxes.ts` is the list,
-  and `styles/tokenAxes.test.ts` holds both axes to their files. `registries/styles.ts` exists and
+  and `styles/tokenAxes.test.ts` holds both axes to their files. `registries/shell/styles.ts` exists and
   its header says it "mirrors registries/themes.ts so a plugin can contribute a style pack the same
   way it would contribute a theme," but no `ctx` member and no manifest key feed it.
   `docs/plugin-authoring.md` says style packs are not contributable, and `docs/ui-design.md` gives

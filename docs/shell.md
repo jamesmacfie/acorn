@@ -157,7 +157,7 @@ preview pane is a child webview rather than a frame, so widening this for `http(
 nothing. Two more directives carry their own reason: `style-src 'unsafe-inline'` is required because
 Shiki emits `style="color:#…"` attributes into HTML that reaches `innerHTML`, and style attributes
 are gated independently of `el.style.x = v` assignments; `img-src https:` exists for GitHub avatars
-rendered in PR authorship (`ui/UserAvatar.tsx`), and narrowing it to the two GitHub avatar hosts is a
+rendered in PR authorship (`kit/components/content/UserAvatar.tsx`), and narrowing it to the two GitHub avatar hosts is a
 one-line change once nothing else renders a remote image.
 
 Development widens the policy in one branch: Vite's HMR socket and the inline preamble its plugins

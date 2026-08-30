@@ -48,7 +48,7 @@ The client-plugins programme keeps the command palette and the overlay stack cor
 would need key handling. The TUI keeps them core-owned too, and draws them itself:
 
 - **The palette** is a centred `Modal` over dimmed content, a `Field` on the first line, `Rows` of
-  results below, the same `palette/model.ts` behind it. Opened by the command chord, dismissed by
+  results below, the same `kit/lib/paletteModel.ts` behind it. Opened by the command chord, dismissed by
   Escape, owns the key layer while open ([05-keys-and-focus.md](./05-keys-and-focus.md) § Traps).
 - **The overlay stack** is a list of open modals, topmost owning the layer. Notifications
   (`client-core/src/features/notifications/`) draw as one-line `Alert`s above the footer, dismiss on a key or

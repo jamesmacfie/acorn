@@ -85,7 +85,7 @@ it('emits a tree plugin by default, filling a slot and an annotation point', () 
   // The entry the manifest names has to be one the bundle announces, or the host draws a placeholder
   // and the author's first run is a mystery. The annotation route has to exist for the same reason.
   expect(files['client.js']).toContain("entries: ['toolCard']")
-  expect(files['node/routes.js']).toContain("pathname === '/marks'")
+  expect(files['server/routes.js']).toContain("pathname === '/marks'")
 })
 
 it('emits a rectangle plugin under --rectangle, as a layout with a frame region', () => {

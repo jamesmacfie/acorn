@@ -63,7 +63,7 @@ Honestly, in the order the phases pay it:
   three `absent`, one `fallback` (`packages/client-core/src/kit/tokens/support.ts`). Each already has a
   sentence saying what it draws. This is volume, not design.
 - **Seven layout components.** Each has a written projection. Volume again.
-- **A focus and key story without a DOM.** `keys/regions.ts` and `keys/trap.ts` are DOM-deep. The
+- **A focus and key story without a DOM.** `host/layouts/regions.ts` and `keys/trap.ts` are DOM-deep. The
   intents, the layers, and the collection state are not. Phase 2 owns the split.
 - **A process that is shell and broker at once.** The desktop puts the renderer and the helper in two
   processes so the renderer never holds a token. A terminal is one process. Phase 3 and

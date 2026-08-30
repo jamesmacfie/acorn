@@ -36,7 +36,7 @@ keybinding target. The legacy manifest `palette` array is a compatibility alias 
 Context-menu rows share the commands' ceiling without sharing their registry. A menu row is a label, an
 order, a predicate over what is under the cursor, and one verb from the same closed context-free set a
 command takes — so a right-click can do exactly what a command can do and nothing more. They stay a
-separate registry (`registries/contextMenus.ts`) because a command is global and a menu row is about
+separate registry (`registries/panes/contextMenus.ts`) because a command is global and a menu row is about
 one thing: the row needs a target and a predicate over it, and neither has any meaning in the palette.
 Core's own row actions register there too, which is what keeps the contract honest — see
 `docs/ui-design.md § Menus and right-click`.
@@ -144,7 +144,7 @@ global chord that switches tasks, and a collection's intents at priority 40. Bot
 so they are live only while focus is inside them.
 
 Escape is the exception the engine cannot express. An open overlay answers its own Escape, and
-`ui/dismissable.ts` keeps a stack of them so a pile unwinds one press at a time, so an `escape`
+`kit/lib/dismissable.ts` keeps a stack of them so a pile unwinds one press at a time, so an `escape`
 binding goes inactive while focus is inside a dialog. Consuming the key in the engine would stop the
 DOM event too, and the overlay would never see it.
 

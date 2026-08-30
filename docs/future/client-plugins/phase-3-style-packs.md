@@ -38,7 +38,7 @@ Out: icon sets (parked), any new style token, any change to the theme contributi
 
 ## Design detail
 
-**The validator as a table.** `STYLE_TOKEN_FAMILIES` in `ui/tokenAxes.ts` maps each `STYLE_TOKENS`
+**The validator as a table.** `STYLE_TOKEN_FAMILIES` in `kit/tokens/tokenAxes.ts` maps each `STYLE_TOKENS`
 entry to a family name, and `styleValueAlphabet` in `@acorn/protocol` maps a family to a predicate.
 A token with no family is a test failure, so a new style token cannot be added without deciding its
 alphabet. This is the shape the parked icon door asks for: an `icon` family later is a row.

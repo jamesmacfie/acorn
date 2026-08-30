@@ -18,6 +18,15 @@ notification sources, and the shell registries before rendering.
 appearance. It selects a Node-aware cache scope and keys task content by Node/task identity so a
 switch disposes the previous task scope.
 
+**Four folders under `packages/client-core/src`, and the order is the dependency order.** `kit/` is
+the design system: components, role tokens, the diff toolkit, the key primitives. Props in, DOM out,
+and an arch test holds it there, because `kit/` is what `@acorn/plugin-api/ui` re-exports. `infra/`
+is the machinery a browser needs and a product does not care about: the platform seam, persistence,
+stylesheets, the highlighter, the Node client. `host/` is the plugin host itself: the registries, the
+layouts, frames, trees, trust, the palette. `features/` is the product, one folder per surface —
+tasks, workspaces, projects, diff, editor, settings, fleet, dashboards, integrations, notifications,
+tabs, agent. A file whose folder you cannot guess belongs in `features/`.
+
 ## Registries and plugins
 
 The client plugin host activates `apps/desktop/src/client/plugins.ts`. Plugins register panes,
@@ -115,12 +124,12 @@ anything of that provider's, not whether the routed project does: a source that 
 between repositories in one workspace would read as a bug, so it stays and shows its own empty state.
 
 A Fleet home node card can also carry a plugin's own number beside core's task count
-(`registries/nodeStats.ts`). The card lives in client-core, which cannot import the agents or
+(`registries/rail/nodeStats.ts`). The card lives in client-core, which cannot import the agents or
 workflows plugins to ask them directly, so a plugin registers its own labelled count instead. A stat
 is fetched per Node the way the attention inbox is, but is not merged with it: an attention item is a
 navigable row with a severity and a target, and a stat is one integer with a label.
 
-A plugin's status markers on a rail control are data, not markup: `registries/railMarkers.ts` takes a
+A plugin's status markers on a rail control are data, not markup: `features/tabs/railMarkers.ts` takes a
 callback returning marker descriptions for one task, source, or pane, and the host decides the corner,
 the colour, the spin, and the tooltip legend
 ([ui-design.md § Rail controls and status markers](./ui-design.md)). The callback runs inside the
@@ -151,7 +160,7 @@ The router is registry-driven. A source contributes path shapes with an explicit
 shell composes them before rendering, so a static route stays ahead of a parameter route without embedding a
 provider's URL scheme in `index.tsx`.
 
-Core owns its own URLs as constants in `registries/corePaths.ts` (`/p/:projectId`,
+Core owns its own URLs as constants in `registries/commands/corePaths.ts` (`/p/:projectId`,
 `/p/:projectId/new`, `/t/:taskId`) and never resolves them through the registry. A contributed route
 addresses something inside a surface; it does not decide whether the surface renders. A browse source
 renders at `/p/:projectId`, and GitHub's `/pulls/:number` and Linear's `/issues/:identifier` select an
@@ -221,7 +230,7 @@ them.
 The top bar's bell renders two kinds of item, and the difference matters to whatever produces one. A
 notice is an event that already happened, such as a run finishing or a build failing. It is
 client-local, dismissible, and gone once the ring rolls over it. An attention item
-(`registries/attention.ts`) is a state that lasts until something changes on the Node: a pending
+(`registries/rail/attention.ts`) is a state that lasts until something changes on the Node: a pending
 approval is still pending after a person dismisses it, so it returns on the next fetch. That is why
 attention items are fetched per Node rather than pushed, and why they carry no `read` flag. A notice
 is fired once and forgotten.

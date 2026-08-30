@@ -75,6 +75,7 @@ needing something the package never told anyone to install.
   acorn-plugin.json      the manifest — the only file the loader trusts about this directory
   node/
     index.js             default-exports the NodePlugin
+  server/
     routes.js            imported by index.js with a relative specifier
   client.js              one file, plain JS, no imports
   migrations/            a Drizzle chain, only if this plugin owns tables
@@ -805,7 +806,7 @@ longer a way to mean "all of it is my iframe".
 ### `node/index.js`
 
 ```js
-import { handle } from './routes.js'
+import { handle } from '../server/routes.js'
 
 // Relative imports and `node:` builtins only — this directory has no node_modules.
 export default {
@@ -818,7 +819,7 @@ export default {
 }
 ```
 
-### `node/routes.js`
+### `server/routes.js`
 
 ```js
 export async function handle(request, context, core) {

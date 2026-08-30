@@ -96,6 +96,10 @@ Five docs, and they do not overlap. Start at the map.
 
 ## The rules this list follows
 
+The files stay flat. A folder split by kind — `reference/`, `guides/` — was refused on 2026-08-30
+because this list groups them by kind without moving anything, every inbound link keeps working, and
+the path checker's job stays small. If the count passes 60, the question is open again.
+
 A fact has exactly one owning document, and the others link to it. Where a document under
 [future/](./future/README.md) disagrees with one above, the one above wins. When behaviour or a
 contract changes, the owning document changes in the same commit —
