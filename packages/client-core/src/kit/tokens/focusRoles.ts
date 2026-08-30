@@ -62,6 +62,10 @@ export const NODE_FOCUS = {
   Facts: 'none',
   DescriptionList: 'none',
   Table: 'none',
+  TableHead: 'none',
+  // A stop only when the row was given an action, the same answer Card gives.
+  TableRow: 'conditional',
+  TableCell: 'none',
   // The exception named at the top of this file: it roves, but over a `selected` index the caller
   // holds rather than the host's collection store.
   Grid: 'collection',

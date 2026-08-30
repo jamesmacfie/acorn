@@ -941,7 +941,10 @@ disagree about which nodes exist or what each one does with focus.
 | `StatusDot` | none | `●` in colour, `○` for neutral |
 | `Facts` | none | two columns, labels dim; `grouping="rows"` is one pair per line |
 | `DescriptionList` | none | as `Facts`, one pair per line |
-| `Table` | none | reduced: box-drawn, truncating columns by priority |
+| `Table` | none | reduced: box-drawn, truncating columns by the priority its heads declare |
+| `TableHead` | none | reduced: the column's label in the bold header line; the lowest priority is dropped first, and the header names what was lost |
+| `TableRow` | conditional | reduced: one line, cells separated by `│`, truncated by column priority; a tab stop only when it has an action |
+| `TableCell` | none | reduced: the cell's text in its column's width, ellipsised where it does not fit; `header` makes it bold |
 | `Grid` | collection | reduced: as `Table`, with a row-range indicator instead of a scrollbar |
 | `Meter` | none | `████░░░░ 62%` |
 | `CodeBlock` | none | monospace lines, a dim rule above and below |

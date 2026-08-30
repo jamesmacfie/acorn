@@ -12,8 +12,8 @@ import type { KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import {
   Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, ConfirmButton, DescriptionList, EmptyState,
   DetailColumn, Field, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
-  SegmentedControl, Select, Spinner, SplitHandle, StatusDot, Table, Textarea, ToggleButton, Toolbar,
-  TreeRow,
+  SegmentedControl, Select, Spinner, SplitHandle, StatusDot, Table, TableCell, TableHead, TableRow,
+  Textarea, ToggleButton, Toolbar, TreeRow,
 } from '../../kit/components/primitives'
 import Icon from '../../kit/components/content/Icon'
 import Picker from '../../kit/components/inputs/Picker'
@@ -51,7 +51,7 @@ import { DiffPane } from '../../features/diff/DiffPane'
 import ModelConnectionPicker from '../../features/settings/models/ModelConnectionPicker'
 
 // `Component<any>` and not a union of every node's props: the renderer has already validated the
-// props against the wire schema, and a union of 62 prop types would make every mount site an
+// props against the wire schema, and a union of every node's prop type would make every mount site an
 // unresolvable overload. The typing that matters is the key set, which is exhaustive.
 // oxlint-disable-next-line no-explicit-any
 type AnyKitComponent = Component<any>
@@ -63,7 +63,7 @@ export const KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {
   // remote tree only under a name of their own.
   ModalBody: Modal.Body, ModalActions: Modal.Actions, TabPanel: Tabs.Panel, ToolbarSpacer: Toolbar.Spacer,
   Text, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
-  DescriptionList, Table, Grid, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
+  DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
   FileHead, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
   PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,

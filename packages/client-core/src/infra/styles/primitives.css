@@ -781,6 +781,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-table[data-size='sm'] th,
 .ui-table[data-size='sm'] td { padding: var(--space-2) var(--space-4); }
 .ui-table[data-sticky] thead th { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--bg-subtle); }
+/* `align` on a head or a cell. Start is the default the rule above already sets, so only the two
+   other values need a line. `--priority` has no rule on purpose: on a wide-enough host the answer
+   to a narrow table is the scroll wrapper, and the column the author would drop stays drawn. */
+.ui-table :is(th, td)[data-align='center'] { text-align: center; }
+.ui-table :is(th, td)[data-align='end'] { text-align: end; }
 
 /* ── TreeRow ────────────────────────────────────────────────────────────────────────────────
    Depth indentation generalises Row's single `nested` boolean and replaces the editor's nested-<ul>

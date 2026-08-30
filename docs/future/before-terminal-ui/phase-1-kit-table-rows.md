@@ -1,6 +1,6 @@
 # Phase 1: the kit's Table owns its rows
 
-Status: not started. Waits on nothing.
+Status: shipped, 2026-08-31.
 
 ## Goal
 

@@ -49,7 +49,7 @@ Decided with the owner on 2026-08-31. A phase file may not reopen them.
 | Phase | File | What it delivers | What it unblocks | Waits on |
 | --- | --- | --- | --- | --- |
 | 0 ✅ | [phase-0-agents-dom-hygiene.md](./phase-0-agents-dom-hygiene.md) | The agents plugin's cheap raw DOM gone: the context picker's paragraphs, the two form wrappers | Phase 7's empty baseline | Nothing |
-| 1 | [phase-1-kit-table-rows.md](./phase-1-kit-table-rows.md) | `TableHead`/`TableRow`/`TableCell` in the kit; all three raw-row callers migrated | The pricing page; the terminal's `Table` projection being honest | Nothing |
+| 1 ✅ | [phase-1-kit-table-rows.md](./phase-1-kit-table-rows.md) | `TableHead`/`TableRow`/`TableCell` in the kit; all three raw-row callers migrated | The pricing page; the terminal's `Table` projection being honest | Nothing |
 | 2 | [phase-2-link-node.md](./phase-2-link-node.md) | A `Link` kit node; the github ref links off raw anchors | Phase 7's empty baseline | Nothing |
 | 3 | [phase-3-platform-file-seams.md](./phase-3-platform-file-seams.md) | `pickFiles` and `saveFile` on the platform seam; the composer's hidden input and both download anchors gone | Agents whole on any host | Nothing |
 | 4 | [phase-4-editor-codemirror.md](./phase-4-editor-codemirror.md) | Both Monaco instances on CodeMirror 6; `monaco-editor` out of the tree; the editor pane on a kit root | Phase 5; a lighter renderer everywhere | Nothing |

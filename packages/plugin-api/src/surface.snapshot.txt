@@ -490,6 +490,9 @@ ui/tree: Stack
 ui/tree: StatusDot
 ui/tree: TabPanel
 ui/tree: Table
+ui/tree: TableCell
+ui/tree: TableHead
+ui/tree: TableRow
 ui/tree: Tabs
 ui/tree: Text
 ui/tree: Textarea
@@ -581,6 +584,9 @@ ui: StatusDot
 ui: TabDef
 ui: TabPanel
 ui: Table
+ui: TableCell
+ui: TableHead
+ui: TableRow
 ui: Tabs
 ui: Text
 ui: Textarea

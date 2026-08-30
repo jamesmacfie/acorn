@@ -1293,6 +1293,60 @@ export function Table(props: {
   )
 }
 
+/* Table's own rows. Before these, every caller wrote the `<thead>`/`<tr>`/`<td>` markup the closed
+   kit forbids everywhere else, and the support matrix promised a terminal rendering — box-drawn,
+   truncating columns — that no host could keep over DOM it cannot see.
+
+   `children` stays `JSX.Element`: Solid types every JSX expression as `JSX.Element`, so a type that
+   said "rows only" would be a lie the compiler cannot check. The rule is the kit-purity arch test
+   (docs/future/before-terminal-ui/phase-7-enforcement-and-docs.md). */
+
+/** Where a cell's content sits in its column. A role, not a length. */
+type CellAlign = 'start' | 'center' | 'end'
+
+/** Which columns survive on a host too narrow to draw them all: the lowest goes first. The DOM host
+ *  ignores it and scrolls sideways instead; a terminal host must not, because the choice of what to
+ *  lose belongs to the author, the same rule the layouts follow. */
+type ColumnPriority = 'high' | 'normal' | 'low'
+
+/** One column's label. Lives in a `TableRow head`. */
+export function TableHead(props: { align?: CellAlign; priority?: ColumnPriority; children?: JSX.Element }) {
+  return <th scope="col" data-align={props.align} data-priority={props.priority}>{props.children}</th>
+}
+
+/** One row. `head` puts it in the `<thead>`, which is what `Table`'s `stickyHead` pins.
+ *
+ *  `onPress` is here rather than left to the caller because a table whose rows open something was
+ *  clickable by mouse and by nothing else at all three call sites: `Row` gives a list its keyboard,
+ *  and a table cell cannot be a `Row`. */
+export function TableRow(props: { head?: boolean; onPress?: () => void; children: JSX.Element }) {
+  const row = () => (
+    <tr
+      role={props.onPress ? 'button' : undefined}
+      tabindex={props.onPress ? 0 : undefined}
+      onClick={() => props.onPress?.()}
+      onKeyDown={(event) => {
+        if (!props.onPress) return
+        // A press inside a cell's own control is that control's, not the row's.
+        if (event.target !== event.currentTarget) return
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        props.onPress()
+      }}
+    >{props.children}</tr>
+  )
+  // Read once: `head` says which half of the table a row belongs to, and no caller moves a row
+  // between them.
+  return props.head ? <thead>{row()}</thead> : row()
+}
+
+/** One cell. `header` makes it the row's own label rather than a value. */
+export function TableCell(props: { align?: CellAlign; header?: boolean; children?: JSX.Element }) {
+  return props.header
+    ? <th scope="row" data-align={props.align}>{props.children}</th>
+    : <td data-align={props.align}>{props.children}</td>
+}
+
 /* TreeRow: a Row with a disclosure twist and a depth, kept a wrapper so Row's API stays flat.
 
    Tree container semantics come from `Rows tree`, which is the container: it gives each row its
