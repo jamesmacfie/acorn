@@ -123,9 +123,12 @@ Eight departures from the plan above. The folder README carries the same list.
 `ListDetail` and `DocumentTabs` stay exported kit nodes. The scope line called them layouts, which was
 true when it was written and stopped being true during phases 5 to 8: a pane's regions are the *outer*
 arrangement, and a split *inside* one region is a different object with a different owner. Ten plugins
-split inside a region, github nests two splits in one, and `plugins/http/src/tree/HttpPanel.tsx` says
-so at the top of the file. Deleting them would have meant either a pane layout per nesting depth or a
-rewrite of every one of those surfaces to lose a split it needs.
+split inside a region and github nests two splits in one (`plugins/github/src/client/pullDetail/
+PrFiles.tsx`, inside one panel of a `tabs` pane). Deleting them would have meant either a pane layout
+per nesting depth or a rewrite of every one of those surfaces to lose a split it needs.
+
+The API pane was the eleventh and is no longer one: phase 10 gave the host a `model` seam, and http's
+two columns became the two regions of a `list-detail` pane (`plugins/http/src/tree/panelModel.ts`).
 
 `overlay`, `importer` and `coreSlot` still take no layout. The scope line asked for the layout-less
 `PluginFrame` branch of all six frame targets. Three of them are rectangles by construction: a

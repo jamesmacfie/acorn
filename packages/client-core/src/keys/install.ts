@@ -6,12 +6,14 @@
 // its terminal adapter, which we do not use yet, is in the same package. Nothing here is an adapter
 // of ours, which is the point of adopting it rather than writing one.
 //
-// Three tiers of layer, ordered by priority because the engine sorts on that and not on how local a
+// Four tiers of layer, ordered by priority because the engine sorts on that and not on how local a
 // layer is:
 //
 //   0   the command layer: acorn's resolved keybindings, one binding each, gated by a matcher that
 //       reproduces the scope rules exactly as the old window listener did
 //   5   the region chords, global, because moving between regions has to work from anywhere
+//   30  a pane's own layer, focus-within on the pane element: the `tabs` layout's ⌘1..⌘9, which is
+//       the only one so far (../layouts/Tabs.tsx)
 //   40  a kit collection's intents, focus-within on the collection
 //
 // A binding whose handler returns false is not handled, so dispatch carries on to the next layer.

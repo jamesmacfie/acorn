@@ -172,9 +172,17 @@ describe('primitive adoption', () => {
   // rules below hold for everything. A ledger only ever answers "has this file been done"; a rule
   // answers "can this be written at all", which is the question that stays useful.
 
-  const pluginTsx = () => tsx().filter((file) => rel(file).startsWith('plugins/'))
+  // A plugin's own components, which is what these rules are about. Test files are excluded: a
+  // `.test.tsx` in a plugin package renders a region under jsdom and stubs its neighbours
+  // (plugins/vitest.shared.ts § hosts), and a stub's job is to be identifiable on screen rather than
+  // to be a kit node. Nothing a test file draws ever reaches a user.
+  const pluginTsx = () =>
+    tsx().filter((file) => rel(file).startsWith('plugins/') && !/\.test\.tsx?$/.test(file))
 
   it('no plugin draws a raw div or span', () => {
+    // Anti-vacuity first: this rule reads a file list, and a list that came back empty — a renamed
+    // directory, a changed `rel` — would make every assertion below pass by finding nothing.
+    expect(pluginTsx().length).toBeGreaterThan(50)
     // The one that took the whole programme. A plugin's tree is kit nodes: `Stack` and `Inline` for
     // grouping, `Text` for a run of words, `Rectangle` for pixels somebody else owns. A raw element is
     // how a plugin used to reach a class in the host's stylesheet, and it is the one thing that cannot

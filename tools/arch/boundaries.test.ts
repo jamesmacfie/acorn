@@ -928,10 +928,22 @@ describe('architecture boundaries', () => {
     }
     const pluginFiles = PACKAGES.filter((pkg) => pkg.kind === 'plugin').flatMap((pkg) => filesIn(pkg.src))
     const stylesheets = pluginFiles.filter((file) => file.endsWith('.css')).map(rel)
+    // Both spellings. The named import is what anybody writes, and the namespace import is what
+    // somebody writes once the named one is refused, so a rule that only knew the first would be a
+    // rule with a documented way around it.
+    //
+    // Test files are exempt, and only test files: a `.test.tsx` in a plugin package renders one of
+    // that plugin's regions under jsdom (plugins/vitest.shared.ts § hosts), which is the whole point
+    // of that tier and never reaches a user.
+    const mountsSolid = (source: string): boolean =>
+      /\bimport\s*\{[^}]*\brender\b[^}]*\}\s*from\s*'solid-js\/web'/.test(source)
+      || /\bimport\s*\*\s*as\s+\w+\s*from\s*'solid-js\/web'/.test(source)
     const roots = pluginFiles
-      .filter((file) => /\.tsx?$/.test(file))
-      .filter((file) => /\bimport\s*\{[^}]*\brender\b[^}]*\}\s*from\s*'solid-js\/web'/.test(readFileSync(file, 'utf8')))
+      .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+      .filter((file) => mountsSolid(readFileSync(file, 'utf8')))
       .map(rel)
+    // Anti-vacuity: a moved package root would empty both lists and make this pass on nothing.
+    expect(pluginFiles.length).toBeGreaterThan(100)
     expect({ stylesheets, roots }).toEqual({ stylesheets: [], roots: [] })
   })
 })
