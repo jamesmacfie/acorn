@@ -2,7 +2,6 @@
 // taskId, not path: the client never hands over a path, so this resolves taskId to taskRoot and
 // runs rg with cwd:root, searching `.`. Exposed as the SearchBridge (server/routes/search.ts).
 import { execFile } from 'node:child_process'
-import { sep } from 'node:path'
 import { promisify } from 'node:util'
 import { rgPath } from '@vscode/ripgrep'
 import type { SearchBridge, SearchOpts } from '../server/routes/search'
