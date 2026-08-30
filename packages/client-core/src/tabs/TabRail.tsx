@@ -1,4 +1,4 @@
-import { createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Project, type Task } from '../queries'
@@ -16,6 +16,7 @@ import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
 import { markersFor } from '../registries/railMarkers'
 import { railStatusMarkers } from '../tasks/railStatus'
+import { requestTaskAnnotations } from '../tasks/taskAnnotations'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
 import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
@@ -125,6 +126,12 @@ export default function TabRail() {
     const scoped = inWs ? all.filter((task) => inWs.has(task.projectId) && !projects.data?.find((project) => project.id === task.projectId)?.hidden) : all
     return applyRailOrder(scoped, railOrder())
   }
+
+  // What other plugins know about the rows on screen (`core:task`, ../tasks/taskAnnotations.ts). One
+  // request per contributor for the whole list, re-asked when the list changes and not when the rail
+  // merely re-renders. The answers arrive as rail markers through `markersFor` below, so nothing here
+  // reads them.
+  createEffect(() => requestTaskAnnotations(visibleTasks().map((task) => task.id)))
 
   const sources = () => availableSources(integrations.data?.integrations, sourceScope())
   function selectSource(id: SourceId) {

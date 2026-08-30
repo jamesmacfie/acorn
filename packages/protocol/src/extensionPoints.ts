@@ -245,6 +245,27 @@ export type CoreHookPoint = (typeof CORE_HOOK_POINTS)[number]
 export const isCoreHookPoint = (value: unknown): value is CoreHookPoint =>
   typeof value === 'string' && (CORE_HOOK_POINTS as readonly string[]).includes(value)
 
+/**
+ * The one annotation point core owns, and the reason it is here rather than in a manifest.
+ *
+ * A task row on the rail is an item core draws, and what another plugin knows about a task — a
+ * deploy is live, an incident is open, a ticket moved — is a fact pinned to it. That is an
+ * annotation, not a rail-specific contribution: docs/future/rail-tab.md § Slice 3 says why one
+ * mechanism serves a rail row, a diff line and an editor gutter, and why three would not.
+ *
+ * Keyed by task id alone. A row is one task and there is nothing else to disambiguate.
+ *
+ * The rail is 52 pixels wide, so a mark is drawn as a status marker rather than as a line of text:
+ * the icon takes a free corner and the words go in the hover legend (client-core
+ * tasks/taskAnnotations.ts). That is the host's decision about its own surface, and it is why the
+ * mark shape carries a severity and an icon and no geometry.
+ */
+export const CORE_TASK_POINT = 'core:task'
+
+/** The field order `annotationKeyOf` mints `core:task` lookups in. One field, declared as a list for
+ *  the same reason every other point's is: the order is the contract. */
+export const CORE_TASK_KEY = ['task'] as const
+
 // ── The exclusive half ────────────────────────────────────────────────────────────────────────────
 
 /**

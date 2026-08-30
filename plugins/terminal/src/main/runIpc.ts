@@ -49,7 +49,10 @@ export function createRuntimeService(
   return new RuntimeService({
     loadTargets: (taskId) => core.tasks.runConfig(taskId),
     startSession: glue.startSession,
-    ...(hooks ? { hooks } : {}),
+    // A plain property, not a spread. A spread bypasses the excess-property check, so a rename on
+    // either side of this seam would compile and the hook would simply stop running — which is how
+    // `terminal:before-run-target` could be declared in the trust prompt and never called.
+    hooks,
     isRunning: glue.isRunning,
     exitCode: glue.exitCode,
     killSession: glue.killSession,

@@ -45,19 +45,27 @@ const MAX_DOCUMENT_FRACTION = 0.7
 
 const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
   const [size, setSize] = layoutState(props.stateKey, 'document-size', DEFAULT_DOCUMENT_SIZE)
+  let root: HTMLDivElement | undefined
   let dragStart: number | null = null
-  const extent = () => (axis === 'x' ? window.innerWidth : window.innerHeight)
+  // The ceiling is this layout's own box, never the window. A pane is one column of a task row, so the
+  // window is not what it is allowed to fill, and no layout may read the window's width (shell.css §
+  // Layouts, docs/future/layout/09-doors-left-open.md, "never do these" item 12). Before the element is
+  // measurable there is no ceiling to apply, which is the honest answer: the floor still holds.
+  const ceiling = () => {
+    const extent = axis === 'x' ? (root?.offsetWidth ?? 0) : (root?.offsetHeight ?? 0)
+    return extent > 0 ? extent * MAX_DOCUMENT_FRACTION : Number.POSITIVE_INFINITY
+  }
   const drag = createSplitDrag({
     axis,
     label: `Resize ${props.label} editor`,
     onStart: () => { dragStart = size() },
     onDelta: (deltaPx) =>
-      setSize(Math.min(Math.max((dragStart ?? size()) + deltaPx, MIN_DOCUMENT_SIZE), extent() * MAX_DOCUMENT_FRACTION)),
+      setSize(Math.min(Math.max((dragStart ?? size()) + deltaPx, MIN_DOCUMENT_SIZE), ceiling())),
     onCommit: () => { dragStart = null },
   })
 
   return (
-    <div class="pane layout-document-split" data-axis={axis}>
+    <div ref={root} class="pane layout-document-split" data-axis={axis}>
       <div
         class="layout-region-document"
         style={axis === 'x' ? { width: `${size()}px` } : { height: `${size()}px` }}

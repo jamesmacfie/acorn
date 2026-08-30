@@ -10,7 +10,7 @@ import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { buildRoster, resumeCommandFor, type RosterRow } from './model'
 import { managedAgentStore } from './managedStore'
-import { agentPaneModel } from './agentPaneModel'
+import type { AgentPaneModel } from './agentPaneModel'
 import { sessionModelLabel } from './agentConfigOptions'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
@@ -51,13 +51,13 @@ const LEGACY_TONE: Record<string, 'ok' | 'warn' | 'danger' | 'muted'> = {
 
 /** The list column's header: how many sessions this task has. Its own region, so it stays put while
  *  the list under it scrolls (docs/panes.md § Layout model). */
-export function AgentSidebarHeader(props: { task: Task }) {
-  const model = agentPaneModel(props.task)
+export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel }) {
+  const model = props.model
   return <SectionHeader count={model.taskSessions().length}>Agents</SectionHeader>
 }
 
-export default function AgentTaskSidebar(props: { task: Task }) {
-  const model = agentPaneModel(props.task)
+export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneModel }) {
+  const model = props.model
   // The desktop probe, on the capability rather than on a PTY accessor's null return. CommandPalette
   // already reads it this way.
   const hasEngine = () => hasHostCapability({ plugin: 'terminal' })

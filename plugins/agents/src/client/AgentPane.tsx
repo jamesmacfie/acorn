@@ -11,7 +11,7 @@ import AgentUsageIndicator from './AgentUsageIndicator'
 import ProviderGlyph from './ProviderGlyph'
 import QueuedAgentTurns from './QueuedAgentTurns'
 import RuntimeStateIcon from './RuntimeStateIcon'
-import { agentPaneModel } from './agentPaneModel'
+import type { AgentPaneModel } from './agentPaneModel'
 import { canStopAgent } from './agentActivity'
 import { agentSessionIsStarting } from './agentComposerState'
 import { managedAgentApi } from './managedClient'
@@ -25,8 +25,8 @@ import { clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } 
 // by being its siblings rather than by a second set of regions (docs/panes.md § Layout model).
 
 /** The header bar: which session is open, what it is doing, and how to start another. */
-function AgentDetailHeader(props: { task: Task }) {
-  const model = agentPaneModel(props.task)
+function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
+  const model = props.model
   return (
     <Toolbar ariaLabel="Agent session">
       <Heading level={2} eyebrow={model.selected()?.providerId}>
@@ -116,8 +116,8 @@ function AgentDetailHeader(props: { task: Task }) {
 }
 
 /** Nothing open yet: one card per harness this node can run. */
-function AgentProviderCards(props: { task: Task }) {
-  const model = agentPaneModel(props.task)
+function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
+  const model = props.model
   return (
     <EmptyState
       icon={<Icon name="sparkles" tone="accent" />}
@@ -151,8 +151,8 @@ function AgentProviderCards(props: { task: Task }) {
 
 /** Rename and archive. Both are dialogs rather than `window.prompt` and `window.confirm`, which are
  *  unstyled in the shell and suppressed outright in a sandboxed frame. */
-function AgentSessionDialogs(props: { task: Task }) {
-  const model = agentPaneModel(props.task)
+function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
+  const model = props.model
   return (
     <>
       <Show when={model.dialog()?.kind === 'rename'}>
@@ -193,13 +193,13 @@ function AgentSessionDialogs(props: { task: Task }) {
   )
 }
 
-export default function AgentPaneDetail(props: { task: Task }) {
-  const model = agentPaneModel(props.task)
+export default function AgentPaneDetail(props: { task: Task; model: AgentPaneModel }) {
+  const model = props.model
   return (
     <>
-      <AgentDetailHeader task={props.task} />
+      <AgentDetailHeader task={props.task} model={model} />
       <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-      <Show when={model.selected()} fallback={<AgentProviderCards task={props.task} />}>
+      <Show when={model.selected()} fallback={<AgentProviderCards task={props.task} model={model} />}>
         {(session) => (
           <>
             <Show
@@ -248,7 +248,7 @@ export default function AgentPaneDetail(props: { task: Task }) {
           </>
         )}
       </Show>
-      <AgentSessionDialogs task={props.task} />
+      <AgentSessionDialogs task={props.task} model={model} />
     </>
   )
 }

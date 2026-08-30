@@ -7,7 +7,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
-import { collectionId, contextModel, pillText, sessionLabel } from './contextModel'
+import { collectionId, pillText, sessionLabel, type ContextModel } from './contextModel'
 import { CONTEXT_SECTION_POINT } from './sectionPoint'
 
 // The three regions of the Context pane (docs/agent-tools.md § Context sections). The host draws the
@@ -21,8 +21,8 @@ const originBadge = (author?: 'user' | 'agent' | 'workflow'): string =>
 const scopePill = (scope?: string): string =>
   (scope === 'task' ? '◆ task' : scope === 'workspace' ? 'ws' : scope === 'global' ? '🌐' : '')
 
-export function ContextHeader(props: { task: Task }) {
-  const model = () => contextModel(props.task)
+export function ContextHeader(props: { task: Task; model: ContextModel }) {
+  const model = () => props.model
   return (
     <Stack gap="row">
       <Inline gap="row">
@@ -34,8 +34,8 @@ export function ContextHeader(props: { task: Task }) {
   )
 }
 
-export function ContextBody(props: { task: Task }) {
-  const model = () => contextModel(props.task)
+export function ContextBody(props: { task: Task; model: ContextModel }) {
+  const model = () => props.model
 
   // Pane intents: context:reveal scrolls to (and expands) a section/item row.
   const applyIntent = (intent: PaneIntent | undefined) => {
@@ -132,6 +132,8 @@ export function ContextBody(props: { task: Task }) {
         <Slot
           point={CONTEXT_SECTION_POINT}
           key={section().id}
+          taskId={props.task.id}
+          projectId={props.task.projectId}
           props={() => ({
             task: props.task,
             onChanged: () => void model().refreshContext(),
@@ -159,8 +161,8 @@ export function ContextBody(props: { task: Task }) {
   )
 }
 
-export function ContextFooter(props: { task: Task }) {
-  const model = () => contextModel(props.task)
+export function ContextFooter(props: { task: Task; model: ContextModel }) {
+  const model = () => props.model
   return (
     <Stack gap="none">
       <Fold label="preview" persistKey="context.preview" meta={<Text emphasis="muted">{formatSize(bytesOf(model().assembled()?.block ?? ''))}</Text>}>

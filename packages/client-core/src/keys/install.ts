@@ -12,7 +12,6 @@
 //   0   the command layer: acorn's resolved keybindings, one binding each, gated by a matcher that
 //       reproduces the scope rules exactly as the old window listener did
 //   5   the region chords, global, because moving between regions has to work from anywhere
-//   20  a pane's own layer, focus-within on the pane element
 //   40  a kit collection's intents, focus-within on the collection
 //
 // A binding whose handler returns false is not handled, so dispatch carries on to the next layer.

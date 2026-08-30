@@ -337,7 +337,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                     />
                     {/* Room beside the numbers for somebody else's: a graph plugin, a cost estimate.
                         `stack`, so every plugin that has something gets a column. */}
-                    <Slot point={STATS_BESIDE_POINT} props={() => ({ container: props.target })} />
+                    <Slot point={STATS_BESIDE_POINT} taskId={props.taskId} props={() => ({ container: props.target })} />
                   </Inline>
                 )}
               </Show>

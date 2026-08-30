@@ -5,7 +5,7 @@ import {
   Section, Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
-import { changeKey, changesModel } from './changesModel'
+import { changeKey, type ChangesModel } from './changesModel'
 import { DIFF_LINE_POINT } from './extensionPoints'
 
 // The four regions of the Changes pane: a PR-style "Files changed" view over the task worktree's
@@ -16,8 +16,8 @@ import { DIFF_LINE_POINT } from './extensionPoints'
 // a row scrolls to it, the way the pull-request pane's file list works. The per-file git actions stay
 // on the rows, the whole-tree ones sit on the group headers, and commit and push are the footer.
 
-export function ChangesHeader(props: { task: Task }) {
-  const model = () => changesModel(props.task)
+export function ChangesHeader(props: { task: Task; model: ChangesModel }) {
+  const model = () => props.model
   return (
     <Toolbar size="sm" ariaLabel="Changes">
       <Text emphasis="muted">{model().isGit() ? 'uncommitted' : 'not a git project'}</Text>
@@ -44,8 +44,8 @@ export function ChangesHeader(props: { task: Task }) {
   )
 }
 
-export function ChangesList(props: { task: Task }) {
-  const model = () => changesModel(props.task)
+export function ChangesList(props: { task: Task; model: ChangesModel }) {
+  const model = () => props.model
 
   const FileRow = (rowProps: { change: LocalChange; item: Parameters<Parameters<typeof Rows>[0]['children']>[1] }) => {
     const change = () => rowProps.change
@@ -160,8 +160,8 @@ export function ChangesList(props: { task: Task }) {
   )
 }
 
-export function ChangesFooter(props: { task: Task }) {
-  const model = () => changesModel(props.task)
+export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
+  const model = () => props.model
   return (
     <Show when={model().isGit()}>
       <Stack gap="row">
@@ -192,8 +192,8 @@ export function ChangesFooter(props: { task: Task }) {
   )
 }
 
-export function ChangesDiff(props: { task: Task }) {
-  const model = () => changesModel(props.task)
+export function ChangesDiff(props: { task: Task; model: ChangesModel }) {
+  const model = () => props.model
   return (
     <Show when={model().isGit()} fallback={<EmptyState>Nothing to diff.</EmptyState>}>
       {/* Marks from other plugins land under the same lines this pane's own review notes do
