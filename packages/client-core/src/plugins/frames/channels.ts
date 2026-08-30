@@ -69,7 +69,7 @@ export const isSubscribable = (channel: string): channel is SubscribableChannel 
   (SUBSCRIBABLE_CHANNELS as readonly string[]).includes(channel)
 
 // The node side of the same grant list. `permissions.events` is one vocabulary across both sides of
-// the wire (node-core/server/plugin/context.ts § on), so a manifest naming one of these is asking for
+// the wire (node-core/server/pluginHost/context.ts § on), so a manifest naming one of these is asking for
 // its node half to hear a core event, not for its frame to subscribe to anything.
 //
 // `tasks:changed`, `connection:changed` and the four after them are in both lists, which is what a node-emitted fact looks

@@ -3,8 +3,8 @@
 // proxy replaces 25 hand-written tool bodies; the registry (server/agentTools) stays the single
 // source of truth for names, schemas, risk and availability.
 //
-// Launched by the agent (registered user-wide via `claude mcp add …` with the Electron-as-node
-// launcher over ./main.ts). Outside a task session, or with acorn not running, tools/list is empty
+// Launched by the agent, registered user-wide with `claude mcp add` pointing at the desktop app's
+// node launcher. Outside a task session, or with acorn not running, tools/list is empty
 // and a call returns a structured 'no-active-task' or 'acorn-not-running' result, never a protocol
 // error, because a plain terminal loads this server too.
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'

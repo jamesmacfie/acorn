@@ -21,7 +21,7 @@ import { providerError } from '../integrations/respondProvider'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
-import { projectInWorkspace } from './workspaces'
+import { projectInWorkspace } from './projects/workspaces'
 
 // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation).
 const setDisabledBody = z.object({ disabled: z.boolean() })

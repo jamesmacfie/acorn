@@ -59,7 +59,7 @@ export default function PluginTrustDialog() {
 
   let dialog!: HTMLElement
   // Escape is "not now", and it records nothing. It used to call decide('rejected'), which is a
-  // remembered answer (@acorn/desktop-helper/main/pluginTrustStore.ts: a rejection is kept so a turned-away plugin does not
+  // remembered answer (@acorn/desktop-helper/plugins/pluginTrustStore.ts: a rejection is kept so a turned-away plugin does not
   // ask every boot), so a stray keypress permanently disabled a plugin, with no surface anywhere to
   // undo it. Dropping the queue entry leaves the bundle undecided, which is what brings it back at the
   // next boot pass, and is what the footer promises.

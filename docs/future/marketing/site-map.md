@@ -78,7 +78,7 @@ is in [plugin-reference.md](./plugin-reference.md).
 | The package and manifest | `docs/plugin-authoring.md` § the manifest |
 | Manifest reference | **generated** from `packages/protocol/src/pluginContract.ts` |
 | Contribution points (catalogue, one page per key) | `pluginContract.ts` + the owning feature docs |
-| The node half | `docs/plugin-authoring.md` § the node half + `packages/node-core/src/server/plugin/types.ts` |
+| The node half | `docs/plugin-authoring.md` § the node half + `packages/node-core/src/server/pluginHost/types.ts` |
 | The client half and the frame SDK | `docs/plugin-authoring.md` §§ client half, reaching the bridge + `packages/plugin-sdk/src/public.ts` |
 | Permissions and security | `docs/plugin-authoring.md` § permissions + `docs/security.md` (trust model subset) |
 | Storage and migrations | `docs/plugin-authoring.md` § storage and migrations |

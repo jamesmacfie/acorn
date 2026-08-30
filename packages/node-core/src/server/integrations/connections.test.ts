@@ -10,14 +10,14 @@ import {
   setConnectionDisabled,
   testConnection,
 } from './connections'
-import { publicConnectionProvider } from './providers/shared'
+import { publicConnectionProvider } from './providerShared'
 import { ProviderOperationError } from './types'
-import { SecretService } from '../../main/core/secrets'
+import { SecretService } from '../core/secrets'
 
 // The socket is the boundary worth stubbing: everything above it is the code under test, and a real hub
 // has no connections in a unit test, so a broadcast would be a silent no-op and prove nothing.
 const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
-vi.mock('../../main/wsHub', async (importOriginal) => ({
+vi.mock('../transport/wsHub', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
 }))

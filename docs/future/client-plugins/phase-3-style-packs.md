@@ -70,7 +70,7 @@ projection reads computed values.
 - `packages/client-core/src/plugins/chrome/styles.ts` (new).
 - `packages/client-core/src/plugins/contributions.ts` and `frames/register.ts`: register styles per
   plugin, gated on trust like themes.
-- `packages/node-core/src/main/pluginManifest.ts`: the validator on install.
+- `packages/node-core/src/server/plugins/manifest.ts`: the validator on install.
 - `packages/client-core/src/settings/AppearanceSettings.tsx` (or wherever the style picker lives;
   verify): plugin packs listed.
 - `packages/plugin-types/acorn-plugin.schema.json`: regenerated.

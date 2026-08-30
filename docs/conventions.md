@@ -15,9 +15,6 @@ PascalCase `.ts` file exists anywhere. A camelCase `.tsx` is allowed when a modu
 component needs JSX: a registry holding a fallback, an entry file. Do not reach for `.tsx` on a file
 with no JSX in it.
 
-Not yet everywhere: `apps/desktop/src/app/client/pageContributions.tsx` and `slotContributions.tsx`
-have no JSX and become `.ts` in phase 2.
-
 **Tests are `<subject>.test.ts` or `.test.tsx`, beside the subject.** Every test in the repo is
 colocated; there is no `.spec` and no `__tests__/`. The extension picks the runner, because `.tsx`
 runs in jsdom, so one subject may have both. There is no other infix. A test named for a behaviour
@@ -32,10 +29,7 @@ or lives in `test/helpers/`.
 
 Not yet everywhere: the agents plugin spells it `testFixtures/`; phase 4 renames it.
 
-**Scripts are kebab-case `.mjs`.**
-
-Not yet everywhere: `nodeRuntime.mjs` and `locate-db.ts`, the one kebab-case `.ts` beside camelCase
-siblings, conform to their neighbours in phases 2 and 3.
+**Scripts are kebab-case `.mjs`.** A `.ts` script is camelCase like any other TypeScript module.
 
 **CSS sits with its feature, is kebab-case, and is imported only by files in its own folder.** The
 stylesheets more than one feature reads stay together in one `styles/` folder.
@@ -107,8 +101,6 @@ Not yet everywhere: ten plugins still have a `main/`, which merges into `server/
 
 **A folder is plural for a collection of peers and singular for a layer.** `routes/`, `plugins/`,
 `registries/`, and `features/` are collections. `server/`, `client/`, `kit/`, and `host/` are layers.
-
-Not yet everywhere: `server/plugin/` in node-core becomes `server/pluginHost/` in phase 3.
 
 **A folder does not repeat its own name in its files.** `pluginHost/pluginState.ts` is
 `pluginHost/state.ts`. A module that moves into a folder named for its subject drops the prefix.

@@ -7,8 +7,8 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { PULLS_STALE_AFTER_MS as FILES_STALE_AFTER_MS } from '../syncPolicy'
 import { pullFiles } from './pullFiles'
 import { resolveRepoForUser } from './repoMirror'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
+import type { PluginDatabase } from '@acorn/node-core/server/plugins/storage.ts'
 import { seedGithubIntegration } from '../../testkit/githubToken'
 
 vi.mock('..', async (importOriginal) => {

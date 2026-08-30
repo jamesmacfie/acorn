@@ -1,7 +1,9 @@
 # Local development
 
 acorn is a pnpm workspace with Turborepo. First-party packages are source-consumed TypeScript
-packages; `apps/node` and `apps/desktop` are the composition/build roots.
+packages; `apps/node` and `apps/desktop` are the composition/build roots. The node's build entries are
+in `apps/node/src/entries/` and the boot code they share is in `apps/node/src/composition/`; the
+desktop's three processes are `apps/desktop/src/client/`, `src/shell/`, and `src/helper/`.
 
 ## Environment
 
@@ -49,7 +51,7 @@ target to build into and why the node restarts.
 ## Native ABI
 
 `node-pty` is the only native module. SQLite is the runtime's own `node:sqlite`
-(`packages/node-core/src/main/sqlite.ts`), so it has no ABI to match. Rebuild once at the workspace
+(`packages/node-core/src/server/storage/sqlite.ts`), so it has no ABI to match. Rebuild once at the workspace
 root for the process that loads node-pty. Where the prebuilt binary applies, the rebuild script
 detects that and does nothing:
 

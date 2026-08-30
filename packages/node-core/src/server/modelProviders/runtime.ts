@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import { redact, SecretUnavailableError, type SecretService } from '../../main/core/secrets'
+import { redact, SecretUnavailableError, type SecretService } from '../core/secrets'
 import {
   connectionProviderRegistry,
   type ConnectionProviderRegistry,
@@ -14,7 +14,7 @@ import {
 import { ProviderOperationError } from '../integrations/types'
 import { ModelProviderRegistry, modelProviderRegistry } from './registry'
 import type { GenerateTextInput, GenerateTextResult } from './types'
-import { broadcastConnectionChanged } from '../../main/notify'
+import { broadcastConnectionChanged } from '../notify'
 
 const DEFAULT_TIMEOUT_MS = 60_000
 const MAX_SYSTEM_CHARS = 100_000

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { rendererBaseCheckout } from '@acorn/node-core/main/taskWorktree.ts'
+import { rendererBaseCheckout } from '@acorn/node-core/server/worktrees/taskWorktree.ts'
 
 describe('terminal renderer cwd boundary', () => {
   const dirs: string[] = []

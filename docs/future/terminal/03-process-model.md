@@ -10,7 +10,7 @@ of those two.
 ## Attach or start
 
 The node takes an exclusive lock on its data root at boot (`openDataRoot`,
-`apps/node/src/server/standalone.ts`). That lock is the fact `acorn` reads:
+`apps/node/src/entries/standalone.ts`). That lock is the fact `acorn` reads:
 
 1. Resolve the data root: `ACORN_DATA_DIR`, else the desktop app's data root if the app is installed
    here, else the dev root. The rule is the node's own, and `acorn` calls the same function rather than
@@ -31,7 +31,7 @@ first TUI that started it, which is the desktop's behaviour too: the app that st
 its lifetime. A TUI that attached to a node it did not start leaves it running on exit.
 
 The supervise-a-child code is the desktop helper's (`packages/desktop-helper/src/main/`), and the
-helper has no shell binding by design (`packages/desktop-helper/src/main/index.ts`). The TUI imports
+helper has no shell binding by design (`packages/desktop-helper/src/index.ts`). The TUI imports
 it as a library. It does not speak the helper's wire protocol (`apps/desktop/src/shell/wire.ts`),
 because there is no second process to speak it to.
 
@@ -39,7 +39,7 @@ because there is no second process to speak it to.
 
 On the desktop the renderer never holds a token. The helper brokers every request over pinned HTTPS
 with a device bearer, and the bearer rides the WebSocket upgrade header, which a browser cannot set
-(`packages/desktop-helper/src/main/nodeBroker.ts`). That split is why the helper is a separate
+(`packages/desktop-helper/src/broker/nodeBroker.ts`). That split is why the helper is a separate
 process.
 
 A terminal is one process, and it runs under Node, so it can set the upgrade header itself. The
@@ -82,7 +82,7 @@ worker).
 ## Remote nodes
 
 `acorn --node https://host:4317` runs the desktop's three steps in the terminal
-(`packages/desktop-helper/src/main/nodePairing.ts`): an unverified probe of `GET /v2/node` that
+(`packages/desktop-helper/src/broker/nodePairing.ts`): an unverified probe of `GET /v2/node` that
 cross-checks the socket's fingerprint against the body's; the six words printed for the person to
 compare against what the node printed at its own boot; `POST /v2/pair` over a pinned agent with the
 code. The TUI stores the resulting device token beside its config, keyed by node id, and pins the

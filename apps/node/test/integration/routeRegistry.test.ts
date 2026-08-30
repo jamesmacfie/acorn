@@ -3,20 +3,20 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { nodePlugins } from '../../src/server/plugins'
+import { nodePlugins } from '../../src/composition/plugins'
 import { createApp } from '@acorn/node-core/server/index.ts'
-import { memoryIdentityStore } from '@acorn/node-core/main/activeIdentity.ts'
-import { createCoreServices, SecretService } from '@acorn/node-core/main/core/index.ts'
+import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
+import { createCoreServices, SecretService } from '@acorn/node-core/server/core/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import { CapabilityRegistry } from '@acorn/node-core/server/plugin/capabilities.ts'
-import { initPlugins } from '@acorn/node-core/server/plugin/host.ts'
+import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { Scheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { connectionProviderRegistry } from '@acorn/node-core/server/integrations/connectionRegistry.ts'
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations/registry.ts'
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders/registry.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit/db.ts'
 import { RouteRegistry, routeMountPath } from '@acorn/node-core/server/routeRegistry.ts'
-import { readGolden, writeGolden } from './golden'
+import { readGolden, writeGolden } from '../helpers/golden'
 
 describe('plugin route registry', () => {
   it('mounts a contribution under its declared plugin namespace', () => {
@@ -94,7 +94,7 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 // table through the loader's fetch carrier (docs/plugins.md § Loaded plugins), which this suite
 // doesn't assemble. `pluginLoader.test.ts` exercises a loaded plugin's routes, `httpLoaded.test.ts`
 // drives http's through that carrier, and `linear.test.ts` drives linear's router directly.
-const PLUGIN_ROUTES = 'routeRegistry.snapshot.json'
+const PLUGIN_ROUTES = join(import.meta.dirname, 'routeRegistry.snapshot.json')
 
 describe('assembled routes', () => {
   // A plugin that declares periodic work resolves the scheduler through the capability registry at

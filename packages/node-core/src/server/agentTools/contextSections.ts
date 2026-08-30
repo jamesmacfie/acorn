@@ -4,7 +4,7 @@ import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } fr
 import type { NoteAuthor, NoteScope } from '@acorn/protocol/notes.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import { runHook } from '../plugin/hooks'
+import { runHook } from '../pluginHost/hooks'
 import { parseCached } from '../integrations/codec'
 import { integrationProviderRegistry } from '../integrations/registry'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
@@ -316,7 +316,7 @@ export async function assembleContext(
     notes: [],
     memory: [],
   }
-  // Budget shaping and PII stripping, as somebody else's plugin (server/plugin/hooks.ts,
+  // Budget shaping and PII stripping, as somebody else's plugin (server/pluginHost/hooks.ts,
   // docs/plugins.md § Hooks). What is offered is which sections are in, as names: a handler can drop
   // one, and nothing else. Core's, not the context plugin's — the context plugin is client-only, and
   // the assembler that makes a snapshot lives here.

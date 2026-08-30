@@ -22,7 +22,7 @@ named `service` imports from it. Neither name predicts its contents.
 workflowRunner, workflowFiles, memoryGen, httpLoaded), lifecycle (standaloneShutdown,
 standaloneParity, serviceSpawn, enrollment), auth (pairing, internalPrincipal, idempotency), and the
 plugin system (pluginLoader, pluginDisable, mainBarrelLoad). `test/fixtures/` holds one file,
-`apps/node/test/fixtures/fake-agent.sh`, which `packages/node-core/src/main/headless.ts` line 10
+`apps/node/test/fixtures/fake-agent.sh`, which `packages/node-core/src/server/headless.ts` line 10
 points at from another package. Two helpers in test dirs (`apps/node/test/registerProviders.ts`,
 `apps/node/test/integration/golden.ts`) carry no suffix marking them as helpers. One colocated test
 (`apps/node/src/service/runtime.test.ts`) against 32 under `test/`.
@@ -57,8 +57,8 @@ and ten plugin-lifecycle modules: `pluginManifest`, `pluginLoader`, `pluginInsta
 `bundledPluginState`, `disabledPlugins`. `main/server.ts` creates the listener while
 `server/index.ts` creates the Hono app.
 
-Electron residue that is live code, not comments: `packages/node-core/src/main/bindings.ts` line 116
-and `packages/node-core/src/main/pluginMigrations.ts` line 42 both read a variable named
+Electron residue that is live code, not comments: `packages/node-core/src/server/bindings.ts` line 116
+and `packages/node-core/src/server/plugins/migrations.ts` line 42 both read a variable named
 `electronResourcesPath`. Comments in `main/server.ts` lines 221 to 227 explain layout in terms of
 "Electron's utility service". `apps/node/src/server/standalone.ts` opens with "The Electron-free
 entry" and `apps/node/src/service/runtime.test.ts` has `describe('Electron-free service runtime')`.
@@ -96,8 +96,8 @@ the second importing the first.
 - Single-file folders: `server/nodeActions/`, `server/integrations/providers/`, seven under
   `main/core/`. Two-file folders: `server/collections/`, `server/nodeProviders/`, `server/runs/`.
 - 13 orphan tests named after a behaviour with no sibling module. Two test a module in another
-  folder: `packages/node-core/src/server/plugin/reload.test.ts` tests `main/pluginReload.ts`;
-  `packages/node-core/src/server/routes/requireUser.test.ts` tests `middleware/requireUser.ts`.
+  folder: `packages/node-core/src/server/plugins/reload.test.ts` tests `main/pluginReload.ts`;
+  `packages/node-core/src/server/middleware/requireUser.test.ts` tests `middleware/requireUser.ts`.
 - One `.integration.test.ts` infix in the package: `main/tunnelPorts.integration.test.ts`, beside
   `main/tunnelPorts.test.ts`.
 - `packages/node-core/scripts/locate-db.ts` is kebab-case beside `migrate.ts`.
@@ -364,7 +364,7 @@ What does not hold:
   files with no order of work. The README's status table header says 2026-08-28 while rows say
   2026-08-29 and 2026-08-30.
 - `docs/schemas/enrollment-v1.json` is the one well-governed file: generated, pinned by
-  `packages/node-core/src/main/enrollmentSchema.test.ts`, versioned, immutable by rule.
+  `packages/node-core/src/server/enrollmentSchema.test.ts`, versioned, immutable by rule.
 - `tools/arch/docPaths.test.ts` walks only `docs/`, excuses extension-less paths, and excludes a
   `docs/reviews/` that does not exist. `.github/workflows/build-desktop.yml` runs neither `pnpm lint`
   nor `pnpm test` and has no `pull_request` trigger, so no arch or doc test runs anywhere but a

@@ -43,7 +43,7 @@ Then, in one commit:
 9. Dedupe `pnpm-workspace.yaml`: `allowBuilds` and `onlyBuiltDependencies` list the same three
    packages. Keep the one the installed pnpm version reads.
 10. Fix the dead test: add `src/**/*.test.ts` to the shell project's `include` in
-    `apps/desktop/vitest.config.ts` so `apps/desktop/src/app/client/scopedEviction.test.ts` runs.
+    `apps/desktop/vitest.config.ts` so `apps/desktop/src/client/scopedEviction.test.ts` runs.
     Confirm with `vitest list` that the count rises from 76.
 
 ## Out of scope

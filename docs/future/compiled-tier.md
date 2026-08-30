@@ -13,7 +13,7 @@ provides the UIs."
 
 Six plugins are loaded (database, http, linear, model-providers, nodes-file, rollbar) with **zero
 production import edges** into them. A compiled plugin costs one roster line per side
-(`apps/desktop/src/app/client/plugins.ts`, `apps/node/src/server/plugins.ts`) and registers
+(`apps/desktop/src/client/plugins.ts`, `apps/node/src/composition/plugins.ts`) and registers
 itself through `ctx`. A loaded plugin can shadow a built-in by id (`composition.ts`) — the
 migration hatch is already wired. The registration-point sprawl this review expected to find was
 already fixed.
@@ -41,7 +41,7 @@ last consumer leaves.
 One blocker the table does not spell out per row, because it applies to five of them at once: the
 composition root calls `agents`, `notes`, `terminal`, and `workflows` with a `NodePluginDeps` bag,
 and `agents`, `memory`, and `notes` with the data root as a first argument
-(`apps/node/src/server/plugins.ts`). The loader activates a loaded plugin with its context and
+(`apps/node/src/composition/plugins.ts`). The loader activates a loaded plugin with its context and
 nothing else, so every one of those arguments has to become a capability, a route, or a
 `ctx.storage` path before the plugin can move. `docs/first-party-plugins.md` lists it as reason F.
 

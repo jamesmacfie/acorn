@@ -44,7 +44,7 @@ maintain forever. This vocabulary is a fixed struct with a most-restrictive merg
 
 ## Trust the row
 
-The repo-config trust gate (`packages/node-core/src/main/repoConfigTrust.ts`) hashes `.acorn/*` files
+The repo-config trust gate (`packages/node-core/src/server/repoConfigTrust.ts`) hashes `.acorn/*` files
 on the premise that the checkout is untrusted and the database is trusted. [api-gates.md](./api-gates.md)
 § Gate 2 closes the write path that broke that premise. As the belt behind that gate, extend
 `readRepoConfigSnapshot` to include the project row's executable fields (`setupScript`, `devScript`,
@@ -59,7 +59,7 @@ the database file — and a developer controls the database file. For a buyer, t
 the machine. Two pieces:
 
 1. **OTLP export** of the existing append-only `audit` table
-   (`packages/node-core/src/server/routes/audit.ts`, retention and route already exist) to the managed
+   (`packages/node-core/src/server/routes/security/audit.ts`, retention and route already exist) to the managed
    telemetry sink.
 2. **The tool-dispatch trail.** `docs/agent-tools.md` § Rich results already names the registry
    dispatch seam as where a tool-usage audit belongs. Emit it there, keyed by task, and export it the

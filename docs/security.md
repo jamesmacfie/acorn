@@ -107,7 +107,7 @@ unguarded `/devices` route. One ordering rule matters too: a missing PTY engine 
 one wired) must still answer with the bridge's 503, not the ownership guard's 404, because the
 client's degraded-mode handling keys on the 503 and the two failures are not interchangeable.
 
-The WebSocket hub (`main/wsHub.ts`) had the same class of gap. `authorize()` verified a task-scoped
+The WebSocket hub (`server/transport/wsHub.ts`) had the same class of gap. `authorize()` verified a task-scoped
 internal token and returned its claims, but the connection object built afterward discarded them, so
 the `term:` dispatch routed by session id alone and every other channel, plus the broadcast path, ran
 with no scope check at all. A task-scoped credential could open the socket itself and reach
@@ -163,7 +163,7 @@ Routes that administer or spend a provider connection use a middleware gate one 
 provider reads to warm a mirror. A `task`-scoped token still cannot reach these routes.
 
 Core's own code reads a stored secret through `SecretService.use()`
-(`packages/node-core/src/main/core/security/secrets.ts`), not through a raw decrypt call. Before this
+(`packages/node-core/src/server/core/secrets.ts`), not through a raw decrypt call. Before this
 existed, `decryptSecret(row.authRef, c.env.SESSION_ENC_KEY)` appeared at six sites across core and
 three plugins, and each site both held the plaintext and had `SESSION_ENC_KEY` itself in scope.
 `use()` passes the plaintext into a caller-supplied function and, if that function throws, scrubs the
@@ -182,8 +182,8 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
 
 - Plugins use CoreServices for filesystem access and Git. The filesystem service applies one
   symlink-aware data-root/worktree confinement policy
-  (`packages/node-core/src/main/core/filesystem/confinement.ts`). Four call sites used to each check
-  this on their own: `taskWorktree.ts`'s lexical-plus-symlink check, `pathGuards.ts`'s lexical-only
+  (`packages/node-core/src/server/core/fs.ts`). Four call sites used to each check
+  this on their own: `server/worktrees/taskWorktree.ts`'s lexical-plus-symlink check, `server/worktrees/pathGuards.ts`'s lexical-only
   check, the agents plugin's own realpath-and-relative pass, and the editor plugin's `confine()`
   wrapper. Lexical-only is not enough on its own: a worktree holds arbitrary checked-out content,
   including a symlink an untrusted branch added that points at `~/.ssh`, and a lexical check lets that
@@ -210,7 +210,7 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   HTTP(S) URLs without userinfo.
 
 The untrusted input the trust gate hashes is the repo config **and the project row**
-(`main/repoConfigTrust.ts`). The gate started on the premise that the checkout is untrusted and the
+(`server/repoConfigTrust.ts`). The gate started on the premise that the checkout is untrusted and the
 database is trusted, and that premise only holds while nothing but the owner can write the database.
 `PUT /v2/core/projects/:id/config` is device-only now, so it holds again; the row is in the snapshot as
 the belt behind that gate. A write the owner did not make changes the hash, and the next thing that
@@ -245,14 +245,14 @@ symlink in the window between them. Real, hard to hit, and the honest fix is an 
 open rather than a tighter check, so it is recorded here rather than papered over. The per-task sandbox
 (`docs/future/sandbox/sandbox.md`) is the layer that eventually subsumes it.
 
-Before the broker (`packages/node-core/src/main/core/exec/proc.ts`) existed, about sixteen call sites
+Before the broker (`packages/node-core/src/server/core/proc.ts`) existed, about sixteen call sites
 spawned or exec'd children with their own ad hoc handling, and the inconsistency was not cosmetic.
 `plugins/terminal`'s preview capture ran a repo-configured script through `/bin/sh -c` with no `env`
 option, so it inherited the node's full environment, `SESSION_ENC_KEY` and `INTERNAL_TOKEN` included,
 and had no output cap. The agents plugin's Claude driver spread `process.env` into its child the same
 way. The Docker plugin denylisted six named secrets, and the "keep in sync" comment above the list
 pointed at a file that no longer existed; a denylist silently misses any binding nobody remembered to
-add. Only one site, `main/headless.ts`, killed the child's process group, so everywhere else a hung
+add. Only one site, `server/headless.ts`, killed the child's process group, so everywhere else a hung
 child's grandchildren survived and kept the stdio pipes open. The broker fixes this by building a
 caller's environment from an allowlist and never spreading `process.env`; a caller that needs more
 passes `passthrough: ['DOCKER_*']`, visible at the call site and additive rather than "everything
@@ -557,7 +557,7 @@ Assets, concretely, on a machine running a Node:
   per-project shell commands the Node executes (`setup_script`, `dev_script`,
   `teardown_script`, `db_url_script`) and the local filesystem path of every mapped codebase.
 - **Provider secrets**: encrypted at rest, decrypted in the Node's memory when used
-  (`packages/node-core/src/main/core/secrets.ts`).
+  (`packages/node-core/src/server/core/secrets.ts`).
 - **The user's account**: `~/.ssh`, `~/.aws`, browser profiles, anything user-readable, plus the
   ability to spawn processes (the Node legitimately owns PTYs, Git, Docker).
 - **The fleet**: a plugin's routes and broadcasts reach every device paired with the Node.
@@ -632,7 +632,7 @@ development time with a TypeError the author sees immediately, and the shape of 
 documentation of the grant. Keep the facet→permission mapping in one module with exhaustive
 tests (phase-1 test list).
 
-`ctx.core.projects` (`packages/node-core/src/main/core/projects.ts`) is the model every facet
+`ctx.core.projects` (`packages/node-core/src/server/core/projectRefs.ts`) is the model every facet
 should copy, and also the clearest illustration of rung 1's limit. It is built for plugins rather
 than merely exposed to them: identity and write methods use `ProjectRef` projections, so a plugin
 can resolve project identity without seeing the config columns on the row and without ever holding
@@ -784,9 +784,9 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 ### Storage
 
 - **Migrations** run in the Node at boot against the plugin's own file only
-  (`packages/node-core/src/main/pluginMigrations.ts`). SQL is data, not code, but verify the
-  plugin database factory (`main/pluginStorage.ts`) keeps `load_extension` unavailable
-  (the default `main/sqlite.ts` pins) and never grants `ATTACH` reach into other files — an attached
+  (`packages/node-core/src/server/plugins/migrations.ts`). SQL is data, not code, but verify the
+  plugin database factory (`server/plugins/storage.ts`) keeps `load_extension` unavailable
+  (the default `server/storage/sqlite.ts` pins) and never grants `ATTACH` reach into other files — an attached
   database is a cross-plugin read the boundary rules exist to prevent.
 - **Backups.** Backup snapshots scrub core credentials and device rows
   (docs/architecture-overview.md), but a plugin that stashes tokens in its own SQLite defeats
@@ -804,7 +804,7 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 ### Supply chain
 
 - npm's published `dist.integrity` is compared against the downloaded bytes, and a mismatch fails the
-  install with nothing written (`main/pluginInstaller.ts`). It used to be recorded into provenance and
+  install with nothing written (`server/plugins/installer.ts`). It used to be recorded into provenance and
   never checked, which made it a note about the package rather than a statement about what ran. A
   package the registry publishes no integrity string for still installs — refusing would break every
   older package that only ever published a shasum — and the lockfile records the archive hash either
@@ -1018,7 +1018,7 @@ which is an approval gate and denies on timeout: a gate that opens when its keep
 one.
 
 Secret *use* is not recorded, only creation, replacement and deletion. Every credential read goes
-through `SecretService.use` (`main/core/secrets.ts`), which holds only an encryption key and nothing
+through `SecretService.use` (`server/core/secrets.ts`), which holds only an encryption key and nothing
 else, no database, no request, no connection id, so a row written from there could only name the
 credential by a hash of its ciphertext. Recording every read would also turn the table into a request
 log, since a mirror refresh reads a provider token on a timer, and would bury the handful of decisions

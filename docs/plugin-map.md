@@ -24,7 +24,7 @@ Tree is the default. `npm create acorn-plugin my-widget` emits one, and `--recta
 Pick the frame when the surface owns its pixels, such as a chart, an image editor or a canvas.
 
 A compiled plugin registers by adding one line to each roster:
-`apps/node/src/server/plugins.ts` and `apps/desktop/src/app/client/plugins.ts`. Everything else it
+`apps/node/src/composition/plugins.ts` and `apps/desktop/src/client/plugins.ts`. Everything else it
 does, it does through the context object the host hands it.
 
 A loaded plugin arrives through `POST /v2/core/plugins/install` and declares its contributions in an
@@ -469,8 +469,8 @@ export const tunnelsClientPlugin: ClientPlugin = {
 }
 ```
 
-Two roster lines make it real: one in `apps/node/src/server/plugins.ts`, one in
-`apps/desktop/src/app/client/plugins.ts`.
+Two roster lines make it real: one in `apps/node/src/composition/plugins.ts`, one in
+`apps/desktop/src/client/plugins.ts`.
 
 ## Example: a loaded plugin pushing to its own tree
 

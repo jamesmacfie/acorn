@@ -57,7 +57,7 @@ its identical `exports`/`scripts` blocks stay copied rather than generated.
 "Shell-free" in `main/` is about what loads, not about taste: a plugin's main barrel is imported by
 `apps/node`, and a barrel evaluates every module on it, so one module that reaches for something only
 the desktop bundle has kills the standalone node at link time, before a line of it runs.
-`apps/node/test/integration/mainBarrelLoad.test.ts` loads every `plugins/*/src/main/index.ts` in a
+`apps/node/test/integration/pluginSystem/mainBarrelLoad.test.ts` loads every `plugins/*/src/main/index.ts` in a
 plain Node child to catch that at the commit that causes it. Nothing in `main/` reaches for a shell
 any more: the folder picker the terminal plugin used to own is a Tauri command, and the preview pane
 is a child webview the shell drives (`docs/shell.md` § Host-owned webviews).
@@ -131,7 +131,7 @@ side-effect-free claim.
 fails that test until the snapshot is regenerated
 (`UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test`), which is the point: growing the contract
 should be a deliberate act. The implementation still lives in
-`packages/node-core/src/server/plugin/types.ts` and
+`packages/node-core/src/server/pluginHost/types.ts` and
 `packages/client-core/src/registries/plugin.ts`, which stay free to move files around underneath.
 
 **Adding a name is free. Removing one is a major bump.** The snapshot's first line records the
@@ -304,7 +304,7 @@ NodePluginContext` — and a forgery cannot fail when the host's context changes
 green against a shape that no longer existed.
 
 `makeTestNodeContext({ plugin, permissions?, migrations? })` is therefore not a mock. It calls the
-same `server/plugin/context.ts` the host calls at boot, over a temp data root, so which tier a test
+same `server/pluginHost/context.ts` the host calls at boot, over a temp data root, so which tier a test
 gets — `routes.register` present or absent, core scoped or whole, storage bound or missing — is the
 host's decision and not the test's. Its `cleanup()` runs the host's own registration rollback.
 `makeTestRequestContext` does the same for a loaded plugin's fetch handler: the real
@@ -312,7 +312,7 @@ host's decision and not the test's. Its `cleanup()` runs the host's own registra
 for real. Alongside them: `makeTestDb`/`makeTestPluginDb`, `testEnv`, `testGate`,
 `seedProviderConnection`, core's `schema` for seeding fixtures, and `validatePluginConfig`, which runs
 the real manifest schema over a plugin's `acorn-plugin.config.mjs` so a bad declaration fails in
-`pnpm test` rather than at the next boot (`apps/node/test/pluginConfigs.test.ts` checks every one).
+`pnpm test` rather than at the next boot (`apps/node/test/integration/pluginSystem/pluginConfigs.test.ts` checks every one).
 
 The testkit is node-environment safe by rule — no components, no `window` — because plugin vitest
 configs are node-env and a barrel evaluates every module on it. First-party tests that still reach
@@ -321,7 +321,7 @@ are touched; a new deep seam means the testkit is missing something, and the fix
 
 ## Activation
 
-`apps/node/src/server/plugins.ts` is the Node activation list. `apps/desktop/src/app/client/plugins.ts`
+`apps/node/src/composition/plugins.ts` is the Node activation list. `apps/desktop/src/client/plugins.ts`
 is the client activation list. The host validates unique names, applies the per-Node disabled-plugin
 set, initializes enabled plugins, runs the optional ready/activation pass, and owns disposal of their
 registrations.
@@ -357,7 +357,7 @@ Node initialization happens before the listener accepts requests. A plugin can r
 Two things a plugin CANNOT register, because they are the host's to write on its behalf: node actions
 and managed-agent harnesses. Both come from the manifest — a command whose verb is `runNodeAction`, and
 `contributions.harnesses` — and the host replays them through `HostPluginContext`, a shape
-`server/plugin/types.ts` keeps deliberately off the authoring type. They sat on `NodePluginContext`
+`server/pluginHost/types.ts` keeps deliberately off the authoring type. They sat on `NodePluginContext`
 until 2026-08-27, reading as members an author should reach for, and across 21 plugins nobody ever did.
 
 There is no `ctx.log` either. Two plugins used it and four reached past it for `console`, which is
@@ -387,7 +387,7 @@ A Node can also load a plugin's node half from disk, from `<dataRoot>/plugins/<i
 holding an `acorn-plugin.json` manifest and an ESM bundle that default-exports a `NodePlugin`. The
 manifest's shape is declared once, in `packages/protocol/src/pluginContract.ts`, because the client
 registers contributions from the same shape and neither side may import the other;
-`packages/node-core/src/main/pluginManifest.ts` adds the cross-field rules that need `id` — route
+`packages/node-core/src/server/plugins/manifest.ts` adds the cross-field rules that need `id` — route
 confinement, surface reachability — and reads the file. Loaded plugins join the same
 array and the same host pass as the compiled-in ones, so ordering, `ready`, capability late-binding
 and disposal are identical.
@@ -398,7 +398,7 @@ Three things differ, and all three follow from the code not being ours:
   `Idempotency-Key` required, audited) resolves a GitHub release, an npm package, a tarball URL or a
   local folder; validates the manifest; and places the package atomically with a hash-pinned lockfile
   beside it — except for a folder, which is symlinked and therefore pins nothing
-  ([security.md § Installing from a folder](./security.md)) (`packages/node-core/src/main/pluginInstaller.ts`,
+  ([security.md § Installing from a folder](./security.md)) (`packages/node-core/src/server/plugins/installer.ts`,
   docs/plugins.md). Uninstalling removes the package and, by default, leaves its
   SQLite file alone. Each device then asks its own owner before running the plugin's interface code.
   Nothing in that family starts a plugin — each answers "the disk now says this". The one exception is
@@ -475,7 +475,7 @@ script is authoritatively changing that, and without this a developer already tr
 build would stay trapped through any number of rebuilds. Under `--package-root` the script cannot clear
 that row — the staged output is not going into that data root, and could be for a different machine's —
 so it prints the row, the file and the fix instead. Both Node hosts also report every ownership row at
-boot (`reconcileBundledPackages` in `apps/node/src/server/composition.ts`), because reconciliation's
+boot (`reconcileBundledPackages` in `apps/node/src/composition/composition.ts`), because reconciliation's
 "declined to update" list can only name a package it had a newer copy of, and the whole failure mode is a
 frozen package on a node that has no newer copy to decline.
 Bundled client bytes are trusted only after the desktop helper reads and hashes its own application
@@ -511,7 +511,7 @@ staging directory instead, which is the one to use when iterating on a **bundled
 
 A malformed `acorn-plugin.config.mjs` no longer waits for a rebuild or a boot to announce itself:
 `validatePluginConfig` (`@acorn/plugin-api/testkit`) runs the real manifest schema over it, and
-`apps/node/test/pluginConfigs.test.ts` does that for every loadable plugin at `pnpm test` time.
+`apps/node/test/integration/pluginSystem/pluginConfigs.test.ts` does that for every loadable plugin at `pnpm test` time.
 
 The node restart is the step that is real rather than ritual: a loaded plugin's routes, tables and jobs
 wire at init, so a rebuilt bundle is not live until the node re-runs it. Under `pnpm dev:node` node's own
@@ -565,7 +565,7 @@ its bundle hash, so a new hash is a new origin and a new document with nothing c
 
 **Boot** trust prompts are gone from development, because a development build acknowledges the bundled
 first-party roster on exactly the terms a packaged build does — the same directory, read and hashed by
-the helper (`packages/desktop-helper/src/main/bundledPluginTrust.ts`). This is parity, not a widening: a
+the helper (`packages/desktop-helper/src/plugins/bundledPluginTrust.ts`). This is parity, not a widening: a
 hand-installed package, a third-party one, and anything a node serves this device still prompt. Set
 `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` to get the prompts back when the trust flow itself is what you are
 working on.
@@ -576,7 +576,7 @@ bundle while the app is running and its new hash has never been granted, so the 
 prompts — once, and not again after a relaunch. Rebuilding into the data root instead (a plain
 `build:plugin`, or a package served by a paired `dev:node`) is outside the grant entirely and prompts per
 rebuild by design; the marker that would let the host recognise a dev build cannot be a security signal
-(`packages/node-core/src/main/bundledPlugins.ts` says why). So: iterate on a client bundle with
+(`packages/node-core/src/server/plugins/bundled.ts` says why). So: iterate on a client bundle with
 `--package-root` into `apps/desktop/dist/bundled-plugins` and relaunch, and a node-only change needs no
 prompt at all.
 
@@ -660,7 +660,7 @@ Per-hash trust is right for distribution and wrong for iteration: an agent savin
 would mean a prompt per save. So the owner makes one decision instead — approving a `dev: true` request —
 and the device stores a **dev trust grant**.
 
-The grant lives in the device's existing trust file (`packages/desktop-helper/src/main/pluginTrustStore.ts`),
+The grant lives in the device's existing trust file (`packages/desktop-helper/src/plugins/pluginTrustStore.ts`),
 beside the acknowledgements, as `{ pluginId, nodeId, path?, grantedAt }`. It is keyed on the **pair**.
 The design note says "per (pluginId, device)" and the device half is the file itself; the node half is an
 addition, because fleet resolution picks the highest version across every paired node and a grant keyed on
@@ -1275,7 +1275,7 @@ and it re-checks route confinement on every call rather than only at registratio
 
 **Node actions have no `ctx` member.** Which of this plugin's actions a person may put on a schedule
 is declared in the manifest, as a **command** whose verb is `runNodeAction`, and the host replays
-that through a host-only seam (`HostPluginContext` in `server/plugin/types.ts`). Declaring nothing
+that through a host-only seam (`HostPluginContext` in `server/pluginHost/types.ts`). Declaring nothing
 means none of this plugin's actions can be scheduled, which is the right default for most of them;
 an action that declares no `risk` is treated as `execute`, so the omission fails safe rather than
 quiet. It sat on `NodePluginContext` until 2026-08-27, where it read as something an author writes,
@@ -1929,7 +1929,7 @@ hosts read and adds no bridge verb, so it can never disagree with what is on scr
 ## Node-side extension points
 
 The same model, on the node, for the same problem: plugin A opens a named point and any number of
-plugins deliver into it. `ctx.extensionPoints` (`node-core/server/plugin/extensionPoints.ts`), with
+plugins deliver into it. `ctx.extensionPoints` (`node-core/server/pluginHost/extensionPoints.ts`), with
 three calls — `open(point, label)`, `contribute(point, entry)`, `entries(point)`.
 
 It exists because capabilities are single-provider by construction. `ctx.capabilities.provide` throws
@@ -1986,7 +1986,7 @@ importing the other's implementation ([workflows.md](./workflows.md) § Contribu
 Everything above is about drawing. Hooks are about **deciding**. "Before I push, does anyone object?"
 "Before I send this prompt, does anyone want to change it?" The owner declares the moment and what is
 allowed at it, contributors register a handler, and the host runs the chain and hands the owner a
-verdict (`node-core/server/plugin/hooks.ts`).
+verdict (`node-core/server/pluginHost/hooks.ts`).
 
 **A hook is not an event.** An event has already happened; "task archived" cannot be blocked after the
 archive. Events fan out, fire and forget, and carry state rather than deltas. A hook runs *before*, in
@@ -2472,7 +2472,7 @@ Two feeders, one registry, exactly like schedules and collections: a compiled pl
 `ctx.taskChecks.register({ id, check, apply? })`, a loaded one declares `contributions.taskChecks` in
 its manifest and the host synthesises the same registration over the two routes above. Nothing
 downstream can tell which one answered. The registry is
-`packages/node-core/src/server/plugin/taskChecks.ts`; the dialog it feeds is
+`packages/node-core/src/server/pluginHost/taskChecks.ts`; the dialog it feeds is
 `packages/client-core/src/registries/willPhase.tsx`.
 
 A concern is plain data:
@@ -2537,10 +2537,10 @@ there is: no route, no bundle, no build step.
 The two-feeder pattern again, with one difference that matters. A compiled plugin registers a launch
 spec directly with the driver registry in plugins/agents; a loaded one declares the harness in its
 manifest and the host synthesises the registration through a host-only seam (`HostPluginContext` in
-`server/plugin/types.ts`; there is no `ctx.harnesses` for a plugin to call). The difference is where
+`server/pluginHost/types.ts`; there is no `ctx.harnesses` for a plugin to call). The difference is where
 the registration lands: schedules, collections and task checks land in a node-core registry, and a harness
 lands in **another plugin's**, through the `agents.harnessRegistry` capability that plugins/agents
-publishes. The contract is `packages/node-core/src/server/plugin/harnesses.ts`, in node-core rather
+publishes. The contract is `packages/node-core/src/server/pluginHost/harnesses.ts`, in node-core rather
 than in the agents plugin because the host is what delivers a harness and neither package may import
 the other.
 
@@ -2560,7 +2560,7 @@ Resolved at delivery time and never cached. With agents disabled, a contributed 
 silent nothing every unmatched contribution is, and re-enabling redelivers.
 
 **A harness package with no node half still gets a plugin row.** This is the one place the loader
-produces a plugin from a manifest alone (`main/pluginLoader.ts`): a no-op `init`, no storage, and
+produces a plugin from a manifest alone (`server/plugins/loader.ts`): a no-op `init`, no storage, and
 everything else a plugin row carries — a line in Settings → Plugins, an owner who can disable it, and
 registrations that roll back with the rest. Delivering such a package beside the host instead would
 mean reimplementing all of that. A manifest-only package may not take a built-in's id, because there
@@ -2643,7 +2643,7 @@ name clash, it is a substitution nothing announces.
 Two ids are exempt, and both are host-declared invitations rather than any plugin's property:
 `core.taskWorktreeCreated` and `agents.harnessRegistry`. Whichever plugin owns worktree side effects or
 agent sessions on a given node fills them. `HOST_OWNED_CAPABILITY_IDS` in
-`packages/node-core/src/main/pluginPermissions.ts` is the list, and a test holds it against the real
+`packages/node-core/src/server/plugins/permissions.ts` is the list, and a test holds it against the real
 constants.
 
 The catalogue of every id the first-party plugins publish, with its signature, is
@@ -2733,7 +2733,7 @@ What each tier declares:
 - **A compiled plugin** sets `migrationsModule: import.meta.url` on its `NodePlugin`. The host walks
   from that module for the chain, which is how one declaration covers all three runtime layouts —
   `plugins/<id>/migrations/` in a source tree, `out/migrations/<id>/` in a build, `<resources>/migrations/<id>/`
-  when packaged (`packages/node-core/src/main/pluginMigrations.ts`).
+  when packaged (`packages/node-core/src/server/plugins/migrations.ts`).
 - **A loaded plugin** declares a package-relative `migrations` directory in `acorn-plugin.json`. The
   loader confines and validates that chain and the host binds the filename to the manifest id. A
   `migrationsModule` on a loaded plugin's exported object is IGNORED — a bundle must not be able to point
@@ -2746,7 +2746,7 @@ directory its chain lives in.
 HTTP is the only plugin on that path, and it is what makes the rest of this paragraph real rather than
 designed: `build-plugin.mjs` stages the declared directory into the package it builds — a chain that
 travels with the code, since Drizzle reads the journal and the `.sql` files off disk at migrate time —
-and `apps/node/test/integration/httpLoaded.test.ts` covers a schema change arriving through an
+and `apps/node/test/integration/plugins/httpLoaded.test.ts` covers a schema change arriving through an
 installer update against a populated database, a broken chain failing contained, and
 uninstall-without-purge keeping the file. Because the filename is bound from the manifest id, that id
 is the one thing in a table-owning package that can never change: renaming it orphans real rows.
@@ -2814,11 +2814,11 @@ touches that plugin's own `src/` and then only the golden lists. A whole new com
 - `plugins/<id>/package.json`, plus the three one-line config files (§ Package shape). Nothing lists the
   plugin anywhere: `scripts/db.mjs` finds `drizzle.config.ts` by scanning, and `pnpm lint`/`pnpm test` reach
   the package through the workspace.
-- `apps/node/src/server/plugins.ts` — the Node activation list. A plugin that is not in it does not exist in
+- `apps/node/src/composition/plugins.ts` — the Node activation list. A plugin that is not in it does not exist in
   that Node. If it needs an adapter only the composition root can build, `NodePluginDeps` grows a key here
-  and the adapter itself goes in `apps/node/src/server/pluginDeps.ts`, which builds the bag once for both
+  and the adapter itself goes in `apps/node/src/composition/pluginDeps.ts`, which builds the bag once for both
   composition roots.
-- `apps/desktop/src/app/client/plugins.ts` — the client activation list. Rail and pane ORDER is a declared
+- `apps/desktop/src/client/plugins.ts` — the client activation list. Rail and pane ORDER is a declared
   field on the contribution, not a position in this array.
 - `apps/node/package.json` and `apps/desktop/package.json` — each needs `"@acorn/plugin-<id>": "workspace:*"`
   for the half it composes, the Node one for `node/`, the desktop one for `client/`. A plugin with only one
@@ -2846,7 +2846,7 @@ UPDATE_PLUGIN_GOLDENS=1 pnpm --filter @acorn/desktop --filter @acorn/node test
   optional plugin owns each one (`clientPluginDisable.test.ts`).
 - `apps/node/test/integration/routeRegistry.snapshot.json` — every `/v2/p/<plugin>/…` route the compiled
   plugins mount (`routeRegistry.test.ts`).
-- `apps/node/test/integration/pluginDisable.snapshot.json` — the full Node boot's routes, tools, context
+- `apps/node/test/integration/pluginSystem/pluginDisable.snapshot.json` — the full Node boot's routes, tools, context
   sections, providers and databases, and which optional plugin owns each (`pluginDisable.test.ts`).
 
 Every assertion is exact equality against the file, never a subset, so a contribution that silently VANISHES

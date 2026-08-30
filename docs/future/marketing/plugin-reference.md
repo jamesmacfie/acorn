@@ -63,7 +63,7 @@ A CI check regenerates both and diffs against the committed output, so the schem
 from the docs without a red build — herdr's `config_reference_check` discipline.
 
 Two things generation cannot carry, and prose must: the cross-field refinements that live in
-`packages/node-core/src/main/pluginManifest.ts` (route confinement, surface reachability, id
+`packages/node-core/src/server/plugins/manifest.ts` (route confinement, surface reachability, id
 uniqueness — stated as rules on the reference page), and the load-time path checks
 (`resolveInRoot` re-verifies lexical and symlink confinement, which the schema alone cannot
 express).
@@ -99,7 +99,7 @@ panes) rather than re-explaining the feature.
 ## The node half
 
 From `docs/plugin-authoring.md` § the node half, backed by
-`packages/node-core/src/server/plugin/types.ts`. The page documents the `NodePlugin` lifecycle
+`packages/node-core/src/server/pluginHost/types.ts`. The page documents the `NodePlugin` lifecycle
 (`init`, `ready`, `dispose`) and each `NodePluginContext` facet in reference style: `routes`,
 `tools`, `schedules`, `collections`, `taskChecks`, `contextSections`, `providers`, `capabilities`,
 `storage`, `core` (the confined filesystem, git, process broker, and secrets services), `events`.

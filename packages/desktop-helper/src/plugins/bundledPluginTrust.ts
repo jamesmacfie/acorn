@@ -1,0 +1,77 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/pluginGrants.ts'
+import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
+import { readPluginManifest } from '@acorn/node-core/server/plugins/manifest.ts'
+import type { PluginCache } from './pluginCache'
+import type { PluginTrustStore } from './pluginTrustStore'
+
+const packageDirectories = (root: string): string[] => {
+  try {
+    return readdirSync(root, { withFileTypes: true })
+      .filter((entry) => !entry.name.startsWith('.') && entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
+  } catch {
+    return []
+  }
+}
+
+/** The environment-variable opt-out, for anyone testing the trust flow itself: a QA pass over the
+ * dialog, or a spec that wants a bundled package to prompt like a third-party one. Honoured in
+ * packaged builds too, because all it can do is ask more questions. */
+export const BUNDLED_TRUST_OPT_OUT = 'ACORN_PROMPT_BUNDLED_PLUGIN_TRUST'
+
+/** Whether to auto-accept the application's own bundled client bundles on this launch.
+ *
+ * Not `app.isPackaged`. This grant covers the bytes the build produced from the first-party roster,
+ * `apps/desktop/scripts/build-bundled-plugins.mjs`, into this application's own resource directory:
+ * bundle resources when packaged, `dist/bundled-plugins` in a development build, and in both cases a
+ * directory the build owns and nothing else writes to. Gating on packaging made every dev boot answer
+ * four dialogs about the developer's own build output, which taught people to click Trust without
+ * reading.
+ *
+ * It says nothing about packages in the data root. A hand-installed or third-party package, and
+ * anything a node serves this device, still prompts. */
+export const trustsBundledClientPlugins = (env: NodeJS.ProcessEnv = process.env): boolean =>
+  env[BUNDLED_TRUST_OPT_OUT] !== '1'
+
+/** Trust only client bundles read from the application's own resource directory. The node roster is
+ * not consulted, because a remote node calling something "bundled" grants nothing. */
+export function trustBundledClientPlugins(
+  bundledRoot: string,
+  appVersion: string,
+  cache: PluginCache,
+  trust: PluginTrustStore,
+): string[] {
+  const accepted: string[] = []
+  for (const id of packageDirectories(bundledRoot)) {
+    const dir = join(bundledRoot, id)
+    const manifest = readPluginManifest(dir)
+    if (!manifest || manifest.id !== id || !manifest.client) continue
+    const client = resolveInRoot(dir, manifest.client)
+    if (!client) continue
+    try {
+      const hash = cache.putBundled(id, manifest.version, readFileSync(client))
+      trust.record({
+        pluginId: id,
+        hash,
+        nodeId: `bundled:acorn-${appVersion}`,
+        version: manifest.version,
+        permissions: manifest.permissions,
+        webviews: pluginWebviewGrants(manifest.contributions),
+        keyClaims: pluginKeyClaimGrants(manifest.contributions),
+        extensions: pluginExtensionGrants(id, manifest.contributions),
+        schedules: pluginScheduleGrants(manifest.contributions),
+        taskChecks: pluginTaskCheckGrants(manifest.contributions),
+        harnesses: pluginHarnessGrants(manifest.contributions),
+        decision: 'accepted',
+        decidedAt: Date.now(),
+      })
+      accepted.push(id)
+    } catch (error) {
+      console.error(`[plugins] bundled client for ${id} could not be trusted:`, error)
+    }
+  }
+  return accepted
+}

@@ -6,7 +6,7 @@ const AgentCenter = lazy(() => import('./AgentCenter'))
 export const agentCenterSourceContribution: SourceContribution<never> = {
   id: 'agents',
   // Rail position, declared (registries/sources.ts § order). Was implied by this plugin's place in
-  // apps/desktop/src/app/client/plugins.ts.
+  // apps/desktop/src/client/plugins.ts.
   order: 60,
   glyph: 'bot',
   label: 'Agents',

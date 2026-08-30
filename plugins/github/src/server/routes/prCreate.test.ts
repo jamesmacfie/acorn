@@ -5,7 +5,7 @@ import type { ApiError } from '@acorn/protocol/api.ts'
 import { gh } from '..'
 import type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import { prCreate } from './prCreate'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 vi.mock('..', async (importOriginal) => {
   const actual = await importOriginal<typeof import('..')>()

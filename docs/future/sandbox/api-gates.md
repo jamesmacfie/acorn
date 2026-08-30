@@ -24,7 +24,7 @@ first fix in the folder.
 
 The tool-permission ceiling works. It lives in a prefs slice keyed `agentTools.perms`
 (`packages/protocol/src/api.ts:221`), and `loadPerms`
-(`packages/node-core/src/server/routes/agentTools.ts:22`) reads it and enforces it through
+(`packages/node-core/src/server/routes/plugins/agentTools.ts:22`) reads it and enforces it through
 `isToolPermitted` (`packages/node-core/src/server/agentTools/registry.ts:54`) on every task-scoped
 tool call. Turn the execute tier off and execute tools vanish from `tools/list` and are rejected on
 direct invoke.
@@ -59,7 +59,7 @@ path writes prefs over HTTP. The in-process `PrefService.write` used by
 
 **Severity: high.** The project row holds `setupScript`, `devScript`, `devRestartScript`,
 `teardownScript`, and `dbUrlScript` — host commands acorn runs later on worktree creation or a dev
-run (`packages/node-core/src/main/runConfig.ts:229`, `taskWorktree.ts:326`).
+run (`packages/node-core/src/server/runConfig.ts:229`, `taskWorktree.ts:326`).
 
 The mount (`packages/node-core/src/server/index.ts:92`) is `requireUser` only. So a task token can:
 
@@ -75,7 +75,7 @@ The writes are handled at `routes/projects.ts:78`, `:85`, and `:92`. They are no
 task.
 
 The repo-config trust gate does not catch this. `readRepoConfigSnapshot`
-(`packages/node-core/src/main/repoConfigTrust.ts:30`) hashes `.acorn/config.toml` and
+(`packages/node-core/src/server/repoConfigTrust.ts:30`) hashes `.acorn/config.toml` and
 `.acorn/workflows/*.toml` and nothing else. Its premise is that the checkout is untrusted input and
 the database is trusted. That premise fails the moment a task token can write the database.
 

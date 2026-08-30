@@ -6,8 +6,8 @@ import { PULLS_STALE_AFTER_MS as STALE_AFTER_MS } from '../syncPolicy'
 import { readComposite, readFiles } from './prMirror'
 import { pullsBatch } from './pullsBatch'
 import { resolveRepoForUser } from './repoMirror'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
-import type { PluginDatabase } from '@acorn/node-core/main/pluginStorage.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
+import type { PluginDatabase } from '@acorn/node-core/server/plugins/storage.ts'
 
 vi.mock('..', async (importOriginal) => {
   const actual = await importOriginal<typeof import('..')>()

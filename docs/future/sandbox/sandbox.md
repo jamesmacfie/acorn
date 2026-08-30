@@ -24,7 +24,7 @@ There are exactly three places a task's code runs, and they are few on purpose. 
 that list is the migration checklist, already written and already test-enforced. The three that
 matter for task execution:
 
-1. The process broker — `packages/node-core/src/main/core/exec/proc.ts`. Every bounded task command.
+1. The process broker — `packages/node-core/src/server/core/proc.ts`. Every bounded task command.
 2. The PTY spawn — `plugins/terminal/src/main/terminal.ts:411`. Shells and agent profiles.
 3. The managed-agent driver — `plugins/agents/src/main/drivers/jsonRpcProcess.ts:64`. One process
    per agent session.
@@ -102,7 +102,7 @@ prompt the Docker plugin already has (`docs/docker.md` § Surfaces) is the model
 ## The spike to do first
 
 Before any host change, prove the ergonomics with an agent profile. An `AgentProfileContribution`
-(`packages/node-core/src/main/agentProfiles/types.ts`) whose `command` is `sbx` and whose `launchArgs`
+(`packages/node-core/src/server/agentProfiles/types.ts`) whose `command` is `sbx` and whose `launchArgs`
 are `["run", "claude"]` gets a sandboxed agent in a task with zero host changes. Live with it for a
 week. If the round-trip and the port story hold up, build the execution-target seam. If they do not,
 the folder learned something cheaply.

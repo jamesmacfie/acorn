@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation, auth, and
 // the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in

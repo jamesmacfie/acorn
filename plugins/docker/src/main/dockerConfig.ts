@@ -9,7 +9,7 @@
 //   - Exec is ref-addressed, never matcher-addressed. The WS frame names the container it wants and
 //     `isDockerRef` validates it (plugins/docker/src/shared/model.ts). Widening the matcher adds rows
 //     to a list; it does not choose what a caller execs into.
-//   - The hub refuses every non-`term:` channel to a task-confined socket (main/wsHub.ts), so an agent
+//   - The hub refuses every non-`term:` channel to a task-confined socket (server/transport/wsHub.ts), so an agent
 //     cannot open a docker channel at all.
 //
 // If either one changes — an exec that resolves through the matcher, or a docker channel opened to a

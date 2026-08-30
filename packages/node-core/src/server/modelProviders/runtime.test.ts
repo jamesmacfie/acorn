@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../db'
 import { ProviderRequestScheduler } from '../integrations/budgetRuntime'
 import { ConnectionProviderRegistry } from '../integrations/connectionRegistry'
-import { publicConnectionProvider } from '../integrations/providers/shared'
+import { publicConnectionProvider } from '../integrations/providerShared'
 import { ProviderOperationError } from '../integrations/types'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { encryptSecret } from '../secretBox'
 import { ModelProviderRegistry } from './registry'
 import { generateTextForConnection } from './runtime'
 import type { ModelProviderAdapter, ModelProviderAdapterResult } from './types'
-import { SecretService } from '../../main/core/secrets'
+import { SecretService } from '../core/secrets'
 
 const ENCRYPTION_KEY = '22'.repeat(32)
 const SECRETS = new SecretService(ENCRYPTION_KEY)

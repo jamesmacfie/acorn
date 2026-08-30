@@ -640,7 +640,7 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
     },
   }
 
-  // The PTY half of archive (@acorn/node-core/server/routes/worktree.ts owns the route and the
+  // The PTY half of archive (@acorn/node-core/server/routes/projects/worktree.ts owns the route and the
   // orchestration). These four are the only parts of tearing a task down that need a pseudo-terminal:
   // the running-session guard, killing this task's sessions, dropping their rows, and streaming teardown
   // output into a "Teardown" tab. An unfilled slot answers 503.
@@ -687,11 +687,11 @@ export function registerTerminalIpc(pluginDb: PluginDatabase, coreServices: Term
   }
 
   // The stream half. The terminal engine's PTY input, output, attach and detach ride the one
-  // authenticated WebSocket (main/wsHub.ts) instead of per-session IPC channels. The hub routes client
+  // authenticated WebSocket (server/transport/wsHub.ts) instead of per-session IPC channels. The hub routes client
   // frames here and hands each attachment a sink to fan output to.
   deps.streams?.({
     // Which task owns a session, so the WS hub can refuse a task-scoped internal credential that tries to
-    // attach to or type into another task's pseudo-terminal (main/wsHub.ts § mayDriveStream).
+    // attach to or type into another task's pseudo-terminal (server/transport/wsHub.ts § mayDriveStream).
     streamTaskId: (id) => sessions.get(id)?.meta.taskId ?? null,
     input: (id, data) => {
       const s = sessions.get(id)

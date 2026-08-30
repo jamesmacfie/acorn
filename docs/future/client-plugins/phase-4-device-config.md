@@ -102,7 +102,7 @@ is nullable so the PWA is not a half-built host.
 - A terminal host exists that reads config from a path. If not, this phase is not yet due.
 - `packages/client-core/src/persistence/devicePrefs.ts` has the setter every covered key goes
   through, and the write-order rule holds in it.
-- `packages/desktop-helper/src/main/fleetStore.ts` shows how the helper owns a `0600` file; copy its
+- `packages/desktop-helper/src/broker/fleetStore.ts` shows how the helper owns a `0600` file; copy its
   shape for `acorn.json` (which is not secret and needs no `0600`, but the read and write pattern is
   the same).
 - `packages/client-core/src/platform/contract.ts` lists groups as `members<T>()([...])`; add

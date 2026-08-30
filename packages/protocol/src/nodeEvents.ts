@@ -1,7 +1,7 @@
 import type { IntegrationConnectionStatus } from './integrations'
 
 // Core events a plugin's node half may subscribe to with `ctx.events.on`
-// (node-core/server/plugin/types.ts, docs/plugins.md § Hearing another plugin).
+// (node-core/server/pluginHost/types.ts, docs/plugins.md § Hearing another plugin).
 //
 // A named list rather than "any channel", for the same reason the frame side has one
 // (client-core/plugins/frames/channels.ts): a grant the trust prompt cannot describe is a grant the
@@ -42,7 +42,7 @@ export const isNodeEventChannel = (channel: string): channel is NodeEventChannel
 
 // The payload-carrying node events, and the shapes both sides read them through. Each one is state,
 // not a delta: the field says what the thing now is, so a listener that missed an earlier frame still
-// ends up correct (node-core/main/notify.ts says per event why it is not content-free).
+// ends up correct (node-core/server/notify.ts says per event why it is not content-free).
 export type ConnectionChangedEvent = {
   integrationId: string
   providerId: string

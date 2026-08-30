@@ -92,7 +92,7 @@ the payoff from single seams, and it is why this folder is a finishing job rathe
 | --- | --- |
 | Isolated execution seam | The enumerated `child_process` allowlist, `tools/arch/boundaries.test.ts:217`; the broker, `core/exec/proc.ts` |
 | Filesystem confinement | `core/filesystem/confinement.ts`, one symlink-aware policy |
-| Untrusted-config gate, fail-closed | `main/repoConfigTrust.ts`, hash-gated `needs-trust` / `config-changed` |
+| Untrusted-config gate, fail-closed | `server/repoConfigTrust.ts`, hash-gated `needs-trust` / `config-changed` |
 | MCP/tool allowlisting, narrow-only | The agent-tool registry ceiling, `docs/agent-tools.md` § Projections |
 | Immutable audit trail | The append-only `audit` table, `docs/security.md` § Audit |
 | Credential brokering | `SecretService.use`, `core/secrets.ts` — plugin code never holds a decrypted secret |

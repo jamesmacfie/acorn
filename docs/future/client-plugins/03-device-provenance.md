@@ -13,11 +13,11 @@ there.
   `packages/client-core/src/plugins/host.ts` is the only client module that calls it, and its header
   already names the future: "today it fronts the desktop helper's content-addressed store, and a
   future web client fronts IndexedDB."
-- **The cache.** `packages/desktop-helper/src/main/pluginCache.ts` stores bundles content-addressed
+- **The cache.** `packages/desktop-helper/src/plugins/pluginCache.ts` stores bundles content-addressed
   under `<userDataDir>/plugin-cache/<sha256>.js`, caps them at `MAX_BUNDLE_BYTES` (8 MiB), and
   hashes what arrived rather than trusting a claim. Its one fill path is `putFromNode(nodeId,
   pluginId, claim)`, which fetches `/v2/core/plugins/<id>/client.js` through the node broker.
-- **The trust store.** `packages/desktop-helper/src/main/pluginTrustStore.ts` keys acknowledgements
+- **The trust store.** `packages/desktop-helper/src/plugins/pluginTrustStore.ts` keys acknowledgements
   on `(pluginId, hash)`. A row carries `nodeId`, and the comment beside it says "did this come from.
   Not part of the key, because the same bundle from a second node is the same bundle." Dev grants
   are keyed on `(pluginId, nodeId)`.
@@ -54,9 +54,9 @@ holds.
 ### The device fill path
 
 `PluginCache` gains `putFromSource(pluginId, source)` beside `putFromNode`, where `source` is the
-node installer's four-form union from `packages/node-core/src/server/routes/plugins.ts`: `{ github,
+node installer's four-form union from `packages/node-core/src/server/routes/plugins/plugins.ts`: `{ github,
 tag? }`, `{ npm, version? }`, `{ url }`, `{ path }`. The helper resolves the source the way
-`packages/node-core/src/main/pluginInstaller.ts` does, and the resolution code moves to a shared
+`packages/node-core/src/server/plugins/installer.ts` does, and the resolution code moves to a shared
 package both import, so "what does `{ github }` mean" has one answer. The helper reads the manifest
 out of the package, refuses it if it declares a `node` entry (see the rule below), takes the client
 bundle, hashes it, and stores it. The answer is `{ hash }` or one of the existing `PutFailure`
@@ -141,7 +141,7 @@ named the plugin fall back to core through the existing resolver, because the pr
 ### Reconciliation and bundled packages
 
 None of this touches `reconcileBundledPackages` or the tombstone logic in
-`apps/node/src/server/composition.ts`. Bundled packages are node packages. A device never seeds a
+`apps/node/src/composition/composition.ts`. Bundled packages are node packages. A device never seeds a
 plugin on its own; every device plugin is one the user asked for.
 
 ## What does not change

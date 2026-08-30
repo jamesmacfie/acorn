@@ -7,8 +7,8 @@ import { sourceRegistry } from '@acorn/client-core/registries/sources.ts'
 import { initClientPlugins } from '@acorn/client-core/registries/plugin.ts'
 import { THEMES } from '@acorn/client-core/settings/themes.ts'
 import { STYLES } from '@acorn/client-core/settings/uiStyles.ts'
-import { coreSourceContributions } from '../../src/app/client/sourceContributions'
-import { clientPlugins } from '../../src/app/client/plugins'
+import { coreSourceContributions } from '../../src/client/sourceContributions'
+import { clientPlugins } from '../../src/client/plugins'
 import { readGolden, writeGolden } from './golden'
 
 initClientPlugins(clientPlugins)
@@ -128,8 +128,8 @@ const sourceOf = (relative: string): string =>
 
 describe('docs/ui-design.md § Parity — the shell chords', () => {
   const tabRail = sourceOf('../../../../packages/client-core/src/tabs/TabRail.tsx')
-  const taskView = sourceOf('../../src/app/client/TaskView.tsx')
-  const app = sourceOf('../../src/app/client/App.tsx')
+  const taskView = sourceOf('../../src/client/TaskView.tsx')
+  const app = sourceOf('../../src/client/App.tsx')
 
   it('binds ⌘⇧T to the terminal drawer and ⌘⇧N to a new task', () => {
     expect(taskView).toContain("'meta+shift+t'")

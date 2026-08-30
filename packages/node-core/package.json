@@ -11,7 +11,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate && node ../../scripts/db.mjs check",
     "db:check": "node ../../scripts/db.mjs check",
-    "db:locate": "tsx scripts/locate-db.ts",
+    "db:locate": "tsx scripts/locateDb.ts",
     "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {

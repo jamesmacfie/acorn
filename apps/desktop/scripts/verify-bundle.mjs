@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { sha256, targetTriple } from './nodeRuntime.mjs'
+import { sha256, targetTriple } from './node-runtime.mjs'
 
 // What a built `.app` has to contain before anybody installs it (docs/shell.md § Build and packaging).
 //

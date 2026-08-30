@@ -10,7 +10,7 @@ import { scopeEvictorCount } from '@acorn/client-core/registries/scopeEviction.t
 // a pane became lazier.
 describe('scope evictors after the client graph boots', () => {
   it('are registered', async () => {
-    await import('../../src/app/client/activate')
+    await import('../../src/client/activate')
     expect(scopeEvictorCount()).toBeGreaterThan(0)
   })
 })

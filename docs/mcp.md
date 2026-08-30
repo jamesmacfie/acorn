@@ -53,7 +53,8 @@ reach the agent.
 
 ## Configuration
 
-The profile launchers and the Node's `mcp` entrypoint handle MCP registration. Settings → MCP shows
+The profile launchers and the Node's `mcp` entrypoint (`apps/node/src/entries/mcp.ts`, emitted as
+`mcp.js` beside the service) handle MCP registration. Settings → MCP shows
 the generated configuration and the active capability state. It does not store a provider secret.
 
 Registration also refreshes once at boot for every installed agent CLI, not only at session spawn.

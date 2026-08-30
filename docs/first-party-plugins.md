@@ -95,7 +95,7 @@ is not: a tool card is `agents:tool-card`, an ordinary `remote` point, so a load
 one in its manifest like any other extension (docs/contribution-kinds.md).
 
 **F. Constructor arguments from the composition root** — the `NodePluginDeps` bag in
-`apps/node/src/server/plugins.ts`. A loaded plugin is activated by the loader from its manifest and
+`apps/node/src/composition/plugins.ts`. A loaded plugin is activated by the loader from its manifest and
 is handed one thing, its `NodePluginContext`. It is never called with arguments, so anything the
 root passes positionally pins the plugin to the compiled tier no matter what else it uses. Four
 plugins take a dependency bag — **agents**, **notes**, **terminal**, and **workflows** — and three

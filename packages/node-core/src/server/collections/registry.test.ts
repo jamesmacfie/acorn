@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { memoryIdentityStore } from '../../main/activeIdentity'
-import { createCoreServices, SecretService } from '../../main/core'
-import type { NodePermissions, PluginCollectionDescriptor } from '../../main/pluginManifest'
+import { memoryIdentityStore } from '../activeIdentity'
+import { createCoreServices, SecretService } from '../core'
+import type { NodePermissions, PluginCollectionDescriptor } from '../plugins/manifest'
 import { makeTestDb, testEnv } from '../../testkit/db'
-import { CapabilityRegistry } from '../plugin/capabilities'
-import { clearRegistrations, initPlugins } from '../plugin/host'
-import type { NodePlugin, PluginStorage } from '../plugin/types'
+import { CapabilityRegistry } from '../pluginHost/capabilities'
+import { clearRegistrations, initPlugins } from '../pluginHost/host'
+import type { NodePlugin, PluginStorage } from '../pluginHost/types'
 import { CollectionReadError, collectionReads, readCollection } from './registry'
 
 // The node-side collection read registry (docs/schedules.md § Reading a collection from the node):

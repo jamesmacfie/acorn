@@ -5,7 +5,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { docker, setDockerBridge } from './docker'
 import { BridgeError } from '@acorn/node-core/server/bridge.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Transport contract for the docker routes: auth, ref validation so nothing dash-leading reaches
 // argv, body validation, BridgeError passthrough, and bridge-unavailable. The CLI and daemon

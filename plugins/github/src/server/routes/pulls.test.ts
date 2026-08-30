@@ -9,9 +9,9 @@ import { gh } from '..'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { PULLS_STALE_AFTER_MS } from '../syncPolicy'
 import { pulls } from './pulls'
-import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
+import { createTaskService } from '@acorn/node-core/server/core/tasks.ts'
 import { seedGithubIntegration } from '../../testkit/githubToken'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 import { pullRequests, repos, syncState } from '../../node/schema'
 
 vi.mock('..', async (importOriginal) => {

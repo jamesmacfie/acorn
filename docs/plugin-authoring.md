@@ -83,7 +83,7 @@ needing something the package never told anyone to install.
 ```
 
 The layout above is a convention; only the manifest filename is fixed. `MANIFEST_FILE` is
-`acorn-plugin.json` (`packages/node-core/src/main/pluginManifest.ts`), and every other path in the
+`acorn-plugin.json` (`packages/node-core/src/server/plugins/manifest.ts`), and every other path in the
 package is wherever the manifest says it is.
 
 The directory is the unit of identity. A manifest may name any directory, but the **id** in the
@@ -267,7 +267,7 @@ says you offer to clean up, so a version that starts changing something where it
 reads as newly requested.
 
 Every path in every descriptor is confined at parse time to `/v2/p/<id>/` — your own namespace and
-nothing else. That check lives in `pluginManifest.ts` rather than on the fields because it needs `id`,
+nothing else. That check lives in `server/plugins/manifest.ts` rather than on the fields because it needs `id`,
 and it is the parse-time twin of the runtime confinement the frame bridge applies.
 
 The cross-field rules are worth knowing before you write a manifest that parses and then does nothing:
@@ -417,7 +417,7 @@ refuses.
 
 Three lists, and they are enforced in three different places.
 
-`permissions.node` shapes the `ctx` your node half receives (`pluginPermissions.ts`). It is **least
+`permissions.node` shapes the `ctx` your node half receives (`server/plugins/permissions.ts`). It is **least
 privilege for cooperative code, not a sandbox** — a loaded bundle shares the node's process and can
 `import('node:fs')` and ignore `ctx` entirely. Gating is by omission: an undeclared facet is absent,
 so the first call is a `TypeError` the author sees immediately.
@@ -473,7 +473,7 @@ That last one is how a frame gets live data without polling, and it also nudges 
 ## The node half
 
 The loader resolves `manifest.node` inside the package directory and does
-`await import(pathToFileURL(entrypoint).href)` (`pluginLoader.ts`). That is the entire mechanism, and
+`await import(pathToFileURL(entrypoint).href)` (`server/plugins/loader.ts`). That is the entire mechanism, and
 it is why multi-file plain ESM needs no build: Node resolves your relative specifiers itself.
 
 **Relative paths and `node:` builtins only.** A bare specifier — `hono`, `zod`, `drizzle-orm` — has
@@ -698,7 +698,7 @@ messages by hand:
 
 A table-owning plugin ships a Drizzle chain **inside its package** and names it in the manifest. The
 host — never the plugin — opens the database and applies the chain at `ctx.storage.open()`
-(`pluginStorage.ts`, `openPluginDb`), so a plugin never picks a database path or discovers a chain by
+(`server/plugins/storage.ts`, `openPluginDb`), so a plugin never picks a database path or discovers a chain by
 filesystem proximity. The file is `<dataRoot>/plugins/<id>.sqlite`, and the handle you get back is a
 drizzle handle with `batch` and `close`.
 
@@ -730,7 +730,7 @@ audited. For a hand-written directory the source form is a local path:
 { "source": { "path": "/absolute/path/to/my-plugin" } }
 ```
 
-`linkLocal` (`pluginInstaller.ts`) **symlinks** the directory rather than copying it, which is what
+`linkLocal` (`server/plugins/installer.ts`) **symlinks** the directory rather than copying it, which is what
 makes the loop worth having: you edit in place and the next boot runs what you edited. This works on
 every build, packaged included — Settings → Plugins → *Local folder* has a **Choose…** button when the
 target node is this machine. The path must be absolute. Uninstall unlinks rather than following the

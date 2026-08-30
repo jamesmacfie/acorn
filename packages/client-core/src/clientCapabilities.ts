@@ -1,5 +1,5 @@
 // The client-side mirror of the node's capability registry
-// (@acorn/node-core/server/plugin/capabilities.ts). See docs/plugins.md § Collaboration rules for
+// (@acorn/node-core/server/pluginHost/capabilities.ts). See docs/plugins.md § Collaboration rules for
 // why it exists, what it is not, and why it is a singleton unlike the node's.
 
 // Where a key lives: with whichever side would otherwise have to import the other. Usually that is the

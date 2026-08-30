@@ -72,7 +72,7 @@ export async function failingChecksFor(
 }
 
 /**
- * Row counts for core's boot-time storage log (main/storageFootprint.ts), which cannot see these
+ * Row counts for core's boot-time storage log (server/storage/footprint.ts), which cannot see these
  * tables. The two mirror parents plus this plugin's freshness table, so the log line reports the same
  * facts it always did.
  */

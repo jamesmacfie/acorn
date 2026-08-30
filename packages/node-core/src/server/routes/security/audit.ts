@@ -1,0 +1,40 @@
+import { Hono } from 'hono'
+import { z } from 'zod'
+import { auditVocabulary, readAudit } from '../../audit'
+import { getDb } from '../../db'
+import type { AppEnv } from '../../middleware/auth'
+
+// The owner-readable audit trail (docs/security.md § Audit: "Owner-readable in Settings").
+//
+// Read-only, and there is deliberately no delete: an append-only table with a 90-day prune is the whole
+// design, and a route that could remove rows would make the trail worth less than the prune already
+// makes it. Retention is enforced at boot (server/audit.ts's pruneAudit).
+//
+// Gated to `requireDevice` at the mount in server/index.ts, alongside pair/devices/plugins. It has to
+// be: the trail names every device that has ever paired and every credential that has been connected,
+// which is precisely the enumeration security.md forbids an agent-spawned child.
+const query = z.object({
+  // A timestamp cursor, not an offset. Rows are only appended and pruned from the far end, so an
+  // offset would skip or repeat entries whenever a prune ran under a paging reader.
+  before: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+})
+
+export const audit = new Hono<AppEnv>().get('/', async (c) => {
+  // Invalid paging params fall back to the defaults rather than 400: this is a read of a log, and a
+  // stale bookmark in the settings UI should show the first page, not an error.
+  const parsed = query.safeParse(c.req.query())
+  const entries = await readAudit(getDb(c.env), parsed.success ? parsed.data : {})
+  return c.json({
+    entries,
+    // The cursor for the next page, or null at the end. Computed here so the client never has to know
+    // that the cursor is a timestamp; it can stay an opaque token if paging ever changes shape.
+    nextBefore: entries.length > 0 ? entries[entries.length - 1].at : null,
+    // Every verb the running plugins declared, with the label each chose (server/audit.ts). It rides
+    // along on the page rather than taking a route of its own because the only consumer is the list
+    // below it and the two are always read together; twenty label strings per page is cheaper than a
+    // second round trip. Core's own verbs are not here — they are a closed union compiled into the
+    // client too, so it already knows them.
+    vocabulary: auditVocabulary().map((entry) => ({ action: entry.action, label: entry.label })),
+  })
+})

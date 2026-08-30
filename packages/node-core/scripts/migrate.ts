@@ -3,8 +3,8 @@
 // Usage: pnpm db:migrate   (override path with ACORN_DB_PATH)
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { openDb } from '../src/main/bindings.ts'
-import { resolveDatabasePath, resolveServerPaths } from '../src/main/serverPaths.ts'
+import { openDb } from '../src/server/bindings.ts'
+import { resolveDatabasePath, resolveServerPaths } from '../src/server/storage/paths.ts'
 
 const { devDataDir } = resolveServerPaths(dirname(fileURLToPath(import.meta.url)))
 const dbPath = process.env.ACORN_DB_PATH ?? resolveDatabasePath(devDataDir)

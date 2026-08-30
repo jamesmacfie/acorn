@@ -17,7 +17,7 @@ import { persistedStateRegistry } from '@acorn/client-core/persistence/persisted
 import { contentLinkRegistry } from '@acorn/client-core/registries/contentLinks.ts'
 import { brandMarkRegistry } from '@acorn/client-core/ui/brandMarks.ts'
 import { projectImporterRegistry } from '@acorn/client-core/registries/projectImporters.ts'
-import { clientPlugins } from '../../src/app/client/plugins'
+import { clientPlugins } from '../../src/client/plugins'
 import { readGolden, writeGolden } from './golden'
 
 const REGISTRIES = {

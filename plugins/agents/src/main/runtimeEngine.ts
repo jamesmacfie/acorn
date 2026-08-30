@@ -40,7 +40,7 @@ type LiveSession = {
 }
 
 export type AgentRuntimeOptions = {
-  // This plugin's own SQLite file (main/pluginStorage.ts), not core's handle. Everything the engine reads
+  // This plugin's own SQLite file (server/plugins/storage.ts), not core's handle. Everything the engine reads
   // and writes is in the ten `agent_*` tables (node/schema.ts).
   db: PluginDatabase
   dataDir: string

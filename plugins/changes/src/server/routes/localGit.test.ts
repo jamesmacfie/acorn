@@ -1,4 +1,4 @@
-import { createTaskService } from '@acorn/node-core/main/core/tasks.ts'
+import { createTaskService } from '@acorn/node-core/server/core/tasks.ts'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -12,7 +12,7 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { onServerError } from '@acorn/node-core/server/respond.ts'
 import { localGit, setLocalGitBridge } from './localGit'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // Wiring test over a real git worktree: working-tree status, a stage mutation, auth, body validation,
 // and bridge-unavailable. main/localDiff.test.ts covers the git parsing.

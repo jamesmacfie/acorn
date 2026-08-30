@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import type { AppEnv } from './middleware/auth'
 import { onServerError, requestIdMiddleware, respondError } from './respond'
-import type { Env } from '../main/bindings'
+import type { Env } from './bindings'
 
 const app = new Hono<AppEnv>()
   .use('*', requestIdMiddleware)

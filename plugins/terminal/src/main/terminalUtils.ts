@@ -1,7 +1,7 @@
 // Pure terminal helpers: no electron or node-pty imports, so they are unit-testable under plain Node
 // (terminalUtils.test.ts). The PTY and IPC wiring that needs those lives in terminal.ts. Helpers that
-// are not terminal-specific live in core: path and checkout guards in core/main/pathGuards.ts, the
-// task-scoped child environment in core/main/taskEnv.ts.
+// are not terminal-specific live in core: path and checkout guards in core/server/worktrees/pathGuards.ts, the
+// task-scoped child environment in core/server/taskEnv.ts.
 
 export const RING_CAP = 256 * 1024 // bytes of recent raw output kept for prompt detection / transcript-tail analysis
 

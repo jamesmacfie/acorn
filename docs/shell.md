@@ -22,10 +22,10 @@ The Rust half is deliberately small. Three modules serve content (`app_scheme.rs
 (`keychain.rs`), and two carry the window's own surface (`commands.rs`, `menu.rs`). Custody is
 TypeScript.
 
-`packages/desktop-helper` is the other half, composed by its `main/index.ts`: service supervision and
+`packages/desktop-helper` is the other half, composed by its `src/index.ts`: service supervision and
 the restart policy, the connection broker and its fleet, device-token custody, the plugin cache and
 trust store, and the preview tunnels. It runs as its own process under the bundled Node, and
-`apps/desktop/src/shell/helperMain.ts` is its entry point. Rust talks to it over stdin and stdout in
+`apps/desktop/src/helper/helperMain.ts` is its entry point. Rust talks to it over stdin and stdout in
 lines: one handshake line in, one ready line out, then commands. Never through argv or the
 environment, because the handshake carries the data key and argv is world-readable.
 
@@ -50,7 +50,7 @@ inside the data directory, which wins. `SESSION_ENC_KEY` falls through to the no
 key if neither file supplies it, resolved before the listener starts accepting connections.
 
 `tauri_plugin_single_instance` makes a second launch focus the running window instead of starting a
-second process. The data root's own exclusive lock (`node-core/main/dataRoot.ts`) is the real mutual
+second process. The data root's own exclusive lock (`node-core/server/storage/dataRoot.ts`) is the real mutual
 exclusion; the single-instance lock only keeps a second launch from getting as far as contending for
 it.
 
@@ -75,7 +75,7 @@ the same fail-quiet stance `deviceTokenStore.ts` takes and the same blast radius
 `session.key`.
 
 A packaged build's first launch adopts an Electron-era custody root if it finds one:
-`packages/desktop-helper/src/main/legacyCustody.ts` copies `fleet.json`, the trust store, and the
+`packages/desktop-helper/src/custody/legacyCustody.ts` copies `fleet.json`, the trust store, and the
 content-addressed plugin cache, and re-encrypts the device tokens from Chromium's `os_crypt` under
 the data key. Rust reads the old keychain item and passes both in the handshake.
 
@@ -95,7 +95,7 @@ broker only after the listener is ready. Startup failures fail closed; a crash a
 retried with bounded exponential backoff and eventually shows the recovery screen without creating a
 new data root.
 
-The crash budget (`@acorn/desktop-helper/main/crashBudget.ts`) allows five restarts inside a
+The crash budget (`@acorn/desktop-helper/supervision/crashBudget.ts`) allows five restarts inside a
 ten-minute window, waiting 1, 2, 4, 8, then 16 seconds before each one. A sixth crash inside the
 window gives up and shows the recovery screen instead of restarting into the same fault. An earlier,
 tighter policy, roughly 250 ms doubling and capped at three crashes in sixty seconds, meant a service
@@ -114,7 +114,7 @@ processes, workflows, Docker, provider clients, reconciliation, and shutdown dra
 to close the listener, dispose plugin engines, close SQLite, and release the data-root lock with a
 30-second overall deadline.
 
-The supervised child and the standalone node consume the same `apps/node/src/server/composition.ts`
+The supervised child and the standalone node consume the same `apps/node/src/composition/composition.ts`
 graph and the same reconciliation and drain plan. The shell supplies supervision and native adapters;
 it does not assemble a parallel plugin graph.
 
@@ -319,7 +319,7 @@ scheme with no CORS.
 
 ## Connection broker
 
-`@acorn/desktop-helper/main/nodeBroker.ts` runs in the helper process. For each node it owns:
+`@acorn/desktop-helper/broker/nodeBroker.ts` runs in the helper process. For each node it owns:
 
 - endpoint and certificate fingerprint;
 - a pinned `https.Agent` and device token;
@@ -340,7 +340,7 @@ agent, which does its own pinning.
 
 ### Fleet membership
 
-`@acorn/desktop-helper/main/fleetStore.ts` holds which nodes this client knows, where they are, and
+`@acorn/desktop-helper/broker/fleetStore.ts` holds which nodes this client knows, where they are, and
 what certificate to pin, in `fleet.json`. It lives with the host because the host already holds the
 two things fleet membership is inseparable from: device tokens and pinned certificates. The renderer
 gets a token-free `NodeRecord` projection built by explicit field selection, not a spread with keys
@@ -413,7 +413,7 @@ Playwright against a browser of the node's own, so an agent on a headless node h
 preview pane is the person's surface and nothing steers it but them.
 
 For a task whose dev server is served by another node process,
-`@acorn/desktop-helper/main/previewTunnel.ts` opens an authenticated loopback listener that forwards
+`@acorn/desktop-helper/supervision/previewTunnel.ts` opens an authenticated loopback listener that forwards
 raw bytes to the node's own tunnel endpoint over its pinned agent, so the preview pane can reach a
 dev server without the renderer ever touching the network directly. It binds `127.0.0.1` explicitly;
 binding `0.0.0.0` would publish another machine's dev server to the local network, the opposite of

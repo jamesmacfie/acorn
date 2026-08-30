@@ -22,9 +22,9 @@ export default defineConfig({
     'globalThis.process.env': 'globalThis.process.env',
   },
   build: {
-    // Electron 42 ships Node 22, and the standalone deployment targets current Node. electron-vite has
-    // no entry for Electron 42 and silently falls back to node16.17, which downlevels far more than
-    // either runtime needs.
+    // Both deployments run a current Node: the desktop stages a pinned runtime
+    // (apps/desktop/scripts/node-runtime.mjs) and the standalone node runs the machine's. node22 is
+    // the floor of the two, and downlevelling past it costs output for nothing.
     target: 'node22',
     outDir: 'dist',
     assetsDir: 'chunks',
@@ -37,9 +37,9 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        service: resolve(__dirname, 'src/service/index.ts'),
-        mcp: resolve(__dirname, '../../packages/node-core/src/mcp/main.ts'),
-        standalone: resolve(__dirname, 'src/server/standalone.ts'),
+        service: resolve(__dirname, 'src/entries/service.ts'),
+        mcp: resolve(__dirname, 'src/entries/mcp.ts'),
+        standalone: resolve(__dirname, 'src/entries/standalone.ts'),
       },
       // node: builtins are listed explicitly as well as caught by the predicate, so a bare
       // `import 'path'` with no node: prefix can never be bundled either.

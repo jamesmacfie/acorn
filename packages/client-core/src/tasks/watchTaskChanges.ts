@@ -1,6 +1,6 @@
 // The client half of `tasks:changed` (docs/plugins.md § Hearing a core event).
 //
-// Every task write on the node announces itself (node-core/main/notify.ts § broadcastTasksChanged) and
+// Every task write on the node announces itself (node-core/server/notify.ts § broadcastTasksChanged) and
 // this turns that into one cache invalidation. The frame is content-free by design, so there is
 // nothing to merge and no ordering to get wrong: the task list is a fetchable route, and the client
 // re-reads it.

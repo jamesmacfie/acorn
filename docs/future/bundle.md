@@ -18,11 +18,11 @@ Enough that a hand-installed node on the LAN is pleasant to set up:
   On first boot at a real terminal the node lists this machine's IPv4 addresses and asks which to
   advertise; Enter means none. `ACORN_ADVERTISE_HOST` is the non-interactive path for launchd,
   systemd, Docker and the e2e harness, and it overrides the recorded answer.
-  (`packages/node-core/src/main/advertise.ts`)
+  (`packages/node-core/src/server/transport/advertise.ts`)
 - **The Host allowlist widened to a set.** Loopback plus whatever was advertised. The listener binds
   `0.0.0.0` only when something is advertised, and the endpoint it *reports* stays loopback —
   children of the node validate its certificate fully against an `IP:127.0.0.1` SAN, so that origin
-  cannot move. (`packages/node-core/src/main/server.ts`)
+  cannot move. (`packages/node-core/src/server/transport/listener.ts`)
 - **A pairing banner at boot.** Endpoint, identity words, and a live pairing code. The terminal the
   node was started from is the out-of-band channel pairing already depends on; printing there turns
   pairing from "read a device token out of a JSON blob and curl the code route" into copy, compare,
@@ -50,7 +50,7 @@ data root or starts one under the same bundled runtime
 ([terminal/03-process-model.md](./terminal/03-process-model.md)).
 (When this was written the desktop was Electron 42 with Node 24.17; the Tauri migration replaced the
 supervisor and kept the property.) Drizzle publishes no `node:sqlite` driver
-(0.45.2 ships better-sqlite3, bun, expo, op and proxy), so `main/sqlite.ts` presents the small
+(0.45.2 ships better-sqlite3, bun, expo, op and proxy), so `server/storage/sqlite.ts` presents the small
 surface Drizzle's better-sqlite3 session actually calls — `prepare`, `transaction`, and
 `run`/`all`/`get`/`raw` — over a `DatabaseSync`. Two behaviour differences are pinned there
 explicitly: `node:sqlite` enforces foreign keys by default where better-sqlite3 does not, and it
@@ -125,7 +125,7 @@ Three container-specific decisions, none of them code:
 
 ## The snags
 
-**`openssl` on PATH.** `ensureCert` (`packages/node-core/src/main/tls.ts`) shells out to it to mint
+**`openssl` on PATH.** `ensureCert` (`packages/node-core/src/server/transport/tls.ts`) shells out to it to mint
 the node's certificate. Present on macOS and Linux, absent on stock Windows. Either bundle it or
 replace that call with a pure-JS certificate mint (`@peculiar/x509` is the obvious candidate — Node's
 own `crypto` cannot mint an X.509 certificate). Small either way, but it is a dependency on a machine
@@ -137,7 +137,7 @@ desktop auto-update (see the auto-update constraint notes). Linux and Windows ha
 This is why macOS is last, not first.
 
 **Windows is POSIX-shaped in two places.** `SIGUSR1` is how a running node reopens its pairing
-window (`apps/node/src/server/standalone.ts`), and that signal does not exist on Windows — pairing a
+window (`apps/node/src/entries/standalone.ts`), and that signal does not exist on Windows — pairing a
 second device there means a restart until some other trigger exists (a stdin command, or a
 device-authenticated route). The terminal client is such a trigger: a TUI attached to the local node
 is an out-of-band channel of its own and can offer "open a pairing window" as a command, which is
@@ -162,7 +162,7 @@ node-pty means there is still one. With OpenTUI's core there are two.
 
 ## One node, three supervisors
 
-`apps/node/src/server/composition.ts` already builds the same plugin graph for every host; the
+`apps/node/src/composition/composition.ts` already builds the same plugin graph for every host; the
 difference is supervision and native capability injection, not a second assembly. The desktop helper
 supervises it in the app, a service manager or a shell supervises it on a server, and the terminal
 client supervises it when nothing else is (`terminal/03-process-model.md`). The remaining

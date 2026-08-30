@@ -49,7 +49,7 @@ describe('agent note contributions', () => {
 // every contribution reaches the assembled surface; package-level tests cover each projection.
 //
 // Names, not shapes: risk tiers, schemas and the three projections are covered by
-// packages/node-core/src/server/routes/agentTools.test.ts and mcp/server.test.ts over a fixture.
+// packages/node-core/src/server/routes/plugins/agentTools.test.ts and mcp/server.test.ts over a fixture.
 describe('the full agent-tool manifest', () => {
   const CORE_TOOLS = [
     'task_current',
@@ -65,7 +65,7 @@ describe('the full agent-tool manifest', () => {
     // request the owner answers in the shell (docs/plugins.md § Approval-mediated install).
     'plugin_request',
   ]
-  // Preview tools remain an Electron capability exposed through the same assembled tool manifest.
+  // Preview tools remain a desktop-only capability exposed through the same assembled tool manifest.
   const BROWSER_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']
   const CHANGES_TOOLS = ['local_changes', 'local_diff', 'git_log']
   const NOTES_TOOLS = ['notes_list', 'notes_read', 'notes_write', 'notes_append']

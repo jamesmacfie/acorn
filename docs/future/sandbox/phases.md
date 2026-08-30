@@ -37,7 +37,7 @@ is unaffected. The new test fails if a `requireUser`-only core route is added.
 Detail in [enterprise-policy.md](./enterprise-policy.md) § Trust the row. The belt behind phase 1's
 projects gate.
 
-**Shipped 2026-08-28.** `PROJECT_ROW_FIELDS` in `packages/node-core/src/main/repoConfigTrust.ts`
+**Shipped 2026-08-28.** `PROJECT_ROW_FIELDS` in `packages/node-core/src/server/repoConfigTrust.ts`
 folds the row's executable fields (and `runTargets`) into the hashed snapshot.
 
 - [x] Extend `readRepoConfigSnapshot` to include the project row's `setupScript`, `devScript`,

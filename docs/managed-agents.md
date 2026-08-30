@@ -52,9 +52,9 @@ is also why a data-only harness plugin needs no `exec` grant: it never spawns an
 
 **The delivery seam.** A manifest's `harnesses` entries reach the node host like schedules and task
 checks do. The composition root carries them on the loaded-plugin binding, and
-`node-core/server/plugin/host.ts` resolves each adapter entry inside the contributing package, turns
+`node-core/server/pluginHost/host.ts` resolves each adapter entry inside the contributing package, turns
 each probe route into a call, and hands the result to the host-only `harnesses` seam
-(`HostPluginContext` in `server/plugin/types.ts` — a plugin has no member to call, the manifest is the
+(`HostPluginContext` in `server/pluginHost/types.ts` — a plugin has no member to call, the manifest is the
 only way in). That facet forwards to the
 `agents.harnessRegistry` capability plugins/agents publishes, resolved at delivery time and never
 cached, so agents disabled means the same silent nothing every unmatched contribution gets, and
@@ -407,7 +407,7 @@ buffer's per-session timers, then stop the webhook delivery pump. All of it runs
 SQLite file closes, because any of those steps can still write a final row. The plugin's `dispose()`
 (`plugins/agents/src/node/index.ts`) runs this sequence and then clears its own capability bridges
 explicitly, rather than relying on teardown order, so a second boot in the same process (as
-`apps/node/src/service/runtime.test.ts` exercises) never serves a request through the first boot's
+`apps/node/src/composition/runtime.test.ts` exercises) never serves a request through the first boot's
 closed database handle.
 
 Each session mints its own scoped internal token rather than sharing one environment record. See

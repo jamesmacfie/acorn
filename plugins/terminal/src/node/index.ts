@@ -19,7 +19,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
     name: 'terminal',
     required: true,
     // This module's own URL: the chain sits at plugins/terminal/migrations beside it, and the host owns
-    // open/migrate/close from there (@acorn/node-core/main/pluginStorage.ts).
+    // open/migrate/close from there (@acorn/node-core/server/plugins/storage.ts).
     migrationsModule: import.meta.url,
     init: (ctx) => {
       // Opened and migrated by the host before init returns: registerTerminalIpc installs the handle into
@@ -27,7 +27,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // reach an unmigrated database.
       const db = ctx.storage.open()
       // Fills the terminal bridge, the WS stream handlers (including streamTaskId, which the task-scope
-      // guard in main/wsHub.ts refuses attachment without), core's archive-time task-sessions bridge and
+      // guard in server/transport/wsHub.ts refuses attachment without), core's archive-time task-sessions bridge and
       // its on-task-created hook, and the worktree-created hook that runs a repo's setup script.
       const registrations = registerTerminalIpc(db, ctx.core, {
         ...deps,
@@ -76,7 +76,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // projections in apps/node/src/wiring/ reach it without a mutable global.
       // `run:changed` is a core event (@acorn/protocol/nodeEvents.ts) sent from here because terminal
       // holds the process, not because it owns the fact; the core-side spelling is
-      // node-core/main/notify.ts § broadcastRunTargetChanged.
+      // node-core/server/notify.ts § broadcastRunTargetChanged.
       // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks): a turn before a
       // process starts in a task's worktree.
       ctx.hooks.declare({

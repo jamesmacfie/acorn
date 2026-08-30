@@ -55,7 +55,7 @@ const verbsOf = (provider: NodeProviderContribution): NodeLifecycleVerb[] =>
 
 // A module singleton, like the route, collection, node-action and audit registries beside it, with the
 // same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (server/plugin/host.ts § clearRegistrations).
+// (server/pluginHost/host.ts § clearRegistrations).
 const providers = new Map<string, RegisteredNodeProvider>()
 
 /** Register one provider for a plugin. The host binds `pluginId`; a plugin never passes it. */

@@ -1,14 +1,14 @@
 # Phase 3: node-core and desktop-helper
 
-Status: not started. Waits on phase 2.
+Status: shipped 2026-08-30. Waited on phase 2.
 
 ## Goal
 
 `packages/node-core/src` has no `main/`. Its library folder is `server/`, grouped so the ten plugin
 lifecycle modules, the transport, the storage, and the worktree code each have a folder instead of a
 prefix. The `core/` facade migration is finished, not abandoned halfway. `packages/desktop-helper/src`
-has four groups and no `main/` level. The word "Electron" appears only in `legacyCustody.ts`, where
-it is a real migration path.
+has four groups and no `main/` level. The word "Electron" survives only where it names a real
+migration path.
 
 ## Why this phase, and why now
 
@@ -21,84 +21,79 @@ composition roots that construct node-core already have their final paths.
 
 ### Step 1: finish the `core/` migration
 
-1. Delete the three facades with zero importers: `packages/node-core/src/main/core/context.ts`,
-   `packages/node-core/src/main/core/identity.ts`, `packages/node-core/src/main/core/models.ts`.
-2. For the six live facades (`tasks`, `secrets`, `prefs`, `proc`, `fs`, `git`, about 100 import sites
-   in total), rewrite every importer to the implementation module, then delete the facade.
-3. Flatten the seven single-file subfolders back to one file each: `core/tasks/service.ts` becomes
-   `core/tasks.ts`, `core/security/secrets.ts` becomes `core/secrets.ts`, and so on. `core/identity/`
-   has two files; it becomes `core/identity.ts` and `core/preferences.ts`. Move each test beside the
-   file it tests.
-4. Rename `packages/node-core/src/main/core/projects.ts` to `core/projectRefs.ts` or fold it into
-   `main/projects.ts`; two modules named `projects` one directory apart is the finding.
-5. Fix `docs/security.md` lines 166 and 560 to one spelling.
+1. The three facades with zero importers are gone: `core/context.ts`, `core/identity.ts`,
+   `core/models.ts`.
+2. The six live facades are gone too, and each implementation took the facade's path, so no importer
+   moved. `core/tasks/service.ts` is `core/tasks.ts`, `core/security/secrets.ts` is `core/secrets.ts`,
+   `core/identity/preferences.ts` is `core/prefs.ts`, `core/exec/proc.ts` is `core/proc.ts`,
+   `core/filesystem/confinement.ts` is `core/fs.ts`, and `core/vcs/git.ts` is `core/git.ts`.
+3. All eight subfolders are gone. Every test already sat beside the facade name, so each one now sits
+   beside the implementation it tests.
+4. `core/projects.ts` is `core/projectRefs.ts`, which is what it deals in, so the two `projects`
+   modules one directory apart are one `projects.ts` and one `projectRefs.ts`.
+5. `docs/security.md` names `packages/node-core/src/server/core/secrets.ts` at both sites.
 
 ### Step 2: merge `main/` into `server/`
 
-`git mv` in one commit per group so `git log --follow` works:
-
-- `server/transport/`: `main/server.ts` (rename to `listener.ts`; `server/server.ts` is not a name),
-  `tls.ts`, `wsHub.ts`, `tunnel.ts`, `tunnelPorts.ts`, `advertise.ts`, and their tests.
-- `server/storage/`: `sqlite.ts`, `dataRoot.ts`, `backup.ts`, `archive.ts`, `storageFootprint.ts`.
-- `server/plugins/`: the ten lifecycle modules, prefix stripped: `manifest.ts`, `loader.ts`,
+- `server/transport/`: `listener.ts` (was `main/server.ts`), `listenerConfig.ts`, `tls.ts`,
+  `wsHub.ts`, `tunnel.ts`, `tunnelPorts.ts`, `advertise.ts`, `upgradeClaim.ts`, and their tests.
+- `server/storage/`: `sqlite.ts`, `dataRoot.ts`, `paths.ts` (was `serverPaths.ts`), `backup.ts`,
+  `archive.ts`, `footprint.ts`, `diskEncryption.ts`.
+- `server/plugins/`: the ten lifecycle modules with the prefix stripped: `manifest.ts`, `loader.ts`,
   `installer.ts`, `migrations.ts`, `permissions.ts`, `reload.ts`, `storage.ts`, `bundled.ts`,
-  `bundledState.ts`, `disabled.ts`. `packages/node-core/src/main/pluginManifest.test.ts` (1,382
-  lines) comes with `manifest.ts`.
-- `server/worktrees/`: `worktrees.ts`, `taskWorktree.ts`.
+  `bundledState.ts`, `disabled.ts`, plus `fiveKinds.test.ts`.
+- `server/worktrees/`: `worktrees.ts`, `taskWorktree.ts`, `pathGuards.ts`.
 - `server/core/`: the result of step 1.
-- The rest of `main/` flat into `server/`: enrollment, headless, notify, mcpRegister, bindings,
-  runConfig, projects, agentProfiles/.
-- `git mv server/plugin server/pluginHost` and strip the prefix inside: `pluginState.ts` becomes
-  `state.ts`, `pluginSchedules.test.ts` becomes `schedules.test.ts`.
+- The rest flat in `server/`: `activeIdentity`, `bindings`, `enrollment`, `headless`, `mcpRegister`,
+  `notify`, `profiles`, `projectConfig`, `projects`, `repoConfigTrust`, `runConfig`, `sessionKey`,
+  `taskEnv`, `urlGuards`, `agentProfiles/`.
+- `server/plugin/` is `server/pluginHost/`, with `pluginState.ts` as `state.ts` and
+  `pluginSchedules.test.ts` as `schedules.test.ts`.
 
-Then delete `src/main/`.
+`src/main/` is deleted.
 
 ### Step 3: group `routes/`
 
-Per [03-target-layout.md](./03-target-layout.md): `routes/auth/`, `routes/projects/`,
-`routes/plugins/`, `routes/security/`. Move `packages/node-core/src/server/routes/requireUser.test.ts`
-beside `server/middleware/requireUser.ts`. Keep `packages/node-core/src/server/routeRegistry.ts`
-where it is; it is the registry of routes and the name already says so.
+`routes/projects/` (projects, workspaces, tasks, taskContext, worktree, membership,
+externalProjects), `routes/plugins/` (plugins, harness, agentTools), and `routes/security/`
+(security, audit, backup, configTrust). `routes/requireUser.test.ts` moved beside
+`server/middleware/requireUser.ts`. `server/routeRegistry.ts` stayed where it was.
 
 ### Step 4: Electron residue
 
-Rename `electronResourcesPath` to `resourcesPath` in `packages/node-core/src/main/bindings.ts` line
-116 and `packages/node-core/src/main/pluginMigrations.ts` line 42. Rewrite the comments in
-`main/server.ts` lines 221 to 227, `packages/node-core/src/server/auth/deviceTokens.ts` line 53,
-`packages/node-core/src/mcp/server.ts` line 6, `packages/node-core/src/main/wsHub.test.ts` line 15.
+`electronResourcesPath` is `resourcesPath` in `server/bindings.ts` and
+`server/plugins/migrations.ts`. The comments in `server/transport/listener.ts`,
+`server/auth/deviceTokens.ts`, `src/mcp/server.ts`, and `server/transport/wsHub.test.ts` describe the
+composition roots and the desktop shell rather than Electron.
 
 ### Step 5: tests and scripts
 
-Move `packages/node-core/src/server/plugin/reload.test.ts` beside `server/plugins/reload.ts`. Rename
-`packages/node-core/src/main/tunnelPorts.integration.test.ts` to what it tests (`tunnelPortsReuse`
-or fold into `tunnelPorts.test.ts`). Rename `packages/node-core/scripts/locate-db.ts` to
-`locateDb.ts` and fix `packages/node-core/package.json`. Flatten
-`packages/node-core/src/server/nodeActions/registry.ts` to `server/nodeActions.ts` and
-`packages/node-core/src/server/integrations/providers/shared.ts` to
-`server/integrations/providerShared.ts`.
+`server/plugin/reload.test.ts` moved to `server/plugins/reload.test.ts`.
+`main/tunnelPorts.integration.test.ts` folded into `server/transport/tunnelPorts.test.ts`.
+`packages/node-core/scripts/locate-db.ts` moved to `packages/node-core/scripts/locateDb.ts`, and
+`packages/node-core/package.json` names it.
+`server/nodeActions/registry.ts` is `server/nodeActions.ts` and
+`server/integrations/providers/shared.ts` is `server/integrations/providerShared.ts`.
 
 ### Step 6: the arch test
 
-In `tools/arch/boundaries.test.ts` around line 146, remove `main` and `service` from the node-side
-list (phase 2 removed the last `service/`). Keep `mcp` and `wiring` if anything still uses them;
-check with a grep first. Every rule that names a `main/` path (the `TREE_DIRS` list does not; the
-Electron rule at line 514 does not) gets the new path.
+`side()` in `tools/arch/boundaries.test.ts` no longer lists `service` or `wiring`. The plugin-route
+segment check reads `server/plugins/manifest.ts`, the broadcast ratchet names the new hub and
+notifier paths, and the testkit baseline lists the `server/*` roots that replaced the two `main`
+ones.
 
 ### desktop-helper
 
-`git mv src/main/* src/` into `broker/`, `custody/`, `plugins/`, `supervision/` with
-`packages/desktop-helper/src/main/index.ts` becoming `src/index.ts`. Update the three importers in
-`apps/desktop/src/helper/` (after phase 2) and `docs/architecture-overview.md` line 145, plus the six
-`docs/shell.md` citations. Rewrite the "booting Electron" comments in
-`packages/desktop-helper/src/main/crashBudget.ts` lines 6 and 9 and
-`packages/desktop-helper/src/main/pluginCache.test.ts` line 9.
+`src/main/index.ts` is `src/index.ts`, and the other 21 files are in `broker/`, `custody/`,
+`plugins/`, and `supervision/`. The three importers in `apps/desktop/src/helper/`, the client-core
+trust modules, `docs/architecture-overview.md`, and `docs/shell.md` follow.
 
 ### Docs
 
 `docs/architecture-overview.md`, `docs/security.md`, `docs/data-layer.md`, `docs/plugins.md`,
-`docs/node-enrollment.md`, `docs/shell.md`, `docs/testing.md`, `docs/schedules.md`, and
-`docs/managed-agents.md` all cite `node-core/src/main/*` (19 distinct paths). Fix them in this
-phase; the path checker lists them.
+`docs/node-enrollment.md`, `docs/shell.md`, `docs/testing.md`, `docs/schedules.md`,
+`docs/managed-agents.md`, `docs/agent-tools.md`, `docs/plugin-authoring.md`, `docs/editor-monaco.md`,
+`docs/ui-design.md`, `docs/integrations.md`, and `docs/conventions.md` name the new paths.
 
 ## Out of scope
 
@@ -109,14 +104,62 @@ than the plugins). Renaming `server/` to `domain/` (refused). Any change to what
 
 - `ls packages/node-core/src` prints `mcp server testkit`.
 - `ls packages/node-core/src/server/core` has no subdirectories and no two-line files.
-- `grep -rn electron packages/node-core packages/desktop-helper -i` hits only `legacyCustody.ts`.
+- `grep -rn electron packages/node-core packages/desktop-helper -i` hits only the legacy custody path.
 - `ls packages/desktop-helper/src` prints `broker custody index.ts plugins supervision`.
 - No test file in node-core sits in a different folder from the module it imports most.
 - `pnpm lint`, `pnpm test`, and `tools/arch` are green.
 
-## Verify before building
+## Verified before building
 
-- The facade table in [01-findings.md](./01-findings.md) still matches: `grep -rn "core/context'" packages apps plugins` is empty.
-- `packages/node-core/src/main` still has 78 direct files.
-- `tools/arch/boundaries.test.ts` still lists `main` in `side()`.
-- `grep -n electronResourcesPath packages/node-core/src/main/bindings.ts` still hits.
+All four held. No file imported `core/context'`, `src/main` had 78 direct files, `side()` still
+listed `main`, and `bindings.ts` still read `electronResourcesPath`.
+
+## What shipped, and where it differed
+
+Every step landed. Nine things are worth knowing before phase 4.
+
+**The facade migration cost no import churn at all.** Step 1 asked for two passes: rewrite about 100
+import sites from the facade to the implementation, then flatten the implementation back up to the
+facade's own path. The two cancel. Deleting the facade file and moving the implementation into its
+place in one step leaves every importer on a path that still resolves, and the diff is nine deleted
+two-line files plus nine renames.
+
+**`core/prefs.ts`, not `core/preferences.ts`.** Step 3 and
+[03-target-layout.md](./03-target-layout.md) disagreed on the name. `prefs.ts` won: it is the name 13
+import sites already used, and `prefs` is what the service is called in `CoreServices`.
+
+**`storage/footprint.ts`, not `storage/storageFootprint.ts`.** The phase file listed the old name in
+the storage group, which would have kept exactly the prefix stutter the same phase strips off the ten
+plugin modules. The convention in `docs/conventions.md` says a folder does not repeat its own name in
+its files, so the prefix went.
+
+**Six modules the phase file did not place found a group.** `serverConfig.ts` is
+`transport/listenerConfig.ts` and `upgradeClaim.ts` is `transport/upgradeClaim.ts`, both because they
+are about the listener's ports and sockets. `serverPaths.ts` is `storage/paths.ts` and
+`diskEncryption.ts` is `storage/diskEncryption.ts`. `pathGuards.ts` is `worktrees/pathGuards.ts`,
+which its own header already argued for. `fiveKinds.test.ts` is `server/plugins/fiveKinds.test.ts`, beside
+the manifest and loader it drives.
+
+**`tunnelPorts.integration.test.ts` was folded, not renamed.** Both files test exports of
+`tunnelPorts.ts`, one pure and one against a real database. A rename would have left a test file
+named after no module, so the two describes now share `transport/tunnelPorts.test.ts` and the
+`.integration.` infix is gone from the package.
+
+**`routes/auth/` was not created.** `pairing.ts` is the only auth route, and `deviceTokens.ts` is a
+service under `server/auth/`, not a route. A one-file folder is one of the findings this programme
+removes, so `pairing.ts` stays flat with the other seven ungrouped routes.
+
+**`main` stays in `side()`.** Step 6 asked for `main` and `service` to come out of the node-side list
+in the arch test. Ten plugins still have a `main/`, and removing the name would drop those files into
+`shared` and stop the client/node rule biting on them. `service` and `wiring` came out; `main` goes
+in phase 4, with the plugins.
+
+**The testkit baseline grew by two roots before it shrinks.** `rootOf()` in the arch test keys on the
+first two path segments, so the two old roots (`@acorn/node-core/main`, `@acorn/node-core/main/core`)
+became four (`server/core`, `server/plugins`, `server/worktrees`, and the existing `server`). The
+count of deep imports did not move; only how they group. Phase 4 is where the number falls.
+
+**The Electron grep has two hits, not one.** `legacyCustody.ts` keeps the word because it names the
+custody root a previous shell left behind, and so does `legacyCustody.test.ts`, which writes real
+os_crypt blobs to prove the decryption constant has not drifted. Both are the migration path, not
+residue.

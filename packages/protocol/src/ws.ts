@@ -8,7 +8,7 @@
 // its own `shared/`. Core reads only `channel` and never a payload, so a plugin adds a stream without
 // touching this file.
 //
-// Register a channel with `ctx.events.channel(prefix, handler)` on the node (server/plugin/types.ts)
+// Register a channel with `ctx.events.channel(prefix, handler)` on the node (server/pluginHost/types.ts)
 // and `registerWsChannel(prefix, ...)` on the client (@acorn/client-core/wsChannels.ts).
 
 import { z } from 'zod'

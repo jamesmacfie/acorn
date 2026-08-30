@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
-import type { Env } from '@acorn/node-core/main/bindings.ts'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 import { managedAgents, setManagedAgentsBridge, type ManagedAgentsBridge } from './managed'
 
 const req = (url: string, method = 'GET', body?: unknown) =>

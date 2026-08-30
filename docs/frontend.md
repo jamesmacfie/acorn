@@ -10,7 +10,7 @@ information, see [extensibility.md](./extensibility.md) § Some decisions that l
 
 ## Composition
 
-`apps/desktop/src/app/client/index.tsx` creates the renderer runtime and mounts `App.tsx`. The
+`apps/desktop/src/client/index.tsx` creates the renderer runtime and mounts `App.tsx`. The
 runtime installs the client plugin host, scoped persistence, query clients, broker event handling,
 notification sources, and the shell registries before rendering.
 
@@ -20,7 +20,7 @@ switch disposes the previous task scope.
 
 ## Registries and plugins
 
-The client plugin host activates `apps/desktop/src/app/client/plugins.ts`. Plugins register panes,
+The client plugin host activates `apps/desktop/src/client/plugins.ts`. Plugins register panes,
 rail sources, commands and keybindings, settings pages, slots, rail markers, palette rows, ref panels,
 agent contexts, extension points and their own contributions to somebody else's, schedules,
 persisted-state slices, Node stats, attention sources, brand marks, and content links. The host owns

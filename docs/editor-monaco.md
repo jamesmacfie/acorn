@@ -31,7 +31,7 @@ not foresee is the remote component tree, which is argued in
 class names and the frame regions below are how the world looked in 2026-08.
 
 The contract lives in `docs/plugins.md § Document surfaces`; the code is
-`node-core/main/pluginManifest.ts` (the `layout` block and the `surfaceAction` verb),
+`node-core/server/plugins/manifest.ts` (the `layout` block and the `surfaceAction` verb),
 `client-core/src/editor/` (the surface, its theme, its language map, its view state, the chord
 resolution and the completion provider), `client-core/layouts/DocumentSplit.tsx` (the composed
 layout) and `client-core/plugins/frames/layouts.ts` (the trust and confinement

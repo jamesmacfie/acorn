@@ -17,7 +17,7 @@ import type { AppEnv } from '../middleware/auth'
 import type { StoredConnection } from './connections'
 import type { ExternalItemStore } from './itemStore'
 import type { Cached, RefreshResult } from '../sync/engine'
-import type { PluginFetchHandler } from '../plugin/types'
+import type { PluginFetchHandler } from '../pluginHost/types'
 
 export type ProviderCredentials = Record<string, string>
 export type CacheState = 'fresh' | 'stale' | 'missing' | 'malformed' | 'deleted'

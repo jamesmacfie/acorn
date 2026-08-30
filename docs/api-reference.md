@@ -239,7 +239,7 @@ The core worktree router covers project configuration and task lifecycle surface
 /v2/core/tasks/:id/run/*
 ```
 
-The exact method/body contracts are in `packages/node-core/src/server/routes/worktree.ts`,
+The exact method/body contracts are in `packages/node-core/src/server/routes/projects/worktree.ts`,
 `configTrust.ts`, and `harness.ts`. Executable repo configuration is hash-gated before it can be
 used.
 
@@ -333,7 +333,7 @@ marks the Node stale and refetches. Durable agent and workflow history is read f
 PTY output, Docker logs/stats/exec, workflow notices, agent streams, and preview tunnels use the
 same authenticated socket with feature-specific frames and bounded backpressure/replay semantics.
 
-The preview tunnel (`/v2/tunnel`, `packages/node-core/src/main/tunnel.ts`) is a separate upgrade on
+The preview tunnel (`/v2/tunnel`, `packages/node-core/src/server/transport/tunnel.ts`) is a separate upgrade on
 the same listener, resolved from `?task=<uuid>&port=<n>` and gated by the same device and
 internal-token authorization as `/v2/events`. It forwards raw bytes to `127.0.0.1` on the named port
 only, never to a resolved hostname. Only declared ports are tunnellable, and there is no general

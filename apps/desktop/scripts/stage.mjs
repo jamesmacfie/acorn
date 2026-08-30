@@ -2,7 +2,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { stageNodeRuntime, targetTriple } from './nodeRuntime.mjs'
+import { stageNodeRuntime, targetTriple } from './node-runtime.mjs'
 
 // Everything the Rust shell needs on disk before `tauri dev` or `tauri build` runs: the bundled Node
 // runtime, the node service beside the helper, and the migration chains where the node's own walk-up
@@ -30,7 +30,7 @@ cpSync(dist, HELPER, { recursive: true })
 
 // Migration chains, beside the helper for the same reason. Unset `process.resourcesPath` under a real
 // Node means node-core walks up from the service module looking for a `migrations` directory, so this
-// is the first place it looks (packages/node-core/src/main/bindings.ts, pluginMigrations.ts).
+// is the first place it looks (packages/node-core/src/server/bindings.ts, server/plugins/migrations.ts).
 rmSync(resolve(HELPER, 'migrations'), { recursive: true, force: true })
 const chains = [{ plugin: null, dir: resolve(ROOT, 'packages/node-core/migrations') }]
 for (const entry of readdirSync(resolve(ROOT, 'plugins'), { withFileTypes: true })) {
@@ -45,7 +45,7 @@ for (const chain of chains) {
 // The bundled Node runtime, as a Tauri external binary: `binaries/node-<target triple>` is the name
 // `bundle.externalBin` resolves, and the triple comes from rustc rather than a guess about how
 // process.arch spells itself. The runtime is fetched from nodejs.org and checksum-verified, so the
-// developer's own Node no longer has to be the pinned one — see scripts/nodeRuntime.mjs.
+// developer's own Node no longer has to be the pinned one — see scripts/node-runtime.mjs.
 const pin = JSON.parse(readFileSync(resolve(ROOT, 'node-runtime.json'), 'utf8')).version
 const triple = targetTriple()
 const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple })

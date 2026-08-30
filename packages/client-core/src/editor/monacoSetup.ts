@@ -1,5 +1,5 @@
 // Monaco's web-worker wiring, imported for its side effect by the renderer entry (apps/desktop
-// src/app/client/index.tsx) exactly once at boot. It used to sit in ui/ and be imported by both the
+// src/client/index.tsx) exactly once at boot. It used to sit in ui/ and be imported by both the
 // editor and the database pane; it is not presentation, it is Vite-coupled bundler setup, and
 // assigning `self.MonacoEnvironment` once before anything renders beats two panes racing to do it.
 import type {} from 'monaco-editor'

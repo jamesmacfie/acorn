@@ -2,7 +2,7 @@
 // See docs/plugins.md § Loaded plugins for what a manifest is and who reads it.
 //
 // It lives in protocol because the node and the client both need it and neither can import the other.
-// node-core/main/pluginManifest.ts adds the cross-field rules and the reader. The wire projections at
+// node-core/server/plugins/manifest.ts adds the cross-field rules and the reader. The wire projections at
 // the bottom are `z.infer` of these schemas, loosened where an older node's parser had fewer defaults.
 import { z } from 'zod'
 import { collectionParamsSchema, collectionSchema, COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS } from './collections.ts'
@@ -26,10 +26,10 @@ import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from '
 import { normalizeWebviewHost, WEBVIEW_HOST_MAX_COUNT, WEBVIEW_HOST_MAX_LENGTH } from './webview.ts'
 
 // This id becomes the plugin's route namespace and `<dataRoot>/plugins/<id>.sqlite`. An architecture
-// rule keeps the prefix itself out of this package; node-core/main/pluginManifest.ts confines it.
+// rule keeps the prefix itself out of this package; node-core/server/plugins/manifest.ts confines it.
 const ID_RE = /^[a-z][a-z0-9-]{1,31}$/
 
-// Node-half permissions: shapes `ctx` (main/pluginPermissions.ts) and is shown to the user, but is not
+// Node-half permissions: shapes `ctx` (server/plugins/permissions.ts) and is shown to the user, but is not
 // enforced. Surfaces that render this block must keep saying "declared", not "enforced".
 // See docs/security.md.
 const nodePermissions = z.object({
@@ -309,7 +309,7 @@ const sourceDescriptor = z.object({
   // banner, and "nothing is assigned to you" after a timeout is a lie told on the plugin's behalf.
   emptyState: emptyStateDescriptor.optional(),
   // A dashboard region beside this source's rail list, composed by the user under the constraints above.
-  // Mutually exclusive with a `navigate` onSelect, checked in node-core/main/pluginManifest.ts: the
+  // Mutually exclusive with a `navigate` onSelect, checked in node-core/server/plugins/manifest.ts: the
   // detail half of a master/detail browse occupies the same rectangle.
   panels: panelRegion.optional(),
   refresh,
@@ -377,7 +377,7 @@ const extensionPointDescriptor = z.object({
   // an annotation draws at a site the owner registered in code, so neither has a location to name.
   location: z.enum(EXTENSION_POINT_LOCATIONS).optional(),
   surface: z.string().min(1).max(64).optional(),
-  // `pane.aside` only, checked in node-core/main/pluginManifest.ts. The aside's contributor is the
+  // `pane.aside` only, checked in node-core/server/plugins/manifest.ts. The aside's contributor is the
   // user rather than another plugin, so it needs composition constraints rather than a route to read.
   // Absent means the defaults: this plugin's own collections, every view, four panels.
   panels: panelRegion.optional(),
@@ -655,7 +655,7 @@ const taskCheckDescriptor = z.object({
   // checkbox with nothing behind it is worse than none.
   apply: pluginRoute.optional(),
   // Seconds, for the check only. Absent means the host default, and the host ceiling wins either way:
-  // the owner is waiting on a dialog (node-core/server/plugin/taskChecks.ts).
+  // the owner is waiting on a dialog (node-core/server/pluginHost/taskChecks.ts).
   timeout: z.number().int().min(1).max(10).optional(),
 })
 
@@ -688,7 +688,7 @@ const envName = z.string().min(1).max(64).regex(
   'env passthrough must be a variable name or a PREFIX_* glob',
 )
 
-// Exactly one of `command` and `entry`, checked in node-core/main/pluginManifest.ts because a
+// Exactly one of `command` and `entry`, checked in node-core/server/plugins/manifest.ts because a
 // refinement here cannot name the field path inside the containing descriptor.
 const harnessSpawn = z.object({
   // An executable resolved on PATH. The user installs the CLI, and the harness diagnostics report it
@@ -786,7 +786,7 @@ const contributionsShape = z.looseObject({
 //
 // Derived from the schema rather than typed out beside it, so the two cannot drift. Two consumers: the
 // forward-compatibility report, which needs to know which of a loose object's keys this build actually
-// understands (node-core/main/pluginManifest.ts), and the contribution-kind table in
+// understands (node-core/server/plugins/manifest.ts), and the contribution-kind table in
 // docs/contribution-kinds.md, which a test holds against this list.
 export const CONTRIBUTION_KINDS = Object.keys(contributionsShape.shape).sort() as readonly string[]
 
@@ -858,7 +858,7 @@ const manifestShape = z.object({
   permissions: manifestPermissions.prefault({}),
   contributions,
 })
-// `pluginManifestSchema` in node-core/main/pluginManifest.ts wraps this with the cross-field
+// `pluginManifestSchema` in node-core/server/plugins/manifest.ts wraps this with the cross-field
 // refinements (route confinement, surface reachability, id uniqueness), which need `id` and the frame
 // list and so can't live on the fields.
 export const pluginManifestShape = manifestShape

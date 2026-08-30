@@ -1,0 +1,59 @@
+import { chmodSync, existsSync, readFileSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { writePrivateAtomic } from './storage/dataRoot'
+
+// The identity bound to the machine-side internal token: the node's opaque owner id, minted at first
+// boot (server/core/identity.ts). Persisting it explicitly beats guessing from whichever
+// prefs row SQLite returns first. It is not a credential, but it lives in the private data root and
+// is written mode 0600.
+export type ActiveIdentityStore = {
+  get(): string | null
+  set(userId: string): void
+  clear(userId?: string): void
+}
+
+const FILE_NAME = 'active-identity'
+
+export function activeIdentityStore(dataDir: string): ActiveIdentityStore {
+  const file = join(dataDir, FILE_NAME)
+  let current: string | null = null
+  try {
+    current = readFileSync(file, 'utf8').trim() || null
+    chmodSync(file, 0o600)
+  } catch {
+    current = null
+  }
+
+  return {
+    get: () => current,
+    set(userId) {
+      const next = userId.trim()
+      if (!next || next === current) return
+      writePrivateAtomic(file, `${next}\n`)
+      current = next
+    },
+    clear(userId) {
+      if (userId !== undefined && current !== userId) return
+      current = null
+      if (existsSync(file)) rmSync(file)
+    },
+  }
+}
+
+// The same contract with no file behind it, for callers that build CoreServices without a data root.
+// A separate export rather than a `dataDir?` default, so a composition root cannot get a
+// process-local identity by forgetting an argument. Omitting it there is a type error.
+export function memoryIdentityStore(initial: string | null = null): ActiveIdentityStore {
+  let current = initial
+  return {
+    get: () => current,
+    set: (userId) => {
+      const next = userId.trim()
+      if (next) current = next
+    },
+    clear: (userId) => {
+      if (userId !== undefined && current !== userId) return
+      current = null
+    },
+  }
+}

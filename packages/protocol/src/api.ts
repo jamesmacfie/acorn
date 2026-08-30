@@ -226,7 +226,7 @@ export const rendererAgentToolRoute = (taskId: string, name: string) => `/v2/cor
 
 
 // Run targets (docs/workflows.md § Routes and UI): the renderer shares the RunBridge routes the MCP
-// run tools use (server/routes/harness.ts). Replaced the `run:*` IPC channels.
+// run tools use (server/routes/plugins/harness.ts). Replaced the `run:*` IPC channels.
 export const runTargetsRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run`
 export const runDefaultUrlRoute = (taskId: string) => `/v2/core/tasks/${taskId}/run/default-url`
 export const runStartRoute = (taskId: string, targetId: string) => `/v2/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
@@ -253,7 +253,7 @@ export const projectConfigRoute = (id: string) => `${projectRoute(id)}/config`
 export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-targets`
 export const taskArchiveRoute = (id: string) => `/v2/core/tasks/${id}/archive`
 // What every plugin has to say about archiving this task, asked once when the dialog opens
-// (node-core/server/plugin/taskChecks.ts).
+// (node-core/server/pluginHost/taskChecks.ts).
 export const taskArchiveConcernsRoute = (id: string) => `/v2/core/tasks/${id}/archive-concerns`
 export const taskPreviewUrlRoute = (id: string) => `/v2/core/tasks/${id}/preview-url`
 export const taskOnCreatedRoute = (id: string) => `/v2/core/tasks/${id}/on-created`
@@ -287,7 +287,7 @@ export type NodePluginRow = {
   // persisted response type would need a bumped query key (docs/caching.md).
   //
   // Untrusted display text. It comes from a loaded plugin's own throw, so render it as text, never as
-  // markup. The node caps it in node-core/server/plugin/pluginState.ts.
+  // markup. The node caps it in node-core/server/pluginHost/state.ts.
   reason?: string
   // Which pass it died in, so the UI can say "failed to load" rather than "failed to start".
   stage?: 'load' | 'init' | 'ready'
@@ -375,7 +375,7 @@ export type PluginExtensionGrant = {
 export type PluginScheduleGrant = { id: string; label: string; cadence: Cadence }
 
 // The fifth grant: a check this package runs when the owner archives a task, and whether it offers to
-// clean up after it (node-core/server/plugin/taskChecks.ts). Recorded for the same reason as the
+// clean up after it (node-core/server/pluginHost/taskChecks.ts). Recorded for the same reason as the
 // fourth: `cleansUp` in the key is what lets the update prompt say a package that used to only warn
 // now does something.
 export type PluginTaskCheckGrant = { id: string; cleansUp: boolean }

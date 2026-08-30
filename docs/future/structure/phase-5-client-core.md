@@ -89,8 +89,15 @@ Delete `packages/client-core/src/Acorn.tsx` and its `Acorn` export from
 
 ### The three desktop components
 
-If phase 2 decided `App.tsx`, `TaskView.tsx`, or `CommandPalette.tsx` move, they land in
-`features/` here.
+Phase 2 kept `App.tsx` and `TaskView.tsx` in `apps/desktop/src/client/`, and each carries the reason
+in its header: they arrange contributions, and the arrangement is the composition root's.
+
+`CommandPalette.tsx` moves. It is registry-driven with nothing desktop-specific in it, and its
+sibling `WorkspacePalette.tsx` already sits in client-core's `palette/`; the two overlays being in
+different packages is the inconsistency, not the move. It lands in `host/palette/`, beside the
+overlay machinery it already imports, and `apps/desktop/src/client/slotContributions.tsx` lazy-imports
+it from there. `apps/desktop/test/client/parity.test.ts` reads `App.tsx` and `TaskView.tsx` by
+relative path and does not name the palette, so it needs no change.
 
 ### The shared packages
 

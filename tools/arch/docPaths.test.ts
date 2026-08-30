@@ -57,8 +57,11 @@ const GONE = ['delete', 'replaced', 'moved to', 'git history', 'git log', '(new'
 const isDataRoot = (path: string) => path.endsWith('.sqlite')
 
 // A review is dated evidence. Rewriting one so a path resolves would falsify what was true when it
-// was written, so reviews are read-only here and excluded.
-const isReview = (file: string) => rel(file).startsWith('docs/reviews/')
+// was written, so reviews are read-only here and excluded. The structure programme's findings file is
+// the same thing under a different name: it is the 2026-08-30 record of the tree the programme is
+// moving, so every phase that lands makes more of it stale on purpose.
+const REVIEWS = ['docs/reviews/', 'docs/future/structure/01-findings.md']
+const isReview = (file: string) => REVIEWS.some((prefix) => rel(file).startsWith(prefix))
 
 describe('docs cite paths that exist', () => {
   it('every repo-rooted path in backticks resolves', () => {

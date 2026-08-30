@@ -23,7 +23,7 @@ In:
 - `BundleSource` in `@acorn/protocol` and `source` on `BundleCandidate`, `ActiveBundle`,
   `PluginTrustDecision`, `PluginAckRecord`, `PluginDevGrant`, `PluginDevGrantRequest`, and the cache
   entry schema. `nodeId` stays as an accessor for `kind: 'node'`.
-- A shared source resolver package, extracted from `packages/node-core/src/main/pluginInstaller.ts`,
+- A shared source resolver package, extracted from `packages/node-core/src/server/plugins/installer.ts`,
   that both the node installer and the helper call.
 - `PluginCache.putFromSource()` in the helper, with the manifest read, the no-node-half check, and
   `'has-node-half'` as a new `PutFailure`.
@@ -57,7 +57,7 @@ turns out larger than the phase, the helper may import from `node-core` for this
 extraction becomes a follow-up, recorded as a deviation.
 
 **The manifest read.** The helper reads `acorn-plugin.json` out of the package with the same parser
-the node uses (`packages/node-core/src/main/pluginManifest.ts`, which wraps
+the node uses (`packages/node-core/src/server/plugins/manifest.ts`, which wraps
 `@acorn/protocol/pluginContract.ts`). A parse failure is a `PutFailure` with the parser's message.
 The no-node-half check is a function in `@acorn/protocol` beside `isCoreSlotSurface`, so the client
 re-check is the same function.
@@ -89,12 +89,12 @@ uses for fields added after rows were written.
   `devicePluginsDisabled`.
 - `packages/client-core/src/plugins/frames/broker.ts`: `state` verb routes by `source`.
 - `packages/client-core/src/settings/PluginsSettings.tsx`: the device section.
-- `packages/desktop-helper/src/main/pluginCache.ts`: `putFromSource`, `remove`, `source` on entries.
-- `packages/desktop-helper/src/main/pluginTrustStore.ts`: `source` on rows and grants, with the read
+- `packages/desktop-helper/src/plugins/pluginCache.ts`: `putFromSource`, `remove`, `source` on entries.
+- `packages/desktop-helper/src/plugins/pluginTrustStore.ts`: `source` on rows and grants, with the read
   default.
 - `apps/desktop/src/shell/{wire.ts,bridge.ts,helperServer.ts}`: the two verbs.
 - `apps/desktop/src/shell/bridge.test.ts`: the seam check covers the new members.
-- `packages/node-core/src/main/pluginInstaller.ts` and the new `packages/plugin-source/`: the
+- `packages/node-core/src/server/plugins/installer.ts` and the new `packages/plugin-source/`: the
   extraction.
 - `packages/plugin-api/src/testkit/`: the client-only fixture.
 
@@ -148,12 +148,12 @@ Against [07-hosts.md](./07-hosts.md):
 
 - `packages/client-core/src/platform/index.ts` declares `PluginCustody` with exactly `state`,
   `cachePut`, `trustRecord`, `devGrant`, and `contract.ts` lists the same four in `SEAM_GROUPS`.
-- `packages/desktop-helper/src/main/pluginCache.ts` has `putFromNode` and `MAX_BUNDLE_BYTES`;
+- `packages/desktop-helper/src/plugins/pluginCache.ts` has `putFromNode` and `MAX_BUNDLE_BYTES`;
   `pluginTrustStore.ts` keys `decisionFor` on `(pluginId, hash)` and carries `nodeId` on rows.
 - `packages/client-core/src/plugins/resolveBundles.ts` exports `resolveActiveBundles` with
   `BundleCandidate.nodeId` and `ActiveBundle.nodeIds`.
-- `packages/node-core/src/server/routes/plugins.ts` has the four-form `installSource` union and
-  `pluginInstaller.ts` resolves it.
+- `packages/node-core/src/server/routes/plugins/plugins.ts` has the four-form `installSource` union and
+  `server/plugins/installer.ts` resolves it.
 - `apps/desktop/src/shell/wire.ts` lists `plugins-state`, `plugins-cache-put`,
   `plugins-trust-record`, `plugins-dev-grant`.
 - `packages/client-core/src/persistence/devicePrefs.ts` has `DEVICE_KEYS` as a literal set and
