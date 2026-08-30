@@ -33,7 +33,7 @@ const tipAttrs = (own: Tipped) => ({
 // Anything that is not this document is somebody else's site, and a link to one opens away from the
 // app with the opener severed. Derived rather than asked for, so no call site can forget the `rel`.
 const EXTERNAL = /^[a-z][a-z0-9+.-]*:/i
-const isExternal = (href: string) => EXTERNAL.test(href) && !href.startsWith('#')
+export const isExternal = (href: string) => EXTERNAL.test(href) && !href.startsWith('#')
 
 /* Button: the action buttons only. Rows, tabs, tree nodes and popover triggers that happen to be
    <button> belong to Row, Tabs, or Picker instead. */

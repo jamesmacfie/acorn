@@ -34,6 +34,7 @@ import { Tabs } from '../../kit/components/layout/Tabs'
 import { UserAvatar } from '../../kit/components/content/UserAvatar'
 import { Stack } from '../../kit/components/layout/Stack'
 import { Text } from '../../kit/components/content/Text'
+import { Link } from '../../kit/components/content/Link'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Heading } from '../../kit/components/content/Heading'
 import { Section } from '../../kit/components/layout/Section'
@@ -62,7 +63,7 @@ export const KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
   // remote tree only under a name of their own.
   ModalBody: Modal.Body, ModalActions: Modal.Actions, TabPanel: Tabs.Panel, ToolbarSpacer: Toolbar.Spacer,
-  Text, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
+  Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
   DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
   FileHead, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,

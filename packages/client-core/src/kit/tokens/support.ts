@@ -46,6 +46,8 @@ export const NODE_SUPPORT = {
 
   // Showing
   Text: { dom: 'full', tui: 'full' },
+  // Text that acts. `Text` is presentational and stays that way; the kit is one intent per node.
+  Link: { dom: 'full', tui: 'full' },
   Heading: { dom: 'full', tui: 'full' },
   Rows: { dom: 'full', tui: 'full' },
   Row: { dom: 'full', tui: 'full' },

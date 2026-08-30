@@ -930,6 +930,7 @@ disagree about which nodes exist or what each one does with focus.
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
 | `Text` | none | plain text; `mono` is a no-op, `muted` is dim, `strong` is bold |
+| `Link` | stop | the text, underlined, pressable |
 | `Heading` | none | eyebrow in dim uppercase, heading in bold |
 | `Rows` | collection | its items on successive lines; `virtual` is the scroll window and changes nothing else |
 | `Row` | item | one line: status glyph, title, meta right-aligned; subtitle on a second line if there is room |
