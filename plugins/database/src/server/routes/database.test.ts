@@ -8,7 +8,7 @@ import type { Principal } from '@acorn/node-core/server/middleware/auth.ts'
 import type { PluginRequestContext } from '@acorn/plugin-api/node'
 import type { PluginCompletionResponse } from '@acorn/protocol/documentSurface.ts'
 import type { DbSavedQuery } from '../../shared/database'
-import type { DatabaseBridge } from '../../main/database'
+import type { DatabaseBridge } from '../database'
 import { createDatabaseFetch } from './database'
 
 // These routes run over the portable carrier: no host Hono stack, no middleware-set principal, and the

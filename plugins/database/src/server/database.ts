@@ -9,6 +9,7 @@ import { promisify } from 'node:util'
 import pg from 'pg'
 import type { QueryResult, QueryResultRow } from 'pg'
 import { type CoreServices, loadRepoConfig } from '@acorn/plugin-api/node'
+import { formatSchema, qid } from './formatSchema'
 import type { DbCatalogResult, DbCatalogTable, DbCell, DbColumn, DbConnectResult, DbColumnsResult, DbPk, DbQueryResult, DbResultSet, DbRowsResult, DbSchemaResult, DbTablesResult, DbWriteResult } from '../shared/database'
 
 // The Postgres surface this plugin's routes call. Declared beside the implementation, not in the
@@ -54,7 +55,6 @@ function toResultSet(res: QueryResult<QueryResultRow>): DbResultSet {
 
 // Double-quote an identifier (escaping embedded quotes). Only ever called on identifiers already
 // checked against the introspected schema.
-const qid = (id: string): string => `"${id.replace(/"/g, '""')}"`
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
@@ -156,19 +156,7 @@ const SCHEMA_CHAR_CAP = 80_000
 const capSchema = (text: string): string =>
   text.length <= SCHEMA_CHAR_CAP ? text : `${text.slice(0, SCHEMA_CHAR_CAP)}\n-- (schema truncated)`
 
-// Compact CREATE TABLE-ish text from introspected tables, for the AI prompt rather than execution.
-export function formatSchema(tables: { schema: string; name: string; columns: DbColumn[] }[]): string {
-  return tables
-    .map((t) => {
-      const cols = t.columns
-        .map((c) => `  ${qid(c.name)} ${c.dataType}${c.nullable ? '' : ' NOT NULL'}${c.isPk ? ', -- PK' : ','}`)
-        .join('\n')
-      return `CREATE TABLE ${qid(t.schema)}.${qid(t.name)} (\n${cols}\n);`
-    })
-    .join('\n\n')
-}
-
-// Validates a renderer-supplied table against the live schema, returning the matched {schema,name} or
+// Validates a client-supplied table against the live schema, returning the matched {schema,name} or
 // throwing. Only names Postgres itself reported are ever quoted, which prevents identifier injection.
 async function assertTable(pool: InstanceType<typeof Pool>, schema: string, name: string): Promise<{ schema: string; name: string }> {
   const match = (await listTables(pool)).find((t) => t.schema === schema && t.name === name)
@@ -176,7 +164,7 @@ async function assertTable(pool: InstanceType<typeof Pool>, schema: string, name
   return match
 }
 
-// Validate renderer-supplied column names against the table; returns the column metadata by name.
+// Validate client-supplied column names against the table; returns the column metadata by name.
 async function assertColumns(pool: InstanceType<typeof Pool>, schema: string, name: string, cols: string[]): Promise<Map<string, DbColumn>> {
   const meta = new Map((await tableColumns(pool, schema, name)).map((c) => [c.name, c]))
   for (const c of cols) if (!meta.has(c)) throw new Error(`Unknown column ${c} on ${schema}.${name}`)
