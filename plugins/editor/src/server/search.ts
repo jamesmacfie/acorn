@@ -1,5 +1,5 @@
 // Find-in-files: project-wide text search over the task's worktree, backed by ripgrep. Keyed by
-// taskId, not path: the renderer never hands over a path, so this resolves taskId to taskRoot and
+// taskId, not path: the client never hands over a path, so this resolves taskId to taskRoot and
 // runs rg with cwd:root, searching `.`. Exposed as the SearchBridge (server/routes/search.ts).
 import { execFile } from 'node:child_process'
 import { sep } from 'node:path'
@@ -16,14 +16,6 @@ export type SearchCoreServices = Pick<CoreServices, 'tasks'>
 const MAX_TOTAL_HITS = 2000 // Bound the response; the pane reports when results are truncated.
 const MAX_PREVIEW_LEN = 300 // Keep one long or minified line from bloating the response payload.
 
-// electron-builder stores executable dependencies beside the archive. Electron's CommonJS
-// child_process shim redirects an app.asar path there, but an ESM import of execFile does not:
-// spawning rgPath verbatim then throws ENOTDIR because app.asar is a file to the OS.
-export function ripgrepExecutablePath(path: string): string {
-  const archiveSegment = `${sep}app.asar${sep}`
-  return path.replace(archiveSegment, `${sep}app.asar.unpacked${sep}`)
-}
-
 // One line of `rg --json` output. Only the fields we consume are typed; `type` discriminates.
 type RgEvent = {
   type: 'begin' | 'end' | 'match' | 'summary' | 'context'
@@ -36,7 +28,7 @@ type RgEvent = {
 }
 
 // ripgrep's submatch offsets are UTF-8 bytes, while JavaScript strings and Monaco columns use UTF-16
-// code units. Convert at the main-process boundary so every renderer consumer shares one column
+// code units. Convert on the node so every client consumer shares one column
 // contract. rg only reports code-point boundaries, so a partial character cannot occur, and the >=
 // check clamps a malformed offset to the next valid position.
 function utf16OffsetAtUtf8Byte(text: string, byteOffset: number): number {
@@ -115,7 +107,7 @@ export async function searchInFiles(core: SearchCoreServices, taskId: string, qu
   // rg blocks reading stdin forever and only dies at the timeout. `.` means search the cwd, the
   // worktree.
   args.push('--', query, '.')
-  const { stdout } = await promisify(execFile)(ripgrepExecutablePath(rgPath), args, {
+  const { stdout } = await promisify(execFile)(rgPath, args, {
     cwd: root,
     timeout: 10_000,
     maxBuffer: 32 * 1024 * 1024,

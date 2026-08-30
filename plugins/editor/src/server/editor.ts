@@ -2,7 +2,7 @@
 // behind the HTTP routes in server/routes/editor.ts. The taskId is the capability, and every call
 // re-derives the worktree root from the DB. Path confinement is `resolveInRoot` (docs/security.md §
 // Process, path, and configuration controls). Pure Node, so it works in dev:node too. Wired in
-// main/serverBridges.ts.
+// node/index.ts.
 import { BridgeError, type CoreServices, gitOrThrow, type PluginHookRegistry } from '@acorn/plugin-api/node'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
@@ -68,7 +68,7 @@ export const editorBridge = (
 
   // Write keeps the {ok, reason} contract and never throws: EditorPane surfaces reason inline, and
   // the autosave loop must not see a rejected promise. A path escape is a benign {ok:false} rather
-  // than a 4xx, because the renderer already confined the path and this check is a second layer.
+  // than a 4xx, because the client already confined the path and this check is a second layer.
   write: async (taskId, relPath, content) => {
     const root = await core.tasks.root(taskId)
     const abs = root && core.fs.resolveInRoot(root, relPath)

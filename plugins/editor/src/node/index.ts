@@ -1,6 +1,6 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
-import { editorBridge } from '../main/editor'
-import { searchBridge } from '../main/search'
+import { editorBridge } from '../server/editor'
+import { searchBridge } from '../server/search'
 import { editor, EDITOR } from '../server/routes/editor'
 import { search, SEARCH } from '../server/routes/search'
 
