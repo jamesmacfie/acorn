@@ -16,6 +16,17 @@ const REPO = join(PACKAGES, '..')
 
 // tsc and @types/node, resolved out of the workspace store so the out-of-repo check below needs no
 // network. Both are pnpm-shaped paths, which is the one thing about this test that is not portable.
+const CLI = join(HERE, 'index.mjs')
+
+/** Run the scaffolder the way a person does, in a fresh directory, and read back what it wrote. */
+function runCli(...args: string[]): { dir: string; manifest: Record<string, unknown> } {
+  const cwd = mkdtempSync(join(tmpdir(), 'acorn scaffold-'))
+  execFileSync(process.execPath, [CLI, ...args], { cwd, stdio: 'pipe' })
+  const [id] = readdirSync(cwd)
+  const dir = join(cwd, id!)
+  return { dir, manifest: JSON.parse(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')) }
+}
+
 const TSC = join(PACKAGES, 'protocol', 'node_modules', '.bin', 'tsc')
 const NODE_TYPES = (() => {
   const store = join(REPO, 'node_modules', '.pnpm')
@@ -184,4 +195,29 @@ it("type-checks its node half against the published declarations, from outside t
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+// The one flag the CLI has, exercised through the CLI. Every other test here calls `scaffoldFiles`
+// directly, which skips the argv reading entirely — so the flag could have stopped being read and
+// nothing would have said so.
+it('--rectangle picks the render path, wherever it sits in the argv', () => {
+  const before = runCli('--rectangle', 'sink one')
+  const after = runCli('sink two', '--rectangle')
+  for (const { manifest } of [before, after]) {
+    const frames = (manifest.contributions as { frames?: { regions?: Record<string, unknown> }[] }).frames ?? []
+    // A rectangle: the host draws the box and the plugin draws the inside.
+    expect(frames[0]?.regions).toEqual({ body: 'frame' })
+  }
+  // The name is read past the flag rather than as the flag, which is the mistake this guards.
+  expect(before.dir.endsWith('sink-one')).toBe(true)
+  expect(after.dir.endsWith('sink-two')).toBe(true)
+})
+
+it('scaffolds a tree by default, with both halves of the cooperative seam', () => {
+  const { manifest } = runCli('sink three')
+  const contributions = manifest.contributions as { frames?: unknown[]; extensions?: { point: string }[] }
+  // No rectangle at all: a tree plugin draws through somebody else's slot and its own pane comes later.
+  expect(contributions.frames).toBeUndefined()
+  expect((contributions.extensions ?? []).map((entry) => entry.point))
+    .toEqual(['agents:tool-card', 'changes:diff-line'])
 })

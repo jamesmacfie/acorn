@@ -15,6 +15,9 @@ const { extensionDeliveries, extensionPointFor, extensionPointRegistry, extensio
   await import('../../registries/extensionPoints')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../distribution')
 const { _resetChromeContributions, syncChromeContributions } = await import('./register')
+// The two carriers that run a plugin's own bytes register in the frames pass instead, where the
+// accepted bundle hash and the trust answer are both in scope. Only the five-kinds case below needs it.
+const { _resetFrameContributions, syncFrameContributions } = await import('../frames/register')
 
 // The cooperative cross-plugin seam, end to end through the pass that builds it. Pins the four
 // promises and the one refusal docs/plugins.md § Cooperative extension points describes: the host
@@ -69,6 +72,7 @@ beforeEach(() => {
 
 afterEach(() => {
   _resetChromeContributions()
+  _resetFrameContributions()
   _resetPluginDistribution()
   setActiveNode(null)
 })
@@ -227,6 +231,65 @@ describe('cooperative extension points', () => {
     ]]])
     syncChromeContributions()
     expect(extensionDeliveries('board:card-links').map((entry) => entry.pluginId)).toEqual(['zeta', 'alpha'])
+  })
+
+  // One plugin, all five kinds, on the client side of the same seam. The node's half of this fixture
+  // is `node-core/src/main/fiveKinds.test.ts`, which loads the same shape from disk; this is what the
+  // chrome pass does with the roster row that comes out of it.
+  //
+  // The interesting one is the hook. It registers here like the rest so the developer view can list it
+  // beside them, and it delivers nowhere, because the chain runs on the node and this registry has no
+  // part in it (../../registries/extensionPoints.ts § carrierFits).
+  it('registers all five kinds from one plugin, and delivers the four that draw', () => {
+    const SINK: Partial<PluginContributions> = {
+      frames: [
+        { target: 'pane', id: 'sink', label: 'Sink', glyph: 'puzzle', order: 800, formFactor: ['desktop'] },
+      ],
+      extensionPoints: [
+        { id: 'card-links', label: 'Linked items', kind: 'rows', location: 'pane.footer', surface: 'sink', max: 4 },
+        { id: 'row-note', label: 'Row notes', kind: 'annotation', key: { row: 'string' }, max: 4 },
+        { id: 'beside-row', label: 'Beside a row', kind: 'remote', mode: 'replace', max: 4 },
+        { id: 'beside-pane', label: 'Beside the pane', kind: 'rectangle', location: 'pane.inline-beside', surface: 'sink', mode: 'replace', max: 4 },
+        { id: 'before-flush', label: 'flush the sink', kind: 'hook', max: 4 },
+      ],
+    }
+    const GUEST: Partial<PluginContributions> = {
+      frames: [{ target: 'inline', id: 'preview', label: 'Preview', glyph: 'eye', order: 800, formFactor: ['desktop'] }],
+      extensions: [
+        { id: 'links', point: 'sink:card-links', label: 'Guest links', order: 500, items: '/v2/p/guest/links' },
+        { id: 'notes', point: 'sink:row-note', label: 'Guest notes', order: 500, items: '/v2/p/guest/marks' },
+        { id: 'card', point: 'sink:beside-row', label: 'Guest card', order: 500, remote: 'card' },
+        { id: 'box', point: 'sink:beside-pane', label: 'Guest box', order: 500, frame: 'preview' },
+        { id: 'scan', point: 'sink:before-flush', label: 'Guest scan', order: 500, route: '/v2/p/guest/scan' },
+      ],
+    }
+    const guestRow = row('guest', GUEST)
+    _seedPluginDistribution([['node-a', [
+      row('sink', SINK),
+      // A `remote` contribution runs the plugin's own bytes, so it needs an accepted bundle on this
+      // device for the same reason a frame does.
+      { ...guestRow, installed: { ...guestRow.installed!, client: { hash: HASH, bytes: 12 } } },
+    ]]], [`guest ${HASH}`])
+    // Both passes, because the five kinds are split across them: `items` and `route` are descriptors
+    // and ride the chrome pass, while `remote` and `frame` run the contributor's own bytes and ride the
+    // frames pass, where the accepted hash and the trust answer are in scope. One plugin, five
+    // declarations, two doors — and one registry on the other side of both.
+    syncChromeContributions()
+    syncFrameContributions()
+
+    expect(extensionPointRegistry.entries().map((entry) => [entry.id, entry.kind])).toEqual([
+      ['sink:card-links', 'rows'],
+      ['sink:row-note', 'annotation'],
+      ['sink:beside-row', 'remote'],
+      ['sink:beside-pane', 'rectangle'],
+      ['sink:before-flush', 'hook'],
+    ])
+    expect(extensionRegistry.entries().map((entry) => entry.carrier).sort())
+      .toEqual(['frame', 'items', 'items', 'remote', 'route'])
+    for (const point of ['sink:card-links', 'sink:row-note', 'sink:beside-row', 'sink:beside-pane']) {
+      expect(extensionDeliveries(point).map((entry) => entry.pluginId)).toEqual(['guest'])
+    }
+    expect(extensionDeliveries('sink:before-flush')).toEqual([])
   })
 
   it('disposes then registers on a re-sync, so a reload does not double a point or its contribution', () => {
