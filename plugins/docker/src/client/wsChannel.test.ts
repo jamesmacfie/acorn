@@ -5,7 +5,7 @@ import { setActiveNode } from '@acorn/client-core/node/activeNode.ts'
 // Core's test covers the transport, the reconnect edge, and the fleet filter. This one covers
 // docker's part: a stream routes by kind and id, and a live subscription re-attaches after a drop.
 //
-// The bridge is faked rather than a WebSocket, because the renderer owns no socket. The helper's
+// The bridge is faked rather than a WebSocket, because the client owns no socket. The helper's
 // broker does, so what is under test is subscription bookkeeping.
 
 type Bridge = {

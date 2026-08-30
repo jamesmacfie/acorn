@@ -9,7 +9,7 @@ import type { DockerContainerAction, DockerPort } from '../shared/model'
 import { containerAction, fetchContainerDetail, removeContainer } from './dockerClient'
 import { refreshDocker } from './dockerStore'
 import { dockerLogBuffer, type DockerLogBuffer } from './dockerLogStore'
-import { containerTone, dockerDetailState, rememberDockerDetailState, type DockerDetailTab as Tab } from './dockerViewState'
+import { containerTone, dockerDetailState, rememberDockerDetailState, type DockerDetailTab as Tab } from './dockerViewStore'
 import DockerExecTerminal from './DockerExecTerminal'
 import { STATS_BESIDE_POINT } from './extensionPoints'
 import {
