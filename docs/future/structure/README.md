@@ -1,6 +1,6 @@
 # Structure: making the folder names say what the architecture doc says
 
-Status: proposal, 2026-08-30. Phases 0 to 5 shipped the same day; phase 6 is next.
+Status: proposal, 2026-08-30. Phases 0 to 6 shipped the same day; phase 7 is next.
 
 This folder is the plan for reorganising the repo so a reader can predict where a file lives without
 first reading `docs/architecture-overview.md`. The architecture is documented well and enforced by
@@ -49,7 +49,7 @@ docs saying the new true thing ([docs-migration.md](./docs-migration.md) says wh
 | [3: node-core and desktop-helper](./phase-3-node-core.md) — shipped | Finish the `core/` facade migration, merge `main/` into `server/` with real groups, flatten desktop-helper. | 2 |
 | [4: plugins](./phase-4-plugins.md) — shipped | Retire `main/` in ten plugins, apply the contract rule, subdivide agents and github, apply the naming conventions, drop Electron residue. | 3 |
 | [5: client-core](./phase-5-client-core.md) — shipped | The four-group regroup: `kit/`, `host/`, `infra/`, `features/`. Re-point the plugin-api facade. | 4 |
-| [6: enforcement](./phase-6-enforcement.md) | Arch rules for folder shape and contract tests, the path checker covers the root docs, CI runs lint and test. | 5 |
+| [6: enforcement](./phase-6-enforcement.md) — shipped | Arch rules for folder shape and contract tests, the path checker covers the root docs, CI runs lint and test. | 5 |
 | [7: docs reference sweep](./phase-7-docs-reference-sweep.md) | Every path and link in `docs/` and `docs/future/` re-checked against the moved tree. Retire this folder. | 6 |
 
 The analysis files are [01-findings.md](./01-findings.md) (what the review found, with counts),

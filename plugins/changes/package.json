@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-changes",
   "version": "0.1.0",
+  "description": "The working-tree diff: what a task changed, reviewed and commented on in place.",
   "private": true,
   "type": "module",
   "exports": {

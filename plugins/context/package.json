@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-context",
   "version": "0.1.0",
+  "description": "What an agent is told: the task-context snapshot the composer assembles and keys.",
   "private": true,
   "type": "module",
   "exports": {

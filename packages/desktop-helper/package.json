@@ -1,6 +1,7 @@
 {
   "name": "@acorn/desktop-helper",
   "version": "0.1.0",
+  "description": "What a desktop needs around the service: the request broker, credential custody, the plugin cache, and child supervision.",
   "private": true,
   "type": "module",
   "exports": {

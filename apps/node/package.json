@@ -1,6 +1,7 @@
 {
   "name": "@acorn/node",
   "version": "0.1.0",
+  "description": "The Node service: the composition root that wires core, the plugins, and the HTTP and WebSocket surface.",
   "private": true,
   "type": "module",
   "exports": {

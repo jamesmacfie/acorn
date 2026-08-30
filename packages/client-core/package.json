@@ -1,6 +1,7 @@
 {
   "name": "@acorn/client-core",
   "version": "0.1.0",
+  "description": "The client half of the product: the UI kit, the plugin host, the platform seam, and the feature surfaces.",
   "private": true,
   "type": "module",
   "exports": {

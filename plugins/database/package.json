@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-database",
   "version": "0.1.0",
+  "description": "A SQL console for a repo's database: saved queries, schema browsing, and AI-assisted drafting.",
   "private": true,
   "type": "module",
   "exports": {

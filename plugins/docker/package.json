@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-docker",
   "version": "0.1.0",
+  "description": "Containers for a task: status, logs, and event streams over a WebSocket channel.",
   "private": true,
   "type": "module",
   "exports": {

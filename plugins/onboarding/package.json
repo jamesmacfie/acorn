@@ -1,6 +1,7 @@
 {
   "name": "@acorn/plugin-onboarding",
   "version": "0.1.0",
+  "description": "The first-run wizard, opened when a ready node has no projects yet.",
   "private": true,
   "type": "module",
   "exports": {

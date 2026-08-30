@@ -133,6 +133,26 @@ console line the page logged with the value it saw. Opt-in through
 `pnpm test` should pay for. On a machine with no Chrome it takes the other branch and asserts the
 tools reported why.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs `pnpm lint` and `pnpm test` on every pull request and on push to
+`main`. Before it existed, the architecture rules and the path checker ran only on whoever remembered
+to run them: `.github/workflows/build-desktop.yml` has no `pull_request` trigger and tests the desktop
+package alone. That is how twelve doc paths rotted without anything going red.
+
+It runs on Linux, for two reasons that are both about the runner rather than the code. A macOS runner
+has no Docker for the container probes to find, and its `/var` is a symlink to `/private/var`, which is
+the artefact behind one of the pre-existing failures below.
+
+`@acorn/desktop` is filtered out of the test run. Its `test` script stages the whole bundle and then
+runs `cargo test`, and `build-desktop.yml` already has the Rust toolchain, the staged inputs, and the
+pinned-runtime cache to do it in. That does mean the boot test and the Rust suite gate `main` rather
+than the pull request.
+
+Nothing is cached between runs, so CI runs the suites a local `pnpm test` usually serves from
+Turborepo's cache. A green local run with 30 of 31 tasks cached is not evidence about the one task you
+changed.
+
 ## The smoke checklist
 
 Deliberately manual — it replaced the Playwright specs, whose harness left the repo with the Electron

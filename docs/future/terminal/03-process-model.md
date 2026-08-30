@@ -30,7 +30,7 @@ A second `acorn` in a second terminal finds the lock and attaches. The node live
 first TUI that started it, which is the desktop's behaviour too: the app that started the node owns
 its lifetime. A TUI that attached to a node it did not start leaves it running on exit.
 
-The supervise-a-child code is the desktop helper's (`packages/desktop-helper/src/main/`), and the
+The supervise-a-child code is the desktop helper's (`packages/desktop-helper/src/supervision/`), and the
 helper has no shell binding by design (`packages/desktop-helper/src/index.ts`). The TUI imports
 it as a library. It does not speak the helper's wire protocol (`apps/desktop/src/shell/wire.ts`),
 because there is no second process to speak it to.
