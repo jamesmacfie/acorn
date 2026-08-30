@@ -1,5 +1,5 @@
 import { createResource, onCleanup } from 'solid-js'
-import { clientEvents, closeTunnelsForTask, type PaneContribution, recipeBrowserUrl, runApi, type Task, taskBridge, tunnelUrl } from '@acorn/plugin-api/client'
+import { clientEvents, closeTunnelsForTask, type PaneLayoutContribution, recipeBrowserUrl, runApi, type Task, taskBridge, tunnelUrl } from '@acorn/plugin-api/client'
 import PreviewPane from './PreviewPane'
 
 export function PreviewTaskPane(props: { task: Task }) {
@@ -68,11 +68,15 @@ export function PreviewTaskPane(props: { task: Task }) {
   return <PreviewPane taskId={props.task.id} url={loadable() ?? null} />
 }
 
-export const previewPaneContribution: PaneContribution = {
+export const previewPaneContribution: PaneLayoutContribution = {
   id: 'preview', label: 'Browser preview', glyph: 'globe', description: 'Live preview of the app', order: 80,
-  // The one surviving `desktop` gate outside a test (docs/frontend.md § The desktop gate audit). The
-  // pane is a WebContentsView the shell positions over the client; there is no HTTP route behind it
-  // and a browser client has nothing to draw here.
-  defaultChord: 'meta+shift+b', requires: 'desktop', component: PreviewTaskPane,
+  // The gate is the seam that actually backs the pane, not "am I the desktop" (docs/frontend.md §
+  // The desktop gate audit). The pane is a WebContentsView the shell positions over the client, and
+  // a desktop shell may ship without preview views — so a host that has not installed the group
+  // never lists the pane at all, rather than listing it and then saying it cannot draw it.
+  defaultChord: 'meta+shift+b', requires: { seam: 'preview' },
+  // `single`, so the pane inherits the host's frame, focus group and padding rules rather than the
+  // `<section class="pane workspace-preview">` it used to write for itself.
+  layout: 'single', regions: { body: PreviewTaskPane },
   keepAlive: 'dom', minWidth: 320,
 }

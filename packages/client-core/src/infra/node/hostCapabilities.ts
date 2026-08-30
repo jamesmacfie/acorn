@@ -1,4 +1,5 @@
 import { isDesktopHost } from '../platform'
+import { seamPresent, type SeamGroup } from '../platform/contract'
 import { disabledNodePlugins } from './nodePlugins'
 
 // What the surroundings offer a contribution: is a desktop shell hosting this renderer, and does the
@@ -7,14 +8,17 @@ import { disabledNodePlugins } from './nodePlugins'
 // source's `requiresProvider` asks whether a connected integration grants an operation. Three
 // questions, three names.
 //
-// Two kinds of question, and they are not the same one:
+// Three kinds of question, and they are not the same one:
 //
 // - `'desktop'`        is a desktop shell hosting this renderer. True platform gating, for surfaces
-//                      that need something only a shell can do (a native folder dialog, a
-//                      WebContentsView). A closed question with one answer, so it stays a bare word.
+//                      that need something only a shell can do (a native folder dialog). A closed
+//                      question with one answer, so it stays a bare word.
 // - `{ plugin: id }`   does the node run that plugin. Answered by the node's plugin roster, because
 //                      the terminal drawer, agents, run targets and workflows are ordinary `/v2` plus
 //                      WebSocket surfaces that work from any client.
+// - `{ seam: group }`  did this host install that group of the platform seam. Answered by the seam's
+//                      own probe (../platform/contract.ts), so the question the rail asks and the
+//                      object the surface calls are the same one.
 //
 // Those two were one probe until 2026-08-15, and it was the wrong one: `terminal` meant "the preload
 // exposes a native folder picker", so the whole terminal, agents and workflows block was hidden from
@@ -25,11 +29,14 @@ import { disabledNodePlugins } from './nodePlugins'
 // things (2026-08-27 extensibility review, finding 8). `disabledNodePlugins()` already answers the
 // question for any id, so the requirement now carries the id and core names no plugin.
 //
-// Reach for `'desktop'` sparingly. It's right for the folder picker and the preview pane; it's wrong
-// for anything whose implementation is an HTTP route.
+// Reach for `'desktop'` sparingly. It is right for a surface that is about the shell itself, and
+// wrong both for anything whose implementation is an HTTP route and for anything a shell can ship
+// without — the desktop's own preview views are optional, so the preview pane asks `{ seam: 'preview' }`
+// rather than "am I the desktop" (docs/frontend.md § The desktop gate audit).
 export type HostRequirement =
   | 'desktop'
   | { plugin: string }
+  | { seam: SeamGroup }
 
 // `requires` on a contribution, and the rule for where that field belongs: EVERY contribution the host
 // filters before drawing takes it, because the question is the host's and the answer is the same
@@ -46,8 +53,11 @@ export type HostCapabilityRequirement = 'none' | HostRequirement | readonly Host
 // the owner's toggle without anyone re-reading it. Empty until the first roster read resolves, which is
 // the right default: a node that hasn't answered must not be assumed to have anything disabled, or the
 // first paint drops panes and then adds them back.
-const meets = (requirement: HostRequirement): boolean =>
-  requirement === 'desktop' ? isDesktopHost() : !disabledNodePlugins().includes(requirement.plugin)
+const meets = (requirement: HostRequirement): boolean => {
+  if (requirement === 'desktop') return isDesktopHost()
+  if ('seam' in requirement) return seamPresent(requirement.seam)
+  return !disabledNodePlugins().includes(requirement.plugin)
+}
 
 export const hasHostCapability = (requirement: HostCapabilityRequirement = 'none'): boolean => {
   if (requirement === 'none') return true

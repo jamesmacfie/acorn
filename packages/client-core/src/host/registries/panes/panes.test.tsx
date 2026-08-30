@@ -1,7 +1,7 @@
 import { onCleanup } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { paneRegistry, type PaneLayoutContribution } from './panes'
+import { paneAvailable, paneRegistry, type PaneLayoutContribution } from './panes'
 import type { Task } from '../../../infra/queries'
 import { _resetPaneModels } from './paneModels'
 import { evictScope } from '../shell/scopeEviction'
@@ -121,5 +121,26 @@ describe('the model a pane’s regions share', () => {
     expect(disposed).toEqual(['t1'])
     evictScope({ scope: 'task', taskId: 't2' })
     expect(disposed).toEqual(['t1', 't2'])
+  })
+})
+
+describe('paneAvailable', () => {
+  // The gate the rail and the pane switcher both read (../../../features/tasks/TaskPaneHost.tsx).
+  // The seam arm is what keeps the browser preview off a shell that ships without preview views:
+  // `'desktop'` said yes to that shell, and the pane then rendered a dead end.
+  afterEach(() => { delete (window as unknown as { acorn?: unknown }).acorn })
+
+  it('a seam gate follows the host, not the shell', () => {
+    const gated = pane({ id: 'preview', requires: { seam: 'preview' } })
+    register(gated)
+    const entry = paneRegistry.get('preview')!
+    ;(window as unknown as { acorn?: unknown }).acorn = { desktop: true, platform: 'darwin' }
+    expect(paneAvailable(entry)).toBe(false)
+    ;(window as unknown as { acorn?: unknown }).acorn = {
+      desktop: true,
+      platform: 'darwin',
+      preview: { ensure() {}, setBounds() {}, show() {}, hide() {}, load() {}, command() {}, evict() {}, onEvent: () => () => {} },
+    }
+    expect(paneAvailable(entry)).toBe(true)
   })
 })

@@ -10,10 +10,16 @@ import TaskPaneHost from './TaskPaneHost'
 // tests; what a render adds is that the reducer's answer reaches the screen, and that the fallbacks
 // are real rather than intended.
 
-const capabilities = vi.hoisted(() => ({ desktop: true, terminal: true }))
+// All three `requires` shapes, answered from a table the tests below set: the bare word, `{ plugin }`
+// and `{ seam }`. The predicate itself has a unit test of its own
+// (infra/node/hostCapabilities.test.ts); this stub only has to be honest about the shapes, which it
+// was not while it took a string and read `{ plugin: 'terminal' }` as `undefined`.
+const capabilities = vi.hoisted(() => ({ desktop: true, terminal: true, preview: true }))
 vi.mock('../../infra/node/hostCapabilities', () => ({
-  hasHostCapability: (requirement: 'none' | 'desktop' | 'terminal' = 'none') =>
-    requirement === 'none' || capabilities[requirement],
+  hasHostCapability: (requirement: 'none' | 'desktop' | { plugin?: string; seam?: string } = 'none') =>
+    requirement === 'none' ? true
+      : requirement === 'desktop' ? capabilities.desktop
+      : capabilities[(requirement.plugin ?? requirement.seam) as keyof typeof capabilities] ?? true,
 }))
 
 // The layout store, the node's freshness, and the rail's markers are all read through modules of
@@ -74,6 +80,7 @@ const drawn = () => [...host.querySelectorAll('.task-slot')].map((node) => node.
 beforeEach(() => {
   capabilities.desktop = true
   capabilities.terminal = true
+  capabilities.preview = true
   layout.panes = ['pr']
   layout.pinned = []
   layout.weights = {}
@@ -113,8 +120,10 @@ describe('TaskPaneHost', () => {
   })
 
   it('says so when the layout has nothing left to draw', () => {
-    capabilities.desktop = false
-    pane({ id: 'preview', order: 0, requires: 'desktop' })
+    // The seam gate, which is what the browser preview asks: a shell without preview views never
+    // offers the pane (plugins/preview/src/client/PreviewTaskPane.tsx).
+    capabilities.preview = false
+    pane({ id: 'preview', order: 0, requires: { seam: 'preview' } })
     layout.panes = ['preview']
 
     mount()

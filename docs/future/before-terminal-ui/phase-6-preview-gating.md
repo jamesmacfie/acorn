@@ -1,6 +1,6 @@
 # Phase 6: preview is absent where it cannot draw
 
-Status: not started. Waits on nothing.
+Status: shipped 2026-08-31.
 
 ## Goal
 
