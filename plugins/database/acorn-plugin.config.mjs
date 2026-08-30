@@ -49,9 +49,6 @@ export default {
   factory: 'databasePlugin',
   client: {
     entry: './src/tree/index.tsx',
-    // The bundle runs in a worker and emits a tree of acorn's own component names; the builder maps
-    // this key to the Vite transforms that compile JSX into that tree rather than into a document.
-    framework: 'solid',
   },
   // Staged into the built package by the builder, and opened by the host from there. The chain in
   // `plugins/database/migrations` stays the source of truth and drizzle-kit keeps generating into it.

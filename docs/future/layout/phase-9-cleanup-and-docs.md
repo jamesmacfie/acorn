@@ -1,6 +1,6 @@
 # Phase 9: cleanup, docs, and the full test pass
 
-Status: not started.
+Status: shipped 2026-08-30. What changed on the way is at the end, and the folder README repeats it.
 
 ## Goal
 
@@ -113,3 +113,64 @@ support row, every layout with both projections, intents only, one keymap, `fram
 - `find plugins -name '*.css' -path '*/src/*'` lists what is left to delete.
 - docs-migration.md rows marked done by earlier phases are actually done: spot-check
   `docs/plugins.md` § "Cooperative extension points" and `docs/command-palette-and-shortcuts.md`.
+
+## What changed on the way
+
+Eight departures from the plan above. The folder README carries the same list.
+
+**Two deletions were refused, and the argument is the finding.**
+
+`ListDetail` and `DocumentTabs` stay exported kit nodes. The scope line called them layouts, which was
+true when it was written and stopped being true during phases 5 to 8: a pane's regions are the *outer*
+arrangement, and a split *inside* one region is a different object with a different owner. Ten plugins
+split inside a region, github nests two splits in one, and `plugins/http/src/tree/HttpPanel.tsx` says
+so at the top of the file. Deleting them would have meant either a pane layout per nesting depth or a
+rewrite of every one of those surfaces to lose a split it needs.
+
+`overlay`, `importer` and `coreSlot` still take no layout. The scope line asked for the layout-less
+`PluginFrame` branch of all six frame targets. Three of them are rectangles by construction: a
+full-screen picker, a wizard the plugin owns, a replacement for one of core's surfaces. Each has no
+arrangement to name and no second region, so a layout key there would be a manifest field whose only
+legal value is `single` over `frame`, threaded through three registrations that each pass their own
+callbacks. `pane`, `refPanel` and `settings` do require one now, enforced in `pluginManifest.ts` and
+re-checked over the roster row, and the implicit "no layout means the whole surface is my iframe" path
+is gone with it.
+
+**Three things arrived that the plan did not name.**
+
+`Rectangle` gained a fourth kind, `editor`, and a `mount` prop. The kind has two consumers: the editor
+pane's Monaco and the host's own document surface, both of which were a `<div>` and a stylesheet. The
+prop is what let the last five host elements go: every rectangle holds something that wants a DOM node
+of its own, and the host draws that node and hands it over rather than each plugin writing one.
+
+`Drawer` is a host component on `@acorn/plugin-api/ui/host`, beside `PaletteSurface`. Phase 6 recorded
+that the terminal drawer's outer box stays the plugin's CSS because no pane layout owns it. That was
+the last plugin stylesheet, and where the icon rails are and how tall the top bar is are the shell's
+facts. It is not a kit node: its height is a pixel the resize grip produced, which a kit node's props
+may not be.
+
+`text` gained a `match` role, for the run inside a line that a search matched. Two surfaces highlight
+one, the diff's find bar and the editor's find-in-files, and both spelled the host class
+`.ui-find-mark` directly.
+
+**Three consequences of the deletions.**
+
+The plugin API major went from 6 to 7. Removing `agentToolRendererRegistry`, its two types and the
+`CollapsibleSection` alias shrinks the published surface, and `surface.test.ts` refuses that under an
+unchanged number.
+
+The changes plugin's tool card matches on kind rather than on a predicate. It matched "did this call
+touch a path"; as an `agents:tool-card` contribution it declares `['read', 'edit', 'delete', 'move']`.
+A point's arbitration has to be decidable without running a contributor's code. It also lost
+`onOpenChange`: a function does not cross a port, so both render paths get the same props and only the
+owner's own card teaches the fold setting.
+
+The editor plugin was converted here, because no phase had scheduled it and `find plugins -name '*.css'`
+could not be emptied without it. Its find-in-files panel is kit nodes over a `Rows` collection, and its
+file tree is a flat `Rows tree`, which is how a tree that never had arrow keys got them. Its two
+stylesheets are gone and `docs/third-party/editor.md` is deleted, its surviving facts folded into
+`docs/first-party-plugins.md` and `docs/panes.md`.
+
+**What is owed.** Items 23 to 25 of `docs/testing.md` § The smoke checklist: keyboard-only traversal of
+every pane, and a scaffolded plugin of each shape installed from disk. Both need a person in front of
+the running app. They are on `docs/next-review.md` § Verification.

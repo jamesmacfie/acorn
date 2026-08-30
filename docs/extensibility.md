@@ -53,8 +53,13 @@ driver. Same question, two answers, in one place. See
 
 If no, it needs the shared realm and stays first-party. That is a short list: owning a WebSocket
 stream or channel (the transport itself, not a consumer of it), components the shell renders
-*inside its own tree* (an agent-tool renderer drawn inline in a transcript list, an overlay),
-code that runs in the desktop shell itself, and publishing something core cannot start without.
+*inside its own tree* at a place it has not opened as an extension point, code that runs in the
+desktop shell itself, and publishing something core cannot start without.
+
+That third item used to be much longer. A card in a transcript, a section in somebody else's tray, a
+panel body: each looked like "a component inside another component" and each is an extension point
+with two render paths now. Before adding to the list, ask whether the owner could open a point
+instead. Usually it can.
 
 The test is easy to get wrong in one specific way, and we got it wrong: **"another plugin renders
 it" is not the same as "embedded in a render tree."** A reference panel looks like the first and is
@@ -322,9 +327,9 @@ Roughly in order of how much they matter:
    design record `third-party/monaco.md`). That surface exists because a Monaco frame measurably cannot be
    served: 7.93 MiB against an 8.00 MiB cap with a stub UI, and its language-service workers denied
    outright by the one-file origin and a CSP with no `worker-src`
-   (docs/third-party/editor.md § Monaco in a frame) — the first surface class the sandbox demonstrably
-   does not serve, answered by widening nothing. What remains is editor itself: its own template shape
-   and the open-document verb ⌘P needs (docs/third-party/editor.md).
+   (docs/first-party-plugins.md § First-party only by history) — the first surface class the sandbox
+   demonstrably does not serve, answered by widening nothing. Editor itself stays compiled for that
+   reason and no other: both its surfaces are host layouts filled with kit nodes now.
    linear, earlier, was the one that found a capability the tier cannot carry rather than merely
    reshape (docs/third-party/README.md § What is still owed).
 3. **The carriers that were missing have answers.** `agentContexts` has a form and real callers;

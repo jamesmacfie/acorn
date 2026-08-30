@@ -7,7 +7,7 @@ Almost none of it needs writing from scratch: `docs/plugin-authoring.md` is alre
 authoring guide that needs splitting, `packages/protocol/src/pluginContract.ts` is a heavily
 commented single source of truth the manifest reference can be generated from, and
 `packages/plugin-sdk/src/public.ts` is a hand-written published declaration file that already
-is the frame-SDK reference.
+is the SDK reference for both render paths.
 
 ## The narrative page: why plugins work this way
 
@@ -18,9 +18,11 @@ internal doc. The page carries four ideas and no more:
   is where it is — first-party is a reason, not a status.
 - **The sandboxing line**, quoted as-is: "can the contribution be expressed as data plus
   asynchronous messages?" If yes, it can be a loaded plugin.
-- **Rectangles get frames; chrome gets descriptors.** A plugin draws inside a sandboxed iframe;
-  everything in the shell's own chrome is host-drawn from declarative descriptors, so plugin
-  JavaScript never touches a shell registry.
+- **Descriptors for facts, trees for UI, rectangles for pixels.** Three answers, asked in that
+  order. A chip or a badge is a descriptor the host draws. A pane or a panel body is a tree: the
+  plugin's bundle names acorn's own components from a Web Worker with no DOM, and the host draws
+  them, so it gets the shell's keyboard handling, focus, ARIA and style pack. Only pixels the host
+  cannot draw get an iframe. Plugin JavaScript never touches a shell registry in any of the three.
 - **The Node distributes; the device decides.** Install is per-node, trust is per-device.
 
 ## The authoring guide split
@@ -107,14 +109,15 @@ refers to: a plugin's HTTP surface lives at `/v2/p/<id>/*`, the id binds the nam
 permanently, and a loaded plugin's fetch handler is resolved per request — which is what makes
 hot reload work.
 
-## The client half and the frame SDK
+## The client half and the SDK
 
 Two halves on one page, because the projection path is the part people misunderstand:
 
 1. **The projection path.** The node sends the manifest and client-bundle hash in the roster;
    the client fetches and caches the bundle, runs the one shared eligibility-and-trust check,
    then registers descriptor-derived entries into the same registries a compiled plugin uses.
-   The plugin's JavaScript never touches a shell registry — frames are the only place it runs.
+   The plugin's JavaScript never touches a shell registry: a worker and an iframe are the only
+   places it runs, and the tree a worker emits is drawn by the host's own components.
 2. **The bridge reference.** Derived from `packages/plugin-sdk/src/public.ts`, which is
    hand-written as a published declaration and held to the implementation by a contract test —
    so the docs page can track that file section by section: the `context` snapshot,

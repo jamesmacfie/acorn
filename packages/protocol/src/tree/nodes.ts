@@ -21,7 +21,7 @@ export const TREE_PROTOCOL_VERSION = 1
 /** Every node a tree may name. Mirrors `NODE_SUPPORT` in client-core's kit. */
 export const KIT_NODES = [
   // Grouping
-  'Stack', 'Inline', 'Section', 'Fold', 'CollapsibleSection', 'Card', 'Timeline', 'Tabs', 'Toolbar',
+  'Stack', 'Inline', 'Section', 'Fold', 'Card', 'Timeline', 'Tabs', 'Toolbar',
   'Modal', 'ModalBody', 'ModalActions', 'Menu', 'Popover', 'ListDetail', 'ListColumn', 'DetailColumn',
   'SplitHandle', 'DocumentTabs', 'SectionHeader', 'TabPanel', 'ToolbarSpacer',
   // Showing
@@ -71,7 +71,7 @@ export const ROLE_VALUES = {
   space: ['none', 'inline', 'row', 'stack', 'section'],
   size: ['xs', 'sm', 'md', 'lg'],
   tone: ['neutral', 'muted', 'accent', 'ok', 'warn', 'danger'],
-  text: ['body', 'strong', 'muted', 'mono', 'eyebrow', 'heading'],
+  text: ['body', 'strong', 'muted', 'mono', 'eyebrow', 'heading', 'match'],
   border: ['none', 'divider', 'control', 'surface', 'stripe'],
   radius: ['control', 'surface', 'chip', 'pill'],
 } as const satisfies Record<string, readonly string[]>

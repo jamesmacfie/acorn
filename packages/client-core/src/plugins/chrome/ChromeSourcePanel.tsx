@@ -22,7 +22,7 @@ import { activateTaskSignals, pathForTask } from '../../tasks/activate'
 
 // The one rail list every descriptor source renders through. `Row`, `Badge` and `Icon` are the shell's
 // own primitives, so a third-party rail list matches a first-party one under every appearance pack
-// (docs/plugins.md § Descriptors for chrome, frames for rectangles).
+// (docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels).
 
 export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourceDescriptor }
 

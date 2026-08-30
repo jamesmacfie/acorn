@@ -16,7 +16,8 @@ What shipped, in one line each: every core event in the catalogue is emitted nod
 `<noun>:changed` name, worktree lifecycle folded into `tasks:changed`; every catalogued plugin verb
 except preview's is emitted on its plugin's own channel; `emits` exists in the manifest and on
 `NodePlugin`; a subscriber names another plugin's verb in `permissions.events` and hears it on the
-node and in a frame; workflows hears `plugin:github:checks-changed` instead of polling.
+node and in a client bundle, frame or tree alike; workflows hears `plugin:github:checks-changed`
+instead of polling.
 
 ## Open
 
@@ -30,7 +31,7 @@ branches are already computed node-side (`harness.ts`, `worktree.ts`), so the ho
 the resolution ladder to the node and emits `plugin:preview:url-changed`
 `{ taskId, url, source: 'run-target' | 'config' | 'script' | 'recipe' }` from there. That move is a
 prerequisite, not a nicety; `navigated` `{ taskId, url }` follows it and has `webview:navigated` as
-the frame-tier precedent for the shape.
+the client-bundle precedent for the shape.
 
 Done when: a node with no client attached knows a task's preview URL and broadcasts a change; the
 preview pane reads it instead of re-deriving it.
@@ -55,7 +56,7 @@ that is a decision, not a line. Decide, then emit from the delete path in
 Both are in `docs/plugins.md § Hearing another plugin`; repeated here because they are the things a
 future reader will trip over.
 
-- The frame side does not consult the producer's `emits`. A producer's frames reach every socket
+- The client side does not consult the producer's `emits`. A producer's frames and trees reach every socket
   regardless, so the check would be cosmetic; the node-side check is the one that holds.
 - Init order is not a dependency contract, so a consumer that subscribes before its producer's init
   has run sees an "absent" producer and is admitted even for an undeclared verb. The frames never

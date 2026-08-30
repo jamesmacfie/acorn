@@ -4,9 +4,6 @@ import { createSignal, Show, type JSX } from 'solid-js'
 // with its own localStorage closure across three different mechanisms, two of them missing
 // `aria-expanded`. See docs/ui-design.md § The closed kit for why it uses native `<details>` and has
 // no accordion mode.
-//
-// Named `Fold` since the kit closed; `CollapsibleSection` is the same component under its old name
-// and goes away in phase 9 of the layout programme.
 
 // Reading and writing one localStorage key is the same carve-out ui/diff/DiffRows.tsx has for draft
 // state, and is why this is a component rather than a caller responsibility: the eight github sites each
@@ -83,6 +80,3 @@ export function Fold(props: {
     </details>
   )
 }
-
-/** @deprecated The kit calls this `Fold`. Removed in phase 9 of the layout programme. */
-export const CollapsibleSection = Fold

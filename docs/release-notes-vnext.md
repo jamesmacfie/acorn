@@ -18,6 +18,27 @@ notes/memory/context, workflows, Docker, PostgreSQL tools, encrypted HTTP reques
 model providers, Nodes, per-Node plugin toggles, Fleet surfaces, backup, configuration import, audit,
 security settings, and the standalone Node tarball.
 
+## Plugin UI
+
+Every pane is one of eight host-owned layouts filled with regions, and the host draws the arrangement,
+the divider and the drag handle. Every component a plugin may draw with is in one closed kit whose
+props are role tokens rather than pixels, colours or classes. No plugin in this repository ships a
+stylesheet or writes a raw `div`, and three tests hold that.
+
+A loaded plugin draws the same components from a Web Worker with no DOM, so linear, rollbar, the API
+pane and the Database pane are the shell's own nodes rather than an iframe. An iframe survives for
+surfaces that own their pixels.
+
+Plugins extend each other through five declared kinds of extension point: rows, annotations, remote
+trees, rectangles and node-side hooks. The owner consents in its manifest, the host mints every name,
+and the trust prompt names both sides. A compiled plugin and a sandboxed one fill the same point.
+
+Keyboard navigation comes from the tree. `@opentui/keymap` turns a key into an intent before anything
+sees it, the host owns selection and scroll state per collection, and the kit decides what is
+focusable. Panes that had no arrow keys have them.
+
+`npm create acorn-plugin` scaffolds a tree by default, and `--rectangle` scaffolds a frame.
+
 ## Security and operations
 
 Authentication uses paired device tokens held by the desktop helper and scoped internal HMAC tokens for

@@ -95,12 +95,9 @@ export type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
 // The host owns scroll, the same way it owns selection, so a pane never selects a row out of the DOM.
 export { revealCollectionItem } from '@acorn/client-core/keys/collection.ts'
 export { agentContextContributions } from '@acorn/client-core/registries/agentContexts.ts'
-// prune candidate: agent-tool renderers are in-realm components drawn inside the transcript list, so
-// they cannot cross a sandbox boundary. First-party only, permanently (docs/extensibility.md § Two
-// tiers, permanently).
-export { agentToolRendererRegistry } from '@acorn/client-core/registries/agentToolRenderers.ts'
-export type { AgentToolRendererContribution, AgentToolRendererProps } from '@acorn/client-core/registries/agentToolRenderers.ts'
-export { agentToolTone } from '@acorn/client-core/registries/agentToolRenderers.ts'
+// The tone of a tool call's status dot. Shared because two plugins draw that dot: agents owns the
+// `agents:tool-card` point and changes fills it.
+export { agentToolTone } from '@acorn/client-core/registries/agentToolTone.ts'
 export { onScopeEvicted } from '@acorn/client-core/registries/scopeEviction.ts'
 
 // ── Tasks, sessions, layout ───────────────────────────────────────────────────────────────────

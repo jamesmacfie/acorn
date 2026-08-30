@@ -293,10 +293,12 @@ the plugins section of [node distribution](./node-distribution.md).
 Plugins come in two tiers. Those feature packages are **compiled in**: they ship in the binary, run
 in the shell's own realm, and are trusted like the rest of the app. A Node can also **load** a plugin
 from disk, installed through an owner-authenticated route, distributed to each paired device by the
-Node that owns it, and rendered in a sandboxed frame or as host-drawn descriptors. The two tiers are
-permanent, and the line between them is what a contribution needs. Anything expressible as data plus
-async messages can be sandboxed, while PTY stream ownership, inline agent-tool renderers, and
-components embedded in another surface's tree need the shared realm and stay first-party.
+Node that owns it, and drawn three ways: as host-drawn descriptors, as a tree of the host's own
+components emitted from a Web Worker, or in a sandboxed frame for pixels the host cannot draw. The two
+tiers are permanent, and the line between them is what a contribution needs. Anything expressible as
+data plus async messages can be sandboxed, while PTY stream ownership and components the shell renders
+inside its own tree at a place it has not opened as an extension point need the shared realm and stay
+first-party.
 [The plugins doc](./plugins.md) describes both tiers,
 [first-party plugins](./first-party-plugins.md) says which shipped plugins are in the first tier
 because they must be, and [extensibility](./extensibility.md) is why the split exists at all.
@@ -417,7 +419,11 @@ administer the Node. Service-scoped internal calls are reserved for Node-owned o
   written first: [first-party plugins](./first-party-plugins.md).
 - Review findings from moving Rollbar out of the binary onto the loaded-plugin path:
   [third-party](./third-party/).
-- The planned redesign of plugin UI into host-owned layouts, a closed component kit, remote component
-  trees, five extension kinds, and host-owned keyboard navigation: [layout](./future/layout/README.md).
-  A proposal; the owning docs above describe current behaviour until its phases ship.
+- How plugin UI came to be host-owned layouts, a closed component kit, remote component trees, five
+  extension kinds and host-owned keyboard navigation: [layout](./future/layout/README.md). Shipped
+  2026-08-30. The folder sequences and links; the owning docs above describe the behaviour. The kit is
+  in [ui design](./ui-design.md) § The closed kit, the layouts in [panes](./panes.md) § Layout model,
+  the keyboard in [command palette and shortcuts](./command-palette-and-shortcuts.md), the five kinds
+  in [plugins](./plugins.md) § Cooperative extension points, and the two render paths in
+  [plugins](./plugins.md) § Loaded plugins: the client half.
 - Runtime and development: [shell](./shell.md) and [local development](./local-development.md).

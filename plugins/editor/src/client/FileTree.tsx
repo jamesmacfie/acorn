@@ -1,8 +1,12 @@
-import { createEffect, createSignal, For, onMount, Show } from 'solid-js'
-import { TreeRow } from '@acorn/plugin-api/ui'
+import { createEffect, createMemo, createSignal, onMount } from 'solid-js'
+import { revealCollectionItem } from '@acorn/plugin-api/client'
+import { Rows, TreeRow } from '@acorn/plugin-api/ui'
 import { editorApi, type EditorEntry } from './editorClient'
 import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from './editorTreeState'
-import { directoryContainsFile, type FileTreeRevealRequest } from './fileTreeReveal'
+import { type FileTreeRevealRequest } from './fileTreeReveal'
+
+/** The collection id, so the reveal below and the host's stored place agree on one name. */
+const TREE = 'editor.file-tree'
 
 export default function FileTree(props: {
   taskId: string
@@ -11,134 +15,90 @@ export default function FileTree(props: {
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
 }) {
-  // The tree's container semantics live here, as TreeRow's contract requires: a row cannot know its
-  // tree.
-  return (
-    <div role="tree" aria-label="Worktree files">
-      <Tree
-        taskId={props.taskId}
-        relPath=""
-        depth={0}
-        onOpen={props.onOpen}
-        openPath={props.openPath}
-        reveal={props.reveal}
-        onRevealed={props.onRevealed}
-      />
-    </div>
-  )
-}
-
-// A directory's children, listed lazily on mount (so a folder's contents load only when expanded).
-function Tree(props: {
-  taskId: string
-  relPath: string
-  depth: number
-  onOpen: (path: string) => void
-  openPath: string | null
-  reveal: FileTreeRevealRequest | null
-  onRevealed: (revision: number) => void
-}) {
   const api = editorApi()
-  const [entries, setEntries] = createSignal<EditorEntry[]>([])
-  onMount(() => {
-    void (async () => {
-      if (api) setEntries(await api.list(props.taskId, props.relPath))
-    })()
+  // One directory's listing per key, fetched the first time the directory is opened and kept after it
+  // closes: reopening a folder is instant and the tree's shape is stable across a collapse. `''` is
+  // the worktree root, which is the one listing fetched without being asked for.
+  const [listings, setListings] = createSignal<ReadonlyMap<string, EditorEntry[]>>(new Map())
+
+  const load = async (dir: string): Promise<void> => {
+    if (!api || listings().has(dir)) return
+    const entries = await api.list(props.taskId, dir)
+    setListings((current) => new Map(current).set(dir, entries))
+  }
+  onMount(() => void load(''))
+
+  const isOpen = (path: string) => editorTreeDirectoryOpen(props.taskId, path)
+  const setOpen = (path: string, open: boolean) => {
+    setEditorTreeDirectoryOpen(props.taskId, path, open)
+    if (open) void load(path)
+  }
+
+  // The visible rows, flat. A tree is a flat collection with a depth on each row, which is what lets
+  // the host own arrow keys, type-ahead, `aria-activedescendant` and the roving stop: the recursive
+  // component this replaced had a `<ul>` per directory and no keyboard at all.
+  type TreeItem = { key: string; label: string; depth: number; dir: boolean }
+  const items = createMemo<TreeItem[]>(() => {
+    const rows: TreeItem[] = []
+    const walk = (dir: string, depth: number): void => {
+      for (const entry of listings().get(dir) ?? []) {
+        const path = dir ? `${dir}/${entry.name}` : entry.name
+        rows.push({ key: path, label: entry.name, depth, dir: entry.dir })
+        if (entry.dir && isOpen(path)) walk(path, depth + 1)
+      }
+    }
+    walk('', 0)
+    return rows
   })
-  return (
-    <ul class="tree" role="group">
-      <For each={entries()}>
-        {(entry) => (
-          <TreeNode
-            taskId={props.taskId}
-            parent={props.relPath}
-            depth={props.depth}
-            entry={entry}
-            onOpen={props.onOpen}
-            openPath={props.openPath}
-            reveal={props.reveal}
-            onRevealed={props.onRevealed}
-          />
-        )}
-      </For>
-    </ul>
-  )
-}
 
-function TreeNode(props: {
-  taskId: string
-  parent: string
-  depth: number
-  entry: EditorEntry
-  onOpen: (path: string) => void
-  openPath: string | null
-  reveal: FileTreeRevealRequest | null
-  onRevealed: (revision: number) => void
-}) {
-  // The <li>, not the row: TreeRow has no `ref` prop. A props member named `ref` silently becomes a
-  // DOM setter in Solid, so naming it that would break rather than warn.
-  let fileRow: HTMLLIElement | undefined
-  const path = () => (props.parent ? `${props.parent}/${props.entry.name}` : props.entry.name)
-  const open = () => editorTreeDirectoryOpen(props.taskId, path())
-  const setOpen = (value: boolean) => setEditorTreeDirectoryOpen(props.taskId, path(), value)
-
+  // Reveal: open every directory above the file, waiting for each listing before asking for the next,
+  // then put the row in view. Sequential because a child directory cannot be opened until its parent's
+  // listing has arrived, and `revealCollectionItem` is a no-op for a key the collection does not hold.
   createEffect(() => {
     const request = props.reveal
     if (!request) return
-    const nodePath = path()
-    if (props.entry.dir && directoryContainsFile(nodePath, request.path)) {
-      setOpen(true)
-    } else if (!props.entry.dir && nodePath === request.path) {
-      queueMicrotask(() => {
-        fileRow?.scrollIntoView({ block: 'nearest' })
-        props.onRevealed(request.revision)
-      })
-    }
+    void (async () => {
+      const segments = request.path.split('/').slice(0, -1)
+      let dir = ''
+      for (const segment of segments) {
+        dir = dir ? `${dir}/${segment}` : segment
+        setEditorTreeDirectoryOpen(props.taskId, dir, true)
+        await load(dir)
+      }
+      revealCollectionItem(TREE, request.path)
+      props.onRevealed(request.revision)
+    })()
   })
 
   return (
-    // `aria-level` is 1-based; depth is 0-based, hence the +1.
-    <li
-      ref={(element) => { fileRow = element }}
-      role="treeitem"
-      aria-level={props.depth + 1}
-      aria-expanded={props.entry.dir ? open() : undefined}
+    <Rows
+      id={TREE}
+      tree
+      ariaLabel="Worktree files"
+      items={items()}
+      selected={props.openPath}
+      onActivate={(key) => {
+        const item = items().find((candidate) => candidate.key === key)
+        if (item && !item.dir) props.onOpen(key)
+      }}
+      // The left and right arrows, from the host's tree collection. Clicking the twist goes through
+      // `onToggle` below; both land in the same place.
+      onExpand={(key, expand) => setOpen(key, expand)}
     >
-      <Show
-        when={props.entry.dir}
-        fallback={
-          <TreeRow
-            depth={props.depth}
-            selected={props.openPath === path()}
-            onPress={() => props.onOpen(path())}
-          >
-            {props.entry.name}
-          </TreeRow>
-        }
-      >
-        {/* The twist was a ▾/▸ glyph literal; TreeRow draws it from the marker token, so it scales
-            with the style pack rather than with a font. */}
+      {(item, itemProps, selected) => (
         <TreeRow
-          depth={props.depth}
-          expandable
-          expanded={open()}
-          onToggle={() => setOpen(!open())}
-          onPress={() => setOpen(!open())}
+          item={itemProps}
+          depth={item.depth}
+          selected={selected()}
+          expandable={item.dir}
+          expanded={item.dir ? isOpen(item.key) : undefined}
+          onToggle={() => setOpen(item.key, !isOpen(item.key))}
+          onPress={() => (item.dir ? setOpen(item.key, !isOpen(item.key)) : props.onOpen(item.key))}
+          title={item.key}
         >
-          {props.entry.name}
+          {item.label}
         </TreeRow>
-        <Show when={open()}>
-          <Tree
-            taskId={props.taskId}
-            relPath={path()}
-            depth={props.depth + 1}
-            onOpen={props.onOpen}
-            openPath={props.openPath}
-            reveal={props.reveal}
-            onRevealed={props.onRevealed}
-          />
-        </Show>
-      </Show>
-    </li>
+      )}
+    </Rows>
   )
 }

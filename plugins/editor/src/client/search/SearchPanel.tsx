@@ -1,14 +1,18 @@
-import { createEffect, createMemo, createResource, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, on, Show } from 'solid-js'
 import { debounce } from '@acorn/plugin-api/client'
-import { CopyButton, Input, ToggleButton, Toolbar } from '@acorn/plugin-api/ui'
+import { CopyButton, EmptyState, Input, Row, Rows, Section, Stack, TabPanel, Text, ToggleButton, Toolbar } from '@acorn/plugin-api/ui'
 import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
-import './search.css'
 
 // Find-in-files panel: substring search by default, with case, whole-word, and regex toggles.
 // Double-clicking a hit opens the file in the editor beside it, centered on the match. For why this
 // is a sidebar panel rather than its own pane, and why it stays mounted when hidden, see
 // docs/panes.md § Contributions.
+//
+// Entirely kit nodes since phase 9 of the layout programme, and its stylesheet went with them. Two
+// things came back for free in the trade: the results are a `Rows` collection, so arrow keys, Home,
+// End, the page keys and type-ahead work in a list that had none of them, and `TabPanel` owns the
+// hidden-but-mounted half that the panel used to spell as an inline `display: none`.
 export default function SearchPanel(props: { taskId: string; active: boolean }) {
   const [query, setQuery] = createSignal('')
   const [debounced, setDebounced] = createSignal('')
@@ -33,31 +37,36 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
     (src) => findInFiles(src.taskId, src.q, src.opts),
   )
 
-  const totalHits = createMemo(() => (results()?.files ?? []).reduce((n, f) => n + f.hits.length, 0))
+  const files = () => results()?.files ?? []
+  const totalHits = createMemo(() => files().reduce((n, f) => n + f.hits.length, 0))
 
-  // The retained pane intent rather than a callback prop. See docs/third-party/editor.md.
+  // The retained pane intent rather than a callback prop. See docs/panes.md § Contributions.
   function openHit(path: string, hit: SearchHit) {
     requestEditorReveal(props.taskId, path, hit.line, hit.col)
   }
 
   // Focus the box whenever the sidebar flips to Search, including when the retained `editor:search`
-  // intent does the flipping (docs/panes.md § Contributions). Deferred to a microtask because the
-  // panel is display:none until the same render that sets `active`, and a hidden input cannot take
-  // focus.
+  // intent does the flipping (docs/panes.md § Contributions). Deferred to a microtask because
+  // `TabPanel` keeps the panel hidden until the same render that sets `active`, and a hidden input
+  // cannot take focus.
   let input: HTMLInputElement | undefined
   createEffect(on(() => props.active, (active) => {
     if (active) queueMicrotask(() => input?.focus())
   }))
 
+  const status = () => {
+    if (!debounced().trim()) return 'Type to search the worktree.'
+    if (results.loading) return 'Searching…'
+    const hits = `${totalHits()} result${totalHits() === 1 ? '' : 's'}`
+    const where = `${files().length} file${files().length === 1 ? '' : 's'}`
+    return `${hits} in ${where}${results()?.truncated ? ' · results truncated' : ''}`
+  }
+
   return (
-    <div
-      id="editor-side-panel-search"
-      role="tabpanel"
-      aria-labelledby="editor-side-tab-search"
-      class="search-panel"
-      style={{ display: props.active ? undefined : 'none' }}
-    >
-      <div class="search-bar">
+    <TabPanel idPrefix="editor-side" id="search" active={props.active ? 'search' : 'files'}>
+      {/* Stacked, not a row: the sidebar is narrow, and an input sharing it with three toggles
+          leaves about a hundred pixels to type a query into. */}
+      <Stack gap="row">
         <Input
           ref={input}
           kind="filter"
@@ -73,50 +82,47 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
           <ToggleButton variant="bare" size="sm" title="Whole word" pressed={wholeWord()} onPressedChange={setWholeWord}>\b</ToggleButton>
           <ToggleButton variant="bare" size="sm" title="Use regular expression" pressed={regex()} onPressedChange={setRegex}>.*</ToggleButton>
         </Toolbar.Group>
-      </div>
+      </Stack>
 
-      <div class="search-status muted">
-        <Show when={debounced().trim()} fallback={<span>Type to search the worktree.</span>}>
-          <Show when={!results.loading} fallback={<span>Searching…</span>}>
-            <span>{totalHits()} result{totalHits() === 1 ? '' : 's'} in {results()?.files.length ?? 0} file{(results()?.files.length ?? 0) === 1 ? '' : 's'}</span>
-            <Show when={results()?.truncated}><span class="search-truncated"> · results truncated</span></Show>
-          </Show>
-        </Show>
-      </div>
-
-      <div class="search-results">
-        <For each={results()?.files ?? []}>
-          {(file) => (
-            <div class="search-file">
-              <div class="search-file-head copyable" title={file.path}>
-                <span class="search-file-path">{file.path}</span>
-                <CopyButton text={() => file.path} title="Copy file path" />
-                <span class="search-file-count muted">{file.hits.length}</span>
-              </div>
-              {/* Render every returned hit; the backend caps the total result set. */}
-              <For each={file.hits}>
-                {(hit) => (
-                  <button
-                    type="button"
-                    class="search-hit"
-                    title={`Open ${file.path} at ${hit.line}:${hit.col}`}
-                    onClick={(event) => {
-                      // Keyboard and assistive activation has detail 0. A mouse click waits for the
-                      // double-click below, so inspecting results does not navigate.
-                      if (event.detail === 0) openHit(file.path, hit)
-                    }}
-                    onDblClick={() => openHit(file.path, hit)}
+      <Show when={files().length} fallback={<EmptyState busy={results.loading} size="sm" align="start">{status()}</EmptyState>}>
+        {/* One collection per file rather than one for the whole result set: a hit's key has to be
+            stable across a refetch, and `path:line:col` is the only thing about a hit that is. */}
+        <Stack gap="stack">
+          <Text emphasis="muted">{status()}</Text>
+          {files().map((file) => (
+            <Section
+              label={file.path}
+              count={file.hits.length}
+              sticky
+              actions={<CopyButton text={() => file.path} title="Copy file path" />}
+            >
+              {/* Every returned hit; the node caps the total result set. */}
+              <Rows
+                id={`editor.search:${file.path}`}
+                ariaLabel={`Matches in ${file.path}`}
+                items={file.hits.map((hit) => ({ key: `${hit.line}:${hit.col}`, label: String(hit.line), hit }))}
+                onActivate={(key) => {
+                  const hit = file.hits.find((candidate) => `${candidate.line}:${candidate.col}` === key)
+                  if (hit) openHit(file.path, hit)
+                }}
+              >
+                {(item, itemProps) => (
+                  <Row
+                    item={itemProps}
+                    density="compact"
+                    title={`Open ${file.path} at ${item.hit.line}:${item.hit.col}`}
+                    leading={<Text emphasis="mono">{String(item.hit.line)}</Text>}
+                    onPress={() => openHit(file.path, item.hit)}
                   >
-                    <span class="search-hit-line muted">{hit.line}</span>
-                    <span class="truncate"><HitPreview hit={hit} /></span>
-                  </button>
+                    <HitPreview hit={item.hit} />
+                  </Row>
                 )}
-              </For>
-            </div>
-          )}
-        </For>
-      </div>
-    </div>
+              </Rows>
+            </Section>
+          ))}
+        </Stack>
+      </Show>
+    </TabPanel>
   )
 }
 
@@ -128,10 +134,10 @@ function HitPreview(props: { hit: SearchHit }) {
     return { before: preview.slice(0, start), match: preview.slice(start, end), after: preview.slice(end) }
   })
   return (
-    <>
+    <Text emphasis="mono">
       {parts().before}
-      <mark class="ui-find-mark">{parts().match}</mark>
+      <Text emphasis="match">{parts().match}</Text>
       {parts().after}
-    </>
+    </Text>
   )
 }

@@ -1,51 +1,38 @@
-import { Show, type JSX } from 'solid-js'
-import { createDismissable } from './dismissable'
-import { Button } from './primitives'
+import { Portal } from 'solid-js/web'
+import type { JSX } from 'solid-js'
 
-// Modal's sibling, not its child: the same behaviour core, different geometry. Edge-anchored,
-// full-extent along that edge, slides in.
+// The app's one drawer: a bottom dock between the two icon rails, above the task footer
+// (docs/ui-design.md § Chrome and overlays).
 //
-// Behaviour is createDismissable verbatim. See docs/ui-design.md § Chrome and overlays for why
-// that hook exists.
+// It exists because a drawer is a `drawer` slot rather than a pane, so no host layout owns its outer
+// box — and until phase 9 of the layout programme that box was the terminal plugin's own stylesheet.
+// Where the rails are, how tall the top bar is and which z-layer a drawer sits on are the shell's
+// facts, not a plugin's, and a plugin that writes them down is one shell change away from being wrong.
+//
+// Not a modal. Nothing behind it goes inert, there is no backdrop and Escape does not dismiss it: the
+// drawer is a second place to work, not an interruption. What is inside it is the caller's, and the
+// terminal's is entirely kit nodes (docs/terminal-and-agents.md § Client).
 export function Drawer(props: {
-  onClose: () => void
-  side?: 'right' | 'left' | 'bottom'
-  size?: 'sm' | 'md' | 'lg'
-  title?: string
-  /** Which gestures dismiss. Defaults to Escape + backdrop. */
-  dismissOn?: readonly ('escape' | 'backdrop')[]
-  labelledBy?: string
+  /** Height in pixels while not maximized. The caller owns it because the caller owns the grip that
+   *  drags it (`createSplitDrag`); ignored when `maximized`, where a top and a bottom decide it. */
+  height: number
+  maximized?: boolean
+  ariaLabel: string
+  /** The host box, for a caller that has to measure it or bind a drag to it. */
+  ref?: (element: HTMLElement) => void
   children: JSX.Element
 }) {
-  let dialog!: HTMLDivElement
-  const dismiss = createDismissable({
-    onDismiss: () => props.onClose(),
-    container: () => dialog,
-    on: props.dismissOn,
-  })
-
   return (
-    <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
-      <div
-        ref={dialog}
+    <Portal>
+      <aside
+        ref={props.ref}
         class="ui-drawer"
-        data-side={props.side ?? 'right'}
-        data-size={props.size ?? 'md'}
-        role="dialog"
-        aria-modal="true"
-        aria-label={props.labelledBy ? undefined : props.title}
-        aria-labelledby={props.labelledBy}
-        onClick={dismiss.onContainerClick}
-        onKeyDown={dismiss.onKeyDown}
+        aria-label={props.ariaLabel}
+        {...(props.maximized ? { 'data-maximized': '' } : {})}
+        style={{ height: props.maximized ? undefined : `${props.height}px` }}
       >
-        <Show when={props.title}>
-          <div class="ui-drawer-head">
-            <span class="ui-drawer-title">{props.title}</span>
-            <Button variant="bare" iconOnly label="Close" onPress={() => props.onClose()}>✕</Button>
-          </div>
-        </Show>
         {props.children}
-      </div>
-    </div>
+      </aside>
+    </Portal>
   )
 }

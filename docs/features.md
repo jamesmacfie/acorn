@@ -31,9 +31,13 @@ lazily when a task first needs filesystem/process access.
 - `database` — task-scoped PostgreSQL schema, rows, SQL, and project-scoped saved queries.
 - `docker` — task-matched containers, logs, stats, exec, and lifecycle actions.
 - `http` — encrypted requests, variables, auth helpers, and response inspection.
-- `linear` and `rollbar` — the two external-item panes, each a sandboxed frame supplied by a loaded
-  package that is installed and trusted. Linear's also renders as the reference panel beside a pull
-  request.
+- `linear` and `rollbar` — the two external-item panes, each supplied by a loaded package that is
+  installed and trusted. Linear's also renders as the reference panel beside a pull request.
+
+Every pane names one of the host's layouts and fills its regions; the host draws the arrangement, the
+divider and the drag handle, and owns the keyboard navigation inside it ([panes](./panes.md) § Layout
+model). A loaded package's pane draws the same components from a Web Worker with no DOM, so linear's
+and rollbar's are the shell's own nodes rather than an iframe.
 
 The row is ordered/resizable and persisted per Node/task. Contributions are registered by plugins;
 unknown persisted pane IDs render safely as placeholders.

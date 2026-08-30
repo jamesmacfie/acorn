@@ -163,8 +163,8 @@ see `docs/plugins.md` § "Loaded plugins: the client half".
 Each pane contributes its ID, label, order, default chord, minimum width, and optional availability
 predicate through `paneRegistry`. It then draws itself one of two ways: with a `component`, or with a
 `layout` and a `regions` record, in which case the registry builds the component. A pane may also
-register context sections, task slots, palette rows, commands/keybindings, agent-tool renderers, and
-persisted state through its plugin.
+register palette rows, commands and keybindings, persisted state, and contributions to another
+plugin's extension points, through its plugin.
 
 ```ts
 ctx.panes.register({
@@ -175,8 +175,11 @@ ctx.panes.register({
 })
 ```
 
-A loaded plugin declares the same two keys on a `frames` entry, and a region there is one of three
-things:
+A loaded plugin declares the same two keys on a `frames` entry, and it has to: `layout` is required on
+a `pane`, a `refPanel` and a `settings` surface. Omitting it used to mean "the whole surface is my
+iframe", and that implicit path is gone. A surface that wants pixels says so with a `frame` region.
+
+A region is one of three things:
 
 | Region | What fills it |
 | --- | --- |
@@ -199,9 +202,15 @@ tree path changes where a plugin's bytes run, not whose they are.
 }]
 ```
 
-A reference panel and a settings page may name `layout: 'single'` too, and nothing wider: the host
-already draws the box, the backdrop, the title and the dismiss for one and the settings page frame for
-the other, so all that is left is one region. Naming it is how such a surface says its body is a tree.
+A reference panel and a settings page name `layout: 'single'` and nothing wider: the host already draws
+the box, the backdrop, the title and the dismiss for one and the settings page frame for the other, so
+all that is left is one region. Naming it is how such a surface says whether its body is a tree or a
+rectangle.
+
+The three surfaces the host wraps entirely take no layout: an `overlay` is a full-screen picker, an
+`importer` is a wizard the plugin owns, and a `coreSlot` replaces one of core's own surfaces outright.
+Each is a rectangle by construction, with no arrangement to name and no second region to put anything
+in.
 
 A layout naming a region it does not have, or missing one it requires, throws at registration rather
 than at render. The manifest parser refuses the same thing on the node, and the client repeats the

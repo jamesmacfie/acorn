@@ -1,4 +1,5 @@
 import { createEffect, onCleanup, onMount } from 'solid-js'
+import { Rectangle } from '@acorn/plugin-api/ui'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
@@ -27,7 +28,7 @@ function installScrollAreaGuard() {
 // xterm restored from main's canonical headless framebuffer.
 export default function TerminalSurface(props: { sessionId: string; fontSize: number; onExit?: (exitCode: number | null) => void }) {
   const api = terminalApi()
-  let host!: HTMLDivElement
+  let host!: HTMLElement
   let applyFontSize: ((fontSize: number) => void) | undefined
 
   createEffect(() => {
@@ -134,5 +135,9 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     })
   })
 
-  return <div class="terminal-surface" ref={host} />
+  // A PTY is pixels, so it is a rectangle rather than a tree: the kit owns the box and the way in and
+  // out of it with the keyboard, and xterm owns everything inside (docs/terminal-and-agents.md §
+  // Client). `mount` is the element xterm attaches to, drawn by the host, which is why this file spells
+  // no element and carries no stylesheet.
+  return <Rectangle kind="pty" label="Terminal" mount={(element) => { host = element }} />
 }

@@ -25,6 +25,7 @@ import {
 import { monacoLanguageFor } from './language'
 import { MONACO_THEME, watchMonacoTheme } from './theme'
 import { Alert } from '../ui/primitives'
+import { Rectangle } from '../ui/Rectangle'
 
 // A host-owned document surface: the host draws the editor, the plugin supplies the document. See
 // docs/third-party/monaco.md.
@@ -104,7 +105,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   // device as a roster row, which is bytes a node sent (the rule chrome/data.ts states).
   const language = monacoLanguageFor(isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext')
 
-  let host: HTMLDivElement | undefined
+  let host: HTMLElement | undefined
   let editor: monaco.editor.IStandaloneCodeEditor | undefined
   let model: monaco.editor.ITextModel | undefined
   let stopTheme: (() => void) | undefined
@@ -308,7 +309,12 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     // a second `contain: layout paint` nobody needed. A region of a pane is not a pane.
     <section class="document-surface">
       <Show when={error()}><Alert>{error()}</Alert></Show>
-      <Show when={ready()}><div class="document-surface-host" ref={host} /></Show>
+      {/* Monaco owns these pixels, so the box is a rectangle: the kit owns it and the way in and out
+          of it with the keyboard, which is what stops a reader who tabs into an editor region from
+          being stuck there (ui/Rectangle.tsx). */}
+      <Show when={ready()}>
+        <Rectangle kind="editor" label={`${props.surfaceId} document`} mount={(element) => { host = element }} />
+      </Show>
     </section>
   )
 }

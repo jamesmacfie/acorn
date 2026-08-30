@@ -194,7 +194,7 @@ export default function AgentPricingSettings() {
                     <tr>
                       <th>Model</th>
                       <For each={PRICE_FIELDS}>{(field) => <th>{field.label}</th>}</For>
-                      <th><span class="sr-only">Actions</span></th>
+                      <th aria-label="Actions" />
                     </tr>
                   </thead>
                   <tbody>
@@ -267,7 +267,7 @@ export default function AgentPricingSettings() {
                         <tr>
                           <th>Exact model id</th>
                           <For each={PRICE_FIELDS}>{(field) => <th>{field.label}</th>}</For>
-                          <th><span class="sr-only">Actions</span></th>
+                          <th aria-label="Actions" />
                         </tr>
                       </thead>
                       <tbody>

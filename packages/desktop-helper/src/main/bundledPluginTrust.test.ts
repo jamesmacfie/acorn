@@ -31,7 +31,12 @@ describe('bundled plugin client trust', () => {
       id: 'rollbar', name: 'Rollbar', version: '1.2.3', apiVersion: PLUGIN_API_MAJOR,
       client: './dist/client.js',
       permissions: { api: ['core.tasks:read'], events: [], node: {} },
-      contributions: { frames: [{ target: 'pane', id: 'rollbar', label: 'Rollbar', glyph: 'circle-dot', order: 100 }] },
+      contributions: {
+        frames: [{
+          target: 'pane', id: 'rollbar', label: 'Rollbar', glyph: 'circle-dot', order: 100,
+          layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } },
+        }],
+      },
     }))
     const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
     const trust = new PluginTrustStore(userData)

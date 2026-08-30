@@ -24,7 +24,7 @@ import MentionTextarea from '../../ui/MentionTextarea'
 import Markdown from '../../ui/Markdown.tsx'
 import { Menu } from '../../ui/Menu'
 import { RowActions } from '../../ui/RowActions'
-import { CollapsibleSection, Fold } from '../../ui/Fold'
+import { Fold } from '../../ui/Fold'
 import { Composer } from '../../ui/Composer'
 import { DocumentTabs } from '../../ui/DocumentTabs'
 import { FindBar } from '../../ui/FindBar'
@@ -57,7 +57,7 @@ import ModelConnectionPicker from '../../modelProviders/ModelConnectionPicker'
 type AnyKitComponent = Component<any>
 
 export const KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {
-  Stack, Inline, Section, Fold, CollapsibleSection, Card, Timeline, Tabs, Toolbar,
+  Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar,
   Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs, SectionHeader,
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
   // remote tree only under a name of their own.

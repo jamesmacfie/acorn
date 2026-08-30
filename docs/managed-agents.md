@@ -229,7 +229,7 @@ somebody is reading.
   then stays where the reader puts it. Reactive expansion would instead slam the card shut the moment
   the subagent finished, which is when somebody is most likely to be reading it.
 - A subagent's run renders through exactly the same cards as its parent's: tool calls, prose, reasoning
-  and file changes all go through one `AgentEventCard`, so a contributed tool renderer works inside a
+  and file changes all go through one `AgentEventCard`, so a contributed tool card works inside a
   subagent's run without knowing it is in one. A tool call belongs to whichever stream opened it, and
   every later update folds there wherever it arrives from, because a provider need not repeat the
   attribution on each one. Claude's adapter in particular tags a subagent's `tool_call` and its final

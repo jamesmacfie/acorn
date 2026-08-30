@@ -241,22 +241,21 @@ It is on the verification list below.
   grammar exists to close, it has no confirmation story when two providers' patterns collide, and it
   is a second pattern language beside the one contentLinks already teaches.
 - **database has since moved** over the document surface it forced into existence (above). **editor has
-  not**, and it is the last first-party plugin held by the Monaco finding: what it still needs is its own
-  template — `frame-beside-document`, or host-drawn tabs fed by a document-list route — and the
-  open-document verb ⌘P needs, both named in `docs/third-party/monaco.md § Sequence` step 7. Its brief is
-  [editor.md](./editor.md). The rollbar brief itself was not restored; this file plus `plugins/rollbar/`
-  is the reference now.
+  not**, and it is the last first-party plugin held by the Monaco finding. The layout programme answered
+  the template half: both its surfaces are host layouts filled with kit nodes and it ships no stylesheet.
+  What is left is Monaco's size, which no template fixes, and the open-document verb ⌘P needs
+  (`docs/third-party/monaco.md § Sequence` step 7). The rollbar brief itself was not restored; this file
+  plus `plugins/rollbar/` is the reference now.
 - **`agentContexts` has a manifest form** and now a real caller: http serves its options and capture
   from two of its own routes, with the redaction on the node and tested there.
   A descriptor names two routes in the plugin's own namespace — `options` (GET) and `capture` (POST) —
   and the host binds everything a plugin should not: `source` from the plugin id, the capture time,
   and the byte measurement the 512 KiB ceiling is checked against. `revision?()` deliberately has no
   form: it is synchronous and a descriptor answers across a fetch.
-- **Editor has one blocker left**, and it is now a build rather than a question: its template
-  (`frame-beside-document`, or host-drawn tabs fed by a document-list route) and the open-document verb
-  ⌘P needs. The contract and the first composed consumer both exist; what editor wants from it does not
-  yet. The `overlay` slot and the `persistedState` slice are resolved — see the section above and
-  [editor.md](./editor.md).
+- **Editor has one blocker left**, and it is Monaco's size rather than a template: a frame bundle
+  measures 7.93 MiB against an 8.00 MiB cap with no editor UI in it, and its four language-service
+  workers cannot be served at all (`docs/first-party-plugins.md`, the editor row). The `overlay` slot and
+  the `persistedState` slice are resolved, and the layout question closed at layout phase 9.
 - **Release validation**, as the moved doc already noted: a real-token soak and an installer-driven
   update. The bundled-plugin distribution work (rollbar's blocker finding) is a precondition for the
   second of those.
@@ -267,11 +266,11 @@ There are no unblocked migrations left in this folder, and the three items that 
 — the `overlay` form, the `persistedState` decision and the find-in-files fold — have landed. What
 remains needs either a person in front of the running app or build work on a decided design:
 
-- **The editor plugin's move** (`docs/third-party/monaco.md § Sequence`, step 7) — the last one held by the
-  Monaco finding, and the only step of that sequence left. Steps 1–6 have shipped: the consolidation,
-  the language-id vocabulary, the region-addressed contract, `document-over-frame`, the bridge document
-  API and completions. What step 7 has to settle is editor's own template shape and the open-document
-  verb ⌘P needs; the brief is [editor.md](./editor.md).
+- **The editor plugin's move** (`docs/third-party/monaco.md § Sequence`, step 7) — the last one held by
+  the Monaco finding, and the only step of that sequence left. Steps 1–6 have shipped: the
+  consolidation, the language-id vocabulary, the region-addressed contract, `document-over-frame`, the
+  bridge document API and completions. Layout phase 9 settled editor's template shape, so what step 7
+  has left is the open-document verb ⌘P needs, and Monaco's size, which is not a step at all.
 - **A live verification pass**, and it now covers three migrations plus the editor-pane fold (list at the
   bottom of this file). `pnpm test` cannot render a Solid component in this repo, so every frame surface
   these migrations added is read-and-reasoned rather than watched.

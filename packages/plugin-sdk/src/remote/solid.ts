@@ -19,7 +19,7 @@
 // ```
 export {
   solidTree, KIT_NODE_COMPONENTS,
-  Stack, Inline, Section, Fold, CollapsibleSection, Card, Timeline, Tabs, Toolbar, Modal, ModalBody,
+  Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, Modal, ModalBody,
   ModalActions, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs,
   SectionHeader, TabPanel, ToolbarSpacer, Text, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
   ChipRow, StatusDot, Facts, DescriptionList, Table, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,

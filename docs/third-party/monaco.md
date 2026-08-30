@@ -45,7 +45,7 @@ because of it. A single-file Monaco frame measures **7.93 MiB against an 8.00 Mi
 and its language-service workers (**14.58 MiB across four emitted chunks**) cannot be served at all: an
 `app-plugin://<hash>` origin serves `/client.js` plus the host's `/ui.css` and nothing else, and the
 frame CSP has no `worker-src`, so `default-src 'none'` denies workers including `blob:`
-(`docs/third-party/editor.md § Monaco in a frame: measured`).
+(`docs/first-party-plugins.md § First-party only by history`, the editor row).
 
 So: should the app own one editor and lend it to plugins, instead of each plugin shipping its own?
 
@@ -337,7 +337,7 @@ surroundings: a **multi-document** surface needs "show this uri" — a picker or
 file, and nothing in read/write/flush can point the host's editor at a different document
 (`openPane` carries no payload). Whether that lands as `bridge.document.open(uri)` or as host-drawn
 tabs fed by the surface's document-list route is part of editor's template question
-(`docs/third-party/editor.md` § Sequence) — design the contract knowing the slot exists; do not build
+— design the contract knowing the slot exists; do not build
 it for database, which is single-document. Beyond that, resist anything more — cursor position,
 selection, decorations — until a real plugin cannot ship without it, and weigh any such request
 against § Language smarts first, because the LSP-shaped route is usually the better home.
@@ -445,7 +445,7 @@ grows without becoming Monaco's API in a trench coat.
 ## What this does not fix
 
 - **The editor plugin still cannot move, but this is now its ONLY blocker.** Its other two are
-  resolved (`docs/third-party/editor.md`): `overlay` is a frame target opened by the `openOverlay`
+  resolved: `overlay` is a frame target opened by the `openOverlay`
   verb, and `persistedState` is decided as no-manifest-form-ever, with the frame's
   `state.get`/`state.set` as the tier's store. Porting ⌘P itself additionally needs the
   open-document slot noted in § Communication between regions.
@@ -499,14 +499,17 @@ grows without becoming Monaco's API in a trench coat.
    is read by plugin authors and not by an LSP client. The node-side schema cache invalidates on
    connect, on disconnect, and after any statement whose command was not a plain read or write.
 7. **Then the editor move itself.** Its other two blockers have since been resolved (`overlay` is a
-   frame target; `persistedState` deliberately has no manifest form — `docs/third-party/editor.md`),
+   frame target; `persistedState` deliberately has no manifest form),
    so this design is the last thing between editor and the loaded tier. Planning that move settles
    the two questions reserved above: its template shape (`frame-beside-document` vs host-drawn tabs)
    and the open-document verb.
 
 ## Related
 
-- `docs/third-party/editor.md` — the measurement that started this, and editor's other two blockers.
+- `docs/first-party-plugins.md § First-party only by history` — the measurement that started this,
+  in the editor row. The editor brief that held the rest was every open item this design and the layout
+  programme answered, and it went at layout phase 9. Find it with
+  `git log --follow -- docs/third-party/editor.md`.
 - `docs/third-party/README.md § database has moved` — the outcome record of steps 5 and 6: that
   plugin's move built `document-over-frame`, and the findings from doing so live there.
 - `docs/future/terminal.md` — the tier-1 "one host-owned template" conclusion this instantiates.

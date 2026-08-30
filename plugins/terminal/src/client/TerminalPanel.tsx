@@ -1,14 +1,13 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { Portal } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { activeTerminal, addSession, clientEvents, consumeTerminalFocusIntent, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, refreshSessions, registerCommands, rememberActiveTerminal, savePref, sessions, type Task, termFontSize } from '@acorn/plugin-api/client'
 import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
-import { Alert, Button, createSplitDrag, DocumentTabs, EmptyState, Icon, Menu, Rectangle, SplitHandle } from '@acorn/plugin-api/ui'
+import { Alert, Button, createSplitDrag, DocumentTabs, EmptyState, Icon, Menu, SplitHandle } from '@acorn/plugin-api/ui'
+import { Drawer } from '@acorn/plugin-api/ui/host'
 import { resolveTerminalFontSize } from './preferences'
-import './terminal.css'
 
 // Bottom drawer of persistent local sessions. The "+" opens a profile menu; the node resolves the
 // active project folder/worktree from the task id on a durable tmux backend. Sessions are scoped to
@@ -227,109 +226,105 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   }
 
   return (
-    <Portal>
-      <aside ref={drawerRef} class="terminal-drawer" classList={{ maximized: maximized() }} style={{ height: maximized() ? undefined : `${height()}px` }}>
-        <Show when={!maximized()}>
-          <SplitHandle axis="y" drag={drawerDrag} />
-        </Show>
-        {/* Was a hand-rolled strip inside a hand-rolled header. DocumentTabs owns both halves now,
-            the tabs and the `actions` slot the +, ^C and ✕ ride in, so this drawer's header is the
-            same element at the same height as the editor's file tab bar. */}
-        <DocumentTabs
-          idPrefix="terminal"
-          ariaLabel="Terminal sessions"
-          active={activeId() ?? ''}
-          onActivate={setActiveId}
-          onClose={(id) => {
-            const session = visibleSessions().find((candidate) => candidate.id === id)
-            if (session) void closeTab(session)
-          }}
-          tabs={[
-            ...visibleSessions().map((session) => ({
-              id: session.id,
-              label: session.title,
-              status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
-              title: session.idle ? 'Agent idle — may be waiting for input' : session.title,
-            })),
-            // The launching session has no id yet, so it cannot be activated or closed. It is a
-            // placeholder tab that the real session replaces.
-            ...(pendingTitle() ? [{ id: 'pending', label: pendingTitle()!, pending: true }] : []),
-          ]}
-          actions={
-            <>
-              {/* Was an absolutely-positioned div with a full-viewport transparent backdrop for
-                  click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
-                  roles. Menu brings all of it. */}
-              <Menu
-                ariaLabel="New session"
-                trigger={({ toggle, open }) => (
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    iconOnly
-                    disabled={busy() || !ws()}
-                    title={ws() ? 'New session' : 'Select a task first'}
-                    opens="menu"
-                    expanded={open()}
-                    onPress={toggle}
-                  >
-                    <Icon name="plus" />
-                  </Button>
-                )}
-              >
-                {(menu) => (
-                  <For each={profiles()}>
-                    {(p) => (
-                      <Menu.Item
-                        context={menu}
-                        disabled={!p.available}
-                        title={!p.available ? `${p.label} not found on PATH` : p.tmuxMissing ? 'tmux not found on PATH — this session will not survive an app restart' : undefined}
-                        onSelect={() => void startProfile(p.id)}
-                        trailing={
-                          <>
-                            <Show when={!p.available}>not found</Show>
-                            {/* tmux degrade hint (docs/terminal-and-agents.md): the profile still
-                                works, but the durable backend silently fell back to node-pty. */}
-                            <Show when={p.available && p.tmuxMissing}>tmux missing — won't survive restart</Show>
-                          </>
-                        }
-                      >
-                        {p.label}
-                      </Menu.Item>
-                    )}
-                  </For>
-                )}
-              </Menu>
-              <Show when={activeRunning()}>
-                <Button variant="bare" size="sm" title="Interrupt (Ctrl-C)" onPress={() => void api.interrupt(activeId()!)}>
-                  ^C
+    <Drawer ref={(element) => { drawerRef = element }} ariaLabel="Terminal" height={height()} maximized={maximized()}>
+      <Show when={!maximized()}>
+        <SplitHandle axis="y" drag={drawerDrag} />
+      </Show>
+      {/* Was a hand-rolled strip inside a hand-rolled header. DocumentTabs owns both halves now,
+          the tabs and the `actions` slot the +, ^C and ✕ ride in, so this drawer's header is the
+          same element at the same height as the editor's file tab bar. */}
+      <DocumentTabs
+        idPrefix="terminal"
+        ariaLabel="Terminal sessions"
+        active={activeId() ?? ''}
+        onActivate={setActiveId}
+        onClose={(id) => {
+          const session = visibleSessions().find((candidate) => candidate.id === id)
+          if (session) void closeTab(session)
+        }}
+        tabs={[
+          ...visibleSessions().map((session) => ({
+            id: session.id,
+            label: session.title,
+            status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
+            title: session.idle ? 'Agent idle — may be waiting for input' : session.title,
+          })),
+          // The launching session has no id yet, so it cannot be activated or closed. It is a
+          // placeholder tab that the real session replaces.
+          ...(pendingTitle() ? [{ id: 'pending', label: pendingTitle()!, pending: true }] : []),
+        ]}
+        actions={
+          <>
+            {/* Was an absolutely-positioned div with a full-viewport transparent backdrop for
+                click-away, no Escape, no portal (so any overflow ancestor clipped it) and no menu
+                roles. Menu brings all of it. */}
+            <Menu
+              ariaLabel="New session"
+              trigger={({ toggle, open }) => (
+                <Button
+                  variant="bare"
+                  size="sm"
+                  iconOnly
+                  disabled={busy() || !ws()}
+                  title={ws() ? 'New session' : 'Select a task first'}
+                  opens="menu"
+                  expanded={open()}
+                  onPress={toggle}
+                >
+                  <Icon name="plus" />
                 </Button>
-              </Show>
-              <Button variant="bare" size="sm" iconOnly onPress={props.onClose} title="Close drawer (sessions keep running)" label="Close">
-                <Icon name="x" />
+              )}
+            >
+              {(menu) => (
+                <For each={profiles()}>
+                  {(p) => (
+                    <Menu.Item
+                      context={menu}
+                      disabled={!p.available}
+                      title={!p.available ? `${p.label} not found on PATH` : p.tmuxMissing ? 'tmux not found on PATH — this session will not survive an app restart' : undefined}
+                      onSelect={() => void startProfile(p.id)}
+                      trailing={
+                        <>
+                          <Show when={!p.available}>not found</Show>
+                          {/* tmux degrade hint (docs/terminal-and-agents.md): the profile still
+                              works, but the durable backend silently fell back to node-pty. */}
+                          <Show when={p.available && p.tmuxMissing}>tmux missing — won't survive restart</Show>
+                        </>
+                      }
+                    >
+                      {p.label}
+                    </Menu.Item>
+                  )}
+                </For>
+              )}
+            </Menu>
+            <Show when={activeRunning()}>
+              <Button variant="bare" size="sm" title="Interrupt (Ctrl-C)" onPress={() => void api.interrupt(activeId()!)}>
+                ^C
               </Button>
-            </>
-          }
-        />
+            </Show>
+            <Button variant="bare" size="sm" iconOnly onPress={props.onClose} title="Close drawer (sessions keep running)" label="Close">
+              <Icon name="x" />
+            </Button>
+          </>
+        }
+      />
 
-        <Show when={error()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
+      <Show when={error()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
 
-        {/* A PTY is pixels, so it is a rectangle rather than a tree: the kit owns the box and the way
-            in and out of it with the keyboard, and xterm owns everything inside. */}
-        <Rectangle kind="pty" label="Terminal">
-          <Show
-            when={activeId()}
-            fallback={
-              <EmptyState busy={launching() || !!pendingTitle()}>
-                {launching() || pendingTitle() ? 'Launching…' : 'No sessions. Press + to open one.'}
-              </EmptyState>
-            }
-            keyed
-          >
-            {(id) => <TerminalSurface sessionId={id} fontSize={surfaceFontSize()} onExit={() => void refreshSessions()} />}
-          </Show>
-        </Rectangle>
-      </aside>
-    </Portal>
+      {/* The session draws its own `Rectangle kind="pty"` (./TerminalSurface.tsx): a terminal is the
+          rectangle, and an empty drawer has no pixels for one to hold. */}
+      <Show
+        when={activeId()}
+        fallback={
+          <EmptyState busy={launching() || !!pendingTitle()}>
+            {launching() || pendingTitle() ? 'Launching…' : 'No sessions. Press + to open one.'}
+          </EmptyState>
+        }
+        keyed
+      >
+        {(id) => <TerminalSurface sessionId={id} fontSize={surfaceFontSize()} onExit={() => void refreshSessions()} />}
+      </Show>
+    </Drawer>
   )
 }

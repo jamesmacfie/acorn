@@ -2,6 +2,7 @@ import { createMemo, createResource, Show } from 'solid-js'
 import { editorApi } from './editorClient'
 import { editorOpen } from './editorState'
 import { activeTaskId, createOverlayPalette, dispatchActiveLayout, fuzzyScore } from '@acorn/plugin-api/client'
+import { Inline, Text } from '@acorn/plugin-api/ui'
 import { PaletteSurface } from '@acorn/plugin-api/ui/host'
 
 // ⌘P quick-open: fuzzy-jump to a file in the active task's worktree. Monaco has no built-in file
@@ -62,12 +63,12 @@ export default function FilePalette() {
       row={(path) => {
         const slash = path.lastIndexOf('/')
         return (
-          <>
-            <span class="palette-label">{slash >= 0 ? path.slice(slash + 1) : path}</span>
-            <Show when={slash >= 0}>
-              <span class="palette-hint muted">{path.slice(0, slash)}</span>
-            </Show>
-          </>
+          <Inline>
+            {/* Filename first, then the directory that holds it, dimmed: the name is what a person
+                typed and the path is how they tell two of them apart. */}
+            <Text>{slash >= 0 ? path.slice(slash + 1) : path}</Text>
+            <Show when={slash >= 0}><Text emphasis="muted">{path.slice(0, slash)}</Text></Show>
+          </Inline>
         )
       }}
     />

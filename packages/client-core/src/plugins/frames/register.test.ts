@@ -35,11 +35,17 @@ const { _resetFrameContributions, frameBindingFor, syncFrameContributions } = aw
 
 const HASH = 'a'.repeat(64)
 
+// A pane, a reference panel and a settings page have to say how they are drawn, so the default here is
+// the plainest true answer: one region, filled by the plugin's own rectangle. A case testing a layout
+// or a tree overrides both keys.
+const DRAWN_TARGETS = new Set(['pane', 'refPanel', 'settings'])
+
 const surface = (over: Partial<PluginFrameSurface> & Pick<PluginFrameSurface, 'target' | 'id'>): PluginFrameSurface => ({
   label: over.id,
   glyph: 'puzzle',
   order: 500,
   formFactor: ['desktop'],
+  ...(DRAWN_TARGETS.has(over.target) ? { layout: 'single' as const, regions: { body: 'frame' as const } } : {}),
   ...over,
 })
 

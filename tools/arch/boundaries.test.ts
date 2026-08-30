@@ -901,70 +901,37 @@ describe('architecture boundaries', () => {
     for (const [path] of ALLOWED) expect(readers.map(rel)).toContain(path)
   })
 
-  it('no plugin stylesheet styles another package\'s markup', () => {
-    const pluginDirs = readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })
-      .filter((e) => e.isDirectory()).map((e) => e.name)
-
-    // Class names too generic or structural to attribute by grep: state flags a plugin sets on its own
-    // elements, plus the shared vocabularies that live in core.
-    const SHARED = /^(ui-|diff-|is-|has-|active$|muted$|glyph$|placeholder$|spin$|truncate$|scroll$|mono$|list-reset$|markdown$)/
-
-    // `walk` yields only JS and TS, so it silently returns no stylesheets, which made the first draft of
-    // this rule pass unconditionally.
-    const cssIn = (dir: string, out: string[] = []): string[] => {
+  it('no plugin ships a stylesheet, and none mounts its own root', () => {
+    // The permanent form of two rules phase 9 of the layout programme could finally state.
+    //
+    // The old rule here was narrower — a plugin's stylesheet must not style another package's markup —
+    // because plugins had stylesheets and the question was only whose markup they reached. They have
+    // none now: a plugin draws kit nodes, which carry no `class` and no `style`, and the appearance a
+    // reader chose reaches a plugin because the host draws it. A plugin with a stylesheet is a plugin
+    // that has written an element to hang it on, and `ui/adoption.test.ts` refuses that separately.
+    //
+    // The second half is the render path. A tree is mounted by the host, or by `mountTree` for a bundle
+    // in a worker. A plugin calling Solid's `render` has made a root nothing knows about: outside every
+    // focus group, reachable by no intent, wrapped in no contribution boundary, and impossible to move
+    // to a worker later.
+    // `walk` yields only JS and TS, so a stylesheet scan built on it would pass unconditionally — the
+    // trap the rule this replaced fell into first. Its own reader, over the plugin source trees only,
+    // so a dependency's stylesheet under node_modules is not mistaken for a plugin's own.
+    const filesIn = (dir: string, out: string[] = []): string[] => {
       if (!existsSync(dir)) return out
-      for (const e of readdirSync(dir, { withFileTypes: true })) {
-        const p = join(dir, e.name)
-        if (e.isDirectory()) cssIn(p, out)
-        else if (e.name.endsWith('.css')) out.push(p)
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name)
+        if (entry.isDirectory()) filesIn(path, out)
+        else out.push(path)
       }
       return out
     }
-
-    const offenders: string[] = []
-    for (const plugin of pluginDirs) {
-      const cssFiles = cssIn(join(ROOT, 'plugins', plugin))
-      const declared = new Set<string>()
-      for (const file of cssFiles) {
-        const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-        for (const group of text.match(/[^{}]+(?=\{)/g) ?? []) {
-          for (const selector of group.split(',')) {
-            // Ownership is the first class of the first compound unit. `.a.b` is a modifier on `.a`, and
-            // `.a .b` is this plugin scoping something inside its own container.
-            const first = selector.trim().match(/^\.([a-zA-Z][\w-]*)/)
-            if (first && !SHARED.test(first[1])) declared.add(first[1])
-          }
-        }
-      }
-      if (!declared.size) continue
-
-      // Every .tsx outside this plugin. A class is "worn" when it appears inside a class attribute.
-      const outside = [join(ROOT, 'packages'), join(ROOT, 'apps', 'desktop', 'src'), join(ROOT, 'plugins')]
-        // `.flatMap(walk)` would hand walk the array index as its accumulator. Call it explicitly.
-        .filter(existsSync).flatMap((d) => walk(d))
-        .filter((f) => f.endsWith('.tsx') && !f.startsWith(join(ROOT, 'plugins', plugin) + '/'))
-      for (const file of outside) {
-        const text = readFileSync(file, 'utf8')
-        for (const attr of text.match(/class(?:List)?=\{?[^}\n]*/g) ?? []) {
-          for (const name of declared) {
-            if (new RegExp(`[\\s"'\`{]${name}[\\s"'\`}:,]`).test(attr)) {
-              offenders.push(`plugins/${plugin} defines .${name}, worn by ${relative(ROOT, file)}`)
-            }
-          }
-        }
-      }
-    }
-    // The baseline is empty, and stays empty. It held one plugin contributing markup into another's
-    // container, where the markup belonged to the guest and the box to the host.
-    //
-    // Context's two vocabulary classes went with phase 6 of the layout programme: memory's section is a
-    // contribution to the `context:section` point now, written in kit nodes, so there is no class for it
-    // to borrow. The earlier note here said a cooperative point could not take it because the section is
-    // UI rather than a descriptor — which was true of the `rows` kind and stopped being true when the
-    // `remote` kind arrived with two render paths (docs/plugins.md § Cooperative extension points).
-    // `.agent-tool` went the same way in phase 8: the agents plugin has no stylesheet left, so there is
-    // nothing for a guest card to wear.
-    const BASELINE: string[] = []
-    expect([...new Set(offenders)].sort()).toEqual(BASELINE)
+    const pluginFiles = PACKAGES.filter((pkg) => pkg.kind === 'plugin').flatMap((pkg) => filesIn(pkg.src))
+    const stylesheets = pluginFiles.filter((file) => file.endsWith('.css')).map(rel)
+    const roots = pluginFiles
+      .filter((file) => /\.tsx?$/.test(file))
+      .filter((file) => /\bimport\s*\{[^}]*\brender\b[^}]*\}\s*from\s*'solid-js\/web'/.test(readFileSync(file, 'utf8')))
+      .map(rel)
+    expect({ stylesheets, roots }).toEqual({ stylesheets: [], roots: [] })
   })
 })

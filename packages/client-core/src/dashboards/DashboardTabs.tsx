@@ -1,7 +1,7 @@
 import { createSignal, Index, Show } from 'solid-js'
 import { Button, Input } from '../ui/primitives'
 import { createArmedConfirm } from '../ui/confirm'
-import { createListNavigation } from '../ui/focus'
+import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import Icon from '../ui/Icon'
 import { ContextMenu, Menu, type MenuContext } from '../ui/Menu'
 import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './homeTab'
@@ -19,6 +19,9 @@ import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persi
 //
 // The root is a `<span>` because the bar takes the section header's label seat: tabs are the heading
 // when there are several (`SectionHeader`, primitives.tsx).
+
+const NEXT_KEYS = new Set(['ArrowRight', 'ArrowDown', 'j'])
+const PREV_KEYS = new Set(['ArrowLeft', 'ArrowUp', 'k'])
 
 /** The tab title, editable in place. It holds its own element because the text is uncontrolled: the
  *  input owns it until it commits, so nothing in the model changes per keystroke and Escape has
@@ -64,11 +67,25 @@ export default function DashboardTabs(props: {
     focusTab(id)
   }
 
-  const onKeyDown = createListNavigation({
-    count: () => props.tabs.length,
-    active: () => Math.max(0, props.tabs.findIndex((tab) => tab.id === props.active)),
-    setActive: (index) => select(props.tabs[index].id),
-  })
+  // Roving arrows over the strip, written here rather than taken from `keys/collection.ts`, which is
+  // what every other collection in the app uses. The strip holds an inline rename `Input`, and an
+  // intent layer binds Left and Right unconditionally, so a person renaming a tab would lose the
+  // caret keys to tab movement. `isTypingTarget` is the whole difference, and it is three lines.
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (isTypingTarget(event.target)) return
+    const count = props.tabs.length
+    if (count <= 0) return
+    const at = Math.max(0, props.tabs.findIndex((tab) => tab.id === props.active))
+    const next
+      = event.key === 'Home' ? 0
+        : event.key === 'End' ? count - 1
+          : NEXT_KEYS.has(event.key) ? (at + 1) % count
+            : PREV_KEYS.has(event.key) ? (at - 1 + count) % count
+              : at
+    if (next === at) return
+    event.preventDefault()
+    select(props.tabs[next].id)
+  }
 
   // ── The verbs ───────────────────────────────────────────────────────────────────────────────
   //

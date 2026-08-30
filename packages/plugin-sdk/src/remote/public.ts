@@ -30,7 +30,6 @@ export declare const Stack: (props: KitNodeProps) => JSX.Element
 export declare const Inline: (props: KitNodeProps) => JSX.Element
 export declare const Section: (props: KitNodeProps) => JSX.Element
 export declare const Fold: (props: KitNodeProps) => JSX.Element
-export declare const CollapsibleSection: (props: KitNodeProps) => JSX.Element
 export declare const Card: (props: KitNodeProps) => JSX.Element
 export declare const Timeline: (props: KitNodeProps) => JSX.Element
 export declare const Tabs: (props: KitNodeProps) => JSX.Element

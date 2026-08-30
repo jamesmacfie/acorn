@@ -1,7 +1,7 @@
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import * as monaco from 'monaco-editor'
 import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWithin, type PaneIntent, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
-import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Tabs } from '@acorn/plugin-api/ui'
+import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Rectangle, TabPanel, Tabs } from '@acorn/plugin-api/ui'
 import { MONACO_THEME, monacoLanguageForPath, watchMonacoTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi } from './editorClient'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
@@ -9,7 +9,6 @@ import { editorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import SearchPanel from './search/SearchPanel'
-import './editor.css'
 
 // The extension-to-language map and the Monaco theme live in the host
 // (docs/third-party/monaco.md § Status).
@@ -28,7 +27,7 @@ export default function EditorPane(props: { task: Task }) {
   const [side, setSide] = createSignal<'files' | 'search'>('files')
   let treeRevealRevision = 0
 
-  let host: HTMLDivElement | undefined
+  let host: HTMLElement | undefined
   let editor: monaco.editor.IStandaloneCodeEditor | undefined
   let stopTheme: (() => void) | undefined
   // One Monaco instance reused across tab switches, with the current path tracked explicitly rather
@@ -247,7 +246,7 @@ export default function EditorPane(props: { task: Task }) {
   )
 
   return (
-    <section ref={paneRef} class="pane editor-pane" style={{ 'grid-column': '1 / 3' }}>
+    <section ref={paneRef} class="pane editor-pane">
       <Show when={root() !== undefined} fallback={<EmptyState busy>Loading…</EmptyState>}>
         <Show when={root()} fallback={<EmptyState>Open a terminal first to map this repo's checkout.</EmptyState>}>
           <ListDetail
@@ -261,14 +260,10 @@ export default function EditorPane(props: { task: Task }) {
                   idPrefix="editor-side"
                   ariaLabel="Editor sidebar"
                 />
-                {/* Both stay mounted; the hidden one keeps its scroll, its open folders and its results. */}
-                <div
-                  id="editor-side-panel-files"
-                  role="tabpanel"
-                  aria-labelledby="editor-side-tab-files"
-                  class="editor-tree"
-                  style={{ display: side() === 'files' ? undefined : 'none' }}
-                >
+                {/* Both stay mounted; the hidden one keeps its scroll, its open folders and its results.
+                    `TabPanel` owns the hidden-but-mounted half, which this pane used to spell as an
+                    inline `display: none` beside six hand-written tab attributes. */}
+                <TabPanel idPrefix="editor-side" id="files" active={side()}>
                   <FileTree
                     taskId={taskId}
                     onOpen={(p) => openPath(p, true)}
@@ -278,7 +273,7 @@ export default function EditorPane(props: { task: Task }) {
                       setTreeReveal((request) => request?.revision === revision ? null : request)
                     }}
                   />
-                </div>
+                </TabPanel>
                 <SearchPanel taskId={taskId} active={side() === 'search'} />
               </>
             }
@@ -322,7 +317,10 @@ export default function EditorPane(props: { task: Task }) {
                 </>
               }
             />
-            <div class="editor-host" ref={host} />
+            {/* Monaco owns these pixels — its own DOM, its own keyboard, its own scrolling — so the
+                pane hands it a box rather than a tree. `mount` is the element it attaches to, drawn by
+                the host (ui/Rectangle.tsx). */}
+            <Rectangle kind="editor" label="Editor" mount={(element) => { host = element }} />
           </ListDetail>
         </Show>
       </Show>

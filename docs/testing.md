@@ -40,6 +40,11 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   checks machinery, not pixels: a contribution under test renders a `<span>` carrying its own id. The
   smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
   any of these;
+- the plugin invariants hold the closed kit closed at the call site. `ui/adoption.test.ts` fails on a
+  raw `div` or `span` anywhere under `plugins/`, and two arch rules in `tools/arch/boundaries.test.ts`
+  fail on a plugin stylesheet and on a plugin importing Solid's `render`. These were a ledger of
+  converted files until layout phase 9 finished the conversion; a ledger answers "has this file been
+  done" and a rule answers "can this be written at all";
 - the three kit invariants hold the component set closed, and each one reads the contract rather
   than the code that implements it. `ui/kit/support.test.ts` reads the `/ui` barrel and asserts that
   the nodes it exports and the rows in `NODE_SUPPORT` are the same list, each with a terminal level.
@@ -165,8 +170,8 @@ The next two are the remote tree's, from layout phase 3 (2026-08-29). The suites
 renderer, the worker lifecycle and the two render paths producing identical DOM; what nothing
 automated covers is a real worker started from a real bundle over the shell's own scheme.
 
-17. Install a plugin declaring `contributions.remote` with `target: 'agentToolRenderer'`, accept its
-    trust prompt, and run an agent turn that makes a matching tool call. The card draws from the
+17. Install a plugin declaring an `extensions` entry on `agents:tool-card`, accept its trust prompt,
+    and run an agent turn that makes a matching tool call. The card draws from the
     plugin's worker and is indistinguishable from a compiled one: same spacing, same disclosure
     behaviour, same style pack. Reject the bundle instead and the built-in card draws.
 18. Break that bundle so it throws on mount. The card shows the labelled placeholder, a row appears on
@@ -190,6 +195,23 @@ the automated tiers stop at the JSX preset, so these are the eyes-on pass on the
 22. Open a task linked to a Rollbar item, pick an occurrence, and copy its context. Then reject one of
     the four bundles at the trust prompt: its pane draws the labelled placeholder and the other three
     keep working.
+
+The last three are layout phase 9's (2026-08-30), and they are the pass the whole programme was
+building towards. The kit invariants and the arch rules prove no plugin writes an element or a
+stylesheet; only a person can tell whether the result is usable.
+
+23. Traverse every pane with the keyboard and nothing else. Tab reaches each region in turn, arrow
+    keys move inside a list, Enter opens a rectangle and Escape leaves it, and no pane is a place the
+    keyboard can get stuck. Do the editor pane's file tree, the find-in-files results, the terminal
+    drawer, the agents transcript and the PR pane's diff at minimum. Turn on a screen reader for one
+    pass over the editor's sidebar: the file tree announces as a tree with levels and expanded state.
+24. Scaffold a fresh plugin with `npm create acorn-plugin`, install it from disk, accept its bundle,
+    and check both halves of what it declares. Its tool card draws in an agent transcript from its own
+    worker, and its diff-line annotation appears on every tenth line of the Changes pane. Then check
+    the developer view on the plugin's page, disable the plugin, and uninstall it: the card and the
+    annotation go at each step and nothing else moves.
+25. Scaffold the other shape with `--rectangle` and repeat the install. Its pane draws inside an
+    iframe, and a network call from that iframe fails.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

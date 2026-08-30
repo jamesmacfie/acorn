@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canRevealActiveFile, directoryContainsFile } from './fileTreeReveal'
-
-describe('directoryContainsFile', () => {
-  it('matches descendants on a path-segment boundary', () => {
-    expect(directoryContainsFile('src', 'src/app/index.ts')).toBe(true)
-    expect(directoryContainsFile('src/app', 'src/app/index.ts')).toBe(true)
-    expect(directoryContainsFile('src/app', 'src/application.ts')).toBe(false)
-    expect(directoryContainsFile('src/app/index.ts', 'src/app/index.ts')).toBe(false)
-  })
-})
+import { canRevealActiveFile } from './fileTreeReveal'
 
 describe('canRevealActiveFile', () => {
   const context = {

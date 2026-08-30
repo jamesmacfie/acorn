@@ -21,10 +21,16 @@ switch disposes the previous task scope.
 ## Registries and plugins
 
 The client plugin host activates `apps/desktop/src/app/client/plugins.ts`. Plugins register panes,
-rail sources, commands/keybindings, settings pages, slots, rail markers, palette rows,
-context-section slots, ref panels, agent contexts/renderers, schedules, persisted-state slices, Node
-stats, attention sources, brand marks, and content links. The host owns the returned disposables so a plugin can be disabled and
-reactivated without duplicate entries.
+rail sources, commands and keybindings, settings pages, slots, rail markers, palette rows, ref panels,
+agent contexts, extension points and their own contributions to somebody else's, schedules,
+persisted-state slices, Node stats, attention sources, brand marks, and content links. The host owns
+the returned disposables so a plugin can be disabled and reactivated without duplicate entries.
+
+There are two render paths and one component API. A compiled plugin's tree runs in this process and
+the host mounts its components directly. A loaded plugin's runs in a Web Worker with no DOM, emitting
+a stream of node names the host draws with the same components. Both produce the same tree, which is
+what lets one plugin fill another's slot whichever tier it ships in
+(`docs/plugins.md` § Loaded plugins: the client half).
 
 A pane registers either a `component` or a `layout` plus a `regions` record. The layouts are the
 host's, one per name in `client-core/src/layouts`, and the registry turns a declared one into the

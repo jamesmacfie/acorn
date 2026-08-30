@@ -67,6 +67,7 @@ const text: Mapping<TextRole> = {
     mono: '--font-mono',
     eyebrow: '--label-size',
     heading: '--heading-weight',
+    match: '--find-hit-bg',
   },
   tui: {
     body: 'plain',
@@ -75,6 +76,7 @@ const text: Mapping<TextRole> = {
     mono: 'ignored',
     eyebrow: 'dim uppercase',
     heading: 'bold',
+    match: 'reverse',
   },
 }
 

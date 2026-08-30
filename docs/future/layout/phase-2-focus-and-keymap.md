@@ -83,8 +83,8 @@ propagates as a data attribute for styling.
   keymap; the scope type stays for manifests.
 - `packages/client-core/src/registries/commands.ts`: exposes the catalog.
 - `packages/client-core/src/tasks/tasks.ts`: `focusedPane` reads the region store.
-- `packages/client-core/src/ui/focus.ts`: `createListNavigation` and `trapOverlayFocus` callers
-  move to kit behaviour; the file is deleted in phase 9.
+- `ui/focus.ts` in client-core: `createListNavigation` and `trapOverlayFocus` callers move to kit
+  behaviour. Phase 9 deleted the file.
 - `packages/client-core/src/lib/isTypingTarget.ts`: replaced by node roles.
 - Kit nodes in `ui/`: `Row`, `TreeRow`, `Tabs`, `Menu`, `Modal`, `Picker`, `Composer`, `Fold`,
   `Timeline`, `Table`, `Grid`, `ChipRow`, `SegmentedControl`, `KeyValueEditor`, `Button`, `Input`,
@@ -134,8 +134,8 @@ propagates as a data attribute for styling.
 - `packages/client-core/src/registries/keybindings.ts` still has `KeybindingScope = 'global' | 'task'
   | 'pane' | 'typing-exempt'` and `scopesConflict`.
 - `packages/client-core/src/tasks/tasks.ts` holds `focusedPane` as a signal-backed record.
-- `packages/client-core/src/ui/focus.ts` exports `createListNavigation`, `nextListIndex`,
-  `trapOverlayFocus`.
+- `ui/focus.ts` in client-core exports `createListNavigation`, `nextListIndex`, `trapOverlayFocus`.
+  Phase 9 deleted the file.
 - `references/opentui/packages/keymap/` is present and its README lists the HTML adapter and Solid
   helpers; check the published package name and version on npm before adding it.
 - `docs/command-palette-and-shortcuts.md` § "Focus and typing" describes the frame keydown

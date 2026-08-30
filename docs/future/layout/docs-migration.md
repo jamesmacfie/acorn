@@ -1,6 +1,8 @@
 # Docs migration: what changes under `docs/`, and when
 
-Part of [docs/future/layout/](./README.md). Ninety-seven markdown files were read on 2026-08-28.
+Part of [docs/future/layout/](./README.md). **Executed in full; the programme shipped 2026-08-30.**
+Kept as the record of which document owns what, not as a list of work. Ninety-seven markdown files were
+read on 2026-08-28.
 This is the map of which ones change, in which phase, and what the new owning section is. The rule
 from the repo's own conventions applies: **update the owning doc in the same change.** A phase is
 not done until the document that owns the behaviour says the new true thing. Phase 9 does the large

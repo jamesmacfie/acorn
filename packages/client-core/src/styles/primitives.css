@@ -86,6 +86,12 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 .ui-rect { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .ui-rect:focus-visible { outline: var(--control-bw) solid var(--accent); outline-offset: calc(-1 * var(--control-bw)); }
 .ui-rect > * { flex: 1; min-height: 0; min-width: 0; }
+/* The element a library attaches to, when the caller passed `mount` rather than children. Its only
+   job is to be there and to fill the box; what it holds draws itself. */
+.ui-rect-mount { display: block; }
+/* FitAddon subtracts padding from xterm's own element, not from its parent host, so the visual inset
+   has to be here: put it on the host and the fitted row count clips the final terminal row. */
+.ui-rect[data-kind='pty'] .xterm { height: 100%; padding: var(--space-2) var(--space-3); }
 
 /* `grow`: the textarea IS the region. No drag handle, because the box is the region's to size. */
 textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
@@ -958,7 +964,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-findbar-count { flex: none; color: var(--text-muted); font-variant-numeric: var(--tabular); white-space: nowrap; }
 .ui-findbar-status { flex: none; font-size: var(--fs-xs); white-space: nowrap; }
 /* One highlight vocabulary, replacing three. Callers put these on their own <mark> elements. */
-.ui-find-mark { background: var(--find-hit-bg); color: inherit; border-radius: var(--radius-marker); }
+.ui-find-mark,
+.ui-text[data-emphasis='match'] { background: var(--find-hit-bg); color: inherit; border-radius: var(--radius-marker); }
 .ui-find-mark[data-current] { background: var(--find-current-bg); }
 
 /* ── KeyValueEditor ─────────────────────────────────────────────────────────────────────────

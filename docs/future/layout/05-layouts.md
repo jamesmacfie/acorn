@@ -71,7 +71,7 @@ Used by: docker detail, linear, rollbar, http response, editor sidebar, the gith
 Regions: `document` (a host-owned editor; `DocumentSurface`) and `frame` (a plugin tree, or a
 rectangle for a plugin that still ships one). Two focus groups. Existing code:
 `frames/DocumentOverFrame.tsx`, `frames/documentSurfaces.ts`, `editor/DocumentSurface`. The
-beside variant is the one `docs/third-party/editor.md` names as the editor plugin's blocker.
+beside variant is the one the editor plugin named as its blocker.
 
 Narrow: the frame region collapses to a sheet the document can summon. Terminal: the document region
 is a host text view, read-only in a first version; the frame region draws its tree.

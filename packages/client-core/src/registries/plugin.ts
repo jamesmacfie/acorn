@@ -1,7 +1,6 @@
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../persistence/persistedState'
 import { agentContextRegistry } from './agentContexts'
-import { agentToolRendererRegistry, type AgentToolRendererContribution } from './agentToolRenderers'
 import { paletteRowRegistry, type PaletteRowSource } from './paletteRows'
 import { attentionRegistry, type AttentionSourceContribution } from './attention'
 import { collectionKey, collectionRegistry, type CollectionRegistration } from './collections'
@@ -68,7 +67,6 @@ export type ClientPluginContext = {
   refPanels: ClientContributionPoint<RefPanelContribution>
   paletteRows: ClientContributionPoint<PaletteRowSource>
   agentContexts: ClientContributionPoint<AgentContextContribution>
-  agentToolRenderers: ClientContributionPoint<AgentToolRendererContribution>
   // The same word the node uses for the same idea, and deliberately not the same shape
   // (registries/schedules.ts).
   schedules: ClientContributionPoint<ClientScheduleContribution>
@@ -214,7 +212,6 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Cl
     refPanels: own(refPanelRegistry),
     paletteRows: own(paletteRowRegistry),
     agentContexts: own(agentContextRegistry),
-    agentToolRenderers: own(agentToolRendererRegistry),
     schedules: own(clientScheduleRegistry),
     railMarkers: own(railMarkerRegistry),
     persistedStateSlices: own(persistedStateRegistry),

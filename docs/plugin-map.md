@@ -17,6 +17,9 @@ A plugin has a node half, a client half, or both. Which one you write decides wh
 | Frame | A sandboxed iframe inside a pane the host draws | The bridge only: HTTP to its own routes, state, one channel, a few UI verbs |
 | Tree | A Web Worker with no DOM, drawing acorn's own components | The same bridge, and the kit instead of pixels: the shell's focus, keys, ARIA and style pack come with it |
 
+Tree is the default. `npm create acorn-plugin my-widget` emits one, and `--rectangle` emits a frame.
+Pick the frame when the surface owns its pixels, such as a chart, an image editor or a canvas.
+
 A compiled plugin registers by adding one line to each roster:
 `apps/node/src/server/plugins.ts` and `apps/desktop/src/app/client/plugins.ts`. Everything else it
 does, it does through the context object the host hands it.
@@ -110,11 +113,10 @@ Your plugin exports a `ClientPlugin`: a `name`, an `init`, and optionally `activ
 | `settingsPages` | A page in Settings, with a group and an order |
 | `slots` | A component in a host-owned region of the shell, or inside a task's chrome. The slot id decides which, and which context your component receives |
 | `extensionPoints` | A place inside one of your own surfaces that other plugins may fill. The host mints the id from your plugin name |
-| `extensions` | What you bring to somebody else's point, as a component the host mounts |
+| `extensions` | What you bring to somebody else's point, as a component the host mounts. This is how your tool's calls draw in an agent transcript: fill `agents:tool-card` |
 | `refPanels` | A reference panel for an external item. Not a pane, see [panes.md](./panes.md) |
 | `paletteRows` | Rows the palette can search, sourced from your own state |
 | `agentContexts` | Context an agent can pull from your plugin |
-| `agentToolRenderers` | How your tool's calls draw in an agent transcript. Compiled plugins only |
 | `schedules` | Periodic client work with an interval and an optional external refresh trigger |
 | `railMarkers` | Status markers the host draws on a rail control |
 | `persistedStateSlices` | A slice of state that survives a reload |
@@ -465,7 +467,7 @@ export const tunnelsClientPlugin: ClientPlugin = {
 Two roster lines make it real: one in `apps/node/src/server/plugins.ts`, one in
 `apps/desktop/src/app/client/plugins.ts`.
 
-## Example: a loaded plugin pushing to its own frame
+## Example: a loaded plugin pushing to its own tree
 
 A loaded plugin has no Hono and no channel prefix. It serves a fetch handler and broadcasts on its own
 namespace.
@@ -496,33 +498,50 @@ export default {
 } satisfies NodePlugin
 ```
 
-The frame half:
+The client half. A tree, which is what the manifest's `layout` and `remote` region name, so the worker
+runs this and the host draws the nodes:
 
 ```tsx
-import { mountFrame } from '@acorn/plugin-api/ui/sdk'
-import { render } from 'solid-js/web'
-// Inlined, not linked: a plugin origin serves one file, so a frame with a separate asset is broken.
-import styles from './styles.css?inline'
+import { mountTree } from '@acorn/plugin-api/ui/sdk'
+import { Badge, Inline, Stack, Text } from '@acorn/plugin-api/ui/tree'
 
-mountFrame({ styles }, (bridge, root) => {
-  const [state, setState] = createSignal('unknown')
+mountTree({
+  // One key per entry a manifest region or extension names. `regions: { body: { kind: 'remote',
+  // entry: 'pane' } }` mounts this one.
+  pane: (bridge) => {
+    const [state, setState] = createSignal('unknown')
 
-  // Returns the unsubscribe. Only your own plugin's channels resolve; another plugin's throws.
-  const off = bridge.events.on('plugin:buildwatch:status', (payload) => {
-    setState((payload as { state: string }).state)
-  })
-  onCleanup(off)
+    // Returns the unsubscribe. Only your own plugin's channels resolve; another plugin's throws.
+    const off = bridge.events.on('plugin:buildwatch:status', (payload) => {
+      setState((payload as { state: string }).state)
+    })
+    onCleanup(off)
 
-  // Your own routes, already authenticated. The path is relative to your mount.
-  void bridge.api.get<{ state: string }>('/status').then((r) => setState(r.state))
+    // Your own routes, already authenticated. The path is relative to your mount.
+    void bridge.api.get<{ state: string }>('/status').then((r) => setState(r.state))
 
-  // Persists through core prefs under plugin:buildwatch:*, the same namespace the node half's prefs
-  // facet is projected into. This is the supported node-to-frame state channel, capped at 1 MiB.
-  void bridge.state.set('lastSeen', Date.now())
+    // Persists through core prefs under plugin:buildwatch:*, the same namespace the node half's prefs
+    // facet is projected into. This is the supported node-to-client state channel, capped at 1 MiB.
+    void bridge.state.set('lastSeen', Date.now())
 
-  render(() => <Status state={state()} />, root)
+    return () => (
+      <Stack gap="row">
+        <Inline>
+          <Text emphasis="strong">Build</Text>
+          <Badge tone={state() === 'passing' ? 'ok' : 'danger'}>{state()}</Badge>
+        </Inline>
+      </Stack>
+    )
+  },
 })
 ```
+
+Import the nodes from `@acorn/plugin-api/ui/tree`, never `@acorn/plugin-api/ui`. That barrel is
+components compiled for a document, and a tree bundle's own preset would compile one into a tree of
+its own.
+
+A plugin that owns its pixels calls `mountFrame` instead, gets a sandboxed iframe, and writes its own
+markup and CSS. That is the other shape, and it is what `--rectangle` scaffolds.
 
 ## Rules that bite
 

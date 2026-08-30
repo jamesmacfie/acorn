@@ -22,11 +22,14 @@ These are pieces of the transport, not consumers of it; there is no message-pass
 "own the byte stream" that is not just the byte stream, slower. Never present on a loaded
 plugin's context, whatever its manifest says.
 
-**B. In-realm components inside another surface's tree** — agent-tool renderers drawn inline in a
-transcript list, diff components embedded in a pane someone else owns, overlay slots. The host
-holds the component function and calls it inside its own JSX. An iframe is opaque: nothing
-reaches inside it and nothing inside reaches out, so it cannot be a child in another component's
-render tree.
+**B. In-realm components inside another surface's tree** — overlay slots, the terminal drawer, the
+task footer. The host holds the component function and calls it inside its own JSX.
+
+This reason was much wider before the layout programme, and it has dissolved for everything a remote
+tree can carry. A card in a transcript, a section in somebody else's tray, a panel body: each is an
+extension point with two render paths now, and a loaded plugin fills one by naming a bundle entry the
+host mounts. What is left on this list is the places the host has not opened as a point, plus the
+places that hold a live stream rather than a tree.
 
 The test is *embedded in a render tree*, not *rendered by another plugin*. A **ref panel** is the
 case worth being careful about: it used to look like the strongest counter-example on this page —
@@ -158,7 +161,7 @@ Ordered by how strong the first-party claim is.
 | Plugin | Why | Reason |
 | --- | --- | --- |
 | **terminal** | Owns the PTY stream handlers and a WS channel prefix — the transport itself. Also `required`, publishes seven capabilities (`TERMINAL_SESSIONS`, `RUN_TARGETS`, `WORKTREE_CREATED`, `TASK_CREATED`, …) that four other plugins consume, and contributes two component slots. It is the most privileged plugin in the tree. | A, B, D, F |
-| **agents** | `required`. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`, `AGENTS_HARNESS_REGISTRY`; owns the managed-agent session model that core's context assembler and the shell's transcript both read, and the harness seam that lets a loaded plugin add an agent as data (docs/managed-agents.md § Harnesses). `managedAgents.ts` is still in protocol because client-core's agent-tool renderer registry names it. | D, E, F |
+| **agents** | `required`. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`, `AGENTS_HARNESS_REGISTRY`; owns the managed-agent session model that core's context assembler and the shell's transcript both read, and the harness seam that lets a loaded plugin add an agent as data (docs/managed-agents.md § Harnesses). `managedAgents.ts` is still in protocol because the `agents:tool-card` point's props name it. | D, E, F |
 | **docker** | Owns a WS channel prefix for container log and event streams. Its footer badge and rail slot are component contributions. | A, B |
 | **preview** | Its display lifecycle calls the host-owned webview service any plugin surface can use, and its node half owns the preview page rules the shell enforces, delivered over the service protocol. The browser agent tools left for `plugins/browser`, which drives a browser of the node's own. Supplying shell-enforced policy—not merely showing a page—is why preview remains first-party. | C |
 | **memory** | `required`. Publishes `KNOWLEDGE`/`MEMORY_KNOWLEDGE` and contributes two task-context sections that core's assembler depends on existing. | D, F |
@@ -169,7 +172,7 @@ Ordered by how strong the first-party claim is.
 
 | Plugin | Why | Reason |
 | --- | --- | --- |
-| **changes** | Contributes an **agent-tool renderer** — the component that draws its tool's calls inline in the agents transcript, dozens per screen, sharing the list's scroll and selection. Everything else about it (its SQLite file, its pane, its agent tool, `LOCAL_GIT`) is available to loaded plugins. | B |
+| **changes** | Nothing keeps it here. Its tool card is a contribution to `agents:tool-card`, an ordinary `remote` point a loaded plugin can fill, and everything else about it (its SQLite file, its pane, its agent tool, `LOCAL_GIT`) was already available. It stays compiled by preference: it is one of the four panes a task always has. | — |
 | **github** | Publishes `GITHUB_MIRROR`, and uses `ctx.contentLinks` for its content-link recognisers — which now have a manifest form, so this is a carrier difference rather than a privilege. Notably **not** `required` any more. Every one of its five surfaces is a host layout filled with kit nodes and it ships no stylesheet, so nothing about how it draws itself keeps it here: what does is `GITHUB_MIRROR` having a consumer. | D |
 | **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability rather than UI. | D, E, F |
 | **context** | Contributes a `persistedState` slice, which has no manifest form. Its `agentContexts` entry no longer counts — that has a descriptor now — but its `revision()` does: the composer reads it synchronously to key the automatic task-context snapshot, and a descriptor cannot answer synchronously. Small plugin, narrow reason. | E |
@@ -181,7 +184,7 @@ written before the loader existed.
 
 | Plugin | What it uses | Portable? |
 | --- | --- | --- |
-| **editor** | Monaco pane with find-in-files (ripgrep) folded into its sidebar, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. | **One blocker left, and it is a build rather than a question.** Neither capability has an outside consumer; the `overlay` slot has a manifest form (`target: "overlay"` + the `openOverlay` verb) and `persistedState` has a decided answer (bridge `state.*`, no manifest form — see [docs/plugins.md](./plugins.md)). The document surface that unblocked database now exists; what editor still needs from it is its own template (`frame-beside-document`, or host-drawn tabs) and the open-document verb ⌘P needs ([docs/third-party/editor.md](./third-party/editor.md)) |
+| **editor** | Monaco pane with find-in-files (ripgrep) folded into its sidebar, an `overlay` component slot, a `persistedState` slice, `EDITOR`/`SEARCH`. Both surfaces are host layouts filled with kit nodes and it ships no stylesheet. | **One blocker, and it is Monaco's size rather than a question.** A Monaco frame bundle measured 7.93 MiB against the 8.00 MiB cap with no editor UI in it, and its four language-service workers, another 14.58 MiB, cannot be delivered at all: a plugin origin serves one file and the frame CSP has no `worker-src`. So a Monaco frame would run with no TypeScript, JSON, CSS or HTML diagnostics, which for an editor is a different product rather than a degraded mode. Neither capability has an outside consumer. |
 
 **http** used to head this table and has moved. It was the first table-owning plugin to go, which is why
 it was chosen: it is the only candidate that exercises the whole storage path, and the part nothing had
@@ -321,5 +324,7 @@ remaining github→linear coupling is one string, in one place, for a reason tha
 `linkifyLinearIds` scans PR body HTML for Linear's key prefixes, so those bare-id anchors are github's
 own and carry no URL for a recogniser to claim.
 
-Worth reading, though not portable: **changes**, for what a plugin looks like when exactly one
-contribution — its agent-tool renderer — is the thing keeping it first-party.
+Worth reading: **changes**, for what happens when the one contribution keeping a plugin first-party
+stops needing to. Its tool card was a private renderer registry only a compiled plugin could reach;
+opening `agents:tool-card` turned it into a manifest line, and the plugin stayed compiled because
+that suits it rather than because it has to.

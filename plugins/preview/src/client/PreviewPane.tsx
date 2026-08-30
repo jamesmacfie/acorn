@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents, previewViews } from '@acorn/plugin-api/client'
-import { Button, EmptyState, Spinner } from '@acorn/plugin-api/ui'
+import { Button, EmptyState, Input, Rectangle, Spinner, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
@@ -13,7 +13,7 @@ export const activatePreviewEvents = (): (() => void) =>
   clientEvents.on('runtime:task-archived', ({ taskId }) => evictPreviewWebview(taskId))
 
 export default function PreviewPane(props: { taskId: string; url: string | null }) {
-  let host!: HTMLDivElement
+  let host!: HTMLElement
   const preview = previewViews()
   const [loading, setLoading] = createSignal(false)
   const [addr, setAddr] = createSignal('')
@@ -112,25 +112,30 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
             URL in Settings → workspace.
           </EmptyState>
         }>
-          <div class="preview-chrome">
+          {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
+              the address box is an `Input`, so it takes the reader's style pack like every other box
+              in the app instead of the three rules this plugin used to ship for it. */}
+          <Toolbar size="sm" ariaLabel="Preview">
             <Button variant="bare" title="Back" disabled={!canBack()} onPress={() => preview?.command(props.taskId, 'back')}>‹</Button>
             <Button variant="bare" title="Forward" disabled={!canFwd()} onPress={() => preview?.command(props.taskId, 'forward')}>›</Button>
             <Button variant="bare" title={loading() ? 'Stop' : 'Reload'} onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}>{loading() ? '✕' : '↻'}</Button>
             <Button variant="bare" title="Home" onPress={() => props.url && preview?.load(props.taskId, props.url)}>⌂</Button>
-            <input
-              class="preview-url"
-              type="text"
-              spellcheck={false}
+            <Input
+              size="sm"
+              label="Preview address"
+              assist={false}
               value={addr()}
-              onInput={(e) => setAddr(e.currentTarget.value)}
-              onKeyDown={(e) => e.key === 'Enter' && go()}
+              onInput={(value) => setAddr(value)}
+              onKeyDown={(event) => { if (event.key === 'Enter') go() }}
             />
             <Button variant="bare" title="Toggle preview DevTools" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')}>{'</>'}</Button>
             <Show when={loading()}><Spinner label="Loading page" /></Show>
-          </div>
+          </Toolbar>
         </Show>
       </Show>
-      <div class="workspace-preview-host" ref={host} />
+      {/* A WebContentsView is somebody else's pixels, so it is a rectangle: the kit owns the box and
+          the way in and out of it with the keyboard, and the shell positions the view over `mount`. */}
+      <Rectangle kind="webview" label="Preview" mount={(element) => { host = element }} />
     </section>
   )
 }

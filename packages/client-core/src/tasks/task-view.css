@@ -75,25 +75,16 @@
 }
 .workspace-empty-term:hover { background: var(--bg-hover); }
 
+/* Editor pane: fills the content columns, like the preview pane below. Both boxes are the host's
+   because both are the pane's outer shape rather than anything about what the plugin draws; they were
+   the plugins' own stylesheets until phase 9 of the layout programme. */
+.editor-pane { grid-column: 1 / 3; display: flex; flex-direction: column; overflow: hidden; }
+
 /* Browser-preview pane: the <webview> fills the content columns. */
 .workspace-preview { grid-column: 1 / 3; display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .workspace-preview-host { flex: 1; min-height: 0; display: flex; }
 
 /* Browser chrome above the preview WebContentsView: navigation + URL bar + preview devtools + spinner. */
-.preview-chrome { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 5px var(--space-3); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
-.preview-url {
-  flex: 1;
-  min-width: 0;
-  height: 26px;
-  padding: 0 var(--space-5);
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg-subtle);
-  border: var(--control-border);
-  border-radius: var(--radius);
-}
-.preview-url:focus { outline: none; border-color: var(--accent); }
 .plugin-webview-hostname {
   flex: 1;
   min-width: 0;

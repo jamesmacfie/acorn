@@ -14,8 +14,13 @@ export const size = ['xs', 'sm', 'md', 'lg'] as const
 /** What a thing means, not what colour it is. */
 export const tone = ['neutral', 'muted', 'accent', 'ok', 'warn', 'danger'] as const
 
-/** How text carries. `mono` is the only one a host without fonts ignores outright. */
-export const text = ['body', 'strong', 'muted', 'mono', 'eyebrow', 'heading'] as const
+/** How text carries. `mono` is the only one a host without fonts ignores outright.
+ *
+ *  `match` is the odd one: it means "this run is what you searched for", and it is the only value
+ *  that is about a run inside a line rather than about the line. It is here because two surfaces
+ *  highlight a hit — the diff's find bar and the editor's find-in-files — and both used to reach for
+ *  the host class `.ui-find-mark` directly, which a plugin is not allowed to spell. */
+export const text = ['body', 'strong', 'muted', 'mono', 'eyebrow', 'heading', 'match'] as const
 
 /** Which border this is, by the job it does. See docs/ui-design.md § Borders: a pack may set any of
  *  these to zero width, so picking the wrong role renders nothing at all. */
