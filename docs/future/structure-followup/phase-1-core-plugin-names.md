@@ -1,6 +1,8 @@
 # Phase 1: core stops naming plugins
 
-Status: not started. Waits on phase 0.
+Status: **shipped 2026-08-31**. Five things landed differently from the plan below; they are recorded
+in "What shipped differently" at the end, and the owning docs already say the true version. Phase 3
+reads that section, not this plan.
 
 ## Goal
 
@@ -106,3 +108,43 @@ have found at least one literal on a scratch file to be trusted.
 - `contextSections.ts` still builds the four sections inline.
 - `mcpRegister.ts` still declares `AgentFlavour` as a two-member union.
 - `plugins/github/src/client/index.ts` still registers exactly one persisted slice.
+
+## What shipped differently
+
+**The diff-view preference was renamed, not moved.** The plan said `github.diff-view` becomes one of
+github's `persistedStateSlices`. `DiffPane` turned out to be core's own shared component — `changes`
+draws it, github draws it, and so do the tree and remote surfaces — so the preference is core's and
+only the slice id was wrong. It is `core.diff-view` now, in the same place, with the stored key
+`diff_view` untouched. Moving it into github would have taken the split/unified toggle away from the
+`changes` pane whenever github was switched off.
+
+**A source needed two new fields, not one.** `SourceContribution.defaultPane` already existed and was
+read by nothing, so the first-pane item only had to give it a reader (`defaultPaneForTask`, asking
+whoever owns the task's URL first and a link's provider second). The origin item needed a second
+field: a source's rail id and the origin it stamps on a task need not match, and github's do not
+(`github` and `github-pr`), so `origins` maps origin id to glyph. Linear declares `defaultPane`
+through its manifest, which meant the descriptor schema, the node's parse-time check and the client's
+re-check all gained it, the same three places a content link's `openPane` lives in.
+
+**`task.terminal.new-codex` moved too.** The plan named only `new-claude`. Leaving its sibling behind
+would have split one decision across two packages for no reason: both name a profile id the agents
+plugin declares. Both are in `plugins/agents/src/client/terminalProfileCommands.ts` now, registered
+app-wide with a `when: () => !!activeTaskId()` rather than per task. The shell keeps
+`task.terminal.toggle` and `task.terminal.new-shell`, which are the drawer's and a plain shell's.
+
+**Moving the context sections cost a plugin API major.** `memorySection`, `notesSection` and
+`pullRequestSection` were exported from `@acorn/plugin-api/node`, and shrinking that surface is a
+`PLUGIN_API_MAJOR` bump by this repo's own rule. It went to `8`, the loaded packages were rebuilt, and
+`docs/plugins.md` § The plugin API records the reason. The plan did not anticipate the cost; it is
+paid.
+
+**The arch rule is an allowlist with reasons, not a baseline at zero.** The plan wanted the baseline
+empty. Ten roster ids are also core's own words — `terminal` is a UI style, a command category, a
+setup-script trigger and an agent controller; `context` is an agent input part; `github` is an install
+source kind and a brand mark — and a string match cannot tell them apart. Emptying that list would
+mean renaming core vocabulary, which is worse than the thing the rule is for. So `core never names a
+plugin` in `tools/arch/boundaries.test.ts` carries a `NAMES_A_PLUGIN_OK` map of file to reason,
+entries may only be removed, and no exception may outlive the code it excuses. Nine roster ids —
+`agents`, `browser`, `docker`, `linear`, `model-providers`, `nodes-file`, `onboarding`, `preview`,
+`rollbar` — are held at zero, which is the tracker case the phase was written for. Tests are exempt:
+a fixture naming a plugin is a fixture, the same reasoning the schema and testkit ratchets use.

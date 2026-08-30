@@ -267,6 +267,15 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     route(entry.items, ['contributions', 'sources', i, 'items'])
     if (entry.onSelect) action(entry.onSelect, ['contributions', 'sources', i, 'onSelect'])
     if (entry.emptyState?.action) action(entry.emptyState.action, ['contributions', 'sources', i, 'emptyState', 'action'])
+    // Same rule as a content link's `openPane`: the pane a task first opens on has to be one this
+    // manifest declares, or a roster row would aim core's first-open at somebody else's pane.
+    if (entry.defaultPane !== undefined && !taskPanes.has(entry.defaultPane)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'sources', i, 'defaultPane'],
+        message: `defaultPane names '${entry.defaultPane}', which this manifest does not declare as a task-scoped pane`,
+      })
+    }
     // A source panel has one rectangle beside its rail list, and both of these want it: a `navigate`
     // onSelect is the detail half of a master/detail browse, and a reserved panel region is a dashboard in
     // the same seat (docs/dashboards.md § Placements). Declaring both would parse and then draw one of

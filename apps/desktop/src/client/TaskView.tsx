@@ -146,9 +146,9 @@ export default function TaskView(props: {
     const commands = registerCommands([
       ...paneCommands,
       { id: 'task.terminal.toggle', title: () => props.terminalOpen ? 'Hide terminal drawer' : 'Show terminal drawer', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: props.onToggleTerminal },
+      // A plain shell only. A terminal running a harness CLI is that harness's command and is
+      // registered by the agents plugin (plugins/agents/src/client/terminalProfileCommands.ts).
       { id: 'task.terminal.new-shell', title: 'New terminal', hint: 'open a shell in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('shell') },
-      { id: 'task.terminal.new-claude', title: 'New Claude Code terminal', hint: 'run claude in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('claude-code') },
-      { id: 'task.terminal.new-codex', title: 'New Codex terminal', hint: 'run codex in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('codex') },
       { id: 'task.archive', title: 'Archive task', hint: 'guarded teardown', category: 'task', palette: true, run: openClose },
       ...paneContributions().map((pane) => ({
         id: `pane.restore.${pane.id}`, title: `Restore ${pane.label} pane row`, category: 'pane' as const,

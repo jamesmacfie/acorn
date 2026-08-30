@@ -1,7 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { and, eq } from 'drizzle-orm'
 import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } from '@acorn/protocol/api.ts'
-import type { NoteAuthor, NoteScope } from '@acorn/protocol/notes.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { runHook } from '../pluginHost/hooks'
@@ -35,20 +34,9 @@ export type PluginContextSection = Omit<ContextSectionContribution, 'assemble'> 
   assemble: (args: Omit<AssembleArgs, 'db'>) => Promise<ContextDraft>
 }
 
-export type ContextNotesSource = (
-  taskId: string,
-  repo: string,
-) => Promise<{ slug: string; scope: NoteScope; title: string; kind: string; body: string; author: NoteAuthor }[]>
-export type ContextMemorySource = (taskId: string, projectId: string) => Promise<{ name: string; description: string }[]>
-
-export type ContextPullRequestSource = (
-  userId: string,
-  repoOwner: string,
-  repoName: string,
-  pullNumber: number,
-) => Promise<{ number: number; title: string; body: string | null; changedFiles: string[] } | null>
-
-const truncateBytes = (value: string, max: number): string => {
+// Trim a string to a byte ceiling without splitting a multi-byte character, appending an ellipsis.
+// Exported because a plugin's own `format` needs the same ceiling arithmetic core applies to items.
+export const truncateBytes = (value: string, max: number): string => {
   if (Buffer.byteLength(value, 'utf8') <= max) return value
   let bytes = Buffer.from(value, 'utf8').subarray(0, Math.max(0, max - Buffer.byteLength('…')))
   let text = bytes.toString('utf8')
@@ -90,49 +78,15 @@ function budgetCompatibilityProjection(
   return result
 }
 
-const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more omitted` : '')
+export const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more omitted` : '')
 
 // Invariant: a section's `compact` must be computed independently of which other sections are
 // included (docs/agent-tools.md § Context sections).
 
-// ─── The sections ───────────────────────────────────────────────────────────────────────────────
+// ─── The one section core owns ──────────────────────────────────────────────────────────────────
 //
-// Registered by whoever owns the rows (docs/agent-tools.md § Context sections).
-
-export function pullRequestSection(source: ContextPullRequestSource): PluginContextSection {
-  return {
-    id: 'pr',
-    order: 10,
-    label: 'Pull request',
-    defaultIncluded: false,
-    budget: { maxItems: 1, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
-    async assemble({ userLogin, task, github }) {
-      if (task.pullNumber == null || !github) return { items: [] }
-      const pr = await source(userLogin, github.owner, github.name, task.pullNumber)
-      if (!pr) return { items: [] }
-      const changedFiles = pr.changedFiles
-      const compatibility = { number: pr.number, title: pr.title, body: pr.body, changedFiles }
-      return {
-        items: [{ id: `pr:${pr.number}`, kind: 'PR', label: `#${pr.number} ${pr.title}`, body: pr.body ?? undefined, details: changedFiles }],
-        compatibility: { pr: compatibility },
-      }
-    },
-    format(items) {
-      const item = items[0]
-      if (!item) return ''
-      const lines = [`## PR ${item.label}`]
-      const body = item.body?.replace(/<[^>]+>/g, '').trim()
-      if (body) lines.push(truncateBytes(body, 600))
-      const files = item.details ?? []
-      if (files.length) {
-        const shown = files.slice(0, 30)
-        const more = files.length - shown.length
-        lines.push(`Changed files (${files.length}): ${shown.join(', ')}${more > 0 ? `, +${more} more` : ''}`)
-      }
-      return lines.join('\n')
-    },
-  }
-}
+// Every other section is registered by the plugin that owns its rows: `pr` by github, `notes` by
+// notes, `memory` by memory (docs/agent-tools.md § Context sections).
 
 // `task_links` and `issues` are core tables (docs/data-layer.md § External-item read model);
 // GitHub and Rollbar write them through the ExternalItemStore seam. This is also the only section
@@ -191,52 +145,6 @@ export const linkedIssuesSection: ContextSectionContribution = {
     if (absent) lines.push(`- ⚠ ${absent.detail}`)
     return lines.join('\n') + formatOmitted(omitted)
   },
-}
-
-export function notesSection(source: ContextNotesSource): PluginContextSection {
-  return {
-    id: 'notes',
-    order: 30,
-    label: 'Notes',
-    defaultIncluded: true,
-    budget: { maxItems: 10, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
-    async assemble({ task, repo, workflowRunId }) {
-      const allNotes = await source(task.id, repo)
-      const notes = workflowRunId
-        ? allNotes.filter((note) => !note.slug.startsWith('workflow-handoffs-') || note.slug === `workflow-handoffs-${workflowRunId}`)
-        : allNotes
-      return {
-        items: notes.map((note) => ({ id: `${note.scope}:${note.slug}`, kind: note.kind, label: note.title, body: note.body, details: [note.scope], origin: { author: note.author } })),
-        compatibility: { notes: notes.map((note) => ({ slug: note.slug, scope: note.scope, title: note.title, body: note.body })) },
-      }
-    },
-    format(items, omitted) {
-      if (!items.length) return ''
-      return ['## Notes', ...items.flatMap((item) => [`### ${item.label}`, item.body?.trim() ?? ''])].join('\n') + formatOmitted(omitted)
-    },
-    jump: (item) => ({ pane: 'notes', itemId: item.id.slice(item.id.indexOf(':') + 1), noteScope: item.id.slice(0, item.id.indexOf(':')) as NoteScope }),
-  }
-}
-
-export function memorySection(source: ContextMemorySource): PluginContextSection {
-  return {
-    id: 'memory',
-    order: 40,
-    label: 'Project memory',
-    defaultIncluded: false,
-    budget: { maxItems: 30, overflow: 'index-only' },
-    async assemble({ task }) {
-      const memories = task.projectId ? await source(task.id, task.projectId) : []
-      return {
-        items: memories.map((memory) => ({ id: memory.name, kind: 'memory', label: memory.name, details: [memory.description] })),
-        compatibility: { memory: memories },
-      }
-    },
-    format(items, omitted) {
-      if (!items.length) return ''
-      return ['## Project memory (index — ask for bodies via memory_get)', ...items.map((item) => `- ${item.label} — ${item.details?.[0] ?? ''}`)].join('\n') + formatOmitted(omitted)
-    },
-  }
 }
 
 // ─── The contribution point ─────────────────────────────────────────────────────────────────────

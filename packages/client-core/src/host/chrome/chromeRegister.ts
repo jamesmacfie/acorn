@@ -213,6 +213,12 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     // off a roster row.
     const emptyState = usableEmptyState(pluginId, surfaces, rawSource.emptyState)
     const descriptor = emptyState === rawSource.emptyState ? rawSource : { ...rawSource, emptyState }
+    // Same re-check a content link's `openPane` gets below: a named pane has to be one this plugin
+    // declared, or a roster row could point core's first-open at somebody else's pane.
+    const defaultPane = descriptor.defaultPane && taskPanes.has(descriptor.defaultPane) ? descriptor.defaultPane : undefined
+    if (descriptor.defaultPane && !defaultPane) {
+      console.warn(`[plugin-chrome] ${pluginId} source '${descriptor.id}' names an undeclared pane '${descriptor.defaultPane}'.`)
+    }
     add('source', descriptor.id, () => sourceRegistry.register({
       id: descriptor.id,
       label: descriptor.label,
@@ -220,6 +226,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       order: descriptor.order,
       ...(descriptor.providerId ? { providerId: descriptor.providerId } : {}),
       ...(descriptor.projectScoped ? { projectScoped: true } : {}),
+      ...(defaultPane ? { defaultPane } : {}),
       when: () => pluginEnabledOnNode(chromeNode(), pluginId),
       component: () => createComponent(ChromeSourcePanel, { pluginId, descriptor }),
       // A row's `task` block is the promotion capability. Registered independently of row selection, so

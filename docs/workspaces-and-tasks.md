@@ -92,7 +92,9 @@ A task contains:
 
 - One required `projectId`.
 - An optional branch and optional worktree path.
-- An origin: `github-pr`, `linear`, `rollbar`, or `local`.
+- An origin: a source id the owning plugin declared, or `local` for a task core made itself. The
+  source that tracks a task also says which pane it opens on the first time it is activated
+  (`defaultPane`); a task no source claims lands on the layout reducer's default.
 - Optional primary pull-request number, title and icon, rail sort, status, archive timestamp, and parent task.
 - Task links to external items, and feature-owned terminal, agent, and pane state.
 - Zero or more durable `task_pulls` relations for PRs Acorn created in the task. The scalar primary

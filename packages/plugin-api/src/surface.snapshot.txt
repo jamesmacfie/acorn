@@ -1,7 +1,8 @@
-# plugin API major: 7
+# plugin API major: 8
 client: CHECK_TONE
 client: ClientPlugin
 client: ClientScheduleContribution
+client: CommandContribution
 client: ContentLinkContribution
 client: FAILED_STATUSES
 client: HostCapabilityRequirement
@@ -175,6 +176,7 @@ node: AGENTS_HARNESS_REGISTRY
 node: AgentProfileContribution
 node: AgentToolContribution
 node: AppEnv
+node: Argv
 node: BridgeError
 node: Cached
 node: CachedExternalItem
@@ -203,6 +205,7 @@ node: Launcher
 node: LayoutRecipe
 node: ManifestHarness
 node: ManifestHarnessSpawn
+node: McpCommands
 node: MirroredResourceContribution
 node: ModelProviderAdapter
 node: ModelService
@@ -211,6 +214,7 @@ node: NodeProviderContribution
 node: NodeSpec
 node: PLUGIN_API_MAJOR
 node: PluginBroadcast
+node: PluginContextSection
 node: PluginDatabase
 node: PluginFetchHandler
 node: PluginHookHandler
@@ -258,9 +262,11 @@ node: connectProvider
 node: connectionHasCapability
 node: defaultBudgets
 node: encodeCached
+node: envFlags
 node: extensionPointId
 node: externalIdsFor
 node: fileBodyBlobKey
+node: formatOmitted
 node: getProfile
 node: git
 node: gitOrThrow
@@ -275,8 +281,6 @@ node: listProfileDefs
 node: listProfiles
 node: loadRepoConfig
 node: mayActOnTask
-node: memorySection
-node: notesSection
 node: onServerError
 node: ownerId
 node: parseCached
@@ -289,7 +293,6 @@ node: providerError
 node: providerRequestScheduler
 node: publicConnectionProvider
 node: publicProvider
-node: pullRequestSection
 node: registerAcornMcp
 node: rendererBaseCheckout
 node: requireDevice
@@ -306,6 +309,7 @@ node: serverName
 node: setRouteTestCapability
 node: taskContext
 node: tmuxAvailable
+node: truncateBytes
 node: viaBridge
 testkit: AppDatabase
 testkit: TestDb

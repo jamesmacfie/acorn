@@ -155,7 +155,7 @@ export const tasks = sqliteTable('tasks', {
   id: text('id').primaryKey(), // opaque uuid
   title: text('title').notNull(), // editable label; seeded from origin (PR title, ticket, …)
   icon: text('icon'), // optional Lucide icon name; null = derive from origin (see ui/Icon.tsx)
-  origin: text('origin').notNull(), // 'github-pr' | 'linear' | 'rollbar' | 'local'
+  origin: text('origin').notNull(), // a plugin-declared source id, or 'local' for core's own
   projectId: text('project_id').notNull(),
   branch: text('branch'), // null = run in the project root; non-null = isolated Git worktree
   worktreePath: text('worktree_path'), // null until a terminal is first opened (Flow C)

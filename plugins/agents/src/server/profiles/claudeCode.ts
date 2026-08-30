@@ -1,4 +1,5 @@
 import { type AgentProfileContribution, lineDelimitedJsonAdapter, registerAcornMcp } from '@acorn/plugin-api/node'
+import { claudeMcpCommands } from './mcpCommands'
 
 export const claudeCodeProfile: AgentProfileContribution = {
   id: 'claude-code',
@@ -7,7 +8,7 @@ export const claudeCodeProfile: AgentProfileContribution = {
   command: 'claude',
   backendPreference: 'tmux',
   transport: 'pty',
-  mcpRegistration: (name, launcher) => registerAcornMcp('claude', name, launcher),
+  mcpRegistration: (name, launcher) => registerAcornMcp(claudeMcpCommands, name, launcher),
   // Pull, not push (docs/notes-and-memory.md): a system-prompt instruction to fetch the task's own
   // context through the projected MCP tools. A pushed block queues 'after-ready', so it lands after the
   // user's first ask whenever the CLI is busy. A system prompt cannot race.

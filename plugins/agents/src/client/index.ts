@@ -14,6 +14,7 @@ import { agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
 import { agentCenterSourceContribution } from './sourceContribution'
+import { harnessTerminalCommands } from './terminalProfileCommands'
 import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
 
 const AgentConcurrencySettings = lazy(() => import('./settings/AgentConcurrencySettings'))
@@ -52,6 +53,9 @@ export const agentsClientPlugin: ClientPlugin = {
     // owns the corner and the collision rules; this plugin only says what is true.
     ctx.railMarkers.register(agentRailMarkerContribution)
     ctx.sources.register(agentCenterSourceContribution)
+    // A terminal running one of this plugin's harness CLIs (./terminalProfileCommands.ts). The shell
+    // keeps the drawer toggle and the plain shell; it no longer knows a harness by name.
+    for (const contribution of harnessTerminalCommands) ctx.commands.register(contribution)
     // The same roster the stat counts and the inbox filters, with a schema on it, so a dashboard panel
     // can be composed over running agents (collectionContribution.ts).
     ctx.collections.register(agentSessionsCollection)

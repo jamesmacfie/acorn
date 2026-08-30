@@ -68,6 +68,7 @@ export { projectImporterRegistry } from '@acorn/client-core/host/registries/sour
 export type { ProjectImporterProps } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
 export type { IntegrationFlowContribution } from '@acorn/client-core/host/registries/sources/integrationFlows.ts'
 export { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
+export type { CommandContribution } from '@acorn/client-core/host/registries/commands/commands.ts'
 // See docs/dashboards.md § Provenance, and what a row may not claim for what `openInAppUrl`
 // answers and how a URL's destination gets resolved.
 export {

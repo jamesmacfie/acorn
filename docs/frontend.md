@@ -181,6 +181,14 @@ source claim a task's URL, so GitHub puts a PR-backed task at its PR URL, and `p
 back to `/t/:taskId`. The alternative, asking the registry for whichever source owned a route `kind`,
 is a global first-match that only works while one plugin has routes.
 
+Two smaller claims ride on the same relationship. **`origins`** maps the task origins a source creates
+to the glyph each is drawn with, because a source's rail id and the origin it stamps on a task need not
+match — GitHub's rail is `github` and its tasks carry `github-pr`. **`defaultPane`** is the pane a task
+this source tracks opens on the first time it is activated: `defaultPaneForTask` asks whoever owns the
+task's URL first and a link's provider second, so a PR-backed task whose body cites a ticket lands on
+the pull request. A task no source claims is left alone and the layout reducer's default stands. Both
+used to be tables of plugin names inside core.
+
 Task panes are addressed with query params rather than path segments: `/t/:taskId?pane=…&item=…` is consumed
 once into a `PaneIntent` and then stripped (`tasks/taskDeepLink.ts`). The pane layout is a row with focus and
 maximise state persisted per task, so the URL carries the intent, not the layout.

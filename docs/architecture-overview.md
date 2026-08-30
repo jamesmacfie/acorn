@@ -291,7 +291,10 @@ Workspace: named group of projects
 ```
 
 Workspaces are machine-local groups. A project belongs to one workspace. A task is always owned
-by one Node and one project. Task origins are `github-pr`, `linear`, `rollbar`, or `local`.
+by one Node and one project. A task's origin is the id of the source that made it, which the owning
+plugin declares, or `local` for one core made itself. Core keeps no list of them: the glyph a row is
+drawn with comes from the source's own `origins` map, and a task whose plugin is switched off falls
+back to local chrome with its origin as the tooltip.
 
 The renderer shell is contribution-driven. Plugins register task panes, rail sources, command-palette
 rows, settings pages, slots, context-section slots, attention sources, and node statistics. The shipped

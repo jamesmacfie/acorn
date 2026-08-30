@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultSourceId, sourceIsProjectScoped, sourceRegistry, sourceRouteContributions, taskPathFromSources, taskTracksRef, type SourceContribution } from './sources'
+import { defaultPaneForTask, defaultSourceId, sourceIsProjectScoped, sourceRegistry, sourceRouteContributions, taskPathFromSources, taskTracksRef, type SourceContribution } from './sources'
 import type { Task } from '../../../infra/queries'
 
 const source = (id: string, order: number, isDefault?: boolean): SourceContribution => ({
@@ -113,6 +113,45 @@ describe('taskTracksRef', () => {
       expect(taskTracksRef(task, { providerId: 'linear', displayId: 'ENG-1' })).toBe(false)
     } finally {
       github.dispose()
+    }
+  })
+})
+
+describe('the pane a task first opens on', () => {
+  // Core used to make this choice itself, by name: "a PR-less task with a Linear link starts on
+  // 'linear', everything else on 'pr'". The two claims below are what replaced that sentence, and the
+  // order between them is the part worth pinning — a PR-backed task whose body cites a ticket has to
+  // land on the pull request, not on the ticket.
+  const withLinks = (links: { providerId: string; identifier: string }[], pullNumber?: number) =>
+    ({ id: 'task-1', links: links.map((l) => ({ ...l, connectionId: 'c1' })), pullNumber }) as unknown as Task
+
+  it('prefers the source that owns the task URL over one that only holds a link', () => {
+    const github = sourceRegistry.register({
+      id: 'test.pane.github', order: 1, glyph: 'x', label: 'GitHub', providerId: 'github', defaultPane: 'pr',
+      taskPath: (task) => (task.pullNumber != null ? `/pulls/${task.pullNumber}` : undefined),
+    })
+    const tracker = sourceRegistry.register({
+      id: 'test.pane.tracker', order: 2, glyph: 'x', label: 'Tracker', providerId: 'tracker', defaultPane: 'ticket',
+    })
+    try {
+      expect(defaultPaneForTask(withLinks([{ providerId: 'tracker', identifier: 'ENG-42' }], 7))).toBe('pr')
+      expect(defaultPaneForTask(withLinks([{ providerId: 'tracker', identifier: 'ENG-42' }]))).toBe('ticket')
+      // Nobody claims it, so the caller leaves the layout alone and the reducer's default stands.
+      expect(defaultPaneForTask(withLinks([]))).toBeUndefined()
+    } finally {
+      tracker.dispose()
+      github.dispose()
+    }
+  })
+
+  it('ignores a source that tracks the task but names no pane', () => {
+    const quiet = sourceRegistry.register({
+      id: 'test.pane.quiet', order: 1, glyph: 'x', label: 'Quiet', providerId: 'tracker',
+    })
+    try {
+      expect(defaultPaneForTask(withLinks([{ providerId: 'tracker', identifier: 'ENG-42' }]))).toBeUndefined()
+    } finally {
+      quiet.dispose()
     }
   })
 })

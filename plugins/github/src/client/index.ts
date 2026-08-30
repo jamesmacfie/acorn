@@ -34,6 +34,10 @@ export const githubClientPlugin: ClientPlugin = {
     // gates the source on the GitHub integration.
     ctx.sources.register({
       id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
+      // The rail is `github`; the tasks it makes carry `github-pr` (client/pullTasks.ts). Core used to
+      // keep the glyph for that origin in a built-in table, which meant a task drawn by name here and
+      // by hand there (client-core/features/tasks/origin.ts).
+      origins: { 'github-pr': 'git-pull-request' },
       // GithubBrowse lists the routed project's pull requests, so the shell offers a project picker here.
       projectScoped: true,
       routes: githubRouteContributions,

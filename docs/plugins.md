@@ -154,6 +154,12 @@ core, and it is now `'desktop' | { plugin: id }` or an array of them, answered b
 while every plugin is in this repository and expensive the moment one is not, and the `4` batch was the
 last window before the namespace rules would have had to grandfather an ecosystem.
 
+It went to `8` on 2026-08-31, when `memorySection`, `notesSection` and `pullRequestSection` came off
+`/node`. Those three built a plugin's own context section inside core, so core knew three plugins by
+name to hand them back their own rows. Each now lives in the package that owns the rows, and what the
+facade offers instead is the arithmetic they shared: `truncateBytes`, `formatOmitted`, and the
+`PluginContextSection` type.
+
 **Folding a removal into an open batch is a judgement, not a loophole.** The snapshot guard compares the
 committed major against the current one, so it cannot tell "this major already shipped" from "this major
 was bumped an hour ago in the same uncommitted change". Nothing had been released under `4` when the
@@ -1062,6 +1068,10 @@ be attached to an external item: a github-pr task records its pull request as `p
 row, and its links hold the *Linear* tickets found in the PR body. The host asks links first, since that
 is provider-agnostic and covers everything that seeds them, then asks every source for its own second
 spelling. A source that has only one way of recording the relationship implements nothing.
+
+A source may also declare **`defaultPane`**, the pane a task it tracks opens on the first time it is
+activated. Like a content link's `openPane`, it is re-checked on the device against the panes this
+manifest declares, so a roster row cannot aim core's first-open at somebody else's pane.
 
 `path` is confined at parse time to the prefix the host mints from the plugin id —
 `/p/:projectId/x/<plugin-id>/` — so it cannot claim core's `/p/:projectId`, `/p/:projectId/new`, or

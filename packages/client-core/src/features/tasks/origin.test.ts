@@ -18,3 +18,15 @@ describe('task origin appearance', () => {
     expect(taskOriginAppearance('tracker')).toEqual({ glyph: 'square-check' })
   })
 })
+
+describe('an origin a source declares but does not share an id with', () => {
+  it('draws the glyph the source named for it', () => {
+    dispose = sourceRegistry.register({
+      id: 'tracker', label: 'Tracker', glyph: 'square-check', order: 10,
+      origins: { 'tracker-item': 'git-pull-request' },
+    }).dispose
+    expect(taskOriginAppearance('tracker-item')).toEqual({ glyph: 'git-pull-request' })
+    // And core's own origin never asks a source at all.
+    expect(taskOriginAppearance('local')).toEqual({ glyph: 'circle-dot' })
+  })
+})

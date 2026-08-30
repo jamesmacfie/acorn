@@ -2,7 +2,7 @@ import type { Task } from '../../infra/queries'
 import { markTaskRead } from '../notifications/notifications'
 import { dispatchLayout, layoutForTask, setActiveTaskId, setSelectedSource } from './tasks'
 import type { PaneId } from './taskLayout'
-import { taskPathFromSources } from '../../host/registries/sources/sources'
+import { defaultPaneForTask, taskPathFromSources } from '../../host/registries/sources/sources'
 import { taskPath } from '../../host/registries/commands/corePaths'
 
 // Where a task lives in the router. A source may claim it, as GitHub puts a PR-backed task at its PR
@@ -19,10 +19,10 @@ export function activateTaskSignals(t: Task, options?: { pane?: PaneId }): void 
   setActiveTaskId(t.id)
   markTaskRead(t.id) // viewing acknowledges its notices (docs/terminal-and-agents.md)
   if (options?.pane) return dispatchLayout(t.id, { type: 'show', pane: options.pane })
-  // First open: a PR-less task with a Linear link starts on 'linear', everything else on 'pr'. That's
-  // also the reducer's default, but seeding it keeps the persisted layout explicit.
+  // First open: the source that tracks this task says which pane it starts on. Seeding it keeps the
+  // persisted layout explicit. A task no source claims is left alone, which is the reducer's default.
   if (layoutForTask(t.id) == null) {
-    const hasLinear = t.links.some((l) => l.providerId === 'linear')
-    dispatchLayout(t.id, { type: 'show', pane: !t.pullNumber && hasLinear ? 'linear' : 'pr' })
+    const pane = defaultPaneForTask(t)
+    if (pane) dispatchLayout(t.id, { type: 'show', pane })
   }
 }
