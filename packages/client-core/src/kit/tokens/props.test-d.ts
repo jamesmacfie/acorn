@@ -10,16 +10,16 @@ import type {
   Kbd, ListDetail, Meter, Row, SectionHeader, SegmentedControl, Select, Spinner, StatusDot, Table,
   Textarea, ToggleButton, Toolbar, TreeRow,
 } from '../components/primitives'
-import type { ChipRow } from '../components/ChipRow'
-import type { Facts } from '../components/Facts'
-import type { Fold } from '../components/Fold'
-import type { Grid } from '../components/Grid'
-import type { Heading } from '../components/Heading'
-import type { Inline } from '../components/Inline'
-import type { Log } from '../components/Log'
-import type { Section } from '../components/Section'
-import type { Stack } from '../components/Stack'
-import type { Timeline } from '../components/Timeline'
+import type { ChipRow } from '../components/layout/ChipRow'
+import type { Facts } from '../components/content/Facts'
+import type { Fold } from '../components/layout/Fold'
+import type { Grid } from '../components/layout/Grid'
+import type { Heading } from '../components/content/Heading'
+import type { Inline } from '../components/layout/Inline'
+import type { Log } from '../components/content/Log'
+import type { Section } from '../components/layout/Section'
+import type { Stack } from '../components/layout/Stack'
+import type { Timeline } from '../components/content/Timeline'
 
 /** The props of anything callable with props, whether it was written as a function or typed as a
  *  `Component`. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { annotationKeyOf } from '@acorn/protocol/extensionPoints.ts'
-import type { CodeRow } from '../../kit/diff/model'
+import type { CodeRow } from '../../kit/diff/diffModel'
 import { DIFF_ANNOTATION_FIELDS, annotationKey } from './annotationKey'
 
 // The two halves of a diff annotation, held against each other (docs/plugins.md § Cooperative

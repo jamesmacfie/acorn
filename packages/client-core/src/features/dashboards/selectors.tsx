@@ -6,7 +6,7 @@ import {
   type PluginCollectionFieldType,
   type PluginCollectionParam,
 } from '@acorn/protocol/collections.ts'
-import Picker from '../../kit/components/Picker'
+import Picker from '../../kit/components/inputs/Picker'
 import { Checkbox, Input, Select } from '../../kit/components/primitives'
 import { operatorLabel, operatorsForField, toggleParamValue } from './editor'
 import type { PanelFilterOp, PanelMappingColumnDef, PanelTone } from './model'

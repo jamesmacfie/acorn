@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js'
 import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
-import Icon from '../../kit/components/Icon'
+import Icon from '../../kit/components/content/Icon'
 import { annotationsFor } from './annotations'
 import './annotations.css'
 

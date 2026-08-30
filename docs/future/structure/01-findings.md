@@ -167,7 +167,7 @@ Overlaps and misplacements:
   `RefPanelTaskLink.tsx` are components filed under registries because `ui/` may not import a
   registry function. `packages/plugin-api/src/ui/host.ts` explains this in a comment.
 - `packages/client-core/src/features/settings/OverflowMenu.tsx` (its header says the name is wrong),
-  `packages/client-core/src/kit/components/Acorn.tsx` (19 lines of ASCII art, marked prune candidate in
+  `packages/client-core/src/kit/components/content/Acorn.tsx` (19 lines of ASCII art, marked prune candidate in
   `plugin-api/src/ui/host.ts`), and `packages/client-core/src/styles.css` beside `styles/`.
 - `packages/client-core/src/highlight/protocol.ts` shares a name with the `@acorn/protocol`
   dependency.

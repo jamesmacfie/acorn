@@ -10,7 +10,7 @@
 // about this task, which is exactly what a check that found nothing says, and the caller
 // (./taskChecks.ts) already treats both as no row.
 import type { Env } from '../bindings'
-import type { PluginTaskCheckDescriptor } from '@acorn/protocol/pluginContract.ts'
+import type { PluginTaskCheckDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import type { TaskRef } from '../core'
 import { dispatchPluginRoute } from './dispatch'
 import type { TaskConcern } from './taskChecks'

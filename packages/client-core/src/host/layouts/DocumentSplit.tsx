@@ -3,7 +3,7 @@ import { layoutState } from './state'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
 // import has to be here even though nothing calls it.
 // eslint-disable-next-line no-unused-vars -- used by the `use:regionFocus` directive.
-import { regionFocus } from '../keys/regions'
+import { regionFocus } from '../keys/focusRegions'
 import type { LayoutProps } from './regions'
 
 // `document-over-frame` and `frame-beside-document`: a host-owned editor and a plugin's region, with a

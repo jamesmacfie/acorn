@@ -481,7 +481,7 @@ The node half:
 
 ```ts
 import { portableCarrier, type NodePlugin } from '@acorn/plugin-api/node'
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { Hono } from 'hono'
 
 export default {

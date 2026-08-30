@@ -314,7 +314,7 @@ export type NodePluginRow = {
 // the types below are `z.infer` of it. This file used to carry a hand-written twin, ~330 lines kept in
 // step by nothing at all. Re-exported rather than moved so the 134 importers keep working; new code
 // should import from ./pluginContract.ts directly.
-export { PLUGIN_API_MAJOR } from './pluginApiVersion.ts'
+export { PLUGIN_API_MAJOR } from './plugin/apiVersion.ts'
 export type {
   NodePluginPermissions,
   PluginAgentContextDescriptor,
@@ -338,7 +338,7 @@ export type {
   PluginSourceDescriptor,
   PluginSourceEmptyState,
   PluginThemeDescriptor,
-} from './pluginContract.ts'
+} from './plugin/contract.ts'
 
 // The two grants the device derives from a manifest's frame surfaces and records against a trust
 // decision. Not manifest shapes: they're what the owner consented to, one row per surface.
@@ -479,16 +479,16 @@ export type InstalledPluginRow = {
   // (docs/plugins.md § Forward compatibility). This is the reporting half: the device raises one
   // attention row per entry, on the same path a surface that failed to register takes.
   unknown?: readonly string[]
-  permissions: import('./pluginContract.ts').NodePluginPermissions
-  contributions: import('./pluginContract.ts').PluginContributions
+  permissions: import('./plugin/contract.ts').NodePluginPermissions
+  contributions: import('./plugin/contract.ts').PluginContributions
   // What the plugin declared other plugins may hear (docs/plugins.md § Hearing another plugin). Optional
   // rather than defaulted for the same reason `reason` is: this row is persisted in the query cache
   // and a required field would need a bumped key.
-  emits?: readonly import('./pluginContract.ts').PluginEmit[]
+  emits?: readonly import('./plugin/contract.ts').PluginEmit[]
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
   // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
   // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't
-  // claim another's mark. See client-core/kit/lib/brandMarks.ts and docs/ui-design.md § Icons.
+  // claim another's mark. See client-core/kit/tokens/brandMarks.ts and docs/ui-design.md § Icons.
   icon?: { d: string; color?: string }
   icons?: Record<string, { d: string; color?: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is

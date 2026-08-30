@@ -146,7 +146,7 @@ that day (`git history: docs/future/node-first/platform-seam.md`). Everything el
    buffers whole responses (streaming cannot cross IPC), so a web transport is free to return a
    streaming response — the type is per-implementation and does not impose the desktop's limit.
 2. **`formFactor` on frame surfaces** in the plugin manifest, default `["desktop"]`. One field,
-   added while the schema is young. Descriptors need nothing. (Shipped — `pluginContract.ts`.)
+   added while the schema is young. Descriptors need nothing. (Shipped — `plugin/contract.ts`.)
 3. **Keep the sandbox bridge scheme-agnostic.** The MessageChannel bridge and SDK must not
    hardcode `app-plugin://` — on web the same isolation is a sandboxed iframe with an opaque
    origin and CSP headers. (Held today — `frames/sdk.ts` names no origin.)

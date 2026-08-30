@@ -4,7 +4,7 @@ import { HeaderBodyFooter } from './HeaderBodyFooter'
 import { ListDetail } from './ListDetail'
 import { Single } from './Single'
 import { StackSplit } from './StackSplit'
-import { Tabs } from './Tabs'
+import { Tabs } from './TabsLayout'
 import { Wizard } from './Wizard'
 import type { Layout } from './regions'
 

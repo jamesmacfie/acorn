@@ -1,4 +1,4 @@
-import { syncChromeContributions } from '../chrome/register'
+import { syncChromeContributions } from '../chrome/chromeRegister'
 import { syncFrameContributions } from '../frames/register'
 
 /**

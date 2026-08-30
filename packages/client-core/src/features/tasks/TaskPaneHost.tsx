@@ -4,15 +4,15 @@ import { paneAvailable, paneContribution, paneContributions, type PaneContributi
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodeState } from '../../infra/node/fleet'
 import { freshnessOf, type Freshness } from '../../infra/node/freshness'
-import NodeChip from '../../infra/node/NodeChip'
-import { ContributionBoundary } from '../../kit/components/ContributionBoundary'
+import NodeChip from '../fleet/NodeChip'
+import { ContributionBoundary } from '../../kit/components/content/ContributionBoundary'
 // Imported for `use:paneFocus` below. Solid compiles a directive to a bare reference to this
 // identifier, so without the import the first pane to render dies on "paneFocus is not defined".
 // The linter cannot see that use, hence the suppression.
 // eslint-disable-next-line no-unused-vars -- used by the `use:paneFocus` directive on the pane element.
 import { paneFocus } from './paneFocus'
 import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
-import { defaultLayout, type LayoutAction } from './layout'
+import { defaultLayout, type LayoutAction } from './taskLayout'
 import { formatChord } from './paneShortcuts'
 import { Button, EmptyState } from '../../kit/components/primitives'
 import { RailTab } from '../tabs/RailTab'

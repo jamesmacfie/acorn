@@ -13,16 +13,16 @@ sets; this file holds the door open.
   `THEME_PALETTE_TOKENS`, every value against `isThemeColorValue` (a hex literal or a flat colour
   function whose argument alphabet excludes the characters that could close a declaration), and
   generates `:root[data-theme="plugin:<pluginId>:<themeId>"]` itself in
-  `packages/client-core/src/host/chrome/themes.ts`. No plugin CSS reaches the shell.
+  `packages/client-core/src/host/chrome/chromeThemes.ts`. No plugin CSS reaches the shell.
 - `data-style` selects shape, typography, space, density, chrome, and motion: `tokens-style.css`
-  plus one of three packs. `STYLE_TOKENS` in `packages/client-core/src/kit/lib/tokenAxes.ts` is the list,
+  plus one of three packs. `STYLE_TOKENS` in `packages/client-core/src/kit/tokens/tokenAxes.ts` is the list,
   and `styles/tokenAxes.test.ts` holds both axes to their files. `registries/styles.ts` exists and
   its header says it "mirrors registries/themes.ts so a plugin can contribute a style pack the same
   way it would contribute a theme," but no `ctx` member and no manifest key feed it.
   `docs/plugin-authoring.md` says style packs are not contributable, and `docs/ui-design.md` gives
   the reason: "the mechanism would be the same; the judgement is not."
 
-Icons resolve by name in `packages/client-core/src/kit/components/Icon.tsx`: a `brand:` prefix looks up
+Icons resolve by name in `packages/client-core/src/kit/components/content/Icon.tsx`: a `brand:` prefix looks up
 `brandMarkRegistry` (one SVG path `d` in a 24-box, drawn with `fill="currentColor"`), anything else
 looks up Lucide's `iconNodes` (rendered through `<Dynamic>`, never `innerHTML`), and an unmatched
 name renders as text. Plugins add `brand:` marks through `brandMarkRegistry.register()` or manifest

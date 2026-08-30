@@ -20,7 +20,7 @@ different value alphabet, so the phase is small.
 
 In:
 
-- `contributions.styles: [{ id, label, description?, tokens }]` in `pluginContract.ts`, with the
+- `contributions.styles: [{ id, label, description?, tokens }]` in `plugin/contract.ts`, with the
   per-family validator from [05-appearance-and-icons.md](./05-appearance-and-icons.md) as one
   function in `@acorn/protocol`.
 - - `packages/client-core/src/host/registries/shell/styles.ts` (new) beside `themes.ts`: `pluginStyleId`,
@@ -62,9 +62,9 @@ projection reads computed values.
 
 ## Code touched
 
-- `packages/protocol/src/pluginContract.ts`: `contributions.styles`.
+- `packages/protocol/src/plugin/contract.ts`: `contributions.styles`.
 - `packages/protocol/src/styleValues.ts` (new): the family predicates.
-- `packages/client-core/src/kit/lib/tokenAxes.ts`: `STYLE_TOKEN_FAMILIES`, `DERIVED_STYLE_TOKENS`.
+- `packages/client-core/src/kit/tokens/tokenAxes.ts`: `STYLE_TOKEN_FAMILIES`, `DERIVED_STYLE_TOKENS`.
 - `packages/client-core/src/infra/styles/tokenAxes.test.ts`: every style token has a family; the cap is
   first-party only; the shadow-colour indirection invariant.
 - `packages/client-core/src/host/registries/shell/styles.ts` (new).
@@ -109,9 +109,9 @@ function with no DOM dependency, so the terminal host can validate a pack it wil
 
 - `packages/client-core/src/host/registries/shell/styles.ts` exports `styleRegistry` with `StyleContribution =
   { id, label, description? }` and no writer other than `settings/uiStyles.ts`.
-- `packages/client-core/src/host/chrome/themes.ts` exports `pluginThemeId`, `pluginThemeBlock`,
+- `packages/client-core/src/host/chrome/chromeThemes.ts` exports `pluginThemeId`, `pluginThemeBlock`,
   `registerPluginTheme`, `pluginThemeStyleSheet`; copy its shape.
-- `packages/client-core/src/kit/lib/tokenAxes.ts` exports `STYLE_TOKENS` as a list with `--radius-*`,
+- `packages/client-core/src/kit/tokens/tokenAxes.ts` exports `STYLE_TOKENS` as a list with `--radius-*`,
   `--space-*`, `--font-*`, `--shadow-*`, `--fs-*`, `--lh*`, `--fw-*`, `--*-transform`,
   `--*-tracking` entries; check the exact list before writing the families.
 - `packages/client-core/src/infra/styles/tokenAxes.test.ts` has the 25-selector cap.

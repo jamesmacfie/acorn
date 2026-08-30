@@ -1,6 +1,6 @@
 import { createQuery } from '@tanstack/solid-query'
 import { integrationsOptions, workspaceExternalProjectsOptions } from '../../infra/queries'
-import type { SourceScope } from './sources'
+import type { SourceScope } from './railSources'
 
 /** The external-project mapping the rail gate reads, for one workspace. Shared rather than derived at
  *  each call site: the rail hides a source's row and App resets the selection when a source goes away,

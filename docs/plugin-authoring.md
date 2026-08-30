@@ -92,7 +92,7 @@ can never change — see "Plugin ids are permanent" under Updating below.
 
 ## The manifest
 
-`packages/protocol/src/pluginContract.ts` is the schema, declared once because the node parses it off
+`packages/protocol/src/plugin/contract.ts` is the schema, declared once because the node parses it off
 disk and the client registers contributions from the same shape. Its top-level keys:
 
 | Key | Required | What it is |
@@ -100,7 +100,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `id` | yes | Matches `/^[a-z][a-z0-9-]{1,31}$/` — 2 to 32 characters, lowercase, no dots. The dot ban is what keeps `<dataRoot>/plugins/<id>/` and `<dataRoot>/plugins/<id>.sqlite` in one directory without colliding. |
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
-| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'7'` today (`packages/protocol/src/pluginApiVersion.ts`). Write `"7"` unless you have checked your plugin against another major too, in which case `"6 || 7"` or `"5-7"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
+| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'7'` today (`packages/protocol/src/plugin/apiVersion.ts`). Write `"7"` unless you have checked your plugin against another major too, in which case `"6 || 7"` or `"5-7"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -647,7 +647,7 @@ about thirty lines, the protocol is versioned, and `npm create acorn-plugin` wri
 for you. Read `sdk.ts` for the semantics; it stays the reference implementation even when you are
 not importing it.
 
-The sequence (`packages/protocol/src/pluginBridge.ts`):
+The sequence (`packages/protocol/src/plugin/bridge.ts`):
 
 1. The host posts `{ acornBridge: 1 }` into your window with a `MessagePort` transferred alongside.
    `1` is `PLUGIN_BRIDGE_VERSION`; a future protocol change is a different number rather than a

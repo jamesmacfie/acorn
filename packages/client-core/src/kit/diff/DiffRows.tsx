@@ -4,12 +4,12 @@
 // renders NonCodeRow today. What each surface actually varies is passed in as props (composers,
 // resolve/reply callbacks, gap expansion), so nothing here reaches back into a plugin.
 import { createEffect, createSignal, For, Match, on, Show, Switch } from 'solid-js'
-import CopyButton from '../components/CopyButton'
+import CopyButton from '../components/inputs/CopyButton'
 import { fileStatusMeta } from '../lib/displayMeta'
-import MentionTextarea from '../components/MentionTextarea'
-import type { DiffFile, DiffThread } from './model'
-import { UserAvatar } from '../components/UserAvatar'
-import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type Row, type ThreadRowT } from './model'
+import MentionTextarea from '../components/inputs/MentionTextarea'
+import type { DiffFile, DiffThread } from './diffModel'
+import { UserAvatar } from '../components/content/UserAvatar'
+import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type Row, type ThreadRowT } from './diffModel'
 import { markTokens, type FindHighlight } from './find'
 import { persistDraft } from '../lib/draftState'
 import { Button } from '../components/primitives'

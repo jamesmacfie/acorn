@@ -92,7 +92,7 @@ status items."
 - `packages/client-core/src/host/registries/extensionPoints/slots.ts`: `topbar.right` gains a `SlotRef` path beside its
   `SlotHost`.
 - `packages/client-core/src/features/settings/PluginsSettings.tsx`: labels; the "hides" warnings.
-- `packages/plugin-api/src/client/index.ts` and the surface snapshot: the two props types.
+- `packages/plugin-api/src/client.ts` and the surface snapshot: the two props types.
 
 ## Tests
 
@@ -138,7 +138,7 @@ write a selector.
   and one `ExclusiveSlotHost` for `rail.taskList`.
 - `apps/desktop/src/client/App.tsx` holds `<header class="topbar">` with `WorkspacePicker`, the
   project `Picker`, the breadcrumb, the node `Select`, `NodeChip`, and `AccountMenu`.
-- `packages/client-core/src/features/tabs/sources.ts` exports `availableSources()` with the four gates.
+- `packages/client-core/src/features/tabs/railSources.ts` exports `availableSources()` with the four gates.
 - `packages/client-core/src/host/registries/extensionPoints/slots.ts` has `UiSlotId` with `topbar.right` hosted and
   `topbar.left` unhosted.
 - Layout phase 4's `Slot` node exists and supports a host-minted ref.

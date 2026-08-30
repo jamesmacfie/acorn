@@ -1,7 +1,7 @@
 import type { Task } from '../../infra/queries'
 import { markTaskRead } from '../notifications/notifications'
 import { dispatchLayout, layoutForTask, setActiveTaskId, setSelectedSource } from './tasks'
-import type { PaneId } from './layout'
+import type { PaneId } from './taskLayout'
 import { taskPathFromSources } from '../../host/registries/sources/sources'
 import { taskPath } from '../../host/registries/commands/corePaths'
 

@@ -23,7 +23,7 @@
 // A type-only import, so it is erased and creates no runtime edge back to the module that consumes
 // these descriptions.
 import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
-import { parsePluginChannel } from '@acorn/protocol/pluginState.ts'
+import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { GrantDescription } from '../trust/permissions'
 
 export const SUBSCRIBABLE_CHANNELS = [

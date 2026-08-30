@@ -1,7 +1,7 @@
 // Memory proposals (docs/notes-and-memory.md § Memory): agent memory_write never lands silently.
 // The human gate is the only path that writes a memory .md. Proposals are JSON files under
 // <dataDir>/memory-proposals/, visible, greppable, crash-safe, no schema.
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'

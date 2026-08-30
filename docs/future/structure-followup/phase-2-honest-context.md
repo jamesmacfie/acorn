@@ -69,7 +69,7 @@ Decide once, in this table, and apply it to both contexts:
 The reading of an extension point's entries (`entries`) becomes `handlers`, matching hooks. Every
 rename lands as the new name plus the old one marked deprecated for one major, so the six loaded
 plugins in this repo and any outside it move on their own schedule. `PLUGIN_API_MAJOR` in
-`packages/protocol/src/pluginApiVersion.ts` bumps when the old names go, `packages/plugin-api/src/surface.snapshot.txt`
+`packages/protocol/src/plugin/apiVersion.ts` bumps when the old names go, `packages/plugin-api/src/surface.snapshot.txt`
 updates in the same commit, and `packages/plugin-api/src/surface.test.ts` is what refuses a name
 removed without the bump.
 

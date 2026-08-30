@@ -11,7 +11,7 @@ import { clientScheduleRegistry, type ClientScheduleContribution } from '../shel
 import { contentLinkRegistry, type ContentLinkContribution } from '../panes/contentLinks'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution, type ExtensionPointContribution } from './extensionPoints'
 import { qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
-import { brandMarkRegistry, type BrandMark } from '../../../kit/lib/brandMarks'
+import { brandMarkRegistry, type BrandMark } from '../../../kit/tokens/brandMarks'
 import { railMarkerRegistry, type RailMarkerContribution } from '../rail/railMarkerFeed'
 import { clientCapability, clientCapabilityIds, provideClientCapability, requireClientCapability, type ClientCapabilityId } from '../../../infra/node/clientCapabilities'
 import type { Disposable, Registry } from '../../../kit/lib/registry'

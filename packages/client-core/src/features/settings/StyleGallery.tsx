@@ -1,7 +1,7 @@
 import { For, Show, createSignal } from 'solid-js'
 import { Badge, Button, Field, Input, Row, SectionHeader, Select, Spinner, Textarea } from '../../kit/components/primitives'
 import { STYLES } from './uiStyles'
-import { THEMES } from './themes'
+import { THEMES } from './builtInThemes'
 
 // Dev-only style gallery: one instance of every primitive × variant × tone, plus the surfaces the
 // packs restyle most. It exists to make authoring a style pack a tight loop: switch the pack here and

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
+import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import { AcornBridgeError, connect, mountFrame, openLinkOnClick, _resetConnection, type AcornBridge } from './sdk'
 
 // The SDK runs inside a frame, so there is no window here to run it in: the suite is plain Node

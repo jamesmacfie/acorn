@@ -166,7 +166,7 @@ packages/client-core/src/
     projects/              stays, or folds into workspaces/ if still two files
 ```
 
-Deleted: `packages/client-core/src/kit/components/Acorn.tsx` (and its `Acorn` export in
+Deleted: `packages/client-core/src/kit/components/content/Acorn.tsx` (and its `Acorn` export in
 `packages/plugin-api/src/ui/host.ts`). The arch rule "ui/ is pure presentation" becomes "kit/ is pure
 presentation": `kit/` may import `kit/` and `infra/highlight`, and nothing else. The four file-level
 carve-outs go away because the files that needed them moved to `host/`.

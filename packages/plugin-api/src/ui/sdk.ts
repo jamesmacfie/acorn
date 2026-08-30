@@ -10,7 +10,7 @@ export { connect, AcornBridgeError, mountFrame, openLinkOnClick } from '@acorn/c
 export type { AcornBridge } from '@acorn/client-core/host/frames/sdk.ts'
 // The context the host hands a frame on connect. Kept rather than pruned: the four things that name it
 // today are all host-side, and a frame that wants to type the context it was given has nowhere else to go.
-export type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
+export type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 
 // ── The tree path ─────────────────────────────────────────────────────────────────────────────────
 // The second way a sandboxed bundle draws: a tree of the host's own kit nodes instead of pixels

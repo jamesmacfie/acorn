@@ -8,7 +8,7 @@
 // argument, so a fake is injectable without a global registry.
 //
 // SQL-injection posture is main/database.ts's: docs/data-layer.md § Database plugin: the Postgres pane.
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'

@@ -1,6 +1,6 @@
 import { createUniqueId, For, Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
 import { cx } from '../../kit/lib/cx'
-import Icon from '../../kit/components/Icon'
+import Icon from '../../kit/components/content/Icon'
 import { StatusDot } from '../../kit/components/primitives'
 import { resolveRailMarkers, type RailMarker, type RailTone } from './railMarkers'
 import { railDotProps } from '../../kit/lib/displayMeta'

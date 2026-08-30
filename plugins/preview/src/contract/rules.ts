@@ -4,7 +4,7 @@
 // service protocol's previewRules(taskId) method, called from the desktop helper, not from the
 // client over HTTP. The composition root resolves this capability to fill that method. It answers
 // [] when preview is disabled, which the browser automation already treats as "no rules configured".
-import { capabilityId } from '@acorn/protocol/pluginIds.ts'
+import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 
 export type PreviewRulesCapability = {

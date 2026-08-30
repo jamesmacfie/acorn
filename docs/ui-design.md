@@ -82,7 +82,7 @@ preferences persist locally; they do not depend on which Node is active.
 A plugin may contribute a **colour** theme, and only as data. `contributions.themes` in
 `acorn-plugin.json` is a map of theme-token values; the host validates it and generates the
 `:root[data-theme="plugin:<pluginId>:<themeId>"]` block itself
-(`client-core/src/host/chrome/themes.ts`). **No plugin-authored CSS ever reaches the shell.** The
+(`client-core/src/host/chrome/chromeThemes.ts`). **No plugin-authored CSS ever reaches the shell.** The
 theme cannot break shape, density or layout because it cannot express anything but colour, which is
 what makes this seam cheap: there is no stylesheet to parse and no selector to confine.
 
@@ -533,7 +533,7 @@ fix if a mark ever does disappear is a light and dark pair on the mark, not a ru
 
 **It is validated as a hex, not as a CSS colour.** The string reaches a `style` attribute, and a
 colour slot accepts `url()`, so any-CSS-colour would let a manifest make an outbound request.
-`pluginContract.ts` checks `/^#[0-9a-f]{6}$/i`.
+`plugin/contract.ts` checks `/^#[0-9a-f]{6}$/i`.
 
 A frame is the exception to all of this, because it is a separate origin and a separate JS realm with
 no reach into the registry. It draws its own copy of the mark and sets its own `--brand` inline. That
@@ -859,7 +859,7 @@ a different shell. What the kit and the layouts owe it:
   ([docs/panes.md § Layout model](./panes.md#layout-model)).
 - **Breakpoints are style tokens**, not numbers inside a layout, so the mobile shell can set them.
   Nothing in a layout reads the window width; a drag clamps against the layout's own element.
-- **`formFactor` on surfaces stays** (`packages/protocol/src/pluginContract.ts`). A rectangle that
+- **`formFactor` on surfaces stays** (`packages/protocol/src/plugin/contract.ts`). A rectangle that
   only makes sense wide says `['desktop']`, and the mobile shell hides it rather than mangling it.
 - **No kit node carries a desktop-only assumption without a support row.** Hover is never
   load-bearing and every tooltip has a focus equivalent.

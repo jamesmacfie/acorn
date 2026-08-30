@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { projectsOptions, workspacesKey } from '../../infra/queries'
-import { deleteWorkspace, renameWorkspace } from '../workspaces/mutations'
+import { deleteWorkspace, renameWorkspace } from '../workspaces/workspaceMutations'
 import type { Workspace } from '@acorn/protocol/api.ts'
 import { confirmWillEvent } from '../../host/registries/shell/willPhase'
 import { clientEvents } from '../../host/registries/commands/clientEvents'

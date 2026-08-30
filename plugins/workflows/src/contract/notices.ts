@@ -1,4 +1,4 @@
-import { capabilityId } from '@acorn/protocol/pluginIds.ts'
+import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 
 // workflows.notices: the client's notification bell, and the per-step event stream behind the run
 // panel (docs/workflows.md).

@@ -106,7 +106,7 @@ are session-only by choice. `client-core/kit/keys/collectionState.ts` holds `act
 its index: a list rebuilt from a fresh response is a new array of new objects, and an index into it
 points at whatever moved into that slot. Keying by the item's key is what makes a refetch keep your
 place, and it is why the state sits outside the rows rather than inside them.
-`client-core/host/keys/regions.ts` holds which region of which pane has focus, and it is the one place
+`client-core/host/keys/focusRegions.ts` holds which region of which pane has focus, and it is the one place
 `focusedPane` gets written and the one place the `runtime:focus-changed` event is emitted from.
 Neither is persisted. Where you are in a list is a reading posture, not a preference, and restoring
 one across a relaunch would need a scope and an eviction rule nobody has asked for. See

@@ -1,7 +1,7 @@
 import type { PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
 import { readJson } from '../../infra/node/apiClient'
-import { ownsRoute } from '../chrome/data'
+import { ownsRoute } from '../chrome/chromeData'
 import type { FrameBinding } from './broker'
 
 export const pluginWebviewKey = (binding: Pick<FrameBinding, 'pluginId' | 'surface' | 'taskId'>): string =>

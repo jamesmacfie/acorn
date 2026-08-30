@@ -129,6 +129,6 @@ true. Coupling 4, the projects row, is untouched by the layout programme.
 
 Re-run the census: which plugins have `acorn-plugin.config.mjs`; current consumers of each
 host-only registry (`registries/plugin.ts` vs the manifest's contribution block in
-`pluginContract.ts`); whether the memory/context tray coupling and `WORKFLOW_CONTROL` still
+`plugin/contract.ts`); whether the memory/context tray coupling and `WORKFLOW_CONTROL` still
 exist; whether the projects row still carries `github_*` columns; and the current ratchet numbers
 in `tools/arch/boundaries.test.ts`.

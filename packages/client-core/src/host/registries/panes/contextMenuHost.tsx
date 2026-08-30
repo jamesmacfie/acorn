@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js'
-import Icon from '../../../kit/components/Icon'
-import { ContextMenu, Menu, type MenuContext } from '../../../kit/components/Menu'
+import Icon from '../../../kit/components/content/Icon'
+import { ContextMenu, Menu, type MenuContext } from '../../../kit/components/overlays/Menu'
 import {
   contextMenuItems,
   runContextMenuItem,

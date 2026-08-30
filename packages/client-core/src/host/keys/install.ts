@@ -26,14 +26,14 @@ import type { Binding } from '@opentui/keymap'
 import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import { commandAvailable, commandRegistry, commandTitle, executeCommand } from '../registries/commands/commands'
 import type { ResolvedKeybinding } from '../registries/commands/keybindings'
-import { isTerminalTarget, setKeymap } from '../../kit/keys/host'
+import { isTerminalTarget, setKeymap } from '../../kit/keys/keymapHost'
 import { intentKeys, toKeymapKey } from '../../kit/keys/keymap'
 import type { Intent } from '../../kit/keys/intents'
-import { moveRegion, movePane } from './regions'
+import { moveRegion, movePane } from './focusRegions'
 
 // The engine and the intent binder live in `host.ts`, which the kit may import; this module reads the
 // command and keybinding registries and so may not be imported from `ui/`.
-export { isTerminalTarget, keymap, keysFor, registerIntentLayer, type AcornKeymap } from '../../kit/keys/host'
+export { isTerminalTarget, keymap, keysFor, registerIntentLayer, type AcornKeymap } from '../../kit/keys/keymapHost'
 
 export type ScopeContext = {
   prefs: () => { taskActive: boolean; focusedPane?: string }

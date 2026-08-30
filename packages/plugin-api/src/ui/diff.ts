@@ -22,8 +22,8 @@ export {
   rowIdentityKeys,
   splitBandIdentityKeys,
   toBands,
-} from '@acorn/client-core/kit/diff/model.ts'
-export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/kit/diff/model.ts'
+} from '@acorn/client-core/kit/diff/diffModel.ts'
+export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/kit/diff/diffModel.ts'
 
 // The tokenizer the async builders take. On this entrypoint rather than ./client because it's part of
 // the diff toolkit's contract, since `buildDiffRowsAsync(file, tokenizeDocument)` is the whole intended

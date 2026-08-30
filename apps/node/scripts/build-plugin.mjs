@@ -83,7 +83,7 @@ const outDir = join(packageRoot ? resolve(packageRoot) : join(dataRoot, 'plugins
 // That import relies on Node's own type stripping, so it has a version floor. The root package.json
 // pins it, but `engines` is a warning rather than a wall by default — and the failure without this
 // guard is an unresolved-module error that says nothing about Node versions.
-const API_VERSION_SOURCE = '@acorn/protocol/pluginApiVersion.ts'
+const API_VERSION_SOURCE = '@acorn/protocol/plugin/apiVersion.ts'
 let apiMajor
 try {
   ;({ PLUGIN_API_MAJOR: apiMajor } = await import(API_VERSION_SOURCE))
@@ -184,7 +184,7 @@ writeFileSync(
     id,
     name: spec.name,
     // Brand marks, passed through untouched — node-core/server/plugins/manifest.ts is the only thing
-    // that validates them and client-core/kit/components/Icon.tsx the only thing that renders them.
+    // that validates them and client-core/kit/components/content/Icon.tsx the only thing that renders them.
     ...(spec.icon ? { icon: spec.icon } : {}),
     ...(spec.icons ? { icons: spec.icons } : {}),
     version,

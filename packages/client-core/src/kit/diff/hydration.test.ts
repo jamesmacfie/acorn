@@ -1,8 +1,8 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
-import type { DiffFile } from './model'
+import type { DiffFile } from './diffModel'
 import { createDiffHydrator } from './hydration'
-import type { ParsedFile } from './model'
+import type { ParsedFile } from './diffModel'
 
 const pullFile = (path: string, patch: string | null): DiffFile => ({
   path,

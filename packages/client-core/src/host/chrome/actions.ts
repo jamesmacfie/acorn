@@ -10,7 +10,7 @@ import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
 import { taskById } from '../../features/tasks/taskLookup'
 import { activeTaskId, selectedSource } from '../../features/tasks/tasks'
 import { openPluginOverlay } from '../frames/overlays'
-import { ownsRoute } from './data'
+import { ownsRoute } from './chromeData'
 
 // The closed verb set the host executes on a descriptor's behalf. See docs/plugins.md.
 //

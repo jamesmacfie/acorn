@@ -19,7 +19,7 @@ import { pluginRequestContext } from '../server/pluginHost/requestContext'
 import type { NodePlugin, NodePluginContext, PluginProviderRuntime, PluginRequestContext, PluginStorage } from '../server/pluginHost/types'
 import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations } from './db'
 
-// Nothing granted. A loaded plugin's manifest block is all-defaulted (protocol/pluginContract.ts), so
+// Nothing granted. A loaded plugin's manifest block is all-defaulted (protocol/plugin/contract.ts), so
 // this is what `permissions: {}` means in a config, and a test opts into each grant by name.
 const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [] }
 

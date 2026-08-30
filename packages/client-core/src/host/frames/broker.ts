@@ -19,9 +19,9 @@ import type {
   PluginBridgeSelect,
   PluginBridgeSurfaceAction,
   PluginFrameContext,
-} from '@acorn/protocol/pluginBridge.ts'
-import { MAX_DOCUMENT_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/pluginBridge.ts'
-import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/pluginState.ts'
+} from '@acorn/protocol/plugin/bridge.ts'
+import { MAX_DOCUMENT_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/plugin/bridge.ts'
+import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
 import { isNormalizedChord } from '@acorn/protocol/keybindings.ts'
@@ -32,7 +32,7 @@ export type FrameBinding = {
   pluginId: string
   // The contribution id this frame renders, and which registry it landed in. `remote` is the tree
   // path: the same bridge, over a worker port instead of a frame’s. `inline` is a rectangle standing
-  // in another plugin's pane, which grants it nothing of that plugin's (@acorn/protocol/pluginBridge.ts).
+  // in another plugin's pane, which grants it nothing of that plugin's (@acorn/protocol/plugin/bridge.ts).
   surface: string
   target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote' | 'inline'
   nodeId: string

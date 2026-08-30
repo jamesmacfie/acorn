@@ -14,7 +14,7 @@ import { integrationProviderRegistry } from './registry'
 import type { MirroredResourceContribution, ProviderResourceContext } from './types'
 import { broadcastConnectionChanged } from '../notify'
 import { wsBroadcast } from '../transport/wsHub'
-import { pluginChannel } from '@acorn/protocol/pluginState.ts'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
 const failure = (error: ProviderErrorCode, status: RouteFailure['status']): RouteResult<never> => ({
   ok: false,

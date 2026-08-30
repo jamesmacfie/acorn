@@ -19,8 +19,8 @@ import type { Disposable } from './capabilities'
 // The id and its brand live in @acorn/protocol so a plugin's contract/ can mint one without importing
 // this package. The owner's contract/ entrypoint exports the constant, and that is the only thing a
 // contributor imports.
-import { type ExtensionPointId } from '@acorn/protocol/pluginIds.ts'
-export { extensionPointId, type ExtensionPointId } from '@acorn/protocol/pluginIds.ts'
+import { type ExtensionPointId } from '@acorn/protocol/plugin/ids.ts'
+export { extensionPointId, type ExtensionPointId } from '@acorn/protocol/plugin/ids.ts'
 
 export type ExtensionPoint = {
   id: string

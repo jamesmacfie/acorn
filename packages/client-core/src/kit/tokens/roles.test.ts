@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INVARIANT_TOKENS, STYLE_TOKENS, THEME_TOKENS } from '../lib/tokenAxes'
+import { INVARIANT_TOKENS, STYLE_TOKENS, THEME_TOKENS } from './tokenAxes'
 import { ROLE_MAP } from './roles'
 import { ROLE_ENUMS, type RoleName } from './tokens'
 

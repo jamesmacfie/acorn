@@ -1,5 +1,5 @@
 import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
-import type { CodeRow } from '../../kit/diff/model'
+import type { CodeRow } from '../../kit/diff/diffModel'
 
 /**
  * One code row, as an annotation key.

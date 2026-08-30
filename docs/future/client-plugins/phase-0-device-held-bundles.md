@@ -58,7 +58,7 @@ extraction becomes a follow-up, recorded as a deviation.
 
 **The manifest read.** The helper reads `acorn-plugin.json` out of the package with the same parser
 the node uses (`packages/node-core/src/server/plugins/manifest.ts`, which wraps
-`@acorn/protocol/pluginContract.ts`). A parse failure is a `PutFailure` with the parser's message.
+`@acorn/protocol/plugin/contract.ts`). A parse failure is a `PutFailure` with the parser's message.
 The no-node-half check is a function in `@acorn/protocol` beside `isCoreSlotSurface`, so the client
 re-check is the same function.
 

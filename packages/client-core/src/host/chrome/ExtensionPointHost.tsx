@@ -4,8 +4,8 @@ import { activeNodeId } from '../../infra/node/activeNode'
 import { createFleetQuery } from '../../infra/node/fanout'
 import { extensionDeliveries, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
 import { Badge, Row, SectionHeader } from '../../kit/components/primitives'
-import Icon from '../../kit/components/Icon'
-import { chromeDeps, chromeKey } from './data'
+import Icon from '../../kit/components/content/Icon'
+import { chromeDeps, chromeKey } from './chromeData'
 import './extension-points.css'
 
 // The one place another plugin's rows are drawn inside a plugin's surface, by the host, with the

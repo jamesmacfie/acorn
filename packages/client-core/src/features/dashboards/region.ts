@@ -1,5 +1,5 @@
 import { COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS, type PluginCollectionFieldRole } from '@acorn/protocol/collections.ts'
-import type { PluginPanelRegion } from '@acorn/protocol/pluginContract.ts'
+import type { PluginPanelRegion } from '@acorn/protocol/plugin/contract.ts'
 import { collectionKey, type CollectionContribution } from '../../host/registries/sources/collections'
 import type { PanelDefinition, PanelViewKind } from './model'
 import type { PlacementScope } from './persist'

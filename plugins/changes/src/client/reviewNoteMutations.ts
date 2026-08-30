@@ -1,5 +1,5 @@
 // The review-note writes, beside the routes they drive (../shared/api.ts). Core's task writes stay in
-// @acorn/client-core/features/tasks/mutations.ts.
+// @acorn/client-core/features/tasks/taskMutations.ts.
 import { postJson, writeJson } from '@acorn/plugin-api/client'
 import { reviewNoteRoute, reviewNotesRoute, reviewNotesSentRoute, type ReviewNote, type ReviewNoteSeed } from '../shared/api'
 

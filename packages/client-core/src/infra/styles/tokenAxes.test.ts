@@ -10,7 +10,7 @@ import {
   STYLE_TOKENS,
   THEME_TOKENS,
   Z_ORDER_INVARIANTS,
-} from '../../kit/lib/tokenAxes'
+} from '../../kit/tokens/tokenAxes'
 import { declaredByBlock, readAxisSheets, readStylePacks, readStyleSheets } from './readStyleSheets'
 
 // The appearance contract, as executable assertions. See docs/ui-design.md § Token axes for what

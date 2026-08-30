@@ -4,7 +4,7 @@ import type { SourceContribution } from '@acorn/client-core/host/registries/sour
 import { CREATE_TASK_ROUTE, PROJECT_ROUTE } from '@acorn/client-core/host/registries/commands/corePaths.ts'
 
 const Home = lazy(() => import('@acorn/client-core/features/workspaces/Home.tsx'))
-const FleetHome = lazy(() => import('@acorn/client-core/infra/node/FleetHome.tsx'))
+const FleetHome = lazy(() => import('@acorn/client-core/features/fleet/FleetHome.tsx'))
 
 export const coreSourceContributions: SourceContribution[] = [
   {

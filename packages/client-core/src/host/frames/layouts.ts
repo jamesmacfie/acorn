@@ -1,7 +1,7 @@
 import type { PluginFrameSurface, PluginPaneRegion } from '@acorn/protocol/api.ts'
-import { hasFrameRegion, hasRemoteRegion } from '@acorn/protocol/pluginContract.ts'
+import { hasFrameRegion, hasRemoteRegion } from '@acorn/protocol/plugin/contract.ts'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
-import { ownsRoute } from '../chrome/data'
+import { ownsRoute } from '../chrome/chromeData'
 
 // Which declared layouts the host draws, and whether the routes inside them are ones this device will
 // fetch (docs/panes.md § Layout model, docs/panes.md § Layout model).

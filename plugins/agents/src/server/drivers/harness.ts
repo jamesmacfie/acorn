@@ -2,7 +2,7 @@
 // See docs/managed-agents.md § Harnesses for the two driver tiers and which one a new agent belongs in.
 //
 // The internal shape. Its data-only twin is the `harnesses` manifest contribution
-// (@acorn/protocol/pluginContract.ts), which the delivery seam converts into one of these. They differ
+// (@acorn/protocol/plugin/contract.ts), which the delivery seam converts into one of these. They differ
 // only where a manifest cannot carry a function: `entry` resolves a path here and is a package-relative
 // string there, and `probeAuth` is a call here and a route there.
 import type { AgentCapability } from '@acorn/protocol/managedAgents.ts'

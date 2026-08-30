@@ -15,7 +15,7 @@
 import { onCleanup, type JSX } from 'solid-js'
 import { collectionState, setActiveItem, setSelectedItem } from './collectionState'
 import type { Intent } from './intents'
-import { bindIntents } from './host'
+import { bindIntents } from './keymapHost'
 
 export type CollectionItem = {
   key: string

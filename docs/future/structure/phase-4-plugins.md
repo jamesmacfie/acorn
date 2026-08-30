@@ -12,7 +12,7 @@ Status: shipped 2026-08-30. Waited on phase 3.
 - `apps/node/test/integration/pluginSystem/mainBarrelLoad.test.ts` is deleted rather than re-pointed.
   Its subject, `plugins/*/src/main/index.ts`, no longer exists, and every `node/index.ts` is already
   booted by the composition-root suites beside it.
-- `capabilityId` and `extensionPointId` moved to `@acorn/protocol/pluginIds.ts` with their brand
+- `capabilityId` and `extensionPointId` moved to `@acorn/protocol/plugin/ids.ts` with their brand
   types; node-core re-exports them so nothing else changed. Two contract modules still take a type
   (`HeadlessResult`, `StreamEvent`, `LayoutRecipe`) from `@acorn/plugin-api/node`; a type import is
   erased and carries no runtime edge.

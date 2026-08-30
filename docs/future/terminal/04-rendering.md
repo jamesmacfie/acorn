@@ -73,7 +73,7 @@ is shared as-is. The DOM layouts' drag handling (`createSplitDrag`, `offsetWidth
 ## Rectangles
 
 `Rectangle` is the kit's one admission of defeat: four kinds, `pty`, `webview`, `frame`, `editor`,
-and the host draws the box and hands the caller an element (`packages/client-core/src/kit/components/Rectangle.tsx`).
+and the host draws the box and hands the caller an element (`packages/client-core/src/kit/components/content/Rectangle.tsx`).
 On the TUI:
 
 - `pty` is native. The terminal plugin's pane and docker's exec both mount a PTY through a

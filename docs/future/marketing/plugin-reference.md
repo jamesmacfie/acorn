@@ -4,7 +4,7 @@ The design for the Plugins section of the public site — the reason the site ex
 a reference that answers three questions for an author and for the maintainer: what goes in the
 manifest, what the node half can do, and how a node-side contribution ends up as client UI.
 Almost none of it needs writing from scratch: `docs/plugin-authoring.md` is already a public
-authoring guide that needs splitting, `packages/protocol/src/pluginContract.ts` is a heavily
+authoring guide that needs splitting, `packages/protocol/src/plugin/contract.ts` is a heavily
 commented single source of truth the manifest reference can be generated from, and
 `packages/plugin-sdk/src/public.ts` is a hand-written published declaration file that already
 is the SDK reference for both render paths.
@@ -49,7 +49,7 @@ manifest, a two-file node half, and a `client.js` with the handshake inlined.
 The one piece of real build machinery, and the reason the site lives in-repo.
 
 A build script in `apps/site` imports the zod schema from
-`packages/protocol/src/pluginContract.ts` and emits two artifacts:
+`packages/protocol/src/plugin/contract.ts` and emits two artifacts:
 
 1. **A structured JSON document** — sections, keys, types, caps, defaults, and the schema's own
    comments as descriptions — rendered by a client-filterable component. Herdr's
