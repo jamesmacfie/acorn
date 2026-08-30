@@ -3,7 +3,7 @@ import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession }
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from '../sessions/managedClient'
-import { agentContextContributions } from '@acorn/plugin-api/client'
+import { agentContextContributions, pickFiles } from '@acorn/plugin-api/client'
 import {
   Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, Inline, Kbd, MentionTextarea, Picker,
   Popover, Select, Stack, Text, Toolbar,
@@ -25,6 +25,14 @@ import {
   automaticTaskContextFor,
   automaticTaskContextPayload,
 } from './automaticTaskContext'
+
+// What the attach dialog offers, as bare extensions because that is what the platform seam takes.
+// Text the harnesses read, plus the image and document types they can look at.
+const ATTACHMENT_EXTENSIONS = [
+  'txt', 'md', 'json', 'yaml', 'yml', 'toml', 'xml', 'csv', 'ts', 'tsx', 'js', 'jsx', 'css', 'html',
+  'py', 'rb', 'go', 'rs', 'java', 'c', 'h', 'cpp', 'hpp', 'swift', 'sh', 'sql', 'diff', 'patch',
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf',
+]
 
 const draftKey = (sessionId: string): string => `acorn.agent-draft.${sessionId}`
 const attachmentDraftKey = (sessionId: string): string => `acorn.agent-attachments.${sessionId}`
@@ -278,6 +286,14 @@ export default function AgentComposer(props: {
     setDraft((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${value} `)
   }
 
+  // The dialog is the platform's, not the page's, so what comes back is bytes. `File` is the shape
+  // the drop and paste path already hands `addFiles` through the kit's `onFiles`, and the upload
+  // reads its bytes back out, so the two paths meet here rather than one layer down.
+  async function attach() {
+    const picked = await pickFiles({ accept: ATTACHMENT_EXTENSIONS })
+    await addFiles(picked.map((file) => new File([file.bytes as BlobPart], file.name, { type: file.type })))
+  }
+
   async function addFiles(files: File[]) {
     if (!files.length || uploading()) return
     if (attachments().length + files.length > 8) {
@@ -403,8 +419,6 @@ export default function AgentComposer(props: {
         }
         : { text: segment.text })
 
-  let fileInput: HTMLInputElement | undefined
-
   return (
     <Stack gap="row">
       <Show when={configOptions().length}>
@@ -426,20 +440,6 @@ export default function AgentComposer(props: {
           </For>
         </Inline>
       </Show>
-
-      {/* `hidden`, not a class: the picker is the Attach button and this element only exists to open
-          the platform's file dialog. */}
-      <input
-        ref={fileInput}
-        hidden
-        type="file"
-        multiple
-        accept=".txt,.md,.json,.yaml,.yml,.toml,.xml,.csv,.ts,.tsx,.js,.jsx,.css,.html,.py,.rb,.go,.rs,.java,.c,.h,.cpp,.hpp,.swift,.sh,.sql,.diff,.patch,image/jpeg,image/png,image/gif,image/webp,application/pdf"
-        onChange={(event) => {
-          void addFiles([...(event.currentTarget.files ?? [])])
-          event.currentTarget.value = ''
-        }}
-      />
 
       <Show when={attachments().length || contexts().length}>
         <ChipRow ariaLabel="Attached to this turn">
@@ -518,7 +518,7 @@ export default function AgentComposer(props: {
           title="Attach files"
           disabled={uploading() || props.disabled}
           busy={uploading()}
-          onPress={() => fileInput?.click()}
+          onPress={() => void attach()}
         >
           Attach
         </Button>

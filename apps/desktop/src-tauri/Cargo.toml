@@ -28,6 +28,8 @@ tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
+# The file dialogs base64 their bytes across the Tauri channel (src/commands.rs).
+base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }

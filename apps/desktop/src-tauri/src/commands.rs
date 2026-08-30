@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine as _;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
@@ -55,6 +57,82 @@ pub async fn pick_folder(app: AppHandle) -> Option<String> {
     tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(None)).await.unwrap_or(None)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PickedFile {
+    name: String,
+    #[serde(rename = "type")]
+    mime: String,
+    /// Base64. A `Vec<u8>` through Tauri's JSON channel arrives in the renderer as an array of
+    /// numbers, which is the wrong shape and several times the size.
+    bytes: String,
+}
+
+/// The native file dialog, for agent attachments. Returns the chosen files' bytes rather than their
+/// paths, because the node this renderer talks to is not always on this machine and a path would
+/// name something it cannot open. `accept` is bare extensions; an empty list means any file.
+///
+/// A file that cannot be read is dropped rather than failing the whole pick: the owner chose several
+/// and the ones that worked are still worth attaching.
+#[tauri::command]
+pub async fn pick_files(app: AppHandle, accept: Vec<String>) -> Vec<PickedFile> {
+    let mut dialog = app.dialog().file();
+    if !accept.is_empty() {
+        let extensions: Vec<&str> = accept.iter().map(String::as_str).collect();
+        dialog = dialog.add_filter("Supported files", &extensions);
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    dialog.pick_files(move |paths| {
+        let _ = tx.send(paths.unwrap_or_default().into_iter().filter_map(|p| p.into_path().ok()).collect::<Vec<_>>());
+    });
+    // The picker answers on another thread, and this command is already off the main one.
+    let paths = tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or_default()).await.unwrap_or_default();
+    paths
+        .into_iter()
+        .filter_map(|path| {
+            let bytes = std::fs::read(&path).ok()?;
+            Some(PickedFile {
+                name: path.file_name()?.to_string_lossy().into_owned(),
+                mime: mime_for(&path).to_string(),
+                bytes: BASE64.encode(bytes),
+            })
+        })
+        .collect()
+}
+
+/// Enough of a guess for the harnesses that branch on it. The node re-derives what it needs from the
+/// bytes; this only has to distinguish an image or a PDF from text.
+fn mime_for(path: &std::path::Path) -> &'static str {
+    match path.extension().and_then(|e| e.to_str()).unwrap_or_default().to_ascii_lowercase().as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "pdf" => "application/pdf",
+        "json" => "application/json",
+        "md" => "text/markdown",
+        "html" => "text/html",
+        "csv" => "text/csv",
+        _ => "text/plain",
+    }
+}
+
+/// The native save dialog plus the write. False when the owner dismissed the dialog and when the
+/// write failed; either way the renderer learns nothing about where the file went, which keeps the
+/// filesystem the shell's the same way `pick_folder` does.
+#[tauri::command]
+pub async fn save_file(app: AppHandle, bytes: String, suggested_name: String) -> bool {
+    let Ok(decoded) = BASE64.decode(bytes) else { return false };
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.dialog().file().set_file_name(&suggested_name).save_file(move |path| {
+        let _ = tx.send(path.and_then(|p| p.into_path().ok()));
+    });
+    let Some(path) = tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(None)).await.unwrap_or(None) else {
+        return false;
+    };
+    std::fs::write(path, decoded).is_ok()
+}
+
 /// The recovery screen's "Open data folder". Reveals rather than opens, so the owner can look at a
 /// wedged node without the shell deciding what to do about it.
 #[tauri::command]
@@ -92,5 +170,22 @@ pub fn shutdown(app: &AppHandle) {
                 helper.stop();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::mime_for;
+    use std::path::Path;
+
+    #[test]
+    fn a_picked_file_gets_a_media_type_from_its_extension() {
+        assert_eq!(mime_for(Path::new("/tmp/shot.PNG")), "image/png");
+        assert_eq!(mime_for(Path::new("/tmp/scan.jpeg")), "image/jpeg");
+        assert_eq!(mime_for(Path::new("/tmp/report.pdf")), "application/pdf");
+        // Everything the harnesses read as text, including the extensions with no entry of their own
+        // and a file with no extension at all.
+        assert_eq!(mime_for(Path::new("/tmp/main.rs")), "text/plain");
+        assert_eq!(mime_for(Path::new("/tmp/Makefile")), "text/plain");
     }
 }

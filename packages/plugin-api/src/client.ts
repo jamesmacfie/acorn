@@ -146,11 +146,11 @@ export { contextSnapshot } from '@acorn/client-core/features/agent/contextSnapsh
 export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHandler } from '@acorn/client-core/features/agent/reference.ts'
 
 // ── The platform seam ─────────────────────────────────────────────────────────────────────────
-// What the host provides, as opposed to what the node provides. A plugin gets the two groups it has
-// a legitimate use for: the native folder dialog and the host-owned preview view. Transport, fleet
-// and plugin custody stay core's business.
-export { canPickFolder, pickFolder, previewViews } from '@acorn/client-core/infra/platform/index.ts'
-export type { PreviewState, PreviewViews } from '@acorn/client-core/infra/platform/index.ts'
+// What the host provides, as opposed to what the node provides. A plugin gets the groups it has a
+// legitimate use for: the native folder dialog, the file dialogs, and the host-owned preview view.
+// Transport, fleet and plugin custody stay core's business.
+export { canPickFolder, pickFiles, pickFolder, previewViews, saveFile } from '@acorn/client-core/infra/platform/index.ts'
+export type { PickedFile, PreviewState, PreviewViews, SaveRequest } from '@acorn/client-core/infra/platform/index.ts'
 
 // ── Capabilities, prefs, persisted state ──────────────────────────────────────────────────────
 // The host-side gate: is a desktop shell hosting this renderer, and does the node run a given plugin.

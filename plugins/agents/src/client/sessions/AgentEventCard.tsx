@@ -2,8 +2,9 @@ import { createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
 import type { AgentPlanEntry, AgentTurn, AgentUsage } from '@acorn/protocol/managedAgents.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
-import { dispatchLayout, requestTerminalFocus, setTerminalOpen } from '@acorn/plugin-api/client'
+import { dispatchLayout, requestTerminalFocus, saveFile, setTerminalOpen } from '@acorn/plugin-api/client'
 import { managedAgentApi } from './managedClient'
+import { downloadName } from './downloadName'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
   Alert, Button, Card, CodeBlock, CopyButton, Fold, Icon, Inline, Row, Stack, Text,
@@ -38,12 +39,7 @@ const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted
 
 async function downloadArtifact(artifactId: string, title: string): Promise<void> {
   const { bytes, type, filename } = await managedAgentApi.artifactContent(artifactId)
-  const url = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type }))
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename ?? (title.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 180) || 'artifact')
-  anchor.click()
-  URL.revokeObjectURL(url)
+  await saveFile({ bytes, mimeType: type, suggestedName: filename ?? (downloadName(title, 180) || 'artifact') })
 }
 
 export default function AgentEventCard(props: {

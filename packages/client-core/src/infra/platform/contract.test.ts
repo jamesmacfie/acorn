@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SEAM_GROUPS, seamProblems, type SeamGroup } from './contract'
-import { canPickFolder, fleetBridge, nodeTransport, pickFolder } from './index'
+import { canPickFolder, fleetBridge, nodeTransport, pickFiles, pickFolder, saveFile } from './index'
 
 // The seam contract against a mock host. Each shell runs the same checker against its real host
 // object (apps/desktop/src/shell/bridge.test.ts). That half catches a renamed preload key, this half
@@ -30,6 +30,7 @@ const fullHost = () => ({
   plugins: { state: vi.fn(), cachePut: vi.fn(), trustRecord: vi.fn(), devGrant: vi.fn() },
   recovery: { openDataFolder: vi.fn(), quit: vi.fn() },
   folderPath: { pick: vi.fn(async () => '/tmp/picked') },
+  files: { pick: vi.fn(async () => []), save: vi.fn(async () => true) },
   preview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), onEvent: vi.fn() },
   webview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), onEvent: vi.fn(), onBlocked: vi.fn() },
 })
@@ -101,6 +102,21 @@ describe('the platform seam contract', () => {
       await expect(fleet?.forget('n1', false)).resolves.toBeUndefined()
     })
 
+    it('falls back to nothing for the file dialogs when there is no host and no page', async () => {
+      install({})
+      await expect(pickFiles()).resolves.toEqual([])
+      await expect(saveFile({ bytes: new Uint8Array([1]), suggestedName: 'x.txt', mimeType: 'text/plain' })).resolves.toBe(false)
+    })
+
+    it('hands the file dialogs to the host when it installs them', async () => {
+      const picked = [{ name: 'a.md', type: 'text/markdown', bytes: new Uint8Array([1]) }]
+      const files = { pick: vi.fn(async () => picked), save: vi.fn(async () => true) }
+      install({ files })
+      await expect(pickFiles({ accept: ['md'] })).resolves.toEqual(picked)
+      expect(files.pick).toHaveBeenCalledWith({ accept: ['md'] })
+      await expect(saveFile({ bytes: new Uint8Array([1]), suggestedName: 'x.md', mimeType: 'text/markdown' })).resolves.toBe(true)
+    })
+
     it('answers the folder picker the same way whether it is missing or dismissed', async () => {
       install({})
       expect(canPickFolder()).toBe(false)
@@ -120,6 +136,7 @@ describe('the platform seam contract', () => {
       'plugins',
       'desktopExtras',
       'folderPicker',
+      'files',
       'recovery',
       'preview',
       'webviews',

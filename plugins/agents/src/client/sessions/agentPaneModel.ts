@@ -1,7 +1,8 @@
 import { createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
-import { setTerminalOpen, type Task } from '@acorn/plugin-api/client'
+import { saveFile, setTerminalOpen, type Task } from '@acorn/plugin-api/client'
 import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
+import { downloadName } from './downloadName'
 import { managedAgentStore } from './managedStore'
 import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import {
@@ -174,14 +175,11 @@ export function createAgentPaneModel(task: Task) {
     if (!session) return
     await action(async () => {
       const exported = await managedAgentApi.export(session.id, format)
-      const url = URL.createObjectURL(new Blob([exported.content], {
-        type: format === 'json' ? 'application/json' : 'text/markdown',
-      }))
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `${session.title.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 80) || 'agent-session'}.${format === 'json' ? 'json' : 'md'}`
-      anchor.click()
-      URL.revokeObjectURL(url)
+      await saveFile({
+        bytes: new TextEncoder().encode(exported.content),
+        mimeType: format === 'json' ? 'application/json' : 'text/markdown',
+        suggestedName: `${downloadName(session.title, 80) || 'agent-session'}.${format === 'json' ? 'json' : 'md'}`,
+      })
     }, false)
   }
 

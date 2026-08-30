@@ -77,6 +77,23 @@ export type DesktopExtras = {
 // rest of the product on this probe was the original mistake (`capabilities.ts`).
 export type FolderPicker = { pick(): Promise<string | null> }
 
+// Choosing files to attach, and saving one to disk. Unlike the folder dialog these are not
+// desktop-only: a page can open its own file input and click its own download link, so the seam
+// carries that fallback itself (see `pickFiles` and `saveFile` below) and every caller gets working
+// verbs. A host that installs this group takes over with native dialogs, and its save writes where
+// the owner chose instead of into the downloads folder.
+//
+// Bytes cross, never paths. The client and the node are not always the same machine, and the file
+// somebody attaches is on theirs, so a path would name something the node cannot open.
+export type PickedFile = { name: string; type: string; bytes: Uint8Array }
+export type SaveRequest = { bytes: Uint8Array; suggestedName: string; mimeType: string }
+export type FileDialogs = {
+  // `accept` is bare extensions, no dots, because that is the one spelling every host can honour: a
+  // page turns them into the input's `accept`, a shell into dialog filters, a prompt into a hint.
+  pick(options: { accept?: readonly string[] }): Promise<PickedFile[]>
+  save(request: SaveRequest): Promise<boolean>
+}
+
 // The two actions the node recovery screen offers. Neither is expressible in the renderer: one reveals
 // a path in the file manager, the other bypasses the will-quit prompt, whose handler lives in a shell
 // that is not mounted behind the gate.
@@ -180,6 +197,7 @@ type AcornPreload = {
   plugins?: PluginCustody
   recovery?: RecoveryActions
   folderPath?: FolderPicker
+  files?: FileDialogs
   preview?: PreviewViews
   webview?: PluginWebviews
 }
@@ -284,6 +302,50 @@ export const pluginWebviews = (): PluginWebviews | null => acornGlobal()?.webvie
 // cancelled, so both take the same path.
 export const canPickFolder = (): boolean => !!acornGlobal()?.folderPath
 export const pickFolder = async (): Promise<string | null> => (await acornGlobal()?.folderPath?.pick()) ?? null
+
+// The host's native file dialogs, or null where the page does its own (below). Consumers call
+// `pickFiles` and `saveFile`; this accessor exists for the seam contract, which checks the group the
+// host installed rather than the fallback.
+export const fileDialogs = (): FileDialogs | null => acornGlobal()?.files ?? null
+
+// Empty when nobody chose anything and when there was nowhere to ask, so both take the same path.
+export const pickFiles = async (options: { accept?: readonly string[] } = {}): Promise<PickedFile[]> => {
+  const host = acornGlobal()?.files
+  if (host) return host.pick(options)
+  if (typeof document === 'undefined') return []
+  return await new Promise<PickedFile[]>((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    if (options.accept?.length) input.accept = options.accept.map((extension) => `.${extension}`).join(',')
+    // On a browser without `cancel` the promise never settles and the element is collected, which is
+    // the same outcome as the owner walking away from the dialog.
+    input.oncancel = () => resolve([])
+    input.onchange = () => {
+      void Promise.all([...(input.files ?? [])].map(async (file) => ({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        bytes: new Uint8Array(await file.arrayBuffer()),
+      }))).then(resolve)
+    }
+    input.click()
+  })
+}
+
+// False when the save was declined and when there was nowhere to save to. The renderer never learns
+// the path: a shell that saves owns the filesystem touch, exactly as the folder dialog does.
+export const saveFile = async (request: SaveRequest): Promise<boolean> => {
+  const host = acornGlobal()?.files
+  if (host) return host.save(request)
+  if (typeof document === 'undefined') return false
+  const url = URL.createObjectURL(new Blob([request.bytes as unknown as BlobPart], { type: request.mimeType }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = request.suggestedName
+  anchor.click()
+  URL.revokeObjectURL(url)
+  return true
+}
 
 // Whether this host can change fleet membership rather than only read it (`fleetBridge`). Settings →
 // Nodes hides itself rather than offering buttons that cannot work.
