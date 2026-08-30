@@ -91,7 +91,7 @@ export function PrOverview(props: {
         <Facts items={facts()} />
         {/* Room for other plugins beside github's own facts: a deploy, a stack, a release train.
             `stack`, so github's own overview stays and a contributor is added to it. */}
-        <Slot point={SUMMARY_BADGES_POINT} props={() => ({
+        <Slot point={SUMMARY_BADGES_POINT} taskId={model().scope.taskId} props={() => ({
           owner: model().scope.owner,
           repo: model().scope.repo,
           number: model().scope.number,

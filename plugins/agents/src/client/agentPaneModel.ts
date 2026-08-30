@@ -1,5 +1,5 @@
-import { createEffect, createMemo, createResource, createRoot, createSignal, on, onCleanup } from 'solid-js'
-import { onScopeEvicted, setTerminalOpen, type Task } from '@acorn/plugin-api/client'
+import { createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
+import { setTerminalOpen, type Task } from '@acorn/plugin-api/client'
 import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
@@ -31,35 +31,12 @@ export type SessionAction = {
  *  session that is not the open one. */
 export type AgentDialog = { kind: 'rename' | 'archive'; session: AgentSession }
 
-export type AgentPaneModel = ReturnType<typeof build>
-
-const roots = new Map<string, { model: AgentPaneModel; dispose: () => void }>()
-
-export function agentPaneModel(task: Task): AgentPaneModel {
-  const held = roots.get(task.id)
-  if (held) return held.model
-  for (const [id, entry] of roots) if (id !== task.id) { entry.dispose(); roots.delete(id) }
-  const entry = createRoot((dispose) => ({ model: build(task), dispose }))
-  roots.set(task.id, entry)
-  return entry.model
-}
-
-onScopeEvicted((event) => {
-  if (event.scope !== 'task') return
-  roots.get(event.taskId)?.dispose()
-  roots.delete(event.taskId)
-})
-
-/** Test seam. The map is module-level, so a suite must not inherit the previous one's session. */
-export function _resetAgentPaneModel(): void {
-  for (const entry of roots.values()) entry.dispose()
-  roots.clear()
-}
+export type AgentPaneModel = ReturnType<typeof createAgentPaneModel>
 
 const capability = (provider: AgentProviderDescriptor | undefined, name: string): boolean =>
   provider?.capabilities.includes(name as never) ?? false
 
-function build(task: Task) {
+export function createAgentPaneModel(task: Task) {
   const [error, setError] = createSignal('')
   const [creating, setCreating] = createSignal(false)
   const [dialog, setDialog] = createSignal<AgentDialog | null>(null)

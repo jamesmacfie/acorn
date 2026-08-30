@@ -12,9 +12,10 @@
 // than to `document.createElement` and a cloned template. So there is no DOM shim to write, no
 // `innerHTML` parser, and nothing for a plugin to reach through.
 //
-// Your build, whole: name `framework: 'solid'` on your package's client entry, take `mountTree` from
-// the SDK entrypoint and the nodes and `solidTree` from this one, and hand `mountTree` a renderer per
-// surface — `mountTree({ toolCard: solidTree(ToolCard) })`. The builder points the preset here.
+// Your build, whole: take `mountTree` from the SDK entrypoint and the nodes and `solidTree` from this
+// one, and hand `mountTree` a renderer per surface — `mountTree({ toolCard: solidTree(ToolCard) })`.
+// The builder points the preset here; there is no framework key to name, because Solid is the only
+// thing a tree bundle compiles through.
 import { createRenderer } from 'solid-js/universal'
 import { createStore, reconcile } from 'solid-js/store'
 import type { JSX } from 'solid-js'

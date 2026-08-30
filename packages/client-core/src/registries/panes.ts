@@ -3,6 +3,7 @@ import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protoco
 import type { Region } from '../layouts'
 import type { Task } from '../queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../hostCapabilities'
+import { paneModel } from './paneModels'
 import { Registry, type Disposable } from './registry'
 
 export type PaneId = string
@@ -35,15 +36,33 @@ export type PaneContribution = PaneCommon & {
  * The regions are components rather than elements, so a layout that draws one region at a time mounts
  * one. `tabs` names its panels `panel:<tab id>` and takes the bar from `tabs`.
  */
-export type PaneLayoutContribution = PaneCommon & {
+export type PaneLayoutContribution<M = undefined> = PaneCommon & {
   layout: PaneLayoutName
-  regions: Record<string, Component<{ task: Task }>>
+  /**
+   * What every region of this pane shares, built once per task and disposed when the task is evicted
+   * (./paneModels.ts, docs/panes.md § Layout model).
+   *
+   * Regions are separate components the host mounts side by side, so a selection, a draft or an
+   * autosave timer that two of them touch has to outlive both — and a region can be unmounted while
+   * the pane is still open, which is what a collapsed list column is. Declaring it here is what makes
+   * `list-detail` usable at all; without it a pane with two regions has to be one region with a split
+   * drawn inside it.
+   *
+   * Called inside the model's own reactive root, so resources and effects it creates are disposed
+   * together. Omit it and the regions are handed `undefined`, which is every pane whose regions share
+   * nothing.
+   */
+  model?: (task: Task) => M
+  regions: Record<string, Component<{ task: Task; model: M }>>
   tabs?: readonly { id: string; label: string }[]
   /** Regions this pane is not showing right now, asked per render. */
   hidden?: (task: Task) => readonly string[]
 }
 
-export type PaneRegistration = PaneContribution | PaneLayoutContribution
+// `any` for the reason `sourceRegistry` is `SourceContribution<any>`: the registry is heterogeneous by
+// construction and each entry's model type is the pane's, not the registry's.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- see above
+export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
 
 // There is no per-pane `freshness` hook here (docs/panes.md § Contributions has the reason).
 //
@@ -53,7 +72,8 @@ export type PaneRegistration = PaneContribution | PaneLayoutContribution
 // inside the host's `<For>`, or each pane publishing a signal it does not currently have.
 
 /** Turn a declared layout into the component every consumer of this registry already expects. */
-function drawLayout(entry: PaneLayoutContribution): PaneContribution {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- as PaneRegistration above
+function drawLayout(entry: PaneLayoutContribution<any>): PaneContribution {
   if (!isPaneLayout(entry.layout)) throw new Error(`pane '${entry.id}' names an unknown layout '${entry.layout}'`)
   const problem = regionProblem(entry.layout, Object.keys(entry.regions))
   // At registration rather than at render: a pane missing a region is a programming error, and finding
@@ -68,8 +88,14 @@ function drawLayout(entry: PaneLayoutContribution): PaneContribution {
     ...entry,
     component: (props) => {
       const regions: Record<string, Region> = {}
+      // A getter, so the model is looked up when a region renders rather than when the pane is built,
+      // and a pane that switches task hands its regions the new task's model without remounting them.
+      const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => entry.model!(props.task)) : undefined)
       for (const [name, Region] of Object.entries(entry.regions)) {
-        regions[name] = () => createComponent(Region, { get task() { return props.task } })
+        regions[name] = () => createComponent(Region, {
+          get task() { return props.task },
+          get model() { return model() },
+        })
       }
       return createComponent(Draw, {
         stateKey: entry.id,

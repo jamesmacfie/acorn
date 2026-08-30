@@ -1,5 +1,5 @@
-import { createMemo, createResource, createRoot, createSignal } from 'solid-js'
-import { agentSessionsFor, bytesOf, onScopeEvicted, openPane, readJson, revealCollectionItem, toast, taskBridge, type Task } from '@acorn/plugin-api/client'
+import { createMemo, createResource, createSignal } from 'solid-js'
+import { agentSessionsFor, bytesOf, openPane, readJson, revealCollectionItem, toast, taskBridge, type Task } from '@acorn/plugin-api/client'
 import { slotFills } from '@acorn/plugin-api/ui/host'
 import { CONTEXT_SECTION_POINT } from './sectionPoint'
 import { taskContextRoute, type ContextItem, type TaskContext } from '@acorn/protocol/api.ts'
@@ -11,35 +11,17 @@ import { bumpContextRevision } from './contextRevision'
 
 // Everything the Context pane knows, held once per task and read by all three of its regions.
 //
-// The pane is a `header-body-footer` layout now, so the summary line, the sections and the sync bar are
+// The pane is a `header-body-footer` layout, so the summary line, the sections and the sync bar are
 // three components the host mounts rather than one component with everything in scope. They share the
-// inventory, the selection, the expanded rows and the sync state, so the shared thing lives in its own
-// reactive root keyed by task, exactly as notes' model does and for the same reason: a region the host
-// unmounts must not take the fetch with it. See plugins/notes/src/client/notesModel.ts for the note on
-// why `createRoot` is called with no explicit owner.
+// inventory, the selection, the expanded rows and the sync state, and the host holds that: `model` on
+// the pane contribution builds this once per task inside its own reactive root, for the same reason
+// notes' does — a region the host unmounts must not take the fetch with it (client-core
+// registries/paneModels.ts).
 
 /** The id the section's `Rows` is registered under, so `reveal` and the pane agree on one name. */
 export const collectionId = (sectionId: string): string => `context.${sectionId}`
 
-export type ContextModel = ReturnType<typeof build>
-
-const roots = new Map<string, { model: ContextModel; dispose: () => void }>()
-
-export function contextModel(task: Task): ContextModel {
-  const held = roots.get(task.id)
-  if (held) return held.model
-  // One task is on screen at a time; anything else here is a task somebody navigated away from.
-  for (const [id, entry] of roots) if (id !== task.id) { entry.dispose(); roots.delete(id) }
-  const entry = createRoot((dispose) => ({ model: build(task), dispose }))
-  roots.set(task.id, entry)
-  return entry.model
-}
-
-onScopeEvicted((event) => {
-  if (event.scope !== 'task') return
-  roots.get(event.taskId)?.dispose()
-  roots.delete(event.taskId)
-})
+export type ContextModel = ReturnType<typeof createContextModel>
 
 const agoText = (at: number): string => {
   const minutes = Math.round((Date.now() - at) / 60_000)
@@ -56,7 +38,7 @@ export const pillText = (status: SyncStatus): string =>
       ? `synced · ${agoText(status.at)}`
       : `stale · ${status.changes} change${status.changes === 1 ? '' : 's'}`
 
-function build(task: Task) {
+export function createContextModel(task: Task) {
   const api = taskBridge()
   const [msg, setMsg] = createSignal('')
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())

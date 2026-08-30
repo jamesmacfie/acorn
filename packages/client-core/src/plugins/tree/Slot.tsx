@@ -44,6 +44,25 @@ export type SlotProps = {
    *  own answer to "what if nothing is here", which is why it is children rather than a prop: it is
    *  ordinary tree. */
   children?: JSX.Element
+  /**
+   * What the owner's surface is looking at, handed to a contributor's tree as its scope.
+   *
+   * The same two fields `InlineSlot` already passes a rectangle occupant, and for the same reason: a
+   * contributor drawn inside somebody else's pane still has to be able to open a pane, resolve an
+   * in-app link, or answer a task-scoped keybinding, and all three are questions about a task
+   * (frames/frameServices.ts § openPane, openUrl). Without them a tool card's buttons are inert.
+   *
+   * The owner's, not the shell's: `activeTaskId()` would be wrong here for the same reason it is wrong
+   * for a frame. A project-scoped pane and a reference panel are not looking at a task even while one
+   * is selected in the rail behind them, and reading the ambient one would push a pane into a
+   * background task's layout, where the reader is not.
+   *
+   * Read-only, and a scope, not data. What the owner wants the contributor to *know* goes in `props`,
+   * where the owner writes the names; this is the host's answer to "where am I", and the contributor
+   * never sees it directly — it reaches the bridge and nowhere else.
+   */
+  taskId?: string
+  projectId?: string | null
 }
 
 export function Slot(props: SlotProps) {
@@ -80,6 +99,10 @@ export function Slot(props: SlotProps) {
                     entry: contribution.entry ?? '',
                   }}
                   props={props.props ?? (() => ({}))}
+                  scope={() => ({
+                    ...(props.taskId ? { taskId: props.taskId } : {}),
+                    ...(props.projectId ? { projectId: props.projectId } : {}),
+                  })}
                 />
               }
             >

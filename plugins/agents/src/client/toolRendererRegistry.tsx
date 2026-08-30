@@ -106,6 +106,11 @@ export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultO
     <Slot
       point={AGENT_TOOL_CARD_POINT}
       key={props.tool.kind ?? ''}
+      // The task this card is drawn in, so a contributor's buttons can open a pane and resolve a link
+      // rather than being inert (tree/Slot.tsx § taskId). It rides `props` as well, because the owner
+      // chose to tell the contributor which task it is looking at; that is the owner's word and this is
+      // the host's.
+      taskId={props.taskId}
       // An accessor, not a value: this is what makes a redraw one message on the port rather than a
       // worker restart and a fresh tree. `taskId` rides here rather than on the bridge because a
       // worker is shared by every card its plugin draws, in every task.

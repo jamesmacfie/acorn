@@ -1,11 +1,10 @@
-import { createEffect, createResource, createRoot, createSignal, onCleanup, onMount } from 'solid-js'
+import { createEffect, createResource, createSignal, onCleanup, onMount } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import {
   clientEvents,
   consumePaneIntent,
   debounce,
   nodeReady,
-  onScopeEvicted,
   toast,
   workspaceForProject,
   workspacesOptions,
@@ -17,46 +16,20 @@ import { notesSelectionFor, rememberNotesSelection } from './notesPaneState'
 
 // Everything the Notes pane knows, held once per task and read by all three of its regions.
 //
-// The pane is a `list-detail` layout now, so the list, the header above it and the note body are three
+// The pane is a `list-detail` layout, so the list, the header above it and the note body are three
 // components the host mounts side by side rather than one component with everything in scope. They
 // still share a selection, a body, an autosave timer and one set of lists, and the shared thing has to
 // outlive any one of them: collapsing the library unmounts the list, and the note being edited must
 // not go with it.
 //
-// So the model lives in its own reactive root, keyed by task. `createRoot` rather than a plain module
-// object because the resources and effects below need an owner, and the owner has to be one the host's
-// mounting and unmounting cannot take away.
-//
-// No detached owner is passed, and that is deliberate rather than an oversight. Solid's `createRoot`
-// with no second argument still copies the *context* off whichever owner is current, while never
-// adding the new root to that owner's `owned` list. So the query client is in scope and disposal stays
-// this file's to call. Passing an explicit `null` owner would lose the query client instead.
+// The host holds it. `model` on the pane contribution builds this once per task inside its own
+// reactive root and hands it to every region (client-core registries/paneModels.ts, docs/panes.md §
+// Layout model). This file used to keep that root map itself, and so did changes, agents and context.
 
 export type Selected = { scope: NoteScope; slug: string; virtual?: boolean }
-export type NotesModel = ReturnType<typeof build>
+export type NotesModel = ReturnType<typeof createNotesModel>
 
-const roots = new Map<string, { model: NotesModel; dispose: () => void }>()
-
-/** The model for one task, built on first ask. */
-export function notesModel(taskId: string, projectId: string | null): NotesModel {
-  const held = roots.get(taskId)
-  if (held) return held.model
-  // One task is on screen at a time, so anything else here is a task somebody navigated away from.
-  // Disposing it flushes its pending save through the `onCleanup` below, which is the reason this
-  // evicts eagerly rather than waiting for the archive event.
-  for (const [id, entry] of roots) if (id !== taskId) { entry.dispose(); roots.delete(id) }
-  const entry = createRoot((dispose) => ({ model: build(taskId, projectId), dispose }))
-  roots.set(taskId, entry)
-  return entry.model
-}
-
-onScopeEvicted((event) => {
-  if (event.scope !== 'task') return
-  roots.get(event.taskId)?.dispose()
-  roots.delete(event.taskId)
-})
-
-function build(taskId: string, projectId: string | null) {
+export function createNotesModel(taskId: string, projectId: string | null) {
   const api = notesApi()
   let titleField: HTMLInputElement | undefined
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))

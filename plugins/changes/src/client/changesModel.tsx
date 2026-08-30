@@ -1,7 +1,7 @@
-import { For, createEffect, createMemo, createResource, createRoot, createSignal } from 'solid-js'
+import { For, createEffect, createMemo, createResource, createSignal } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import {
-  agentSessionsFor, clientEvents, formatFileReference, onScopeEvicted, projectsOptions, readJson,
+  agentSessionsFor, clientEvents, formatFileReference, projectsOptions, readJson,
   sendReferenceToAgent, taskBridge, taskStatus, type Task,
 } from '@acorn/plugin-api/client'
 import { Badge, Button, Inline, Stack, Text } from '@acorn/plugin-api/ui'
@@ -15,10 +15,10 @@ import { changeKey, groupChanges, pickSelected, stackFor, toPullFile } from './m
 // Everything the Changes pane knows, held once per task and read by all four of its regions
 // (docs/diff-rendering.md, docs/panes.md § Layout model).
 //
-// The pane is a `list-detail` layout now, so the header, the file list, the commit bar and the diff
-// are four components the host mounts rather than one closure. They share a resource, a selection, a
-// diff source and an armed-confirm, so the shared thing lives in its own reactive root keyed by task,
-// the same pattern notes and context follow.
+// The pane is a `list-detail` layout, so the header, the file list, the commit bar and the diff are
+// four components the host mounts rather than one closure. They share a resource, a selection, a diff
+// source and an armed-confirm, and the host holds that: `model` on the pane contribution builds this
+// once per task inside its own reactive root (client-core registries/paneModels.ts).
 //
 // A `.tsx` file even though it is the model: `DiffSource.lineExtra` is a component the source hands
 // the viewer, and the source is the thing being shared.
@@ -26,26 +26,9 @@ import { changeKey, groupChanges, pickSelected, stackFor, toPullFile } from './m
 // One viewer per task pane, so the scope's route key is a constant rather than a coordinate.
 const CHANGES_ROUTE_KEY = 'changes'
 
-export type ChangesModel = ReturnType<typeof build>
+export type ChangesModel = ReturnType<typeof createChangesModel>
 
-const roots = new Map<string, { model: ChangesModel; dispose: () => void }>()
-
-export function changesModel(task: Task): ChangesModel {
-  const held = roots.get(task.id)
-  if (held) return held.model
-  for (const [id, entry] of roots) if (id !== task.id) { entry.dispose(); roots.delete(id) }
-  const entry = createRoot((dispose) => ({ model: build(task), dispose }))
-  roots.set(task.id, entry)
-  return entry.model
-}
-
-onScopeEvicted((event) => {
-  if (event.scope !== 'task') return
-  roots.get(event.taskId)?.dispose()
-  roots.delete(event.taskId)
-})
-
-function build(task: Task) {
+export function createChangesModel(task: Task) {
   const api = taskBridge()
   const projects = createQuery(() => projectsOptions(true))
   const project = () => projects.data?.find((candidate) => candidate.id === task.projectId)

@@ -138,6 +138,45 @@ describe('RuntimeService over real processes', () => {
     expect(await svc.defaultUrl('t1')).toBe('http://localhost:8080')
   })
 
+  // `terminal:before-run-target` is declared in the manifest and shown in the trust prompt as a veto
+  // another plugin may hold (src/node/index.ts). Declared and never run would be the worst of the three
+  // states, because the prompt would be promising a turn nobody gets, so the chain has a test of its
+  // own here rather than only in the hook runner's.
+  it('a veto on before-run-target stops the run and names who stopped it', async () => {
+    targets = [{ id: 'dev', command: 'touch started.marker && sleep 30' }]
+    const asked: { id: string; payload: unknown }[] = []
+    const svc = new RuntimeService({
+      ...deps,
+      hooks: {
+        run: async (id, payload) => {
+          asked.push({ id, payload })
+          return { ok: false, reason: 'a secret is in the environment', by: 'secret-scan', payload }
+        },
+      },
+    })
+    const res = await svc.start('t1', 'dev')
+    expect(res.ok).toBe(false)
+    expect(res.reason).toBe('secret-scan: a secret is in the environment')
+    expect(asked).toEqual([
+      { id: 'before-run-target', payload: { taskId: 't1', targetId: 'dev', command: 'touch started.marker && sleep 30', cwd: dir } },
+    ])
+    // Nothing spawned, and nothing recorded: a vetoed start must leave no instance behind for `stop`
+    // to find.
+    expect(existsSync(join(dir, 'started.marker'))).toBe(false)
+    expect((await svc.status('t1', 'dev')).running).toBe(false)
+  })
+
+  it('an allowing chain leaves the run alone, and no chain at all is the same answer', async () => {
+    targets = [{ id: 'dev', command: 'touch started.marker && sleep 30' }]
+    const svc = new RuntimeService({
+      ...deps,
+      hooks: { run: async (_id, payload) => ({ ok: true, payload }) },
+    })
+    expect((await svc.start('t1', 'dev')).ok).toBe(true)
+    await waitFor(() => existsSync(join(dir, 'started.marker')))
+    expect(existsSync(join(dir, 'started.marker'))).toBe(true)
+  })
+
   it('authorizes only targets whose winning layer is repo-authored', async () => {
     targets = [{ id: 'repo', command: 'true' }, { id: 'user', command: 'true' }]
     const authorized: string[] = []

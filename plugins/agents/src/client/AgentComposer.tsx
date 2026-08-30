@@ -450,6 +450,7 @@ export default function AgentComposer(props: {
               <Slot
                 point={AGENT_ATTACHMENT_POINT}
                 key={attachment.mediaType}
+                taskId={props.session.taskId}
                 props={() => ({ attachment, taskId: props.session.taskId })}
               >
                 <Chip
@@ -588,7 +589,11 @@ export default function AgentComposer(props: {
         {/* Room for another plugin beside this pane's own controls. A `stack` point: several plugins
             with something to offer a draft is a real answer, and four is the owner's ceiling because
             it is the owner's bar. */}
-        <Slot point={AGENT_COMPOSER_ACTIONS_POINT} props={() => ({ taskId: props.session.taskId, sessionId: props.session.id })} />
+        <Slot
+          point={AGENT_COMPOSER_ACTIONS_POINT}
+          taskId={props.session.taskId}
+          props={() => ({ taskId: props.session.taskId, sessionId: props.session.id })}
+        />
         <Toolbar.Spacer />
         <Text emphasis="muted"><Kbd size="xs">Shift+Enter</Kbd> for newline</Text>
         <Button

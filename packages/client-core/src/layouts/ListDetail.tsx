@@ -26,23 +26,32 @@ const MAX_LIST_FRACTION = 0.6
 
 export function ListDetail(props: LayoutProps) {
   const [width, setWidth] = layoutState(props.stateKey, 'list-width', 0)
+  let root: HTMLDivElement | undefined
   let list: HTMLElement | undefined
   // Snapshotted at pointer-down, so a keyboard nudge measures from the width on screen rather than
   // from the last drag's start.
   let dragStart: number | null = null
+  // The ceiling is this layout's own box, never the window. A pane is one column of a task row, so the
+  // window is not what its list is allowed to fill, and no layout may read the window's width
+  // (shell.css § Layouts, docs/future/layout/09-doors-left-open.md, "never do these" item 12). Before
+  // the element is measurable there is no ceiling to apply; the floor still holds.
+  const ceiling = () => {
+    const extent = root?.offsetWidth ?? 0
+    return extent > 0 ? extent * MAX_LIST_FRACTION : Number.POSITIVE_INFINITY
+  }
   const drag = createSplitDrag({
     axis: 'x',
     label: `Resize ${props.label} list`,
     onStart: () => { dragStart = width() || (list?.offsetWidth ?? MIN_LIST_WIDTH) },
     onDelta: (deltaPx) => {
       const from = dragStart ?? (width() || (list?.offsetWidth ?? MIN_LIST_WIDTH))
-      setWidth(Math.min(Math.max(from + deltaPx, MIN_LIST_WIDTH), window.innerWidth * MAX_LIST_FRACTION))
+      setWidth(Math.min(Math.max(from + deltaPx, MIN_LIST_WIDTH), ceiling()))
     },
     onCommit: () => { dragStart = null },
   })
 
   return (
-    <div class="pane layout-list-detail" style={width() ? { '--listdetail-w': `${width()}px` } : undefined}>
+    <div ref={root} class="pane layout-list-detail" style={width() ? { '--listdetail-w': `${width()}px` } : undefined}>
       <Show when={!props.hidden?.includes('list')}>
         {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
             screen reader tells two same-shaped columns apart. */}

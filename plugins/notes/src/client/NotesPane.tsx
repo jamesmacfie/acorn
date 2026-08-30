@@ -5,7 +5,7 @@ import {
   Alert, Button, Checkbox, EmptyState, Input, Markdown, Row, Rows, Section, Stack, Text, Textarea,
   ToggleButton, Toolbar,
 } from '@acorn/plugin-api/ui'
-import { notesModel } from './notesModel'
+import type { NotesModel } from './notesModel'
 import type { NoteScope, NoteSummary } from './notesClient'
 import { libraryCollapsed, setLibraryCollapsed } from './notesPaneState'
 
@@ -16,8 +16,8 @@ import { libraryCollapsed, setLibraryCollapsed } from './notesPaneState'
 const scopeGlyph = (scope: NoteScope): string => (scope === 'task' ? '◆ task' : scope === 'workspace' ? 'ws' : '🌐')
 const authorBadge = (author: NoteSummary['author']): string => (author === 'agent' ? '🤖' : author === 'workflow' ? 'seed' : '')
 
-export function NotesHeader(props: { task: Task }) {
-  const model = () => notesModel(props.task.id, props.task.projectId)
+export function NotesHeader(props: { task: Task; model: NotesModel }) {
+  const model = () => props.model
   return (
     <Toolbar size="sm" ariaLabel="Notes library">
       <Text emphasis="muted">{model().workspace()?.name ?? 'workspace'}</Text>
@@ -42,8 +42,8 @@ function LibraryToggle(props: { task: Task }) {
   )
 }
 
-export function NotesList(props: { task: Task }) {
-  const model = () => notesModel(props.task.id, props.task.projectId)
+export function NotesList(props: { task: Task; model: NotesModel }) {
+  const model = () => props.model
 
   // "In the agent's context" as the checkbox it always was. It used to be a 10px round button with a
   // stylesheet of its own; the state it reports and the state a Checkbox reports are the same state.
@@ -150,8 +150,8 @@ export function NotesList(props: { task: Task }) {
   )
 }
 
-export function NoteBody(props: { task: Task }) {
-  const model = () => notesModel(props.task.id, props.task.projectId)
+export function NoteBody(props: { task: Task; model: NotesModel }) {
+  const model = () => props.model
   return (
     <>
       <Show when={model().actionError()}>{(error) => <Alert>{error()}</Alert>}</Show>
