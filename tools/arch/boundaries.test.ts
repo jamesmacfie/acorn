@@ -485,6 +485,118 @@ describe('architecture boundaries', () => {
     expect([...new Set(named)].sort()).toEqual([...PLUGIN_NAMED_BASELINE].sort())
   })
 
+  it('core never names a plugin', () => {
+    // The claim docs/plugins.md § Adding a plugin contribution makes: a fourth tracker, harness or
+    // terminal-shaped plugin is one roster line and no core edit. A plugin id spelled inside
+    // `packages/*` is how that claim stops being true, so each surviving one is named here with its
+    // reason and the list may only shrink.
+    //
+    // Production code only. A test naming a plugin is a fixture, and counting those would make this
+    // impossible to zero, the same reasoning the schema and testkit ratchets use. `packages/plugin-api`
+    // is exempt whole: a facade names plugins in its re-export paths, which is what a facade is.
+    //
+    // Ten roster ids are also core's own words. Where that is the whole reason, the entry says so.
+    const NAMES_A_PLUGIN_OK = new Map([
+      // `terminal` the UI style pack, which is a shape-and-density choice with no plugin behind it.
+      ['packages/client-core/src/features/settings/AppearanceSettings.tsx', "the 'terminal' UI style"],
+      ['packages/client-core/src/features/settings/StyleGallery.tsx', "the 'terminal' UI style"],
+      ['packages/client-core/src/features/settings/uiStyles.ts', "the 'terminal' UI style"],
+      ['packages/client-core/src/infra/persistence/appStartup.ts', "the 'terminal' UI style"],
+      ['packages/client-core/src/host/frames/PluginFrame.tsx', "the 'terminal' UI style, passed to a frame"],
+      ['packages/client-core/src/host/tree/RemoteTree.tsx', "the 'terminal' UI style, passed to a tree"],
+      // `terminal` the moment a setup script runs, and `terminal` the command palette category.
+      ['packages/client-core/src/features/settings/WorkspaceProjectSettings.tsx', "the 'terminal' setup-script trigger"],
+      ['packages/node-core/src/server/routes/projects/projects.ts', "the 'terminal' setup-script trigger"],
+      ['packages/node-core/src/server/worktrees/taskWorktree.ts', "the 'terminal' setup-script trigger"],
+      ['packages/protocol/src/api.ts', "the 'terminal' setup-script trigger"],
+      ['packages/client-core/src/host/registries/commands/commands.ts', "the 'terminal' command category"],
+      ['packages/protocol/src/plugin/contract.ts', "the 'terminal' command category"],
+      // `terminal` an agent controller and a driver kind; `context` an agent input part.
+      ['packages/protocol/src/managedAgents.ts', "'terminal' the agent controller, 'context' the input part"],
+      ['packages/protocol/src/agentContext.ts', "'context' the agent input part"],
+      ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
+      ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
+      ['packages/node-core/src/server/plugins/permissions.ts', "'context' the permission name"],
+      // Where a task's terminals live is a node question, asked of the roster
+      // (infra/node/hostCapabilities.ts). Sanctioned: see docs/future/structure-followup/refused.md.
+      ['packages/client-core/src/features/tabs/TabRail.tsx', 'the host-capability probe'],
+      ['packages/client-core/src/features/tasks/agentSessions.ts', 'the host-capability probe'],
+      // `github` the website an installable plugin comes from, which is a different thing wearing the
+      // same word, and `github` the brand mark every glyph named `brand:github` resolves through.
+      ['packages/client-core/src/features/settings/PluginsSettings.tsx', "'github' the install source kind"],
+      ['packages/client-core/src/host/trust/approval.ts', "'github' the install source kind"],
+      ['packages/node-core/src/server/agentTools/pluginRequests.ts', "'github' the install source kind"],
+      ['packages/node-core/src/server/plugins/installer.ts', "'github' the install source kind"],
+      ['packages/client-core/src/kit/tokens/brandMarks.ts', "'github' the brand mark"],
+      // The rest, each a plain collision with a word core already had.
+      ['packages/client-core/src/features/editor/DocumentSurface.tsx', "'editor' the rectangle kind"],
+      ['packages/client-core/src/kit/components/content/Rectangle.tsx', "'editor' the rectangle kind"],
+      ['packages/client-core/src/features/tasks/tasksCollection.ts', "'changes' the collection column"],
+      ['packages/client-core/src/host/trust/permissions.ts', "'database' a Lucide icon name"],
+      ['packages/client-core/src/kit/components/inputs/IconPicker.tsx', "'database' and 'terminal', Lucide icon names"],
+      ['packages/node-core/src/server/agentTools/contextSections.ts', "'notes' and 'memory', the TaskContext compatibility keys"],
+      ['packages/node-core/src/server/repoConfigTrust.ts', "'workflows' the .acorn directory name"],
+      ['packages/protocol/src/mcp.ts', "'http' the MCP transport"],
+    ])
+
+    // A `//` outside a string starts a comment. Prose is allowed to name a plugin, and most of the
+    // reasoning about why a name moved does. A `//` inside a multi-line template literal truncates
+    // early, which can only hide a match, never invent one.
+    const codeOnly = (source: string): string =>
+      source
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n')
+        .map((line) => {
+          let quote: string | null = null
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i]
+            if (quote) {
+              if (ch === '\\') i++
+              else if (ch === quote) quote = null
+            } else if (ch === "'" || ch === '"' || ch === '`') quote = ch
+            else if (ch === '/' && line[i + 1] === '/') return line.slice(0, i)
+          }
+          return line
+        })
+        .join('\n')
+
+    const roster = new Set(PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', '')))
+    const namesAPlugin = (source: string): string[] => {
+      const found = new Set<string>()
+      for (const m of codeOnly(source).matchAll(/'([^'\n]*)'|"([^"\n]*)"/g)) {
+        const literal = m[1] ?? m[2]
+        if (roster.has(literal)) found.add(literal)
+      }
+      return [...found].sort()
+    }
+
+    const offenders: string[] = []
+    const matched = new Set<string>()
+    let scanned = 0
+    for (const pkg of PACKAGES.filter((p) => p.kind === 'lib' && p.name !== '@acorn/plugin-api')) {
+      for (const file of walk(pkg.src)) {
+        if (isTestCode(file)) continue
+        scanned++
+        const names = namesAPlugin(readFileSync(file, 'utf8'))
+        if (!names.length) continue
+        matched.add(rel(file))
+        if (!NAMES_A_PLUGIN_OK.has(rel(file))) offenders.push(`${rel(file)}: ${names.join(', ')}`)
+      }
+    }
+    expect(offenders.sort()).toEqual([])
+    // And no exception outlives the code it excuses.
+    expect([...NAMES_A_PLUGIN_OK.keys()].filter((path) => !matched.has(path)).sort()).toEqual([])
+
+    // Anti-vacuity: the walk covers core, the matcher finds a name in code, and does not find one in
+    // the prose explaining where that name went.
+    expect(scanned).toBeGreaterThan(300)
+    expect(namesAPlugin("const x = 'linear'")).toEqual(['linear'])
+    expect(namesAPlugin('const x = "github"')).toEqual(['github'])
+    expect(namesAPlugin("// this used to branch on 'linear'")).toEqual([])
+    expect(namesAPlugin("/* moved to 'github' */")).toEqual([])
+    expect(namesAPlugin("const url = 'https://example.com' // and 'linear'")).toEqual([])
+  })
+
   it('only core reaches the machine identity store', () => {
     // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
     const IDENTITY_STORE_OK = new Set(['packages/node-core', 'apps/node'])

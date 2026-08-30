@@ -106,6 +106,9 @@ export default {
       // The rail route reads `?project=` (src/server/routes/linear.ts), so the shell offers a project
       // picker on this source and re-fetches the list when the project changes.
       projectScoped: true,
+      // A task with a Linear link and no pull request opens on the ticket. Core used to make that
+      // choice itself, by name, in client-core/features/tasks/activate.ts.
+      defaultPane: 'linear',
       // `navigate`, not `openPane`: the detail belongs to the project, so clicking a row changes the
       // URL and the surface beside the list follows. It is also what mounts `linear-issue` at all.
       onSelect: { verb: 'navigate', surface: 'linear-issue' },

@@ -304,6 +304,10 @@ const sourceDescriptor = z.object({
   // the shell's project picker for this source and adds `?project=` to the items route
   // (client-core/host/chrome/ChromeSourcePanel.tsx).
   projectScoped: z.boolean().optional(),
+  // The pane a task this source tracks opens on the first time it is activated
+  // (client-core/host/registries/sources/sources.ts). Has to be one of this plugin's own declared task
+  // panes, re-checked on the device the way a content link's `openPane` is.
+  defaultPane: z.string().min(1).max(64).optional(),
   onSelect: chromeAction.optional(),
   // Shown when the route answered with no items, not when it failed. An unreachable node has its own
   // banner, and "nothing is assigned to you" after a timeout is a lie told on the plugin's behalf.

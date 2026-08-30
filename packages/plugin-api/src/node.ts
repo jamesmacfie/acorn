@@ -108,13 +108,16 @@ export {
   tmuxAvailable,
 } from '@acorn/node-core/server/profiles.ts'
 export type { ProfileDef } from '@acorn/node-core/server/profiles.ts'
-export { launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
-export type { Launcher } from '@acorn/node-core/server/mcpRegister.ts'
+export { envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
+export type { Argv, Launcher, McpCommands } from '@acorn/node-core/server/mcpRegister.ts'
 
 // ── Agent tools ───────────────────────────────────────────────────────────────────────────────
 export { ToolError } from '@acorn/node-core/server/agentTools/registry.ts'
 export type { AgentToolContribution, ToolContext } from '@acorn/node-core/server/agentTools/registry.ts'
-export { memorySection, notesSection, pullRequestSection } from '@acorn/node-core/server/agentTools/contextSections.ts'
+// The context-section helpers, not the sections: `pr`, `notes` and `memory` are shaped by the plugins
+// that own their rows (docs/agent-tools.md § Context sections).
+export { formatOmitted, truncateBytes } from '@acorn/node-core/server/agentTools/contextSections.ts'
+export type { PluginContextSection } from '@acorn/node-core/server/agentTools/contextSections.ts'
 export type { InternalEnvFactory } from '@acorn/node-core/server/auth/internalTokens.ts'
 
 // ── Blobs and the sync engine ─────────────────────────────────────────────────────────────────

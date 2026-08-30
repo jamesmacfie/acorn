@@ -14,3 +14,4 @@ export {
   type MemoryCandidate,
   type MemoryGenDeps,
 } from '../server/memoryGen'
+export { memorySection, type ContextMemorySource } from '../server/contextSection'

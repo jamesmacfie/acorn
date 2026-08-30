@@ -57,6 +57,11 @@ The profile launchers and the Node's `mcp` entrypoint (`apps/node/src/entries/mc
 `mcp.js` beside the service) handle MCP registration. Settings → MCP shows
 the generated configuration and the active capability state. It does not store a provider secret.
 
+Which CLI a harness registers through, and what that CLI wants on its command line, is the harness's
+own declaration (`plugins/agents/src/server/profiles/mcpCommands.ts`). Core owns the shape of the
+exchange only — remove, then add, through a login shell, with the failure turned into a sentence — and
+knows neither CLI by name.
+
 Registration also refreshes once at boot for every installed agent CLI, not only at session spawn.
 The registered launcher command is the Node's own binary path, which in a dev build is a checkout
 path that goes stale after a reinstall. A restored tmux session never re-spawns, so without the boot

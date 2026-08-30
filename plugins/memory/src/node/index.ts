@@ -1,4 +1,5 @@
-import { memorySection, type NodePlugin } from '@acorn/plugin-api/node'
+import type { NodePlugin } from '@acorn/plugin-api/node'
+import { memorySection } from '../server/contextSection'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_SEND_TO_AGENT } from '@acorn/plugin-terminal/contract/sendToAgent.ts'
 import { WORKFLOWS_NOTICES } from '@acorn/plugin-workflows/contract/notices.ts'

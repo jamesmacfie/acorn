@@ -7,18 +7,16 @@ import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import {
   asContextSection,
   linkedIssuesSection,
-  memorySection,
-  notesSection,
-  pullRequestSection,
   registerContextSection,
   removeContextSections,
-  type ContextMemorySource,
-  type ContextNotesSource,
 } from '@acorn/node-core/server/agentTools/contextSections.ts'
 import { taskContext } from '@acorn/node-core/server/routes/projects/taskContext.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit/db.ts'
-import { mirroredPullRequest } from '@acorn/plugin-github/testkit'
-import { pullRequests, prFiles, repos } from '@acorn/plugin-github/testkit'
+// Each plugin-owned section is shaped by the plugin that owns its rows, and reaches a test through
+// that plugin's testkit. Core keeps only `issues`.
+import { mirroredPullRequest, prFiles, pullRequests, pullRequestSection, repos } from '@acorn/plugin-github/testkit'
+import { notesSection, type ContextNotesSource } from '@acorn/plugin-notes/testkit'
+import { memorySection, type ContextMemorySource } from '@acorn/plugin-memory/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 vi.mock('@acorn/node-core/server/db/index.ts', async (importOriginal) => {

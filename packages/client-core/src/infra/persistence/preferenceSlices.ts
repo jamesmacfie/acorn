@@ -48,7 +48,10 @@ export const directPreferenceSlices: readonly PersistedStateSlice<unknown>[] = [
   direct('core.style', PrefKeys.style),
   jsonObject('core.keybindings', PrefKeys.keybindings),
   jsonObject('core.pane-shortcuts-legacy', PrefKeys.paneShortcuts),
-  direct('github.diff-view', PrefKeys.diffView, 'view'),
+  // Unified or split. Named `github.diff-view` until 2026-08-31, which read as github's; the diff
+  // pane it belongs to is core's shared component and `changes` draws it too. Only the slice id
+  // changed — the stored key is still `diff_view`, so nothing migrates.
+  direct('core.diff-view', PrefKeys.diffView, 'view'),
   jsonObject('core.rail-order', PrefKeys.railOrder, 'view'),
   direct('terminal.rail-default', PrefKeys.terminalRailDefault),
   direct('terminal.height', PrefKeys.terminalHeight, 'panes'),

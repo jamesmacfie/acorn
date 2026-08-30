@@ -61,6 +61,12 @@ Core applies byte and token budgets, records section status and freshness, and r
 deterministic snapshot. GitHub, notes, memory, Linear, Rollbar, and task sections are optional
 contributions, and one failing section does not discard its siblings.
 
+A section is also *shaped* by the plugin that owns its rows, not just registered by it: `pr` lives in
+`plugins/github/src/server/contextSection.ts`, `notes` and `memory` in the same file under their own
+packages. Core offers `truncateBytes` and `formatOmitted` through `@acorn/plugin-api/node` so a
+section's own `format` applies the same ceiling arithmetic core applies to items, and keeps the
+assembly, the declared order and the 512 KiB budget.
+
 Core's own `issues` section registers at module scope in `contextSections.ts`, not through
 `wireAgentTools`. `wireAgentTools` is not called on every boot shape: the standalone Node
 (`pnpm dev:node`, and any Node a client pairs with over the LAN) never calls it. Registering at

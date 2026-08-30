@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type AgentProfileContribution, lineDelimitedJsonAdapter, registerAcornMcp } from '@acorn/plugin-api/node'
+import { codexMcpCommands } from './mcpCommands'
 
 function materializeSchema(schema: object): string {
   const dir = mkdtempSync(join(tmpdir(), 'acorn-schema-'))
@@ -17,7 +18,7 @@ export const codexProfile: AgentProfileContribution = {
   command: 'codex',
   backendPreference: 'tmux',
   transport: 'pty',
-  mcpRegistration: (name, launcher) => registerAcornMcp('codex', name, launcher),
+  mcpRegistration: (name, launcher) => registerAcornMcp(codexMcpCommands, name, launcher),
   headlessArgv: (command, opts) => ({
     file: command,
     args: [

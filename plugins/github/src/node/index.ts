@@ -1,4 +1,5 @@
-import { type NodePlugin, pullRequestSection } from '@acorn/plugin-api/node'
+import type { NodePlugin } from '@acorn/plugin-api/node'
+import { pullRequestSection } from '../server/contextSection'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/checks/actions'
 import { PULLS_COLLECTION_ID, pullsCollectionRoute } from '../shared/collections'

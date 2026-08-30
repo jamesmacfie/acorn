@@ -45,6 +45,12 @@ export type SourceContribution<Item = unknown> = {
   // Core's Fleet home is the one user of it (docs/frontend.md § Registries and plugins).
   when?: () => boolean
   component?: Component
+  // The task origins this source creates, as origin id → Lucide glyph (features/tasks/origin.ts). A
+  // source whose origin is its own id needs nothing here; github's rail is `github` and the tasks it
+  // makes carry `github-pr`, so it says so.
+  origins?: Readonly<Record<string, string>>
+  // The pane a task this source tracks opens on the first time it is activated. A task no source
+  // claims falls to the layout reducer's default (features/tasks/taskLayout.ts).
   defaultPane?: string
   // A third question again: given the integration behind `providerId` is connected, does it grant this
   // capability? Not `requires`, which asks about the platform, and not a plugin-to-plugin capability
@@ -119,6 +125,23 @@ export function taskPathFromSources(task: Task): string | undefined {
   for (const source of sourceRegistry.entries()) {
     const path = source.taskPath?.(task)
     if (path) return path
+  }
+  return undefined
+}
+
+/** Which pane a task opens on the first time it is activated, asked of the source that tracks it.
+ *
+ *  Two questions in precedence order, the same two `taskTracksRef` asks. A source that owns the
+ *  task's URL has the strongest claim, which is how a PR-backed task lands on the pull request
+ *  rather than on a ticket linked from its body; failing that, a link's provider claims it. Nobody
+ *  answering is a real answer: the caller leaves the layout alone and the reducer's default stands. */
+export function defaultPaneForTask(task: Task): string | undefined {
+  const claiming = sourceRegistry.entries().filter((source) => source.defaultPane)
+  const byPath = claiming.find((source) => source.taskPath?.(task))
+  if (byPath) return byPath.defaultPane
+  for (const link of task.links) {
+    const source = claiming.find((candidate) => candidate.providerId === link.providerId)
+    if (source) return source.defaultPane
   }
   return undefined
 }
