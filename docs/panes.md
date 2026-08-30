@@ -218,7 +218,7 @@ questions. The pane is "show me this provider's items for this task": richer, an
 the rectangle they were using. The panel is "let me glance at this one thing": it needs no task, so
 it also works in classic browse and beside a rail list, and it keeps the reader's place. Which one a
 click gets is the clicking surface's preference, with the other as fallback. For more information,
-see `docs/plugins.md` § "Loaded plugins: the client half".
+see `docs/plugins.md` § "The client half of a loaded plugin".
 
 ## Contributions
 

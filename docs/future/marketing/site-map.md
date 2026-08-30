@@ -50,7 +50,7 @@ One page per topic, each a user-facing split of the matching internal doc:
 | Page | Source |
 | --- | --- |
 | Workspaces and tasks | `docs/workspaces-and-tasks.md` |
-| Terminal and agents | `docs/terminal-and-agents.md` + `docs/managed-agents.md` |
+| Terminal and agents | `docs/terminal.md` + `docs/managed-agents.md` |
 | Dashboards | `docs/dashboards.md` (59K internal; the public page is the using-it subset, not the design record) |
 | Schedules | `docs/schedules.md` |
 | Notes and memory | `docs/notes-and-memory.md` |
@@ -95,7 +95,7 @@ is in [plugin-reference.md](./plugin-reference.md).
 
 - `docs/plugins.md` as a whole — it is the internal reference manual and design record; the
   public tree takes the authoring-facing subset only.
-- `docs/first-party-plugins.md`, `docs/third-party/`, `docs/future/` — tier audits, migration
+- `docs/first-party-plugins.md`, `docs/loaded-plugin-migration.md`, `docs/future/` — tier audits, migration
   records, and design notes. The public compatibility and security pages state the conclusions
   these files argue for, without the argument.
 - Anything about unshipped work. The public docs describe what loads today; roadmap talk stays

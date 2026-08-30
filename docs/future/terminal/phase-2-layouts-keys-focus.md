@@ -87,7 +87,7 @@ channel. The TUI is a second terminal emulator for it, this time a real one.
 - `docs/panes.md § Layout model`: the projections are drawn, and where a projection changed on
   contact.
 - `docs/command-palette-and-shortcuts.md`: the terminal adapter is used; the double-Escape rule.
-- `docs/terminal-and-agents.md`: the PTY on the TUI.
+- `docs/terminal.md`: the PTY on the TUI.
 
 ## Doors left open
 

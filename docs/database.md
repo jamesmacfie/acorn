@@ -1,4 +1,4 @@
-# PostgreSQL tools
+# Database plugin
 
 The database plugin provides a task-scoped PostgreSQL browser and SQL editor. It does not make
 PostgreSQL data part of acorn's SQLite model.

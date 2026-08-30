@@ -203,7 +203,7 @@ somebody is reading.
   built-in card. A compiled renderer wins because it draws in the transcript's own realm and costs
   nothing; a remote one runs in that plugin's worker and emits a tree of the host's own components,
   which the transcript grafts in place of the card body
-  (`docs/plugins.md` section Loaded plugins: the client half). Either way the props are the same
+  (`docs/plugins.md` section The client half of a loaded plugin). Either way the props are the same
   `tool`, `defaultOpen` and `onOpenChange`, and a card that fails to draw shows a labelled placeholder
   without disturbing the transcript around it. This is what stopped the tool card from being the reason
   a plugin had to be first-party: `changes` is still compiled, but nothing about the card requires it.

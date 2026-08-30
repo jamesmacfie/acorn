@@ -1,6 +1,6 @@
 # Phase 1: docs shape
 
-Status: not started. Waits on phase 0.
+Status: shipped 2026-08-30. Waited on phase 0.
 
 ## Goal
 
@@ -89,9 +89,53 @@ shorter telling.
 - `ls docs/third-party` fails.
 - Every `docs/future/*/` programme folder has a `refused.md`.
 
+## What shipped, and where it differed
+
+Every item landed. Six things are worth knowing before phase 2.
+
+**The plugin docs split further than the scope said.** Promoting the 15 h3s under `## Activation`
+left one of them, "Loaded plugins: the client half", spanning 624 lines, which fails the phase's own
+400-line rule. It was five top-level bullets with the whole contract indented under each, so the five
+became h2s of their own — `## Frames`, `## Remote trees`, `## Document surfaces`, `## Webviews`,
+`## Descriptors` — with their bodies de-indented and the intro rewritten to name them. The h3s that
+were already inside those bullets came out at the right depth by themselves. `#### The tree contract`
+became an h2 as well; it had been a subsection of the client half and it is a peer. Result: 34 h2s,
+longest span 291 lines. Three docs cited the old section name and were repointed.
+
+**`## The manifest schema` was holding three unrelated things.** Only the first was about the
+manifest, so the Hono-and-drizzle tier decision and the testkit got h3s of their own and the section
+kept the generated JSON Schema plus a new paragraph on the ten keys the host reads. The field-by-field
+reference is `docs/plugin-authoring.md` § The manifest and is now the only one.
+
+**`docs/pg.md` was moved to `docs/database.md`, not folded away.** `docs/data-layer.md` § Database plugin is better on connection
+resolution and on what the SQLite file holds, but it says nothing about the `document-over-frame`
+layout, the ⌘Enter chord, the optional model provider, or why the plugin declares `secrets: false`.
+Deleting the file would have lost those, so it is `docs/database.md` with a corrected H1.
+
+**"What a loaded plugin cannot have" stayed.** The scope said make it a pointer, and it cannot be one:
+the six lettered reasons are what the per-plugin table below it cites, row by row. What was duplicated
+was reason B's ref-panel argument, which `docs/extensibility.md` § Two tiers, permanently already
+makes. Those two paragraphs are now three sentences and a link, and the concrete half — github calling
+`openRefPanel` rather than rendering linear's component — moved into extensibility, which is the
+sentence that migration file said this one would give up.
+
+**`docs/conventions.md` needed a shape the draft did not have.** The draft says "Holds" or "Resolves"
+per rule, which reads as a programme note rather than a rule. The owning doc states each rule in the
+present tense and, where the tree does not follow it yet, adds a **Not yet everywhere** line naming
+the exception and the phase that closes it. Phase 6 deletes those lines and adds which rules a test
+enforces.
+
+**The path checker caught four lines, same trap as phase 0.** A backticked repo path fails unless the
+same line carries a marker such as "moved to". Renaming six files broke four lines in this folder that
+name the old paths on purpose; each was reworded to say where the file went, and two of them needed
+the marker moved onto the same line as the path rather than the line below. The checker was not
+touched: phase 6 owns enforcement.
+
 ## Verify before building
+
+Recorded as they were on 2026-08-30, before this phase ran. All five held.
 
 - `docs/plugins.md` line 291 is still `## Activation` and line 2415 is still `## Task checks`.
 - `docs/plugins.md` lines 24 and 54 still say `frame/`.
-- `docs/pg.md` still has zero inbound links: `grep -rn "pg.md" docs` returns only itself.
+- `docs/pg.md` (moved to `docs/database.md`) still has zero inbound links: `grep -rn "pg.md" docs` returns only itself.
 - `ls docs/future/ecosystem/refused.md` still fails.

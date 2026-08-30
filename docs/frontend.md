@@ -30,7 +30,7 @@ There are two render paths and one component API. A compiled plugin's tree runs 
 the host mounts its components directly. A loaded plugin's runs in a Web Worker with no DOM, emitting
 a stream of node names the host draws with the same components. Both produce the same tree, which is
 what lets one plugin fill another's slot whichever tier it ships in
-(`docs/plugins.md` § Loaded plugins: the client half).
+(`docs/plugins.md` § The client half of a loaded plugin).
 
 A pane registers either a `component` or a `layout` plus a `regions` record. The layouts are the
 host's, one per name in `client-core/src/layouts`, and the registry turns a declared one into the
@@ -214,7 +214,7 @@ Focus is shell state too. `client-core/keys/regions.ts` holds which region of wh
 is in and what each region last had focused, and it is the one place `focusedPane` is written and the
 one place `runtime:focus-changed` is emitted from. Beside it, `keys/collectionState.ts` holds every
 list's `active`, `selected` and `offset` keyed by the item's own key. Both are module-level signals
-and neither is persisted; see [state.md](./state.md) for why, and
+and neither is persisted; see [state-ownership.md](./state-ownership.md) for why, and
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) for the keymap that reads
 them.
 

@@ -1,5 +1,8 @@
 # How a plugin fits together
 
+**Read this first if you are new to the plugin system.** The other plugin docs are reference and
+argument; this one is the map, and 30 minutes here saves an afternoon in `plugins.md`.
+
 An orientation map, not the reference. It names every surface a plugin can reach, says what each one
 does in a line, and shows two working examples. When you need the argument behind a rule, follow the
 link: [plugins.md](./plugins.md) is the reference, [plugin-authoring.md](./plugin-authoring.md) is the

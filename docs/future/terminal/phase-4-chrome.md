@@ -48,7 +48,7 @@ bespoke and lives in `apps/tui/src/chrome/`.
 the same command. Results are the registry's, so plugin commands appear as they do on the desktop.
 
 **State.** Rail source restore, active workspace, and per-workspace state are the same signals the
-desktop uses (`docs/state.md`), read from the same modules. The TUI persists session-only state
+desktop uses (`docs/state-ownership.md`), read from the same modules. The TUI persists session-only state
 exactly as the desktop does: not at all across relaunch.
 
 **Footer.** One line, three segments: bindings on the left, notifications transient in the middle,

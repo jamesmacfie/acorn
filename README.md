@@ -59,7 +59,7 @@ imports Node source.
 First-party plugins ship in two tiers. Most are compiled into the composition roots. Rollbar,
 Linear, model-providers, HTTP, and database ship as loaded packages: bundled with the app, installed
 like third-party plugins, importing the host only through `@acorn/plugin-api`. The record of those
-migrations is [docs/third-party/README.md](./docs/third-party/README.md).
+migrations is [docs/loaded-plugin-migration.md](./docs/loaded-plugin-migration.md).
 
 ## Development
 
@@ -93,19 +93,15 @@ one ABI to match: the desktop runs the Node under the same pinned runtime the te
 
 ## Documentation
 
-Start with [architecture-overview.md](./docs/architecture-overview.md), then use the topic docs:
+[docs/README.md](./docs/README.md) is the index. It names every document under `docs/`, grouped by
+kind, with a line each, and it says which document owns what.
 
-- [features.md](./docs/features.md): shipped product surfaces.
-- [frontend.md](./docs/frontend.md) and [state.md](./docs/state.md): renderer composition and state ownership.
-- [authentication.md](./docs/authentication.md) and [security.md](./docs/security.md): device auth and boundaries.
-- [shell.md](./docs/shell.md): the Tauri shell, its schemes, custody, webviews, and packaging.
-- [api-reference.md](./docs/api-reference.md) and [data-layer.md](./docs/data-layer.md): Node API and storage.
-- [plugins.md](./docs/plugins.md), [first-party-plugins.md](./docs/first-party-plugins.md), and
-  [extensibility.md](./docs/extensibility.md): the two plugin tiers, and why they're shaped that way.
-- [agent-tools.md](./docs/agent-tools.md): agent tool contributions and MCP projection.
-- [local-development.md](./docs/local-development.md), [testing.md](./docs/testing.md), and
-  [node-distribution.md](./docs/node-distribution.md): build, test, and distribution workflows.
+The short version: read [architecture-overview.md](./docs/architecture-overview.md) for the runtimes
+and the contracts between them, [features.md](./docs/features.md) for what the product does, and
+[conventions.md](./docs/conventions.md) for where a new file goes and what it is called. If your first
+task is a plugin, [plugin-map.md](./docs/plugin-map.md) is the orientation map over the whole plugin
+system and is much shorter than the reference.
 
-Design and migration material lives under [docs/third-party/](./docs/third-party/README.md) (the
-loaded-plugin record and remaining work) and [docs/future/](./docs/future/README.md), whose README
-indexes every programme and single file. Runtime contracts live in the topic docs above and the code.
+Design material for work that has not shipped lives under [docs/future/](./docs/future/README.md),
+whose README indexes every programme and single file. Runtime contracts live in the topic docs and in
+the code.

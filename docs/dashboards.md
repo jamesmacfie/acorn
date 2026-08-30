@@ -617,7 +617,7 @@ which is the line the new package draws.
 Panel definitions and placements are one JSON blob in the owning node's per-user prefs, as the
 `core.dashboards` persisted-state slice, versioned from day one. They are not device state. A panel
 describes that node's resources, so it follows the resource (see
-[scope rules in the state doc](./state.md)) and every client paired with that node renders the board
+[scope rules in the state doc](./state-ownership.md)) and every client paired with that node renders the board
 its owner built. The device's query cache stays the offline read fallback, as for every other
 node-backed read.
 
@@ -934,6 +934,6 @@ refused each have a deliverable spec in [the dashboards backlog](./future/dashbo
   this sits next to without reversing: descriptors in [the plugins doc](./plugins.md).
 - Why descriptors exist and why the verb set stays closed: [extensibility](./extensibility.md).
 - The mirrors a collection route projects over: [data layer](./data-layer.md).
-- Why panel definitions follow the node rather than the device: [state](./state.md).
+- Why panel definitions follow the node rather than the device: [state](./state-ownership.md).
 - The backlog, one deliverable per file, plus the refusals:
   [dashboards backlog](./future/dashboards/README.md).

@@ -11,7 +11,7 @@ Already shipped and removed from this plan: the agent-authored dev loop (authori
 reload, approval-mediated install, dev trust grant, agent enablement — `docs/plugin-authoring.md`,
 `docs/plugins.md`), plugin themes and the new chrome/extension vocabulary, and the node-first
 preconditions (the client↔node version contract in `docs/api-reference.md § Versioning`, the
-platform seam, node-side compositions in `docs/state.md`).
+platform seam, node-side compositions in `docs/state-ownership.md`).
 
 The ordering principle for what remains: fix the front door for authors first (additive,
 independently useful), put containment before discovery so acorn never has a window where

@@ -2,7 +2,7 @@
 
 Design notes from the http-migration session (2026-08-11), when measuring Monaco against the plugin
 frame contract ended two migrations; extended the same day when the composed-pane question was worked
-through and decided. Companion to [terminal/01-why.md](../future/terminal/01-why.md) and [remote.md](../future/remote.md): this is
+through and decided. Companion to [terminal/01-why.md](./future/terminal/01-why.md) and [remote.md](./future/remote.md): this is
 the concrete instance of the "one host-owned template" conclusion those two reach in the abstract.
 It began life in `docs/future/` as a design to build; with steps 1–6 shipped it lives here as the
 design record of the document surface, beside the migration record it belongs to.
@@ -24,10 +24,10 @@ plugin's frame bundle is 156 KB against the 7.93 MiB a bundled Monaco measured.
 
 **What is still true, and what is a record.** The contract, the litmus test and the language-smarts
 growth rule below are live. The layout vocabulary this file invented is owned by
-[docs/panes.md § Layout model](../panes.md#layout-model) now, and the "descriptor vocabulary" refusal
+[docs/panes.md § Layout model](./panes.md#layout-model) now, and the "descriptor vocabulary" refusal
 in § The template vocabulary was aimed at a static schema and still holds against one — what it did
 not foresee is the remote component tree, which is argued in
-[docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels](../plugins.md). The
+[docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels](./plugins.md). The
 class names and the frame regions below are how the world looked in 2026-08.
 
 The contract lives in `docs/plugins.md § Document surfaces`; the code is
@@ -40,7 +40,7 @@ gate). The wire shapes both ends read are `@acorn/protocol/documentSurface.ts`.
 **Step 7 — the editor plugin's own move — is all that remains**, and it still waits on its consumer in
 the same way: its template shape and the open-document verb land when that move is planned. What came
 out differently from the design is recorded against each step below and, in more detail, in
-`docs/third-party/README.md § database has moved`. The rest of this document is the design, kept as
+`docs/loaded-plugin-migration.md § database has moved`. The rest of this document is the design, kept as
 written.
 
 The filename is the search term, not the contract name. See § Naming for why the contract must not
@@ -283,7 +283,7 @@ else is reversible.
 
 ## The template vocabulary, and document-over-frame concretely
 
-Both sections folded into [docs/panes.md § Layout model](../panes.md#layout-model), which owns the
+Both sections folded into [docs/panes.md § Layout model](./panes.md#layout-model), which owns the
 layout names, their regions, and each one's narrow and terminal projection. What survives from here is
 the litmus test, because it is what keeps that list short:
 
@@ -461,7 +461,7 @@ grows without becoming Monaco's API in a trench coat.
   verb, and `persistedState` is decided as no-manifest-form-ever, with the frame's
   `state.get`/`state.set` as the tier's store. Porting ⌘P itself additionally needs the
   open-document slot noted in § Communication between regions.
-- **Database has moved** (`docs/third-party/README.md § database has moved`), which is what turned the rest of this
+- **Database has moved** (`docs/loaded-plugin-migration.md § database has moved`), which is what turned the rest of this
   document from a design into a contract. What it did NOT settle is the result-grid measurement: rows
   cross the bridge as structured-clone payloads, and 50k of them is a different proposition than an
   in-realm query cache. Nothing headless in this repo can take that measurement.
@@ -493,7 +493,7 @@ grows without becoming Monaco's API in a trench coat.
    was NOT built: it is still a branch in one host module when a consumer wants it, and Monaco was
    already there.
 5. ~~Add `document-over-frame` when database moves.~~ **Done**, with that move
-   (`docs/third-party/README.md § database has moved`). The acceptance test passes: `⌘Enter` runs the query when the plugin
+   (`docs/loaded-plugin-migration.md § database has moved`). The acceptance test passes: `⌘Enter` runs the query when the plugin
    no longer owns the editor. Three things came out differently from the sketch above.
    **Surface actions needed a new VERB after all** — step 4 was right that the chord rides the existing
    `keybindings` carrier, but a `commands` entry still has to say what it does, and "deliver this to my
@@ -522,7 +522,7 @@ grows without becoming Monaco's API in a trench coat.
   in the editor row. The editor brief that held the rest was every open item this design and the layout
   programme answered, and it went at layout phase 9. Find it with
   `git log --follow -- docs/third-party/editor.md`.
-- `docs/third-party/README.md § database has moved` — the outcome record of steps 5 and 6: that
+- `docs/loaded-plugin-migration.md § database has moved` — the outcome record of steps 5 and 6: that
   plugin's move built `document-over-frame`, and the findings from doing so live there.
 - `docs/future/terminal/01-why.md` — the tier-1 "one host-owned template" conclusion this instantiates.
 - `docs/future/remote.md` — `formFactor`, and why descriptors render on other shells for free.

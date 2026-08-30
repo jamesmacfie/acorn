@@ -341,7 +341,7 @@ root.
 The client has one disposable query cache and IndexedDB persister per Node. It also persists fleet
 membership, endpoint pins, device tokens, device preferences, drafts, and selection state. Pane
 layouts and the other compositions belong to the Node they describe, not the device. See
-[the state doc](./state.md).
+[the state doc](./state-ownership.md).
 Every Node-backed query is rendered with `live`, `refreshing`, `stale`, `offline`, `disabled`, or
 `error` status. Cached reads remain visible when a Node is offline; mutations fail fast and retain
 the user's text as a draft. There is no automatic mutation queue.
@@ -404,31 +404,14 @@ over loopback using a task-scoped internal token. It never opens SQLite directly
 Task-scoped child processes can use only task-addressed routes and cannot read provider credentials or
 administer the Node. Service-scoped internal calls are reserved for Node-owned orchestration.
 
-## Documentation map
+## Where the rest of it is written down
 
-- User-visible surfaces: [features](./features.md).
-- Renderer behavior: [frontend](./frontend.md), [state](./state.md), [panes](./panes.md), and
-  [dashboards](./dashboards.md).
-- Trust boundaries: [authentication](./authentication.md) and [security](./security.md).
-- How a provisioned Node introduces itself to a control plane, and the versioned protocol it speaks:
-  [node enrollment](./node-enrollment.md).
-- Node contracts: [API reference](./api-reference.md), [data layer](./data-layer.md), and
-  [caching](./caching.md).
-- Why the plugin system is shaped this way, the decisions behind it, and where it is going:
-  [extensibility](./extensibility.md). Read it before changing a plugin seam.
-- Extension and tool boundaries: [plugins](./plugins.md) and [agent tools](./agent-tools.md).
-- The one-page orientation map over that reference, naming every plugin surface with two worked
-  examples: [how a plugin fits together](./plugin-map.md).
-- The no-build-step authoring contract for a hand-written loaded plugin, with a worked example:
-  [plugin authoring](./plugin-authoring.md).
-- Every shipped plugin, and which are first-party because they must be rather than because they were
-  written first: [first-party plugins](./first-party-plugins.md).
-- Review findings from moving Rollbar out of the binary onto the loaded-plugin path:
-  [third-party](./third-party/).
-- Plugin UI is host-owned layouts, a closed component kit, remote component trees, five extension
-  kinds and host-owned keyboard navigation, all shipped 2026-08-30. The kit is in
-  [ui design](./ui-design.md) § The closed kit, the layouts in [panes](./panes.md) § Layout model, the
-  keyboard in [command palette and shortcuts](./command-palette-and-shortcuts.md), the five kinds in
-  [plugins](./plugins.md) § Cooperative extension points, and the two render paths in
-  [plugins](./plugins.md) § Loaded plugins: the client half.
-- Runtime and development: [shell](./shell.md) and [local development](./local-development.md).
+[docs/README.md](./README.md) lists every document under `docs/`, grouped by kind, with a line each.
+It is the index; this file is the map of the runtimes.
+
+For a newcomer the reading order is short. Finish this file, then read
+[features.md](./features.md) so the machinery has something to hang on, then whichever of
+[frontend.md](./frontend.md) or [api-reference.md](./api-reference.md) sits on the side you are about
+to change, then [conventions.md](./conventions.md) for where a new file goes and what it is called.
+If your first task is a plugin, read [plugin-map.md](./plugin-map.md) in place of the third —
+it is the one-page orientation over the whole plugin system, and much shorter than the reference.

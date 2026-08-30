@@ -74,7 +74,7 @@ tidy-up; it is a claim of provenance the source cannot support.
 ## What is deliberately not on this list
 
 - **The 8 MiB frame cap and no-workers CSP.** Monaco proved some surfaces cannot live in a frame;
-  the recorded answer is host-owned surfaces plugins borrow (`docs/third-party/monaco.md`), not a wider
+  the recorded answer is host-owned surfaces plugins borrow (`docs/editor-monaco.md`), not a wider
   sandbox. That is a boundary, not a blocker — see `shell-vision.md`.
 - **The closed action-verb set and descriptor vocabulary.** Rollbar's rail losing its filters was
   found honestly and answered with "move exploration into the frame." Growing the verb set is a

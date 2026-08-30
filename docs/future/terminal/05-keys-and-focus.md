@@ -12,7 +12,7 @@ outside `packages/client-core/src/keys/`. Inside that folder, three files never 
   `BARE_KEYS`.
 - `collection.ts`, the intent half: `next`, `prev`, `first`, `last`, `pageUp`, `pageDown`, `select`,
   `activate` against a host-owned store of `active`, `selected`, and `offset` keyed by the item's own
-  key (`docs/state.md`). Type-ahead is a raw key by design and stays one on both hosts.
+  key (`docs/state-ownership.md`). Type-ahead is a raw key by design and stays one on both hosts.
 
 The four layer tiers hold on the TUI unchanged (`install.ts`: command layer at 0, region and pane
 chords at 5, pane layer at 30, collection intents at 40). Priority decides, not locality.

@@ -126,7 +126,7 @@ does not draw the source at all (see the source gates in [the frontend doc](./fr
 active issue. See descriptors in [the plugins doc](./plugins.md). An earlier version fell back to the
 viewer's own open issues, cover for a rail that had no way to explain an empty list. That fallback is
 gone, since a source can author the message itself. See the linear-migration summary in
-[the third-party README](./third-party/README.md).
+[the third-party README](./loaded-plugin-migration.md).
 
 The rail used to be a client-side browse pane with its own filtering, sorting, and faceting over a
 locally loaded issue set. None of that survived the move to a host-drawn rail, because a rail row is

@@ -67,6 +67,13 @@ actually the second — it is a rectangle the host places, so it sandboxes fine.
 looks first-party-only, check whether it is genuinely a component inside another component, or
 just a rectangle with an owner.
 
+The panel is the worked example rather than the thought experiment. github's `PullDetail` used to
+render linear's panel beside a PR, which is what B looks like; now github calls
+`openRefPanel({ providerId, displayId })` and the shell draws it in one place. A plugin holding
+another plugin's component became a plugin naming an item, which is data, and Linear ships its panel
+as a sandboxed frame today. The coupling could be deleted rather than defended, which is the point:
+the list is for components that *must* sit in someone else's tree, and a panel never had to.
+
 When a third-party plugin needs something on the first list, the answer is review and adoption into
 first-party — not a wider sandbox. Ergonomics is never a reason to widen it.
 
@@ -356,14 +363,14 @@ Roughly in order of how much they matter:
 2. **The editor plugin's move, the last one.** The migration candidates are done being candidates.
    http moved first with tables; database followed over the **document surface** — the host owns one
    editor and lends it through a vendor-neutral contract (`docs/plugins.md § Document surfaces`,
-   design record `third-party/monaco.md`). That surface exists because a Monaco frame measurably cannot be
+   design record `editor-monaco.md`). That surface exists because a Monaco frame measurably cannot be
    served: 7.93 MiB against an 8.00 MiB cap with a stub UI, and its language-service workers denied
    outright by the one-file origin and a CSP with no `worker-src`
    (docs/first-party-plugins.md § First-party only by history) — the first surface class the sandbox
    demonstrably does not serve, answered by widening nothing. Editor itself stays compiled for that
    reason and no other: both its surfaces are host layouts filled with kit nodes now.
    linear, earlier, was the one that found a capability the tier cannot carry rather than merely
-   reshape (docs/third-party/README.md § What is still owed).
+   reshape (docs/loaded-plugin-migration.md § What is still owed).
 3. **The carriers that were missing have answers.** `agentContexts` has a form and real callers;
    `overlay` is a frame target opened by the `openOverlay` verb (unexercised end to end until a plugin
    declares one); `persistedState` deliberately gets no manifest form — the frame's
@@ -393,11 +400,11 @@ Roughly in order of how much they matter:
 - `first-party-plugins.md` — which shipped plugins are first-party because they must be.
 - `security.md` — trust boundaries, the node-half threat model, and the containment ladder.
 - `command-palette-and-shortcuts.md` — commands, shortcuts, and plugin bindings.
-- `third-party/` — the review record from the first migration out of the binary.
+- `loaded-plugin-migration.md` — the review record from the first migration out of the binary.
 - `future/remote.md` — web, mobile, and remote access.
 - `future/terminal/` — the terminal client programme: `acorn` in a terminal as a second host for the same component tree, and the node + tui deployable.
 - `future/events.md` — the three event items still unbuilt; the catalogue, the admission rule, and
   the refusals shipped into `plugins.md § Hearing another plugin`.
-- `third-party/monaco.md` — a host-owned document surface: the concrete instance of `future/terminal/01-why.md`'s
+- `editor-monaco.md` — a host-owned document surface: the concrete instance of `future/terminal/01-why.md`'s
   "one host-owned template". Built through step 6 (database ships on it); editor's move is the step
   that remains.

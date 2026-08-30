@@ -17,7 +17,7 @@ second tier will not grow until it can do everything the first can" is *not* the
 third-party plugin needs one of those, the recorded answer is review and adoption into
 first-party, not a wider sandbox.
 
-The proof case is Monaco (`docs/third-party/README.md`, `docs/third-party/monaco.md`): a single-file
+The proof case is Monaco (`docs/loaded-plugin-migration.md`, `docs/editor-monaco.md`): a single-file
 editor frame measured 7.93 MiB against the 8 MiB cap and its language workers were undeliverable
 under the frame CSP. The answer was a **host-owned document surface plugins borrow** — core grew
 so the sandbox didn't have to widen. Expect that pattern to repeat for every heavyweight surface:
@@ -33,7 +33,7 @@ boundary this repo built deliberately and documents well. Reversing it buys ideo
 one thing that differentiates acorn from bb: a real trust boundary under a self-modification loop.
 
 The spirit survives intact, because the repo already points at it from the other direction:
-`docs/third-party/README.md` records that the long-term answer to the first-party/loaded asymmetry
+`docs/loaded-plugin-migration.md` records that the long-term answer to the first-party/loaded asymmetry
 is to **confine compiled plugins too, not to unconfine manifests**. Followed to its end, that
 produces exactly the right shape:
 

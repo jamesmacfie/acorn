@@ -203,7 +203,7 @@ A loaded plugin has a second way to draw. Instead of an iframe whose pixels it o
 run in a dedicated Web Worker and emit a *tree*: names of the host's own components, with props, as a
 stream of mutations the renderer applies. The host mounts its components for those names, so what the
 reader gets has the shell's focus handling, keyboard model, ARIA and style pack, none of which an
-iframe can borrow. `docs/plugins.md` § Loaded plugins: the client half has the plugin-facing half;
+iframe can borrow. `docs/plugins.md` § The client half of a loaded plugin has the plugin-facing half;
 this section is the shell's.
 
 The worker script is the plugin's own bundle, served by `app_scheme.rs` at

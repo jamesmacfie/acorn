@@ -114,7 +114,7 @@ with the task, pane and region.
 a segmented control, a timeline and a grid are all one collection with roving focus inside, and the
 arrows, Home, End, the page keys and type-ahead come from `client-core/keys/collection.ts` rather
 than from the pane. `active` and `selected` live in the host's store keyed by the item's own key
-([state.md](./state.md)), so a refetch keeps your place.
+([state-ownership.md](./state-ownership.md)), so a refetch keeps your place.
 
 `Grid` is the one documented exception, and it is a consequence of virtualisation rather than a
 shortcut. Most of its rows have no element, so roving focus cannot be DOM focus: the arrows move a

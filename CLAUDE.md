@@ -1,9 +1,11 @@
 # acorn engineering guide
 
-Architecture and runtime contracts are in
-[docs/architecture-overview.md](./docs/architecture-overview.md) and the topic docs beneath `docs/`.
-Design and migration material lives under `docs/third-party/` (the loaded-plugin record and
-remaining work) and `docs/future/` (its README indexes every programme and single file).
+[docs/README.md](./docs/README.md) is the index: it names every document under `docs/`, grouped by
+kind, and says which one owns what. Start there.
+[docs/architecture-overview.md](./docs/architecture-overview.md) holds the runtimes and the contracts
+between them, and [docs/conventions.md](./docs/conventions.md) holds the naming rules — where a new
+file goes and what it is called. Design material for work that has not shipped lives under
+`docs/future/`, whose README indexes every programme and single file.
 
 Before changing code, identify the owning runtime and trace data from its source through the Node API,
 protocol, broker, client cache, and UI consumer. Preserve the Node/shell and plugin boundaries,

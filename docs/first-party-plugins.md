@@ -31,19 +31,11 @@ extension point with two render paths now, and a loaded plugin fills one by nami
 host mounts. What is left on this list is the places the host has not opened as a point, plus the
 places that hold a live stream rather than a tree.
 
-The test is *embedded in a render tree*, not *rendered by another plugin*. A **ref panel** is the
-case worth being careful about: it used to look like the strongest counter-example on this page —
-github's `PullDetail` rendered linear's panel beside a PR, which sounds like B — and it was not, because
-the panel is a rectangle the host places. So `refPanel` is one of the frame targets and a loaded plugin
-contributes one as a sandboxed frame (`packages/client-core/src/plugins/frames/register.ts`). Linear
-ships that way, so this is observed rather than argued.
-
-The argument is now stronger than "not B", because github does not render the panel at all. It calls
-`openRefPanel({ providerId, displayId })` and the shell draws it in one place
-(`client-core/registries/refPanelHost.tsx`). What was a plugin holding another plugin's component in its
-own JSX is a plugin naming an item, which is data. That the coupling could be deleted rather than
-defended is the point: reason B is about components that *must* be in someone else's render tree, and a
-panel never had to be.
+The test is *embedded in a render tree*, not *rendered by another plugin*, and the reference panel is
+the case that gets it wrong — a panel looks like the first and is really the second.
+[extensibility.md](./extensibility.md) § Two tiers, permanently makes that argument in full; the
+outcome for this list is that `refPanel` is one of the frame targets
+(`packages/client-core/src/plugins/frames/register.ts`) and Linear ships as one, so B does not cover it.
 
 Three of `RefPanelProps` do not survive the boundary, and the third was found by shipping it.
 `onContentClick` and the multi-ref `refs`/`onSelectRef` chip strip do not cross, which costs nothing
@@ -189,14 +181,14 @@ written before the loader existed.
 **http** used to head this table and has moved. It was the first table-owning plugin to go, which is why
 it was chosen: it is the only candidate that exercises the whole storage path, and the part nothing had
 tested — a migration arriving through an installer update against a populated database — now has a test.
-Read [docs/third-party/README.md](./third-party/README.md) for what it cost and what it found —
+Read [docs/loaded-plugin-migration.md](./loaded-plugin-migration.md) for what it cost and what it found —
 including two bugs that had nothing to do with the tier; the per-finding detail is in `git log`.
 
 **database** followed it, and it is the more interesting of the two. It was the entry that read "no, on
 the client half" here, because the pane embeds Monaco and Monaco does not fit a frame. The answer was
 not to widen the sandbox: the host now owns one editor and lends it through a declarative contract, so
 the pane still has a real editor while the plugin ships 156 KB and no Monaco at all
-([docs/third-party/README.md](./third-party/README.md) § database has moved). Its `DATABASE` capability turned out to be
+([docs/loaded-plugin-migration.md](./loaded-plugin-migration.md) § database has moved). Its `DATABASE` capability turned out to be
 an indirection with nothing on the other side of it and was deleted rather than ported.
 
 **model-providers** also used to be on this table and has moved: it is a loaded package now, in neither
@@ -212,7 +204,7 @@ genuinely lost rather than reshaped. Its answer to "portable? yes, fully" turned
 right. The pane, the ref panel, the recognisers, the rail rows and host-owned promotion all crossed;
 the browse's **workspace project picker** did not, because choosing which Linear projects a workspace
 follows writes core's workspace state, and that write is unmappable on the frame bridge and absent
-from `CoreServices`. [third-party/README.md](./third-party/README.md) carries the summary.
+from `CoreServices`. [loaded-plugin-migration.md](./loaded-plugin-migration.md) carries the summary.
 
 Its **project-scoped issue view** was the other loss, and that one is closed. Every frame target the
 manifest had was task-scoped or modal, so the issue detail Linear used to render at `/p/:projectId`
@@ -226,7 +218,7 @@ Rollbar was the sharpest case and is now the best evidence the tier boundary is 
 package serves provider routes through
 `ctx.providers.integration` with a fetch handler; it can create a task from an item and link the
 item to it through the host-owned descriptor promotion flow. Everything Rollbar does, an outside
-author can now do. Review findings from the move are in [third-party/](./third-party/).
+author can now do. Review findings from the move are in [loaded-plugin-migration.md](./loaded-plugin-migration.md).
 
 ## The honest asterisk
 
@@ -261,7 +253,7 @@ nothing broke.
 **When an existing one should stay put.** Always, unless there is a reason beyond proving a point.
 Converting a working integration to exercise a seam confounds "did the seam work" with "did the
 port work", and costs a working integration while you find out. Prove seams with a plugin that has to keep working —
-see [third-party/](./third-party/), which weighs that trade per candidate.
+see [loaded-plugin-migration.md](./loaded-plugin-migration.md), which weighs that trade per candidate.
 
 **When a third-party plugin asks for a first-party privilege.** The escalation path is review and
 adoption into first-party, not a wider sandbox. The two tiers are permanent, and the line is
@@ -293,7 +285,7 @@ node providers at all.
 
 **rollbar** — the loaded reference integration. Its node half chooses the portable fetch carrier,
 and its client half is a sandbox bundle rather than a `ClientPlugin`. Build it with
-`pnpm --filter @acorn/node build:plugin rollbar`; [third-party/](./third-party/) records what the
+`pnpm --filter @acorn/node build:plugin rollbar`; [loaded-plugin-migration.md](./loaded-plugin-migration.md) records what the
 move exposed. The provider registration remains conceptually:
 
 ```ts
