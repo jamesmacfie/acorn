@@ -1,8 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// Settings → Agent pricing after its tables moved onto the kit's row nodes
-// (docs/future/before-terminal-ui/phase-1-kit-table-rows.md). The page is the reason the nodes take
+// Settings → Agent pricing after its tables moved onto the kit's row nodes. The page is the reason the nodes take
 // children rather than data: every price cell is an `Input` with a handler, and a row's Reset button
 // has to still find the row it belongs to.
 

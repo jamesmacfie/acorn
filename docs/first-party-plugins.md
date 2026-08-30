@@ -169,7 +169,7 @@ Ordered by how strong the first-party claim is.
 | --- | --- | --- |
 | **changes** | Nothing keeps it here. Its tool card is a contribution to `agents:tool-card`, an ordinary `remote` point a loaded plugin can fill, and everything else about it (its SQLite file, its pane, its agent tool, `LOCAL_GIT`) was already available. It stays compiled by preference: it is one of the four panes a task always has. | — |
 | **github** | Publishes `GITHUB_MIRROR`, and uses `ctx.contentLinks` for its content-link recognisers — which now have a manifest form, so this is a carrier difference rather than a privilege. Notably **not** `required` any more. Every one of its five surfaces is a host layout filled with kit nodes and it ships no stylesheet, so nothing about how it draws itself keeps it here: what does is `GITHUB_MIRROR` having a consumer. | D |
-| **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability rather than UI. | D, E, F |
+| **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`; `workflow.ts` stays in protocol because client-core's notification pipeline reads the workflow row types. Registers a client capability and one settings page, `WorkflowsSettings.tsx`, which is kit-pure and ships no stylesheet. | D, E, F |
 | **context** | Contributes a `persistedState` slice, which has no manifest form. Its `agentContexts` entry no longer counts — that has a descriptor now — but its `revision()` does: the composer reads it synchronously to key the automatic task-context snapshot, and a descriptor cannot answer synchronously. Small plugin, narrow reason. | E |
 
 ### First-party only by history

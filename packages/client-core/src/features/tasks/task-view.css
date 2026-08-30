@@ -78,8 +78,7 @@
 /* Neither the editor pane nor the preview pane has a box rule of its own any more: the first roots
    itself in the kit's ListDetail and the second declares the `single` layout, and both of those
    already fill the slot. The rules that used to be here were the last thing keeping
-   `class="pane …"` on a raw <section> inside a plugin
-   (docs/future/before-terminal-ui/, phases 4 and 6). What is left below belongs to the host's own
+   `class="pane …"` on a raw <section> inside a plugin. What is left below belongs to the host's own
    plugin webview frame, which is core code rather than a plugin's. */
 
 /* Plugin webview frame: the <webview> fills the content columns. */

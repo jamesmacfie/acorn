@@ -42,13 +42,22 @@ plugin, read column by column against the kit's 80×24 table
 | agents | sessions, transcript, tool cards, composer, approvals | image attachments as images |
 | github | list, overview, checks, conversation, diff with annotations, merge | nothing of note |
 | changes | stage, diff, notes, commit, push | nothing |
-| editor | file tree, search, read-only text view | Monaco; editing hands off to `$EDITOR` |
+| editor | file tree, search, read-only text view | CodeMirror; editing hands off to `$EDITOR` |
 | terminal | the PTY, natively | nothing |
 | docker | containers, info, logs with find, stats as bars, exec natively | nothing |
 | context, memory, notes | all of it | nothing |
 | http, linear, rollbar | all of it | inline images |
-| database | SQL as a text region, results as a table | Monaco completions |
-| preview, browser | URL, run state, capture filenames | the page |
+| database | SQL as a text region, results as a table | CodeMirror completions |
+| onboarding | all of it; the wizard layout has a terminal projection and the splash is already ASCII | nothing |
+| workflows | the settings page | nothing |
+| preview | URL, run state, capture filenames | the page |
+
+model-providers, nodes-file, and browser have no client half at all. The browser plugin's tools are
+node-side, so pairing it with preview overstated it: it draws nothing to lose.
+
+Settings pages are contributions like any other, so the four plugins that register one cross even
+though the desktop's settings modal does not. The terminal draws its own settings surface the way it
+draws its own rail, and fills it with the same pages.
 
 Also not: charts beyond block and braille characters, and hover, which is never load-bearing anywhere.
 

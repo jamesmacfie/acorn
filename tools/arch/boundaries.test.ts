@@ -128,6 +128,34 @@ const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
 // its testkit/, whose helpers are test-only but deliberately unsuffixed.
 const isTestCode = (file: string): boolean => /\.test\.tsx?$/.test(file) || /\/(test|e2e|testkit)(\/|\.ts$)/.test(rel(file))
 
+// Kit purity, shared by the two tiers that have to hold it: a plugin's tree/ and its client/. Both
+// draw only kit nodes, so both are scanned for the same three things — a raw element, a class or an
+// inline style or an innerHTML, and a stylesheet in the directory. What differs between the tiers is
+// only which directories are scanned, whether the components barrel is banned (tree) or the normal
+// way to draw (client), and whether test files are exempt — the client tier's jsdom tests render
+// regions and may scaffold, and a tree directory has never needed the exemption.
+//
+// Closing tags and the void elements, not opening tags: `Promise<void>` and `createSignal<string>`
+// are the same shape as `<div ` and there is no honest way to tell them apart with a regex.
+const RAW_TAG = /<\/[a-z][a-z0-9]*>|<(?:br|hr|img|input|textarea|area|base|col|embed|link|meta|source|track|wbr)[\s/>]/
+
+function kitPurity(dir: string, { skipTests = false } = {}): { offences: string[]; scanned: number } {
+  const offences: string[] = []
+  let scanned = 0
+  for (const file of walk(join(ROOT, dir))) {
+    if (file.endsWith('.css')) offences.push(`${rel(file)}: a stylesheet`)
+    if (!file.endsWith('.tsx') || (skipTests && isTestCode(file))) continue
+    scanned++
+    // Comments hold prose about the markup that used to be here, and prose is allowed to name a div.
+    const code = readFileSync(file, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+    if (RAW_TAG.test(code)) offences.push(`${rel(file)}: a raw element`)
+    if (/\bclass=|\bclassList=|\bstyle=|innerHTML/.test(code)) offences.push(`${rel(file)}: a class, a style or an innerHTML`)
+  }
+  return { offences, scanned }
+}
+
 // Which side of the client/node split a file sits on, from its path inside its package.
 function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   if (pkg.name === '@acorn/client-core') return 'client'
@@ -265,31 +293,50 @@ describe('architecture boundaries', () => {
     //
     // The components barrel is the other half of the rule, and the subtler one. A tree bundle is built
     // with the JSX preset pointed at the remote adapter, so a shell component pulled onto its graph is
-    // compiled into a tree of its own rather than into a document, and the result is neither.
+    // compiled into a tree of its own rather than into a document, and the result is neither. This is
+    // the one check the client tier does not share: a compiled pane is *supposed* to import the barrel.
     const TREE_DIRS = ['plugins/http/src/tree', 'plugins/database/src/tree', 'plugins/linear/src/tree', 'plugins/rollbar/src/tree']
-    // Closing tags and the void elements, not opening tags: `Promise<void>` and `createSignal<string>`
-    // are the same shape as `<div ` and there is no honest way to tell them apart with a regex.
-    const RAW_TAG = /<\/[a-z][a-z0-9]*>|<(?:br|hr|img|input|textarea|area|base|col|embed|link|meta|source|track|wbr)[\s/>]/
     const offences: string[] = []
     let scanned = 0
     for (const dir of TREE_DIRS) {
+      const pure = kitPurity(dir)
+      offences.push(...pure.offences)
+      scanned += pure.scanned
       for (const file of walk(join(ROOT, dir))) {
         if (!file.endsWith('.tsx')) continue
-        scanned++
-        // Comments hold prose about the markup that used to be here, and prose is allowed to name a div.
         const code = readFileSync(file, 'utf8')
           .replace(/\/\*[\s\S]*?\*\//g, '')
           .replace(/^\s*\/\/.*$/gm, '')
-        if (RAW_TAG.test(code)) offences.push(`${rel(file)}: a raw element`)
-        if (/\bclass=|\bclassList=|\bstyle=|innerHTML/.test(code)) offences.push(`${rel(file)}: a class, a style or an innerHTML`)
         if (/from '@acorn\/plugin-api\/ui'/.test(code)) offences.push(`${rel(file)}: the components barrel`)
-      }
-      for (const file of walk(join(ROOT, dir))) {
-        if (file.endsWith('.css')) offences.push(`${rel(file)}: a stylesheet`)
       }
     }
     expect(scanned).toBeGreaterThan(10) // anti-vacuity: the walker found the tree directories
     expect(offences.sort()).toEqual([])
+  })
+
+  it('a compiled plugin pane writes no DOM either', () => {
+    // Same rule, other tier. A compiled pane runs in the shell's process and could reach for a `<form>`
+    // or a `class` and have it work today, which is how seven files of raw DOM accumulated behind a
+    // convention. It works only on a host that draws to a document: a terminal client draws the same
+    // panes to cells and can see the kit nodes, not the markup between them.
+    //
+    // The baseline is empty, and stays empty. It was seven files on 2026-08-31 — the agents context
+    // picker and its two settings forms, the pricing tables, the composer's hidden file input and the
+    // two download anchors, the github ref links, the editor pane's Monaco root and the preview pane's
+    // — and the before-terminal-ui programme emptied it phase by phase, which is why this rule could
+    // land in its endgame shape. An exception costs a line here and a comment saying why it survived.
+    const CLIENT_DOM_BASELINE: string[] = []
+    // Walked rather than listed, so a new plugin is covered on the commit that creates it.
+    const offences: string[] = []
+    let scanned = 0
+    for (const plugin of readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })) {
+      if (!plugin.isDirectory()) continue
+      const pure = kitPurity(`plugins/${plugin.name}/src/client`, { skipTests: true })
+      offences.push(...pure.offences)
+      scanned += pure.scanned
+    }
+    expect(scanned).toBeGreaterThan(40) // anti-vacuity: the walker found the client directories
+    expect(offences.sort()).toEqual([...CLIENT_DOM_BASELINE].sort())
   })
 
   it('plugins reach the host only through @acorn/plugin-api', () => {

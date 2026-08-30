@@ -504,7 +504,7 @@ grows without becoming an editor library's API in a trench coat.
 
 ## Editing in your own editor
 
-Shipped 2026-08-31 (`docs/future/before-terminal-ui/` phase 5). Some people have spent fifteen years
+Shipped 2026-08-31. Some people have spent fifteen years
 in vim and are not going to stop for a pane. The editor pane's file view can hold their editor
 instead of CodeMirror: one device preference, `editor_mode`, and when it says `terminal` the pane
 mounts a PTY rectangle over `$EDITOR <file>` (then `$VISUAL`, then `vi`) in the task's worktree.
@@ -592,8 +592,7 @@ ephemeral channel dying with the panel is what makes the simple thing correct fi
    so this design is the last thing between editor and the loaded tier. Planning that move settles
    the two questions reserved above: its template shape (`frame-beside-document` vs host-drawn tabs)
    and the open-document verb.
-8. ~~Change the engine.~~ **Done** on 2026-08-31, out of order and on its own
-   (`docs/future/before-terminal-ui/` phase 4). Both instances run CodeMirror 6, `monaco-editor` is
+8. ~~Change the engine.~~ **Done** on 2026-08-31, out of order and on its own. Both instances run CodeMirror 6, `monaco-editor` is
    out of both `package.json`s, `monacoSetup.ts` is deleted, and the editor pane's root is kit layout
    rather than a raw `<section>`. Two things came out differently from that phase's sketch.
    **The pane's close-tab chord did not need an element after all**: `onClosePaneWithin` grew a
@@ -604,8 +603,8 @@ ephemeral channel dying with the panel is what makes the simple thing correct fi
    a source off the state, so a second document pane in the same language cannot be offered another
    plugin's items and there is nothing to filter.
 
-9. ~~Let a person edit in their own editor.~~ **Done** on 2026-08-31, also out of order
-   (`docs/future/before-terminal-ui/` phase 5) — § Editing in your own editor. It waited on step 8
+9. ~~Let a person edit in their own editor.~~ **Done** on 2026-08-31, also out of order — §
+   Editing in your own editor. It waited on step 8
    only because the preference it adds chooses between two editors and one of them was being
    replaced.
 
