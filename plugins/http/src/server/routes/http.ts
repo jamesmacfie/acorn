@@ -110,7 +110,7 @@ const toRequest = async (row: typeof httpRequests.$inferSelect, secrets: SecretS
   }
 }
 
-// Secret values never leave the server. The renderer gets '' and shows a "set" placeholder; saving
+// Secret values never leave the server. The client gets '' and shows a "set" placeholder; saving
 // an unchanged secret means sending '' back, which the PUT handler treats as "keep what's stored".
 const toVariable = async (row: typeof httpVariables.$inferSelect, secrets: SecretService): Promise<HttpVariable> => ({
   id: row.id,
@@ -407,7 +407,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
         .where(and(variablesInProject(userId, project.id), eq(httpVariables.id, id)))
       if (!existing.length) return respondError(c, 404, 'not_found')
 
-      // The renderer never sees a secret's plaintext, so it sends '' to mean "leave it alone".
+      // The client never sees a secret's plaintext, so it sends '' to mean "leave it alone".
       const unchangedSecret = d.kind === 'secret' && existing[0].kind === 'secret' && d.value === ''
       const value = unchangedSecret ? existing[0].value : await protectHttpValue(d.value, secrets)
 

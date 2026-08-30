@@ -1,7 +1,7 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
 import { WORKFLOW_STEP_KIND } from '@acorn/plugin-workflows/contract/extensions.ts'
 import { createHttpFetch } from '../server/routes/http'
-import { httpStepHandler, validateHttpStep } from './workflowStep'
+import { httpStepHandler, validateHttpStep } from '../server/workflowStep'
 
 // http ships as a loaded plugin, so both host seams here are the manifest-bound ones
 // (docs/data-layer.md § Plugin databases; docs/http-client.md):
