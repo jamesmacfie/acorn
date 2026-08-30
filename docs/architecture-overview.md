@@ -69,7 +69,7 @@ The service protocol is reserved for lifecycle messages.
 from its name.
 
 The plugin packages are the exception to "the boundary is a test": each one declares an `exports` map
-naming at most six subpaths, so a deep import into a plugin is a `tsc` error at the import site
+naming at most five subpaths, so a deep import into a plugin is a `tsc` error at the import site
 rather than a boundary-test failure somewhere else in the repo.
 
 `@acorn/protocol` is closed too, and it closed differently: it has no entrypoint to funnel through, so
@@ -103,14 +103,13 @@ shared/y.ts -> main/heavy.ts` would drag the implementation into every consumer.
 live in `contract/` or `shared/`.
 
 **What an app may import.** A plugin's public subpaths, and no internal module, so a composition root
-cannot come to depend on something never meant to be load-bearing. There are six kinds, and a plugin
+cannot come to depend on something never meant to be load-bearing. There are five kinds, and a plugin
 declares only the ones it has:
 
 | Subpath | For |
 | --- | --- |
 | `./node/index.ts` | the Node activation entrypoint |
 | `./client/index.ts` | the client activation entrypoint |
-| `./main/index.ts` | the shell-side half, where one exists |
 | `./contract/*` | the cross-plugin surface, open as a directory because that is what a contract is |
 | `./testkit` | what a node-side test outside this package needs |
 | `./testkit/client` | the same for a client-side test, split so DOM types stay out of a node program |
@@ -142,8 +141,8 @@ only, which is also the condition for moving that plugin out of the repository.
 `invoke` and its event API are confined to `apps/desktop/src/shell/`, the bridge the window injects;
 the helper next door names none of them.
 Nothing imports `electron`, a flat ban that covers manifests too.
-`apps/node/test/integration/pluginSystem/mainBarrelLoad.test.ts` is the durable check: it loads every plugin's main
-barrel in a plain Node process, which is the runtime that has to boot.
+The composition-root suites under `apps/node/test/integration/` are the durable check: they boot
+every plugin's `node/index.ts` in a plain Node process, which is the runtime that has to boot.
 
 **The custody stack stays shell-free.** `@acorn/desktop-helper` is the broker, the fleet, the device
 tokens, the plugin cache and trust store, the tunnels, and the supervised node service, composed by

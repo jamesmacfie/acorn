@@ -37,7 +37,7 @@ Then, in one commit:
    says git history is the archive for shipped design.
 7. Delete `plugins/profiles-aider/`, `plugins/profiles-claude/`, `plugins/profiles-codex/`. Each holds
    only gitignored `dist/` and `.turbo/` output; `git ls-files` returns nothing for them. The
-   profiles live in `plugins/agents/src/main/profiles/`.
+   profiles live in `plugins/agents/src/server/profiles/`.
 8. Delete `docs/next-review.md` after moving any item still open into the relevant
    `docs/future/` file. It is a personal checklist with zero inbound links.
 9. Dedupe `pnpm-workspace.yaml`: `allowBuilds` and `onlyBuiltDependencies` list the same three

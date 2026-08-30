@@ -11,7 +11,7 @@ the README's invariant holds, and that is the test that this is the right shape 
 
 ## What is actually missing
 
-**A connection.** `resolveDbUrl` (`plugins/database/src/main/database.ts`) loads a task, takes that
+**A connection.** `resolveDbUrl` (`plugins/database/src/server/database.ts`) loads a task, takes that
 task's **worktree**, and resolves the URL in layers against it: a committed `[database].url_script` run
 in the worktree, then the worktree's `.env`, then `process.env.DATABASE_URL`. Pools are keyed by task
 id. Every layer but the last needs a `root`, and a `root` is a worktree. Panels carry no task at all —

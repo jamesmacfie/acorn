@@ -48,7 +48,7 @@ packages/protocol Wire contracts and route/query builders
 packages/node-core Node server, auth, storage, core services, MCP, and shared registries
 packages/client-core Renderer runtime, fleet state, persistence, registries, settings, and UI kit
 packages/plugin-api The only host import surface for loaded plugins (node/client/ui entrypoints)
-plugins/*         First-party feature packages with client/server/main/shared code as needed
+plugins/*         First-party feature packages with client/server/shared code as needed
 tools/arch/        Import-boundary and package-graph tests
 ```
 

@@ -53,7 +53,7 @@ the rogue agent.
 `packages/client-core/src/settings/savePref.ts`, which authenticates as a paired device. The renderer
 is always a device principal, so a device gate cannot lock it out. No agent tool and no task-scoped
 path writes prefs over HTTP. The in-process `PrefService.write` used by
-`plugins/agents/src/main/pricingStore.ts` does not touch this route and is unaffected.
+`plugins/agents/src/server/pricingStore.ts` does not touch this route and is unaffected.
 
 ## Gate 2 — projects (host code execution)
 

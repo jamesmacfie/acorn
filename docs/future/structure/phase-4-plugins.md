@@ -1,6 +1,29 @@
 # Phase 4: plugins
 
-Status: not started. Waits on phase 3.
+Status: shipped 2026-08-30. Waited on phase 3.
+
+## What shipped differently
+
+- terminal's composition hooks (`configureTerminalMcp`, `reconcileTmux`, `refreshAcornMcpRegistrations`)
+  are exported from `node/index.ts`, not from `contract/`. They are implemented by the PTY engine in
+  `server/`, and the arch rule "a plugin contract/ never re-exports its own internals" forbids a
+  contract module that reaches `server/`. The entrypoint is the other cross-package surface apps/node
+  already imports.
+- `apps/node/test/integration/pluginSystem/mainBarrelLoad.test.ts` is deleted rather than re-pointed.
+  Its subject, `plugins/*/src/main/index.ts`, no longer exists, and every `node/index.ts` is already
+  booted by the composition-root suites beside it.
+- `capabilityId` and `extensionPointId` moved to `@acorn/protocol/pluginIds.ts` with their brand
+  types; node-core re-exports them so nothing else changed. Two contract modules still take a type
+  (`HeadlessResult`, `StreamEvent`, `LayoutRecipe`) from `@acorn/plugin-api/node`; a type import is
+  erased and carries no runtime edge.
+- The onboarding shim is gone and the entry is a plain `index.ts` that calls `createComponent`. The
+  arch resolver maps a subpath to `src/` literally, so an `index.tsx` target would fail it.
+- The three `tsconfig.json` files in browser, model-providers, and nodes-file stay. They remove the
+  DOM lib the shared base adds, so a one-line extend cannot carry them.
+- editor keeps `client/search/searchClient.ts`; agents keeps five wrappers in its feature folders.
+  changes' wrapper is `changesClient.ts`, workflows' is `client/workflowsClient.ts`.
+- Only the three `*Slice`/`*State` pairs this phase named were folded into `*Store`; the rest are
+  phase 5, as `docs/conventions.md` says.
 
 ## Goal
 
@@ -31,27 +54,27 @@ terminal's `main/index.ts` is imported from two places after phase 2, `apps/node
 cross-package by definition) and import from there. agents' `main/index.ts` has no external importer;
 it becomes `server/index.ts` or is inlined into `node/index.ts`.
 
-`plugins/github/src/main/agentTools.ts` and its test move to `server/`, and github's `main/` folder
+`plugins/github/src/server/agentTools.ts` and its test move to `server/`, and github's `main/` folder
 (two files) is gone with them.
 
 ### `node/` holds the entrypoint and schema only
 
-Move `plugins/http/src/node/workflowStep.ts` and its test to `server/`. Pull `toRunStatus`,
+Move `plugins/http/src/server/workflowStep.ts` and its test to `server/`. Pull `toRunStatus`,
 `RUN_LIST_LIMIT`, `TERMINAL_WORKFLOW_STATUSES`, and the deps type out of
 `plugins/workflows/src/node/index.ts` into `shared/runStatus.ts`; the entrypoint imports them.
 
 ### Apply the contract rule
 
-- github gets a `shared/` folder. Move `plugins/github/src/contract/api.ts`,
-  `plugins/github/src/contract/collections.ts`, `plugins/github/src/contract/pullRef.ts` and their
+- github gets a `shared/` folder. Move `plugins/github/src/shared/api.ts`,
+  `plugins/github/src/shared/collections.ts`, `plugins/github/src/shared/pullRef.ts` and their
   tests there; each has zero external importers. Fix the false claim in `api.ts` line 4.
-- Move `plugins/workflows/src/contract/workflowContracts.ts` and
-  `plugins/workflows/src/contract/workflowClient.ts` to `shared/`.
-- Move the two remaining tests out of `contract/`: `plugins/context/src/contract/contextBlock.test.ts`
-  and `plugins/terminal/src/contract/routes.test.ts` go to `shared/` beside a re-export, or the
+- Move `plugins/workflows/src/shared/workflowContracts.ts` and
+  `plugins/workflows/src/client/workflowsClient.ts` to `shared/`.
+- Move the two remaining tests out of `contract/`: `plugins/context/src/shared/contextBlock.test.ts`
+  and `plugins/terminal/src/shared/api.test.ts` go to `shared/` beside a re-export, or the
   module they test moves to `shared/` and `contract/` re-exports it.
-- Rename `plugins/terminal/src/contract/routes.ts` to `api.ts` (it is route builders). Rename
-  `plugins/github/src/client/routes.ts` to `clientRoutes.ts`.
+- Rename `plugins/terminal/src/shared/api.ts` to `api.ts` (it is route builders). Rename
+  `plugins/github/src/client/clientRoutes.ts` to `clientRoutes.ts`.
 - The 12 contract modules that import `@acorn/plugin-api/node` for `capabilityId` and
   `extensionPointId`: move those two helpers to `@acorn/protocol` if they are pure, so a contract
   imports only wire types. If they are not pure, record the exception in the arch test with a reason.
@@ -73,27 +96,27 @@ From [02-conventions.md](./02-conventions.md), per plugin:
 
 - One client wrapper per plugin, `<plugin>Client.ts`, in `client/`. agents keeps its five but they
   move into their feature subfolders. `plugins/terminal/src/contract/sessionsClient.ts` and
-  `plugins/workflows/src/contract/workflowClient.ts` stay in `contract/` only if another plugin
+  `plugins/workflows/src/client/workflowsClient.ts` stay in `contract/` only if another plugin
   imports them (sessionsClient: yes, two importers; workflowClient: no, it moves).
 - Client state files end in `Store.ts`; drop `Slice`, `State`, `ViewState`. docker's four become
   `dockerStore.ts`, `dockerLogStore.ts`, `dockerViewStore.ts`, `dockerPrefs.ts`. github's
   `filterSlice.ts` and `filterState.ts` merge or one renames. context's `selectionSlice.ts` and
   `selectionState.ts` likewise.
-- `plugins/agents/src/main/drivers/testFixtures/` renames to `__fixtures__/`.
-- `plugins/workflows/src/main/workflowExtensions.conformance.test.ts` drops the infix.
+- `plugins/agents/src/server/drivers/__fixtures__/` renames to `__fixtures__/`.
+- `plugins/workflows/src/server/workflowExtensions.test.ts` drops the infix.
 - `plugins/onboarding/src/client/index.ts` shim: keep, it is commented and unique for a reason, or
   make the four loaded plugins do the same. Pick one and write it in `docs/plugins.md`.
 
 ### Electron residue
 
-- Delete the `app.asar` rewrite in `plugins/editor/src/main/search.ts` lines 18 to 24 and the
+- Delete the `app.asar` rewrite in `plugins/editor/src/server/search.ts` lines 18 to 24 and the
   assertion in `search.test.ts` line 51.
 - Rewrite `plugins/preview/src/node/index.ts` lines 3 to 6.
-- Rename `plugins/memory/src/main/knowledgeIpc.ts` to `knowledgeChannel.ts` and
-  `plugins/terminal/src/main/runIpc.ts` to `runChannel.ts`. Rewrite the "main process" and
+- Rename `plugins/memory/src/server/knowledgeChannel.ts` to `knowledgeChannel.ts` and
+  `plugins/terminal/src/server/runChannel.ts` to `runChannel.ts`. Rewrite the "main process" and
   "renderer" prose in the 13 files the review listed; `grep -rln "main process\|main-process\|renderer" plugins --include=*.ts --include=*.tsx`
   finds them.
-- Rewrite `plugins/terminal/src/main/terminalDisplay.ts` line 4.
+- Rewrite `plugins/terminal/src/server/terminalDisplay.ts` line 4.
 
 ### Dependencies
 
@@ -103,7 +126,7 @@ workflows. `pnpm install` and confirm nothing in `src/` outside tests imports th
 
 ### Leftovers
 
-Delete `plugins/database/src/main/formatSchema.test.ts` or extract `formatSchema` from
+Delete `plugins/database/src/server/formatSchema.test.ts` or extract `formatSchema` from
 `database.ts` so the test has a subject. Collapse the three near-identical nine-line `tsconfig.json`
 files in browser, model-providers, nodes-file to a one-line extend if `plugins/tsconfig.base.json`
 can carry the `types` they add.
@@ -137,5 +160,5 @@ the code does; see [refused.md](./refused.md). Splitting `plugins/agents` into p
 - The importer counts in [01-findings.md](./01-findings.md) for github's and workflows' contract
   modules are still zero.
 - terminal's `main/index.ts` is still imported from exactly two files under `apps/node/src`.
-- `plugins/http/src/node/workflowStep.ts` still exists.
+- `plugins/http/src/server/workflowStep.ts` still exists.
 - `plugins/agents/src/client` still has no subdirectories.

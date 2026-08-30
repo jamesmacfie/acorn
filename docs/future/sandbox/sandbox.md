@@ -25,8 +25,8 @@ that list is the migration checklist, already written and already test-enforced.
 matter for task execution:
 
 1. The process broker — `packages/node-core/src/server/core/proc.ts`. Every bounded task command.
-2. The PTY spawn — `plugins/terminal/src/main/terminal.ts:411`. Shells and agent profiles.
-3. The managed-agent driver — `plugins/agents/src/main/drivers/jsonRpcProcess.ts:64`. One process
+2. The PTY spawn — `plugins/terminal/src/server/terminal.ts:411`. Shells and agent profiles.
+3. The managed-agent driver — `plugins/agents/src/server/drivers/jsonRpcProcess.ts:64`. One process
    per agent session.
 
 Everything else that touches a task — the editor, the diff, find-in-files, git, dashboards, notes —
@@ -64,7 +64,7 @@ and nothing more. No provider registry until a third backend exists.
   so acorn must allocate and track a host port per task instead of assuming `pnpm dev` on a known
   port. This touches the preview capture and the run-target surface.
 - **The Docker plugin goes blind.** Each sandbox has its own daemon. The task pane matches containers
-  by compose project and worktree against the host daemon (`plugins/docker/src/main/dockerService.ts`)
+  by compose project and worktree against the host daemon (`plugins/docker/src/server/dockerService.ts`)
   and would find nothing inside a sandbox. The broker's `DOCKER_HOST` passthrough is the hook; the
   plugin has to become sandbox-aware. See `docs/docker.md` for the current matcher.
 - **The HTTP client pane.** It sends requests from the node today (`plugins/http/src/server/send.ts`).

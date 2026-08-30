@@ -1,4 +1,4 @@
-import { extensionPointId } from '@acorn/plugin-api/node'
+import { extensionPointId } from '@acorn/protocol/pluginIds.ts'
 import type { PolicyEvaluator, StepKindContribution, WorkflowTriggerContribution } from '../shared/workflowContracts'
 
 // What another plugin may add to a workflow run, and the only way in (docs/workflows.md § Contributed
