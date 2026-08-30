@@ -71,7 +71,7 @@ const PluginOverlay = lazy(() => import('./PluginOverlay'))
 const ExtendedPane = lazy(() => import('./ExtendedPane'))
 // The tree path's mount point, the counterpart to PluginFrame above: a region, a panel body or a slot
 // drawn from the host's own components rather than from the plugin's pixels
-// (docs/future/layout/06-remote-tree.md).
+// (docs/plugins.md § The tree contract).
 const RemoteTree = lazy(() => import('../tree/RemoteTree').then((module) => ({ default: module.RemoteTree })))
 // Lazy for the reason above, plus one more: this file is evaluated on every shell boot, and a static
 // import would put Monaco's tree in the boot graph for a pane most sessions never open. That includes
@@ -163,7 +163,7 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
   // The two extension carriers that run the plugin's own bytes: a remote tree in a worker, and an
   // `inline` rectangle in an iframe. Both ride this pass rather than the chrome one, and both are gated
   // on trust for the same reason a pane is and with no second question asked — the prompt the owner
-  // answered was about these bytes (docs/future/layout/06-remote-tree.md § The sandbox). The other two
+  // answered was about these bytes (docs/shell.md § The plugin worker). The other two
   // carriers, `items` and `route`, are descriptors and register in the chrome pass.
   for (const entry of row.installed?.contributions.extensions ?? []) {
     if (entry.remote === undefined && entry.frame === undefined) continue

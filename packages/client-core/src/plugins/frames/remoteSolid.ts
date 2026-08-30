@@ -1,5 +1,5 @@
 // Solid, rendering into a remote root instead of a document, and the kit as nodes you can write in
-// JSX (docs/future/layout/06-remote-tree.md § The SDK).
+// JSX (docs/plugins.md § Loaded plugins: the client half).
 //
 // This is the sandbox half of the tree path, so the rules at the top of ./sdk.ts apply here too: it
 // runs inside a stranger's worker, it touches no `window`, and a foreign bundler bundles it. It is

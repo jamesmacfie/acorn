@@ -244,7 +244,7 @@ describe('layout regions are focus groups', () => {
 
   // Every layout, not just the one the phase happened to write a test for. A hole in the cycle is a
   // region a keyboard can leave and not come back to, and it is a property of the layout rather than
-  // of whatever pane declared it (docs/future/layout/07-focus-and-keys.md § Rules with tests behind
+  // of whatever pane declared it (docs/command-palette-and-shortcuts.md § Focus and typing, on the rules with tests behind
   // them, "every focus group has an entry and an exit").
   //
   // `regions` is what the layout is mounted with; `groups` is how many focus groups it actually draws,

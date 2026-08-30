@@ -1,7 +1,7 @@
 // Where every collection's `active`, `selected` and `offset` live: in the host, keyed by the
 // collection's id and by each item's own key.
 //
-// This is ratatui's `ListState` with the host holding it (docs/future/layout/07-focus-and-keys.md
+// This is ratatui's `ListState` with the host holding it (docs/command-palette-and-shortcuts.md § Focus and typing
 // § Collection state is the host's). Keys, never indices: a list rebuilt from a new response is a
 // new array of new objects, and an index into it points at whatever moved into that slot. Keying by
 // the item's own key is what makes a refresh keep your place, and it is the standing fix for the

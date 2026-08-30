@@ -28,11 +28,11 @@ Multi-file designs with an order of work.
 | File | What it is | Status, 2026-08-28 |
 | --- | --- | --- |
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX half shipped; distribution half remains. |
-| [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings now defer to the layout programme. |
+| [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [findings.md](./findings.md) | One core entity, the finding, that gives agent, workflow, and scheduled claims a human disposition, exposed to every harness over MCP; joins notes, memory, gates, and schedules into the harness-engineering loop. | Proposal, 2026-08-29. Not started. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [orchestration.md](./orchestration.md) | An agent spawning and waiting on acorn's agents. | Step-kind registry opened; the spawn tools and ledger remain. |
-| [rail-tab.md](./rail-tab.md) | Rail controls and status markers. | Slices 1 and 2 shipped; slice 3 superseded by the layout programme's annotations. |
+| [rail-tab.md](./rail-tab.md) | Rail controls and status markers. | Slices 1 and 2 shipped; slice 3 superseded by the `core:task` annotation point. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 
@@ -52,5 +52,14 @@ doc owns it and the others point.
 ## Retired folders
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` (replaced by
-the single `events.md` above on 2026-08-28 when all but three items shipped), and the single files
-`live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
+the single `events.md` above on 2026-08-28 when all but three items shipped), `layout/`, and the
+single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour
+moved.
+
+`layout/` was the largest of them: eleven phases that made every pane a host-owned layout filled with
+a tree of closed-kit components, shipped and deleted 2026-08-30. Its behaviour lives in
+[ui-design.md](../ui-design.md) § The closed kit and § Every node at 80 by 24,
+[panes.md](../panes.md) § Layout model, [plugins.md](../plugins.md) §§ The tree contract and
+Cooperative extension points and Hooks,
+[command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Focus and typing,
+[shell.md](../shell.md) § The plugin worker, and [security.md](../security.md) § Rung 0.

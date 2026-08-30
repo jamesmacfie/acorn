@@ -63,7 +63,7 @@ it('emits a manifest the host parses, cross-field rules and all', () => {
 
 it('emits a tree plugin by default, filling a slot and an annotation point', () => {
   // The default render path since phase 9 of the layout programme, and both halves of the cooperative
-  // seam: one contribution draws, the other only says something true (docs/future/layout/06-remote-tree.md).
+  // seam: one contribution draws, the other only says something true (docs/plugins.md § The tree contract).
   const files = scaffoldFiles('my-widget', 'My widget') as Record<string, string>
   const manifest = JSON.parse(files['acorn-plugin.json']) as { contributions: Record<string, unknown> }
   expect(manifest.contributions.frames).toBeUndefined()

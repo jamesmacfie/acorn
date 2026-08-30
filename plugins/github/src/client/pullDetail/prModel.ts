@@ -17,10 +17,10 @@ import { buildConversationEntries, buildThreadSnippetIndex } from './model'
 // Everything one pull request knows, held once per pull and read by every surface that draws it
 // (docs/github-integration.md, docs/panes.md § Layout model).
 //
-// The PR pane is a `tabs` layout now, so Overview, Conversation and Files are three components the
-// host mounts one at a time rather than one long closure. They share fifteen queries, six mutations,
-// two persisted drafts and one error line, so the shared thing lives in its own reactive root keyed
-// by the pull, the same pattern the changes pane follows.
+// Overview, the file list and the conversation are three components rather than one long closure, and
+// browse and the PR pane draw them in different arrangements. They share fifteen queries, six
+// mutations, two persisted drafts and one error line, so the shared thing lives in its own reactive
+// root keyed by the pull, the same pattern the changes pane follows.
 //
 // File selection is deliberately not here. In browse it is `?file=` and in a task pane it is the
 // file-scroll event, so it belongs to whichever surface has a router rather than to the pull

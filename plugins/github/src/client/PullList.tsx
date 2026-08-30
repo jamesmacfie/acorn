@@ -8,7 +8,7 @@ import {
 } from '@acorn/plugin-api/client'
 import {
   Alert, Button, EmptyState, Icon, Input, Menu, Row, RowActions, Rows, StatusDot, Tabs, Text,
-  UserAvatar,
+  Toolbar, UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
@@ -32,7 +32,7 @@ const LIST_TABS = [{ id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed
 // The list is a `Rows` collection with `virtual`, so the scroller, the row placement, the arrows,
 // type-ahead and the place it keeps across a refetch are all the kit's. This pane used to own a
 // virtualizer, a scroll element, two animation frames and a pair of hand-registered `j` / `k`
-// bindings; none of that is here now (docs/future/layout/07-focus-and-keys.md).
+// bindings; none of that is here now (docs/command-palette-and-shortcuts.md § Focus and typing).
 export default function PullList() {
   const params = useParams()
   const navigate = useNavigate()
@@ -131,8 +131,13 @@ export default function PullList() {
         onChange={setTab}
         idPrefix="github-pulls"
         ariaLabel="Pull request state"
-        actions={<Input kind="filter" placeholder="Filter…" value={filter()} onInput={setFilter} />}
       />
+      {/* Under the strip rather than beside it. Open and Closed choose which list this is; the filter
+          is about the list that choice produced, and squeezed into the tab row it had no room and no
+          inset of its own. */}
+      <Toolbar size="sm" ariaLabel="Filter pull requests">
+        <Input kind="filter" placeholder="Filter…" value={filter()} onInput={setFilter} />
+      </Toolbar>
       <Show when={taskError()}>{(text) => <Alert>{text()}</Alert>}</Show>
       <Show
         when={ready()}

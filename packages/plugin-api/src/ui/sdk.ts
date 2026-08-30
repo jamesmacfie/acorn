@@ -14,7 +14,7 @@ export type { PluginFrameContext } from '@acorn/protocol/pluginBridge.ts'
 
 // ── The tree path ─────────────────────────────────────────────────────────────────────────────────
 // The second way a sandboxed bundle draws: a tree of the host's own kit nodes instead of pixels
-// (docs/future/layout/06-remote-tree.md). Same bundle, same bridge, same sandbox rules; what differs
+// (docs/plugins.md § The tree contract). Same bundle, same bridge, same sandbox rules; what differs
 // is that the host mounts its components for the names the tree carries, so the result inherits focus,
 // keys, ARIA and the reader's style pack.
 //

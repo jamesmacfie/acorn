@@ -54,7 +54,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
       )}
     >
       {({ close }) => (
-        <>
+        <div class="notify-inbox">
           <Show when={inbox().rows.length || inbox().unavailable.length}>
             <div class="notify-head">
               <span>Needs you</span>
@@ -129,7 +129,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
               )}
             </For>
           </ul>
-        </>
+        </div>
       )}
     </Popover>
   )

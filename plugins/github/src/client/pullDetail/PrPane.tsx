@@ -1,55 +1,35 @@
-import { createMemo, For, Show, type JSX } from 'solid-js'
+import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { PaneLayoutContribution, Task } from '@acorn/plugin-api/client'
-import { Alert, Button, Chip, ChipRow, EmptyState, Icon, Menu, Stack } from '@acorn/plugin-api/ui'
-import { selectPaneTab } from '@acorn/plugin-api/ui/host'
+import {
+  Alert, Button, Chip, ChipRow, DetailColumn, EmptyState, Fold, Icon, ListColumn, ListDetail, Menu,
+  SectionHeader, Stack,
+} from '@acorn/plugin-api/ui'
 import { useChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
 import { requestFileScroll, routeKey } from '../fileNavigation'
 import ChecksPanel from '../checks/ChecksPanel'
+import { DiffForPull } from '../DiffForPull'
 import { PrConversation } from './Conversation'
-import { PrFilesTab } from './PrFiles'
+import { PrFileList } from './PrFiles'
 import { PrOverview } from './PrOverview'
 import { prModel, type PrModel } from './prModel'
 import { destinationKind, prTabsModel, type PrTabsModel } from './prTabs'
 import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 
-// The PR pane: one pull request as a `tabs` layout, with Overview, Conversation and Files as the
-// three panels the host mounts one at a time (docs/panes.md § Layout model).
+// The PR pane: one pull request, drawn the way the GitHub browse surface draws one — the navigator
+// column beside the diff (../GithubBrowse.tsx). Browse reaches the same pair through its own pull
+// list; a task already knows which pull it is about, so the list is a strip of related pulls instead.
+//
+// A `single` layout holding the kit's split, not the host's `list-detail`: the two columns are one
+// surface with a shared model rather than two regions, which is exactly the case the kit's ListDetail
+// exists for, and it is what makes this look like browse rather than like a second design
+// (docs/panes.md § Layout model).
 //
 // A task can be about more than one pull — the one it was made from, the ones that mention it, the
-// ones stacked on it — so every panel opens with the strip that switches between them. The strip is
-// in the panels rather than beside the tab bar because the bar is the host's, and which pull is
-// showing is shared state rather than chrome (./prTabs.ts).
+// ones stacked on it — so the navigator opens with the strip that switches between them (./prTabs.ts).
 
 const PANE_ID = 'pr'
-const FILES_TAB = 'files'
-
-/** Everything a panel needs: the pull strip, the pull's model, and how this surface opens a file. */
-function usePr(task: Task) {
-  const navigate = useNavigate()
-  const tabs = prTabsModel(task)
-  const model = createMemo<PrModel | null>(() => {
-    const pull = tabs.selected()?.pull
-    if (!pull) return null
-    return prModel({
-      owner: pull.owner,
-      repo: pull.repo,
-      number: pull.number,
-      taskId: task.id,
-      readOnly: !tabs.isPrimary(),
-    })
-  })
-  const onLinkClick = makeContentLinkHandler(navigate, { taskId: task.id })
-  // Show a file in the diff from a panel that is not the diff's. The scroll target is an event the
-  // viewer listens for, and the tab is the host's selection, so this is two asks and no state.
-  const openFile = (path: string) => {
-    const pull = tabs.selected()?.pull
-    if (pull) requestFileScroll({ routeKey: routeKey(pull.owner, pull.repo, pull.number), path })
-    selectPaneTab(PANE_ID, FILES_TAB)
-  }
-  return { tabs, model, onLinkClick, openFile }
-}
 
 /** The strip of pull requests this task is about, and the offer to make a task for one of them. */
 function PullStrip(props: { tabs: PrTabsModel }) {
@@ -129,78 +109,110 @@ function PullStrip(props: { tabs: PrTabsModel }) {
   )
 }
 
-/** The strip over whichever panel asked for it. Every panel opens the same way. */
-function Panel(props: { task: Task; children: (context: ReturnType<typeof usePr>, model: PrModel) => JSX.Element }) {
-  const context = usePr(props.task)
+/** The navigator column: the same three trees browse stacks, over the pull strip. */
+function PrNavigator(props: {
+  model: PrModel
+  current: () => string | undefined
+  onSelect: (path: string) => void
+  onLinkClick: (event: MouseEvent) => void
+}) {
+  const model = () => props.model
   return (
     <Stack gap="section">
-      <PullStrip tabs={context.tabs} />
-      <Show when={context.model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
-        {(model) => props.children(context, model())}
+      <PrOverview model={model()} onOpenFile={props.onSelect} onLinkClick={props.onLinkClick} />
+      <Fold persistKey="files" defaultOpen label="Files" count={model().files().length}>
+        <PrFileList model={model()} current={props.current} onSelect={props.onSelect} />
+      </Fold>
+      <Fold
+        persistKey="conversation"
+        defaultOpen
+        label="Comments/Commits"
+        count={model().conversationEntries().length}
+      >
+        <PrConversation model={model()} onOpenFile={props.onSelect} onLinkClick={props.onLinkClick} />
+      </Fold>
+      {/* The one overlay this pane owns. It is a run's step log, opened from a check row. */}
+      <Show when={model().openCheck()}>
+        {(check) => (
+          <ChecksPanel
+            owner={model().scope.owner}
+            repo={model().scope.repo}
+            runId={check().runId}
+            jobName={check().name}
+            onClose={() => model().setOpenCheck(null)}
+          />
+        )}
       </Show>
     </Stack>
   )
 }
 
-function PrOverviewPanel(props: { task: Task }) {
-  return (
-    <Panel task={props.task}>
-      {(context, model) => (
-        <>
-          <PrOverview model={model} onOpenFile={context.openFile} onLinkClick={context.onLinkClick} />
-          {/* The one overlay this pane owns. It is a run's step log, opened from a check row. */}
-          <Show when={model.openCheck()}>
-            {(check) => (
-              <ChecksPanel
-                owner={model.scope.owner}
-                repo={model.scope.repo}
-                runId={check().runId}
-                jobName={check().name}
-                onClose={() => model.setOpenCheck(null)}
-              />
-            )}
-          </Show>
-        </>
-      )}
-    </Panel>
-  )
-}
-
-function PrConversationPanel(props: { task: Task }) {
-  return (
-    <Panel task={props.task}>
-      {(context, model) => (
-        <PrConversation model={model} onOpenFile={context.openFile} onLinkClick={context.onLinkClick} />
-      )}
-    </Panel>
-  )
-}
-
-function PrFilesPanel(props: { task: Task }) {
-  const context = usePr(props.task)
+export function PrPane(props: { task: Task }) {
+  const navigate = useNavigate()
+  const tabs = prTabsModel(props.task)
+  const model = createMemo<PrModel | null>(() => {
+    const pull = tabs.selected()?.pull
+    if (!pull) return null
+    return prModel({
+      owner: pull.owner,
+      repo: pull.repo,
+      number: pull.number,
+      taskId: props.task.id,
+      readOnly: !tabs.isPrimary(),
+    })
+  })
+  const onLinkClick = makeContentLinkHandler(navigate, { taskId: props.task.id })
+  // A pane has no router, so the selected file is held locally and the diff column hears about it
+  // through the file-scroll event rather than through `?file=` (../changedFiles.ts).
   const changedFiles = useChangedFiles(
     () => {
-      const pull = context.tabs.selected()?.pull
+      const pull = tabs.selected()?.pull
       return pull ? { owner: pull.owner, repo: pull.repo, number: pull.number } : null
     },
     { router: false },
   )
   const select = (path: string) => {
     changedFiles.selectFile(path)
-    const pull = context.tabs.selected()?.pull
+    const pull = tabs.selected()?.pull
     if (pull) requestFileScroll({ routeKey: routeKey(pull.owner, pull.repo, pull.number), path })
   }
+
   return (
-    <Show when={context.model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
-      {(model) => (
-        <PrFilesTab
-          model={model()}
-          current={changedFiles.currentFile}
-          onSelect={select}
-          header={<PullStrip tabs={context.tabs} />}
-        />
-      )}
-    </Show>
+    <ListDetail split listWidth="wide">
+      {/* No "Navigator" header: the tree under it opens with the pull's own heading, which names the
+          column better than a label ever did. The same call browse makes. */}
+      <ListColumn scroll label="Pull request">
+        <PullStrip tabs={tabs} />
+        <Show when={model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
+          {(loaded) => (
+            <PrNavigator
+              model={loaded()}
+              current={changedFiles.currentFile}
+              onSelect={select}
+              onLinkClick={onLinkClick}
+            />
+          )}
+        </Show>
+      </ListColumn>
+      <DetailColumn>
+        <SectionHeader>Diff</SectionHeader>
+        <Show when={tabs.selected()?.pull} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
+          {(pull) => (
+            <DiffForPull
+              route={{
+                owner: pull().owner,
+                repo: pull().repo,
+                number: pull().number,
+                key: routeKey(pull().owner, pull().repo, pull().number),
+              }}
+              router={false}
+              taskId={props.task.id}
+              readOnly={!tabs.isPrimary()}
+            />
+          )}
+        </Show>
+      </DetailColumn>
+    </ListDetail>
   )
 }
 
@@ -208,20 +220,11 @@ export const prPaneContribution: PaneLayoutContribution = {
   id: PANE_ID,
   label: 'PR review',
   glyph: 'git-pull-request',
-  description: 'Overview, conversation & files',
+  description: 'Overview, files & diff',
   order: 10,
   defaultChord: 'meta+shift+r',
   when: (task) => task.pullNumber != null,
   minWidth: 520,
-  layout: 'tabs',
-  tabs: [
-    { id: 'overview', label: 'Overview' },
-    { id: 'conversation', label: 'Conversation' },
-    { id: FILES_TAB, label: 'Files' },
-  ],
-  regions: {
-    'panel:overview': PrOverviewPanel,
-    'panel:conversation': PrConversationPanel,
-    [`panel:${FILES_TAB}`]: PrFilesPanel,
-  },
+  layout: 'single',
+  regions: { body: PrPane },
 }

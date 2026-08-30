@@ -17,7 +17,7 @@ import { Button } from './primitives'
 // its companions are callbacks: the caller owns filtering and ordering, which is what a pinned-first
 // project list needs. `items` is the same list as data, filtered here by substring, and it is the only
 // form a remote tree can use — a function does not cross a message port
-// (docs/future/layout/06-remote-tree.md § The wire format). The data form is deliberately the poorer
+// (docs/plugins.md § The tree contract). The data form is deliberately the poorer
 // one: substring over the label and the note, no ordering of the caller's own.
 
 /** One row, when the list is data rather than a callback. */

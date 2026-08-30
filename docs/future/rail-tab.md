@@ -35,10 +35,10 @@ dropped individually; exactly one of `icon` or `dotTone`; a non-empty label; pri
 names a surface the same plugin declared; and no click verb.
 
 It is not built as a rail-specific contribution. A marker on a task row is a fact pinned to an item
-another surface draws, which is the **annotation** kind in [docs/future/layout/](./layout/README.md)
-([03-extension-kinds.md](./layout/03-extension-kinds.md) § Annotations). The `core:task` annotation
-point, keyed by task id, is the loaded-plugin rail marker: batched by the host, drawn by the host,
-provenance stamped, arbitrated by the same allocator. Building it as annotations gives docker's rail
+another surface draws, which is the **annotation** kind
+([docs/plugins.md](../plugins.md) § Cooperative extension points). The `core:task` point, keyed by
+task id, is the loaded-plugin rail marker: batched by the host, drawn by the host, provenance stamped,
+arbitrated by the same allocator. Building it as annotations gives docker's rail
 row, a diff line, and an editor gutter one mechanism rather than three. Every wire constraint above
 carries over to that point's row.
 

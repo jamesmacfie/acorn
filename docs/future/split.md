@@ -33,9 +33,9 @@ facade. Fix the tests before http moves; it no longer has to move last.
 
 The first version of this file planned an `acorn-ui` repository: the Solid UI kit extracted from
 `client-core/src/ui`, published, and depended on by the host. That plan is withdrawn, and the reason
-is [docs/future/layout/](./layout/README.md).
+is what the kit became.
 
-The kit becomes **closed and host-owned** ([layout/04-kit.md](./layout/04-kit.md)): a fixed node set
+The kit is **closed and host-owned** ([docs/ui-design.md](../ui-design.md) § The closed kit): a fixed node set
 with semantic props, no `class` or `style`, a support matrix per host. A plugin does not import
 components to render itself; it renders a tree of kit node names and the host mounts its own
 components. What a plugin author installs is therefore the *types* of the kit and the remote
@@ -58,8 +58,8 @@ author.
 
 A small pnpm workspace holding everything a plugin author installs:
 
-- `acorn-plugin-sdk`: the bridge (`connect`, `mountFrame`, and after the layout programme's phase 3,
-  `mountTree` with the Solid remote adapter). Ready to publish as it stands today.
+- `acorn-plugin-sdk`: the bridge (`connect`, `mountFrame`, `mountTree` with the Solid remote
+  adapter). Ready to publish as it stands today.
 - `create-acorn-plugin`: the scaffold, ready as it stands.
 - `acorn-plugin-api`: the published form of the facade. Two real problems live here, solved as
   follows:
@@ -126,11 +126,9 @@ mix scoped and unscoped.
    seed from its published artifact, then move rollbar, model-providers, nodes-file, and database.
 4. **Fix http's two test imports, then move it.**
 
-Sequencing against the layout programme: the SDK gains `mountTree` in that programme's phase 3 and
-the loaded plugins switch from `mountFrame` to it in phase 5. Publishing before phase 5 means
-publishing a frame-shaped SDK and then a tree-shaped one under the same major; publishing after means
-the first published artifacts are already trees. Prefer after, unless the release pipeline itself is
-the thing being proven, in which case step 1 alone is fine at any time.
+One sequencing worry is settled: the SDK is tree-shaped already, and every loaded plugin draws a
+tree, so the first published artifacts are trees rather than a frame-shaped SDK republished under the
+same major a release later.
 
 ## Known hazards, from our own records
 

@@ -26,7 +26,7 @@ import { WORKFLOW_CONTROL } from '../contract/workflowControl'
 //
 // Each group is a `Rows` collection, so the arrows, Home, End, type-ahead and the selection that
 // survives a refetch are the kit's and this file writes no key handling
-// (docs/future/layout/07-focus-and-keys.md). Subagents are rows of the sessions collection at depth
+// (docs/command-palette-and-shortcuts.md § Focus and typing). Subagents are rows of the sessions collection at depth
 // one, rather than a nested list, because stepping into a child run is a selection and not an
 // expansion.
 

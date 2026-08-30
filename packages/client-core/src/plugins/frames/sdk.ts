@@ -483,7 +483,7 @@ export function _resetConnection(): void {
 
 // ── The tree path ─────────────────────────────────────────────────────────────────────────────────
 //
-// The second render path (docs/future/layout/06-remote-tree.md). Same bundle, same bridge, same
+// The second render path (docs/plugins.md § The tree contract). Same bundle, same bridge, same
 // sandbox rules; what differs is that the code emits a tree of kit node names instead of pixels, and
 // the host mounts its own components for them.
 //

@@ -14,6 +14,12 @@
   border-radius: var(--radius-pill-fixed);
   pointer-events: none;
 }
+/* Popover owns the surface (portal, position, elevation, dismissal). This is only the inbox's width
+   and the fact that its own rows supply all the padding. It reaches the surface through the wrapper
+   rather than through a class on the node, because the kit takes no class. Without the width the
+   surface sizes to its widest row and the bell opens a page-wide sheet. */
+.notify-inbox { width: 340px; display: flex; flex-direction: column; min-width: 0; }
+.ui-popover:has(> .notify-inbox) { padding: 0; }
 .notify-head {
   display: flex;
   align-items: center;

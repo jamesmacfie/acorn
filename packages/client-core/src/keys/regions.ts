@@ -1,6 +1,6 @@
 // Focus groups: every region of every layout, in document order, and which one has focus.
 //
-// A layout region is a focus group (docs/future/layout/07-focus-and-keys.md § Focus is a property of
+// A layout region is a focus group (docs/command-palette-and-shortcuts.md § Focus and typing, on focus as a property of
 // the tree). `nextRegion` cycles the groups inside one pane, `nextPane` cycles the panes of the task
 // row, and each group remembers the node focus was last on so coming back lands where you left.
 // This generalises the single `focusedPane` per task to every region of every pane.

@@ -5,7 +5,7 @@
 // and not the other is the failure this file exists to make impossible.
 //
 // A plugin never lays anything out. It names a layout and fills the regions, and the host owns what
-// each one means at every width. See docs/future/layout/05-layouts.md for the desktop rendering of
+// each one means at every width. See docs/panes.md § Layout model for the desktop rendering of
 // each layout and for the narrow and terminal projections it has to carry before it lands.
 
 /** Every layout name a pane may declare. Orientation is in the name, never in a prop. */

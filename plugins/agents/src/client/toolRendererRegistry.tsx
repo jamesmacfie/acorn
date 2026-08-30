@@ -95,7 +95,7 @@ export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultO
   // `mergeProps`, not a spread: a spread would read `props.tool` once and freeze it, and the transcript
   // hands out a fresh tool object on every snapshot.
   const full = mergeProps(props, { defaultOpen, onOpenChange: fold.onToggle })
-  // The slot is the only way in (docs/future/layout/06-remote-tree.md § Slots are nodes). Both render
+  // The slot is the only way in (docs/plugins.md § Cooperative extension points). Both render
   // paths arrive here: a compiled contributor's component and a sandboxed plugin's worker tree fill the
   // same `replace` point, and the host arbitrates between them.
   //
