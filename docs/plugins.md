@@ -96,7 +96,7 @@ still reaches for but a third-party plugin should not. It names the `ctx` seam t
 move to instead, so the marked name can come off the surface once every first-party caller has
 moved onto that seam.
 
-Eight entrypoints:
+Eleven entrypoints:
 
 | Entrypoint | What it carries |
 | --- | --- |
@@ -2186,6 +2186,14 @@ fanning out over every reachable Node and unioning the answers, deduped on `prov
 `providerNodeId` — so a provider on a headless Node is exactly as visible as one on the laptop.
 `providerNodeId` is the provider's own id for a machine, stable no matter which Node asked, which is
 what makes two Nodes signed into one account show one row instead of two.
+
+**There is no seam for a provider to say how to reach its node, and there should not be one.** A
+provider returns an endpoint the host dials, pinned by the fingerprint that provider vouched for, and
+the dial happens in the credential path — the one place holding the device token and the pin. A
+plugin that shapes that connection is a plugin inside it, which is what
+[security.md](./security.md) § The control plane keeps out everywhere else. So a provider whose nodes
+sit behind a NAT has a networking problem, not a plugin problem; [future/remote.md](./future/remote.md)
+owns the relay question if it ever becomes ours.
 
 **`ProvidedNode.enrollment.deviceToken` never reaches a client.** `GET /v2/core/nodes` projects it
 out — as an explicit field list, so a new field cannot leak by omission — and

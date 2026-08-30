@@ -1,5 +1,5 @@
 // "Open a new terminal running this harness's CLI." The desktop shell used to carry these two by
-// name, which meant a third harness needed a shell edit (docs/future/structure-followup, phase 1).
+// name until 2026-08-31, which meant a third harness needed a shell edit.
 // The profile ids are this plugin's own (../../server/profiles/), so the commands are too.
 //
 // The shell keeps `task.terminal.toggle` and `task.terminal.new-shell`: a drawer and a plain shell
