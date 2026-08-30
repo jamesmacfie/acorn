@@ -6,7 +6,7 @@ import type { PluginDocumentRegion } from '@acorn/protocol/api.ts'
 import { eventChord } from '@acorn/protocol/keybindings.ts'
 import { isLanguageId } from '@acorn/protocol/languageIds.ts'
 import { readJson, writeJson } from '../infra/node/apiClient'
-import { debounce } from '../lib/debounce'
+import { debounce } from '../kit/lib/debounce'
 import { executeCommand } from '../registries/commands'
 import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../registries/keybindings'
 import {
@@ -24,8 +24,8 @@ import {
 } from './documentModel'
 import { monacoLanguageFor } from './language'
 import { MONACO_THEME, watchMonacoTheme } from './theme'
-import { Alert } from '../ui/primitives'
-import { Rectangle } from '../ui/Rectangle'
+import { Alert } from '../kit/components/primitives'
+import { Rectangle } from '../kit/components/Rectangle'
 
 // A host-owned document surface: the host draws the editor, the plugin supplies the document. See
 // docs/third-party/monaco.md.

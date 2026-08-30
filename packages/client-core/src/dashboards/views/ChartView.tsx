@@ -1,5 +1,5 @@
 import { createMemo, For, Show } from 'solid-js'
-import { EmptyState } from '../../ui/primitives'
+import { EmptyState } from '../../kit/components/primitives'
 import { buildChart, CHART_FRAME, TICK_GAP } from '../chart'
 import type { PanelViewProps } from './props'
 

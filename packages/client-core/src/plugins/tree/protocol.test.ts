@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { mutation, sandboxMessage, TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
 import { KIT_NODES, ROLE_VALUES, TEXT_NODE } from '@acorn/protocol/tree/nodes.ts'
 import { KIT_NODE_SCHEMAS, sanitizeProps } from '@acorn/protocol/tree/props.ts'
-import { NODE_SUPPORT } from '../../ui/kit/support'
-import { ROLE_ENUMS } from '../../ui/kit/tokens'
+import { NODE_SUPPORT } from '../../kit/tokens/support'
+import { ROLE_ENUMS } from '../../kit/tokens/tokens'
 
 // The wire's half of the kit. Protocol is a pure sink, so it holds its own copy of the node names and
 // the role enums; this is the lock that stops the two drifting. It lives here rather than in protocol

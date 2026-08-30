@@ -83,7 +83,7 @@ stay tests. Closing them is a bigger job than closing the plugins was, because e
 into a plugin already went through an entrypoint and the same is not true one level up.
 
 **The UI kit is closed as well**, and by a third mechanism again: by type. Every component a plugin
-may draw with is one row in `packages/client-core/src/ui/kit/support.ts`, a node's props are role
+may draw with is one row in `packages/client-core/src/kit/tokens/support.ts`, a node's props are role
 tokens rather than DOM attributes, and a type-level test refuses `class`, `className` and `style` on
 any of them ([ui design](./ui-design.md) § The closed kit). Two arch rules hold the rest — no plugin
 ships a stylesheet, and no plugin mounts a Solid root of its own.

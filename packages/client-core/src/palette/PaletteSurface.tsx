@@ -1,5 +1,5 @@
 import { For, Show, type JSX } from 'solid-js'
-import { Input } from '../ui/primitives'
+import { Input } from '../kit/components/primitives'
 import type { OverlayPalette } from './overlay'
 // The component owns its stylesheet, so a consumer can't depend on some other palette having been
 // mounted first to get the chrome styled.

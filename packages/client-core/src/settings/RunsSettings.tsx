@@ -2,10 +2,10 @@ import { createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { coreRunsRoute, isTerminalRunStatus, type RunRow, type RunStatus } from '@acorn/protocol/runs.ts'
 import { readJson } from '../infra/node/apiClient'
-import { formatRelativeTime } from '../lib/formatRelativeTime'
+import { formatRelativeTime } from '../kit/lib/formatRelativeTime'
 import { activeNodeId } from '../infra/node/activeNode'
 import { nodes } from '../infra/node/fleet'
-import { Alert, Badge, Button, Row, Select, StatusDot } from '../ui/primitives'
+import { Alert, Badge, Button, Row, Select, StatusDot } from '../kit/components/primitives'
 import './settings.css'
 
 // Settings → Runs, per node (@acorn/protocol/runs.ts): everything on this machine that started, is

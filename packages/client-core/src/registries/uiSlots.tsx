@@ -1,7 +1,7 @@
 import { For } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { hasHostCapability } from '../infra/node/hostCapabilities'
-import { ContributionBoundary } from '../ui/ContributionBoundary'
+import { ContributionBoundary } from '../kit/components/ContributionBoundary'
 import { isTaskSlot, uiSlotRegistry, type ShellSlotContribution, type TaskSlotId, type UiSlotContext, type UiSlotId } from './slots'
 
 // The two slot hosts over the one registry. The registry and its contribution types live in

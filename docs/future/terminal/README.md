@@ -11,8 +11,8 @@ never learns there is a terminal. It ships twice: inside the desktop app beside 
 as a headless artifact with the node and nothing else.
 
 The layout programme (shipped 2026-08-30) made this cheap without building any of it. Every kit node
-carries a `tui` level nothing reads (`packages/client-core/src/ui/kit/support.ts`), every role token
-has a terminal value nothing reads (`packages/client-core/src/ui/kit/roles.ts`), every layout has a
+carries a `tui` level nothing reads (`packages/client-core/src/kit/tokens/support.ts`), every role token
+has a terminal value nothing reads (`packages/client-core/src/kit/tokens/roles.ts`), every layout has a
 written terminal projection (`docs/panes.md § Layout model`), the tree protocol names no DOM
 (`packages/protocol/src/tree/`), and `@opentui/keymap` ships the terminal adapter we do not use
 (`packages/client-core/src/keys/install.ts`). What is missing is a host. The terminal host is the strict

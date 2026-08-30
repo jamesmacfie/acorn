@@ -1,22 +1,22 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { tokenizeDocument } from '../infra/highlight/worker'
-import { readDraft, writeDraft } from '../lib/draftState'
+import { readDraft, writeDraft } from '../kit/lib/draftState'
 import { PrefKeys } from '../infra/persistence/prefKeys'
 import { prefsOptions } from '../infra/queries'
 import { clientEvents } from '../registries/clientEvents'
 import { registerCommands } from '../registries/commands'
 import { registerKeybindings } from '../registries/keybindings'
 import { savePref } from '../settings/savePref'
-import { EmptyState } from '../ui/primitives'
+import { EmptyState } from '../kit/components/primitives'
 import { DiffCanvas } from './DiffCanvas'
-import { FileHead, type LineComposerController, type ThreadCollapseController } from '../ui/diff/DiffRows'
+import { FileHead, type LineComposerController, type ThreadCollapseController } from '../kit/diff/DiffRows'
 import { AnnotationMarks } from '../plugins/annotations/AnnotationMarks'
 import { annotationKey } from './annotationKey'
 import { annotationSignature, annotationsFor, requestAnnotations } from '../plugins/annotations/annotations'
 import { DiffToolbar } from './DiffToolbar'
 import { createDiffFindController } from './findController'
-import { createDiffHydrator } from '../ui/diff/hydration'
+import { createDiffHydrator } from '../kit/diff/hydration'
 import {
   buildDiffRows,
   buildDiffRowsAsync,
@@ -40,12 +40,12 @@ import {
   type Row,
   type SplitBand,
   type ViewMode,
-} from '../ui/diff/model'
+} from '../kit/diff/model'
 import { createDiffScrollRestoration } from './scrollRestoration'
 import type { CommentSide, DiffSource } from './source'
 import { createDiffStickyFile } from './stickyFile'
 import { diffCollapsed, rememberDiffCollapsed } from './viewState'
-import { createDiffMeasureSchedulers, createDiffVirtualizer } from '../ui/diff/virtualization'
+import { createDiffMeasureSchedulers, createDiffVirtualizer } from '../kit/diff/virtualization'
 
 // The diff shell: every changed file's diff stacked in one virtualized list, in unified or split
 // mode, with find, a sticky file header, per-file collapse, gap expansion, and an inline comment

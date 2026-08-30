@@ -896,14 +896,14 @@ bindings pass GitHub's `bodyHTML` to `innerHTML` verbatim, trusting GitHub's san
 
 - `packages/client-core/src/registries/ProviderHtml.tsx`, the host component every provider-rendered
   body now goes through: github's description, its comments and its review threads
-- `packages/client-core/src/ui/diff/DiffRows.tsx`
+- `packages/client-core/src/kit/diff/DiffRows.tsx`
 
 The first was three hand-written bindings inside the github plugin until phase 7 of the layout
 programme. Neither is a known bug. They are listed because each one is a place where a sanitizer being wrong once
 would put script in a webview that can call into Rust, and the policy is what stands behind them if
 that ever happens.
 
-The Markdown renderer (`packages/client-core/src/ui/markdown.ts`) is the other sink, and it is the app's
+The Markdown renderer (`packages/client-core/src/kit/lib/markdown.ts`) is the other sink, and it is the app's
 own. It escapes first and builds tags afterwards, which holds. What did not hold was its sentinel: it
 reserved U+E000 to protect code spans and images across the escaping pass, on the stated grounds that
 real text never contains it. The input decides what is in it, so a source that spelled the sentinel

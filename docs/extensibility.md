@@ -222,7 +222,7 @@ Two earlier decisions are what make this possible, and neither was made for this
   guards against — a frame has a different document and a different bundle, a worker is a different
   thread, and neither shares a reactive graph with the shell. The hazard only exists when two Solids
   share one realm.
-- **The design system is enforced-pure.** `client-core/src/ui/` is props-in, DOM-out with no
+- **The design system is enforced-pure.** `client-core/src/kit/` is props-in, DOM-out with no
   data-layer imports, checked by the boundaries test. That rule was written for contract hygiene;
   its payoff is that those components drop into a sandbox with no query client, no shell context and
   no host services.

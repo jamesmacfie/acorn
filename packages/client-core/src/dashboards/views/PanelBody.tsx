@@ -1,5 +1,5 @@
 import { Match, Switch } from 'solid-js'
-import { EmptyState } from '../../ui/primitives'
+import { EmptyState } from '../../kit/components/primitives'
 import BoardView from './BoardView'
 import ChartView from './ChartView'
 import ListView from './ListView'

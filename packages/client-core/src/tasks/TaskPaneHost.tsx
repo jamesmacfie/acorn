@@ -5,7 +5,7 @@ import { activeNodeId } from '../infra/node/activeNode'
 import { nodeState } from '../infra/node/fleet'
 import { freshnessOf, type Freshness } from '../infra/node/freshness'
 import NodeChip from '../infra/node/NodeChip'
-import { ContributionBoundary } from '../ui/ContributionBoundary'
+import { ContributionBoundary } from '../kit/components/ContributionBoundary'
 // Imported for `use:paneFocus` below. Solid compiles a directive to a bare reference to this
 // identifier, so without the import the first pane to render dies on "paneFocus is not defined".
 // The linter cannot see that use, hence the suppression.
@@ -14,10 +14,10 @@ import { paneFocus } from './paneFocus'
 import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
 import { defaultLayout, type LayoutAction } from './layout'
 import { formatChord } from './paneShortcuts'
-import { Button, EmptyState } from '../ui/primitives'
+import { Button, EmptyState } from '../kit/components/primitives'
 import { RailTab } from '../tabs/RailTab'
 import { markersFor } from '../registries/railMarkers'
-import { createSplitDrag } from '../ui/split'
+import { createSplitDrag } from '../kit/lib/split'
 
 export default function TaskPaneHost(props: {
   task: Task

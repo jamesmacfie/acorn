@@ -47,7 +47,7 @@ export type PanelViewKind = (typeof PANEL_VIEW_KINDS)[number]
 const fieldType = z.enum(COLLECTION_FIELD_TYPES)
 const fieldRole = z.enum(COLLECTION_FIELD_ROLES)
 
-// The host's own status vocabulary (client-core/ui/primitives.tsx, `StatusDot`), so a declared value
+// The host's own status vocabulary (client-core/kit/primitives.tsx, `StatusDot`), so a declared value
 // lands on a colour the appearance packs already own and a plugin never names one. `mixed` is absent: it
 // describes an aggregate of several states, which the host computes rather than a row being one.
 const enumValue = z.object({

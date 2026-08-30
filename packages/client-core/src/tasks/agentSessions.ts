@@ -20,7 +20,7 @@ import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 // arch suite enforces. Two duplicated strings beat inventing a capability seam for a GET.
 const terminalSessionsRoute = '/v2/p/terminal/sessions'
 import { requestTerminalFocusIntent } from '../registries/clientEvents'
-import { latestOnly } from '../lib/latestOnly'
+import { latestOnly } from '../kit/lib/latestOnly'
 import { onScopeEvicted } from '../registries/scopeEviction'
 
 const [sessions, setSessions] = createSignal<TerminalSession[]>([])

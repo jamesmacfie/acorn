@@ -15,7 +15,7 @@ import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPref
 //
 // `follow` is the kit's: the scroller, staying on the newest turn until the reader scrolls away from
 // it, and the place a reader is returned to when they come back are all the timeline's now
-// (client-core/src/ui/Timeline.tsx). This file used to hold that machinery and a scroll element of
+// (client-core/src/kit/Timeline.tsx). This file used to hold that machinery and a scroll element of
 // its own, and none of it was anything but a transcript's ordinary behaviour.
 export default function AgentTranscript(props: {
   taskId: string

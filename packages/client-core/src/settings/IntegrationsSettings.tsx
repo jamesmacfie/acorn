@@ -1,9 +1,9 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
-import CopyButton from '../ui/CopyButton'
-import Icon from '../ui/Icon'
-import { brandStyle } from '../ui/brandMarks'
+import CopyButton from '../kit/components/CopyButton'
+import Icon from '../kit/components/Icon'
+import { brandStyle } from '../kit/lib/brandMarks'
 import {
   connectIntegration,
   deleteIntegration,
@@ -14,7 +14,7 @@ import {
 import { createDeviceFlow } from '../integrations/deviceFlow'
 import { integrationsKey, integrationsOptions } from '../infra/queries'
 import ConnectionProjectMap from './ConnectionProjectMap'
-import { Alert, Button, Chip } from '../ui/primitives'
+import { Alert, Button, Chip } from '../kit/components/primitives'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
   // The tint comes off the mark the provider names, not off a rule keyed to its id, so a plugin that

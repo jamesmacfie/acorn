@@ -13,7 +13,7 @@ import {
 } from '../infra/node/providedNodes'
 import { nodes } from '../infra/node/fleet'
 import { canPairNodes } from '../infra/platform'
-import { Alert, Badge, Button, ConfirmButton, Input } from '../ui/primitives'
+import { Alert, Badge, Button, ConfirmButton, Input } from '../kit/components/primitives'
 import '../infra/node/nodes.css'
 
 // Settings → Nodes, second half: the nodes a plugin's node provider knows about, and the four

@@ -41,10 +41,10 @@ marking it as gone. The list, from this programme:
 | `packages/node-core/src/main/core/*/` subfolders | `src/server/core/<name>.ts` |
 | `packages/node-core/src/server/plugin/` | `src/server/pluginHost/` |
 | `packages/desktop-helper/src/main/` | `packages/desktop-helper/src/<group>/` |
-| `client-core/src/ui/` | `client-core/src/kit/` |
+| `client-core/src/kit/` | `client-core/src/kit/` |
 | `client-core/src/registries/` | `client-core/src/host/registries/<kind>/` |
 | `client-core/src/plugins/` | `client-core/src/host/{frames,chrome,tree,annotations,trust}/` |
-| `client-core/src/lib/` | `client-core/src/kit/lib/` |
+| `client-core/src/kit/lib/` | `client-core/src/kit/lib/` |
 | `client-core/src/{platform,persistence,styles,highlight,node}/` | `client-core/src/infra/...` |
 | every other client-core feature folder | `client-core/src/features/...` |
 | `packages/protocol/src/plugin*.ts` | `packages/protocol/src/plugin/*.ts` |

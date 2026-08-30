@@ -1,4 +1,4 @@
-import { Alert } from '../../ui/primitives'
+import { Alert } from '../../kit/components/primitives'
 
 /**
  * What the reader sees where a remote tree could not be drawn: a node this build has never heard of,

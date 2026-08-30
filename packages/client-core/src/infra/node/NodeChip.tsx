@@ -1,7 +1,7 @@
 import { Show } from 'solid-js'
 import { nodeState, nodeStatus } from './fleet'
 import { formatLastSeen, freshnessOf, FRESHNESS_LABELS, type FreshnessQuery } from './freshness'
-import { StatusDot } from '../../ui/primitives'
+import { StatusDot } from '../../kit/components/primitives'
 import './nodes.css'
 
 // The chip's six-value freshness vocabulary, in StatusDot's terms. NodeChip was the one designed status

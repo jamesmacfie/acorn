@@ -1,6 +1,6 @@
 import { type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { Button, Toolbar } from '../ui/primitives'
+import { Button, Toolbar } from '../kit/components/primitives'
 
 // The box a reference panel is drawn in: the backdrop, the drawer, the title and the dismiss
 // affordance (docs/panes.md § Not a pane: the reference panel).

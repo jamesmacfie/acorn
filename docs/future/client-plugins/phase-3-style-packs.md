@@ -64,7 +64,7 @@ projection reads computed values.
 
 - `packages/protocol/src/pluginContract.ts`: `contributions.styles`.
 - `packages/protocol/src/styleValues.ts` (new): the family predicates.
-- `packages/client-core/src/ui/tokenAxes.ts`: `STYLE_TOKEN_FAMILIES`, `DERIVED_STYLE_TOKENS`.
+- `packages/client-core/src/kit/lib/tokenAxes.ts`: `STYLE_TOKEN_FAMILIES`, `DERIVED_STYLE_TOKENS`.
 - `packages/client-core/src/infra/styles/tokenAxes.test.ts`: every style token has a family; the cap is
   first-party only; the shadow-colour indirection invariant.
 - `packages/client-core/src/plugins/chrome/styles.ts` (new).
@@ -111,7 +111,7 @@ function with no DOM dependency, so the terminal host can validate a pack it wil
   { id, label, description? }` and no writer other than `settings/uiStyles.ts`.
 - `packages/client-core/src/plugins/chrome/themes.ts` exports `pluginThemeId`, `pluginThemeBlock`,
   `registerPluginTheme`, `pluginThemeStyleSheet`; copy its shape.
-- `packages/client-core/src/ui/tokenAxes.ts` exports `STYLE_TOKENS` as a list with `--radius-*`,
+- `packages/client-core/src/kit/lib/tokenAxes.ts` exports `STYLE_TOKENS` as a list with `--radius-*`,
   `--space-*`, `--font-*`, `--shadow-*`, `--fs-*`, `--lh*`, `--fw-*`, `--*-transform`,
   `--*-tracking` entries; check the exact list before writing the families.
 - `packages/client-core/src/infra/styles/tokenAxes.test.ts` has the 25-selector cap.

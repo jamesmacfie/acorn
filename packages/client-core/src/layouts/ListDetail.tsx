@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import { createSplitDrag } from '../ui/split'
+import { createSplitDrag } from '../kit/lib/split'
 import { layoutState } from './state'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
 // import has to be here even though nothing calls it.

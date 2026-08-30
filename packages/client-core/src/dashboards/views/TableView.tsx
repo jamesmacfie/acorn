@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js'
-import { EmptyState, Table } from '../../ui/primitives'
+import { EmptyState, Table } from '../../kit/components/primitives'
 import Cell from './Cell'
 import type { PanelViewProps } from './props'
 

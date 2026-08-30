@@ -20,10 +20,10 @@ import {
   type ScheduleTargetsResponse,
 } from '@acorn/protocol/schedules.ts'
 import { readJson, sendJson, writeJson } from '../infra/node/apiClient'
-import { formatRelativeTime } from '../lib/formatRelativeTime'
+import { formatRelativeTime } from '../kit/lib/formatRelativeTime'
 import { activeNodeId } from '../infra/node/activeNode'
 import { nodes } from '../infra/node/fleet'
-import { Alert, Badge, Button, Checkbox, ConfirmButton, Input, Row, Select, StatusDot } from '../ui/primitives'
+import { Alert, Badge, Button, Checkbox, ConfirmButton, Input, Row, Select, StatusDot } from '../kit/components/primitives'
 import './settings.css'
 
 // Settings → Schedules, per node (docs/schedules.md § Settings): every piece of periodic work this

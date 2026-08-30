@@ -16,7 +16,7 @@ import { composeItems, fuzzyFilter, type PaletteItem } from '@acorn/client-core/
 import { paletteRowSources, type PaletteRowSource } from '@acorn/client-core/registries/paletteRows.ts'
 import { createOverlayPalette } from '@acorn/client-core/palette/overlay.ts'
 import { commandAvailable, commandHint, commandRegistry, commandTitle, executeCommand } from '@acorn/client-core/registries/commands.ts'
-import { Alert } from '@acorn/client-core/ui/primitives.tsx'
+import { Alert } from '@acorn/client-core/kit/components/primitives.tsx'
 import { PaletteSurface } from '@acorn/client-core/palette/PaletteSurface.tsx'
 
 export default function CommandPalette() {

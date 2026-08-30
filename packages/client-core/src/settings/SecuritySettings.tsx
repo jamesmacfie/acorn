@@ -3,7 +3,7 @@ import type { AuditEntry, NodeSecurityPosture } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../infra/node/activeNode'
 import { nodes } from '../infra/node/fleet'
 import { createNodeBackup, nodeAuditPage, nodeSecurityPosture, suggestedBackupPath } from '../infra/node/nodeSecurity'
-import { Alert, Button, Input, Select } from '../ui/primitives'
+import { Alert, Button, Input, Select } from '../kit/components/primitives'
 import './settings.css'
 
 // Settings → Security (docs/security.md § Audit, § On-disk).

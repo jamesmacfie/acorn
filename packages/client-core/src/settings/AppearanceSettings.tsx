@@ -4,7 +4,7 @@ import { prefsOptions } from '../infra/queries'
 import { savePref } from './savePref'
 import { resolveTheme, THEMES } from './themes'
 import { STYLES } from './uiStyles'
-import { Checkbox, Field, Select } from '../ui/primitives'
+import { Checkbox, Field, Select } from '../kit/components/primitives'
 import { PrefKeys } from '../infra/persistence/prefKeys'
 
 // Settings → Appearance. Two orthogonal axes (docs/ui-design.md § Token axes): style owns shape,

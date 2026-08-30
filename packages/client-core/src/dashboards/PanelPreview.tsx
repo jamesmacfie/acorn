@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import { Card, EmptyState } from '../ui/primitives'
+import { Card, EmptyState } from '../kit/components/primitives'
 import type { PanelDraft } from './draft'
 import PanelBody from './views/PanelBody'
 import './dashboards.css'

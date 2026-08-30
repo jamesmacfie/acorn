@@ -6,7 +6,7 @@ import { prefsOptions } from '../infra/queries'
 import { saveJsonPref } from './savePref'
 import { PrefKeys } from '../infra/persistence/prefKeys'
 import { TOOL_TIER_DEFAULTS, toolPermissionsSchema, type ToolPermissions } from '@acorn/protocol/toolPermissions.ts'
-import { Checkbox } from '../ui/primitives'
+import { Checkbox } from '../kit/components/primitives'
 
 // Settings → Agent tools (docs/agent-tools.md § Projections): the permission surface over the
 // agent-tool registry. Tools are grouped by risk tier (read, write, execute); a tier toggle and

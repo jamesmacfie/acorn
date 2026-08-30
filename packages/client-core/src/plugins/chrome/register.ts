@@ -12,7 +12,7 @@ import { keybindingRegistry } from '../../registries/keybindings'
 import type { Disposable } from '../../registries/registry'
 import { sourceRegistry } from '../../registries/sources'
 import { uiSlotRegistry } from '../../registries/slots'
-import { brandMarkRegistry } from '../../ui/brandMarks'
+import { brandMarkRegistry } from '../../kit/lib/brandMarks'
 import {
   loadedPluginStateOnNode,
   pluginEnabledOnNode,

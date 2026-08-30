@@ -2,11 +2,11 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { workspacesOptions } from '../infra/queries'
 import { settingsContributions } from '../registries/settings'
-import { ContributionBoundary } from '../ui/ContributionBoundary'
-import { createDismissable } from '../ui/dismissable'
+import { ContributionBoundary } from '../kit/components/ContributionBoundary'
+import { createDismissable } from '../kit/lib/dismissable'
 import { Dynamic } from 'solid-js/web'
 import './settings.css'
-import { Button } from '../ui/primitives'
+import { Button } from '../kit/components/primitives'
 
 export default function SettingsModal(props: { onClose: () => void; initialTab?: string }) {
   const workspaces = createQuery(() => workspacesOptions(true))

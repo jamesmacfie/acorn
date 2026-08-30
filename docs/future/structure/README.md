@@ -22,7 +22,7 @@ plugin `main/` folders have an entrypoint. Where a module lands, `main/` or `ser
 `electronResourcesPath` in two files. This programme retires the word everywhere.
 
 **Two flat folders hide their structure behind filename prefixes.** `packages/node-core/src/main/`
-is 78 files with ten `plugin*.ts` modules doing the job a folder should. `packages/client-core/src/ui/`
+is 78 files with ten `plugin*.ts` modules doing the job a folder should. `packages/client-core/src/kit/`
 is 64 files (37 components, 15 utility modules, 11 tests) and `packages/client-core/src/registries/`
 is 60, while `lib/` holds eight leftovers and the three `Ref*` components live under `registries/`
 because an arch rule pushed them out of `ui/`. Client-core gets a full regroup into four groups.

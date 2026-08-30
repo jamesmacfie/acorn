@@ -22,8 +22,8 @@ export {
   rowIdentityKeys,
   splitBandIdentityKeys,
   toBands,
-} from '@acorn/client-core/ui/diff/model.ts'
-export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/ui/diff/model.ts'
+} from '@acorn/client-core/kit/diff/model.ts'
+export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/kit/diff/model.ts'
 
 // The tokenizer the async builders take. On this entrypoint rather than ./client because it's part of
 // the diff toolkit's contract, since `buildDiffRowsAsync(file, tokenizeDocument)` is the whole intended
@@ -31,12 +31,12 @@ export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLin
 export { tokenizeDocument } from '@acorn/client-core/infra/highlight/worker.ts'
 export type { TokenizeDocument } from '@acorn/client-core/infra/highlight/worker.ts'
 
-export { collectMatches } from '@acorn/client-core/ui/diff/find.ts'
-export type { FindHighlight } from '@acorn/client-core/ui/diff/find.ts'
-export { createDiffHydrator } from '@acorn/client-core/ui/diff/hydration.ts'
-export { synth } from '@acorn/client-core/ui/diff/synth.ts'
-export { createDiffMeasureSchedulers, createDiffVirtualizer } from '@acorn/client-core/ui/diff/virtualization.ts'
-export { createSplitScrollSync } from '@acorn/client-core/ui/diff/splitScrollSync.ts'
+export { collectMatches } from '@acorn/client-core/kit/diff/find.ts'
+export type { FindHighlight } from '@acorn/client-core/kit/diff/find.ts'
+export { createDiffHydrator } from '@acorn/client-core/kit/diff/hydration.ts'
+export { synth } from '@acorn/client-core/kit/diff/synth.ts'
+export { createDiffMeasureSchedulers, createDiffVirtualizer } from '@acorn/client-core/kit/diff/virtualization.ts'
+export { createSplitScrollSync } from '@acorn/client-core/kit/diff/splitScrollSync.ts'
 
 // The port DiffPane (on ./ui, since it is a component) is driven through. A plugin that owns a diff
 // fills this in from its own queries and mutations; nothing else about the shell is configurable.

@@ -1,5 +1,5 @@
 import { For, Show, createSignal } from 'solid-js'
-import { Badge, Button, Field, Input, Row, SectionHeader, Select, Spinner, Textarea } from '../ui/primitives'
+import { Badge, Button, Field, Input, Row, SectionHeader, Select, Spinner, Textarea } from '../kit/components/primitives'
 import { STYLES } from './uiStyles'
 import { THEMES } from './themes'
 

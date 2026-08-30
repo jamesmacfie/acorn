@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
-import { createDismissable } from '../ui/dismissable'
+import { createDismissable } from '../kit/lib/dismissable'
 import { collectConcerns, type Concern, DETAILS_MAX, type WillEventMap } from './willPhaseModel'
-import { Button, Checkbox } from '../ui/primitives'
+import { Button, Checkbox } from '../kit/components/primitives'
 export { collectConcerns, registerWillHandler } from './willPhaseModel'
 export type { Concern, WillEventMap } from './willPhaseModel'
 

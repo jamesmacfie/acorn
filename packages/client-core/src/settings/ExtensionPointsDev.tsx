@@ -1,6 +1,6 @@
 import { For, Show, createMemo } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { Badge, Field, SectionHeader, Select } from '../ui/primitives'
+import { Badge, Field, SectionHeader, Select } from '../kit/components/primitives'
 import { PrefKeys } from '../infra/persistence/prefKeys'
 import { prefsOptions } from '../infra/queries'
 import { savePref } from './savePref'
