@@ -1,6 +1,6 @@
 # Phase 0: hygiene
 
-Status: not started. Waits on nothing.
+Status: shipped 2026-08-30. Waits on nothing.
 
 ## Goal
 
@@ -60,6 +60,34 @@ not worth a step.
 - `ls plugins | wc -l` reports 19 directories plus the three shared files.
 - `pnpm --filter @acorn/desktop test` collects `scopedEviction.test.ts`.
 - `pnpm lint` and `pnpm test` are green.
+
+## What shipped, and where it differed
+
+Every step landed. Three things are worth knowing before phase 1.
+
+Step 8's one surviving item went to `docs/testing.md`, not to a `docs/future/` file. Nine of
+`next-review.md`'s ten items were already owned: smoke items 1, 2, and 23 to 25 cover the fresh
+install, the second node, and the layout pass, and the checklist already says its first pass is owed;
+[shell.md](../../shell.md) § Signing gates and the updater owes the DMG run on a clean machine;
+[caching.md](../../caching.md) and [data-layer.md](../../data-layer.md) already refuse one blind
+retention rule. The tenth, the Rollbar privacy allowlist against real payloads and the context and
+Notes panes at their narrowest, is manual verification, and manual verification lives in the smoke
+checklist. It is item 26.
+
+Step 9 resolved by probe rather than by reading. A throwaway install under pnpm 11.0.0 with only
+`onlyBuiltDependencies` set still refused to build esbuild, and with only `allowBuilds` set it built
+quietly. `allowBuilds` is the key pnpm reads; the other was dead and is gone.
+
+One step is not in the list above. The deleted `docs/next-review.md` and `docs/plugin-map.html` broke
+`tools/arch/docPaths.test.ts`, which fails a backticked repo path that does not resolve unless the
+same line carries a marker such as "deleted" or "moved to". Five lines named a deleted file: three in
+this folder, one in `docs-migration.md`, one in `phase-7-docs-reference-sweep.md`, and the new
+`testing.md` sentence. Those five lines were reworded. The checker was not touched, because phase 6
+owns enforcement.
+
+Step 10 worked as written: `src/**/*.test.ts` under the shell project collects
+`scopedEviction.test.ts`, and it passes there without the Solid transform. The desktop count is 80,
+up from 76.
 
 ## Verify before building
 

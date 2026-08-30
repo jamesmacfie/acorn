@@ -22,7 +22,7 @@ Multi-file designs with an order of work.
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [structure/](./structure/README.md) | Making the folder names say what the architecture doc says: retire `main/`, regroup client-core and node-core, one plugin shape, a docs index, then a full path sweep. Eight phases. | Proposal, 2026-08-30. Not started; phase 0 blocks on nothing. |
+| [structure/](./structure/README.md) | Making the folder names say what the architecture doc says: retire `main/`, regroup client-core and node-core, one plugin shape, a docs index, then a full path sweep. Eight phases. | Proposal, 2026-08-30. Phase 0 (hygiene) shipped the same day; phase 1 is next. |
 
 ## The single files
 
