@@ -1,6 +1,7 @@
-# Performance: what to measure and what to fix
+# Performance: the first read
 
-Analysis, 2026-08-31. Nothing here is scheduled. Paths are hints, not promises.
+Analysis, 2026-08-31. One of the two inputs to this programme; [architecture.md](./architecture.md)
+is the other, and [phases.md](./phases.md) holds the order of work. Paths are hints, not promises.
 
 This is a first read of the whole app for performance. Nobody has done one before: there is no
 benchmark anywhere in the repo, no timing on any request, and four `console.log` marks on the node's
@@ -303,17 +304,10 @@ requests grows it into megabytes, the answer is per-key persistence rather than 
 
 ## What to do first
 
-1. Cut the icon set out of startup. It is the largest number in the document, it unblocks the build,
-   and it needs no design.
-2. Add timing. A boot breakdown finer than four marks, one request-duration line on the node, and a
-   `performance.mark` around the first paint. Everything below this point is a guess until then.
-3. Fix `appendEvent` and the `turns.find`. Two small, local changes on the surface most likely to be
-   in front of someone during a long agent run.
-4. Fix the task-list N+1 and move the WebSocket node filter into the helper. Both are a few lines.
-5. Move Shiki, `DiffPane`, and `prModel` off the startup path, and find the eager import that pulls
-   each in.
-
-Then re-measure, and only then argue about base64, the transcript projection, and the persister.
+The ordering moved to [phases.md](./phases.md) when this file became one input of two; the companion
+read is [architecture.md](./architecture.md). The one standing rule from this file survives there as
+the gate: add timing before arguing about anything past the startup payload, because no number in the
+agent-transcript or diff sections was measured.
 
 ## Verify before building
 
