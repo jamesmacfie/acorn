@@ -3,10 +3,8 @@ import { createSignal, onCleanup, Show, type JSX } from 'solid-js'
 import { extend } from '@opentui/solid'
 import { EmbeddedTerminalRenderable, type BoxRenderable, type KeyEvent, type Renderable } from '@opentui/core'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { roleCell } from '@acorn/client-core/kit/tokens/roles.ts'
-import { slotColor } from '../appearance'
 import { Line } from './cells'
-import { borderCell } from './roles'
+import { boxBorder } from './roles'
 
 // The PTY, natively, and the keyboard contract that makes a rectangle a rectangle.
 //
@@ -173,13 +171,11 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
       ref={(element: BoxRenderable) => { box = element; element.focusable = true }}
       flexDirection="column"
       flexGrow={1}
-      border={borderCell('surface').box}
-      borderStyle="single"
       // The same border either way, and the title carries the state instead. A `control` border is a
       // different role, not a brighter one, and a style pack may set any role to zero width — so
       // swapping roles to mean "focused" is how a box quietly stops being drawn at all
       // (docs/ui-design.md § Borders).
-      borderColor={slotColor(roleCell('tone', inside() ? 'accent' : 'neutral').slot)}
+      {...boxBorder('surface', { tone: inside() ? 'accent' : 'neutral' })}
       // Short, because a box title that does not fit its width is not drawn at all. The whole rule —
       // "esc leave · esc esc send escape" — is on the footer, which says it while a rectangle is
       // entered (../chrome/Footer.tsx).
@@ -198,7 +194,7 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
  *  Drawn rather than absent because a pane that names one is telling the truth about what is there. */
 export function EditorRectangle(props: { label: string; children?: JSX.Element }) {
   return (
-    <box flexDirection="column" flexGrow={1} border={borderCell('surface').box} borderStyle="single" title={props.label}>
+    <box flexDirection="column" flexGrow={1} {...boxBorder('surface')} title={props.label}>
       <Show when={props.children} fallback={<Line role="muted">the file opens here</Line>}>{props.children}</Show>
     </box>
   )

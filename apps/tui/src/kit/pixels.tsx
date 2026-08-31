@@ -2,7 +2,7 @@
 import { Show, type JSX } from 'solid-js'
 import { HOST, NODE_SUPPORT, type Host, type KitNode } from '@acorn/client-core/kit/tokens/support.ts'
 import { Line, slot } from './cells'
-import { borderCell } from './roles'
+import { boxBorder } from './roles'
 import { EditorRectangle, PtyRectangle, type CellTerminal } from './rectangle'
 
 // The kit's one admission that not everything is a tree, and the two wrappers that let a plugin write
@@ -31,8 +31,7 @@ export function Rectangle(props: {
         <box
           flexDirection="column"
           flexShrink={0}
-          border={borderCell('surface').box}
-          borderStyle="single"
+          {...boxBorder('surface')}
           title={props.label}
         >
           {slot(props.children) ?? <Line role="muted">{`${props.label} needs pixels, so it is not drawn here.`}</Line>}

@@ -1,3 +1,4 @@
+import { RGBA } from '@opentui/core'
 import type { Slot } from '@acorn/client-core/kit/tokens/roles.ts'
 
 // Appearance in a terminal: which colour a slot is, and which of the style axes survive.
@@ -20,16 +21,23 @@ import type { Slot } from '@acorn/client-core/kit/tokens/roles.ts'
 // they are published this is a call site rather than a design.
 
 /** The five colours a role can ask for. `default` is the terminal's own foreground. */
-export type Palette = Record<Slot, string | undefined>
+export type Palette = Record<Slot, RGBA>
 
-/** The terminal's own slots, by name. OpenTUI resolves these against whatever the terminal is set to,
- *  which is the theme the person actually chose. */
+/** The terminal's own slots, as the two colours OpenTUI has that mean "ask the terminal": the default
+ *  foreground, which it writes as `ESC[39m`, and a palette index, which it writes as `ESC[38;5;n`.
+ *  Either way the answer comes from the theme the person chose rather than from us.
+ *
+ *  Both have to be said out loud, and that is the whole of the light-terminal bug. A run with no
+ *  colour is not the terminal's foreground to OpenTUI — it is opaque white, `ESC[38;2;255;255;255m`,
+ *  which on a light background is white on white. And a colour *named* is worse than useless: OpenTUI
+ *  reads `cyan` as the CSS colour and sends `#00FFFF`, so the accent was a fixed hex on every
+ *  terminal rather than the palette's own sixth slot. */
 export const TERMINAL_PALETTE: Palette = {
-  default: undefined,
-  accent: 'cyan',
-  ok: 'green',
-  warn: 'yellow',
-  danger: 'red',
+  default: RGBA.defaultForeground(),
+  accent: RGBA.fromIndex(6),
+  ok: RGBA.fromIndex(2),
+  warn: RGBA.fromIndex(3),
+  danger: RGBA.fromIndex(1),
 }
 
 /** Which theme token feeds which slot. Five of the forty; the rest are backgrounds, borders and diff
@@ -57,15 +65,16 @@ export function paletteFor(theme: Readonly<Record<string, string | undefined>>, 
   if (!truecolor) return palette
   for (const slot of Object.keys(FROM_TOKEN) as Slot[]) {
     const value = theme[FROM_TOKEN[slot]]?.trim()
-    if (value && HEX.test(value)) palette[slot] = value
+    if (value && HEX.test(value)) palette[slot] = RGBA.fromHex(value)
   }
   return palette
 }
 
 let palette: Palette = TERMINAL_PALETTE
 
-/** The colour a slot resolves to right now, or nothing for the terminal's own foreground. */
-export const slotColor = (slot: Slot | undefined): string | undefined => (slot ? palette[slot] : undefined)
+/** The colour a slot resolves to right now. A role that names no slot still gets one: `undefined`
+ *  leaves OpenTUI to draw its own white, so "no colour of its own" has to mean the default slot. */
+export const slotColor = (slot: Slot | undefined): RGBA => palette[slot ?? 'default']
 
 /** Swap the palette. Phase 4's job, when the TUI can read the chosen theme off the node. */
 export const setPalette = (next: Palette): void => { palette = next }

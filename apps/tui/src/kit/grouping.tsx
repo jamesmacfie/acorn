@@ -4,7 +4,7 @@ import type { BoxRenderable } from '@opentui/core'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isCompact } from '../appearance'
 import { flatten, Line, slot } from './cells'
-import { borderCell, spaceCells, spaceLines } from './roles'
+import { borderCell, boxBorder, spaceCells, spaceLines } from './roles'
 import { trapKeys } from '../keys/trap'
 
 // The kit's grouping nodes in cells, each drawn to its sentence in
@@ -99,7 +99,6 @@ export function Card(props: {
   focus?: boolean
   children: JSX.Element
 }) {
-  const surface = borderCell('surface')
   return (
     <box flexDirection="row" flexShrink={0} marginTop={isCompact() ? 0 : 1} marginBottom={isCompact() ? 0 : 1}>
       <Show when={props.stripe}>
@@ -108,8 +107,7 @@ export function Card(props: {
       <box
         flexGrow={1}
         flexDirection="column"
-        border={!isCompact() && surface.box}
-        borderStyle="single"
+        {...boxBorder('surface', { when: !isCompact() })}
         title={props.title}
         paddingLeft={isCompact() ? 0 : 1}
         paddingRight={isCompact() ? 0 : 1}
@@ -203,8 +201,7 @@ export function Modal(props: {
   return (
     <box
       flexDirection="column"
-      border={borderCell('surface').box}
-      borderStyle="single"
+      {...boxBorder('surface')}
       title={props.title}
       paddingLeft={1}
       paddingRight={1}
@@ -267,7 +264,7 @@ export function Menu(props: {
 function MenuList(props: { close: () => void; children: JSX.Element }) {
   trapKeys(() => props.close())
   return (
-    <box flexDirection="column" border={borderCell('surface').box} borderStyle="single" paddingLeft={1} paddingRight={1}>
+    <box flexDirection="column" {...boxBorder('surface')} paddingLeft={1} paddingRight={1}>
       {props.children}
     </box>
   )
@@ -329,7 +326,7 @@ export function Popover(props: {
     <box flexDirection="column">
       {props.trigger({ open, toggle: () => (props.disabled ? undefined : setOpen(!open())) })}
       <Show when={open()}>
-        <box flexDirection="column" border={borderCell('surface').box} borderStyle="single" paddingLeft={1} paddingRight={1}>
+        <box flexDirection="column" {...boxBorder('surface')} paddingLeft={1} paddingRight={1}>
           {typeof props.children === 'function' ? props.children({ close }) : props.children}
         </box>
       </Show>

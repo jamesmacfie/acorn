@@ -14,7 +14,8 @@ import type { PickerProps } from '@acorn/client-core/kit/components/inputs/Picke
 import type { MentionTextareaProps } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 import type { ItemProps } from '../keys/collection'
 import { flatten, hasNode, Line, slot } from './cells'
-import { borderCell } from './roles'
+import { boxBorder } from './roles'
+import { slotColor } from '../appearance'
 import { Menu } from './grouping'
 import { copyToTerminal } from './copy'
 
@@ -88,6 +89,9 @@ export function Input(props: InputProps) {
       // A `width` role is not a number and should not become one, so the host decides: a field takes
       // the room its row has left, which is what the stylesheet decides on the DOM.
       flexGrow={props.width === 'narrow' ? 0 : 1}
+      // An edit buffer's own text colour is opaque white, same as every other renderable's
+      // (../appearance.ts), so both fields say the default slot out loud.
+      textColor={slotColor('default')}
       value={text()}
       placeholder={props.placeholder ?? ''}
       ref={(element: InputRenderable) => { field = element }}
@@ -132,6 +136,7 @@ export function Textarea(props: {
   return (
     <textarea
       flexGrow={props.grow ? 1 : 0}
+      textColor={slotColor('default')}
       // `initialValue`, not a child: a string child of an edit buffer is an orphan text node.
       initialValue={props.value ?? ''}
       placeholder={props.placeholder ?? ''}
@@ -292,7 +297,7 @@ export function Composer(props: {
   rows?: number
 }) {
   return (
-    <box flexDirection="column" border={borderCell('surface').box} borderStyle="single" paddingLeft={1} paddingRight={1}>
+    <box flexDirection="column" {...boxBorder('surface')} paddingLeft={1} paddingRight={1}>
       <box flexDirection="row" gap={1}>
         <Line tone="accent">{'>'}</Line>
         <Textarea
