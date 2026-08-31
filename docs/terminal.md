@@ -123,6 +123,24 @@ profile `Menu`, the "+" and the close control in its actions slot. `SplitHandle`
 The session itself is a `Rectangle kind="pty"`: the kit owns the box and the keyboard contract, so a
 reader who tabs into a terminal can press Escape to get back out, and xterm owns the pixels.
 
+**A `pty` rectangle in a terminal is native**, and it is the one thing the terminal client does better
+than the desktop app. Instead of a terminal emulator written in JavaScript running in a browser
+running in an app, `apps/tui/src/kit/rectangle.tsx` draws OpenTUI's own emulator in cells and the
+PTY's bytes go straight into it. The PTY does not move: it stays on the Node, reached over the same
+`term` WebSocket channel, and the terminal client is a second emulator for it.
+
+What the rectangle hands its caller differs, because there is no element to hand over. The DOM hands
+an `HTMLElement` and the caller attaches xterm to it; the terminal hands the three operations a
+terminal is — bytes in, keystrokes out, and the size of the box in cells. The keyboard contract is the
+same on both, with one rule the terminal adds about its own limits: while a rectangle is entered every
+key is the PTY's, `Ctrl+C` included, Escape alone leaves, and pressing Escape twice goes back in and
+sends one through. A desktop reader can click outside; a terminal reader cannot.
+
+The terminal plugin's own surface does not write to that handle yet, because nothing in a terminal
+mounts the drawer until the chrome exists ([future/terminal/](./future/terminal/README.md), phases 4
+and 6). The rectangle and its contract are built and tested; the two callers move when there is a
+place to mount them.
+
 The drawer is a `drawer` slot rather than a pane, so no pane layout owns its outer box. The `Drawer`
 host component does. It draws the dock between the two icon rails and above the task footer, and it
 takes a height and a maximized flag from the plugin, which owns the resize grip that produced them.

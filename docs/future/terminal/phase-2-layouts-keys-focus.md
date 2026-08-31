@@ -1,6 +1,6 @@
 # Phase 2: layouts, keys, and focus
 
-Status: not started. Waits on phase 1.
+Status: **shipped 2026-08-31.**
 
 Read [findings.md](./findings.md) first: it adds two jobs to this phase, the host-supplied layout table the pane registry currently names directly, and the `Suspense` a `lazy()` region needs on a cell host.
 
@@ -108,3 +108,67 @@ they do on the desktop in every collection.
 - `packages/client-core/src/host/layouts/regions.ts` still exports `LayoutProps` with `Region` as a thunk.
 - `plugins/terminal/src/client/TerminalSurface.tsx` still mounts through `Rectangle`'s `mount`.
 - `docs/panes.md § Layout model` still has a projection row per layout.
+
+## What shipped, and where it differs
+
+Seven layout components, the terminal adapter with all four tiers, focus regions and collections
+without a DOM, traps as layers, and the PTY drawn natively with the Rectangle contract. `pnpm lint` is
+green and the `tui` suite is 111 cases on Node 26.8.1.
+
+Both findings this phase inherited are closed. The pane registry's layout table is host-supplied now
+(`client-core/src/host/layouts/table.ts`), so `paneContributions()` hands back a component either host
+can mount and the toy draws Notes through the pane's own component rather than reading its regions
+back off the entry. And every region is under a `Suspense` of its own in the mount path — as is the
+layout, which is a `lazy` for the same reason and was the empty string that actually broke the mount.
+
+Six things went differently from the plan, or turned up on the way:
+
+- **`keymapHost.ts` did not become generic over a pair of type parameters a caller threads through.**
+  It holds the engine at the widest pair the engine allows and hands each host's pair back at the one
+  call that reads it, because every caller in the kit means the DOM's and threading two parameters
+  through `bindIntents` would have touched forty components to say nothing new. What did move out is
+  `isTerminalTarget`, which is DOM all the way down and now lives in `host/keys/install.ts`; and what
+  moved in is one host-supplied predicate, "is somebody typing", which is the only question a binding
+  asks about the focused thing.
+
+- **A rectangle owns its keys by intercepting, not by holding a layer.** A layer answers keys it can
+  name and a rectangle answers all of them, so `PtyRectangle` registers a key intercept above every
+  layer and consumes what it takes. Keys reach the emulator through `encodeKey`, not through its own
+  `handleKeyPress`: the emulator only takes keys when the renderer has focused it, and here the box
+  holds the focus so that Enter and Escape belong to the rectangle rather than to what is inside it.
+
+- **The double Escape has no pending window.** "Escape alone leaves, Escape twice sends one" is drawn
+  as leave-immediately plus "a second Escape within 400ms goes back in and sends it". Holding the
+  first press to see whether a second arrives would put a delay on every exit, and this is the one key
+  rule the desktop does not have, so it should not also be the slowest.
+
+- **Two rules are the terminal's own, and both are about a host with no pointer.** A pane opens with
+  the keys already somewhere, because there is no click to put them there. And a region opens on its
+  list where it has one rather than on the first field above it, because the first thing focused is
+  the thing the bare keys drive and landing in a filter box means `j` types a `j`. Both are in
+  `docs/command-palette-and-shortcuts.md` § Focus and typing.
+
+- **One written projection changed on contact.** The two document splits said the frame half is a
+  rectangle and is absent, so the document half fills the pane. A `frame` region holds a loaded
+  plugin's tree, which draws in cells like anything else; what cannot cross is an iframe's pixels, and
+  a frame region is not one. Both halves are drawn and `docs/panes.md` says so.
+
+- **A shared test seam was quietly broken and this phase found it.** `_resetCollectionState()` was
+  `setStates(() => ({}))`, and a Solid store setter handed a plain object *merges* it — so the reset
+  did nothing and a suite's second test inherited the first one's caret. It is `reconcile({})` now.
+  The DOM suite never noticed because each jsdom file is a fresh module graph; the terminal's whole
+  suite is one process.
+
+## What this phase deliberately left
+
+`plugins/terminal/src/client/TerminalSurface.tsx` and `plugins/docker/src/client/DockerExecTerminal.tsx`
+are unchanged. Both attach xterm to the element the DOM rectangle hands them, and neither is reachable
+on this host yet: the TUI draws one pane and the roster has one plugin in it, so a change to either
+would be code nothing runs and no test can reach. The seam they will use is built and tested — a `pty`
+rectangle hands its caller `write`, `onData` and `onResize` — and the two callers move in phase 6,
+after phase 4 gives the terminal a drawer to mount them in.
+
+So the "done when" of this file is met for the layouts, the keys, the focus and the rectangle, and not
+for "the terminal pane runs a shell at 80 by 24 with vim inside it": that sentence needs chrome. The
+rectangle test drives the emulator directly instead — bytes in, keys out, resize through — which is
+everything between the pane and the PTY except the pane.

@@ -1,6 +1,7 @@
-import { createComponent, lazy, type Component } from 'solid-js'
+import { createComponent, lazy, Suspense, type Component } from 'solid-js'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { Region } from '../../layouts'
+import { suppliedLayout } from '../../layouts/table'
 import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { paneModel } from './paneModels'
@@ -80,10 +81,15 @@ function drawLayout(entry: PaneLayoutContribution<any>): PaneContribution {
   // it when someone opens the pane means finding it in front of a user.
   if (problem) throw new Error(`pane '${entry.id}': ${problem}`)
   const layout = entry.layout
+  // The host's own table first, the DOM's as the fallback, because a second host draws its layouts
+  // with its own components and this registry is the one place that decided otherwise
+  // (../../layouts/table.ts).
+  //
   // Behind `lazy` for the reason plugins/frames/register.ts states: this module is imported by
   // bare-Node test suites, and the repo's vitest configs have no Solid transform, so a static import
-  // of a `.tsx` file would make it unimportable there.
-  const Draw = lazy(async () => ({ default: (await import('../../layouts')).LAYOUTS[layout] }))
+  // of a `.tsx` file would make it unimportable there. The `??` short-circuits, so a host that
+  // supplied a table never reaches for the DOM one at all.
+  const Draw = lazy(async () => ({ default: suppliedLayout(layout) ?? (await import('../../layouts')).LAYOUTS[layout] }))
   return {
     ...entry,
     component: (props) => {
@@ -92,12 +98,24 @@ function drawLayout(entry: PaneLayoutContribution<any>): PaneContribution {
       // and a pane that switches task hands its regions the new task's model without remounting them.
       const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => entry.model!(props.task)) : undefined)
       for (const [name, Region] of Object.entries(entry.regions)) {
-        regions[name] = () => createComponent(Region, {
-          get task() { return props.task },
-          get model() { return model() },
+        // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
+        // renders as an empty string. On the DOM that is an empty text node nobody sees; a cell host
+        // refuses it, because a run of text there must have a `text` parent, and the mount fails
+        // (docs/future/terminal/findings.md). One boundary per region rather than one per pane, so a
+        // slow region does not blank the ones beside it.
+        regions[name] = () => createComponent(Suspense, {
+          fallback: null,
+          get children() {
+            return createComponent(Region, {
+              get task() { return props.task },
+              get model() { return model() },
+            })
+          },
         })
       }
-      return createComponent(Draw, {
+      // The layout is a `lazy` too, and a pending one renders as an empty string for the same
+      // reason a region does, so it gets the same boundary.
+      return createComponent(Suspense, { fallback: null, get children() { return createComponent(Draw, {
         stateKey: entry.id,
         label: entry.label,
         regions,
@@ -105,7 +123,7 @@ function drawLayout(entry: PaneLayoutContribution<any>): PaneContribution {
         // A getter, so a pane that hides a region on a signal re-renders the layout rather than the
         // pane. Collapsing a library must not remount the note being edited.
         get hidden() { return entry.hidden?.(props.task) },
-      })
+      }) } })
     },
   }
 }

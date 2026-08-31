@@ -20,7 +20,7 @@ import {
   ToggleButton,
 } from './asking'
 import { Fallback, Only, Rectangle } from './pixels'
-import { _resetCollections } from './collection'
+import { _resetCollections } from '../keys/collection'
 
 // One case per kit node, asserting the sentence its row in docs/ui-design.md § Every node at 80 by 24
 // promises, against the cells it actually drew.
@@ -731,9 +731,14 @@ const CASES: Case[] = [
         <Rectangle kind="webview" label="Preview"><Fallback forNode="Rectangle"><Text>open it in a browser</Text></Fallback></Rectangle>
       </Stack>
     ),
-    size: { width: 40, height: 10 },
+    // Taller than most cases: a `pty` rectangle is a real emulator with a real screen in it, so two
+    // rectangles stacked in ten lines leave the second one no interior at all.
+    size: { width: 40, height: 20 },
     check: (frame) => {
       has(frame, 'Terminal')
+      // The box says how to get into it, which is what makes it one stop rather than a picture
+      // (../keys/install.ts, ./rectangle.tsx).
+      has(frame, 'enter')
       has(frame, 'open it in a browser')
     },
   },

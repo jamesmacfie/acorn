@@ -24,7 +24,7 @@ export {
   ToggleButton,
 } from './asking'
 export { Fallback, Only, Rectangle } from './pixels'
-export type { ItemProps } from './collection'
+export type { ItemProps } from '../keys/collection'
 
 // Not components, and not the DOM ones either. Each is a rule rather than a rendering, and every rule
 // here holds in cells: arming a button to confirm is a decision the reader makes twice, markdown to

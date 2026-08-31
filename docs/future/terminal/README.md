@@ -60,7 +60,7 @@ Supporting documents, readable in any order:
 | --- | --- | --- | --- | --- |
 | 0 | [phase-0-host-switch-and-toy.md](./phase-0-host-switch-and-toy.md) | **Shipped 2026-08-31.** `HOST` per host package; `apps/tui/` boots client-core under Node; fifteen kit nodes and both layouts on OpenTUI; the Notes pane drawn against a running `dev:node`, unchanged. Findings in [findings.md](./findings.md) | Proof the kit is intent, not layout. Everything after | Nothing |
 | 1 | [phase-1-kit-complete.md](./phase-1-kit-complete.md) | **Shipped 2026-08-31.** All 74 nodes at their decided level; `roleCell()`; the theme as sixteen slots; one cell-buffer test per node; the presence tests became behaviour tests | Any pane | 0 |
-| 2 | [phase-2-layouts-keys-focus.md](./phase-2-layouts-keys-focus.md) | The seven layout components; the keymap's terminal adapter; focus regions and collections without a DOM; the PTY natively | Every compiled pane | 1 |
+| 2 | [phase-2-layouts-keys-focus.md](./phase-2-layouts-keys-focus.md) | **Shipped 2026-08-31.** The seven layout components and a host-supplied layout table; the keymap's terminal adapter with all four tiers; focus regions and collections without a DOM; traps as layers; the PTY natively | Every compiled pane | 1 |
 | 3 | [phase-3-process-and-auth.md](./phase-3-process-and-auth.md) | The `acorn` command: attach or start, supervise, `--node` with probe, words, and pair; device token custody; reconnect and revoked states; a boot test | Running against any node | 0 |
 | 4 | [phase-4-chrome.md](./phase-4-chrome.md) | Rail, topbar, pane row, palette, overlays, footer; task and workspace switching | A usable workspace | 2, 3 |
 | 5 | [phase-5-loaded-plugins.md](./phase-5-loaded-plugins.md) | The worker-thread sandbox, file custody, the trust prompt as a tree, the third column in `docs/security.md` | Third-party plugins in the TUI; rung 2 groundwork | 2 |
@@ -81,13 +81,20 @@ pending `lazy()` region is an empty string a cell host refuses, and OpenTUI need
 `--experimental-ffi`. **Read it before starting any phase below.**
 
 Phase 1 shipped the same day. Every node draws from its sentence, and the two things it deliberately
-left half-done — the clipboard button and the PTY rectangle — are both waiting on focus, which is
+left half-done — the clipboard button and the PTY rectangle — were both waiting on focus, which was
 phase 2. Its own file says what else moved.
 
-Phases 2 and 3 can run in parallel. The layouts are rendering work; the process model is plumbing that
-touches nothing they touch. Phase 3 can start the day phase 0 boots client-core under Node.
+Phase 2 shipped the same day too. Every compiled pane now has a layout to mount into, a keyboard that
+answers, and a rectangle that owns its keys; a `pty` rectangle draws a real emulator in cells and hands
+its caller bytes in, keys out and a size. Two things it scoped are deliberately not done and are named
+in its own file: the terminal and docker panes still write to an element rather than to that handle,
+because nothing on this host mounts either until there is chrome. That is phase 6, after phase 4.
 
-Phase 4 waits on both, because chrome is layouts plus a live node. Phases 5 and 6 can run in parallel
+Phase 3 is the one that can still run alongside anything: the process model is plumbing that touches
+nothing the rendering work touches, and it could have started the day phase 0 booted client-core under
+Node.
+
+Phase 4 waits on 2 and 3, because chrome is layouts plus a live node. Phases 5 and 6 can run in parallel
 after it: the sandbox is protocol and custody work, the pane sweep is reading each pane at 80 by 24 and
 fixing what is unreadable. Phase 7 ships it. Phase 8 deletes this folder.
 

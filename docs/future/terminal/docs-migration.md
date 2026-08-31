@@ -57,14 +57,25 @@ finding that needed a fix needed it in the host or in the pane registry, not in 
 | `docs/future/terminal/README.md` | The phases, The order of work | Phase 1 marked shipped; what it left for phase 2. |
 | `docs/future/terminal/phase-1-kit-complete.md` | What shipped, and where it differs | Four departures from the plan, and the two things deliberately left for phase 2. |
 
-## Owed by phases 2 to 7
+## Done in phase 2 (2026-08-31)
+
+| Doc | Section | Change |
+| --- | --- | --- |
+| `docs/panes.md` | Layout model | The component table is the host package's and reaches the registry through `layouts/table.ts`; the terminal projections are built rather than written; a handle is a key in a terminal; the two document splits' projection corrected. |
+| `docs/command-palette-and-shortcuts.md` | Focus and typing | The terminal adapter is used and what a target is per host; regions without a DOM and the two rules a host with no pointer adds; `collectionIntents.ts` beside `collection.ts`; the trap and the double-Escape rule. |
+| `docs/terminal.md` | Client | The `pty` rectangle in a terminal, what it hands its caller instead of an element, and why the plugin's own surface has not moved yet. |
+| `docs/testing.md` | Test layers | The layout suite and the keys twin. |
+| `docs/future/terminal/findings.md` | What phase 2 did with these | Five findings closed, six new ones. |
+| `docs/future/terminal/phase-2-layouts-keys-focus.md` | What shipped, What this phase deliberately left | Six departures from the plan, and the two plugin callers that wait for phase 4. |
+| `docs/future/terminal/README.md` | The phases, The order of work | Phase 2 marked shipped; what it left for phases 4 and 6. |
+
+## Owed by phases 3 to 7
 
 | Doc | Section | Phase | What it says afterwards |
 | --- | --- | --- | --- |
 | `docs/testing.md` | Test layers | 3, 6 | The TUI boot test; pane snapshots. |
-| `docs/panes.md` | Layout model | 2 | Projections are drawn; any that changed on contact; the layout table is supplied by the host package rather than named by the pane registry ([findings.md](./findings.md)). |
-| `docs/command-palette-and-shortcuts.md` | Focus and typing | 2, 4 | The terminal adapter is used; the double-Escape rule; the region cycle and the footer. |
-| `docs/terminal.md` | the PTY | 2, 6 | The PTY on the TUI; the editor handoff; docker exec. |
+| `docs/command-palette-and-shortcuts.md` | Focus and typing | 4 | The footer, drawn from the active layers. |
+| `docs/terminal.md` | the PTY | 6 | The editor handoff; docker exec; the two callers writing to the rectangle's handle. |
 | `docs/node-distribution.md` | reaching a node | 3, 7 | `acorn` beside the desktop; `bin/acorn` in the tarball layout. |
 | `docs/security.md` | Transport and auth | 3 | The terminal sets the bearer on the upgrade itself. |
 | `docs/security.md` | Trust boundaries, Transport and auth, Third-party plugin bundles, The containment ladder, summary table | 5 | The terminal column, per `06-isolation.md`. |

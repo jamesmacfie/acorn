@@ -10,7 +10,7 @@
 // Module-level, like the registries and `layouts/state.ts`, and session-only for the same reason:
 // where you are in a list is a reading posture, not a preference.
 
-import { createStore } from 'solid-js/store'
+import { createStore, reconcile } from 'solid-js/store'
 
 export type CollectionState = {
   /** Where roving focus is. Host-owned always; a plugin never writes it. */
@@ -40,7 +40,11 @@ export function setCollectionOffset(id: string, offset: number): void {
   setStates(id, (current) => ({ ...(current ?? EMPTY), offset }))
 }
 
-/** Test seam, and the eviction hook a host with a lifecycle would call. */
+/** Test seam, and the eviction hook a host with a lifecycle would call.
+ *
+ *  Through `reconcile`, because a store setter handed a plain object *merges* it: `setStates(() => ({}))`
+ *  reads as "replace with nothing" and does nothing at all, which left a suite's second test holding
+ *  the first one's caret. Found by the terminal host, whose whole suite is one process. */
 export function _resetCollectionState(): void {
-  setStates(() => ({}))
+  setStates(reconcile({}))
 }

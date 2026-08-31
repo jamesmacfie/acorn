@@ -2,10 +2,10 @@
 import { createMemo, createSignal, For, Index, Show, type JSX } from 'solid-js'
 import type { BoxRenderable } from '@opentui/core'
 import type { Size, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
-import type { CollectionItem } from '@acorn/client-core/kit/keys/collection.ts'
+import type { CollectionItem } from '@acorn/client-core/kit/keys/collectionIntents.ts'
 import type { CodeRow, DiffFile, Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
 import { buildDiffRows, plainTokenize } from '@acorn/client-core/kit/diff/diffModel.ts'
-import { active as activeRow, registerRowPress, registerRows, type ItemProps } from './collection'
+import { createCellCollection, type ItemProps } from '../keys/collection'
 import { flatten, Line, pad, runStyle, slot } from './cells'
 import { markdownLines } from './markdown'
 import { borderCell, rule, spaceCells } from './roles'
@@ -63,13 +63,26 @@ export function Row(props: {
   children: JSX.Element
 }) {
   // The active row is the collection's, the selected row is the pane's, and in a terminal they are
-  // drawn by the same two cells: a caret for where the keys are, reverse video for what is chosen.
-  const isActive = () => !!props.item && activeRow() === props.item.key
-  // A row inside a collection hands its press over, so `activate` can reach it. A row outside one is
-  // a lone stop with nothing to reach it yet; phase 2 gives it focus of its own.
-  if (props.item) registerRowPress(props.item.key, () => props.onPress?.())
+  // drawn by the same two cells: a caret for where the keys are, the `match` role for what is chosen.
+  const isActive = () => !!props.item?.active()
+  // A row inside a collection hands its press over, so `activate` can reach it: on the DOM a `Row` is
+  // a button and Enter on it raises a click by itself, and there is no element here to do that
+  // (../keys/collection.ts).
+  if (props.item) props.item.press(() => props.onPress?.())
   return (
-    <box flexDirection="row" gap={1} paddingLeft={props.depth ? props.depth * 2 : 0}>
+    <box
+      flexDirection="row"
+      gap={1}
+      paddingLeft={props.depth ? props.depth * 2 : 0}
+      ref={(element: BoxRenderable) => {
+        // The row is where focus lands, so the collection can put it there and a region's first stop
+        // can find it. `item` is the collection's; a row outside one is not a stop, which is what
+        // `focusRoles.ts` says a `Row` is — an item, never a stop of its own.
+        if (!props.item) return
+        element.focusable = true
+        props.item.ref(element)
+      }}
+    >
       <Line tone="accent">{isActive() ? '›' : ' '}</Line>
       {slot(props.leading)}
       <Line role={props.selected ? 'match' : 'body'}>{props.children}</Line>
@@ -139,11 +152,17 @@ export function Rows<T extends CollectionItem>(props: {
   children: (item: T, itemProps: ItemProps, selected: () => boolean, place: Record<string, never>) => JSX.Element
 }) {
   const items = createMemo(() => props.items)
-  registerRows({
-    id: props.id,
-    get items() { return items() },
-    ...(props.onActivate ? { activate: props.onActivate } : {}),
-    ...(props.onSelect ? { select: props.onSelect } : {}),
+  // One collection per `Rows`, keyed by the pane's own id, which is what the host store has always
+  // been keyed by. Phase 0's stand-in was one store for every list on screen; this is the real thing
+  // (../keys/collection.ts).
+  const collection = createCellCollection({
+    id: () => props.id,
+    items,
+    ...(props.selected === undefined ? {} : { selected: () => props.selected }),
+    ...(props.onSelect ? { onSelect: props.onSelect } : {}),
+    ...(props.onActivate ? { onActivate: props.onActivate } : {}),
+    ...(props.onExpand ? { onExpand: props.onExpand } : {}),
+    ...(props.onMenu ? { onMenu: props.onMenu } : {}),
   })
   const NO_PLACE = {} as Record<string, never>
 
@@ -155,7 +174,7 @@ export function Rows<T extends CollectionItem>(props: {
     const all = items()
     const fit = rows()
     if (!props.virtual || !fit || all.length <= fit) return { from: 0, items: all }
-    const at = Math.max(0, all.findIndex((item) => item.key === activeRow()))
+    const at = Math.max(0, all.findIndex((item) => item.key === collection.active()))
     const from = Math.min(Math.max(0, at - Math.floor(fit / 2)), Math.max(0, all.length - fit))
     return { from, items: all.slice(Math.max(0, from - OVERSCAN), from + fit + OVERSCAN) }
   })
@@ -163,11 +182,11 @@ export function Rows<T extends CollectionItem>(props: {
   return (
     <box
       flexDirection="column"
-      ref={(element: BoxRenderable) => { box = element; setRows(element.height) }}
+      ref={(element: BoxRenderable) => { box = element; setRows(element.height); collection.attach(element) }}
       onSizeChange={() => setRows(box?.height ?? 0)}
     >
       <For each={window().items}>
-        {(item) => props.children(item, { key: item.key }, () => props.selected === item.key, NO_PLACE)}
+        {(item) => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)}
       </For>
     </box>
   )

@@ -35,17 +35,31 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
  *
  *  The smoke test asserts on what comes back and drives it with keys; `capture.tsx` prints one frame.
  *  Both go through the same function, so the screenshot is of the thing under test. */
-export async function renderFixture(size: { width?: number; height?: number } = {}): Promise<{ frame: () => Promise<string>; press: (key: string) => Promise<void>; done: () => void }> {
-  const { testRender } = await import('@opentui/solid')
-  const { installKeymap } = await import('./keys')
-  const { _resetCollections } = await import('./kit/collection')
-  // The collection store is module state, so two renders in one process share a caret. The real host
+export async function renderFixture(size: { width?: number; height?: number } = {}): Promise<{ frame: () => Promise<string>; press: (key: string) => Promise<void>; resize: (width: number, height: number) => void; done: () => void }> {
+  const { createTestRenderer } = await import('@opentui/core/testing')
+  const { render } = await import('@opentui/solid')
+  const { installKeymap } = await import('./keys/install')
+  const { _resetCollections } = await import('./keys/collection')
+  const { _resetRegions } = await import('./keys/regions')
+  const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
+  // The collection store, the region list and the per-pane layout state are all module state, so two
+  // renders in one process would share a caret, a focused region and a split position. The real host
   // has one render for its lifetime; a suite has one per test.
   _resetCollections()
+  _resetRegions()
+  _resetLayoutState()
   const { task } = await bootFixture()
   const { App } = await import('./App')
-  const { renderer, mockInput, flush, captureCharFrame } = await testRender(() => <App task={task} />, { width: size.width ?? 80, height: size.height ?? 24 })
-  installKeymap(renderer, () => {})
+
+  // The renderer first and the tree second, rather than `testRender`, which builds both at once. The
+  // keymap has to be installed before anything mounts: a layout, a collection and a trap all register
+  // their layer as they draw, and a layer registered against no engine is silently dropped.
+  const { renderer, mockInput, flush, captureCharFrame, resize } = await createTestRenderer({
+    width: size.width ?? 80,
+    height: size.height ?? 24,
+  })
+  installKeymap(renderer)
+  await render(() => <App task={task} />, renderer)
   // Bounded, and the frame is taken either way. A tree that never settles is itself a finding, and a
   // capture that hangs says nothing about which node did it.
   const settle = (ms: number) => Promise.race([flush(), new Promise((done) => setTimeout(done, ms))])
@@ -67,6 +81,7 @@ export async function renderFixture(size: { width?: number; height?: number } = 
       mockInput.pressKey(key)
       await settle(500)
     },
+    resize,
     done: () => renderer.destroy(),
   }
 }
