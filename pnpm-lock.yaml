@@ -357,9 +357,15 @@ importers:
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13)
+      diff:
+        specifier: ^9.0.0
+        version: 9.0.0
       entities:
         specifier: ^7.0.1
         version: 7.0.1
+      gitdiff-parser:
+        specifier: ^0.3.1
+        version: 0.3.1
       idb-keyval:
         specifier: ^6.2.5
         version: 6.2.5

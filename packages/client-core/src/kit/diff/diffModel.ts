@@ -4,7 +4,11 @@ import { diffWordsWithSpace } from 'diff'
 import gitdiffParser from 'gitdiff-parser'
 import { synth } from './synth'
 import type { getHighlighter } from '../../infra/highlight/shiki'
-import { langFor } from '../../infra/highlight/shiki'
+// From `langs.ts` rather than from `shiki.ts`, which re-exports it: the re-export is a value import
+// and pulls the main-thread highlighter and its regex engine into every graph this module is in.
+// `highlighter.worker.ts` splits the vocabulary out for the same reason, and the terminal host is the
+// second caller that wants the row model and has no use for shiki at all.
+import { langFor } from '../../infra/highlight/langs'
 // Type-only, so the worker client's module graph, including its dynamic `?worker` import, stays out
 // of this module. Several plugin tests load it in a node environment where that import cannot
 // resolve.

@@ -27,16 +27,18 @@ export default function Markdown(props: {
   copy?: boolean
   /** Sandboxed frames have no `navigator.clipboard`, so they pass their bridge's copy here. */
   onCopy?: (text: string) => void
-  onClick?: (event: MouseEvent) => void
   /**
-   * A link inside the rendered content was clicked, by its href. The browser's own navigation is
-   * cancelled, so the handler owns where it goes.
+   * A link inside the rendered content was pressed, by its href. Return `false` to let the link open
+   * the way it would have; anything else, `undefined` included, means the handler took it and the
+   * browser's own navigation is cancelled.
    *
-   * One of the kit's eleven events, and that is the point: `onClick` hands over a DOM event, which a
-   * remote tree cannot receive and a terminal host does not have. A plugin that re-points itself when
-   * one of its own tickets is linked needs this and nothing more.
+   * The only event on this node, and the only one it needs: the link's destination is the whole
+   * question. There used to be an `onClick` beside it handing over the DOM event, which a remote tree
+   * cannot receive and a terminal host does not have; its two callers wanted `openInAppUrl(href)` and
+   * the browser on a false, which is what the return value is for. Removed when the terminal host
+   * started drawing this node (docs/future/terminal/findings.md).
    */
-  onSelect?: (href: string) => void
+  onSelect?: (href: string) => boolean | void
 }) {
   let root: HTMLDivElement | undefined
   let generation = 0
@@ -111,12 +113,14 @@ export default function Markdown(props: {
       ref={root}
       class="ui-markdown"
       onClick={(event) => {
+        // A modified click is the reader asking the browser for something — a new tab, a saved
+        // target — and no handler here should take it. Same guard the host's own content-link
+        // handler keeps.
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
         const href = (event.target as HTMLElement | null)?.closest('a')?.getAttribute('href')
-        if (props.onSelect && href) {
-          event.preventDefault()
-          props.onSelect(href)
-        }
-        props.onClick?.(event)
+        if (!props.onSelect || !href) return
+        if (props.onSelect(href) === false) return
+        event.preventDefault()
       }}
     />
   )

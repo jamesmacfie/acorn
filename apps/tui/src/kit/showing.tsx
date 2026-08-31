@@ -1,0 +1,633 @@
+/** @jsxImportSource @opentui/solid */
+import { createMemo, createSignal, For, Index, Show, type JSX } from 'solid-js'
+import type { BoxRenderable } from '@opentui/core'
+import type { Size, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import type { CollectionItem } from '@acorn/client-core/kit/keys/collection.ts'
+import type { CodeRow, DiffFile, Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
+import { buildDiffRows, plainTokenize } from '@acorn/client-core/kit/diff/diffModel.ts'
+import { active as activeRow, registerRowPress, registerRows, type ItemProps } from './collection'
+import { flatten, Line, pad, runStyle, slot } from './cells'
+import { markdownLines } from './markdown'
+import { borderCell, rule, spaceCells } from './roles'
+import { GLYPHS } from './glyphs'
+
+// The kit's showing nodes in cells. One component per sentence in
+// docs/ui-design.md § Every node at 80 by 24; where a node is `reduced`, `support.ts` says what is
+// lost and the component loses exactly that.
+
+export function Text(props: { emphasis?: TextRole; tone?: Tone; wrap?: boolean; children: JSX.Element }) {
+  return <Line role={props.emphasis} tone={props.tone} wrap={props.wrap}>{props.children}</Line>
+}
+
+/** The text, underlined, pressable. Underline is the `control` border role's answer, which is what a
+ *  link is: a run of text with an edge under it. */
+export function Link(props: { href?: string; onPress?: () => void; children: JSX.Element }) {
+  const style = () => ({ ...runStyle('body', 'accent'), attributes: (runStyle('body', 'accent').attributes ?? 0) | borderCell('control').attributes })
+  return <text {...style()}>{flatten(props.children)}</text>
+}
+
+export function Heading(props: { level?: 1 | 2 | 3; eyebrow?: string; children: JSX.Element }) {
+  return (
+    <box flexDirection="column">
+      <Show when={props.eyebrow}><Line role="eyebrow">{props.eyebrow!}</Line></Show>
+      <Line role="heading">{props.children}</Line>
+    </box>
+  )
+}
+
+// ── Lists ─────────────────────────────────────────────────────────────────────────────────────
+
+/** One line: the caret for where the keys are, the leading slot, the title, the meta at the far end.
+ *
+ *  `reveal` hides the trailing controls until hover on the DOM. There is no hover, so they always
+ *  show — the one prop this host answers by ignoring, noted in the node's row in the 80×24 table. */
+export function Row(props: {
+  item?: ItemProps
+  metaFields?: number
+  selected?: boolean
+  nested?: boolean
+  depth?: number
+  reveal?: boolean
+  density?: 'compact' | 'default' | 'roomy'
+  onPress?: () => void
+  href?: string
+  offset?: number
+  height?: number
+  label?: string
+  onHover?: (entered: boolean) => void
+  variant?: 'default' | 'stacked' | 'tree'
+  leading?: JSX.Element
+  trailing?: JSX.Element
+  meta?: JSX.Element
+  title?: string
+  children: JSX.Element
+}) {
+  // The active row is the collection's, the selected row is the pane's, and in a terminal they are
+  // drawn by the same two cells: a caret for where the keys are, reverse video for what is chosen.
+  const isActive = () => !!props.item && activeRow() === props.item.key
+  // A row inside a collection hands its press over, so `activate` can reach it. A row outside one is
+  // a lone stop with nothing to reach it yet; phase 2 gives it focus of its own.
+  if (props.item) registerRowPress(props.item.key, () => props.onPress?.())
+  return (
+    <box flexDirection="row" gap={1} paddingLeft={props.depth ? props.depth * 2 : 0}>
+      <Line tone="accent">{isActive() ? '›' : ' '}</Line>
+      {slot(props.leading)}
+      <Line role={props.selected ? 'match' : 'body'}>{props.children}</Line>
+      <box flexGrow={1} />
+      {slot(props.meta)}
+      {slot(props.trailing)}
+    </box>
+  )
+}
+
+/** `Row` indented by `depth` with `▸` or `▾`. A wrapper, as on the DOM, so `Row`'s API stays flat. */
+export function TreeRow(props: {
+  item?: ItemProps
+  expandable?: boolean
+  expanded?: boolean
+  onToggle?: () => void
+  depth?: number
+  selected?: boolean
+  onPress?: () => void
+  leading?: JSX.Element
+  trailing?: JSX.Element
+  meta?: JSX.Element
+  reveal?: boolean
+  title?: string
+  children: JSX.Element
+}) {
+  return (
+    <Row
+      item={props.item}
+      selected={props.selected}
+      depth={props.depth}
+      density="compact"
+      variant="tree"
+      meta={props.meta}
+      trailing={props.trailing}
+      onPress={props.onPress}
+      leading={<box flexDirection="row" gap={1}><Line>{props.expandable ? (props.expanded ? '▾' : '▸') : ' '}</Line>{slot(props.leading)}</box>}
+    >
+      {props.children}
+    </Row>
+  )
+}
+
+/** The row's actions as glyphs at the right end, always drawn, never on hover. */
+export function RowActions(props: { ariaLabel: string; children: JSX.Element }) {
+  return <box flexDirection="row" gap={1}>{props.children}</box>
+}
+
+// How many rows a virtualised list keeps around the window, so a move by one does not have to
+// re-measure. Same idea as the DOM virtualizer's overscan, one tenth the size: a terminal window is
+// tens of rows, not hundreds.
+const OVERSCAN = 2
+
+/** Items on successive lines. `virtual` is the scroll window and changes nothing else: the component
+ *  is the virtualiser, because OpenTUI has none, and it draws only the rows that fit. */
+export function Rows<T extends CollectionItem>(props: {
+  id: string
+  ariaLabel?: string
+  items: readonly T[]
+  tree?: boolean
+  virtual?: boolean
+  selected?: string | null
+  onSelect?: (key: string) => void
+  onActivate?: (key: string) => void
+  onExpand?: (key: string, expand: boolean) => void
+  onMenu?: (key: string) => void
+  children: (item: T, itemProps: ItemProps, selected: () => boolean, place: Record<string, never>) => JSX.Element
+}) {
+  const items = createMemo(() => props.items)
+  registerRows({
+    id: props.id,
+    get items() { return items() },
+    ...(props.onActivate ? { activate: props.onActivate } : {}),
+    ...(props.onSelect ? { select: props.onSelect } : {}),
+  })
+  const NO_PLACE = {} as Record<string, never>
+
+  let box: BoxRenderable | undefined
+  const [rows, setRows] = createSignal(0)
+  // The window follows the active row rather than a scroll position, because in a terminal there is
+  // no pointer to scroll with: the keys move the caret and the view goes where the caret is.
+  const window = createMemo(() => {
+    const all = items()
+    const fit = rows()
+    if (!props.virtual || !fit || all.length <= fit) return { from: 0, items: all }
+    const at = Math.max(0, all.findIndex((item) => item.key === activeRow()))
+    const from = Math.min(Math.max(0, at - Math.floor(fit / 2)), Math.max(0, all.length - fit))
+    return { from, items: all.slice(Math.max(0, from - OVERSCAN), from + fit + OVERSCAN) }
+  })
+
+  return (
+    <box
+      flexDirection="column"
+      ref={(element: BoxRenderable) => { box = element; setRows(element.height) }}
+      onSizeChange={() => setRows(box?.height ?? 0)}
+    >
+      <For each={window().items}>
+        {(item) => props.children(item, { key: item.key }, () => props.selected === item.key, NO_PLACE)}
+      </For>
+    </box>
+  )
+}
+
+// ── Marks ─────────────────────────────────────────────────────────────────────────────────────
+
+/** `[text]` in the tone's colour. */
+export function Badge(props: {
+  tone?: Extract<Tone, 'neutral' | 'accent' | 'ok' | 'danger' | 'warn'>
+  shape?: 'tag' | 'pill'
+  size?: Extract<Size, 'xs' | 'sm'>
+  dashed?: boolean
+  children: JSX.Element
+}) {
+  return <Line tone={props.tone}>{`[${flatten(props.children)}]`}</Line>
+}
+
+/** `(text)`, with a trailing `✕` when removable. */
+export function Chip(props: {
+  tone?: Extract<Tone, 'neutral' | 'accent' | 'ok' | 'danger' | 'warn'>
+  color?: string
+  onRemove?: () => void
+  onPress?: () => void
+  leading?: JSX.Element
+  size?: Extract<Size, 'xs' | 'sm'>
+  dashed?: boolean
+  reveal?: boolean
+  selected?: boolean
+  title?: string
+  children: JSX.Element
+}) {
+  return (
+    <box flexDirection="row">
+      {slot(props.leading)}
+      <Line role={props.selected ? 'match' : 'body'} tone={props.tone}>
+        {`(${flatten(props.children)}${props.onRemove ? ' ✕' : ''})`}
+      </Line>
+    </box>
+  )
+}
+
+export function ChipRow(props: { ariaLabel?: string; children: JSX.Element }) {
+  return <box flexDirection="row" flexWrap="wrap" gap={spaceCells('inline')}>{props.children}</box>
+}
+
+/** `●` in the tone's colour, `○` for neutral. `pulse` is a state, not a motion: a terminal that has
+ *  to redraw a cell ten times a second to say "starting" is spending a frame on a full stop. */
+export function StatusDot(props: {
+  tone: Extract<Tone, 'ok' | 'warn' | 'danger' | 'muted' | 'accent'>
+  mixed?: boolean
+  pulse?: boolean
+  label?: string
+  size?: Extract<Size, 'sm' | 'md'>
+}) {
+  return <Line tone={props.tone}>{props.mixed ? '◐' : props.tone === 'muted' ? '○' : '●'}</Line>
+}
+
+/** Initials in brackets; no image. Two letters, because a login is a word and a terminal column is
+ *  not a circle. */
+export function UserAvatar(props: { login: string | null | undefined; size?: 'sm' | 'md' }) {
+  const initials = () => {
+    const login = props.login?.trim() ?? ''
+    if (!login) return '··'
+    const parts = login.split(/[^a-zA-Z0-9]+/).filter(Boolean)
+    return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : login.slice(0, 2)).toUpperCase()
+  }
+  return <Line role="muted">{`[${initials()}]`}</Line>
+}
+
+/** A glyph from the name table, an emoji as itself, and nothing for a Lucide name with no glyph.
+ *  Drawing the name as words instead would push every row it sits in sideways by six cells. */
+export function Icon(props: { name: string; size?: number | string; title?: string; tone?: Tone | 'brand'; spin?: boolean }) {
+  const glyph = () => GLYPHS[props.name] ?? ([...props.name].length === 1 ? props.name : '')
+  const tone = () => (props.tone === 'brand' ? 'accent' : props.tone)
+  return <Show when={glyph()}>{(mark) => <Line tone={tone()}>{mark()}</Line>}</Show>
+}
+
+/** `⌘K` or `ctrl+k`, per host. The chord arrives already spelled for this platform; the node is the
+ *  box around it, and a terminal has no box. */
+export function Kbd(props: { size?: Extract<Size, 'xs' | 'sm'>; children: JSX.Element }) {
+  return <Line role="strong">{flatten(props.children)}</Line>
+}
+
+// A braille cycle, which is the one animation a terminal does well.
+const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+
+/** reduced: a braille cycle, or `…` where motion is off. Static, because a spinner that redraws on a
+ *  timer keeps the renderer awake for as long as anything on screen is busy; phase 4 gives the shell
+ *  one tick and every spinner reads it. */
+export function Spinner(_props: { size?: 'sm' | 'md'; label?: string }) {
+  return <Line role="muted">{SPINNER[0]}</Line>
+}
+
+// ── Facts ─────────────────────────────────────────────────────────────────────────────────────
+
+/** Two columns, labels dim; `grouping="rows"` is one pair per line, which in cells is what both
+ *  groupings are. */
+export function Facts(props: {
+  items: readonly { label: string; value: JSX.Element; mono?: boolean }[]
+  size?: 'sm' | 'md'
+  grouping?: 'tiles' | 'rows'
+}) {
+  const width = () => Math.max(0, ...props.items.map((item) => item.label.length))
+  return (
+    <box flexDirection="column">
+      <For each={props.items}>
+        {(item) => (
+          <box flexDirection="row" gap={1}>
+            <Line role="muted">{pad(item.label, width())}</Line>
+            {slot(item.value)}
+          </box>
+        )}
+      </For>
+    </box>
+  )
+}
+
+export function DescriptionList(props: { layout?: 'columns' | 'facts'; size?: 'sm' | 'md'; children: JSX.Element }) {
+  return <box flexDirection="column">{props.children}</box>
+}
+DescriptionList.Item = (props: { label: JSX.Element; mono?: boolean; children: JSX.Element }) => (
+  <box flexDirection="row" gap={1}>
+    <Line role="muted">{flatten(props.label)}</Line>
+    {slot(props.children)}
+  </box>
+)
+
+/** `████░░░░ 62%`. Eight cells, because a meter that spends a whole row on a ratio is a chart. */
+export function Meter(props: {
+  value: number
+  tone?: Extract<Tone, 'accent' | 'warn' | 'danger'> | 'auto'
+  label: string
+  size?: Extract<Size, 'sm' | 'md'>
+}) {
+  const CELLS = 8
+  const ratio = () => Math.min(1, Math.max(0, props.value))
+  const tone = () => {
+    if (props.tone !== 'auto') return props.tone ?? 'accent'
+    return ratio() >= 0.9 ? 'danger' : ratio() >= 0.75 ? 'warn' : 'accent'
+  }
+  const filled = () => Math.round(ratio() * CELLS)
+  return (
+    <box flexDirection="row" gap={1}>
+      <Line tone={tone()}>{'█'.repeat(filled()) + '░'.repeat(CELLS - filled())}</Line>
+      <Line role="muted">{`${Math.round(ratio() * 100)}%`}</Line>
+    </box>
+  )
+}
+
+/** Monospace lines with a dim rule above and below. Every line in a terminal is monospace, so the
+ *  rules are what says "this is a block and not a paragraph". */
+export function CodeBlock(props: {
+  copy?: boolean | string
+  onCopy?: (text: string) => void
+  wrap?: boolean
+  size?: 'xs' | 'sm'
+  maxHeight?: 'none' | 'block'
+  children: JSX.Element
+}) {
+  const RULE = 40
+  return (
+    <box flexDirection="column">
+      <Line role="muted">{rule(RULE)}</Line>
+      <For each={flatten(props.children).split('\n')}>
+        {(line) => <Line role="mono" wrap={props.wrap}>{line}</Line>}
+      </For>
+      <Line role="muted">{rule(RULE)}</Line>
+    </box>
+  )
+}
+
+/** Monospace lines with the find bar as the bottom line. `follow` is what the region's scroll does;
+ *  the tail is at the bottom because a column of cells grows downward. */
+export function Log(props: { lines: readonly string[]; follow?: boolean; find?: JSX.Element; ariaLabel: string }) {
+  return (
+    <box flexDirection="column" flexGrow={1}>
+      <box flexDirection="column" flexGrow={1} overflow="scroll">
+        <For each={props.lines}>{(line) => <Line role="mono">{line}</Line>}</For>
+      </box>
+      {slot(props.find)}
+    </box>
+  )
+}
+
+/** reduced: no images, and a link is its text with the URL beside it in dim. The policy is the
+ *  shell's; this draws what it decided (./markdown.ts). */
+export function Markdown(props: {
+  text: string
+  images?: 'inline' | 'placeholder'
+  copy?: boolean
+  onCopy?: (text: string) => void
+  onSelect?: (href: string) => void
+}) {
+  const lines = createMemo(() => markdownLines(props.text))
+  return (
+    <box flexDirection="column">
+      <For each={lines()}>
+        {(line) => (
+          <Show when={!line.rule} fallback={<Line role="muted">{rule(40)}</Line>}>
+            <box flexDirection="row" paddingLeft={line.indent ?? 0}>
+              <For each={line.runs}>{(run) => <Line role={run.role} tone={run.tone}>{run.text}</Line>}</For>
+            </box>
+          </Show>
+        )}
+      </For>
+    </box>
+  )
+}
+
+// ── Tables ────────────────────────────────────────────────────────────────────────────────────
+
+// The narrowest a column may be before it is worth dropping instead. Below this a cell is an
+// ellipsis and the reader learns nothing from the column being there.
+const MIN_COLUMN = 6
+const PRIORITY_ORDER = { low: 0, normal: 1, high: 2 } as const
+
+type Column = { priority: 'high' | 'normal' | 'low'; label: string }
+type TableState = {
+  width: () => number
+  register: (column: Column) => number
+  hidden: (index: number) => boolean
+  columnWidth: () => number
+}
+
+// A table decides its own columns, so the head and the cells have to hear the decision. A module
+// signal rather than a context, because a table's rows are drawn by the caller and a context would
+// mean the caller wrapping them: one table is being built at a time in a synchronous render pass,
+// which is the same assumption `Rows` makes about its own registration.
+let building: TableState | null = null
+
+/** reduced: box-drawn, truncating columns by the priority its heads declare. */
+export function Table(props: { size?: 'sm' | 'md'; stickyHead?: boolean; minWidth?: number; children: JSX.Element }) {
+  let box: BoxRenderable | undefined
+  const [width, setWidth] = createSignal(80)
+  const [columns, setColumns] = createSignal<Column[]>([])
+
+  const fits = createMemo(() => Math.max(1, Math.floor(width() / MIN_COLUMN)))
+  // Drop the lowest priority first, then the rightmost of equal priority, which is the order a reader
+  // gives up on a table's columns anyway.
+  const kept = createMemo(() => {
+    const all = columns().map((column, index) => ({ ...column, index }))
+    if (all.length <= fits()) return new Set(all.map((column) => column.index))
+    const order = [...all].sort((a, b) => PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority] || a.index - b.index)
+    return new Set(order.slice(0, fits()).map((column) => column.index))
+  })
+  const lost = () => columns().filter((_column, index) => !kept().has(index)).map((column) => column.label)
+
+  const state: TableState = {
+    width,
+    register: (column) => {
+      let index = 0
+      setColumns((current) => {
+        index = current.length
+        return [...current, column]
+      })
+      return index
+    },
+    hidden: (index) => columns().length > 0 && !kept().has(index),
+    columnWidth: () => Math.max(MIN_COLUMN, Math.floor(width() / Math.max(1, kept().size))),
+  }
+  building = state
+
+  return (
+    <box
+      flexDirection="column"
+      ref={(element: BoxRenderable) => { box = element; setWidth(element.width) }}
+      onSizeChange={() => setWidth(box?.width ?? 80)}
+    >
+      {props.children}
+      {/* Naming what was lost, rather than counting it: a reader who can see that two columns are
+          missing still has to widen the pane to find out whether either was the one they wanted. */}
+      <Show when={lost().length}>
+        <Line role="muted">{`+ ${lost().join(' ')}`}</Line>
+      </Show>
+    </box>
+  )
+}
+
+/** reduced: the column's label in the bold header line; the lowest priority is dropped first, and the
+ *  header names what was lost. */
+export function TableHead(props: { align?: 'start' | 'center' | 'end'; priority?: 'high' | 'normal' | 'low'; children?: JSX.Element }) {
+  const table = building
+  const index = table?.register({ priority: props.priority ?? 'normal', label: flatten(props.children) }) ?? 0
+  return (
+    <Show when={!table?.hidden(index)}>
+      <Line role="strong">{pad(flatten(props.children), table?.columnWidth() ?? 12)}</Line>
+    </Show>
+  )
+}
+
+/** reduced: one line, cells separated by `│`, truncated by column priority. */
+export function TableRow(props: { head?: boolean; onPress?: () => void; children: JSX.Element }) {
+  return <box flexDirection="row" gap={1}>{props.children}</box>
+}
+
+/** reduced: the cell's text in its column's width, ellipsised where it does not fit. */
+export function TableCell(props: { align?: 'start' | 'center' | 'end'; header?: boolean; children?: JSX.Element }) {
+  const table = building
+  return <Line role={props.header ? 'strong' : 'body'}>{pad(flatten(props.children), table?.columnWidth() ?? 12)}</Line>
+}
+
+/** reduced: as `Table`, with a row-range indicator instead of a scrollbar, and cells that are
+ *  strings, which is what makes the arithmetic possible at all. */
+export function Grid(props: {
+  columns: readonly string[]
+  rows: readonly (readonly string[])[]
+  selected?: number | null
+  onSelect?: (index: number) => void
+  ariaLabel: string
+}) {
+  let box: BoxRenderable | undefined
+  const [size, setSize] = createSignal({ width: 80, height: 10 })
+  const measure = (element: BoxRenderable | undefined) => {
+    if (element) setSize({ width: element.width, height: element.height })
+  }
+  const fits = () => Math.max(1, Math.floor(size().width / MIN_COLUMN))
+  const shown = () => props.columns.slice(0, fits())
+  const columnWidth = () => Math.max(MIN_COLUMN, Math.floor(size().width / Math.max(1, shown().length)))
+  // Two lines go to the header and the range, so the window is what is left.
+  const visible = () => Math.max(1, size().height - 2)
+  const from = () => {
+    const at = props.selected ?? 0
+    return Math.min(Math.max(0, at - Math.floor(visible() / 2)), Math.max(0, props.rows.length - visible()))
+  }
+  const line = (cells: readonly string[]) => shown().map((_column, index) => pad(cells[index] ?? '', columnWidth())).join('│')
+
+  return (
+    <box
+      flexDirection="column"
+      flexGrow={1}
+      ref={(element: BoxRenderable) => { box = element; measure(element) }}
+      onSizeChange={() => measure(box)}
+    >
+      <Line role="strong">{line(props.columns)}</Line>
+      <Index each={props.rows.slice(from(), from() + visible())}>
+        {(row, index) => (
+          <Line role={props.selected === from() + index ? 'match' : 'body'}>{line(row())}</Line>
+        )}
+      </Index>
+      <Line role="muted">
+        {`${props.rows.length ? from() + 1 : 0}–${Math.min(props.rows.length, from() + visible())} of ${props.rows.length}`}
+        {props.columns.length > shown().length ? ` · ${props.columns.length - shown().length} more columns` : ''}
+      </Line>
+    </box>
+  )
+}
+
+// ── Diff ──────────────────────────────────────────────────────────────────────────────────────
+
+/** reduced: no intra-line word highlight. The gutter is the change, the colour is the direction. */
+export function DiffLine(props: { r: CodeRow; canAdd?: boolean; highlight?: unknown }) {
+  const mark = () => (props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '-' : ' ')
+  const tone = () => (props.r.kind === 'insert' ? 'ok' : props.r.kind === 'delete' ? 'danger' : undefined)
+  return (
+    <box flexDirection="row">
+      <Line role="muted">{`${String(props.r.oldNo ?? '').padStart(4)} ${String(props.r.newNo ?? '').padStart(4)} `}</Line>
+      <Line tone={tone()}>{`${mark()}${props.r.raw}`}</Line>
+    </box>
+  )
+}
+
+/** reduced: the path in bold with `+n −m` at the far end, and no collapse control. */
+export function FileHead(props: { file: DiffFile; anchorId?: string; collapsed?: boolean; onToggleCollapse?: (path: string) => void }) {
+  return (
+    <box flexDirection="row" gap={1}>
+      <Line role="strong">{props.file.path}</Line>
+      <box flexGrow={1} />
+      <Line tone="ok">{`+${props.file.additions ?? 0}`}</Line>
+      <Line tone="danger">{`−${props.file.deletions ?? 0}`}</Line>
+    </box>
+  )
+}
+
+/** reduced: a dim line saying what is not being shown, with no control to act on it. */
+export function NonCodeRow(props: { row: Exclude<DiffRowT, CodeRow> }) {
+  const text = () => {
+    const row = props.row
+    switch (row.kind) {
+      case 'file': return row.file.path
+      case 'hunk': return row.text
+      case 'gap': return `… ${row.count ?? 'more'} unchanged lines`
+      case 'nodiff': return 'no changes'
+      case 'load': return row.status === 'error' ? 'could not load this diff' : 'loading…'
+      case 'thread': return `${row.thread.comments.length} comment${row.thread.comments.length === 1 ? '' : 's'}`
+      default: return ''
+    }
+  }
+  return <Line role="muted">{text()}</Line>
+}
+
+/** absent: side-by-side needs 160 cells, so a terminal diff is unified. */
+export const SplitCell = (_props: { r: CodeRow | null; gutter: number | null }) => null
+
+/** reduced: unified only, and no syntax colour. `buildDiffRows` is the same parse the DOM viewer
+ *  runs; what is dropped is the highlighter it feeds, which needs a grammar and a theme. */
+export function DiffPane(props: { source: { files: () => DiffFile[] | undefined; loading: () => boolean }; annotations?: string }) {
+  return (
+    <box flexDirection="column" flexGrow={1} overflow="scroll">
+      <Show when={props.source.files()} fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}>
+        {(files) => (
+          <For each={files()}>
+            {(file) => (
+              <box flexDirection="column">
+                <FileHead file={file} />
+                <For each={buildDiffRows(file, plainTokenize)}>
+                  {(row) => (
+                    <Show when={row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete'} fallback={<NonCodeRow row={row as Exclude<DiffRowT, CodeRow>} />}>
+                      <DiffLine r={row as CodeRow} />
+                    </Show>
+                  )}
+                </For>
+              </box>
+            )}
+          </For>
+        )}
+      </Show>
+    </box>
+  )
+}
+
+// ── Saying ────────────────────────────────────────────────────────────────────────────────────
+
+/** One line prefixed with the tone's glyph. */
+export function Alert(props: {
+  tone?: Tone
+  variant?: 'inline' | 'banner'
+  title?: string
+  actions?: JSX.Element
+  onDismiss?: () => void
+  children: JSX.Element
+}) {
+  const tone = () => props.tone ?? 'danger'
+  const glyph = () => (tone() === 'ok' ? '✓' : tone() === 'warn' ? '!' : tone() === 'accent' ? 'i' : '✕')
+  return (
+    <box flexDirection="row" gap={1}>
+      <Line role="strong" tone={tone()}>{glyph()}</Line>
+      <Show when={props.title}><Line role="strong" tone={tone()}>{props.title!}</Line></Show>
+      <Line tone={tone()} wrap>{props.children}</Line>
+      {slot(props.actions)}
+    </box>
+  )
+}
+
+/** Centred dim text. Centred by padding rather than by measuring: a pane that has room for an empty
+ *  state has room for two cells of it. */
+export function EmptyState(props: {
+  icon?: JSX.Element
+  title?: string
+  action?: JSX.Element
+  busy?: boolean
+  align?: 'center' | 'start'
+  size?: Size
+  children?: JSX.Element
+}) {
+  return (
+    <box flexDirection="column" paddingTop={1} paddingLeft={2}>
+      <Show when={props.title}><Line role="strong">{props.title!}</Line></Show>
+      <Line role="muted" wrap>{props.busy ? 'loading…' : flatten(props.children)}</Line>
+      {slot(props.action)}
+    </box>
+  )
+}

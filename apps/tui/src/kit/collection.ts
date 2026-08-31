@@ -6,12 +6,13 @@ import type { CollectionItem } from '@acorn/client-core/kit/keys/collection.ts'
 // The shared half of client-core's `collection.ts` — the intents, and a place kept by the item's own
 // key — is what belongs here; its element half (`focus()`, `scrollIntoView`, the `aria-*` and
 // `tabindex` getters) is DOM all the way down. Phase 2 splits that file so both hosts import the
-// intent half. This is the spike's stand-in, and it is deliberately one store for every `Rows` on
+// intent half. This is the stand-in until then, and it is deliberately one store for every `Rows` on
 // screen rather than one per node: a pane's list is drawn as several groups (Notes draws three), and
 // in a terminal the arrows walk what is drawn, in the order it is drawn.
 //
-// What is missing on purpose: type-ahead, the page keys, expansion, and any notion of scrolling a row
-// into view. Phase 1 has the cell buffer to assert against; guessing at them here would be guessing.
+// What is missing on purpose: type-ahead, the page keys, expansion, and focus of any kind. Phase 2
+// splits `collection.ts` and owns all four, and `Rows`' own window already follows the active row, so
+// scrolling a row into view is the same question as focus rather than a separate one.
 
 export type ItemProps = { readonly key: string }
 

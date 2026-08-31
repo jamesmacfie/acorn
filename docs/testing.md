@@ -66,8 +66,13 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
 - the `tui` suite (`apps/tui`) renders the kit to a cell buffer instead of to a document. It runs the
   bundle's own transform, so JSX goes to OpenTUI's reconciler, and it inherits the alias that points
   `@acorn/plugin-api/ui` at the terminal kit, which means a pane under test imports the kit exactly as
-  the shipped bundle does. What it asserts is what a reader would look for on the screen — the group
-  labels, the note titles, the caret moving when `j` is pressed — rather than a snapshot of every cell.
+  the shipped bundle does. What it asserts is what a reader would look for on the screen — `Badge`
+  draws `[text]`, a `Fold` draws `▸ label` shut and `▾ label` open with its children indented two
+  cells, the caret moves when `j` is pressed — rather than a snapshot of every cell, which would fail
+  on every spacing decision anybody makes afterwards and name no broken promise. There is one case per
+  kit node, checked against the kit itself so a node cannot be drawn without being tested, and a pair
+  of whole-pane runs at 80 by 24 and at 120 by 40. Two files alongside need no renderer and never
+  skip: the palette's collapse from a theme to the terminal's slots, and the clipboard sequence.
   It needs a renderer to draw to, and OpenTUI's is Zig behind `node:ffi`, a Node 26.4 builtin behind
   `--experimental-ffi`: the config passes that flag only where it is accepted and the tests skip where
   there is no FFI, so an older Node reports a skip rather than failing the suite for a reason that has

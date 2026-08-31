@@ -38,7 +38,7 @@ if (nodeMajor < 26 || (nodeMajor === 26 && nodeMinor < 4)) {
 }
 
 if (values.pane !== 'notes') {
-  console.error('This build draws the notes pane only. See docs/future/terminal/phase-1-kit-complete.md.')
+  console.error('This build draws the notes pane only. The rail, the pane row and the task switcher are docs/future/terminal/phase-4-chrome.md.')
   process.exit(2)
 }
 

@@ -1,4 +1,4 @@
-import { handlePluginContentLinkClick } from '@acorn/plugin-api/client'
+import { openInAppUrl } from '@acorn/plugin-api/client'
 import { Markdown } from '@acorn/plugin-api/ui'
 
 // The transcript's Markdown policy, in one place: a turn is provider output rather than authored text,
@@ -9,7 +9,7 @@ export default function AgentMarkdown(props: { text: string; taskId: string }) {
       text={props.text}
       images="placeholder"
       copy
-      onClick={(event) => handlePluginContentLinkClick(event, { taskId: props.taskId })}
+      onSelect={(href) => openInAppUrl(href, { taskId: props.taskId })}
     />
   )
 }

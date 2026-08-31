@@ -1,27 +1,14 @@
 /** @jsxImportSource @opentui/solid */
-import { createRequire } from 'node:module'
 import { expect, test } from 'vitest'
+import { hasFfi } from './ffi'
 import { renderFixture } from './harness'
-
-// OpenTUI's render core is Zig behind `node:ffi`, which is a Node 26.4 builtin behind
-// `--experimental-ffi` (vitest.config.ts passes it). On an older Node there is no renderer to draw
-// to, so this file has nothing to say — and it says so rather than failing the repo's suite for a
-// reason that has nothing to do with the change under test. See FINDINGS.md, "The runtime floor".
-const hasFfi = (() => {
-  try {
-    createRequire(import.meta.url)('node:ffi')
-    return true
-  } catch {
-    return false
-  }
-})()
 
 // The one test phase 0 owes: the Notes pane, unchanged, drawn to a cell buffer at 80 by 24.
 //
 // It asserts what a reader would look for on the screen rather than a snapshot of every cell: the
 // group labels the list column drew, the note titles under them, and the body of the note the detail
-// column opened. A snapshot would fail on every spacing decision phase 1 makes, and phase 1 is where
-// cell-level assertions belong (docs/testing.md § Test layers).
+// column opened. Cell-level assertions live one node at a time in kit/kit.test.tsx, which is where a
+// broken promise names itself (docs/testing.md § Test layers).
 test.skipIf(!hasFfi)('the notes pane draws its list and its detail at 80 by 24', async () => {
   const screen = await renderFixture()
   const frame = await screen.frame()
@@ -67,4 +54,28 @@ test.skipIf(!hasFfi)('enter opens the row the caret is on', async () => {
   screen.done()
 
   expect(frame).toContain('Sign in as a new account.')
+}, 30_000)
+
+// The same pane at two sizes, which is what a `reduced` node's loss is about: `list-detail` is two
+// columns above 80 cells and one below it, and a pane that reads at 80 by 24 has to keep reading when
+// the window is bigger rather than leaving a column stranded.
+//
+// Notes rather than the http pane, which is what phase 1 asked for: http ships only a tree bundle
+// (plugins/http/src/tree/, no client/), so drawing it means the worker sandbox and that is phase 5.
+// See docs/future/terminal/findings.md.
+test.skipIf(!hasFfi)('the pane holds together at 120 by 40 as well as at 80 by 24', async () => {
+  const wide = await renderFixture({ width: 120, height: 40 })
+  const frame = await wide.frame()
+  wide.done()
+
+  expect(frame).toContain('TASK')
+  expect(frame).toContain('Scratchpad')
+  expect(frame).toContain('Conventions')
+  // Both columns, still: the list stays its 32 cells and the detail fills what is left, so a row in
+  // the list has the note's body beside it rather than a stranded empty half. Which note is open is
+  // not asserted — the pane's model is per task and outlives a render, so a suite that opened one in
+  // an earlier test finds it open here, which is the pane behaving.
+  const listRow = frame.split('\n').find((line) => line.includes('Scratchpad')) ?? ''
+  expect(listRow.trimEnd().length).toBeGreaterThan(40)
+  for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(120)
 }, 30_000)

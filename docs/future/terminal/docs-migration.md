@@ -46,12 +46,21 @@ adapter sentence), `docs/future/compiled-tier.md`, and the `monaco.md` argument 
 No kit dishonesty was found, so no owning section of `docs/ui-design.md` changed for that reason. Every
 finding that needed a fix needed it in the host or in the pane registry, not in the kit.
 
-## Owed by phases 1 to 7
+## Done in phase 1 (2026-08-31)
+
+| Doc | Section | Change |
+| --- | --- | --- |
+| `docs/ui-design.md` | The closed kit | A `reduced` row names its loss beside its level; both hosts draw the whole kit and `kitTable.test.ts` holds the two tables to the matrix. |
+| `docs/ui-design.md` | What a terminal renderer needs from this | The `tui` column is read rather than tested for presence; `roleCell()` beside `roleVar()`; a role names a colour slot and the appearance layer resolves it. The one prop the kit lost, `Markdown`'s `onClick`. |
+| `docs/ui-design.md` | Every node at 80 by 24 | Seven rows made honest: `Row`'s `reveal`, `Timeline`'s `follow`, `Rows`' window, `Markdown`'s links, `Icon`'s glyph table, `TableHead`'s note, `CopyButton` over OSC 52. |
+| `docs/testing.md` | Test layers | One cell-buffer case per node, the two whole-pane sizes, and the two files that never skip. |
+| `docs/future/terminal/README.md` | The phases, The order of work | Phase 1 marked shipped; what it left for phase 2. |
+| `docs/future/terminal/phase-1-kit-complete.md` | What shipped, and where it differs | Four departures from the plan, and the two things deliberately left for phase 2. |
+
+## Owed by phases 2 to 7
 
 | Doc | Section | Phase | What it says afterwards |
 | --- | --- | --- | --- |
-| `docs/ui-design.md` | Every node at 80 by 24 | 1 | Each `reduced` node's loss in its row. |
-| `docs/ui-design.md` | What a terminal renderer needs from this | 1 | "tested for presence even though nothing reads it" → "read by the TUI host". |
 | `docs/testing.md` | Test layers | 3, 6 | The TUI boot test; pane snapshots. |
 | `docs/panes.md` | Layout model | 2 | Projections are drawn; any that changed on contact; the layout table is supplied by the host package rather than named by the pane registry ([findings.md](./findings.md)). |
 | `docs/command-palette-and-shortcuts.md` | Focus and typing | 2, 4 | The terminal adapter is used; the double-Escape rule; the region cycle and the footer. |

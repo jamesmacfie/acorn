@@ -1,6 +1,6 @@
 # Phase 1: the whole kit
 
-Status: not started. Waits on phase 0.
+Status: **shipped 2026-08-31.**
 
 Read [findings.md](./findings.md) first: it owns `slot()` for element-typed props, the `Markdown` and `Textarea` notes, and which fifteen nodes already exist.
 
@@ -21,7 +21,7 @@ missing node.
 
 In:
 
-- `apps/tui/src/kit/components.ts` (new in phase 0) becomes `Record<KitNodeName, Component>`, complete, no `Partial`.
+- `apps/tui/src/kit/components.tsx` becomes `Record<KitNodeName, Component>`, complete, no `Partial`.
 - Each `reduced` node's loss written next to its level in `support.ts`, per
   [04-rendering.md](./04-rendering.md) § A second `KIT_COMPONENTS`.
 - `roleCell()` beside `roleVar()` in `packages/client-core/src/kit/tokens/roles.ts`, reading the `tui`
@@ -75,7 +75,7 @@ has no virtualiser; the component is one.
   `Fold` draws `▸ label` closed and `▾ label` open with children indented two cells, `Tabs` brackets
   the selected tab, `StatusDot` draws `●` in the tone's slot and `○` for neutral.
 - The three kit invariants above.
-- A snapshot of the http pane at 80 by 24 and at 120 by 40, to catch a regression in a shared node.
+- A snapshot of a pane at 80 by 24 and at 120 by 40, to catch a regression in a shared node.
 
 ## Docs owed
 
@@ -100,3 +100,31 @@ snapshot at 80 by 24 matches its sentence row by row.
   `props.ts` and `components.ts` were stale on 2026-08-30.
 - `tools/arch/kitTable.test.ts` still reads `docs/ui-design.md § Every node at 80 by 24` by heading.
 - OpenTUI's version still exposes a headless render target for tests.
+
+## What shipped, and where it differs
+
+Seventy-four nodes, not seventy: `KIT_NODES` grew after this file was written, which is what the
+verify list below was for. All of them are drawn from `apps/tui/src/kit/`, split by the appendix's own
+grouping, and `tools/arch/kitTable.test.ts` now holds three lists to one: the 80×24 appendix, the
+support matrix, and both hosts' component tables.
+
+Four things went differently from the plan:
+
+- **The pane at two sizes is Notes, not http.** http ships only a tree bundle, so drawing it means the
+  phase 5 sandbox ([findings.md](./findings.md)). Notes is the compiled `list-detail` pane and it is
+  what phase 0 drew, so the two runs compare against something.
+- **`roleCell()` reads a structured `tui` column rather than parsing prose.** The column was six
+  sentences per role; it is now a sentence (`said`) beside the cells the sentence describes, in the
+  same entry, so the documentation and the value cannot drift. `roles.test.ts` holds them together and
+  writes down which role values draw nothing.
+- **The kit lost a prop.** `Markdown`'s `onClick` handed over a DOM event, which findings asked this
+  phase to look at. Both its callers wanted the href and the browser on a miss, so `onSelect` returns
+  `false` for "not mine" and `onClick` is gone. That is the folder's own rule: where the terminal finds
+  a node dishonest, the kit changes for every host.
+- **`Table` names the columns it dropped rather than counting them.** A reader who can see that two
+  columns are missing still has to widen the pane to learn whether either was the one they wanted.
+
+What was scoped here and is not done, on purpose: the OSC 52 path is written and tested but nothing
+presses the button yet, because a `CopyButton` is a focus stop and focus without a DOM is phase 2.
+`Rectangle`'s `pty` and `editor` draw their box and say what they are waiting for, for the same
+reason — a rectangle is defined by its keys. Both are named in phase 2's scope.

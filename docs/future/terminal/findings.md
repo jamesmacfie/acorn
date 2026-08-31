@@ -175,17 +175,22 @@ change for a terminal to draw it, which is the result this phase existed to get.
 
 ## The screenshot
 
-`pnpm --filter @acorn/tui capture`, at 80 by 24, against the fixture in `apps/tui/src/fixture.ts`:
+`pnpm --filter @acorn/tui capture`, at 80 by 24, against the fixture in `apps/tui/src/fixture.ts`.
+Redrawn after phase 1, so it is the kit as it stands rather than as the spike left it: the meta and
+the row actions sit at the far end of the list column now, and the preview toggle draws its state.
 
 ```
 acorn · fix-login · notes
-acorn filter…                   │◀ Scratchpad             ◆ task [x] [Preview]
-TASK 3 +                         Whatever is in hand.
-  [x] Scratchpad ✕
-  [x] Repro steps ✕
-  [ ] What the agent found 🤖 ✕
+acorn filter…                   │◀ Scratchpad           ◆ task [x] [ ] Preview
+                                 Whatever is in hand.
+TASK 3 +
+  [x] Scratchpad               ✕
+  [x] Repro steps              ✕
+  [ ] What the agent found  🤖 ✕
+
 WORKSPACE 1 +
-  [x] Conventions ✕
+  [x] Conventions              ✕
+
 GLOBAL 0 +
 
 
@@ -201,3 +206,43 @@ Against a real node it is the same screen with your own notes in it:
 pnpm dev:node                                    # copy its first line, which is JSON
 ACORN_NODE_HANDSHAKE='<that line>' pnpm --filter @acorn/tui dev
 ```
+
+## What phase 1 did with these
+
+Shipped 2026-08-31. Which of the above is closed, and which moved.
+
+Closed:
+
+- **The element-typed props.** `slot()` lives in `apps/tui/src/kit/cells.tsx` and every node with a
+  `leading`, `trailing`, `meta`, `actions` or `icon` goes through it. It stayed the host's problem, as
+  this file argued: no pane changed.
+- **`Markdown`'s `onClick`.** Gone from the kit. Its two callers wanted the href and the browser on a
+  miss, so `onSelect` returns `false` for "not mine" and both callers now spell that. See
+  `docs/ui-design.md § What a terminal renderer needs from this`.
+- **`Row`'s `reveal`.** Its row in the 80×24 table now says the trailing controls always show.
+- **The `Textarea` handle.** `Input` wanted the same one, exactly as this file predicted, and has it.
+  The composer will want it too and gets it through `Textarea`.
+- **A control has no intrinsic width.** `Input` takes the room its row has left unless its `width`
+  role says `narrow`. The role stayed an enum.
+
+Moved, with the reason:
+
+- **`Markdown` does not use OpenTUI's `markdown` renderable.** That renderable needs a `SyntaxStyle`,
+  which means tree-sitter assets in the bundle and a decision about which theme styles them — the same
+  blocker this file recorded, and phase 1 had no better claim on it than phase 0 did. What it does
+  instead is run the source through the shell's own `renderMarkdown` and turn that HTML into runs of
+  styled text (`apps/tui/src/kit/markdown.ts`), so both hosts agree on what markdown *means* and differ
+  only in how it is painted. Two markdown readers would drift on the first edge case anybody reports.
+  Revisit when the appearance layer has a syntax theme, which is the same decision `CodeBlock` and the
+  diff viewer are waiting on.
+- **The `already destroyed` warning.** Not chased. It did not reproduce in the per-node suite — 74 node
+  cases, every one of them mounting and tearing down `Show`, `For` and `Index` — so whatever swap does
+  it is in the pane path rather than in a kit node. Phase 2 owns the layout mount path and is the right
+  place to find it.
+- **`textBufferViewSetViewport` still throws once per mount** on Node 26.8.1 with `@opentui/core`
+  0.5.9, without stopping the render. Still not chased, still consistent with OpenTUI's Node lane being
+  newer than its Bun one. Phase 7 pins the version and is where a bump gets tested.
+- **`Input`'s `ref` typed to an element.** Still open. The TUI's `Input` takes `ref?: unknown` and
+  ignores it, so a pane compiles and does not get its focus. The kit should answer "focus what I just
+  made" as an intent rather than as an element, and that is a focus decision, so it goes to phase 2
+  with the rest of them.

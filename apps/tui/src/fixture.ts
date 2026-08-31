@@ -2,7 +2,7 @@ import type { Task } from '@acorn/protocol/api.ts'
 import type { NoteSummary } from '@acorn/protocol/notes.ts'
 
 // One task and three notes, as the node would answer them. Shared by the smoke test and the capture
-// script (`pnpm --filter @acorn/tui capture`), which is how the spike gets a screenshot on a machine
+// script (`pnpm --filter @acorn/tui capture`), which is how this package gets a screenshot on a machine
 // with no TTY: the same tree, the same cells, printed instead of asserted.
 
 export const TASK: Task = {

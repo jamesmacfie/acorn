@@ -35,7 +35,7 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
  *
  *  The smoke test asserts on what comes back and drives it with keys; `capture.tsx` prints one frame.
  *  Both go through the same function, so the screenshot is of the thing under test. */
-export async function renderFixture(): Promise<{ frame: () => Promise<string>; press: (key: string) => Promise<void>; done: () => void }> {
+export async function renderFixture(size: { width?: number; height?: number } = {}): Promise<{ frame: () => Promise<string>; press: (key: string) => Promise<void>; done: () => void }> {
   const { testRender } = await import('@opentui/solid')
   const { installKeymap } = await import('./keys')
   const { _resetCollections } = await import('./kit/collection')
@@ -44,7 +44,7 @@ export async function renderFixture(): Promise<{ frame: () => Promise<string>; p
   _resetCollections()
   const { task } = await bootFixture()
   const { App } = await import('./App')
-  const { renderer, mockInput, flush, captureCharFrame } = await testRender(() => <App task={task} />, { width: 80, height: 24 })
+  const { renderer, mockInput, flush, captureCharFrame } = await testRender(() => <App task={task} />, { width: size.width ?? 80, height: size.height ?? 24 })
   installKeymap(renderer, () => {})
   // Bounded, and the frame is taken either way. A tree that never settles is itself a finding, and a
   // capture that hangs says nothing about which node did it.
