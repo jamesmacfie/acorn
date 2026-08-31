@@ -6,6 +6,7 @@ import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
 import { paneContributions } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { setLayouts } from '@acorn/client-core/host/layouts/table.ts'
+import { nodeStatus } from '@acorn/client-core/infra/node/fleet.ts'
 import { LAYOUTS } from './layouts'
 
 // The toy: one pane, one task, no chrome. The rail, the pane row and the task switcher are phase 4.
@@ -36,7 +37,19 @@ setLayouts(LAYOUTS)
 initClientPlugins([notesClientPlugin])
 const notesPane = paneContributions().find((pane) => pane.id === 'notes')!
 
-export function App(props: { task: Task }) {
+// What the footer says when the node is anything but online. Phase 4 draws the real one from the
+// keymap's active layers; until then this line is where a connection the broker has given up on
+// becomes visible, which is the half of phase 3 a person can see. `revoked` never retries, so it says
+// what to do rather than what happened.
+const CONNECTION: Record<string, string> = {
+  degraded: 'reconnecting to the node…',
+  offline: 'the node is unreachable — retrying',
+  incompatible: 'this node speaks a different protocol version — upgrade whichever is older',
+  revoked: 'this device was revoked on the node — pair again to come back',
+}
+
+export function App(props: { task: Task; nodeId: string }) {
+  const footer = (): string => CONNECTION[nodeStatus(props.nodeId)?.state ?? 'online'] ?? 'j/k move · enter open · f6 region · q quit'
   return (
     <QueryClientProvider client={queryClient}>
       <box flexDirection="column" flexGrow={1}>
@@ -45,7 +58,7 @@ export function App(props: { task: Task }) {
             hidden-region check were host-neutral already; the layout table was the one thing that
             was not. */}
         {createComponent(notesPane.component, { get task() { return props.task } })}
-        <text attributes={2}>j/k move · enter open · f6 region · q quit</text>
+        <text attributes={2}>{footer()}</text>
       </box>
     </QueryClientProvider>
   )

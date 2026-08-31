@@ -336,6 +336,9 @@ importers:
       '@acorn/custody':
         specifier: workspace:*
         version: link:../../packages/custody
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../../packages/node-core
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api

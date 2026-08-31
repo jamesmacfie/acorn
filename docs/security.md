@@ -23,6 +23,12 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - Nodes bind to `127.0.0.1` over TLS 1.3 and reject unexpected `Host` values.
 - The certificate is self-signed, persisted in the Node data root, and pinned by fingerprint in the
   helper's broker. A changed fingerprint is a hard stop.
+- The bearer rides the `/v2/events` upgrade request's headers, which a browser cannot set. On the
+  desktop that is why the socket belongs to the helper rather than the renderer. The terminal client
+  (`docs/future/terminal/`) is one process running under Node, so it sets the header itself: equal to
+  the desktop, easier than a browser. What the desktop holds as a process boundary the terminal holds
+  as a module boundary, and an arch rule keeps it — nothing in `apps/tui` that draws a cell may
+  import custody.
 - Every protected HTTP route passes request-id, principal resolution, the auth gate, and then the
   idempotency middleware before reaching a router.
 - `/v2/node` and `/v2/pair` are the only pre-auth routes. Device management, plugin toggles, audit,

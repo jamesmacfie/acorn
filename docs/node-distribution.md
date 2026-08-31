@@ -19,6 +19,26 @@ while no device is paired. `kill -USR1 <pid>` opens another without restarting t
 its live agent and terminal sessions. `SIGUSR1` does not exist on Windows, so pairing a second device
 there means a restart.
 
+## Reaching a node with `acorn`
+
+`acorn` is the terminal client (`apps/tui/`, `docs/future/terminal/`). Run it and it opens the
+workspace for the node this machine's data root holds: `ACORN_DATA_DIR`, else the desktop app's root
+if the app is installed here, else the dev checkout's. It reads the root's lock to decide what to do.
+A node already holds it, so `acorn` attaches, reading the endpoint from `node.json` and the
+certificate to pin from `tls/cert.pem`; nothing holds it, so `acorn` starts one and owns its
+lifetime, draining it on the way out. A second `acorn` in a second terminal finds the lock and
+attaches, and leaves the node running when it quits. The one that started it owns it, which is the
+desktop's rule too.
+
+Attaching needs a device token, and `acorn` keeps its own — in its config directory, at mode 0600,
+never in the node's data root. A node the desktop started is a node whose token belongs to the
+desktop, so the first `acorn` against one asks for a pairing code the same way any other client
+does: `kill -USR1 <pid>` opens one.
+
+`acorn --node https://host:4317` pairs with a node elsewhere: the fingerprint as six words to compare
+against what that node printed, then the code. It remembers what it pairs with, so the second time is
+`acorn --node <name>`.
+
 ## Reaching a node from another machine
 
 A node answers on loopback only until someone says otherwise. Binding beyond `127.0.0.1` puts a

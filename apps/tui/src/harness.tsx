@@ -59,7 +59,7 @@ export async function renderFixture(size: { width?: number; height?: number } = 
     height: size.height ?? 24,
   })
   installKeymap(renderer)
-  await render(() => <App task={task} />, renderer)
+  await render(() => <App task={task} nodeId="node-1" />, renderer)
   // Bounded, and the frame is taken either way. A tree that never settles is itself a finding, and a
   // capture that hangs says nothing about which node did it.
   const settle = (ms: number) => Promise.race([flush(), new Promise((done) => setTimeout(done, ms))])

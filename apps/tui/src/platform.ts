@@ -1,5 +1,10 @@
-import { NodeBroker, type BrokerNode } from '@acorn/custody/broker/nodeBroker.ts'
-import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
+import { NodeBroker } from '@acorn/custody/broker/nodeBroker.ts'
+import { toNodeRecord } from '@acorn/custody/broker/fleetStore.ts'
+import { probeNode, pairWithNode } from '@acorn/custody/broker/nodePairing.ts'
+import type { NodePairRequest, NodeProbeResult, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
+import type { OpenedNode } from './node/open'
+import { startNode } from './node/supervise'
+import { dataRootDir } from './node/paths'
 
 // The platform seam, from a Node process.
 //
@@ -12,41 +17,16 @@ import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 //
 // The broker runs in this process, which the desktop's does not (docs/security.md § Trust
 // boundaries). That is the trade 06-isolation.md records: the token lives in this module and reaches
-// no kit component, a module boundary where the desktop has a process boundary.
+// no kit component, a module boundary where the desktop has a process boundary. Everything below
+// hands out a `NodeRecord`, which `toNodeRecord` strips of the certificate and the device row, and no
+// token crosses into anything the renderer can read.
 
-export type Handshake = {
-  nodeId: string
-  endpoint: string
-  fingerprint?: string
-  certPem?: string
-  deviceToken: string
-}
+export type Platform = { broker: NodeBroker; dispose(): Promise<void> }
 
-/** The node's own boot line, as `apps/node/src/entries/standalone.ts` prints it. Phase 0 is handed
- *  one rather than finding it: attach-or-start, the data-root lock and pairing are phase 3. */
-export function readHandshake(raw: string): Handshake {
-  const parsed: unknown = JSON.parse(raw)
-  if (!parsed || typeof parsed !== 'object') throw new Error('The handshake is not an object.')
-  const value = parsed as Partial<Handshake>
-  if (!value.nodeId || !value.endpoint || !value.deviceToken) {
-    throw new Error('The handshake needs nodeId, endpoint and deviceToken. Copy the first line the node printed.')
-  }
-  return value as Handshake
-}
-
-export function installPlatform(handshake: Handshake): { broker: NodeBroker; record: NodeRecord } {
-  const record: NodeRecord = {
-    nodeId: handshake.nodeId,
-    label: 'local',
-    endpoint: handshake.endpoint,
-    ...(handshake.fingerprint ? { fingerprint: handshake.fingerprint } : {}),
-    local: true,
-  }
-  const node: BrokerNode = {
-    ...record,
-    token: handshake.deviceToken,
-    ...(handshake.certPem ? { certPem: handshake.certPem } : {}),
-  }
+export function installPlatform(opened: OpenedNode, quit: () => void): Platform {
+  const { fleet } = opened
+  let supervised = opened.supervised
+  let stop = opened.stop
 
   const frameHandlers: ((nodeId: string, frame: unknown) => void)[] = []
   const statusHandlers: ((status: NodeStatus) => void)[] = []
@@ -59,7 +39,16 @@ export function installPlatform(handshake: Handshake): { broker: NodeBroker; rec
       for (const handler of statusHandlers) handler(status)
     },
   })
-  broker.upsert(node)
+
+  // Same three lines as the desktop helper's `connect` (apps/desktop/src/helper/helperServer.ts): the
+  // record the renderer sees, plus the two things it never does.
+  const connect = (nodeId: string): void => {
+    const node = fleet.get(nodeId)
+    const token = node && fleet.tokenFor(nodeId)
+    if (!node || !token) return
+    broker.upsert({ ...toNodeRecord(node), token, ...(node.certPem ? { certPem: node.certPem } : {}) })
+  }
+  connect(opened.nodeId)
 
   const subscribe = <T,>(list: T[], handler: T): (() => void) => {
     list.push(handler)
@@ -69,11 +58,12 @@ export function installPlatform(handshake: Handshake): { broker: NodeBroker; rec
     }
   }
 
-  // `fleetList` is here even though phase 0 pairs with nothing, because it is what picks the node:
-  // with no fleet bridge at all `selectActiveNode` reports ready with no node selected, and every
-  // request falls through to apiClient's same-origin path, which in Node is a relative URL with no
-  // origin to be relative to. The rest of the group is absent, which the seam supports as a product
-  // state — this build cannot pair, and says so.
+  // The probe is remembered here rather than handed back to the renderer, which is what makes
+  // confirming the fingerprint a step instead of a parameter a caller could skip. The desktop helper
+  // keeps it in the same place for the same reason.
+  let pending: Awaited<ReturnType<typeof probeNode>> | null = null
+  let announced = false
+
   const acorn = {
     platform: process.platform,
     nodeFetch: (nodeId: string, request: Parameters<NodeBroker['fetch']>[1]) => broker.fetch(nodeId, request),
@@ -81,14 +71,103 @@ export function installPlatform(handshake: Handshake): { broker: NodeBroker; rec
     nodeSend: (nodeId: string, frame: Parameters<NodeBroker['send']>[1]) => broker.send(nodeId, frame),
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => subscribe(frameHandlers, cb),
     onNodeStatus: (cb: (status: NodeStatus) => void) => {
-      // Replay what the broker already reported: the socket opens during `upsert` above, well before
+      // Replay what the broker already reported: the socket opens during `connect` above, well before
       // anything renders, and a status the renderer never hears reads as `offline` forever.
       for (const status of statuses.values()) cb(status)
       return subscribe(statusHandlers, cb)
     },
-    fleetList: async () => ({ nodes: [record], statuses: [...statuses.values()] }),
+
+    // `fleetList` is what picks the node: with no fleet bridge at all `selectActiveNode` reports ready
+    // with nothing selected, and every request falls through to apiClient's same-origin path, which in
+    // Node is a relative URL with no origin to be relative to.
+    fleetList: async () => ({ nodes: fleet.list().map(toNodeRecord), statuses: [...statuses.values()] }),
+    nodeProbe: async (endpoint: string): Promise<NodeProbeResult> => {
+      const probe = await probeNode(endpoint)
+      pending = probe
+      const { certPem: _certPem, ...result } = probe
+      return result
+    },
+    nodePair: async (request: NodePairRequest): Promise<NodeRecord> => {
+      const probe = pending
+      if (!probe) throw new Error('Confirm the node fingerprint before pairing.')
+      if (!probe.compatible) throw new Error('That node speaks a different protocol version.')
+      const result = await pairWithNode(probe, { code: request.code, deviceName: request.deviceName })
+      pending = null
+      const node = fleet.remember(
+        { nodeId: result.nodeId, label: request.label, endpoint: probe.endpoint, fingerprint: probe.fingerprint, certPem: probe.certPem, deviceId: result.device.id, local: false },
+        result.deviceToken,
+      )
+      connect(node.nodeId)
+      return toNodeRecord(node)
+    },
+    nodeRename: async (nodeId: string, label: string): Promise<NodeRecord | null> => {
+      const node = fleet.rename(nodeId, label)
+      if (!node) return null
+      connect(nodeId) // the label rides in the broker's record too
+      return toNodeRecord(node)
+    },
+    nodeForget: async (nodeId: string, revoke: boolean): Promise<void> => {
+      const node = fleet.get(nodeId)
+      if (!node) return
+      if (node.local) throw new Error("The node for this machine's data root cannot be removed.")
+      if (revoke && node.deviceId) {
+        // The last request that will ever authenticate, and it closes our own socket. A failure must
+        // not abort the local forget: the usual reason revoke fails is that the node is offline.
+        await broker
+          .fetch(nodeId, { requestId: `forget-${nodeId}`, path: `/v2/core/devices/${node.deviceId}`, method: 'DELETE', headers: {} })
+          .catch((error: unknown) => console.warn(`[fleet] could not revoke this device on ${nodeId}:`, error))
+      }
+      broker.remove(nodeId)
+      fleet.forget(nodeId)
+    },
+    nodeReconnect: (nodeId: string) => connect(nodeId),
+    nodeRestartLocal: async (): Promise<void> => {
+      if (!supervised) throw new Error('acorn attached to this node rather than starting it, so it is not ours to restart.')
+      await stop()
+      // A restarted node binds a fresh port and may mint a fresh token, so the fleet row is rewritten
+      // from the new handshake rather than reused. What is not here is the desktop's `onNodeReplaced`
+      // push: nothing in this build is holding a view of the old endpoint to invalidate. Phase 4 draws
+      // the chrome that would need telling.
+      const restarted = await startNode(dataRootDir(), fleet.tokenFor(opened.nodeId))
+      const { handshake } = restarted
+      stop = restarted.stop
+      supervised = true
+      fleet.remember(
+        {
+          nodeId: handshake.nodeId,
+          label: fleet.get(handshake.nodeId)?.label ?? 'This computer',
+          endpoint: handshake.endpoint,
+          local: true,
+          ...(handshake.fingerprint ? { fingerprint: handshake.fingerprint } : {}),
+          ...(handshake.certPem ? { certPem: handshake.certPem } : {}),
+        },
+        handshake.deviceToken,
+      )
+      connect(handshake.nodeId)
+    },
+
+    // A terminal has no file manager to reveal a path in, so "open the data folder" is the path
+    // itself. It prints on the way out rather than now, because the renderer owns the screen until
+    // then and a line written under it would be drawn over before anyone read it.
+    recovery: {
+      openDataFolder: () => {
+        if (announced) return
+        announced = true
+        process.once('exit', () => console.log(`acorn's data root is ${dataRootDir()}`))
+      },
+      quit,
+    },
   }
 
   ;(globalThis as { window?: unknown }).window = { acorn }
-  return { broker, record }
+
+  return {
+    broker,
+    dispose: async () => {
+      broker.dispose()
+      // Only a node this TUI started. One that was already running belongs to whoever started it, and
+      // a second `acorn` quitting must not take it down under the first one.
+      if (supervised) await stop()
+    },
+  }
 }

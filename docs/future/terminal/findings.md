@@ -206,11 +206,11 @@ GLOBAL 0 +                      │
 j/k move · enter open · f6 region · q quit
 ```
 
-Against a real node it is the same screen with your own notes in it:
+Against a real node it is the same screen with your own notes in it. Phase 0 was handed a node's boot
+line in an environment variable; since phase 3 it finds one itself:
 
 ```
-pnpm dev:node                                    # copy its first line, which is JSON
-ACORN_NODE_HANDSHAKE='<that line>' pnpm --filter @acorn/tui dev
+pnpm --filter @acorn/tui dev
 ```
 
 ## What phase 1 did with these
@@ -310,3 +310,53 @@ Found here, and worth knowing:
   field so a bare-key binding can say "not while somebody is typing"; the terminal's did not, and the
   engine's answer was a `[unknown-binding-field]` warning on stderr and a `j` that walked the list from
   inside a filter box. Any third host owes the same line.
+
+## What phase 3 did with these
+
+Shipped 2026-08-31. Phase 3 is process and custody work, so only two of the findings above were its
+to close, and both are.
+
+Closed:
+
+- **`fleet.ts` imports `idb-keyval` unconditionally.** Storage is a seam now, `setCacheStorage`, and
+  the TUI installs a directory of files under its config root before `selectActiveNode` builds the
+  first cache (`apps/tui/src/node/cache.ts`). The import stayed static: dropping it would take a
+  dynamic `import('idb-keyval')` on every read and write, which costs more than the dependency does.
+
+- **A transport alone is not enough to reach a node.** Still true, and now `fleetList` is the real
+  fleet store rather than one hard-coded record, with `probe`, `pair`, `rename`, `forget`,
+  `reconnect` and `restartLocal` beside it.
+
+Found here, and worth knowing:
+
+- **`ServiceHost` could not be imported, and the phase file said it could.** The plan read
+  "`packages/custody/src/supervision/` owns spawning the node, parsing the handshake, and the bounded
+  drain. Import it." It owns none of those for this caller: `ServiceHost` drives `service.js` over an
+  fd-3 RPC channel opened before the service binds anything, and a standalone node announces itself
+  with one JSON line on stdout and speaks no RPC at all. Two protocols in one class would be worse
+  than the forty lines in `apps/tui/src/node/supervise.ts`, and the part worth sharing — SIGTERM then
+  SIGKILL after five seconds — is six of them, copied with the reason.
+
+- **`ws` resolves to its browser stub in this pipeline.** `ws` publishes a `browser` export condition
+  whose entire body is a throw, and something between vite's SSR resolver and the TUI's config picks
+  it, so `new WebSocket(...)` fails with "not a constructor" — after the HTTPS half of the very same
+  connection worked, which reads as a broker bug and is not one. `vitest.config.ts` aliases `ws` to
+  the file `import.meta.resolve` gives it. It cannot be fixed in `vite.config.ts`, because the bundle
+  leaves `ws` external and `ws` exports its root and nothing else, so a deep specifier would not
+  resolve at runtime.
+
+- **Attaching to a node the desktop started needs a pairing code.** The design left this open between
+  the pairing banner and a new loopback mint route. It is the banner: `acorn` prints the node's pid
+  and the `kill -USR1 <pid>` that reopens the window, then runs the same three steps `--node` does
+  against loopback. That reuses every line of the remote path and adds no trust. The mint route stays
+  a door.
+
+- **`openDataFolder` has nowhere to open.** A terminal has no file manager, so the recovery seam's
+  first action prints the path — on the way out, registered as a `process.once('exit')` line, because
+  the renderer owns the screen until then and anything written under it is drawn over before anyone
+  reads it.
+
+- **Two things the phase scoped and did not build, both for want of a consumer.** `nodeAdopt` is not
+  installed, so `fleetBridge().adopt` throws its "this build cannot adopt provided nodes" — an honest
+  product state the seam already models, and there is no surface to reach it from until phase 4.
+  Tunnels were out of scope and remain so.

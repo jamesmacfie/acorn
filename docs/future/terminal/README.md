@@ -61,7 +61,7 @@ Supporting documents, readable in any order:
 | 0 | [phase-0-host-switch-and-toy.md](./phase-0-host-switch-and-toy.md) | **Shipped 2026-08-31.** `HOST` per host package; `apps/tui/` boots client-core under Node; fifteen kit nodes and both layouts on OpenTUI; the Notes pane drawn against a running `dev:node`, unchanged. Findings in [findings.md](./findings.md) | Proof the kit is intent, not layout. Everything after | Nothing |
 | 1 | [phase-1-kit-complete.md](./phase-1-kit-complete.md) | **Shipped 2026-08-31.** All 74 nodes at their decided level; `roleCell()`; the theme as sixteen slots; one cell-buffer test per node; the presence tests became behaviour tests | Any pane | 0 |
 | 2 | [phase-2-layouts-keys-focus.md](./phase-2-layouts-keys-focus.md) | **Shipped 2026-08-31.** The seven layout components and a host-supplied layout table; the keymap's terminal adapter with all four tiers; focus regions and collections without a DOM; traps as layers; the PTY natively | Every compiled pane | 1 |
-| 3 | [phase-3-process-and-auth.md](./phase-3-process-and-auth.md) | The `acorn` command: attach or start, supervise, `--node` with probe, words, and pair; device token custody; reconnect and revoked states; a boot test | Running against any node | 0 |
+| 3 | [phase-3-process-and-auth.md](./phase-3-process-and-auth.md) | **Shipped 2026-08-31.** The `acorn` command: attach or start, supervise, `--node` with probe, words, and pair; device token custody in a config directory; revoked on the footer; a boot test with a real node | Running against any node | 0 |
 | 4 | [phase-4-chrome.md](./phase-4-chrome.md) | Rail, topbar, pane row, palette, overlays, footer; task and workspace switching | A usable workspace | 2, 3 |
 | 5 | [phase-5-loaded-plugins.md](./phase-5-loaded-plugins.md) | The worker-thread sandbox, file custody, the trust prompt as a tree, the third column in `docs/security.md` | Third-party plugins in the TUI; rung 2 groundwork | 2 |
 | 6 | [phase-6-panes-sweep.md](./phase-6-panes-sweep.md) | Every first-party pane checked at 80 by 24; `$EDITOR` handoff; docker exec; the agents transcript, composer, and approvals | Parity with the plugin table in 01-why.md | 4 |
@@ -90,9 +90,12 @@ its caller bytes in, keys out and a size. Two things it scoped are deliberately 
 in its own file: the terminal and docker panes still write to an element rather than to that handle,
 because nothing on this host mounts either until there is chrome. That is phase 6, after phase 4.
 
-Phase 3 is the one that can still run alongside anything: the process model is plumbing that touches
-nothing the rendering work touches, and it could have started the day phase 0 booted client-core under
-Node.
+Phase 3 shipped the same day, and it was the one that could have run alongside anything: the process
+model touches nothing the rendering work touches. `acorn` now opens the node for this machine's data
+root — attaching to one that is running, starting and supervising one that is not — or a node
+elsewhere, pairing with it over six words and a code. Two things it found are worth reading before
+phase 4: the helper's supervisor could not be reused, and `nodeAdopt` and the tunnels are the two
+seam verbs it left uninstalled because nothing draws them yet. Its own file says what else moved.
 
 Phase 4 waits on 2 and 3, because chrome is layouts plus a live node. Phases 5 and 6 can run in parallel
 after it: the sandbox is protocol and custody work, the pane sweep is reading each pane at 80 by 24 and

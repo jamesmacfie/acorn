@@ -50,6 +50,21 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
+/** The pid of the node holding this data root, or null when nothing live holds it. Reads the lock
+ *  rather than taking it, because the one caller that asks is not a node: `acorn` decides between
+ *  attaching to a running node and starting one (docs/future/terminal/03-process-model.md § Attach or
+ *  start), and taking the lock to find out would be the very thing it is checking for.
+ *
+ *  A stale file naming a dead process reads as unlocked, the same judgement `acquireLock` makes. */
+export function lockedBy(dir: string): number | null {
+  try {
+    const pid = Number.parseInt(readFileSync(join(dir, LOCK_FILE), 'utf8').trim(), 10)
+    return Number.isInteger(pid) && pid > 0 && processIsAlive(pid) ? pid : null
+  } catch {
+    return null // no file, or it vanished mid-read: nothing holds this root
+  }
+}
+
 function acquireLock(dir: string): () => void {
   const path = join(dir, LOCK_FILE)
   const claim = (): number | null => {
