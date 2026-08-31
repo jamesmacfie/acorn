@@ -1,19 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { paletteFor, reportsTruecolor, TERMINAL_PALETTE } from './appearance'
+import { rgbToHex } from '@opentui/core'
+import { paletteFor, reportsTruecolor, slotColor, TERMINAL_PALETTE } from './appearance'
 import { osc52, supportsClipboard } from './kit/copy'
 
 // The two places this host decides something about the terminal rather than about the kit. Neither
 // needs a renderer, so neither is skipped on an older Node.
 
 describe('the palette', () => {
+  // The light-terminal bug, as an assertion. OpenTUI draws a colour it was not given as opaque white
+  // and reads a colour it was given by name as a CSS colour, so "leave it to the terminal" has to be
+  // said in the two colours it has for that: the default foreground, and a palette index.
+  it('asks the terminal for every slot, including the one no role names', () => {
+    expect(slotColor('default').intent).toBe('default')
+    expect(slotColor(undefined).intent).toBe('default')
+    for (const slot of ['accent', 'ok', 'warn', 'danger'] as const) {
+      expect(slotColor(slot).intent).toBe('indexed')
+    }
+  })
+
   it('defaults to the terminal’s own slots, which is the theme the person chose', () => {
     expect(paletteFor({ '--accent': '#ff0000' }, false)).toEqual(TERMINAL_PALETTE)
   })
 
   it('passes a theme’s hexes through where the terminal says it can take them', () => {
     const palette = paletteFor({ '--accent': '#8be9fd', '--state-ok': '#50fa7b' }, true)
-    expect(palette.accent).toBe('#8be9fd')
-    expect(palette.ok).toBe('#50fa7b')
+    expect(rgbToHex(palette.accent)).toBe('#8be9fd')
+    expect(rgbToHex(palette.ok)).toBe('#50fa7b')
     // Untouched tokens keep the terminal's slot rather than becoming undefined.
     expect(palette.warn).toBe(TERMINAL_PALETTE.warn)
   })

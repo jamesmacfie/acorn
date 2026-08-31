@@ -2,6 +2,7 @@
 import { Show, type JSX } from 'solid-js'
 import type { TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { borderCell, styled, textStyle } from './roles'
+import { slotColor } from '../appearance'
 
 // The three things every component in this package needs, and the reason each exists.
 //
@@ -91,7 +92,7 @@ export function Rule(props: { axis?: 'x' | 'y' }) {
   const vertical = () => props.axis === 'y'
   return (
     <Show when={borderCell('divider').glyph}>
-      <box border={vertical() ? ['left'] : ['top']} borderStyle="single" flexShrink={0} />
+      <box border={vertical() ? ['left'] : ['top']} borderStyle="single" borderColor={slotColor('default')} flexShrink={0} />
     </Show>
   )
 }

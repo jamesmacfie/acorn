@@ -1,4 +1,5 @@
 import { TextAttributes } from '@opentui/core'
+import type { RGBA } from '@opentui/core'
 import { roleCell, type CellAttribute, type CellStyle } from '@acorn/client-core/kit/tokens/roles.ts'
 import type { Border, Space, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isCompact, slotColor } from '../appearance'
@@ -10,7 +11,7 @@ import { isCompact, slotColor } from '../appearance'
 // names a colour, a gap or a box character — it asks for a role, and the answer arrives here.
 
 export type Style = {
-  fg?: string
+  fg: RGBA
   attributes?: number
   transform?: (value: string) => string
 }
@@ -29,10 +30,11 @@ const attributes = (cell: CellStyle): number =>
 export function textStyle(role: TextRole | undefined, tone?: Tone): Style {
   const text = roleCell('text', role ?? 'body')
   const colour = roleCell('tone', tone ?? 'neutral')
-  const fg = slotColor(colour.slot)
   return {
+    // Always a colour, never omitted: an unset `fg` is opaque white to OpenTUI rather than the
+    // terminal's own foreground, and `muted` is the tone that names no slot (../appearance.ts).
+    fg: slotColor(colour.slot),
     attributes: attributes(text) | attributes(colour),
-    ...(fg ? { fg } : {}),
     ...(text.upper ? { transform: (value: string) => value.toUpperCase() } : {}),
   }
 }
@@ -49,6 +51,24 @@ export const spaceCells = (space: Space | undefined): number => roleCell('space'
 export const spaceLines = (space: Space | undefined): number => {
   const lines = roleCell('space', space ?? 'stack').lines ?? 0
   return isCompact() ? 0 : lines
+}
+
+/** The border props for a box drawing a border role, and no colour at all where it draws no box.
+ *
+ *  Two things about OpenTUI a caller has to answer for. Its own border colour is opaque white, the
+ *  same trap a run of text has; and a `borderColor` handed to a box with no border switches the border
+ *  back on, so the colour has to be absent exactly when the box is. */
+export const boxBorder = (border: Border, opts: { when?: boolean; tone?: Tone } = {}): {
+  border: boolean
+  borderStyle: 'single'
+  borderColor: RGBA | undefined
+} => {
+  const box = (opts.when ?? true) && borderCell(border).box
+  return {
+    border: box,
+    borderStyle: 'single',
+    borderColor: box ? slotColor(roleCell('tone', opts.tone ?? 'neutral').slot) : undefined,
+  }
 }
 
 /** What a border role draws: a box around the thing, a character to repeat, or nothing. */
