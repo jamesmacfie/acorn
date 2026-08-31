@@ -29,7 +29,7 @@ import type { ShellModel } from './model'
 
 /** Below this many cells across the whole shell the rail is a marker strip. The desktop's
  *  `leftCollapsed` preference at a width instead of a click, because there is no grip to drag and no
- *  room to spare (docs/future/terminal/07-chrome.md § The screen). */
+ *  room to spare (docs/tui.md § The screen). */
 export const RAIL_COLLAPSE_AT = 100
 
 /** Before every region a layout registers, so the cycle reads down the screen (./Shell.tsx). */
@@ -96,7 +96,7 @@ export function Rail(props: { model: ShellModel; collapsed: boolean }) {
     >
       <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} collapsed={props.collapsed} />} />
       {/* Only where there is something under it. A rule with nothing below is a line that means
-          nothing, and the bundled roster registers no browse source until the pane sweep. */}
+          nothing, and how many browse sources the roster registers is the roster's business. */}
       <Show when={sources().length}>
         <Rule />
         <Rows

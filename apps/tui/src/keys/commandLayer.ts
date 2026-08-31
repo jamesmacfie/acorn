@@ -44,7 +44,7 @@ const isBareKey = (key: string): boolean => !key.includes('+')
  * name for the platform's command key and comes out of `toKeymapKey` as `super` on macOS. The intent
  * table already asks this host which modifier it has and is told `ctrl` (../keys/install.ts); a
  * contribution's own chord is a literal and had to be read the same way, or the footer advertises keys
- * that do nothing (docs/future/terminal/phase-6-panes-sweep.md).
+ * that do nothing (docs/tui.md).
  *
  * Collisions are possible and are the lesser problem: `resolveKeybindings` already reports two bindings
  * on one chord, and a duplicate that shows up in the conflict list beats a chord that silently never

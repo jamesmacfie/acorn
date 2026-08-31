@@ -101,7 +101,7 @@ function drawLayout(entry: PaneLayoutContribution<any>): PaneContribution {
         // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
         // renders as an empty string. On the DOM that is an empty text node nobody sees; a cell host
         // refuses it, because a run of text there must have a `text` parent, and the mount fails
-        // (docs/future/terminal/findings.md). One boundary per region rather than one per pane, so a
+        // (docs/tui.md). One boundary per region rather than one per pane, so a
         // slow region does not blank the ones beside it.
         regions[name] = () => createComponent(Suspense, {
           fallback: null,

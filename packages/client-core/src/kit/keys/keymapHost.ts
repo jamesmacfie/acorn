@@ -35,7 +35,7 @@ let typing: () => boolean = () => false
 // modifier, which on macOS is `super`, and that is right in a browser and wrong in a terminal: a
 // terminal emulator keeps Cmd for itself and never delivers it, so `super+return` is a chord nobody
 // can press. So a host may say. Nothing supplies it but the terminal
-// (docs/future/terminal/05-keys-and-focus.md § The adapter).
+// (docs/tui.md § The adapter).
 let primary: 'super' | 'ctrl' | null = null
 
 /** The installed keymap, or null before the host's root exists. */

@@ -7,8 +7,8 @@ Three docs have "terminal" in the name and they are about different things. This
 terminal drawer inside the desktop app: a shell, or a provider's own CLI, running raw in a PTY, with
 nothing between you and it. [managed-agents.md](./managed-agents.md) is the other way to run the same
 providers: acorn drives the session over a protocol, keeps a ledger of every turn, and can replay it.
-[future/terminal/](./future/terminal/README.md) is neither; it is the plan for running acorn itself
-in a terminal, as a second host beside the desktop window.
+[tui.md](./tui.md) is neither; it is acorn itself running in a terminal, as a second host beside the
+desktop window.
 
 Worktree creation is a core-owned choke point. When a fresh worktree is created, core resolves the
 `core.taskWorktreeCreated` capability supplied by the terminal plugin and the plugin runs the repository
@@ -149,7 +149,7 @@ are both throwaway PTYs, both about fifteen lines now, and both work on a host w
 The terminal plugin's own drawer surface keeps its own xterm, because it is not throwaway: it carries
 the app's theme, the font-size preference, the WebGL renderer and the Shift+Enter rule, and none of
 those has a meaning in cells. The drawer has no home on the terminal client anyway, which is the other
-half of why it stayed ([future/terminal/](./future/terminal/README.md) § Chrome).
+half of why it stayed ([tui.md](./tui.md) § Chrome).
 
 **The `$EDITOR` handoff needed nothing built.** The editor pane already has a terminal mode: one device
 preference swaps the CodeMirror rectangle for a throwaway PTY running the reader's own editor on the

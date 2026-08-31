@@ -2,7 +2,7 @@
 //
 // The list rules — what wraps, where the first press lands, which of select and activate picks, what
 // the page keys move by — are `collectionIntents.ts` and are shared, so the two hosts cannot drift
-// (docs/future/terminal/05-keys-and-focus.md § Collections). This file supplies the two things the
+// (docs/tui.md § Collections). This file supplies the two things the
 // DOM half supplies with elements:
 //
 //   land    put focus on the item. There is no element, so a row hands its renderable back as it

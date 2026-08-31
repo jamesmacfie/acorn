@@ -3,7 +3,7 @@
 // `client-core/host/keys/focusRegions.ts` keeps the same contract and is DOM all the way down: it
 // orders regions by `compareDocumentPosition`, finds a region's first stop with `querySelector`,
 // focuses with `element.focus()`, and listens for `focusin` and `pointerdown`. None of that exists
-// here (docs/future/terminal/05-keys-and-focus.md § Focus regions).
+// here (docs/tui.md § Focus regions).
 //
 // What replaces each:
 //
@@ -194,7 +194,7 @@ export function claimIfProvisional(node: Renderable | undefined): boolean {
  *
  * Every region, not the focused pane's alone, and that is this host's own answer: a terminal draws
  * one pane, so the rail, the pane strip, the pane's own regions and the footer are one screen and one
- * cycle (docs/future/terminal/07-chrome.md § Navigation). The desktop scopes the cycle to a pane
+ * cycle (docs/tui.md § Navigation). The desktop scopes the cycle to a pane
  * because it draws several side by side and Tab into the next one would be a surprise; here there is
  * no next one to be surprised by, and the chord that switches which pane is drawn is `nextPane`.
  *

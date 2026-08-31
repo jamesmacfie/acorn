@@ -36,7 +36,7 @@ export default function Markdown(props: {
    * question. There used to be an `onClick` beside it handing over the DOM event, which a remote tree
    * cannot receive and a terminal host does not have; its two callers wanted `openInAppUrl(href)` and
    * the browser on a false, which is what the return value is for. Removed when the terminal host
-   * started drawing this node (docs/future/terminal/findings.md).
+   * started drawing this node (docs/tui.md).
    */
   onSelect?: (href: string) => boolean | void
 }) {

@@ -21,7 +21,7 @@ there means a restart.
 
 ## Reaching a node with `acorn`
 
-`acorn` is the terminal client (`apps/tui/`, `docs/future/terminal/`). Run it and it opens the
+`acorn` is the terminal client (`apps/tui/`, [docs/tui.md](./tui.md)). Run it and it opens the
 workspace for the node this machine's data root holds: `ACORN_DATA_DIR`, else the desktop app's root
 if the app is installed here, else the dev checkout's. It reads the root's lock to decide what to do.
 A node already holds it, so `acorn` attaches, reading the endpoint from `node.json` and the

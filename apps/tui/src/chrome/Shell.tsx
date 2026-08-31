@@ -113,7 +113,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     const quit = () => {
       // A node this TUI started dies with it, and a reader who typed `q` by accident should not
       // discover that afterwards. One this TUI only attached to is left running, so there is nothing
-      // to confirm (docs/future/terminal/03-process-model.md § Attach or start).
+      // to confirm (docs/tui.md § Attach or start).
       if (props.supervised) openOverlay('quit')
       else props.onQuit()
     }

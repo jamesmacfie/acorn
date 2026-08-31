@@ -145,7 +145,7 @@ export default function EditorPane(props: { task: Task }) {
   // Reload-on-focus, where there is a window to lose focus. A host without one — the terminal client
   // runs this pane under Node — has nothing to listen to, and reaching for the listener took the whole
   // pane down: the throw landed inside the mount and the pane drew nothing at all
-  // (docs/future/terminal/phase-6-panes-sweep.md). The agent and the human still share the worktree
+  // (docs/tui.md). The agent and the human still share the worktree
   // there; what a reader gets instead of the automatic reload is the pane's own refetch.
   const watchFocus = (add: boolean): void => {
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return

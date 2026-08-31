@@ -16,7 +16,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status, 2026-08-30 |
 | --- | --- | --- |
-| [terminal/](./terminal/README.md) | `acorn` in a terminal: a second host for the same component tree and layouts, the process model, and the node + tui deployable beside the desktop. Nine phases. | Proposal, 2026-08-30. Not started; phase 0 blocks on nothing. Replaces the single file `terminal.md`. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [events.md](./events.md) | Node-emitted core events, plugin events on `plugin:<id>:*`, and cross-plugin subscription. | Shipped 2026-08-28; three items open (preview URL, `emits` on the settings page, connection deletion). |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
@@ -39,10 +38,10 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 ## How these relate
 
-Host-owned plugin UI is the seam most of the others lean on, and it shipped in 2026-08: the terminal
-client ([terminal/](./terminal/README.md)) is a second host for the same component tree and is the
-first programme to build one, and its prerequisite sweep is done: the client tier holds no raw DOM
-for a second host to fail to draw. The PWA is the layouts' narrow projections,
+Host-owned plugin UI is the seam most of the others lean on, and it shipped in 2026-08. The terminal
+client ([tui.md](../tui.md)) was the second host built on it, which is why the kit's `tui` column is
+read rather than asserted, and what is left of shipping it is step 7 of [bundle.md](./bundle.md).
+The PWA is the layouts' narrow projections,
 compiled-tier's component couplings dissolved into slots, rail-tab's slice 3 became the `core:task`
 annotation point, and the marketing plugin docs should be written against the tree rather than the
 frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
@@ -55,8 +54,8 @@ doc owns it and the others point.
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` (replaced by
 the single `events.md` above on 2026-08-28 when all but three items shipped), `layout/`, `structure/`,
-`structure-followup/`, and the single files `live-qa.md` and `dx.md` are in git history. Each ended by
-saying where its behaviour moved.
+`structure-followup/`, `before-terminal-ui/`, `terminal/`, and the single files `live-qa.md` and
+`dx.md` are in git history. Each ended by saying where its behaviour moved.
 
 `structure/` was eight phases that made the folder names say what the architecture doc says: `main/`
 retired everywhere, client-core regrouped into `kit/`, `host/`, `infra/`, and `features/`, one shape
@@ -66,6 +65,25 @@ the package boundaries in [architecture-overview.md](../architecture-overview.md
 boundaries, the index in [README.md](../README.md), and the CI that runs the arch suite in
 [testing.md](../testing.md).
 
+`terminal/` was nine phases that built a second host for the whole workspace: `acorn`, client-core
+booted under Node, drawing the same panes in cells. Phases 0 to 6 shipped on 2026-08-31 and the folder
+was deleted the same day. [tui.md](../tui.md) owns the client — the process model, the config
+directory, the host switch, the chrome, the keys, the sandbox and the doors it left open — and the
+behaviour that belongs to a shared contract went to that contract's owner instead:
+[ui-design.md](../ui-design.md) §§ The closed kit, What a terminal renderer needs from this and Every
+node at 80 by 24 for the kit and the role tokens, [panes.md](../panes.md) § Layout model for the
+projections, [command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Focus and
+typing for the intents and the layers, [security.md](../security.md) §§ Trust boundaries, Transport
+and auth, Third-party plugin bundles and The containment ladder for the worker-thread sandbox,
+[plugins.md](../plugins.md) § The tree contract for the shared batch rules,
+[first-party-plugins.md](../first-party-plugins.md) § What each of these loses in a terminal for the
+plugin-by-plugin table, [terminal.md](../terminal.md) § Client and [editor.md](../editor.md) for
+`attachPty` and the `$EDITOR` handoff, [node-distribution.md](../node-distribution.md) § Reaching a
+node with `acorn`, and [testing.md](../testing.md) § Test layers for the six suites. Phase 7, putting
+`acorn` in the two artifacts, is the one phase that never ran; its design is
+[bundle.md](./bundle.md) § Shipping `acorn`, which is where it belonged all along, because the tarball
+is that file's pipeline and not this programme's.
+
 `before-terminal-ui/` was eight phases that emptied the plugin client tier of the raw DOM a second
 host cannot draw, shipped and deleted 2026-08-31. The kit grew four nodes and
 [ui-design.md](../ui-design.md) §§ The closed kit and Every node at 80 by 24 owns them; the file
@@ -73,9 +91,10 @@ dialogs are two verbs on the platform seam in [frontend.md](../frontend.md), whi
 `{ seam: … }` host requirement that replaced the preview pane's desktop gate; the editor is
 CodeMirror with an `$EDITOR`-in-a-PTY mode and [editor.md](../editor.md) owns both, with
 [first-party-plugins.md](../first-party-plugins.md) carrying the row. The survey that started it
-lives on in the corrected plugin table in [terminal/01-why.md](./terminal/01-why.md) and in the
-baseline comment on the client-tier purity rule in `tools/arch/boundaries.test.ts`, which is the
-programme's last deliverable and the reason none of it can leak back.
+lives on in the corrected plugin table in [first-party-plugins.md](../first-party-plugins.md) § What
+each of these loses in a terminal and in the baseline comment on the client-tier purity rule in
+`tools/arch/boundaries.test.ts`, which is the programme's last deliverable and the reason none of it
+can leak back.
 
 `structure-followup/` was the three places the whiteboard drawing still lied once `structure/` had
 moved the folders, in three phases and a sweep, shipped and deleted 2026-08-31. The custody package is

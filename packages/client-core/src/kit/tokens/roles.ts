@@ -51,7 +51,7 @@ const space: Mapping<Space> = {
   // `Inline gap="row"` glued its children together and the context pane's header came out as
   // "context2 sections". Vertically they still spend nothing; horizontally the floor is one cell,
   // because two runs of text with nothing between them are one word
-  // (docs/future/terminal/phase-6-panes-sweep.md).
+  // (docs/tui.md).
   tui: {
     none: { said: '0 lines, 0 cells', lines: 0, cells: 0 },
     inline: { said: 'one cell', cells: 1 },

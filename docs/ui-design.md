@@ -378,7 +378,7 @@ answer to that is a `<Fallback>` child, not a branch.
 
 Two hosts exist, and both draw the whole kit. `dom` is the desktop and the browser, from
 `client-core/host/tree/components.ts`. `tui` is the terminal, from `apps/tui/src/kit/components.tsx`,
-since that programme's phase 1 on 2026-08-31 (`docs/future/terminal/`). The two tables have the same
+since 2026-08-31 (`docs/tui.md`). The two tables have the same
 keys as each other and as this matrix, held by `tools/arch/kitTable.test.ts`, so a node cannot be
 added to one host and forgotten on the other, and nobody adds a node at all without deciding what it
 does on a host with no pixels.
@@ -869,9 +869,9 @@ pull list owned a virtualizer, a scroll element, two animation frames and a pair
 
 ## What the kit and layouts must never do
 
-Twelve standing constraints. Each one keeps open a door that a mobile PWA
-([docs/future/remote.md](./future/remote.md)) or a terminal renderer
-([docs/future/terminal/](./future/terminal/README.md)) walks through later, and each is cheap to hold now
+Twelve standing constraints. Each one keeps open a door that the terminal renderer
+([docs/tui.md](./tui.md)) already walked through and a mobile PWA
+([docs/future/remote.md](./future/remote.md)) walks through later, and each is cheap to hold now
 and expensive to reopen. The arguments are in [What the kit refuses](#what-the-kit-refuses) above and
 in [docs/security.md](./security.md).
 
@@ -910,10 +910,9 @@ Host-owned layouts make a focused mobile subset cheap; they do not decide what i
 ### What a terminal renderer needs from this
 
 A terminal host cannot run the web renderer, so it needs the tree, the kit, the layouts and the
-keymap to be honest about intent. The host that reads these is the programme in
-[docs/future/terminal/](./future/terminal/README.md), whose phase 1 shipped on 2026-08-31 and
-draws the whole kit in cells. What phase 0 found on the way is in
-[findings.md](./future/terminal/findings.md). Drawing all seventy-four nodes cost the kit one prop:
+keymap to be honest about intent. The host that reads these is `acorn`
+([docs/tui.md](./tui.md)), which shipped on 2026-08-31 and draws the whole kit in cells.
+Drawing all seventy-four nodes cost the kit one prop:
 `Markdown` had an `onClick` beside its `onSelect`, handing over a DOM event that a remote tree cannot
 receive and a terminal has no way to raise. Its two callers wanted the link's href and the browser on
 a miss, so `onSelect` returns `false` for "I did not take it" and `onClick` is gone. Nothing else
@@ -939,7 +938,7 @@ moved. This is what the kit holds for it:
   A `pty` rectangle is filled through `attachPty`, which takes the channel rather than handing back a
   box: an xterm on the DOM, OpenTUI's emulator in cells, one source in the plugin
   ([docs/terminal.md § Client](./terminal.md)). What crosses to a terminal plugin by plugin is in
-  [docs/future/terminal/01-why.md](./future/terminal/01-why.md).
+  [docs/first-party-plugins.md](./first-party-plugins.md) § What each of these loses in a terminal.
 - **A prop type is declared once and both hosts compile against it.** `ButtonProps`, `InputProps`,
   `SelectProps`, `PickerProps` and `MentionTextareaProps` are exported from the DOM kit and imported by
   the terminal one, because a node's props are one contract and a hand-written second copy loses a prop

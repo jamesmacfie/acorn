@@ -3,7 +3,7 @@
 // Split out of `collection.ts` in terminal phase 2. The arrows, Home, End, the page keys, wrapping,
 // where the first press lands, and which of `select` and `activate` picks are all rules about a list
 // rather than about a document, and a second host had to keep them exactly
-// (docs/future/terminal/05-keys-and-focus.md § Collections). What stayed behind in `collection.ts`
+// (docs/tui.md § Collections). What stayed behind in `collection.ts`
 // is the DOM half: `focus()`, `scrollIntoView`, the `aria-*` and `tabindex` getters.
 //
 // The host supplies two things and nothing else: `land`, which puts focus on an item, and `onItem`,

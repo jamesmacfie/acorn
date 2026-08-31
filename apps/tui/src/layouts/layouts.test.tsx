@@ -195,7 +195,7 @@ describe.skipIf(!hasFfi)('the layouts in cells', () => {
   it('a layout re-lays out when the terminal is resized', async () => {
     // `SIGWINCH` is the renderer's: it listens for the signal itself and re-lays out, and no layout
     // reads the terminal's size, so a resize is one thing rather than eight
-    // (docs/future/terminal/04-rendering.md § What the TUI never does).
+    // (docs/tui.md § What the TUI never does).
     const frame = await draw(CASES.find((entry) => entry.layout === 'list-detail')!, { width: 60, height: 24 })
     try {
       expect(frame.text).not.toContain('a detail')

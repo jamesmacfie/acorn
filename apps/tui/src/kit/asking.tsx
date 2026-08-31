@@ -6,9 +6,9 @@ import type { Size } from '@acorn/client-core/kit/tokens/tokens.ts'
 // The prop types, not the components. A node's props are one contract on both hosts — a pane compiles
 // against one of them and runs on either — and this host had hand-written copies that had quietly lost
 // `tip`, `iconOnly`, `min` and the rest, so nothing in the roster type-checked
-// (docs/future/terminal/phase-6-panes-sweep.md). `import type` is erased, so the DOM components behind
+// (docs/tui.md). `import type` is erased, so the DOM components behind
 // this module never reach the bundle and the barrel rule holds
-// (docs/future/terminal/08-deployables.md).
+// (docs/tui.md).
 import type { ButtonProps, InputProps, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
 import type { PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import type { MentionTextareaProps } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'

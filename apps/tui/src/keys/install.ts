@@ -37,7 +37,7 @@ export type TuiKeymap = Keymap<Renderable, KeyEvent>
 // The intent is the shared one and the table is still `intentKeys`. This is a host adding a key to an
 // intent it already has, which is what a per-host key table is for; a key that meant something a
 // desktop intent does not would be a second keymap, and that is refused
-// (docs/future/terminal/05-keys-and-focus.md § What must never happen).
+// (docs/tui.md § What must never happen).
 const HOST_KEYS: Partial<Record<Intent, readonly string[]>> = {
   nextRegion: ['tab'],
   prevRegion: ['shift+tab'],

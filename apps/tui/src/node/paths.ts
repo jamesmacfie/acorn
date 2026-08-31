@@ -8,7 +8,7 @@ import { devDataDir } from '@acorn/node-core/server/transport/listenerConfig.ts'
 // Two directories, and they belong to different owners. The config directory is the TUI's: the fleet
 // store, the device tokens, and the cache the query layer persists. The data root is the node's, and
 // nothing here writes to it — `acorn` reads the lock and the identity, and the node itself owns the
-// rest (docs/future/terminal/03-process-model.md § Where the TUI keeps things).
+// rest (docs/tui.md § Where the TUI keeps things).
 
 // The desktop app's own data root, when the app is installed on this machine. Its Rust shell puts the
 // node's root under the bundle identifier's application-data directory, so this is the same path from

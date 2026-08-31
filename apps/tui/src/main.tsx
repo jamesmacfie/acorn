@@ -15,9 +15,8 @@ import { App } from './App'
 //   acorn --node <https://host>     pair with a node elsewhere, then open it
 //   acorn --node <name>             open a node this device already paired with
 //
-// Phases 3 and 4 (docs/future/terminal/phase-4-chrome.md). The shell is whole: a rail of tasks, a
-// pane strip, a palette, a footer that says what the keyboard will do. What it does not have yet is
-// most of the panes, which is the pane sweep.
+// The shell is whole (docs/tui.md § The screen): a rail of tasks, a pane strip, a palette, a footer
+// that says what the keyboard will do, and the same twelve client plugins the desktop registers.
 
 const { values } = parseArgs({
   options: {
@@ -101,9 +100,8 @@ watchPluginChanges()
 // binds to it and `render` hands it back to nobody.
 //
 // `exitOnCtrlC` is off: Ctrl+C at the shell is the TUI's, and inside an entered PTY rectangle it is
-// the PTY's, which is the whole reason a rectangle owns its keys (docs/future/terminal/03-process-model.md
-// § Signals and exit). The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing
-// here listens for one.
+// the PTY's, which is the whole reason a rectangle owns its keys (docs/tui.md § Signals and exit).
+// The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
 const renderer = await createCliRenderer({ exitOnCtrlC: false })
 const engine = installKeymap(renderer)
 

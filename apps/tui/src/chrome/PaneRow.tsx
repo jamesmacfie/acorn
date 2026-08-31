@@ -40,7 +40,7 @@ export function PaneStrip(props: { task: Task; focused: boolean }) {
 // The pane itself is the contribution's own component, model root, layout and all — the same object
 // the desktop mounts, drawn by this host's layout table (../layouts/index.ts). One error boundary per
 // pane, as on the DOM, drawn as an `Alert` in `warn` tone: a pane that throws is one pane with a
-// message in it, not a blank terminal (docs/future/terminal/04-rendering.md § Unknown nodes and failed
+// message in it, not a blank terminal (docs/tui.md § Unknown nodes and failed
 // trees). `ContributionBoundary` itself is not reused — its fallback is `<section>` and `<strong>`.
 export function PaneBody(props: { task: Task }) {
   const shown = () => shownPane(props.task)
@@ -53,7 +53,7 @@ export function PaneBody(props: { task: Task }) {
           answers a height deficit by shrinking every child that will give — so a one-line row shrunk to
           half a line lands on the line above it, and the PR pane came out as two screens interleaved
           character by character. Clipping is the honest answer and it is the one a terminal gives
-          (docs/future/terminal/phase-6-panes-sweep.md).
+          (docs/tui.md).
           A scroll box was the other candidate and is refused: its content box is free-sized, so every
           layout that measures its own box to decide whether it is narrow — which all of them do —
           measures a width that is not on screen, and the detail column of a `list-detail` pane never

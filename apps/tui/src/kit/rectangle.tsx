@@ -26,7 +26,7 @@ extend({ embedded_terminal: EmbeddedTerminalRenderable })
  *
  * The DOM hands over an element and the caller attaches xterm to it. There is no element here, so the
  * host hands over the three operations a terminal is: bytes in, keystrokes out, and the size of the
- * box in cells (docs/future/terminal/04-rendering.md § Rectangles).
+ * box in cells (docs/tui.md § Rectangles).
  */
 export type CellTerminal = {
   /** Bytes from the PTY, written into the emulator. */
@@ -44,14 +44,13 @@ export type CellTerminal = {
 
 // Above every layer there is: while a rectangle is entered the keys are its, `Ctrl+C` included, and
 // no app layer may fire. An intercept rather than a layer, because a layer answers keys it can name
-// and a rectangle answers all of them (docs/future/terminal/05-keys-and-focus.md § The Rectangle
-// contract).
+// and a rectangle answers all of them (docs/tui.md § The Rectangle contract).
 const RECTANGLE_PRIORITY = 200
 
 // How long after leaving a rectangle a second Escape means "send an Escape to what is inside".
 //
 // The contract is "Escape alone leaves, Escape twice sends one"
-// (docs/future/terminal/05-keys-and-focus.md § The Rectangle contract). Leaving on the first press
+// (docs/tui.md § The Rectangle contract). Leaving on the first press
 // and treating a second press as re-enter-and-send is the same behaviour with no latency: holding the
 // first Escape for a window to see whether a second arrives would make every exit feel slow, and this
 // is the one key rule the desktop does not have, so it should not also be the slowest.
@@ -66,7 +65,7 @@ const ESCAPE_PAIR_MS = 400
 const [entered, setEntered] = createSignal(0)
 
 /** Is a rectangle holding every key right now? Read by the footer, which says so and says how to get
- *  back out (docs/future/terminal/07-chrome.md § The footer). */
+ *  back out (docs/tui.md § The footer). */
 export const enteredRectangle = (): boolean => entered() > 0
 
 /**
@@ -193,8 +192,9 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
 
 /** An `editor` rectangle: the text of the file, read-only, with the handoff to `$EDITOR` beside it.
  *
- *  A box and a line until phase 6, which owns the read-only view, the search inside it, and the
- *  suspend-and-resume that runs the reader's own editor (docs/future/terminal/phase-6-panes-sweep.md).
+ *  A box and a line. The read-only view and the search inside it are not built, and the handoff
+ *  needed nothing built: the editor pane's terminal mode runs the reader's own editor in a PTY on the
+ *  node, so in cells it simply draws (docs/tui.md § Rectangles).
  *  Drawn rather than absent because a pane that names one is telling the truth about what is there. */
 export function EditorRectangle(props: { label: string; children?: JSX.Element }) {
   return (

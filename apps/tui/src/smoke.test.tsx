@@ -76,7 +76,7 @@ test.skipIf(!hasFfi)('enter opens the row the caret is on', async () => {
 //
 // Notes rather than the http pane, which is what phase 1 asked for: http ships only a tree bundle
 // (plugins/http/src/tree/, no client/), so drawing it means the worker sandbox and that is phase 5.
-// See docs/future/terminal/findings.md.
+// See docs/tui.md.
 test.skipIf(!hasFfi)('the pane holds together at 120 by 40 as well as at 80 by 24', async () => {
   const wide = await renderFixture({ width: 120, height: 40, pane: 'notes' })
   const frame = await wide.frame()

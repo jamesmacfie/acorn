@@ -4,7 +4,7 @@ import { hasFfi } from './ffi'
 import { renderFixture } from './harness'
 
 // The pane sweep: every first-party pane the roster registers, opened at exactly 80 by 24 with the
-// chrome present (docs/future/terminal/phase-6-panes-sweep.md).
+// chrome present (docs/tui.md).
 //
 // One case per pane, and each asks the three questions the sweep exists to ask rather than pinning
 // every cell: can a reader find the thing this pane is for on the first screen, is nothing wider than
@@ -33,7 +33,7 @@ const drewCleanly = (frame: string, paneId: string): void => {
  * on screen. A pane's own data is a route and a store rather than a prop, and the first render in a
  * fresh worker also pays for compiling everything the pane pulls in — so the settle the harness does
  * comes back before the pane has filled, and every one of these asserted on an empty screen once
- * (docs/future/terminal/phase-6-panes-sweep.md).
+ * (docs/tui.md).
  *
  * Bounded, and the frame comes back either way: a pane that never fills is itself a finding, and this
  * reports it as a missing line on a screen somebody can read rather than as a timeout.
@@ -75,7 +75,7 @@ describe.skipIf(!hasFfi)('every pane at 80 by 24', () => {
     // run past the bottom, so `Files 2` is a count on the first screen and the names are a scroll away.
     // That is the pane behaving — the thing it is for is what this pull request is — and it is written
     // down rather than fixed, because closing the folds by default would cost the reader a press on
-    // every host (docs/future/terminal/findings.md).
+    // every host (docs/tui.md).
     expect(frame).toContain('Description')
   }, 60_000)
 

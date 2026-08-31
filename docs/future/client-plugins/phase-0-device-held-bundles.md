@@ -43,7 +43,7 @@ In:
 
 Out: any replaceable surface (phase 1), style packs (phase 3), the config file (phase 4), the worker
 render path (layout phase 3), the PWA and terminal custody implementations (07-hosts.md says what
-they owe; `remote.md` and `terminal/06-isolation.md` own them).
+they owe; `remote.md` and `docs/tui.md` own them).
 
 ## Design detail
 
@@ -122,7 +122,7 @@ uses for fields added after rows were written.
 Per [docs-migration.md](./docs-migration.md), phase 0 rows: `docs/plugins.md` (two sections plus one
 new), `docs/security.md` (three sections), `docs/state-ownership.md`, `docs/plugin-authoring.md`,
 `docs/contribution-kinds.md`, `docs/shell.md`, `docs/testing.md`, `docs/architecture-overview.md`,
-`docs/future/remote.md`, `docs/future/terminal/06-isolation.md`, `docs/future/ecosystem/README.md`.
+`docs/future/remote.md`, `docs/tui.md`, `docs/future/ecosystem/README.md`.
 
 ## Doors left open
 

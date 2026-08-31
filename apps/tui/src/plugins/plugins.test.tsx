@@ -10,7 +10,7 @@ import { renderCells } from '../kit/render'
 import { Text } from '../kit/showing'
 
 // What phase 5 promises, tested at the two levels it can be: the sandbox for real, and the drawing in
-// cells (docs/future/terminal/phase-5-loaded-plugins.md § Tests).
+// cells (docs/tui.md).
 //
 // The sandbox half never skips. It starts a real `node:worker_threads` worker under `--permission`,
 // hands it a bundle out of a real content-addressed cache, and asserts both halves of the containment

@@ -3,7 +3,7 @@
 // A terminal shows one pane. The desktop's row of panes side by side needs pixels to be worth
 // anything — two panes at 80 cells are two 40-cell columns, and `docs/ui-design.md`'s own floor is
 // that a pane reads at 80 — so the honest projection of "a left-to-right row of panes" is a strip of
-// labels and one pane under it (docs/future/terminal/07-chrome.md § The screen).
+// labels and one pane under it (docs/tui.md § The screen).
 //
 // So `nextPane` and `prevPane` walk the switcher's list rather than a row of mounted panes, and
 // choosing one is the reducer's own `show`, which is what a plain click is on the desktop. Nothing

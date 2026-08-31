@@ -97,7 +97,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   // Twenty more turns of the loop. A pane's own data is a route and a store, not a prop, and the first
   // render in a fresh worker also pays for compiling every module the pane pulls in — so the settles
   // above come back before the pane has anything in it, and the first test in every file was asserting
-  // on an empty pane (docs/future/terminal/phase-6-panes-sweep.md). Each turn is cheap: `flush`
+  // on an empty pane (docs/tui.md). Each turn is cheap: `flush`
   // resolves as soon as the render loop is idle, so this is twenty chances for a promise to land rather
   // than four seconds of waiting.
   for (let turn = 0; turn < 20; turn += 1) await settle(200)

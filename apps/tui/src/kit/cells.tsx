@@ -19,7 +19,7 @@ export const slot = (value: JSX.Element): JSX.Element => {
   }
   // An array mixes the two, and a fragment is an array: `hint={<><Kbd>⌘↵</Kbd> to send</>}` is one node
   // and one bare string, and the string on its own would land in a box, which is the shape a cell host
-  // refuses outright (docs/future/terminal/phase-6-panes-sweep.md).
+  // refuses outright (docs/tui.md).
   if (Array.isArray(value)) return value.map((item) => slot(item as JSX.Element)) as unknown as JSX.Element
   return value
 }
@@ -39,7 +39,7 @@ export const flatten = (value: unknown): string => {
  *  inside a `Chip`. `flatten` turns one into `[object Object]`, because a renderable has no text to
  *  read off it — which is how the pane sweep found this, on the file rows of the changes pane and the
  *  item rows of the context pane. So a line asks first, and a line whose children are a tree draws the
- *  tree instead (docs/future/terminal/phase-6-panes-sweep.md).
+ *  tree instead (docs/tui.md).
  *
  *  Its own function so `Line` stays one expression, and exported because `Row` asks the same question
  *  about the same children when it decides whether the `match` role is its to apply. */
@@ -72,7 +72,7 @@ export function Line(props: { role?: TextRole; tone?: Tone; wrap?: boolean; chil
  *  fit, each is shrunk and each clips its own content, which turned "hash but `signIn` still" into
  *  "hash bsignInstill" on the agents transcript. A `span` is a run inside one `text`, so the whole
  *  line wraps and clips as one thing — which is what a line of styled words is
- *  (docs/future/terminal/phase-6-panes-sweep.md).
+ *  (docs/tui.md).
  *
  *  Only for a caller that owns the `text` around it. Everything else uses `Line`. */
 export function Run(props: { role?: TextRole; tone?: Tone; children: JSX.Element }) {
