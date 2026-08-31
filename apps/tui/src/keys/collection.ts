@@ -110,7 +110,21 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
         if (!options.items().length) return
         queueMicrotask(() => {
           const key = keys.active()
-          if (key) claimIfProvisional(boxes.get(key))
+          if (!key) return
+          const box = boxes.get(key)
+          if (!box) return
+          // …and this is the other thing that effect has to catch: the rebuild took the keys with it.
+          // `Rows` draws through `<For>`, which is keyed by reference, and a pane's items are a fresh
+          // array on every render — so any refetch destroys the row focus was on, the renderer's focus
+          // goes with it, and on a host with no pointer there is no way to put it back. Re-land on the
+          // same key, which is the row the reader was on.
+          const holder = focusedRenderable()
+          if (holder?.isDestroyed) {
+            box.focus()
+            noteFocus(box)
+            return
+          }
+          claimIfProvisional(box)
         })
       })
     },

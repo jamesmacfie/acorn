@@ -1,7 +1,19 @@
 /** @jsxImportSource @opentui/solid */
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
+import { agentsClientPlugin } from '@acorn/plugin-agents/client/index.ts'
+import { changesClientPlugin } from '@acorn/plugin-changes/client/index.ts'
+import { contextClientPlugin } from '@acorn/plugin-context/client/index.ts'
+import { dockerClientPlugin } from '@acorn/plugin-docker/client/index.ts'
+import { editorClientPlugin } from '@acorn/plugin-editor/client/index.ts'
+import { githubClientPlugin } from '@acorn/plugin-github/client/index.ts'
+import { memoryClientPlugin } from '@acorn/plugin-memory/client/index.ts'
 import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
+import { onboardingClientPlugin } from '@acorn/plugin-onboarding/client/index.ts'
+import { previewClientPlugin } from '@acorn/plugin-preview/client/index.ts'
+import { terminalClientPlugin } from '@acorn/plugin-terminal/client/index.ts'
+import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
+import { setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { setLayouts } from '@acorn/client-core/host/layouts/table.ts'
 import { setRemoteTree } from '@acorn/client-core/host/tree/table.ts'
 import { LAYOUTS } from './layouts'
@@ -35,7 +47,27 @@ installPluginWorkers()
 // the one compiled pane phase 0 proved and the rest are the pane sweep's
 // (docs/future/terminal/phase-6-panes-sweep.md). A loaded plugin is not on this list and never will
 // be: it arrives from a node as a bundle, and `syncPluginDistribution` in main.tsx is what finds it.
-initClientPlugins([notesClientPlugin])
+// …and no landing page. `selectedSource()` resolves an unset selection to whichever registered source
+// is the default, which on the desktop is core's own home page and here is whichever plugin's browse
+// source happens to be first — so the shell would open on a repo browser instead of on the reader's
+// work. This host opens on a task (chrome/Shell.tsx § Open on something), so the selection starts
+// explicitly empty and only the rail puts a source in it.
+setSelectedSource(null)
+
+initClientPlugins([
+  agentsClientPlugin,
+  changesClientPlugin,
+  contextClientPlugin,
+  dockerClientPlugin,
+  editorClientPlugin,
+  githubClientPlugin,
+  memoryClientPlugin,
+  notesClientPlugin,
+  onboardingClientPlugin,
+  previewClientPlugin,
+  terminalClientPlugin,
+  workflowsClientPlugin,
+])
 
 export function App(props: { nodeId: string; supervised: boolean; onQuit: () => void }) {
   return (

@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { createComponent, ErrorBoundary, Show } from 'solid-js'
+import { createComponent, ErrorBoundary, Show, Suspense } from 'solid-js'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
 import { Tabs } from '../kit/grouping'
 import { Line } from '../kit/cells'
@@ -49,12 +49,28 @@ export function PaneBody(props: { task: Task }) {
       when={shown()}
       fallback={<EmptyState title="No panes available here">Nothing this build can draw is available on this task.</EmptyState>}
     >
+      {/* Clipped, not shrunk. A pane taller than the screen is the normal case at 24 rows, and yoga
+          answers a height deficit by shrinking every child that will give — so a one-line row shrunk to
+          half a line lands on the line above it, and the PR pane came out as two screens interleaved
+          character by character. Clipping is the honest answer and it is the one a terminal gives
+          (docs/future/terminal/phase-6-panes-sweep.md).
+          A scroll box was the other candidate and is refused: its content box is free-sized, so every
+          layout that measures its own box to decide whether it is narrow — which all of them do —
+          measures a width that is not on screen, and the detail column of a `list-detail` pane never
+          draws at all. */}
       {(pane) => (
-        <box flexDirection="column" flexGrow={1}>
+        <box flexDirection="column" flexGrow={1} overflow="hidden">
           <ErrorBoundary fallback={(error) => (
             <Alert tone="warn" title={pane().id}>{error instanceof Error ? error.message : String(error)}</Alert>
           )}>
-            {createComponent(pane().component, { get task() { return props.task } })}
+            {/* Under a `Suspense`, because a pane whose contribution is a bare component rather than a
+                set of regions is a `lazy()` this host mounts itself, and a pending `lazy()` resolves to
+                an empty string — which a cell host refuses outright where the DOM would have drawn a
+                text node nobody sees (findings.md § A pending `lazy()` region is an empty string). The
+                layout mount path already has this guard; a component pane does not go through it. */}
+            <Suspense fallback={null}>
+              {createComponent(pane().component, { get task() { return props.task } })}
+            </Suspense>
           </ErrorBoundary>
         </box>
       )}

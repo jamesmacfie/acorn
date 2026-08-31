@@ -46,12 +46,18 @@ const space: Mapping<Space> = {
     stack: '--gap-stack',
     section: '--gap-section',
   },
+  // A space role has to answer both axes, because the same token spaces a column of rows and a line of
+  // words. `row` and `stack` said "0 lines" and nothing about cells, which read as zero — so an
+  // `Inline gap="row"` glued its children together and the context pane's header came out as
+  // "context2 sections". Vertically they still spend nothing; horizontally the floor is one cell,
+  // because two runs of text with nothing between them are one word
+  // (docs/future/terminal/phase-6-panes-sweep.md).
   tui: {
-    none: { said: '0 lines', lines: 0 },
+    none: { said: '0 lines, 0 cells', lines: 0, cells: 0 },
     inline: { said: 'one cell', cells: 1 },
-    row: { said: '0 lines', lines: 0 },
-    stack: { said: '0 lines', lines: 0 },
-    section: { said: '1 blank line', lines: 1 },
+    row: { said: '0 lines, one cell', lines: 0, cells: 1 },
+    stack: { said: '0 lines, one cell', lines: 0, cells: 1 },
+    section: { said: '1 blank line, one cell', lines: 1, cells: 1 },
   },
 }
 

@@ -76,7 +76,17 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   region table, at the same two sizes. And a twin of client-core's `keys.test.tsx` against the terminal
   adapter, so the two adapters cannot drift: where the keys land when a pane opens, the moves and their
   wrapping, activate reaching a row, the region cycle remembering its place, a modal swallowing what is
-  behind it, and a `pty` rectangle taking every key on Enter and giving them back on Escape. A chrome
+  behind it, and a `pty` rectangle taking every key on Enter and giving them back on Escape. A pane file
+  (`src/panes.test.tsx`) opens each first-party pane in the roster at exactly 80 by 24 with the chrome
+  around it and asks the three questions the pane sweep asks: is the thing the pane is for on the first
+  screen, is no line wider than the 80 cells the kit promises, and did the pane draw itself rather than
+  its error boundary. It names one string per pane rather than snapshotting the buffer, for the reason
+  the kit cases do. Two of its cases go further: the PR pane at 120 by 40, where a `list-detail` node
+  draws both columns, and an agent session opened from the sidebar, which is where the transcript, a
+  tool card, a pending approval and the composer all have to appear at once. Each case waits for the
+  string it is about rather than for a fixed time, because a pane's data is a route and a store rather
+  than a prop and the first render in a fresh worker also pays for compiling everything the pane
+  imports. A chrome
   file drives the whole shell rather than a pane: the topbar, the rail and the footer at 80 by 24 and
   at 120 by 40, Tab walking rail to pane strip to pane, the rail collapsing at 99 cells and coming
   back at 100, the palette opening on its chord and giving the keys back where it found them, a

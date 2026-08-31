@@ -109,6 +109,13 @@ export { Rows } from '@acorn/client-core/kit/components/layout/Rows.tsx'
 // The kit's one admission that not everything is a tree, and the keyboard contract for getting in
 // and out of one.
 export { Rectangle } from '@acorn/client-core/kit/components/content/Rectangle.tsx'
+// The other half of a `pty` rectangle. A `Rectangle` promises the host draws what is inside the box,
+// and for `pty` the DOM used to keep only half of it: three plugins each built their own xterm on the
+// element it handed back. The caller now says what the channel is — open at a size, bytes in, bytes
+// out — and the host draws the emulator, which is what let the editor handoff and docker exec cross to
+// a terminal (docs/terminal.md § Client).
+export { attachPty } from '@acorn/client-core/features/terminal/attachPty.ts'
+export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib/pty.ts'
 
 // The two host wrappers. Here before there is a second host, so a plugin can be written against one
 // before it arrives: `Only` is "this exists on these hosts", `Fallback` is "draw this instead where

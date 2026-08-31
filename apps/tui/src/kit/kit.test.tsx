@@ -313,7 +313,7 @@ const CASES: Case[] = [
   {
     node: 'RowActions',
     draws: "the row's actions as glyphs, always drawn, never on hover",
-    render: () => <Row reveal trailing={<RowActions ariaLabel="Actions"><Icon name="x" /></RowActions>}>a row</Row>,
+    render: () => <Row reveal trailing={<RowActions ariaLabel="Actions">{() => <Icon name="x" />}</RowActions>}>a row</Row>,
     check: (frame) => expect(lineWith(frame, 'a row')).toContain('✕'),
   },
   {
@@ -731,9 +731,10 @@ const CASES: Case[] = [
         <Rectangle kind="webview" label="Preview"><Fallback forNode="Rectangle"><Text>open it in a browser</Text></Fallback></Rectangle>
       </Stack>
     ),
-    // Taller than most cases: a `pty` rectangle is a real emulator with a real screen in it, so two
-    // rectangles stacked in ten lines leave the second one no interior at all.
-    size: { width: 40, height: 20 },
+    // Taller than most cases: a `pty` rectangle is a real emulator with a real screen in it and grows
+    // to fill what it is given, so two rectangles stacked in ten lines leave the second one no interior
+    // at all — and since the pane sweep nothing in the kit shrinks to make room, it clips instead.
+    size: { width: 40, height: 30 },
     check: (frame) => {
       has(frame, 'Terminal')
       // The box says how to get into it, which is what makes it one stop rather than a picture

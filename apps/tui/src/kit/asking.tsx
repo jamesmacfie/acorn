@@ -2,9 +2,18 @@
 import { createEffect, createSignal, For, Index, Show, type JSX } from 'solid-js'
 import type { InputRenderable, TextareaRenderable } from '@opentui/core'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
-import type { Size, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import type { Size } from '@acorn/client-core/kit/tokens/tokens.ts'
+// The prop types, not the components. A node's props are one contract on both hosts — a pane compiles
+// against one of them and runs on either — and this host had hand-written copies that had quietly lost
+// `tip`, `iconOnly`, `min` and the rest, so nothing in the roster type-checked
+// (docs/future/terminal/phase-6-panes-sweep.md). `import type` is erased, so the DOM components behind
+// this module never reach the bundle and the barrel rule holds
+// (docs/future/terminal/08-deployables.md).
+import type { ButtonProps, InputProps, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
+import type { PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
+import type { MentionTextareaProps } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 import type { ItemProps } from '../keys/collection'
-import { flatten, Line, slot } from './cells'
+import { flatten, hasNode, Line, slot } from './cells'
 import { borderCell } from './roles'
 import { Menu } from './grouping'
 import { copyToTerminal } from './copy'
@@ -17,29 +26,12 @@ import { copyToTerminal } from './copy'
 // changes from outside has to be written into the renderable rather than passed as a prop.
 
 /** `[ label ]`. `bare` drops the brackets, for a control that is a word inside a sentence. */
-export function Button(props: {
-  label?: string
-  variant?: 'solid' | 'outline' | 'ghost' | 'bare'
-  tone?: Extract<Tone, 'neutral' | 'accent' | 'warn' | 'danger'>
-  size?: Extract<Size, 'xs' | 'sm' | 'md'>
-  iconOnly?: boolean
-  busy?: boolean
-  disabled?: boolean
-  title?: string
-  submit?: boolean
-  autofocus?: boolean
-  hidden?: boolean
-  id?: string
-  pressed?: boolean
-  armed?: boolean
-  opens?: 'menu' | 'listbox' | 'dialog'
-  expanded?: boolean
-  describedBy?: string
-  href?: string
-  onPress?: () => void
-  children?: JSX.Element
-}) {
-  const body = () => flatten(props.children) || props.label || ''
+export function Button(props: ButtonProps) {
+  // A terminal draws the button's words, not its glyph. An icon-only button's child is a node with no
+  // text to read off it — `flatten` would print `[object Object]`, which is how the agents pane's
+  // header read before the sweep — and the kit makes such a button carry `label`, which is the words
+  // (docs/ui-design.md § The closed kit).
+  const body = () => (hasNode(props.children) ? props.label ?? '' : flatten(props.children) || props.label || '')
   return (
     <Show when={!props.hidden}>
       <Line
@@ -54,17 +46,11 @@ export function Button(props: {
 
 /** `[ Delete? ]` after the first press: the armed button is the prompt, which is the same rule the
  *  DOM keeps and the same shared helper behind it. */
-export function ConfirmButton(props: {
-  label?: string
-  variant?: 'solid' | 'outline' | 'ghost' | 'bare'
-  tone?: Extract<Tone, 'neutral' | 'accent' | 'warn' | 'danger'>
-  size?: Extract<Size, 'xs' | 'sm' | 'md'>
-  disabled?: boolean
+export function ConfirmButton(props: ButtonProps & {
   confirmLabel?: string
   timeoutMs?: number
   skipConfirm?: boolean
   onConfirm: () => void
-  children?: JSX.Element
 }) {
   const armed = createArmedConfirm(() => props.timeoutMs ?? 3000)
   const body = () => flatten(props.children) || props.label || ''
@@ -88,32 +74,7 @@ export function ConfirmButton(props: {
   )
 }
 
-export function Input(props: {
-  size?: Extract<Size, 'sm' | 'md'>
-  invalid?: boolean
-  width?: 'full' | 'auto' | 'narrow'
-  kind?: 'filter' | 'bare'
-  label?: string
-  title?: string
-  id?: string
-  name?: string
-  disabled?: boolean
-  required?: boolean
-  autofocus?: boolean
-  assist?: boolean
-  value?: string | number
-  type?: string
-  placeholder?: string
-  readOnly?: boolean
-  maxLength?: number
-  suggestions?: readonly string[]
-  onInput?: (value: string) => void
-  onChange?: (value: string) => void
-  onSubmit?: (value: string) => void
-  onFocus?: () => void
-  onBlur?: () => void
-  ref?: unknown
-}) {
+export function Input(props: InputProps) {
   let field: InputRenderable | undefined
   const text = () => (props.value === undefined ? '' : String(props.value))
   // An edit buffer owns its text once it has it, so a value set from outside is written in and only
@@ -183,14 +144,7 @@ export function Textarea(props: {
 }
 
 /** `[ value ▾ ]`, opening a `Menu`. The list is the menu's; this is the trigger and the value. */
-export function Select(props: {
-  size?: Extract<Size, 'sm' | 'md'>
-  label?: string
-  disabled?: boolean
-  options: readonly { value: string; label: string; title?: string; disabled?: boolean }[]
-  value?: string
-  onChange?: (value: string) => void
-}) {
+export function Select(props: SelectProps) {
   const current = () => props.options.find((option) => option.value === props.value)
   return (
     <Menu
@@ -241,15 +195,7 @@ export function Checkbox(props: {
 
 /** `[x] label`, the same two cells as a Checkbox, because in a terminal a switch is a checkbox that
  *  took a different route to the same state. */
-export function ToggleButton(props: {
-  label?: string
-  size?: Extract<Size, 'xs' | 'sm' | 'md'>
-  tone?: Extract<Tone, 'neutral' | 'accent' | 'warn' | 'danger'>
-  disabled?: boolean
-  pressed: boolean
-  onPressedChange: (pressed: boolean) => void
-  children?: JSX.Element
-}) {
+export function ToggleButton(props: ButtonProps & { pressed: boolean; onPressedChange: (pressed: boolean) => void }) {
   return (
     <box flexDirection="row" gap={1}>
       <Line tone={props.disabled ? 'muted' : undefined}>{props.pressed ? '[x]' : '[ ]'}</Line>
@@ -271,26 +217,7 @@ export function SegmentedControl<T extends string>(props: {
 }
 
 /** A field that opens a `Menu` filtered by typing. */
-export function Picker<T>(props: {
-  label: string | JSX.Element
-  ariaLabel?: string
-  placeholder: string
-  emptyText: string
-  items?: readonly { id: string; label: string; note?: string; active?: boolean; disabled?: boolean; removable?: boolean }[]
-  onPick?: (id: string) => void
-  onRemove?: (id: string) => void
-  results?: (query: string) => T[]
-  rowLabel?: (item: T) => string
-  rowDescription?: (item: T) => string | undefined
-  isActive?: (item: T) => boolean
-  isDisabled?: (item: T) => boolean
-  onSelect?: (item: T) => void
-  leading?: (item: T) => JSX.Element
-  tools?: JSX.Element
-  status?: JSX.Element
-  disabled?: boolean
-  keepOpen?: boolean
-}) {
+export function Picker<T>(props: PickerProps<T>) {
   const [query, setQuery] = createSignal('')
   const rows = () => {
     if (props.items) {
@@ -391,21 +318,7 @@ export function Composer(props: {
 /** reduced: no inline highlight of the completed token; the menu is a list under the field. Colouring
  *  a run inside an edit buffer means a mirror element over the field, and a terminal has no layer to
  *  put one on. */
-export function MentionTextarea(props: {
-  value: string
-  onInput: (value: string) => void
-  mentions?: readonly string[]
-  sources?: readonly { sigil: string; label: string; emptyText: string; loading?: boolean; error?: string; suggest: (query: string) => readonly { value: string; label: string; detail?: string }[] }[]
-  segments?: (value: string) => unknown
-  placeholder?: string
-  disabled?: boolean
-  label?: string
-  rows?: number
-  onSubmit?: () => void
-  onCancel?: () => void
-  overlay?: JSX.Element
-  ref?: unknown
-}) {
+export function MentionTextarea(props: MentionTextareaProps) {
   // The word being typed after a sigil, which is the whole of what the mirror was for.
   const active = () => {
     const sigils = props.sources?.map((source) => source.sigil) ?? (props.mentions ? ['@'] : [])

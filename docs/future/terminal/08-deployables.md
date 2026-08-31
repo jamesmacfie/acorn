@@ -60,6 +60,17 @@ plausible and is not promised; phase 7 decides after the tarball ships.
 - `@opentui/core` and its platform package in the generated `package.json`'s real dependencies.
 - The runtime, once bundling lands.
 
+**And a decision about twenty-four other packages.** The pane sweep put the whole roster in the graph,
+and what the bundle leaves external is now more than OpenTUI: fifteen CodeMirror language packages,
+`shiki`, `lucide-static`, three `@xterm` packages, `seroval`. `apps/tui/package.json` lists all of them,
+because a chunk that cannot resolve an import crashes the pane that loads it and `pnpm dev` has to
+work. What ships is a different question. Most of these are behind a chunk this host never loads —
+xterm because the emulator here is OpenTUI's, CodeMirror because the `editor` rectangle draws a box and
+`$EDITOR` opens in it — and a tarball that carries fifteen grammars for a pane that cannot use them is
+carrying about 30 MB for nothing. Phase 7 owes the count: which of these a terminal build actually
+reaches at runtime, and whether the panes that mention the rest should reach them through a dynamic
+import the way `attachPty` reaches xterm.
+
 ## What the Tauri bundle grows
 
 - `acorn` as a second `externalBin` or as a resource beside `helper/`, with the same runtime.

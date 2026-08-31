@@ -8,15 +8,16 @@
 // (ui/diff/DiffRows.tsx) bind to it, and client-core may not import a plugin. The `comment-draft:`
 // key prefix is unchanged, so existing drafts survive the move.
 import { createEffect, on, type Accessor } from 'solid-js'
+import { readLocal, writeLocal } from './deviceStorage'
 
 const PREFIX = 'comment-draft:'
 
-export const readDraft = (key: string): string => localStorage.getItem(PREFIX + key) ?? ''
+// Through `deviceStorage.ts` rather than `localStorage` directly, because a host may have nowhere to
+// keep a draft: this pane's composer threw on mount under the terminal client and took the pane with
+// it (./deviceStorage.ts, docs/future/terminal/phase-6-panes-sweep.md).
+export const readDraft = (key: string): string => readLocal(PREFIX + key) ?? ''
 
-export const writeDraft = (key: string, value: string): void => {
-  if (value) localStorage.setItem(PREFIX + key, value)
-  else localStorage.removeItem(PREFIX + key)
-}
+export const writeDraft = (key: string, value: string): void => writeLocal(PREFIX + key, value)
 
 // Bind a text signal to a keyed draft: reseed the signal when the key (PR/thread context) changes,
 // and write back on every edit. A null key disables persistence.

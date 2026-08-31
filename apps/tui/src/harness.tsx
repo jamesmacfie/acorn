@@ -39,7 +39,7 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
  *  What it draws is the fixture node's one task and its notes pane, because that is the roster
  *  `App.tsx` registers. The chrome around it is real: the same rail, strip, palette and footer a
  *  person gets. */
-export async function renderFixture(size: { width?: number; height?: number; supervised?: boolean } = {}): Promise<{ frame: () => Promise<string>; press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<void>; resize: (width: number, height: number) => void; quits: () => number; done: () => void }> {
+export async function renderFixture(size: { width?: number; height?: number; supervised?: boolean; pane?: string } = {}): Promise<{ frame: () => Promise<string>; press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<void>; resize: (width: number, height: number) => void; quits: () => number; done: () => void }> {
   const { createTestRenderer } = await import('@opentui/core/testing')
   const { render } = await import('@opentui/solid')
   const { installKeymap } = await import('./keys/install')
@@ -55,6 +55,24 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   _resetLayoutState()
   _resetChrome()
   await bootFixture()
+  // Which pane the fixture task opens on. The roster has eight of them now, so "the pane" is a choice
+  // rather than the only one there is, and a test that does not make it gets whatever the task's saved
+  // layout puts first (../chrome/panes.ts § shownPane).
+  if (size.pane) {
+    const { dispatchLayout } = await import('@acorn/client-core/features/tasks/tasks.ts')
+    const { paneContribution } = await import('@acorn/client-core/host/registries/panes/panes.ts')
+    dispatchLayout(TASK.id, { type: 'show', pane: size.pane })
+    // …and wait for its code, the pane's and every region's. A pane and each of its regions is a
+    // `lazy()`, and under the test transform the import is a compile rather than a read of one bundled
+    // chunk: the agents pane pulls a highlighter and the editor pulls CodeMirror, which is seconds. A
+    // suite that took its frame before that finished would be asserting on a blank pane and calling it
+    // a finding. The real host has the same wait and shows the pane's `Suspense` fallback through it.
+    const pane = paneContribution(size.pane)
+    type Lazy = { preload?: () => Promise<unknown> }
+    const regions = Object.values((pane as { regions?: Record<string, unknown> } | undefined)?.regions ?? {})
+    await Promise.all([pane?.component as Lazy | undefined, ...regions as Lazy[]]
+      .map((entry) => entry?.preload?.()))
+  }
   const { App } = await import('./App')
 
   // The renderer first and the tree second, rather than `testRender`, which builds both at once. The
@@ -76,6 +94,13 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   renderer.console.deactivate()
   renderer.console.hide()
   await settle(1000)
+  // Twenty more turns of the loop. A pane's own data is a route and a store, not a prop, and the first
+  // render in a fresh worker also pays for compiling every module the pane pulls in — so the settles
+  // above come back before the pane has anything in it, and the first test in every file was asserting
+  // on an empty pane (docs/future/terminal/phase-6-panes-sweep.md). Each turn is cheap: `flush`
+  // resolves as soon as the render loop is idle, so this is twenty chances for a promise to land rather
+  // than four seconds of waiting.
+  for (let turn = 0; turn < 20; turn += 1) await settle(200)
   return {
     frame: async () => {
       await settle(500)

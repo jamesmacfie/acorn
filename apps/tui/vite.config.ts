@@ -28,8 +28,13 @@ const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 // `@opentui/core` stays external: it is the native half, and bundling it would not help.
 const isReactiveRuntime = (id: string) =>
   id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/') || id === '@opentui/solid'
+// Aliased to something local, so it must not be externalized first: the `external` callback sees the
+// raw specifier and a `true` there wins before `resolve.alias` runs, which left `@solidjs/router` in the
+// output as a bare import of a package this host deliberately does not have
+// (src/kit/router.ts, docs/future/terminal/phase-6-panes-sweep.md).
+const isAliased = (id: string) => id === '@solidjs/router' || id.startsWith('@acorn/plugin-api/ui')
 const externalizeBareImports = (id: string) =>
-  !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id)
+  !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id) && !isAliased(id)
 
 export default defineConfig({
   resolve: {
@@ -37,7 +42,15 @@ export default defineConfig({
     // Anchored patterns rather than the object form, which matches by prefix and would rewrite
     // `solid-js/dist/solid.js` again, forever.
     alias: [
-      { find: '@acorn/plugin-api/ui', replacement: resolve(import.meta.dirname, 'src/kit/ui.ts') },
+      { find: /^@acorn\/plugin-api\/ui$/, replacement: resolve(import.meta.dirname, 'src/kit/ui.ts') },
+      // …and the host's own surfaces beside it. `ui/host` is the palette chrome, the drawer, the
+      // reference-panel box and the two cooperative-extension nodes, and the DOM's copies of them are
+      // portals and `<ul>`s (src/kit/host.tsx).
+      { find: /^@acorn\/plugin-api\/ui\/host$/, replacement: resolve(import.meta.dirname, 'src/kit/host.tsx') },
+      // The router, removed rather than replaced. `@solidjs/router` reads `window.history.state` at
+      // module scope, so a pane that imports it cannot even be loaded here, and there is no URL behind
+      // it to answer with (src/kit/router.ts).
+      { find: /^@solidjs\/router$/, replacement: resolve(import.meta.dirname, 'src/kit/router.ts') },
       // Solid's `node` export condition is its server renderer, which has no reactivity. Every
       // consumer that runs Solid on a real Node process points at the client build instead; OpenTUI's
       // own Node harness does the same (references/opentui/packages/solid/scripts/solid-transform.ts).

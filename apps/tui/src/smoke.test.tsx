@@ -19,7 +19,7 @@ const intoPane = async (screen: { press: (key: string) => Promise<void> }): Prom
 }
 
 test.skipIf(!hasFfi)('the notes pane draws its list at 80 by 24', async () => {
-  const screen = await renderFixture()
+  const screen = await renderFixture({ pane: 'notes' })
   const frame = await screen.frame()
   screen.done()
 
@@ -36,7 +36,7 @@ test.skipIf(!hasFfi)('the notes pane draws its list at 80 by 24', async () => {
 // walk it. `j` is `next` in the one table both hosts read (kit/keys/keymap.ts), and the caret is
 // where this host draws the collection's active row.
 test.skipIf(!hasFfi)('j moves the caret down the list', async () => {
-  const screen = await renderFixture()
+  const screen = await renderFixture({ pane: 'notes' })
   await intoPane(screen)
   const first = await screen.frame()
   await screen.press('j')
@@ -58,7 +58,7 @@ test.skipIf(!hasFfi)('j moves the caret down the list', async () => {
 // `list-detail` is below its own 80-cell threshold — one group at a time, with `expand` switching
 // between them. Opening a note there does not reveal it until you go and look.
 test.skipIf(!hasFfi)('enter opens the row the caret is on', async () => {
-  const screen = await renderFixture()
+  const screen = await renderFixture({ pane: 'notes' })
   await intoPane(screen)
   // Past the scratchpad, which the pane opens by itself, onto the second note.
   await screen.press('j')
@@ -78,7 +78,7 @@ test.skipIf(!hasFfi)('enter opens the row the caret is on', async () => {
 // (plugins/http/src/tree/, no client/), so drawing it means the worker sandbox and that is phase 5.
 // See docs/future/terminal/findings.md.
 test.skipIf(!hasFfi)('the pane holds together at 120 by 40 as well as at 80 by 24', async () => {
-  const wide = await renderFixture({ width: 120, height: 40 })
+  const wide = await renderFixture({ width: 120, height: 40, pane: 'notes' })
   const frame = await wide.frame()
   wide.done()
 

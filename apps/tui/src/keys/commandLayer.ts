@@ -36,6 +36,22 @@ export type CommandScope = {
  *  because a plugin may bind a bare key this host has never heard of. */
 const isBareKey = (key: string): boolean => !key.includes('+')
 
+/**
+ * The command key, read as Ctrl.
+ *
+ * A terminal emulator keeps Cmd for itself and never delivers it, so `super+shift+r` is a chord nobody
+ * can press — and half the panes in the roster spell their own as `meta+shift+…`, which is acorn's
+ * name for the platform's command key and comes out of `toKeymapKey` as `super` on macOS. The intent
+ * table already asks this host which modifier it has and is told `ctrl` (../keys/install.ts); a
+ * contribution's own chord is a literal and had to be read the same way, or the footer advertises keys
+ * that do nothing (docs/future/terminal/phase-6-panes-sweep.md).
+ *
+ * Collisions are possible and are the lesser problem: `resolveKeybindings` already reports two bindings
+ * on one chord, and a duplicate that shows up in the conflict list beats a chord that silently never
+ * fires.
+ */
+const asCtrl = (key: string): string => (key.startsWith('super+') ? `ctrl+${key.slice('super+'.length)}` : key)
+
 const mayFire = (binding: ResolvedKeybinding, scope: CommandScope): boolean => {
   if (binding.active && !binding.active()) return false
   const when = binding.when ?? 'global'
@@ -62,7 +78,8 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
     }))
     const bindings = resolveKeybindings(keybindingRegistry.entries(), scope.prefs())
       .flatMap((binding): Binding<Renderable, KeyEvent>[] => {
-        const key = binding.chord && toKeymapKey(binding.chord)
+        const spelled = binding.chord && toKeymapKey(binding.chord)
+        const key = spelled && asCtrl(spelled)
         if (!key) return []
         // No `desc` or `group` on the binding, unlike the DOM installer's: this engine's compiler
         // has no field for either and drops them with a warning, and the command they resolve to

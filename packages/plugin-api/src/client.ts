@@ -201,3 +201,9 @@ export { onClosePaneWhen, onClosePaneWithin } from '@acorn/client-core/host/keys
 // Which sandboxed plugin, if any, draws a given agent tool call. Data, not a component: the component
 // that mounts it is `RemoteTree` on ./ui/host. See docs/plugins.md § The tree contract.
 export type { RemoteContribution } from '@acorn/client-core/host/tree/treeRegistry.ts'
+
+// Per-device scraps — an unsent draft, a closed fold — through one guarded accessor. On this barrel
+// rather than on ./ui because a plugin's own model is a `.ts` file with a node-environment test, and
+// ./ui carries Solid components: one of those makes the whole entrypoint unloadable there
+// (docs/plugin-authoring.md § Testing). Nothing in the module below imports anything.
+export { clearLocal, deviceStorage, readLocal, writeLocal } from '@acorn/client-core/kit/lib/deviceStorage.ts'

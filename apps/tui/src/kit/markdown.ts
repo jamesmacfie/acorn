@@ -23,8 +23,16 @@ const attr = (raw: string, name: string): string | undefined =>
 
 /** The shell's markdown, as lines of runs. Headings bold, lists as `•`, code as its own block,
  *  links as their text with the URL beside them, images gone. */
-export function markdownLines(source: string): Line[] {
-  const html = renderMarkdown(source, { images: 'placeholder' })
+export const markdownLines = (source: string): Line[] =>
+  htmlLines(renderMarkdown(source, { images: 'placeholder' }))
+
+/** The same pass, over HTML somebody else rendered.
+ *
+ *  GitHub and most trackers hand back `bodyHTML` rather than source, so the policy above has nothing
+ *  to decide about them and the skin is the only thing they share with markdown. The DOM host writes
+ *  that string into a div (`ProviderHtml`); here it goes through the same tag walk, which is why the
+ *  walk is its own function rather than the back half of the one above. */
+export function htmlLines(html: string): Line[] {
   const lines: Line[] = []
   let runs: Run[] = []
   let indent = 0

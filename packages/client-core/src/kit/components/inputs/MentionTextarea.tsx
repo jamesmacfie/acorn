@@ -43,7 +43,7 @@ export type MentionSegment = {
   caret?: number
 }
 
-export default function MentionTextarea(props: {
+export type MentionTextareaProps = {
   value: string
   onInput: (value: string) => void
   /** Completions after `@`, as bare names. The short form of `sources`, for a field that offers one
@@ -67,7 +67,9 @@ export default function MentionTextarea(props: {
   /** Drawn inside the field's box, before the text: the agents composer's expand toggle. */
   overlay?: JSX.Element
   ref?: HTMLTextAreaElement | ((element: HTMLTextAreaElement) => void)
-}) {
+}
+
+export default function MentionTextarea(props: MentionTextareaProps) {
   const sources = createMemo<readonly MentionSource[]>(() => props.sources ?? (props.mentions
     ? [{
         sigil: '@',

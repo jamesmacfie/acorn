@@ -134,7 +134,10 @@ export function Button(props: ButtonProps) {
 
 /** What every text control shares. Semantic: how big, how wide, whether it is a filter box or a
  *  bare underline, and whether what it holds is valid. */
-type ControlOwn = {
+/** Exported because a node's props are one contract on both hosts: the terminal kit compiles the
+ *  roster against these declarations rather than against a hand-written copy of them, which is how
+ *  four of them had quietly lost a prop (docs/future/terminal/phase-6-panes-sweep.md). */
+export type ControlOwn = {
   size?: Extract<Size, 'sm' | 'md'>
   invalid?: boolean
   width?: 'full' | 'auto' | 'narrow'
@@ -378,11 +381,13 @@ function SelectList(props: {
  *
  *  Options are data rather than `<option>` children. A plugin writing raw tags into a control is
  *  exactly what the closed kit is for. */
-export function Select(props: ControlOwn & {
+export type SelectProps = ControlOwn & {
   options: readonly SelectOption[]
   value?: string
   onChange?: (value: string) => void
-}) {
+}
+
+export function Select(props: SelectProps) {
   let triggerRef: HTMLButtonElement | undefined
   const current = () => props.options.find((option) => option.value === props.value)
   const label = () => current()?.label ?? ''

@@ -65,7 +65,7 @@ Supporting documents, readable in any order:
 | 3 | [phase-3-process-and-auth.md](./phase-3-process-and-auth.md) | **Shipped 2026-08-31.** The `acorn` command: attach or start, supervise, `--node` with probe, words, and pair; device token custody in a config directory; revoked on the footer; a boot test with a real node | Running against any node | 0 |
 | 4 | [phase-4-chrome.md](./phase-4-chrome.md) | **Shipped 2026-08-31.** Rail, topbar, pane strip, palette, cheat sheet, overlays, notifications, footer; task, workspace, pane and node switching; a quit that asks | A usable workspace | 2, 3 |
 | 5 | [phase-5-loaded-plugins.md](./phase-5-loaded-plugins.md) | **Shipped 2026-08-31.** The worker-thread sandbox under `--permission` with a module deny list; custody over files; the trust prompt as a kit tree; the batch rules split out so both hosts share one copy; the third column in `docs/security.md` | Third-party plugins in the TUI; rung 2 groundwork | 2 |
-| 6 | [phase-6-panes-sweep.md](./phase-6-panes-sweep.md) | Every first-party pane checked at 80 by 24; `$EDITOR` handoff; docker exec; the agents transcript, composer, and approvals | Parity with the plugin table in 01-why.md | 4 |
+| 6 | [phase-6-panes-sweep.md](./phase-6-panes-sweep.md) | **Shipped 2026-08-31.** The whole first-party roster registered and read at 80 by 24; `attachPty` in place of three copies of xterm; docker exec and the `$EDITOR` handoff on this host; the agents transcript, tool cards, approvals and composer; a pane suite | Parity with the plugin table in 01-why.md | 4 |
 | 7 | [phase-7-deployables.md](./phase-7-deployables.md) | `bin/acorn` in the node tarball and in the app bundle; the pack script grows the TUI entry; the native prebuild matrix gains OpenTUI's core; a bundled runtime | Shipping | 4, and `bundle.md` steps 2 to 4 |
 | 8 | [phase-8-cleanup-and-docs.md](./phase-8-cleanup-and-docs.md) | Behaviour rehomed into owning docs, a new `docs/tui.md`, this folder deleted | Done | 7 |
 
@@ -115,7 +115,17 @@ the bootstrap closes with a module deny list — and three it deliberately left,
 `Slot`, which has no consumer until the pane sweep crosses the host barrel. Its own file says what else
 moved, and `docs/security.md § Rung 0` now has the terminal's column.
 
-Phase 6 is what is left before shipping: reading each pane at 80 by 24 and fixing what is unreadable.
+Phase 6 shipped the same day, and it is the one that turned a host with one pane in it into the
+workspace the plugin table promises: the same twelve client plugins the desktop registers, eight panes
+in the strip, and every one of them read at 80 by 24. Almost none of the work was in a pane. What it
+found instead was a kit that shrank rather than clipped, four prop types written twice and each missing
+one, two nodes drawn to the wrong shape, a router that cannot be imported in this process, and two
+panes that reached for a browser and took themselves down with it. Two of its results are worth
+knowing before phase 7: the `$EDITOR` handoff needed nothing built, because the editor pane's terminal
+mode already runs the reader's own editor in a PTY on the node; and the `pty` rectangle's promise moved
+rather than its handle, so `attachPty` now takes the channel and the host draws the emulator. Three
+things it left are in its own file, the largest being that the no-shrink rule has no test holding it.
+
 Phase 7 ships it. Phase 8 deletes this folder.
 
 ## How to work a phase

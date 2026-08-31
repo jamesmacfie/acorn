@@ -114,14 +114,31 @@ built.
 | `docs/future/terminal/phase-5-loaded-plugins.md` | status, What shipped | Five departures from the plan, and the three things it left. |
 | `docs/future/terminal/README.md` | Decisions taken, The phases, The order of work | The worker thread as a decision of its own; phase 5 marked shipped; what it left. |
 
-## Owed by phases 6 and 7
+## Done in phase 6 (2026-08-31)
+
+| Doc | Section | Change |
+| --- | --- | --- |
+| `docs/terminal.md` | Client | `attachPty`: what a caller says about a PTY and what each host draws, why the drawer surface keeps its own xterm, and the `$EDITOR` handoff needing nothing built. |
+| `docs/editor.md` | Editing in your own editor | The same preference is the terminal client's whole handoff; what that host does not have is the graphical side. |
+| `docs/first-party-plugins.md` | What each of these loses in a terminal (new) | One row per plugin that loses something, and the four that reach this host as a tree bundle instead. |
+| `docs/ui-design.md` | Role tokens | A space role answers both axes; `row` and `stack` are one cell horizontally. |
+| `docs/ui-design.md` | What a terminal renderer needs from this | `attachPty` fills a `pty` rectangle; a prop type is declared once and both hosts compile against it; nothing in the kit shrinks. |
+| `docs/ui-design.md` | Every node at 80 by 24 | Five rows: `Timeline.Turn`, `Modal`'s compound spellings, `ListDetail`'s two forms and its narrow stack, `Row`'s `stacked` variant, an icon-only `Button` drawing its label. |
+| `docs/panes.md` | Layout model | The `ListDetail` node's two forms, and which one a remote tree can use. |
+| `docs/plugins.md` | The plugin API | `attachPty` on `/ui`; the per-device storage helpers on `/client`. |
+| `docs/testing.md` | Test layers | The pane suite: what it opens, the three questions it asks, and why each case waits for its own string. |
+| `docs/future/terminal/01-why.md` | What a terminal client gets, and does not | Three rows corrected — editor, terminal, preview — and a paragraph on what the sweep found reading the table. |
+| `docs/future/terminal/findings.md` | The screenshot, What phase 6 did with these | The frame redrawn with the whole roster; one finding closed, fifteen new, three things left. |
+| `docs/future/terminal/phase-6-panes-sweep.md` | status, What shipped, What this phase deliberately left | Seven departures from the plan, and the three things it left. |
+| `docs/future/terminal/08-deployables.md` | What `pack-node.mjs` grows | The twenty-four packages the bundle leaves external now, and the count phase 7 owes. |
+| `docs/future/terminal/README.md` | The phases, The order of work | Phase 6 marked shipped; what it found and what it left. |
+| `tools/arch/docPaths.test.ts` | the link check | Fenced blocks are skipped, because the avatar and chip a terminal screenshot draws around an author name read as a link to this check. |
+
+## Owed by phase 7
 
 | Doc | Section | Phase | What it says afterwards |
 | --- | --- | --- | --- |
-| `docs/testing.md` | Test layers | 6 | Pane snapshots. |
-| `docs/terminal.md` | the PTY | 6 | The editor handoff; docker exec; the two callers writing to the rectangle's handle. |
 | `docs/node-distribution.md` | reaching a node | 7 | `bin/acorn` in the tarball layout. |
-| `docs/first-party-plugins.md` | per plugin | 6 | A terminal note where something is reduced or handed off. |
 | `docs/future/bundle.md` | the sections in `08-deployables.md` | 7 | Rewritten to what shipped; steps reordered. |
 | `docs/shell.md` | resources | 7 | The `acorn` resource and the link offer. |
 

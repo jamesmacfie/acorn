@@ -61,6 +61,7 @@ client: bytesOf
 client: canPickFolder
 client: checkStatusTone
 client: checksState
+client: clearLocal
 client: clientCapability
 client: clientCapabilityId
 client: clientEvents
@@ -77,6 +78,7 @@ client: createProject
 client: createTask
 client: createWorkspace
 client: debounce
+client: deviceStorage
 client: dispatchActiveLayout
 client: dispatchLayout
 client: fileStatusMeta
@@ -126,6 +128,7 @@ client: railDotProps
 client: readBytes
 client: readDraft
 client: readJson
+client: readLocal
 client: recipeBrowserUrl
 client: refResolutionsOptions
 client: refreshSessions
@@ -170,6 +173,7 @@ client: workspacesKey
 client: workspacesOptions
 client: writeDraft
 client: writeJson
+client: writeLocal
 client: wsAttach
 client: wsConnect
 client: wsOnNotice
@@ -579,6 +583,8 @@ ui: Only
 ui: Picker
 ui: PickerRow
 ui: Popover
+ui: PtyEvent
+ui: PtyIo
 ui: Rectangle
 ui: Row
 ui: RowActions
@@ -608,6 +614,7 @@ ui: Toolbar
 ui: ToolbarSpacer
 ui: TreeRow
 ui: UserAvatar
+ui: attachPty
 ui: createArmedConfirm
 ui: createSplitDrag
 ui: defaultModelIdFor

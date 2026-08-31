@@ -38,6 +38,8 @@
     "@tanstack/query-async-storage-persister": "^5.101.0",
     "@tanstack/solid-query": "^5.101.0",
     "@tanstack/solid-virtual": "^3.13.29",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
     "codemirror": "^6.0.2",
     "diff": "^9.0.0",
     "gitdiff-parser": "^0.3.1",

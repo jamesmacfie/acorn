@@ -16,9 +16,13 @@ export const TASK: Task = {
   // Not decoration. `activateTaskSignals` asks the sources which pane a task opens on, and that
   // walks `links`; a fixture without one takes the shell's own activation effect down.
   links: [],
-  github: null,
-  worktreePath: null,
-  pullNumber: null,
+  // A repo and a pull request, so the panes that are only offered on a task that has one are offered
+  // here: the PR pane asks `task.pullNumber != null`, and the changes pane wants a worktree to be
+  // reviewing. The pane sweep needs every row of the roster reachable from one task
+  // (docs/future/terminal/phase-6-panes-sweep.md).
+  github: { owner: 'runn-fast', name: 'acorn' },
+  worktreePath: '/tmp/acorn-fixture/fix-login',
+  pullNumber: 42,
   parentId: null,
   sort: 0,
 }
@@ -35,7 +39,205 @@ export const WORKSPACE_NOTES: NoteSummary[] = [
 
 const BODY = '# Repro steps\n\n1. Sign in as a new account.\n2. Change the password.\n3. Sign in again — the old one still works.\n'
 
-/** A transport that answers the routes this pane asks for and 404s the rest, so a route the pane
+
+// ── Per-pane fixtures ──────────────────────────────────────────────────────────────────────────────
+// Kept beside the transport rather than in each test, so every pane's snapshot is of the same node.
+
+const PROJECT = {
+  id: 'project-1',
+  name: 'acorn',
+  path: '/tmp/acorn-fixture',
+  workspaceId: 'ws-1',
+  sort: 0,
+  hidden: false,
+  color: null,
+  vcs: 'git' as const,
+  defaultBranch: 'main',
+  remoteUrl: 'git@github.com:runn-fast/acorn.git',
+  github: { owner: 'runn-fast', name: 'acorn', repoId: 1 },
+}
+
+const AGENT_PROVIDERS = [{
+  id: 'claude',
+  profileId: 'claude',
+  label: 'Claude Code',
+  driverKind: 'acp' as const,
+  driverVersion: '1',
+  installed: true,
+  authenticated: true,
+  statusAuthority: 'driver',
+  capabilities: [],
+  configOptions: [],
+  commands: [],
+  skills: [],
+  diagnostics: [],
+}]
+
+const AGENT_SESSIONS = [{
+  id: 'session-1',
+  taskId: TASK.id,
+  providerId: 'claude',
+  profileId: 'claude',
+  kind: 'managed',
+  driverKind: 'acp',
+  driverVersion: '1',
+  providerSessionRef: null,
+  controller: 'acorn',
+  runtimeState: 'idle',
+  attention: 'none',
+  statusAuthority: 'driver',
+  title: 'Find why the old password still works',
+  model: 'claude-opus-5',
+  config: {},
+  parentSessionId: null,
+  parentTurnId: null,
+  subagents: [],
+  lastEventSeq: 2,
+  lastReadSeq: 2,
+  archivedAt: null,
+  createdAt: 0,
+  updatedAt: 0,
+}]
+
+// One turn, a prompt, an answer, a tool card and an approval still waiting: the four things the sweep
+// has to see on the agents transcript (docs/future/terminal/phase-6-panes-sweep.md § Scope).
+const AGENT_TURN = {
+  id: 'turn-1',
+  sessionId: 'session-1',
+  ordinal: 1,
+  source: 'user',
+  status: 'completed',
+  input: [{ type: 'text', text: 'Why does the old password still work after a reset?' }],
+  effectivePolicy: {},
+  providerTurnRef: null,
+  stopReason: 'end_turn',
+  usage: null,
+  error: null,
+  attempt: 1,
+  createdAt: 0,
+  updatedAt: 0,
+}
+
+const event = (seq: number, value: unknown) => ({
+  id: `event-${seq}`,
+  sessionId: 'session-1',
+  turnId: 'turn-1',
+  seq,
+  schemaVersion: 1,
+  event: value,
+  searchText: null,
+  createdAt: 0,
+})
+
+const AGENT_SNAPSHOT = {
+  session: AGENT_SESSIONS[0],
+  turns: [AGENT_TURN],
+  events: [
+    event(1, { type: 'user_message', text: 'Why does the old password still work after a reset?' }),
+    event(2, { type: 'tool', tool: { id: 'tool-1', title: 'Read src/login.ts', status: 'completed', output: 'export async function signIn(' } }),
+    event(3, { type: 'assistant_message', text: 'The reset writes a new hash but `signIn` still checks the one it was passed.' }),
+    event(4, { type: 'request', requestId: 'request-1', kind: 'permission', title: 'Write src/login.ts', detail: 'Replace the password check', options: [{ id: 'allow', label: 'Allow' }, { id: 'deny', label: 'Deny' }] }),
+  ],
+  requests: [{
+    id: 'request-1',
+    sessionId: 'session-1',
+    turnId: 'turn-1',
+    providerRequestId: 'request-1',
+    kind: 'permission',
+    status: 'pending',
+    title: 'Write src/login.ts',
+    detail: 'Replace the password check',
+    payload: { options: [{ id: 'allow', label: 'Allow' }, { id: 'deny', label: 'Deny' }] },
+    resolution: null,
+    expiresAt: null,
+    createdAt: 0,
+    resolvedAt: null,
+  }],
+}
+
+const LOCAL_CHANGES = [
+  { path: 'src/login.ts', status: 'modified', staged: false, additions: 12, deletions: 3 },
+  { path: 'src/session.ts', status: 'modified', staged: true, additions: 4, deletions: 0 },
+  { path: 'src/reset.test.ts', status: 'added', staged: false, additions: 40, deletions: 0 },
+]
+
+const PATCH = [
+  'diff --git a/src/login.ts b/src/login.ts',
+  '--- a/src/login.ts',
+  '+++ b/src/login.ts',
+  '@@ -1,4 +1,5 @@',
+  ' export async function signIn(email: string, password: string) {',
+  '-  return check(email, password)',
+  '+  const account = await load(email)',
+  '+  return check(account.passwordHash, password)',
+  ' }',
+].join('\n')
+
+const TASK_CONTEXT = {
+  task: { id: TASK.id, title: TASK.title, projectId: TASK.projectId, branch: TASK.branch, worktreePath: TASK.worktreePath, pullNumber: TASK.pullNumber },
+  sections: [{
+    id: 'notes',
+    label: 'Notes',
+    defaultIncluded: true,
+    budget: {},
+    items: [{ id: 'repro-steps', kind: 'note', label: 'Repro steps' }],
+    compact: '1 note',
+    omitted: 0,
+  }, {
+    id: 'changes',
+    label: 'Working tree',
+    defaultIncluded: true,
+    budget: {},
+    items: [{ id: 'src/login.ts', kind: 'file', label: 'src/login.ts', details: ['+12 -3'] }],
+    compact: '3 files',
+    omitted: 0,
+  }],
+  issues: [],
+  notes: [],
+  memory: [],
+}
+
+const PULL_REF = { owner: 'runn-fast', repo: 'acorn', number: 42 }
+
+const PULL = {
+  number: 42,
+  title: 'Invalidate the old password on reset',
+  state: 'open',
+  draft: false,
+  author: 'jamesmacfie',
+  headRef: 'fix-login',
+  baseRef: 'main',
+  updatedAt: 0,
+  mergeable: 'MERGEABLE',
+  mergeStateStatus: 'CLEAN',
+  autoMergeEnabled: false,
+}
+
+const PULL_DETAIL = {
+  pull: { ...PULL, body: 'Loads the account first so the stored hash is the one being checked.', headSha: 'abc123' },
+  labels: [],
+  reviews: [],
+  requestedReviewers: [],
+  comments: [],
+  commits: [{ sha: 'abc123', message: 'Invalidate the old password on reset', author: 'James Macfie', authorLogin: 'jamesmacfie', committedAt: 0 }],
+  checks: [{ name: 'lint', status: 'success', url: null, runId: 1 }, { name: 'test', status: 'success', url: null, runId: 2 }],
+  threads: [],
+}
+
+const PULL_FILES = [
+  { path: 'src/login.ts', status: 'modified', additions: 12, deletions: 3, sha: 'a', viewed: false, patch: null },
+  { path: 'src/session.ts', status: 'modified', additions: 4, deletions: 0, sha: 'b', viewed: false, patch: null },
+]
+
+const EDITOR_ENTRIES = [
+  { name: 'src', dir: true },
+  { name: 'package.json', dir: false },
+  { name: 'README.md', dir: false },
+]
+
+const FILE_TEXT = 'export async function signIn(email: string, password: string) {\n  const account = await load(email)\n  return check(account.passwordHash, password)\n}\n'
+
+/** A transport that answers the routes the panes ask for and 404s the rest, so a route the pane
  *  starts asking for shows up as an empty region rather than as a silent pass. */
 export function stubTransport(): { fetch: (nodeId: string, request: { path: string; method?: string }) => Promise<{ status: number; headers: Record<string, string>; body: Uint8Array }> } {
   const json = (value: unknown) => ({
@@ -52,12 +254,41 @@ export function stubTransport(): { fetch: (nodeId: string, request: { path: stri
       if (path === '/v2/core/prefs') return json({})
       if (path === '/v2/core/integrations') return json({ integrations: [], providers: [] })
       if (path === '/v2/core/workspaces') return json([{ id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }] }])
+      if (path === '/v2/core/workspaces/ws-1/external-projects') return json([])
       if (path === '/v2/core/tasks') return json([TASK])
+      if (path === '/v2/core/projects') return json({ projects: [PROJECT] })
       if (path === `/v2/p/notes/tasks/${TASK.id}/notes`) return json(TASK_NOTES)
       if (path === '/v2/p/notes/workspaces/ws-1/notes') return json(WORKSPACE_NOTES)
       if (path === '/v2/p/notes/workspaces/global/notes') return json([])
       if (path.endsWith('/repro-steps')) return json({ slug: 'repro-steps', title: 'Repro steps', body: BODY, included: true })
       if (path.endsWith('/scratchpad')) return json({ slug: 'scratchpad', title: 'Scratchpad', body: 'Whatever is in hand.\n', included: true })
+      // ── One answer per pane in the roster ─────────────────────────────────────────────────────
+      // Enough for each pane to draw its own shape rather than an error, because the sweep is about
+      // whether a reader can find the thing the pane is for in 24 rows — and a pane showing one
+      // `Alert` reads the same however unreadable the real thing is.
+      if (path === '/v2/p/agents/providers') return json(AGENT_PROVIDERS)
+      if (path.startsWith('/v2/p/agents/sessions?')) return json({ sessions: AGENT_SESSIONS, nextCursor: null })
+      if (/^\/v2\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(AGENT_SNAPSHOT)
+      if (path.startsWith('/v2/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
+      if (path === `/v2/p/changes/tasks/${TASK.id}/local/changes`) return json(LOCAL_CHANGES)
+      if (path === `/v2/p/changes/tasks/${TASK.id}/review-notes`) return json([])
+      if (path.startsWith(`/v2/p/changes/tasks/${TASK.id}/local/diff`)) return json({ patch: PATCH })
+      if (path.startsWith(`/v2/core/tasks/${TASK.id}/context`)) return json(TASK_CONTEXT)
+      if (path === `/v2/p/workflows/tasks/${TASK.id}/workflows/runs`) return json([])
+      if (path === `/v2/p/editor/tasks/${TASK.id}/editor/root`) return json({ root: TASK.worktreePath })
+      if (path.startsWith(`/v2/p/editor/tasks/${TASK.id}/editor/list`)) return json(EDITOR_ENTRIES)
+      if (path === `/v2/p/editor/tasks/${TASK.id}/editor/files`) return json(['src/login.ts', 'src/session.ts'])
+      if (path.startsWith(`/v2/p/editor/tasks/${TASK.id}/editor/read`)) return json({ text: FILE_TEXT })
+      if (path === `/v2/p/github/tasks/${TASK.id}/pulls`) return json({ pulls: [{ pull: PULL_REF, role: 'primary', provenance: 'agent', sessionId: 'session-1' }] })
+      if (path === '/v2/p/github/repos/runn-fast/acorn/pulls/42') return json(PULL_DETAIL)
+      if (path.startsWith('/v2/p/github/repos/runn-fast/acorn/pulls/42/files')) return json(PULL_FILES)
+      if (path.startsWith('/v2/p/github/repos/runn-fast/acorn/pulls?')) return json([PULL])
+      if (path === '/v2/p/github/repos/runn-fast/acorn/labels') return json([])
+      if (path === '/v2/p/github/repos/runn-fast/acorn/mentions') return json([])
+      // `ACORN_FIXTURE_LOG=1` prints what went unanswered. A pane that starts asking for a new route
+      // otherwise shows up as an empty region, and finding out which route it wanted is the difference
+      // between a minute and an afternoon.
+      if (process.env.ACORN_FIXTURE_LOG) process.stderr.write(`MISS ${request.method ?? 'GET'} ${path}\n`)
       return { status: 404, headers: {}, body: new Uint8Array() }
     },
   }

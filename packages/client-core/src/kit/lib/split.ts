@@ -16,7 +16,9 @@ export type SplitDrag = {
   }
 }
 
-export function createSplitDrag(opts: {
+/** Exported because the terminal kit declares its own `createSplitDrag` — a handle nobody can grab —
+ *  against these options rather than a copy of them (docs/future/terminal/phase-6-panes-sweep.md). */
+export type SplitDragOptions = {
   /** The axis the handle moves along: 'x' for a vertical divider between columns. */
   axis: 'x' | 'y'
   label: string
@@ -32,7 +34,9 @@ export function createSplitDrag(opts: {
   onReset?: () => void
   /** Invert the keyboard direction, for a handle whose "grow" is up or left (the drawer). */
   invert?: boolean
-}): SplitDrag {
+}
+
+export function createSplitDrag(opts: SplitDragOptions): SplitDrag {
   const step = () => opts.step ?? 16
 
   // See docs/ui-design.md § Drag-to-resize: a drag that outlives its component would keep moving

@@ -36,6 +36,10 @@ export type CellTerminal = {
   /** The region's size in cells, whenever it changes. A terminal resize is the renderer's alone: it
    *  handles `SIGWINCH` itself, re-lays out, and this is how that reaches the PTY. */
   onResize: (listener: (cols: number, rows: number) => void) => void
+  /** The region's size in cells right now, for a caller that has to open its channel at a size before
+   *  the first resize arrives. `onResize` alone would leave a PTY guessing until the reader dragged
+   *  something (./pty.ts). */
+  size: () => { cols: number; rows: number }
 }
 
 // Above every layer there is: while a rectangle is entered the keys are its, `Ctrl+C` included, and
@@ -138,6 +142,7 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
           if (at >= 0) sizeListeners.splice(at, 1)
         })
       },
+      size: () => ({ cols: renderable.width, rows: renderable.height }),
     })
   }
 
