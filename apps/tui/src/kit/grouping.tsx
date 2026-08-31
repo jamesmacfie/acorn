@@ -171,7 +171,7 @@ Toolbar.Group = (props: { children: JSX.Element }) => <box flexDirection="row">{
  *  focusable elements; there is nothing to walk here, so a modal traps by pushing a layer above the
  *  pane's that answers `dismiss` and swallows the rest until it closes
  *  (docs/future/terminal/05-keys-and-focus.md § Traps). That is what a terminal modal is, and it is
- *  the same thing the overlay stack does for the palette in phase 4. */
+ *  the same thing the shell's overlay stack does (../chrome/state.ts). */
 export function Modal(props: {
   onDismiss: () => void
   title?: string

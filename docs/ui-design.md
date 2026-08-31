@@ -18,6 +18,28 @@ The shell owns navigation chrome and modal prompts. Plugins supply feature conte
 and slots. A child webview is positioned over a pane host by the shell; page content never
 owns the surrounding chrome.
 
+The terminal draws the same hierarchy at a quarter of the size, and where it differs it differs
+because there are no pixels to spend (`apps/tui/src/chrome/`):
+
+```text
+Topbar:   one line. Workspace, task count, the open branch, the node's state as a dot
+Rail:     a column of tasks, browse sources under a rule; two cells of marks below 100 columns
+Main:     one pane, with a strip of pane labels above it
+Overlays: the palette, the cheat sheet and a quit confirmation, drawn where the pane is
+Footer:   one line. What the keyboard will do, and the node's state when it needs a sentence
+```
+
+Three differences are worth naming. There is one pane rather than a row of them, because two panes at
+80 columns are two 40-column panes and the kit's own floor is 80, so `nextPane` switches which pane is
+drawn instead of walking to the next one. The region cycle is the whole screen rather than the focused
+pane, for the same reason: rail, pane strip, the pane's own regions, and back. And an overlay hides the
+pane rather than replacing it, so opening the palette does not tear down the pane's queries and its
+model.
+
+The rail's task list goes through the same `rail.taskList` exclusive slot the desktop's does, so a
+plugin that offers to replace it replaces it on both hosts. The topbar and the pane strip are bespoke
+on both until `docs/future/client-plugins/04-replaceable-surfaces.md` gives them contracts.
+
 Both vertical rails, the TabRail on the left and the task pane switcher on the right, are built from
 one component: `tabs/RailTab.tsx`, a square 52px control styled by `.tabrail-tab`. Every control in
 both rails goes through it, including the bottom-pinned "+" on the left and "close task" on the

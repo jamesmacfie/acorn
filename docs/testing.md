@@ -76,8 +76,12 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   region table, at the same two sizes. And a twin of client-core's `keys.test.tsx` against the terminal
   adapter, so the two adapters cannot drift: where the keys land when a pane opens, the moves and their
   wrapping, activate reaching a row, the region cycle remembering its place, a modal swallowing what is
-  behind it, and a `pty` rectangle taking every key on Enter and giving them back on Escape. Three
-  files alongside need no renderer and never skip: the palette's collapse from a theme to the
+  behind it, and a `pty` rectangle taking every key on Enter and giving them back on Escape. A chrome
+  file drives the whole shell rather than a pane: the topbar, the rail and the footer at 80 by 24 and
+  at 120 by 40, Tab walking rail to pane strip to pane, the rail collapsing at 99 cells and coming
+  back at 100, the palette opening on its chord and giving the keys back where it found them, a
+  notification appearing above the footer without taking focus, and `q` asking before it stops a node
+  this `acorn` started. Three files alongside need no renderer and never skip: the palette's collapse from a theme to the
   terminal's slots, the clipboard sequence, and the boot test below.
   It needs a renderer to draw to, and OpenTUI's is Zig behind `node:ffi`, a Node 26.4 builtin behind
   `--experimental-ffi`: the config passes that flag only where it is accepted and the tests skip where

@@ -62,7 +62,7 @@ Supporting documents, readable in any order:
 | 1 | [phase-1-kit-complete.md](./phase-1-kit-complete.md) | **Shipped 2026-08-31.** All 74 nodes at their decided level; `roleCell()`; the theme as sixteen slots; one cell-buffer test per node; the presence tests became behaviour tests | Any pane | 0 |
 | 2 | [phase-2-layouts-keys-focus.md](./phase-2-layouts-keys-focus.md) | **Shipped 2026-08-31.** The seven layout components and a host-supplied layout table; the keymap's terminal adapter with all four tiers; focus regions and collections without a DOM; traps as layers; the PTY natively | Every compiled pane | 1 |
 | 3 | [phase-3-process-and-auth.md](./phase-3-process-and-auth.md) | **Shipped 2026-08-31.** The `acorn` command: attach or start, supervise, `--node` with probe, words, and pair; device token custody in a config directory; revoked on the footer; a boot test with a real node | Running against any node | 0 |
-| 4 | [phase-4-chrome.md](./phase-4-chrome.md) | Rail, topbar, pane row, palette, overlays, footer; task and workspace switching | A usable workspace | 2, 3 |
+| 4 | [phase-4-chrome.md](./phase-4-chrome.md) | **Shipped 2026-08-31.** Rail, topbar, pane strip, palette, cheat sheet, overlays, notifications, footer; task, workspace, pane and node switching; a quit that asks | A usable workspace | 2, 3 |
 | 5 | [phase-5-loaded-plugins.md](./phase-5-loaded-plugins.md) | The worker-thread sandbox, file custody, the trust prompt as a tree, the third column in `docs/security.md` | Third-party plugins in the TUI; rung 2 groundwork | 2 |
 | 6 | [phase-6-panes-sweep.md](./phase-6-panes-sweep.md) | Every first-party pane checked at 80 by 24; `$EDITOR` handoff; docker exec; the agents transcript, composer, and approvals | Parity with the plugin table in 01-why.md | 4 |
 | 7 | [phase-7-deployables.md](./phase-7-deployables.md) | `bin/acorn` in the node tarball and in the app bundle; the pack script grows the TUI entry; the native prebuild matrix gains OpenTUI's core; a bundled runtime | Shipping | 4, and `bundle.md` steps 2 to 4 |
@@ -97,9 +97,16 @@ elsewhere, pairing with it over six words and a code. Two things it found are wo
 phase 4: the helper's supervisor could not be reused, and `nodeAdopt` and the tunnels are the two
 seam verbs it left uninstalled because nothing draws them yet. Its own file says what else moved.
 
-Phase 4 waits on 2 and 3, because chrome is layouts plus a live node. Phases 5 and 6 can run in parallel
-after it: the sandbox is protocol and custody work, the pane sweep is reading each pane at 80 by 24 and
-fixing what is unreadable. Phase 7 ships it. Phase 8 deletes this folder.
+Phase 4 shipped the same day, and it is the one that makes `acorn` a workspace rather than a pane: a
+rail of tasks, a strip of panes, a palette over the same model the desktop's runs on, and a footer read
+off the keymap's own active layers. Three things it found are worth reading before either phase after
+it — a terminal cannot press Cmd, a `Modal`'s trap was swallowing the keys its own list needed, and a
+theme's colours have no way to reach this host — and three it deliberately left, the largest being the
+terminal drawer, which is phase 6's along with both PTY callers. Its own file says what else moved.
+
+Phases 5 and 6 can run in parallel now: the sandbox is protocol and custody work, the pane sweep is
+reading each pane at 80 by 24 and fixing what is unreadable. Phase 7 ships it. Phase 8 deletes this
+folder.
 
 ## How to work a phase
 

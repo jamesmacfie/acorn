@@ -99,7 +99,10 @@ engine reaches none of them and cannot be rebound, overridden, or shown to the r
 `collapse`, `activate`, `dismiss`, `commit`, `search`, `menu`, `delete`, and the four region and pane
 moves. `client-core/kit/keys/keymap.ts` maps this host's keys onto them, and it is the only file that
 knows a platform difference: `commit` is Cmd+Enter on macOS and Ctrl+Enter everywhere else, and
-nothing else changes between the two. A kit node handles intents. A plugin receives `onSelect`,
+nothing else changes between the two. Which of the two a host gets is the host's answer and not the
+platform's, because a terminal emulator keeps Cmd for itself and never delivers it — so the terminal
+passes `ctrl` to `setKeymap` and every chord in the table, and every chord its shell registers,
+is spelled with Ctrl there. A kit node handles intents. A plugin receives `onSelect`,
 `onActivate` and the rest, and never a key event, outside `Input`, `Textarea`, `Composer` and the
 inside of a rectangle.
 
@@ -123,6 +126,13 @@ with the keys already somewhere, because there is no click to put them there. An
 its list where it has one, rather than on the first field above it: on the desktop a reader clicks
 what they meant, and here the first thing focused is the thing the bare keys drive, so landing in a
 filter box would mean `j` types a `j`.
+
+Two more are the terminal's own and both come from drawing one pane. The cycle is the whole screen
+rather than the focused pane — rail, pane strip, the pane's own regions, and back — because there is no
+second pane to be surprised by, and the chrome joins it by declaring orders outside the range a layout
+uses. And Tab is `nextRegion` there, beside F6: the browser owns Tab and a terminal does not, and a
+reader in one presses it first. The intent is the shared one and `intentKeys` is still the table; a
+host adding a key to an intent it already has is what a per-host key table is for.
 
 **Collection state is the host's.** A run of `Row`s inside a `Rows`, a tab strip, a menu, a chip row,
 a segmented control, a timeline and a grid are all one collection with roving focus inside, and the
@@ -171,16 +181,27 @@ DOM event too, and the overlay would never see it.
 
 **In a terminal, an overlay and a rectangle each own the keys outright**, and these are the two places
 the terminal's keyboard is not the desktop's. There is no scrim to click through and no window to
-click outside of, so a `Modal` or an open `Menu` pushes a layer above every pane and collection layer
-that answers `dismiss` and swallows the rest, and an entered `pty` rectangle takes every key before
-dispatch — `Ctrl+C` included, which is the point of entering one. Escape alone leaves a rectangle;
-pressing it twice goes back in and sends one through, which is how a reader reaches vim's normal mode
-from in there.
+click outside of, so a `Modal` or an open `Menu` takes two layers: `dismiss` above everything, and a
+swallow of every other intent above a pane's own layer and below a collection's. The swallow sits
+below the collection tier on purpose — priority decides, not locality, so a swallow at the trap's own
+tier would eat Enter before a list drawn inside the modal could answer it, and a collection behind the
+overlay cannot fire anyway, because the overlay took the focus. An entered `pty` rectangle takes every
+key before dispatch, `Ctrl+C` included, which is the point of entering one. Escape alone leaves a
+rectangle; pressing it twice goes back in and sends one through, which is how a reader reaches vim's
+normal mode from in there.
 
 **The cheat sheet** (`client-core/host/keys/CheatSheet.tsx`, Cmd+/) lists what the keyboard will do right
 here, read from the engine's own catalog rather than from the keybinding registry. `getActiveKeys`
 answers for the layers that are live against the element that has focus, so a chord a pane shadows
 shows the pane's meaning and a chord whose command is unavailable does not appear.
+
+**The terminal's footer is the same list, one line long.** `apps/tui/src/chrome/bindings.ts` reads
+`getActiveKeys` too, gives each live intent a word, and the footer prints as many as fit while the
+cheat sheet on `?` prints all of them. Nothing is declared twice. `getActiveKeys` is a snapshot with
+no signal behind it, so the list also reads the two signals that move the active layers — where the
+keys are, and whether an overlay has taken them — or the footer would be whatever was true at the
+render that happened to build it. While a rectangle is entered the footer says `esc leave · esc esc
+send escape` instead, because every other hint is false in there.
 
 A sandboxed plugin frame has its own document, so its SDK normalizes and forwards unclaimed keydowns
 over the existing rate-limited bridge. The host resolves them against the same binding table,

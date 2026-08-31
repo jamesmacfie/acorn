@@ -31,6 +31,12 @@ let installed: Keymap<object, KeymapEvent> | null = null
 // terminal asks whether the focused renderable is an input or a textarea. Same question, and the
 // only one a bare-key binding needs.
 let typing: () => boolean = () => false
+// Which modifier this host's chords are spelled with. The engine reports the *platform's* primary
+// modifier, which on macOS is `super`, and that is right in a browser and wrong in a terminal: a
+// terminal emulator keeps Cmd for itself and never delivers it, so `super+return` is a chord nobody
+// can press. So a host may say. Nothing supplies it but the terminal
+// (docs/future/terminal/05-keys-and-focus.md § The adapter).
+let primary: 'super' | 'ctrl' | null = null
 
 /** The installed keymap, or null before the host's root exists. */
 export const keymap = <
@@ -41,15 +47,17 @@ export const keymap = <
 /** Called by a host's installer only. Returns the teardown that clears the singleton again. */
 export function setKeymap<Target extends object, Event extends KeymapEvent>(
   engine: Keymap<Target, Event> | null,
-  host: { typing: () => boolean } = { typing: () => false },
+  host: { typing: () => boolean; primary?: 'super' | 'ctrl' } = { typing: () => false },
 ): () => void {
   const held = engine as Keymap<object, KeymapEvent> | null
   installed = held
   typing = host.typing
+  primary = host.primary ?? null
   return () => {
     if (installed !== held) return
     installed = null
     typing = () => false
+    primary = null
   }
 }
 
@@ -57,9 +65,9 @@ export function setKeymap<Target extends object, Event extends KeymapEvent>(
  *  by anything else that has to keep out of somebody's way while they type. */
 export const isTyping = (): boolean => typing()
 
-/** The intent-to-key table for this host, against the platform the keymap reports. */
+/** The intent-to-key table for this host: what the host said, else the platform the keymap reports. */
 export const keysFor = (): Record<Intent, readonly string[]> =>
-  intentKeys(installed?.getHostMetadata().primaryModifier === 'super' ? 'super' : 'ctrl')
+  intentKeys(primary ?? (installed?.getHostMetadata().primaryModifier === 'super' ? 'super' : 'ctrl'))
 
 /**
  * Bind a run of intents to a target, as a focus-within layer.

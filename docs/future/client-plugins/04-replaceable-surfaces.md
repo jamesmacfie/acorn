@@ -60,6 +60,18 @@ authority.
 | `rail` | `TabRail.tsx`, the whole `<nav class="tabrail">` | `sources: { id, label, icon, selected, markers }[]`, `workspaces`, `collapsed`, and the `rail.taskList` slot as a nested slot the provider must place | `selectSource(id)`, `openWorkspace(id)`, `toggleCollapsed()`, `reorderSources(ids)` | 2 |
 | `topbar` | `App.tsx`, the `<header class="topbar">` | `workspace`, `project`, `breadcrumb`, `node: { id, label, state }`, `nodes[]`, `account`, and the `topbar.right` slot contents | `pickWorkspace(id)`, `pickProject(id)`, `pickNode(id)`, `openSettings()`, `collapseRail()` | 2 |
 
+**The terminal is the second consumer of each of these.** Since terminal phase 4 (2026-08-31) the TUI
+draws its rail's task list through the same `rail.taskList` registry, with its own component behind
+`resolveExclusiveSlot` for the reason `KIT_COMPONENTS` and the layout table have one: the arbitration
+rule is shared and only the drawing is the host's. So a plugin that offers to replace the task list
+replaces it in a terminal too, with no change in `apps/tui/`. The topbar and the pane strip are
+bespoke on both hosts until phases 1 and 2 here give them contracts, and both are already one props
+object over kit nodes on the terminal side, which is the shape this contract asks for.
+
+That is also the test this design wanted. A props type that carried a shell callback or a
+`MouseEvent` would have been caught by a host with neither, and none of the four contracts needed
+changing.
+
 The nested `rail.taskList` inside `rail` is one level, which is what `refused.md § Nested slots` in
 the layout folder allows: the rail provider places a slot the host fills, and does not open slots of
 its own beyond that. The topbar provider likewise places `topbar.right`. A provider that omits a
