@@ -53,6 +53,18 @@ const RECTANGLE_PRIORITY = 200
 // is the one key rule the desktop does not have, so it should not also be the slowest.
 const ESCAPE_PAIR_MS = 400
 
+// Whether any rectangle has the keys, for the footer.
+//
+// A count rather than a boolean, because two rectangles can be mounted at once — a task with a
+// terminal pane and a docker exec — and the second one leaving must not clear a flag the first one
+// still holds. Module state rather than a prop threaded up through the shell: the footer is drawn by
+// the chrome and the rectangle is drawn by a pane, and there is no path between them.
+const [entered, setEntered] = createSignal(0)
+
+/** Is a rectangle holding every key right now? Read by the footer, which says so and says how to get
+ *  back out (docs/future/terminal/07-chrome.md § The footer). */
+export const enteredRectangle = (): boolean => entered() > 0
+
 /**
  * A `pty` rectangle: an emulator in cells, one tab stop from outside.
  *
@@ -80,12 +92,21 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
     if (bytes?.length) emit(bytes)
   }
 
-  const enter = () => setInside(true)
+  const enter = () => {
+    if (inside()) return
+    setInside(true)
+    setEntered((open) => open + 1)
+  }
   const leave = () => {
+    if (!inside()) return
     setInside(false)
+    setEntered((open) => Math.max(0, open - 1))
     leftAt = Date.now()
     box?.focus()
   }
+  // A rectangle unmounted while entered — a pane closed with Ctrl+C still in flight — must not leave
+  // the footer telling a reader to press Escape at nothing.
+  onCleanup(() => { if (inside()) setEntered((open) => Math.max(0, open - 1)) })
 
   const handed = (renderable: EmbeddedTerminalRenderable) => {
     term = renderable
@@ -156,8 +177,8 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
       // (docs/ui-design.md § Borders).
       borderColor={slotColor(roleCell('tone', inside() ? 'accent' : 'neutral').slot)}
       // Short, because a box title that does not fit its width is not drawn at all. The whole rule —
-      // "esc leave · esc esc send escape" — belongs on the footer, which phase 4 draws from the
-      // active layers (docs/future/terminal/07-chrome.md § The footer).
+      // "esc leave · esc esc send escape" — is on the footer, which says it while a rectangle is
+      // entered (../chrome/Footer.tsx).
       title={`${props.label} · ${inside() ? 'esc leave' : 'enter'}`}
     >
       <embedded_terminal ref={handed} flexGrow={1} />

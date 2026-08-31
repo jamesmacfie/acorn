@@ -176,35 +176,47 @@ change for a terminal to draw it, which is the result this phase existed to get.
 ## The screenshot
 
 `pnpm --filter @acorn/tui capture`, at 80 by 24, against the fixture in `apps/tui/src/fixture.ts`.
-Redrawn after phase 2. The caret is the visible half of what that phase built: the pane opens with the
-keys on the note it opened, rather than with focus nowhere and a list nobody can drive.
+Redrawn after each phase that changed what is on screen. The caret is the visible half of what phase 2
+built: the pane opens with the keys somewhere, rather than with focus nowhere and a list nobody can
+drive.
 
 ```
-acorn · fix-login · notes
-acorn filter…                   │◀ Scratchpad           ◆ task [x] [ ] Preview
-                                │Whatever is in hand.
-TASK 3 +                        │
-› [x] Scratchpad               ✕│
-  [x] Repro steps              ✕│
-  [ ] What the agent found  🤖 ✕│
-                                │
-WORKSPACE 1 +                   │
-  [x] Conventions              ✕│
-                                │
-GLOBAL 0 +                      │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │
-                                │21 B                          view in Context →
-j/k move · enter open · f6 region · q quit
+acorn · 1 task                                                       fix-login ●
+›◉│  [Notes]
+  │acorn filter…
+  │
+  │TASK 3 +
+  │  [x] Scratchpad                                                            ✕
+  │  [x] Repro steps                                                           ✕
+  │  [ ] What the agent found                                               🤖 ✕
+  │
+  │WORKSPACE 1 +
+  │  [x] Conventions                                                           ✕
+  │
+  │GLOBAL 0 +
+  │
+  │
+  │
+  │
+  │
+  │
+  │
+  │
+  │
+  │
+j/k move · enter open · ctrl+k commands · ? help · w switch workspace · ctrl+…
 ```
+
+Redrawn again after phase 4, which is the first frame with a shell around the pane: a topbar naming
+the workspace, the task count, the open branch and the node's state; a rail collapsed to a strip of
+marks, because 80 cells is under the 100 the names need; the pane strip; and a footer read off the
+keymap's active layers. What is in the middle is the same Notes, still unchanged.
+
+Two things that frame shows and are worth saying out loud. The chrome spends three cells, so at 80
+columns the pane is 77 and `list-detail` is under its own 80-cell threshold: one group at a time, with
+`expand` switching between them, which means opening a note does not reveal it until you press `l`.
+And that 77 is what every pane in the roster inherits, so it is where the phase 6 sweep will find most
+of its work.
 
 Against a real node it is the same screen with your own notes in it. Phase 0 was handed a node's boot
 line in an environment variable; since phase 3 it finds one itself:
@@ -360,3 +372,56 @@ Found here, and worth knowing:
   installed, so `fleetBridge().adopt` throws its "this build cannot adopt provided nodes" — an honest
   product state the seam already models, and there is no surface to reach it from until phase 4.
   Tunnels were out of scope and remain so.
+
+## What phase 4 did with these
+
+Shipped 2026-08-31. Phase 4 is chrome, so it closed the findings that were waiting on a shell, and
+found four of its own.
+
+Closed:
+
+- **`registerBindingFields` is per host and easy to forget.** Still true, and phase 4 met the other
+  half of it. The OpenTUI adapter has no compiler for `desc` or `group`, so the command layer's
+  bindings carry neither and the footer reads both off the command each binding resolves to.
+  Registering them by hand is worse than leaving them out: the engine already has fields under those
+  names and says so.
+
+- **A box title that does not fit is not drawn at all.** The rule phase 2 could not fit in a
+  rectangle's title, "esc leave · esc esc send escape", is on the footer, which says it while any
+  rectangle is entered and says nothing about it otherwise.
+
+- **`Spinner` was static.** The shell starts one interval and every spinner reads the same counter,
+  which is what the DOM gets for free by putting the animation in CSS. One timer for the screen, and
+  unref'd, so a spinner cannot hold the process open.
+
+- **Nothing drew the fleet.** Every node this device has paired with is a palette row that switches to
+  it, re-registered when the fleet changes. That is the surface phase 3 said `nodeAdopt` was waiting
+  for; adopting is still not installed, because the row that would reach it belongs to a nodes
+  surface and the palette is not one.
+
+Found here, and worth knowing:
+
+- **A terminal cannot press Cmd, and the keymap did not know.** The engine reports the *platform's*
+  primary modifier, so on macOS `intentKeys` was handed `super` and `commit` came out as
+  `super+return`, a chord a terminal emulator keeps for itself and never delivers. `setKeymap` takes a
+  `primary` now and this host says `ctrl`. Any third host on a surface that cannot see the command key
+  owes the same line.
+
+- **A `Modal`'s trap swallowed the keys its own contents needed.** Phase 2 reasoned that a collection
+  inside an overlay would answer its arrows first "because its layer is focus-within on itself".
+  Priority decides, not locality: the swallow sat at 60 and a collection sits at 40, so a list inside a
+  `Modal` could not be activated at all. The swallow is at 35 now, above a pane's own layer and below a
+  collection's, and a collection behind the overlay still cannot fire, because the overlay took the
+  focus.
+
+- **`getActiveKeys` is a snapshot with no signal behind it.** The footer read it in a memo whose only
+  dependencies were the width and the node's state, so it drew whatever was true at the render that
+  happened to build it: j/k in the suite, where a later render always comes, and the wrong line under
+  the capture script, where none does. It reads the focused renderable and the overlay stack now,
+  which are the two signals that move the active layers.
+
+- **A theme cannot cross to a terminal yet.** `appearance.ts` expected phase 4 to read the preference.
+  A theme in acorn is an id; its colours live in a `:root[data-theme=…]` block in a stylesheet, and the
+  only JS reader of those blocks walks the repo from `pnpm-workspace.yaml` and is test-only by
+  construction. The terminal keeps its own palette until the appearance layer publishes the tokens as
+  data.

@@ -1,7 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { parseArgs } from 'node:util'
 import { createCliRenderer } from '@opentui/core'
-import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { render } from '@opentui/solid'
 import type { Task } from '@acorn/protocol/api.ts'
 import { installPlatform } from './platform'
@@ -16,13 +15,13 @@ import { App } from './App'
 //   acorn --node <https://host>     pair with a node elsewhere, then open it
 //   acorn --node <name>             open a node this device already paired with
 //
-// Phase 3 (docs/future/terminal/phase-3-process-and-auth.md). What it still does not have is chrome:
-// one pane on one task, no rail and no task switcher, which is phase 4.
+// Phases 3 and 4 (docs/future/terminal/phase-4-chrome.md). The shell is whole: a rail of tasks, a
+// pane strip, a palette, a footer that says what the keyboard will do. What it does not have yet is
+// most of the panes, which is the pane sweep.
 
 const { values } = parseArgs({
   options: {
     node: { type: 'string' },
-    pane: { type: 'string', default: 'notes' },
     task: { type: 'string' },
   },
   allowPositionals: false,
@@ -36,11 +35,6 @@ const { values } = parseArgs({
 const [nodeMajor = 0, nodeMinor = 0] = process.versions.node.split('.').map(Number)
 if (nodeMajor < 26 || (nodeMajor === 26 && nodeMinor < 4)) {
   console.error(`acorn draws with OpenTUI, which needs Node 26.4 or later started with --experimental-ffi. This is Node ${process.versions.node}.`)
-  process.exit(2)
-}
-
-if (values.pane !== 'notes') {
-  console.error('This build draws the notes pane only. The rail, the pane row and the task switcher are docs/future/terminal/phase-4-chrome.md.')
   process.exit(2)
 }
 
@@ -61,6 +55,7 @@ const { readJson } = await import('@acorn/client-core/infra/node/apiClient.ts')
 const { setCacheStorage } = await import('@acorn/client-core/infra/node/fleet.ts')
 const { fileCacheStorage } = await import('./node/cache')
 const { tasksRoute } = await import('@acorn/protocol/api.ts')
+const { activateTaskSignals } = await import('@acorn/client-core/features/tasks/activate.ts')
 
 // The query cache persists to files rather than to IndexedDB, which there is none of here. Installed
 // before `selectActiveNode`, because that is what builds the first node's cache.
@@ -73,11 +68,17 @@ const tasks = await readJson<Task[]>(tasksRoute).catch(async (error: unknown) =>
   console.error(`acorn reached ${opened.nodeId} but could not read its tasks: ${error instanceof Error ? error.message : String(error)}`)
   process.exit(1)
 })
-const task = values.task ? tasks.find((candidate) => candidate.id === values.task) : tasks[0]
-if (!task) {
-  await platform.dispose()
-  console.error(values.task ? `No task ${values.task} on this node.` : 'This node has no tasks. Make one in the app first.')
-  process.exit(1)
+// `--task` opens one by id; without it the shell opens the first task in the workspace it lands on.
+// Refused here rather than drawn as an empty rail, because a name that matches nothing is a typo and
+// a person wants to hear about it before the screen is redrawn.
+if (values.task) {
+  const task = tasks.find((candidate) => candidate.id === values.task)
+  if (!task) {
+    await platform.dispose()
+    console.error(`No task ${values.task} on this node.`)
+    process.exit(1)
+  }
+  activateTaskSignals(task)
 }
 
 // The renderer is built here rather than left to `render`, because the keymap's terminal adapter
@@ -100,16 +101,15 @@ async function quit(code = 0): Promise<never> {
   process.exit(code)
 }
 
-// Not an intent: quitting is the shell's, and phase 4 gives it a command and a confirm when the TUI
-// is the thing that started the node.
+// `q` is the shell's, registered as a command with a confirm when this TUI is the thing that started
+// the node (chrome/Shell.tsx). `Ctrl+C` is not: it is the signal a terminal sends to say stop now,
+// and it stops now. Inside an entered rectangle it never reaches here at all, which is the whole
+// point of the Rectangle contract.
 engine.registerLayer({
   priority: 0,
-  bindings: [
-    { key: 'q', cmd: () => { void quit(); return true }, active: () => !isTyping() },
-    { key: 'ctrl+c', cmd: () => { void quit(); return true } },
-  ],
+  bindings: [{ key: 'ctrl+c', cmd: () => { void quit(); return true } }],
 })
 // A supervisor's SIGTERM drains the child this process started, which is the whole reason it waits.
 process.once('SIGTERM', () => void quit())
 
-await render(() => <App task={task} nodeId={opened.nodeId} />, renderer)
+await render(() => <App nodeId={opened.nodeId} supervised={opened.supervised} onQuit={() => void quit()} />, renderer)

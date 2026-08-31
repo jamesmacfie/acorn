@@ -1,6 +1,6 @@
 # Phase 4: chrome
 
-Status: not started. Waits on phases 2 and 3.
+Status: **shipped 2026-08-31.**
 
 ## Goal
 
@@ -98,3 +98,84 @@ folder.
   and `docs/future/client-plugins/` still plans `pane.switcher`, `rail`, and `topbar`.
 - `packages/client-core/src/kit/lib/paletteModel.ts` still has no DOM import.
 - `packages/client-core/src/features/tabs/TabRail.tsx` still calls `ExclusiveSlotHost` for the task list.
+
+## What shipped, and where it differs
+
+The screen in [07-chrome.md](./07-chrome.md), against a real node: a rail of tasks, a topbar, a pane
+strip, a palette, a cheat sheet, notifications, a footer that says what the keyboard will do, and a
+quit that asks when this TUI started the node. `pnpm lint` is green and the `tui` suite is 128 cases
+on Node 26.8.1, nine of them the chrome's own.
+
+Eight things went differently from the plan, or turned up on the way.
+
+- **The region cycle is the screen, not the pane.** `moveRegion` walked the focused pane's regions,
+  because the desktop draws several panes side by side and Tab into the next one would be a surprise.
+  There is no next one here, so the rail, the pane strip and the pane's regions are one cycle, and the
+  chrome orders itself around the pane by declaring orders outside the range a layout uses. The chord
+  that switches which pane is drawn is `nextPane`, which is a switch on this host rather than a walk.
+
+- **Tab is `nextRegion`, beside F6.** The DOM host spells that intent F6 because the browser owns Tab.
+  A terminal owns Tab and a reader in one presses it first, so the host's key table adds it. The
+  intent is the shared one and `intentKeys` is still the table; a host adding a key to an intent it
+  already has is what a per-host key table is for.
+
+- **Chords are spelled with Ctrl, and `keysFor()` grew a seam to say so.** The engine reports the
+  platform's primary modifier, which on macOS is `super`, and a terminal emulator keeps Cmd for
+  itself and never delivers it. So `commit` was `super+return`, a chord nobody can press. `setKeymap`
+  takes a `primary` now and this host passes `ctrl`; the desktop passes nothing and is unchanged.
+
+- **A `Modal`'s trap could not be activated from the inside.** Phase 2 put the swallow layer at the
+  trap's own tier and reasoned that a collection inside the overlay would still answer its arrows
+  "because its layer is focus-within on itself". Priority decides, not locality, so Enter reached the
+  swallow first and a list inside a `Modal` was dead. The swallow sits below the collection tier now,
+  which costs nothing: a collection behind the overlay does not fire anyway, because the overlay took
+  the focus. Found by the quit confirmation, which is a list inside a modal and nothing else.
+
+- **The palette does not use the kit's collection.** The desktop's `createOverlayPalette` handles its
+  own arrows because the input owns the typing; in cells the argument is sharper, because a
+  collection's keys are bare keys and a bare key does not fire while something is being typed into,
+  which in a palette is always. So the palette keeps one cursor signal and binds the arrows above the
+  trap.
+
+- **An overlay hides the pane rather than replacing it.** Opening the palette must not tear down the
+  pane behind it and throw away its queries and its model, so the pane box is `visible={false}` while
+  an overlay is on top — the same thing `TabPanel` does for a hidden tab. `takeFocus` is the region
+  store's answer to the DOM palette's `prevFocus`: what had the keys is remembered and put back.
+
+- **`ExclusiveSlotHost` is the host's, like `KIT_COMPONENTS` and the layout table.** The arbitration
+  rule in `exclusiveSlots.ts` is shared unchanged; only the drawing moved, because the DOM host's
+  file reaches for `Dynamic` from `solid-js/web` and pulling that in would put a second Solid
+  renderer in the graph for a component that renders one child.
+
+- **The footer had to be told when to re-read.** The engine has no signal for "the active layers
+  changed", so `activeHints()` reads the two signals that move them — where the keys are, and
+  whether an overlay has taken them. Without that the footer is whatever was true at the render that
+  happened to build it, which the capture script caught and the suite did not.
+
+## What this phase deliberately left
+
+- **The rail's drawer sources are browse sources, not terminal profiles.**
+  [07-chrome.md](./07-chrome.md) says the rows under the rail's rule are the terminal drawer's and
+  that choosing one opens the PTY as the pane. The terminal plugin's client half writes to the DOM
+  rectangle's element and is not on this host's roster; moving it is phase 6, which owns both PTY
+  callers. What is under the rule is the rail's browse sources, from the same `availableSources` the
+  desktop rail reads, and the bundled roster registers none of them yet, so the rule draws nothing.
+
+- **The footer is not a focus stop.** 07-chrome lists four stops in the cycle: rail, pane row, pane,
+  footer help. The footer is a label with nothing to drive, and a stop that does nothing is a hole a
+  reader falls into. `?` reaches the same list as a modal.
+
+- **The theme is still the terminal's own palette.** `appearance.ts` said phase 4 would reach the
+  preference. It cannot: a theme in acorn is an id, and its forty tokens live in a
+  `:root[data-theme=…]` block in a stylesheet, whose only JS reader walks the repo from
+  `pnpm-workspace.yaml` and is test-only by construction. Publishing those tokens as data is the
+  appearance layer's change, not the chrome's. The default was always the terminal's own palette and
+  it stays right.
+
+- **Notifications are toasts, not notices.** The transient stack is the same `toast()` store the
+  desktop's `ToastHost` draws, so `bridge.ui.toast` and every plugin that calls it lands on the
+  footer's line. The notification bell is fed by agent sessions, which is the pane sweep's.
+
+- **A workspace switch does not restore what you were looking at.** The desktop's
+  `planWorkspaceViewTransition` remembers a view per workspace; this host clears the source and lets
+  the first task open. Worth having, and it wants the persisted-state pipeline the TUI has none of.

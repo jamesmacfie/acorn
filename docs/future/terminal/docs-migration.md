@@ -85,20 +85,29 @@ finding that needed a fix needed it in the host or in the pane registry, not in 
 Unchanged as the phase predicted: `docs/node-enrollment.md`, because the loopback mint route was not
 built.
 
-## Owed by phases 4 to 7
+## Done in phase 4 (2026-08-31)
+
+| Doc | Section | Change |
+| --- | --- | --- |
+| `docs/ui-design.md` | Shell hierarchy | The terminal's shell beside the desktop's: what is in the cycle, what is drawn and not focused, and which surfaces go through the exclusive-slot registry. |
+| `docs/command-palette-and-shortcuts.md` | Focus and typing | The footer as a view of the active layers; the region cycle being the screen on a host that draws one pane; Tab beside F6; the primary modifier as a host's answer rather than the platform's. |
+| `docs/future/client-plugins/04-replaceable-surfaces.md` | Who draws each surface | The terminal is the second consumer, and its defaults reach the reader through the same registry. |
+| `docs/testing.md` | Test layers | The chrome suite: what it drives and the two whole-screen sizes. |
+| `docs/future/terminal/findings.md` | The screenshot, What phase 4 did with these | The frame redrawn with a shell around it; four findings closed, four new ones. |
+| `docs/future/terminal/phase-4-chrome.md` | What shipped, What this phase deliberately left | Eight departures from the plan, and the five things it left. |
+| `docs/future/terminal/README.md` | The phases, The order of work | Phase 4 marked shipped; what it left for phases 5 and 6. |
+
+## Owed by phases 5 to 7
 
 | Doc | Section | Phase | What it says afterwards |
 | --- | --- | --- | --- |
 | `docs/testing.md` | Test layers | 6 | Pane snapshots. |
-| `docs/command-palette-and-shortcuts.md` | Focus and typing | 4 | The footer, drawn from the active layers. |
 | `docs/terminal.md` | the PTY | 6 | The editor handoff; docker exec; the two callers writing to the rectangle's handle. |
 | `docs/node-distribution.md` | reaching a node | 7 | `bin/acorn` in the tarball layout. |
 | `docs/security.md` | Trust boundaries, Transport and auth, Third-party plugin bundles, The containment ladder, summary table | 5 | The terminal column, per `06-isolation.md`. |
 | `docs/plugins.md` | The tree contract | 5 | A second host applies the same mutations to cells. |
 | `docs/future/ecosystem/blockers.md` | rung 2 | 5 | The terminal sandbox is the down payment. |
 | `docs/future/client-plugins/07-hosts.md` | The terminal | 5 | The host exists; custody is file-backed as designed. |
-| `docs/future/client-plugins/04-replaceable-surfaces.md` | each contract | 4 | The TUI is a second consumer; its defaults are providers. |
-| `docs/ui-design.md` | Shell hierarchy | 4 | The terminal's shell beside the desktop's. |
 | `docs/first-party-plugins.md` | per plugin | 6 | A terminal note where something is reduced or handed off. |
 | `docs/future/bundle.md` | the sections in `08-deployables.md` | 7 | Rewritten to what shipped; steps reordered. |
 | `docs/shell.md` | resources | 7 | The `acorn` resource and the link offer. |

@@ -5,7 +5,8 @@
 // `intentKeys` table, same four tiers ordered by priority, a different pair of type parameters:
 // `Keymap<Renderable, KeyEvent>` where the DOM's is `Keymap<HTMLElement, HtmlKeymapEvent>`.
 //
-//   0   the command layer, phase 4, when there is a palette to fill it from
+//   0   the command layer: acorn's resolved keybindings over the command registry, the same tier the
+//       desktop puts them on (./commandLayer.ts)
 //   5   the region and pane chords, global, because moving between regions has to work from anywhere
 //   30  a pane's own layer: the `tabs` layout's chords, and the group switch a narrow `list-detail`
 //       registers
@@ -26,6 +27,33 @@ import { moveRegion, movePane } from './regions'
 
 export type TuiKeymap = Keymap<Renderable, KeyEvent>
 
+// The one intent this host spells with a key the desktop cannot spare.
+//
+// Tab is the browser's own focus order, so the DOM host reaches "the next region of this window" with
+// F6, which is the platform convention and not a chord anything else claims. A terminal has no focus
+// order to inherit and no other claim on Tab, and a reader in one presses Tab first — so on this host
+// the intent has two keys rather than one.
+//
+// The intent is the shared one and the table is still `intentKeys`. This is a host adding a key to an
+// intent it already has, which is what a per-host key table is for; a key that meant something a
+// desktop intent does not would be a second keymap, and that is refused
+// (docs/future/terminal/05-keys-and-focus.md § What must never happen).
+const HOST_KEYS: Partial<Record<Intent, readonly string[]>> = {
+  nextRegion: ['tab'],
+  prevRegion: ['shift+tab'],
+}
+
+/** The intent-to-key table for this host: the shared one, plus what the terminal adds. Read by the
+ *  region layer below and by the footer, so a hint cannot name a key nothing is bound to. */
+export function hostKeysFor(): Record<Intent, readonly string[]> {
+  const map = keysFor()
+  const merged = { ...map } as Record<Intent, readonly string[]>
+  for (const [intent, keys] of Object.entries(HOST_KEYS)) {
+    merged[intent as Intent] = [...map[intent as Intent], ...keys]
+  }
+  return merged
+}
+
 /**
  * Install the keymap on the renderer and register the region chords.
  *
@@ -45,6 +73,11 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
   // keys before dispatch instead, because a predicate can only hold off the bindings that ask
   // (../kit/rectangle.tsx § The Rectangle contract).
   setKeymap(engine, {
+    // Ctrl, whatever platform this is. The engine reports the *platform's* primary modifier and on
+    // macOS that is `super`, which a terminal emulator keeps for itself and never delivers — so
+    // `super+return` would be a chord nobody can press. Every chord in the intent table is spelled
+    // with Ctrl here, and so is every chord the shell registers.
+    primary: 'ctrl',
     typing: () => {
       const focused = renderer.currentFocusedRenderable
       return !!focused && (focused instanceof InputRenderable || focused instanceof TextareaRenderable)
@@ -60,7 +93,7 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
 
   // Region and pane chords. Global, because they are how you get back to a region you can no longer
   // see, and typing-exempt because they have to work from inside a composer.
-  const map = keysFor()
+  const map = hostKeysFor()
   const moves: [Intent, () => boolean][] = [
     ['nextRegion', () => moveRegion(1)],
     ['prevRegion', () => moveRegion(-1)],

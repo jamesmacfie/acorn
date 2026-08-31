@@ -10,6 +10,7 @@ import { flatten, Line, pad, runStyle, slot } from './cells'
 import { markdownLines } from './markdown'
 import { borderCell, rule, spaceCells } from './roles'
 import { GLYPHS } from './glyphs'
+import { spinnerFrame } from './tick'
 
 // The kit's showing nodes in cells. One component per sentence in
 // docs/ui-design.md § Every node at 80 by 24; where a node is `reduced`, `support.ts` says what is
@@ -274,11 +275,11 @@ export function Kbd(props: { size?: Extract<Size, 'xs' | 'sm'>; children: JSX.El
 // A braille cycle, which is the one animation a terminal does well.
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
-/** reduced: a braille cycle, or `…` where motion is off. Static, because a spinner that redraws on a
- *  timer keeps the renderer awake for as long as anything on screen is busy; phase 4 gives the shell
- *  one tick and every spinner reads it. */
+/** reduced: a braille cycle, on the shell's one tick (./tick.ts). One timer for the whole screen
+ *  rather than one per spinner, which is the same thing the DOM gets for free by putting the
+ *  animation in CSS. Before the shell starts the tick this is frame zero and stays there. */
 export function Spinner(_props: { size?: 'sm' | 'md'; label?: string }) {
-  return <Line role="muted">{SPINNER[0]}</Line>
+  return <Line role="muted">{SPINNER[spinnerFrame() % SPINNER.length]}</Line>
 }
 
 // ── Facts ─────────────────────────────────────────────────────────────────────────────────────

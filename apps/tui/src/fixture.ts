@@ -9,7 +9,19 @@ export const TASK: Task = {
   id: 'task-1',
   title: 'fix-login',
   projectId: 'project-1',
-} as Task
+  branch: 'fix-login',
+  origin: 'local',
+  icon: null,
+  status: 'active',
+  // Not decoration. `activateTaskSignals` asks the sources which pane a task opens on, and that
+  // walks `links`; a fixture without one takes the shell's own activation effect down.
+  links: [],
+  github: null,
+  worktreePath: null,
+  pullNumber: null,
+  parentId: null,
+  sort: 0,
+}
 
 export const TASK_NOTES: NoteSummary[] = [
   { slug: 'scratchpad', title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0 },
@@ -34,6 +46,11 @@ export function stubTransport(): { fetch: (nodeId: string, request: { path: stri
   return {
     fetch: async (_nodeId, request) => {
       const path = request.path
+      // The shell asks for these on mount. Answering them keeps a suite's output free of query
+      // errors that say nothing about what is under test; both are empty, which is what a node with
+      // no integrations and no saved preferences would say.
+      if (path === '/v2/core/prefs') return json({})
+      if (path === '/v2/core/integrations') return json({ integrations: [], providers: [] })
       if (path === '/v2/core/workspaces') return json([{ id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }] }])
       if (path === '/v2/core/tasks') return json([TASK])
       if (path === `/v2/p/notes/tasks/${TASK.id}/notes`) return json(TASK_NOTES)

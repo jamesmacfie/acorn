@@ -3,13 +3,22 @@ import { expect, test } from 'vitest'
 import { hasFfi } from './ffi'
 import { renderFixture } from './harness'
 
-// The one test phase 0 owes: the Notes pane, unchanged, drawn to a cell buffer at 80 by 24.
+// The one test phase 0 owes: a first-party pane, unchanged, drawn to a cell buffer at 80 by 24.
 //
 // It asserts what a reader would look for on the screen rather than a snapshot of every cell: the
 // group labels the list column drew, the note titles under them, and the body of the note the detail
 // column opened. Cell-level assertions live one node at a time in kit/kit.test.tsx, which is where a
-// broken promise names itself (docs/testing.md § Test layers).
-test.skipIf(!hasFfi)('the notes pane draws its list and its detail at 80 by 24', async () => {
+// broken promise names itself (docs/testing.md § Test layers). The chrome around the pane has its own
+// file (chrome/chrome.test.tsx); this one is about the pane.
+//
+// Since phase 4 the pane is inside a shell, so getting to it takes two presses of Tab — rail, pane
+// strip, pane. That is the shell behaving, and it is asserted in the file that owns it.
+const intoPane = async (screen: { press: (key: string) => Promise<void> }): Promise<void> => {
+  await screen.press('TAB')
+  await screen.press('TAB')
+}
+
+test.skipIf(!hasFfi)('the notes pane draws its list at 80 by 24', async () => {
   const screen = await renderFixture()
   const frame = await screen.frame()
   screen.done()
@@ -18,7 +27,6 @@ test.skipIf(!hasFfi)('the notes pane draws its list and its detail at 80 by 24',
   expect(frame).toContain('Repro steps')
   expect(frame).toContain('What the agent found')
   expect(frame).toContain('Conventions')
-  expect(frame).toContain('Whatever is in hand.')
   // 80 cells is the contract, not an accident of this fixture: a wider line is a node that read a
   // width it does not have (docs/ui-design.md § What the kit and layouts must never do).
   for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(80)
@@ -29,13 +37,13 @@ test.skipIf(!hasFfi)('the notes pane draws its list and its detail at 80 by 24',
 // where this host draws the collection's active row.
 test.skipIf(!hasFfi)('j moves the caret down the list', async () => {
   const screen = await renderFixture()
-  await screen.press('j')
+  await intoPane(screen)
   const first = await screen.frame()
   await screen.press('j')
   const second = await screen.frame()
   screen.done()
 
-  const caretRow = (frame: string) => frame.split('\n').findIndex((line) => line.includes('\u203a'))
+  const caretRow = (frame: string) => frame.split('\n').findIndex((line) => line.includes('›'))
   expect(caretRow(first)).toBeGreaterThan(0)
   expect(caretRow(second)).toBe(caretRow(first) + 1)
 }, 30_000)
@@ -44,11 +52,18 @@ test.skipIf(!hasFfi)('j moves the caret down the list', async () => {
 // on the DOM is a button, so Enter on it raises a click and `onPress` runs by itself. There is no
 // element here, so the row hands its press to the collection and the intent routes it
 // (keys/collection.ts).
+//
+// The `l` at the end is the shell's doing rather than the pane's, and it is a real finding: the
+// chrome spends three cells on the rail and its rule, so at 80 columns the pane is 77 and
+// `list-detail` is below its own 80-cell threshold — one group at a time, with `expand` switching
+// between them. Opening a note there does not reveal it until you go and look.
 test.skipIf(!hasFfi)('enter opens the row the caret is on', async () => {
   const screen = await renderFixture()
+  await intoPane(screen)
   // Past the scratchpad, which the pane opens by itself, onto the second note.
   await screen.press('j')
   await screen.press('RETURN')
+  await screen.press('l')
   const frame = await screen.frame()
   screen.done()
 

@@ -50,8 +50,9 @@ export const focusedRenderable = focusedNode
 /** Which region has focus, or null before anything in a layout has been focused. */
 export const focusedRegion = (): RegionRef | null => focused
 
-/** Registration order within a pane, then mount order. A layout hands its own order in; two panes
- *  are told apart by their pane id and never compared. */
+/** Every region on screen, in the order it draws. A layout hands its own order in and the chrome
+ *  takes numbers outside the range a layout uses, so the sort reads down the screen: rail, pane
+ *  strip, the pane's own regions (../chrome/Shell.tsx). */
 const ordered = (): Group[] => [...groups].sort((a, b) => a.order - b.order)
 
 export function registerRegion(box: Renderable, ref: RegionRef, order: number): () => void {
@@ -89,7 +90,7 @@ const regionOf = (node: Renderable): Group | undefined => {
 }
 
 /** Called when focus lands on something. Idempotent, and a no-op for a node in no region, which is
- *  the chrome until phase 4 registers its own. */
+ *  a run of text or a strip nothing focuses. The chrome registers its own (../chrome/Shell.tsx). */
 export function noteFocus(node: Renderable): void {
   setFocusedNode(node)
   provisional = false
@@ -147,6 +148,33 @@ const enter = (group: Group | undefined): boolean => {
   return true
 }
 
+/**
+ * Hand the keys to an overlay that has just opened, and give them back when it closes.
+ *
+ * The DOM palette keeps a `prevFocus` element for exactly this and restores it on dismissal
+ * (client-core/host/palette/overlay.ts). Same rule, no element: what had the keys is remembered and
+ * put back, unless it went away while the overlay was open, in which case the region that owned it
+ * keeps the claim and its own `last` decides.
+ *
+ * A microtask, because the overlay's children are mounted by the render that produced its box.
+ */
+export function takeFocus(box: Renderable): void {
+  const previous = focusedNode()
+  const previousRegion = focused
+  queueMicrotask(() => {
+    const target = firstStop(box) ?? box
+    if (target === box) box.focusable = true
+    target.focus()
+    setFocusedNode(target)
+  })
+  onCleanup(() => {
+    focused = previousRegion
+    if (!previous || previous.isDestroyed) return
+    previous.focus()
+    setFocusedNode(previous)
+  })
+}
+
 /** Offer the keys to something that has just mounted. Taken when nobody has them, or when the region
  *  that has them is only holding them for want of anything better. */
 export function claimIfProvisional(node: Renderable | undefined): boolean {
@@ -161,21 +189,39 @@ export function claimIfProvisional(node: Renderable | undefined): boolean {
   return true
 }
 
-/** Move to the next or previous region of the pane that has focus. Wraps. */
+/**
+ * Move to the next or previous region on screen. Wraps.
+ *
+ * Every region, not the focused pane's alone, and that is this host's own answer: a terminal draws
+ * one pane, so the rail, the pane strip, the pane's own regions and the footer are one screen and one
+ * cycle (docs/future/terminal/07-chrome.md § Navigation). The desktop scopes the cycle to a pane
+ * because it draws several side by side and Tab into the next one would be a surprise; here there is
+ * no next one to be surprised by, and the chord that switches which pane is drawn is `nextPane`.
+ *
+ * The chrome orders itself around the pane by declaring orders outside the range a layout uses
+ * (../chrome/Shell.tsx), which is the same "the layout knows its own order" rule regions already
+ * keep — one screen wide instead of one pane wide.
+ */
 export function moveRegion(delta: 1 | -1): boolean {
   const all = ordered()
-  const inPane = all.filter((group) => group.paneId === (focused?.paneId ?? all[0]?.paneId))
-  if (inPane.length < 2) return false
-  const at = inPane.findIndex((group) => group.regionId === focused?.regionId)
-  return enter(inPane[(((at < 0 ? 0 : at) + delta) + inPane.length) % inPane.length])
+  if (all.length < 2) return false
+  const at = all.findIndex((group) => group.paneId === focused?.paneId && group.regionId === focused?.regionId)
+  return enter(all[(((at < 0 ? 0 : at) + delta) + all.length) % all.length])
 }
 
-/** Move to the next or previous pane, landing on whatever it last had focused. One pane until phase
- *  4 draws a pane row, so this answers false and the intent bubbles. */
+// What the shell does when there is no second pane mounted to move to. A terminal shows one pane at
+// a time, so "the next pane" is a switch rather than a walk, and the switch belongs to the chrome
+// (../chrome/panes.ts). Installed rather than imported, because this module is the keys' and must not
+// reach into the shell.
+let cycler: ((delta: 1 | -1) => boolean) | null = null
+export const setPaneCycler = (next: ((delta: 1 | -1) => boolean) | null): void => { cycler = next }
+
+/** Move to the next or previous pane, landing on whatever it last had focused, or — where only one
+ *  pane is mounted, which is this host's usual state — switch which pane that is. */
 export function movePane(delta: 1 | -1): boolean {
   const panes: string[] = []
   for (const group of ordered()) if (!panes.includes(group.paneId)) panes.push(group.paneId)
-  if (panes.length < 2) return false
+  if (panes.length < 2) return cycler?.(delta) ?? false
   const at = panes.indexOf(focused?.paneId ?? '')
   const paneId = panes[(((at < 0 ? 0 : at) + delta) + panes.length) % panes.length]
   return enter(ordered().find((group) => group.paneId === paneId))
@@ -186,5 +232,6 @@ export function _resetRegions(): void {
   groups.length = 0
   focused = null
   provisional = false
+  cycler = null
   setFocusedNode(null)
 }

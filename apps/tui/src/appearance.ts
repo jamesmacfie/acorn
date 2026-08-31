@@ -11,9 +11,13 @@ import type { Slot } from '@acorn/client-core/kit/tokens/roles.ts'
 // wrong. `paletteFor` is what a theme is for: a caller that knows the theme's colours and knows the
 // terminal will take them can hand both over.
 //
-// No theme is read yet, because nothing in this host knows which one is chosen: the preference lives
-// on the node and the TUI reaches it in phase 4 with the rest of the chrome. `paletteFor` is written
-// and tested against the theme tokens, so that phase is a call site rather than a design.
+// No theme is read, and phase 4 found out why it cannot be yet: a theme in acorn is an id, and its
+// forty tokens live in a `:root[data-theme=…]` block in a stylesheet. There is no JS-readable table of
+// them — the only reader is `infra/styles/readStyleSheets.ts`, which walks the repo from
+// `pnpm-workspace.yaml` and is test-only by construction. So the terminal cannot resolve a theme's
+// colours without the appearance layer publishing them as data, and that is the appearance layer's
+// change to make, not this file's. `paletteFor` is written and tested against the tokens, so the day
+// they are published this is a call site rather than a design.
 
 /** The five colours a role can ask for. `default` is the terminal's own foreground. */
 export type Palette = Record<Slot, string | undefined>
