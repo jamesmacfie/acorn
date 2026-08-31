@@ -59,16 +59,21 @@ does not rewrite the durable row.
 **Inside a pane** the host owns the arrangement. A pane names one of the layouts below and supplies a
 component per region; it never draws the split, the divider, or the drag handle itself. The names and
 each layout's region set are in
-[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts) and the components are in
-`client-core/src/host/layouts`.
+[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts).
+
+**Which components draw them is the host package's,** the same way `KIT_COMPONENTS` is: the desktop's
+are in `client-core/src/host/layouts` and the terminal's are in `apps/tui/src/layouts`, and a host
+hands its table to `client-core/src/host/layouts/table.ts` before the first pane draws. The pane
+registry used to name the desktop's table directly, which meant a declared layout came back as a
+component only one host could mount.
 
 **Eight names, seven components**, and the mismatch is deliberate: `document-over-frame` and
 `frame-beside-document` are the same two regions with the axis flipped, so one component draws both.
 Position is in the name rather than in a prop precisely so that it is never a knob a plugin turns.
 Counts elsewhere in the docs are of the eight names.
 
-Each layout carries three renderings: the desktop one, which is built, plus a **narrow** projection
-for a mobile PWA and a **terminal** projection, both written down and neither built. Writing them is
+Each layout carries three renderings: the desktop one and the **terminal** one, both built, plus a
+**narrow** projection for a mobile PWA, written down and not built. Writing them is
 the layout's half of the kit's admission rule
 ([docs/ui-design.md § The closed kit](./ui-design.md#the-closed-kit)): a layout earns a name when two
 or more surfaces need it and cannot be expressed in the ones that exist, its regions are semantic
@@ -81,7 +86,7 @@ the answer; a new named layout is.
 | `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups |
 | `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer | body scrolls, header and footer pinned | unchanged; the footer stays pinned | the same |
 | `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar | the bar, then one panel at a time | the bar scrolls horizontally | the bar is one line |
-| `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | the document is a host text view, read-only in a first version; the frame region draws its tree |
+| `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | both halves, with a rule between; the document is a host text view, read-only for now |
 | `frame-beside-document` | the same two, with the axis flipped by the name rather than by a prop | side by side | as `document-over-frame` | the same |
 | `stack-split` | `top`, `bottom` | two stacked regions with a handle | `bottom` becomes a full-height sheet | native, as on desktop |
 | `wizard` | `step`; the host draws the indicator and the back and next controls | one step at a time | unchanged | unchanged |
@@ -97,7 +102,20 @@ is the region name — `pane.inline-below` is a `header-body-footer` footer, `pa
 `list-detail` detail ([docs/plugins.md § Cooperative extension points](./plugins.md)).
 
 **Nothing in a layout reads the window width.** Breakpoints are style tokens so a mobile shell can set
-them, and a drag clamps against the layout's own element (`shell.css` § Layouts).
+them, and a drag clamps against the layout's own element (`shell.css` § Layouts). The terminal keeps
+the same rule against the terminal's own size: a layout asks its own box how wide it turned out, and
+`SIGWINCH` is the renderer's alone.
+
+**Every handle is a key in a terminal**, because there is no grip to drag: the primary modifier with
+Shift and an arrow moves a split, and the position is kept in the same host-owned session signal the
+desktop's drag writes to. That is why `SplitHandle` and `SplitCell` are `absent` in the support
+matrix — the handle is not a node there.
+
+One projection changed on contact, in terminal phase 2. `document-over-frame` and
+`frame-beside-document` were written as "the frame region is a rectangle and is absent, so the
+document half fills the pane". That was drawn before it was clear what a `frame` region holds: a
+loaded plugin's *tree*, which draws in cells like any other. What cannot cross is an iframe's pixels,
+and a frame region is not one. Both halves are drawn.
 
 **The host owns a region's inset.** A region's contents are a plugin's tree, and the kit takes no
 `class`, so a chip row or a composer sitting flush against the pane's border is the one thing a plugin

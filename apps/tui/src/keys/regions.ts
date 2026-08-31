@@ -1,0 +1,190 @@
+// Focus regions without a DOM.
+//
+// `client-core/host/keys/focusRegions.ts` keeps the same contract and is DOM all the way down: it
+// orders regions by `compareDocumentPosition`, finds a region's first stop with `querySelector`,
+// focuses with `element.focus()`, and listens for `focusin` and `pointerdown`. None of that exists
+// here (docs/future/terminal/05-keys-and-focus.md § Focus regions).
+//
+// What replaces each:
+//
+//   order       the layout registers its regions in the order it draws them, from its own knowledge
+//               (LAYOUT_REGIONS in @acorn/protocol/paneLayouts.ts). Nothing is derived from position.
+//   first stop  the first renderable in the region's subtree that OpenTUI will focus. The kit marks
+//               those as it draws them — `focusRoles.ts` says which nodes are a stop, an item, a
+//               collection or a trap — and the renderer's own `focusable` flag is what that becomes.
+//   focus       the renderer's. There is one focused renderable at a time and it owns which.
+//   pointer     absent. Mouse in a terminal, if it ever comes, clicks to focus and does nothing else.
+//
+// The pane and region chords live on the same layer 5 the desktop uses, so priority decides here too.
+
+import { createSignal, onCleanup } from 'solid-js'
+import type { Renderable } from '@opentui/core'
+
+export type RegionRef = { paneId: string; regionId: string }
+
+type Group = RegionRef & {
+  box: Renderable
+  /** Where this region drew in its layout, so the cycle walks the screen rather than mount order. */
+  order: number
+  /** What focus was last on inside this group, so re-entering restores rather than resets. */
+  last?: Renderable
+}
+
+const groups: Group[] = []
+let focused: RegionRef | null = null
+// Whether the focused region is only holding the keys because it had nothing better when it opened.
+//
+// A region's contents are `lazy`, so when a pane opens there is often nothing in it yet and the
+// region's own box is the only stop there is. That is the right answer for a region that never grows
+// one, and the wrong one the moment a list arrives — so it is remembered rather than settled, and a
+// collection mounting into that region takes the keys off it (`claimIfProvisional`).
+let provisional = false
+// What has the keys, as a signal, because it is what a row draws its caret from: in a terminal the
+// caret is not decoration, it is where focus is. The renderer owns focus and has no signal for it, so
+// this is written here, at the one place that moves it.
+const [focusedNode, setFocusedNode] = createSignal<Renderable | null>(null)
+
+/** The renderable that has the keys. */
+export const focusedRenderable = focusedNode
+
+/** Which region has focus, or null before anything in a layout has been focused. */
+export const focusedRegion = (): RegionRef | null => focused
+
+/** Registration order within a pane, then mount order. A layout hands its own order in; two panes
+ *  are told apart by their pane id and never compared. */
+const ordered = (): Group[] => [...groups].sort((a, b) => a.order - b.order)
+
+export function registerRegion(box: Renderable, ref: RegionRef, order: number): () => void {
+  const group: Group = { ...ref, box, order }
+  groups.push(group)
+  return () => {
+    const at = groups.indexOf(group)
+    if (at >= 0) groups.splice(at, 1)
+  }
+}
+
+/** The helper a layout calls in setup, where the DOM layout uses the `use:regionFocus` directive.
+ *  There is no directive mechanism outside the DOM renderer, so this is a function and the layout
+ *  calls it from the region box's `ref`. */
+export const regionFocus = (ref: RegionRef, order: number) => (box: Renderable) => {
+  onCleanup(registerRegion(box, ref, order))
+  // Something has to have the keys when a pane opens, and on this host nothing else will decide: the
+  // desktop lands focus with a click or a Tab and there is neither here. The first region to register
+  // takes it, once its own children exist, which is a microtask later.
+  queueMicrotask(() => {
+    if (focused) return
+    const group = groups.find((candidate) => candidate.box === box)
+    if (group) enter(group)
+  })
+}
+
+/** Which region a renderable is inside, by walking up the retained tree. The DOM half asks the same
+ *  question with `focusin` bubbling; here the tree is the bubble. */
+const regionOf = (node: Renderable): Group | undefined => {
+  for (let at: Renderable | null = node; at; at = at.parent) {
+    const group = groups.find((candidate) => candidate.box === at)
+    if (group) return group
+  }
+  return undefined
+}
+
+/** Called when focus lands on something. Idempotent, and a no-op for a node in no region, which is
+ *  the chrome until phase 4 registers its own. */
+export function noteFocus(node: Renderable): void {
+  setFocusedNode(node)
+  provisional = false
+  const group = regionOf(node)
+  if (!group) return
+  group.last = node
+  focused = { paneId: group.paneId, regionId: group.regionId }
+}
+
+// Which renderables are a collection's rows. A region opens on its list where it has one, and this is
+// how a region tells a row from a field without asking the kit what node drew it.
+const items = new WeakSet<Renderable>()
+
+/** Called by a collection for each row it draws (./collection.ts). */
+export const markItem = (box: Renderable): void => { items.add(box) }
+
+const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable | undefined => {
+  for (const child of box.getChildren()) {
+    if (child.visible && take(child)) return child
+    const nested = child.visible ? walk(child, take) : undefined
+    if (nested) return nested
+  }
+  return undefined
+}
+
+/**
+ * The first thing inside a region a keyboard can reach. Depth-first over the renderable tree, which
+ * is retained and ordered, so this is the same reading `querySelector` gives on the DOM.
+ *
+ * With one departure, and it is a terminal's: a region opens on its list rather than on the first
+ * field above it. The DOM does not need the rule, because a reader arrives at a pane with a pointer
+ * and clicks what they meant; here the first thing focused is the thing the bare keys drive, and
+ * landing in a filter box means `j` types a `j`. A region with no rows falls back to the first stop,
+ * which is the DOM's answer unchanged.
+ */
+export function firstStop(box: Renderable): Renderable | undefined {
+  return walk(box, (child) => items.has(child))
+    ?? walk(box, (child) => child.focusable)
+}
+
+const enter = (group: Group | undefined): boolean => {
+  if (!group) return false
+  // The region's own box is the last resort, as it is on the DOM: a region with nothing focusable in
+  // it still has to be reachable, or the cycle has a hole and the layout's own chords — the group
+  // switch, the split — have nothing to be focus-within of.
+  const target = (group.last && !group.last.isDestroyed ? group.last : undefined)
+    ?? firstStop(group.box)
+    ?? group.box
+  if (target === group.box) group.box.focusable = true
+  target.focus()
+  setFocusedNode(target)
+  provisional = target === group.box
+  group.last = target
+  focused = { paneId: group.paneId, regionId: group.regionId }
+  return true
+}
+
+/** Offer the keys to something that has just mounted. Taken when nobody has them, or when the region
+ *  that has them is only holding them for want of anything better. */
+export function claimIfProvisional(node: Renderable | undefined): boolean {
+  if (!node) return false
+  if (focused) {
+    if (!provisional) return false
+    const group = regionOf(node)
+    if (!group || group.paneId !== focused.paneId || group.regionId !== focused.regionId) return false
+  }
+  node.focus()
+  noteFocus(node)
+  return true
+}
+
+/** Move to the next or previous region of the pane that has focus. Wraps. */
+export function moveRegion(delta: 1 | -1): boolean {
+  const all = ordered()
+  const inPane = all.filter((group) => group.paneId === (focused?.paneId ?? all[0]?.paneId))
+  if (inPane.length < 2) return false
+  const at = inPane.findIndex((group) => group.regionId === focused?.regionId)
+  return enter(inPane[(((at < 0 ? 0 : at) + delta) + inPane.length) % inPane.length])
+}
+
+/** Move to the next or previous pane, landing on whatever it last had focused. One pane until phase
+ *  4 draws a pane row, so this answers false and the intent bubbles. */
+export function movePane(delta: 1 | -1): boolean {
+  const panes: string[] = []
+  for (const group of ordered()) if (!panes.includes(group.paneId)) panes.push(group.paneId)
+  if (panes.length < 2) return false
+  const at = panes.indexOf(focused?.paneId ?? '')
+  const paneId = panes[(((at < 0 ? 0 : at) + delta) + panes.length) % panes.length]
+  return enter(ordered().find((group) => group.paneId === paneId))
+}
+
+/** Test seam. The list is module-level, so a suite must not inherit the previous one's regions. */
+export function _resetRegions(): void {
+  groups.length = 0
+  focused = null
+  provisional = false
+  setFocusedNode(null)
+}

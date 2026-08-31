@@ -80,8 +80,13 @@ is why Settings can show it as a conflict while the keyboard behaves as if it we
 
 The keyboard is one engine, `@opentui/keymap`, installed on the shell root by
 `client-core/host/keys/install.ts`. Its HTML adapter turns DOM keydowns into keymap events and tracks
-targets with a `MutationObserver`; the same package carries a terminal adapter, which is what keeps a
-terminal renderer a matter of swapping the adapter rather than rewriting the keyboard.
+targets with a `MutationObserver`. The same package carries a terminal adapter, and the terminal
+client uses it: `apps/tui/src/keys/install.ts` builds `createDefaultOpenTuiKeymap(renderer)` and gets
+the same four tiers, the same `intentKeys` table and the same bubbling. What differs is the pair of
+type parameters — a target is an OpenTUI `Renderable` there and an `HTMLElement` here — so
+`client-core/kit/keys/keymapHost.ts` names neither: the host supplies its pair at `setKeymap`, along
+with its own answer to "is somebody typing right now", which is the only question a binding asks
+about the focused thing.
 
 **There is no second keymap, and there will not be.** One engine, one command catalog, one adapter per
 host. No plugin and no first-party pane installs a key handler of its own outside an input and the
@@ -110,11 +115,27 @@ panes, and each group remembers the node focus was last on, so coming back lands
 `client-core/host/keys/focusRegions.ts` holds that, writes `focusedPane`, and emits `runtime:focus-changed`
 with the task, pane and region.
 
+The terminal keeps the contract and replaces the mechanism, in `apps/tui/src/keys/regions.ts`: a
+layout registers each region with the order it draws it rather than having it derived from document
+position, a region's first stop is found by walking the retained renderable tree, and focus is the
+renderer's. Two rules are the terminal's own, and both are about a host with no pointer. A pane opens
+with the keys already somewhere, because there is no click to put them there. And a region opens on
+its list where it has one, rather than on the first field above it: on the desktop a reader clicks
+what they meant, and here the first thing focused is the thing the bare keys drive, so landing in a
+filter box would mean `j` types a `j`.
+
 **Collection state is the host's.** A run of `Row`s inside a `Rows`, a tab strip, a menu, a chip row,
 a segmented control, a timeline and a grid are all one collection with roving focus inside, and the
-arrows, Home, End, the page keys and type-ahead come from `client-core/kit/keys/collection.ts` rather
-than from the pane. `active` and `selected` live in the host's store keyed by the item's own key
-([state-ownership.md](./state-ownership.md)), so a refetch keeps your place.
+arrows, Home, End, the page keys and type-ahead come from `client-core/kit/keys/collectionIntents.ts`
+rather than from the pane. `active` and `selected` live in the host's store keyed by the item's own
+key ([state-ownership.md](./state-ownership.md)), so a refetch keeps your place.
+
+That file is the rules about a *list*: what wraps, where the first press lands, which of select and
+activate picks, what a page key moves by. Each host supplies two things and nothing else — put focus
+on an item, and say whether the item itself holds focus rather than a control inside it.
+`collection.ts` beside it is the DOM's half: `focus()`, `scrollIntoView`, the `aria-*` attributes and
+the roving `tabindex`. `apps/tui/src/keys/collection.ts` is the terminal's, where a row hands its
+renderable back as it draws and the caret is drawn wherever focus is.
 
 `Grid` is the one documented exception, and it is a consequence of virtualisation rather than a
 shortcut. Most of its rows have no element, so roving focus cannot be DOM focus: the arrows move a
@@ -147,6 +168,14 @@ Escape is the exception the engine cannot express. An open overlay answers its o
 `kit/lib/dismissable.ts` keeps a stack of them so a pile unwinds one press at a time, so an `escape`
 binding goes inactive while focus is inside a dialog. Consuming the key in the engine would stop the
 DOM event too, and the overlay would never see it.
+
+**In a terminal, an overlay and a rectangle each own the keys outright**, and these are the two places
+the terminal's keyboard is not the desktop's. There is no scrim to click through and no window to
+click outside of, so a `Modal` or an open `Menu` pushes a layer above every pane and collection layer
+that answers `dismiss` and swallows the rest, and an entered `pty` rectangle takes every key before
+dispatch — `Ctrl+C` included, which is the point of entering one. Escape alone leaves a rectangle;
+pressing it twice goes back in and sends one through, which is how a reader reaches vim's normal mode
+from in there.
 
 **The cheat sheet** (`client-core/host/keys/CheatSheet.tsx`, Cmd+/) lists what the keyboard will do right
 here, read from the engine's own catalog rather than from the keybinding registry. `getActiveKeys`

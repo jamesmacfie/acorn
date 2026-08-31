@@ -71,8 +71,14 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   cells, the caret moves when `j` is pressed — rather than a snapshot of every cell, which would fail
   on every spacing decision anybody makes afterwards and name no broken promise. There is one case per
   kit node, checked against the kit itself so a node cannot be drawn without being tested, and a pair
-  of whole-pane runs at 80 by 24 and at 120 by 40. Two files alongside need no renderer and never
-  skip: the palette's collapse from a theme to the terminal's slots, and the clipboard sequence.
+  of whole-pane runs at 80 by 24 and at 120 by 40. One case per layout beside it, drawn from the
+  terminal projection in [panes.md](./panes.md) § Layout model and checked against the protocol's own
+  region table, at the same two sizes. And a twin of client-core's `keys.test.tsx` against the terminal
+  adapter, so the two adapters cannot drift: where the keys land when a pane opens, the moves and their
+  wrapping, activate reaching a row, the region cycle remembering its place, a modal swallowing what is
+  behind it, and a `pty` rectangle taking every key on Enter and giving them back on Escape. Two files
+  alongside need no renderer and never skip: the palette's collapse from a theme to the terminal's
+  slots, and the clipboard sequence.
   It needs a renderer to draw to, and OpenTUI's is Zig behind `node:ffi`, a Node 26.4 builtin behind
   `--experimental-ffi`: the config passes that flag only where it is accepted and the tests skip where
   there is no FFI, so an older Node reports a skip rather than failing the suite for a reason that has

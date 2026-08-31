@@ -1,9 +1,14 @@
-// One collection, keyboard-operable, ARIA-correct, with its place held outside its rows.
+// One collection on the DOM: keyboard-operable, ARIA-correct, with its place held outside its rows.
 //
 // Every roving-focus list in the kit is this: `Rows`, `TreeRow` runs, `Tabs`, `Menu`, `ChipRow`,
 // `SegmentedControl`, `Timeline`, `Grid`. They differ in what they draw and in nothing else, which is
-// why the arrows, Home, End, page keys, type-ahead and `aria-activedescendant` are written once here
+// why the arrows, Home, End, page keys, type-ahead and `aria-activedescendant` are written once
 // rather than eight times (docs/command-palette-and-shortcuts.md § Focus and typing).
+//
+// The rules about the *list* — what wraps, where the first press lands, which of select and activate
+// picks — moved to `collectionIntents.ts` in terminal phase 2, so the terminal host keeps them
+// exactly rather than nearly. What is left here is the DOM's share: `focus()`, `scrollIntoView`, the
+// `aria-*` attributes and the roving `tabindex`.
 //
 // A collection is one tab stop with roving focus inside, the React Aria and Kobalte shape. `active`
 // and `selected` live in `collectionState.ts` keyed by the item's own key, so a list rebuilt from a
@@ -13,16 +18,14 @@
 // bubbles to its ancestors and then to the region.
 
 import { onCleanup, type JSX } from 'solid-js'
-import { collectionState, setActiveItem, setSelectedItem } from './collectionState'
+import { setActiveItem } from './collectionState'
+import {
+  COLLECTION_INTENTS, createCollectionIntents, createTypeAhead, PAGE, type CollectionItem,
+} from './collectionIntents'
 import type { Intent } from './intents'
 import { bindIntents } from './keymapHost'
 
-export type CollectionItem = {
-  key: string
-  disabled?: boolean
-  /** What type-ahead matches on. Omit it and the collection has no type-ahead. */
-  label?: string
-}
+export type { CollectionItem }
 
 export type CollectionOptions = {
   /** Stable across a rebuild of the data, because it keys the stored state. */
@@ -48,9 +51,6 @@ export type CollectionOptions = {
    *  of its items have no element to focus until the scroller has been asked to reach them. */
   scrollToKey?: (key: string) => void
 }
-
-const PAGE = 10
-const TYPE_AHEAD_RESET_MS = 700
 
 // Every collection on screen, by its stable id, so something outside one can put an item in view.
 //
@@ -101,115 +101,38 @@ export type Collection = {
 
 export function createCollection(options: CollectionOptions): Collection {
   const elements = new Map<string, HTMLElement>()
-  const horizontal = () => options.orientation === 'horizontal'
 
-  const enabled = () => options.items().filter((item) => !item.disabled)
-  const has = (key: string | null) => !!key && enabled().some((item) => item.key === key)
-  const selected = (): string | null =>
-    options.selected ? options.selected() ?? null : collectionState(options.id()).selected
-  // The stored place, then whatever is picked, then the top. Falling back to the selection is what
-  // makes the first arrow press mean "the next one" rather than "the second one", which is what a
-  // native select does and what a tab strip has to do to keep its one tab stop on the open tab.
-  const active = (): string | null => {
-    const stored = collectionState(options.id()).active
-    if (has(stored)) return stored
-    const picked = selected()
-    return has(picked) ? picked : enabled()[0]?.key ?? null
-  }
+  const keys = createCollectionIntents({
+    ...options,
+    // The DOM's whole share of a move: focus the row, or scroll a virtualised one into existence and
+    // focus it on the next frame, by which time it exists.
+    land: (key) => {
+      const element = elements.get(key)
+      if (element) element.focus()
+      else if (options.scrollToKey) {
+        options.scrollToKey(key)
+        requestAnimationFrame(() => elements.get(key)?.focus())
+      }
+    },
+    onItem: (key) => elements.get(key) === document.activeElement,
+  })
+  const active = keys.active
 
   // By position, not by the key itself: a key is a branch name or a file path, and a DOM id may not
   // hold half of what those contain.
   const index = (key: string) => options.items().findIndex((item) => item.key === key)
   const itemId = (key: string) => options.itemId?.(key) ?? `${options.id()}-item-${index(key)}`
 
-  const land = (key: string | undefined) => {
-    if (!key) return false
-    setActiveItem(options.id(), key)
-    const element = elements.get(key)
-    if (element) element.focus()
-    else if (options.scrollToKey) {
-      // Nothing to focus yet: the row is outside a virtualised window. Scroll it in, then focus it on
-      // the next frame, by which time it exists.
-      options.scrollToKey(key)
-      requestAnimationFrame(() => elements.get(key)?.focus())
-    }
-    if (options.selectOnMove) pick(key)
-    return true
-  }
-
-  const pick = (key: string) => {
-    if (!options.selected) setSelectedItem(options.id(), key)
-    options.onSelect?.(key)
-  }
-
-  const move = (delta: number, absolute?: 'first' | 'last') => {
-    const list = enabled()
-    if (!list.length) return false
-    if (absolute) return land(absolute === 'first' ? list[0].key : list[list.length - 1].key)
-    const at = list.findIndex((item) => item.key === active())
-    // Wraps, because a list you cannot fall off the end of is a list you never have to look at.
-    return land(list[(((at < 0 ? 0 : at) + delta) + list.length) % list.length].key)
-  }
-
-  const onItem = (key: string | null): boolean => !!key && elements.get(key) === document.activeElement
-
-  const handle = (intent: Intent): boolean => {
-    const current = active()
-    switch (intent) {
-      case 'next': return move(1)
-      case 'prev': return move(-1)
-      case 'first': return move(0, 'first')
-      case 'last': return move(0, 'last')
-      case 'pageNext': return move(PAGE)
-      case 'pagePrev': return move(-PAGE)
-      case 'expand':
-        if (horizontal()) return move(1)
-        if (!current || !options.onExpand) return false
-        options.onExpand(current, true)
-        return true
-      case 'collapse':
-        if (horizontal()) return move(-1)
-        if (!current || !options.onExpand) return false
-        options.onExpand(current, false)
-        return true
-      // Only when the item itself has focus. The layer is focus-within, so a button inside a row is
-      // inside the collection too, and Enter there belongs to the button.
-      case 'activate':
-        if (!onItem(current)) return false
-        pick(current!)
-        options.onActivate?.(current!)
-        return true
-      case 'menu':
-        if (!onItem(current) || !options.onMenu) return false
-        options.onMenu(current!)
-        return true
-      default: return false
-    }
-  }
-
-  const INTENTS: readonly Intent[] = ['next', 'prev', 'first', 'last', 'pageNext', 'pagePrev', 'expand', 'collapse', 'activate', 'menu']
-
   // Type-ahead is typing, not a chord, so it stays a keydown on the container rather than a binding:
   // every printable character is a candidate and no keymap can enumerate that.
-  let typed = ''
-  let typedAt = 0
+  const typeAhead = createTypeAhead(keys)
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key.length !== 1 || event.metaKey || event.ctrlKey || event.altKey) return
-    const now = Date.now()
-    typed = now - typedAt > TYPE_AHEAD_RESET_MS ? event.key : typed + event.key
-    typedAt = now
-    const list = enabled().filter((item) => item.label)
-    if (!list.length) return
-    const at = list.findIndex((item) => item.key === active())
-    const rotated = [...list.slice(at + 1), ...list.slice(0, at + 1)]
-    const match = rotated.find((item) => item.label!.toLowerCase().startsWith(typed.toLowerCase()))
-    if (!match) return
-    event.preventDefault()
-    land(match.key)
+    if (typeAhead(event.key)) event.preventDefault()
   }
 
   const reveal = (key: string) => {
-    if (!has(key)) return
+    if (!keys.enabled().some((item) => item.key === key)) return
     setActiveItem(options.id(), key)
     const element = elements.get(key)
     if (element) element.scrollIntoView({ block: 'nearest' })
@@ -222,13 +145,13 @@ export function createCollection(options: CollectionOptions): Collection {
 
   return {
     active,
-    selected,
+    selected: keys.selected,
     focus: (key) => { setActiveItem(options.id(), key) },
     reveal,
     containerProps: {
-      ref: (element: HTMLElement) => bindIntents(element, INTENTS, handle),
+      ref: (element: HTMLElement) => bindIntents(element, COLLECTION_INTENTS, keys.handle),
       role: options.role,
-      'aria-orientation': options.role === 'tablist' && !horizontal() ? 'vertical' : undefined,
+      'aria-orientation': options.role === 'tablist' && options.orientation !== 'horizontal' ? 'vertical' : undefined,
       get 'aria-activedescendant'() { return active() ? itemId(active()!) : undefined },
       onKeyDown,
     },

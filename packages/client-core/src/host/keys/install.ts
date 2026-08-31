@@ -26,14 +26,28 @@ import type { Binding } from '@opentui/keymap'
 import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import { commandAvailable, commandRegistry, commandTitle, executeCommand } from '../registries/commands/commands'
 import type { ResolvedKeybinding } from '../registries/commands/keybindings'
-import { isTerminalTarget, setKeymap } from '../../kit/keys/keymapHost'
+import { setKeymap } from '../../kit/keys/keymapHost'
 import { intentKeys, toKeymapKey } from '../../kit/keys/keymap'
 import type { Intent } from '../../kit/keys/intents'
 import { moveRegion, movePane } from './focusRegions'
 
 // The engine and the intent binder live in `host.ts`, which the kit may import; this module reads the
 // command and keybinding registries and so may not be imported from `ui/`.
-export { isTerminalTarget, keymap, keysFor, registerIntentLayer, type AcornKeymap } from '../../kit/keys/keymapHost'
+export { keymap, keysFor, registerIntentLayer, type AcornKeymap } from '../../kit/keys/keymapHost'
+
+/** xterm focuses a hidden textarea, so a terminal reads as a typing target, but Cmd chords are never
+ *  terminal input on macOS (xterm leaves them to the browser), so chord shortcuts may fire there.
+ *  Bare-key shortcuts must still stay off: those keystrokes are terminal input.
+ *
+ *  Asked of the kit's own PTY rectangle, not of a plugin's class. Every terminal in the app is inside
+ *  one — the drawer's and docker's exec both — and a plugin that drew its own box would be a plugin
+ *  that could quietly opt out of this rule (kit/components/content/Rectangle.tsx).
+ *
+ *  Here rather than in `kit/keys/keymapHost.ts`, which stopped naming the DOM when the terminal host
+ *  started using it: the terminal asks the same question of the focused renderable's rectangle kind
+ *  (docs/future/terminal/05-keys-and-focus.md § The adapter). */
+export const isTerminalTarget = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && !!target.closest('.ui-rect[data-kind="pty"]')
 
 export type ScopeContext = {
   prefs: () => { taskActive: boolean; focusedPane?: string }
@@ -55,7 +69,7 @@ const scopeActive = (binding: ResolvedKeybinding, context: ScopeContext, event: 
   if (binding.chord === 'escape' && target instanceof Element && target.closest('[role="dialog"], [role="alertdialog"]')) return false
   if (!isTypingTarget(target)) return true
   // xterm focuses a hidden textarea, so a terminal reads as a typing target; a command chord there is
-  // never terminal input on macOS, so it still fires. See `isTerminalTarget` in ./host.ts.
+  // never terminal input on macOS, so it still fires. See `isTerminalTarget` above.
   if (scope !== 'global' && !(event()?.super && isTerminalTarget(target))) return false
   return scope !== 'typing-exempt'
 }
@@ -66,7 +80,7 @@ const scopeActive = (binding: ResolvedKeybinding, context: ScopeContext, event: 
  */
 export function installKeymap(root: HTMLElement, context: ScopeContext): void {
   const engine = createDefaultHtmlKeymap(root)
-  onCleanup(setKeymap(engine))
+  onCleanup(setKeymap(engine, { typing: () => isTypingTarget(document.activeElement) }))
 
   // Per-binding gating. `registerEnabledFields` only reaches layers and commands, and acorn's scopes
   // are a property of one binding.

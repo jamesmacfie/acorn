@@ -176,28 +176,34 @@ change for a terminal to draw it, which is the result this phase existed to get.
 ## The screenshot
 
 `pnpm --filter @acorn/tui capture`, at 80 by 24, against the fixture in `apps/tui/src/fixture.ts`.
-Redrawn after phase 1, so it is the kit as it stands rather than as the spike left it: the meta and
-the row actions sit at the far end of the list column now, and the preview toggle draws its state.
+Redrawn after phase 2. The caret is the visible half of what that phase built: the pane opens with the
+keys on the note it opened, rather than with focus nowhere and a list nobody can drive.
 
 ```
 acorn · fix-login · notes
 acorn filter…                   │◀ Scratchpad           ◆ task [x] [ ] Preview
-                                 Whatever is in hand.
-TASK 3 +
-  [x] Scratchpad               ✕
-  [x] Repro steps              ✕
-  [ ] What the agent found  🤖 ✕
-
-WORKSPACE 1 +
-  [x] Conventions              ✕
-
-GLOBAL 0 +
-
-
-
-
-                                 21 B                          view in Context →
-j/k move · enter open · q quit
+                                │Whatever is in hand.
+TASK 3 +                        │
+› [x] Scratchpad               ✕│
+  [x] Repro steps              ✕│
+  [ ] What the agent found  🤖 ✕│
+                                │
+WORKSPACE 1 +                   │
+  [x] Conventions              ✕│
+                                │
+GLOBAL 0 +                      │
+                                │
+                                │
+                                │
+                                │
+                                │
+                                │
+                                │
+                                │
+                                │
+                                │
+                                │21 B                          view in Context →
+j/k move · enter open · f6 region · q quit
 ```
 
 Against a real node it is the same screen with your own notes in it:
@@ -246,3 +252,61 @@ Moved, with the reason:
   ignores it, so a pane compiles and does not get its focus. The kit should answer "focus what I just
   made" as an intent rather than as an element, and that is a focus decision, so it goes to phase 2
   with the rest of them.
+
+## What phase 2 did with these
+
+Shipped 2026-08-31. Which of the above is closed, and which moved.
+
+Closed:
+
+- **The pane registry draws DOM layouts.** The layout table is host-supplied now, through
+  `client-core/src/host/layouts/table.ts`, the same seam `KIT_COMPONENTS` already had one of. The DOM's
+  table is the fallback, so nothing on the desktop changed, and the `??` short-circuits so a host that
+  supplied a table never reaches for the other one. `apps/tui/src/App.tsx` draws Notes through the
+  pane's own component and the cast is gone.
+
+- **A pending `lazy()` region is an empty string.** Every region is under a `Suspense` in the mount
+  path, as the finding asked, and so is the layout — which is a `lazy` for exactly the same reason and
+  was the one that actually broke the mount, because phase 0 never used the registry's component.
+  `fallback: null` on both, which is the same nothing the DOM rendered before.
+
+- **`Input`'s `ref` typed to an element.** Still `ref?: unknown` and still ignored, and that is now a
+  decision rather than a gap: a row hands its renderable back through `ItemProps`, which is the kit's
+  own opaque object, and "focus what I just made" is answered by the collection rather than by handing
+  a pane an element it would have to know the type of.
+
+- **Enter has to be routed to a row's `onPress`.** `ItemProps` carries the press. A row registers its
+  handler with its collection as it draws, and `activate` routes it, so a pane that spells neither
+  `onActivate` nor `onSelect` still opens on Enter.
+
+- **The `already destroyed` warning.** Not seen once across 111 cases, including every layout swapping
+  its regions and a modal mounting and unmounting over a live list. Phase 1 guessed it was in the pane
+  path; the pane path is now the registry's own and the warning is gone with the workaround that stood
+  in for it.
+
+Found here, and worth knowing:
+
+- **A border role is not a brightness.** Drawing an entered rectangle with a `control` border and an
+  idle one with `surface` made the box vanish on entry, because a style pack may set any role to zero
+  width and `control` is one it sets. The role stays `surface` either way and the colour carries the
+  state. Same trap as the one in `docs/ui-design.md § Borders`, met from the other side.
+
+- **A box title that does not fit is not drawn at all.** `Terminal · esc leave · esc esc send escape`
+  is 44 cells and the box was 40, so the title came back empty rather than truncated. Titles are short
+  and the full rule belongs on the footer, which phase 4 draws from the active layers.
+
+- **`_resetCollectionState()` never reset anything.** `setStates(() => ({}))` on a Solid store *merges*
+  the object, so the seam was a no-op and a suite's second test inherited the first one's caret. It is
+  `reconcile({})` now. This is client-core's own seam and the DOM suite could not see it, because each
+  jsdom test file is a fresh module graph and the terminal's whole suite is one process.
+
+- **`mockInput.pressKey` takes OpenTUI's own spelling.** `'F6'` is F6 and `'f6'` types two letters.
+  The same trap phase 0 wrote down for `RETURN`, met again, and the reason `renderCells` waits a real
+  80ms after a key: a lone Escape is the start of every escape sequence there is, and the terminal's
+  parser holds it until it is sure nothing follows. Flushing the render loop does not make that timer
+  run.
+
+- **`registerBindingFields` is per host and easy to forget.** The DOM installer registers the `active`
+  field so a bare-key binding can say "not while somebody is typing"; the terminal's did not, and the
+  engine's answer was a `[unknown-binding-field]` warning on stderr and a `j` that walked the list from
+  inside a filter box. Any third host owes the same line.

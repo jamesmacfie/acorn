@@ -3,7 +3,7 @@ import { createEffect, createSignal, For, Index, Show, type JSX } from 'solid-js
 import type { InputRenderable, TextareaRenderable } from '@opentui/core'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
 import type { Size, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
-import type { ItemProps } from './collection'
+import type { ItemProps } from '../keys/collection'
 import { flatten, Line, slot } from './cells'
 import { borderCell } from './roles'
 import { Menu } from './grouping'

@@ -43,11 +43,10 @@ test.skipIf(!hasFfi)('j moves the caret down the list', async () => {
 // And Enter opens what the caret is on. Worth its own test because the wiring is not obvious: a `Row`
 // on the DOM is a button, so Enter on it raises a click and `onPress` runs by itself. There is no
 // element here, so the row hands its press to the collection and the intent routes it
-// (kit/collection.ts).
+// (keys/collection.ts).
 test.skipIf(!hasFfi)('enter opens the row the caret is on', async () => {
   const screen = await renderFixture()
   // Past the scratchpad, which the pane opens by itself, onto the second note.
-  await screen.press('j')
   await screen.press('j')
   await screen.press('RETURN')
   const frame = await screen.frame()

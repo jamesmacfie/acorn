@@ -2,10 +2,11 @@
 import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { createCliRenderer } from '@opentui/core'
+import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { render } from '@opentui/solid'
 import type { Task } from '@acorn/protocol/api.ts'
 import { installPlatform, readHandshake } from './platform'
-import { installKeymap } from './keys'
+import { installKeymap } from './keys/install'
 import { App } from './App'
 
 // `acorn`, phase 0. Attach-or-start, pairing and the config directory are phase 3; this is handed the
@@ -67,10 +68,25 @@ if (!task) {
 
 // The renderer is built here rather than left to `render`, because the keymap's terminal adapter
 // binds to it and `render` hands it back to nobody.
-const renderer = await createCliRenderer({ exitOnCtrlC: true })
-installKeymap(renderer, () => {
+//
+// `exitOnCtrlC` is off: Ctrl+C at the shell is the TUI's, and inside an entered PTY rectangle it is
+// the PTY's, which is the whole reason a rectangle owns its keys (docs/future/terminal/03-process-model.md
+// § Signals and exit). The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing
+// here listens for one.
+const renderer = await createCliRenderer({ exitOnCtrlC: false })
+const engine = installKeymap(renderer)
+const quit = () => {
   renderer.destroy()
   broker.dispose()
   process.exit(0)
+}
+// Not an intent: quitting is the shell's, and phase 4 gives it a command and a confirm when the TUI
+// is the thing that started the node.
+engine.registerLayer({
+  priority: 0,
+  bindings: [
+    { key: 'q', cmd: () => { quit(); return true }, active: () => !isTyping() },
+    { key: 'ctrl+c', cmd: () => { quit(); return true } },
+  ],
 })
 await render(() => <App task={task} />, renderer)

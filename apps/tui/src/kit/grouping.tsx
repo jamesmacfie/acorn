@@ -5,14 +5,16 @@ import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isCompact } from '../appearance'
 import { flatten, Line, slot } from './cells'
 import { borderCell, spaceCells, spaceLines } from './roles'
+import { trapKeys } from '../keys/trap'
 
 // The kit's grouping nodes in cells, each drawn to its sentence in
 // docs/ui-design.md § Every node at 80 by 24 and no further.
 //
 // A terminal has no floating layer and no scrim, so the three overlay nodes flatten: a `Modal` is a
 // bordered box where the pane would go, a `Menu` is a list in a box under its trigger, and a
-// `Popover` is a full-width block. The keys that make them modal are the keymap's, not theirs
-// (docs/future/terminal/05-keys-and-focus.md § Traps), and phase 2 owns that half.
+// `Popover` is a full-width block. The keys that make them modal are the keymap's, not theirs: a
+// `Modal` and an open `Menu` push a layer above the pane's that answers `dismiss` and swallows the
+// rest (../keys/trap.ts, docs/future/terminal/05-keys-and-focus.md § Traps).
 
 export function Stack(props: { gap?: Space; children: JSX.Element }) {
   return <box flexDirection="column" gap={spaceLines(props.gap ?? 'stack')}>{props.children}</box>
@@ -164,7 +166,12 @@ Toolbar.Group = (props: { children: JSX.Element }) => <box flexDirection="row">{
 
 /** A centred box over the content. Nothing dims behind it, because dimming a whole screen of cells
  *  costs a repaint of every one of them and buys a reader who can already see the border nothing.
- *  What makes it modal is the key layer it owns, which is phase 2's. */
+ *
+ *  What makes it modal is the key layer it owns. `keys/trap.ts` on the DOM contains Tab by walking
+ *  focusable elements; there is nothing to walk here, so a modal traps by pushing a layer above the
+ *  pane's that answers `dismiss` and swallows the rest until it closes
+ *  (docs/future/terminal/05-keys-and-focus.md § Traps). That is what a terminal modal is, and it is
+ *  the same thing the overlay stack does for the palette in phase 4. */
 export function Modal(props: {
   onDismiss: () => void
   title?: string
@@ -176,6 +183,9 @@ export function Modal(props: {
   labelledBy?: string
   children: JSX.Element
 }) {
+  // Open is mounted, so the trap's life is this component's: it takes the keys now and gives them
+  // back when the caller stops drawing it.
+  if (props.dismissOn === undefined || props.dismissOn.includes('escape')) trapKeys(() => props.onDismiss())
   return (
     <box
       flexDirection="column"
@@ -225,10 +235,21 @@ export function Menu(props: {
     <box flexDirection="column">
       {props.trigger({ open, toggle: () => set(!open()) })}
       <Show when={open()}>
-        <box flexDirection="column" border={borderCell('surface').box} borderStyle="single" paddingLeft={1} paddingRight={1}>
-          {props.children({ close: () => set(false) })}
-        </box>
+        {/* Open, so it owns the layer: the same trap a `Modal` is, mounted and unmounted with the
+            list rather than with the trigger. */}
+        <MenuList close={() => set(false)}>{props.children({ close: () => set(false) })}</MenuList>
       </Show>
+    </box>
+  )
+}
+
+/** The open half of a `Menu`, so the trap's life is the list's rather than the trigger's: a component
+ *  that only exists while the list is open takes the keys on mount and gives them back on unmount. */
+function MenuList(props: { close: () => void; children: JSX.Element }) {
+  trapKeys(() => props.close())
+  return (
+    <box flexDirection="column" border={borderCell('surface').box} borderStyle="single" paddingLeft={1} paddingRight={1}>
+      {props.children}
     </box>
   )
 }

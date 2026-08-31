@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
-import { type JSX } from 'solid-js'
+import { Show, type JSX } from 'solid-js'
 import type { TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
-import { styled, textStyle } from './roles'
+import { borderCell, styled, textStyle } from './roles'
 
 // The three things every component in this package needs, and the reason each exists.
 //
@@ -35,6 +35,22 @@ export function Line(props: { role?: TextRole; tone?: Tone; wrap?: boolean; chil
   const run = () => styled(flatten(props.children), props.role, props.tone)
   return (
     <text {...run().style} wrapMode={props.wrap ? 'word' : 'none'}>{run().text}</text>
+  )
+}
+
+/** A divider between two regions, along the axis it separates: a line across for `x`, a column of
+ *  cells for `y`.
+ *
+ *  One side of a box's border rather than a run of repeated characters, so the renderer draws it to
+ *  whatever width or height the layout gave it and nothing here measures anything. Drawn only where
+ *  the `divider` border role has a glyph at all: a style pack may set it to nothing, and then this
+ *  draws nothing and the layout is still correct, which is the role's own promise. */
+export function Rule(props: { axis?: 'x' | 'y' }) {
+  const vertical = () => props.axis === 'y'
+  return (
+    <Show when={borderCell('divider').glyph}>
+      <box border={vertical() ? ['left'] : ['top']} borderStyle="single" flexShrink={0} />
+    </Show>
   )
 }
 
