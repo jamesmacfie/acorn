@@ -91,7 +91,7 @@ export function Fold(props: {
 export function Card(props: {
   interactive?: boolean
   selected?: boolean
-  stripe?: Extract<Tone, 'accent' | 'warn' | 'danger'>
+  stripe?: Extract<Tone, 'accent' | 'ok' | 'warn' | 'danger'>
   pad?: Extract<Size, 'sm' | 'md'>
   disabled?: boolean
   onPress?: () => void

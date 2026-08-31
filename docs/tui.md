@@ -193,6 +193,16 @@ The seven layout components are `apps/tui/src/layouts/`, reaching the pane regis
 `client-core/src/host/layouts/table.ts`, which is host-supplied for the same reason the component
 table is.
 
+One guard sits over the renderer, in `apps/tui/src/renderGuard.ts`, installed beside it in `main.tsx`
+and in the test harness. OpenTUI reads a node's size straight from yoga, and a node that joins the tree
+after a frame's layout pass has no measured size: the width comes back `NaN` and the frame hands it to
+the Zig side, which takes a `u32` and throws "Argument 3 must be a uint32" from inside the render loop.
+That ends the process. It lasts one frame and hits any node with a border or a hit box, so no single
+node can own the fix — `list-detail` mounts its divider when the list region arrives, and a `Card`
+mounts on every turn of the agents transcript, which is how switching to a workspace whose task opens
+that pane killed `acorn`. The guard clamps an unmeasured size to one cell, and goes the day OpenTUI
+clamps its own.
+
 ### Rectangles
 
 `Rectangle` is the kit's one admission that a pane needs pixels, and it has four kinds. On this host:
@@ -358,9 +368,10 @@ every plugin that calls it lands on a line above the footer. They never take foc
 
 `Tab` and `Shift+Tab` cycle regions, beside `F6`, which is what the DOM host spells the same intent
 because the browser owns Tab. In the rail, `j` and `k` move and `Enter` opens the task. `w` switches
-workspace through a `Menu`, and does not restore what you were looking at: the desktop remembers a
-view per workspace, and this host clears the source and lets the first task open. The command chord
-opens the palette from anywhere except an entered PTY.
+workspace through an overlay, because that is the shape that takes the keys off whatever had them; it
+does not restore what you were looking at, since the desktop remembers a view per workspace and this
+host clears the source and lets the first task open. The command chord opens the palette from anywhere
+except an entered PTY.
 
 A pane opens with the keys already somewhere, because there is no click to put them there. And a
 region opens on its list where it has one rather than on the first field above it, because the first

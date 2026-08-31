@@ -525,6 +525,7 @@ export default function AgentComposer(props: {
         <Picker<AgentContextContribution>
           label="Context"
           ariaLabel="Add Acorn context"
+          size="sm"
           placeholder="Filter context sources…"
           emptyText="No context sources available."
           results={(query) => agentContextContributions().filter((contribution) =>
@@ -546,6 +547,7 @@ export default function AgentComposer(props: {
         <Picker<InsertChoice>
           label="Insert"
           ariaLabel="Insert provider command or skill"
+          size="sm"
           placeholder="Filter commands and skills…"
           emptyText="No commands or skills advertised."
           results={(query) => insertChoices().filter((choice) =>

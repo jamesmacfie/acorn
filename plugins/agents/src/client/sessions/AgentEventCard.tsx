@@ -106,13 +106,18 @@ export default function AgentEventCard(props: {
         {(_shown) => {
           const message = () => event() as Extract<ReturnType<typeof event>, { type: 'assistant_message' }>
           return (
-            <Stack gap="row">
-              <Inline>
-                <Text emphasis="eyebrow">Agent</Text>
-                <CopyButton text={() => message().text} title="Copy response" />
-              </Inline>
-              <AgentMarkdown text={message().text} taskId={props.taskId} />
-            </Stack>
+            // The same card the reader's own turn gets, in the other stripe colour: the two sides of
+            // the conversation are the pair that has to be told apart at a glance, and everything
+            // else in the stream is a tool call or a note rather than somebody talking.
+            <Card pad="sm" stripe="ok">
+              <Stack gap="row">
+                <Inline>
+                  <Text emphasis="eyebrow">Agent</Text>
+                  <CopyButton text={() => message().text} title="Copy response" />
+                </Inline>
+                <AgentMarkdown text={message().text} taskId={props.taskId} />
+              </Stack>
+            </Card>
           )
         }}
       </Show>

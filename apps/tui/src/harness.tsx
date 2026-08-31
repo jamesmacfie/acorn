@@ -43,6 +43,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   const { createTestRenderer } = await import('@opentui/core/testing')
   const { render } = await import('@opentui/solid')
   const { installKeymap } = await import('./keys/install')
+  const { installRenderGuard } = await import('./renderGuard')
   const { _resetCollections } = await import('./keys/collection')
   const { _resetRegions } = await import('./keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
@@ -78,6 +79,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   // The renderer first and the tree second, rather than `testRender`, which builds both at once. The
   // keymap has to be installed before anything mounts: a layout, a collection and a trap all register
   // their layer as they draw, and a layer registered against no engine is silently dropped.
+  installRenderGuard()
   const { renderer, mockInput, flush, captureCharFrame, resize } = await createTestRenderer({
     width: size.width ?? 80,
     height: size.height ?? 24,

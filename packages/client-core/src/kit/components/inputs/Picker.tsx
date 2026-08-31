@@ -3,6 +3,7 @@ import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type Placement } from '../../lib/anchor'
 import PickerRow from './PickerRow'
 import { Button } from '../primitives'
+import type { Size } from '../../tokens/tokens'
 
 // Searchable popover picker: a button showing the current value opens a filter input + scrollable
 // list. Presentational chrome only; the parent supplies results(query) so it owns filtering and
@@ -52,7 +53,9 @@ export type PickerProps<T> = {
   leading?: (item: T) => JSX.Element // optional per-row leading control (e.g. pin)
   tools?: JSX.Element // optional extra toolbar control beside the filter (e.g. refresh)
   status?: JSX.Element // optional status line under the toolbar (e.g. refresh failed)
-  buttonClass?: string
+  /** The trigger's size, as any Button's. A picker in a bar of `sm` buttons takes `sm` too, or it
+   *  stands 6px taller than everything beside it. */
+  size?: Extract<Size, 'sm' | 'md'>
   disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
   keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
   placement?: Placement // 'bottom-end' for a trigger at the right edge, so the list opens leftward
@@ -113,20 +116,22 @@ export default function Picker<T>(props: PickerProps<T>) {
 
   return (
     <div class="repo-picker" ref={rootRef}>
-      <button
-        type="button"
-        class={props.buttonClass ?? 'repo-picker-button'}
-        aria-label={props.ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open()}
+      {/* The kit's own Button, not a second one styled to look like it: height, radius, hover,
+          focus ring and the disabled state all came out slightly different, and a picker beside a
+          button stood 6px taller than it wherever the two met. */}
+      <Button
+        label={props.ariaLabel}
+        size={props.size}
+        opens="listbox"
+        expanded={open()}
         disabled={props.disabled}
-        onClick={toggle}
+        onPress={toggle}
       >
         <span class="repo-picker-label">{props.label}</span>
         <span class="repo-picker-chevron" aria-hidden="true">
           ▾
         </span>
-      </button>
+      </Button>
       <Show when={open()}>
         <Portal>
           <div

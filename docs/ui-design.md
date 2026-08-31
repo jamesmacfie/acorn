@@ -970,7 +970,7 @@ disagree about which nodes exist or what each one does with focus.
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
 | `Timeline` | collection | cards in sequence, a dim rule between turns; `follow` is a no-op, because a column of cells pins to its last child by construction. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets |
-| `Toolbar` | none | children on one line |
+| `Toolbar` | none | children on one line; a `Heading` in a bar is cut short rather than wrapped, as it is on the DOM, so the bar stays one line tall and the controls at the far end stay on screen |
 | `Modal` | trap | a centred box over dimmed content; Escape dismisses. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
 | `ModalBody` | none | the lines between the title rule and the actions line |
 | `ModalActions` | none | the buttons on one line, right-aligned inside the box |

@@ -508,6 +508,21 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 }
 .ui-toolbar-spacer { flex: 1; }
 .ui-toolbar-group { display: inline-flex; align-items: center; gap: var(--space-2); }
+/* A heading in a bar is one line that gets cut short, never two lines that make the bar taller. A
+   session title is a sentence somebody typed, and left to wrap it pushed the bar to twice its height
+   and squeezed the controls at the far end off the pane. The extra end margin is so a title that
+   runs the full width still reads as separate from the first control after it. */
+.ui-toolbar > .ui-heading { margin-inline-end: var(--gap-stack); }
+/* Something ahead of the heading is a mark for it, not a control of its own — the agents header's
+   provider glyph — so it gets a little more air than the bar's gap alone. Written against the
+   heading rather than the mark because an unmatched icon name draws as a span, not an svg. */
+.ui-toolbar > .ui-heading:not(:first-child) { margin-inline-start: var(--space-2); }
+.ui-toolbar > .ui-heading > .ui-heading-title,
+.ui-toolbar > .ui-heading > .ui-heading-eyebrow {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ── Chip ───────────────────────────────────────────────────────────────────────────────────
    Badge's interactive sibling, sharing its tone tokens so the two read as one family. Static label
@@ -713,6 +728,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-card[data-selected] { background: var(--bg-selected); border-color: var(--accent); }
 .ui-card[data-stripe] { border-left-width: var(--stripe-w); }
 .ui-card[data-stripe='accent'] { border-left-color: var(--accent); }
+.ui-card[data-stripe='ok'] { border-left-color: var(--state-ok); }
 .ui-card[data-stripe='warn'] { border-left-color: var(--warn); }
 .ui-card[data-stripe='danger'] { border-left-color: var(--danger); }
 

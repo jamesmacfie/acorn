@@ -201,13 +201,35 @@
    the same way every scrolling body above does. Chrome takes it back: a `Toolbar` and a `Tabs` strip
    carry that padding themselves and have a background that has to reach the pane's edge, so they are
    pulled back out by the same amount rather than being inset twice. */
-.layout-region-detail { padding-inline: var(--pane-pad); }
+/* The block end and the gap are the same argument one step further: the column's last child is a
+   composer or a row of actions, and with neither it sat on the pane's bottom border with the
+   transcript above it touching it. */
+.layout-region-detail {
+  padding-inline: var(--pane-pad);
+  padding-block-end: var(--space-4);
+  row-gap: var(--gap-stack);
+}
 .layout-region-detail > .ui-toolbar,
 .layout-region-detail > .ui-tabs { margin-inline: calc(-1 * var(--pane-pad)); }
+/* The reading column stops at `--pane-measure` and sits in the middle of whatever is left. A pane
+   is as wide as the display someone gave it, and on a 3700px one a transcript line runs to about
+   480 characters, which is a line nobody reads. Chrome is exempt, because a bar's background has to
+   reach the pane's edge either way, and so is a scroller: capping the scroller instead of the list
+   inside it puts a dead gutter on each side that the wheel does nothing over. `width` is spelled
+   out because an auto inline margin turns a flex item's stretch off, and without it a short card
+   would shrink to the width of its own text. */
+.layout-region-detail > *:not(.ui-toolbar, .ui-tabs, .ui-timeline-scroll),
+.layout-region-detail > .ui-timeline-scroll > .ui-timeline {
+  width: 100%;
+  max-width: var(--pane-measure);
+  margin-inline: auto;
+}
 /* Two children are edge-to-edge by nature and opt the whole column out: a split, whose divider is its
    columns' shared edge and whose columns pad themselves, and a diff, which is a canvas. */
 .layout-region-detail:has(> .ui-listdetail),
-.layout-region-detail:has(> .diff-toolbar) { padding-inline: 0; }
+.layout-region-detail:has(> .diff-toolbar) { padding: 0; row-gap: 0; }
+.layout-region-detail:has(> .ui-listdetail) > *,
+.layout-region-detail:has(> .diff-toolbar) > * { max-width: none; margin-inline: 0; }
 
 /* `list-detail`. The list column's width is a style token until someone drags the handle, which
    writes a pixel value onto the container. The divider is the handle's, so the column carries no

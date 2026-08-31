@@ -354,8 +354,8 @@
    control it is one of several stacked fields, so it takes the field's width like the rest. A 300px
    button above a full-width input reads as a mistake. Same for a param's picker, which sits in the
    split field's control column beside inputs that fill it. */
-.dash-add-picker .repo-picker-button,
-.dash-param-picker .repo-picker-button {
+.dash-add-picker .repo-picker > .ui-btn,
+.dash-param-picker .repo-picker > .ui-btn {
   width: 100%;
   max-width: 100%;
 }

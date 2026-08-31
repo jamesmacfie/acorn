@@ -24,10 +24,13 @@ export default function AgentUsageIndicator() {
           <Icon name="gauge" />
           {/* The placeholder names no harness, because only the node knows which ones exist. */}
           <Show when={entries().length} fallback={<Text emphasis="muted">reading usage…</Text>}>
-            <Inline>
+            {/* The pairs sit a step further apart than the dot sits from its own label, which is
+                what keeps "Claude Code 48%" and "Codex —" reading as two readings rather than one
+                run of words. Gap `none` on the inner one had the dot touching the C. */}
+            <Inline gap="stack">
               <For each={entries()}>
                 {(entry) => (
-                  <Inline gap="none">
+                  <Inline>
                     <StatusDot tone={usageTone(entry.health)} size="sm" />
                     <Text emphasis="muted">{entry.label} {entry.value}</Text>
                   </Inline>
