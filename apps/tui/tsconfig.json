@@ -1,0 +1,20 @@
+{
+  // The terminal host. `@acorn/plugin-api/ui` resolves to this package's kit rather than to
+  // client-core's DOM components — the same swap `vite.config.ts` makes, written twice because tsc does not read a
+  // bundler's aliases. That facade is the host switch for a compiled pane: a pane imports the kit
+  // through it and never learns which host it landed on.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // DOM is in `lib` even though there is no DOM here. client-core is DOM-typed throughout — the
+    // focus regions, the keymap host, the notifications — and tsc pulls those sources into this
+    // program whether or not the TUI draws them. Narrowing `lib` the way apps/node does would report
+    // three hundred errors about a host that is not this one. Phase 2 splits the DOM half of
+    // focus and keys out; that is the change that lets this line go (FINDINGS.md).
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@acorn/plugin-api/ui": ["./src/kit/ui.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

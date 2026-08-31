@@ -31,16 +31,29 @@ Untouched on purpose, because they describe shipped behaviour and the terminal o
 `docs/plugin-authoring.md` (raw key handlers dropped), `docs/command-palette-and-shortcuts.md` (the
 adapter sentence), `docs/future/compiled-tier.md`, and the `monaco.md` argument paragraphs.
 
-## Owed by phases 0 to 7
+## Done in phase 0 (2026-08-31)
+
+| Doc | Section | Change |
+| --- | --- | --- |
+| `docs/future/terminal/findings.md` | new file | What phase 0 found, which decision each finding moves, and which later phase owns the fix. |
+| `docs/ui-design.md` | The closed kit | `HOST` is supplied per host package at build time; `dom` and `tui` exist and which is which. |
+| `docs/ui-design.md` | What a terminal renderer needs from this | The `tui` column is read by the nodes the spike drew, tested for presence for the rest. Points at the findings. |
+| `docs/testing.md` | Test layers | The `tui` suite: what it renders, what it asserts, and why it skips without `node:ffi`. |
+| `docs/future/terminal/README.md` | Decisions taken, The files, The phases, The order of work | The Node 26.4 floor as a decision of its own; the findings row; phase 0 marked shipped. |
+| `docs/future/terminal/02-survey.md` | OpenTUI row | The Node floor and the flag, and that OpenTUI's Node lane is Linux x64 only. |
+| `docs/future/terminal/08-deployables.md` | What changes in `bundle.md`'s claims | Bundling the runtime is a precondition, not a last step; `bin/acorn` passes the flag; prebuild parity is not proven. |
+
+No kit dishonesty was found, so no owning section of `docs/ui-design.md` changed for that reason. Every
+finding that needed a fix needed it in the host or in the pane registry, not in the kit.
+
+## Owed by phases 1 to 7
 
 | Doc | Section | Phase | What it says afterwards |
 | --- | --- | --- | --- |
-| `docs/ui-design.md` | The closed kit | 0 | `HOST` is supplied per host package; `dom` and `tui` exist. |
-| `docs/ui-design.md` | owning sections | 0 | Any kit dishonesty phase 0 found, fixed for both hosts. |
 | `docs/ui-design.md` | Every node at 80 by 24 | 1 | Each `reduced` node's loss in its row. |
 | `docs/ui-design.md` | What a terminal renderer needs from this | 1 | "tested for presence even though nothing reads it" → "read by the TUI host". |
-| `docs/testing.md` | Test layers | 1, 3, 6 | The `tui` vitest project; the TUI boot test; pane snapshots. |
-| `docs/panes.md` | Layout model | 2 | Projections are drawn; any that changed on contact. |
+| `docs/testing.md` | Test layers | 3, 6 | The TUI boot test; pane snapshots. |
+| `docs/panes.md` | Layout model | 2 | Projections are drawn; any that changed on contact; the layout table is supplied by the host package rather than named by the pane registry ([findings.md](./findings.md)). |
 | `docs/command-palette-and-shortcuts.md` | Focus and typing | 2, 4 | The terminal adapter is used; the double-Escape rule; the region cycle and the footer. |
 | `docs/terminal.md` | the PTY | 2, 6 | The PTY on the TUI; the editor handoff; docker exec. |
 | `docs/node-distribution.md` | reaching a node | 3, 7 | `acorn` beside the desktop; `bin/acorn` in the tarball layout. |

@@ -2,6 +2,8 @@
 
 Status: not started. Waits on phase 1.
 
+Read [findings.md](./findings.md) first: it adds two jobs to this phase, the host-supplied layout table the pane registry currently names directly, and the `Suspense` a `lazy()` region needs on a cell host.
+
 ## Goal
 
 The seven layout components drawn from their projections, the keymap's terminal adapter installed

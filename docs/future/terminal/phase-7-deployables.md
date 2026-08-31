@@ -1,6 +1,8 @@
 # Phase 7: the two deployables
 
 Status: not started. Waits on phase 4 and on `docs/future/bundle.md` steps 2 to 4 (the Docker
+
+Read [findings.md](./findings.md) first: the bundled runtime is a precondition rather than a last step, and it is Node 26.4+ with a flag.
 image, the Linux node-pty prebuild, the CI matrix for Linux and Windows).
 
 ## Goal

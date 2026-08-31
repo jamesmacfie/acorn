@@ -1,6 +1,15 @@
 # Phase 0: the host switch and the toy
 
-Status: not started. Waits on nothing.
+Status: **shipped 2026-08-31**. What it found, including where this file was wrong, is in
+[findings.md](./findings.md). Two things to know before reading the rest of it as a plan:
+
+- It drew **Notes**, not http and linear. Both of those ship only a tree bundle, so drawing either means
+  the phase 5 sandbox. Notes is the compiled `list-detail` pane with three regions sharing a model.
+- OpenTUI needs **Node 26.4 with `--experimental-ffi`**, which moves a decision in the README and a
+  claim in `08-deployables.md`.
+
+The rest of this file is left as written, because a phase file is the plan that was made and the
+findings are what happened to it.
 
 ## Goal
 

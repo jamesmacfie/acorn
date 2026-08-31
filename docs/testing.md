@@ -63,6 +63,16 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   type-level test that no node's props accept `class`, `className`, `style`, or an arbitrary string
   where a role is meant, and `tsc --noEmit` under `pnpm lint` is the pass that checks it. See
   [ui design](./ui-design.md) § The closed kit;
+- the `tui` suite (`apps/tui`) renders the kit to a cell buffer instead of to a document. It runs the
+  bundle's own transform, so JSX goes to OpenTUI's reconciler, and it inherits the alias that points
+  `@acorn/plugin-api/ui` at the terminal kit, which means a pane under test imports the kit exactly as
+  the shipped bundle does. What it asserts is what a reader would look for on the screen — the group
+  labels, the note titles, the caret moving when `j` is pressed — rather than a snapshot of every cell.
+  It needs a renderer to draw to, and OpenTUI's is Zig behind `node:ffi`, a Node 26.4 builtin behind
+  `--experimental-ffi`: the config passes that flag only where it is accepted and the tests skip where
+  there is no FFI, so an older Node reports a skip rather than failing the suite for a reason that has
+  nothing to do with the change under test. See
+  [docs/future/terminal/findings.md](./future/terminal/findings.md) § The runtime floor;
 - Node-core tests cover data roots, TLS, auth, pairing, idempotency, migrations, backups, audit,
   worktrees, process/filesystem guards, routes, and WebSocket behavior;
 - plugin tests cover schemas, providers, route behavior, reconciliation, and client models using

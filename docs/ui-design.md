@@ -338,10 +338,21 @@ custom property.
 **A node says which hosts can draw it.** `kit/tokens/support.ts` holds a row per node with a `dom`
 column and a `tui` column, at one of four levels: `full` draws it natively, `reduced` draws it with
 named things missing, `fallback` draws a stated substitute, and `absent` draws nothing unless the
-node has a `<Fallback>` child. Only `dom` is implemented. The `tui` column is documentation with a
-test that it is filled in, so nobody adds a node without deciding what it does on a terminal. The
-80-column sentence for each one is in [Every node at 80 by 24](#every-node-at-80-by-24) at the end of
-this page.
+node has a `<Fallback>` child. The 80-column sentence for each one is in
+[Every node at 80 by 24](#every-node-at-80-by-24) at the end of this page.
+
+Which host a build draws to is `HOST` in the same file, supplied by the host package at build time,
+because it is a fact about the bundle rather than about the run: `apps/desktop`'s Vite config defines
+it `dom` and `apps/tui`'s defines it `tui`. Where nothing defines it — a test, a plain browser served
+by a node — it is `dom`. `Only` and `Fallback` are the only things that read it, and that is the rule:
+a node that wants to know which host it is on is a node about to draw something host-specific, and the
+answer to that is a `<Fallback>` child, not a branch.
+
+Two hosts exist. `dom` is the desktop and the browser. `tui` is the terminal, which as of 2026-08-31
+draws one pane from a spike (`apps/tui/`, `docs/future/terminal/`) and grows to the whole kit in that
+folder's phase 1. Until then the `tui` column is a mixture: read by the nodes that spike drew, and
+documentation with a test that it is filled in for the rest, so nobody adds a node without deciding
+what it does on a host with no pixels.
 
 **The classes moved inward.** A kit component keeps its `ui-*` classes and styles its own children
 by position, as in `.ui-code-wrap > .ui-btn`. Nothing exported accepts a class, `cx.ts` is internal,
@@ -871,10 +882,14 @@ Host-owned layouts make a focused mobile subset cheap; they do not decide what i
 
 A terminal host cannot run the web renderer, so it needs the tree, the kit, the layouts and the
 keymap to be honest about intent. The host that reads these is the programme in
-[docs/future/terminal/](./future/terminal/README.md); this list is what the kit already holds for it:
+[docs/future/terminal/](./future/terminal/README.md), whose phase 0 shipped on 2026-08-31 and drew a
+first-party pane in cells with no change to the pane. What it found is in
+[findings.md](./future/terminal/findings.md); nothing on this list had to change. This is what the kit
+holds for it:
 
 - **Every kit node has an 80×24 monochrome sentence** below and a `tui` level in
-  `packages/client-core/src/kit/tokens/support.ts`, tested for presence even though nothing reads it.
+  `packages/client-core/src/kit/tokens/support.ts`. The fifteen nodes the spike drew are read; the rest
+  are tested for presence until that folder's phase 1 draws them.
 - **Every layout has a terminal projection** in [docs/panes.md](./panes.md#layout-model).
 - **Role tokens never expose pixels.** Each role has a documented terminal value, including
   `ignored`, in `packages/client-core/src/kit/tokens/roles.ts`.
