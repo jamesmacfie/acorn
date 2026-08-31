@@ -3,7 +3,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
 import { setLayouts } from '@acorn/client-core/host/layouts/table.ts'
+import { setRemoteTree } from '@acorn/client-core/host/tree/table.ts'
 import { LAYOUTS } from './layouts'
+import { RemoteTree } from './plugins/RemoteTree'
+import { installPluginWorkers } from './plugins/workerFactory'
 import { Shell } from './chrome/Shell'
 
 // The composition root's client half: the roster, the layout table, and the query client under which
@@ -21,11 +24,17 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30
 // (client-core/host/layouts/table.ts, docs/future/terminal/findings.md).
 setLayouts(LAYOUTS)
 
+// The loaded-plugin path, the same two seams one level up: a plugin's tree is drawn by this host's
+// `RemoteTree` into cells, and the worker it emits from is a `node:worker_threads` thread under
+// `--permission` rather than a Web Worker under a CSP (docs/future/terminal/06-isolation.md).
+setRemoteTree(RemoteTree)
+installPluginWorkers()
+
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
 // because that is where a pane comes from on the desktop too. It is one line long because notes is
 // the one compiled pane phase 0 proved and the rest are the pane sweep's
-// (docs/future/terminal/phase-6-panes-sweep.md); http and linear ship only a tree bundle and need the
-// worker sandbox, which is phase 5.
+// (docs/future/terminal/phase-6-panes-sweep.md). A loaded plugin is not on this list and never will
+// be: it arrives from a node as a bundle, and `syncPluginDistribution` in main.tsx is what finds it.
 initClientPlugins([notesClientPlugin])
 
 export function App(props: { nodeId: string; supervised: boolean; onQuit: () => void }) {

@@ -30,6 +30,16 @@ capabilities, no general secret read path, and friends. The reload path's candid
 lifecycle is the supervision shape to reuse. This is the single biggest lift in the whole program
 and the hard precondition for gate 2's discovery half.
 
+**There is a down payment on it, made for the client half.** The terminal client runs a loaded
+plugin's tree in a `node:worker_threads` realm under `--permission`, and shipping it settled three of
+rung 2's open questions the cheap way (`docs/security.md § Rung 0 — The client sandbox`): the flag set
+applies per realm rather than per process, so the host needs no grants of its own; a bundle can be
+loaded by path with nothing else on the filesystem readable; and the network hole Node's permission
+model leaves is closable with a `module.registerHooks` deny list rather than only with rung 3's OS
+sandbox. What is left for rung 2 is the part this did not touch: turning `ctx` into authorised calls
+over the boundary, and the plugin-scoped token behind them. The lift is smaller than it was, and none
+of it is guesswork any more.
+
 ## 2. No signing, no discovery
 
 **What.** Installs are hash-pinned (the lockfile records source, resolved version, archive

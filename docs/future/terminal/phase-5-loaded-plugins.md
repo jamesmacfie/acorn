@@ -1,8 +1,10 @@
 # Phase 5: loaded plugins
 
-Status: not started. Waits on phase 2. Runs beside phase 6.
+Status: **shipped 2026-08-31.** What shipped, and where it differs from the plan, is at the bottom.
 
-Read [findings.md](./findings.md) first: the host half now needs `--allow-ffi` and `--allow-worker` of its own before a plugin worker gets none.
+Read [findings.md](./findings.md) first. One line of it is now wrong and phase 5 is what corrected it:
+the host half needs no permission flags at all, because a worker thread's grants turn out to be its
+own.
 
 ## Goal
 
@@ -108,3 +110,49 @@ not granted is refused and shown as a placeholder.
 - `packages/client-core/src/host/plugins/host.ts` is still the only caller of `pluginCustody()`.
 - Node's `--permission` model at the pinned runtime version: check whether worker threads can be
   granted less than the parent.
+
+## What shipped, and where it differs
+
+Five departures from the plan above, in the order they matter.
+
+**A worker thread, and no measurement worth recording as a trade-off.** The plan said to measure
+whether `--permission` being process-wide made a worker thread unworkable, and to fall back to a child
+process per plugin with the two ports over IPC. Measured on Node 24.11 and 26: `execArgv` applies the
+permission model to the thread, and the worker is denied a read the parent is allowed. So the answer is
+the worker thread, the fallback is not built, and the TUI process runs with no flags of its own. The
+grants are the bootstrap and the bundle, `realpathSync`'d, and nothing else.
+
+**The network hole, closed in the sandbox.** Node's permission model does not cover the network, which
+is what the DOM worker's CSP gave away free. `apps/tui/src/plugins/pluginWorker.js` runs before a
+stranger's module scope and installs a `module.registerHooks` resolver refusing fourteen builtins —
+`node:module` and `node:worker_threads` among them, so a bundle cannot undo the hook or start a thread
+that inherited none of it — and deletes five globals. This was not in the plan and it is the difference
+between "contained" and "contained except for the internet".
+
+**`TreeHost.tsx` split rather than parameterised.** The plan said "the coalescer takes a scheduler; the
+rendering shell is separated from `acceptable()`/`apply()` if it is not already". It was not. The store,
+the pre-flight check, the apply, the prop sanitiser and the coalescer are
+`client-core/host/tree/treeState.ts` with no JSX in them, and both hosts write a shell over it. That is
+a bigger change than a scheduler parameter and a smaller one than two tree hosts: two copies of the
+batch rules would have been two copies of a security decision.
+
+**Two more host seams than the plan named.** `frames/register.ts` reached for the DOM's `RemoteTree`
+and the DOM's layout table by name, which is exactly the finding phase 0 recorded one registry over.
+Both are host-supplied now with the DOM's as the fallback. And `createFrameServices` took
+`navigator.clipboard` and `window.open` as given; `FrameServiceHost` has an optional `copy` and
+`openExternal`, so this host answers with OSC 52 and a notification.
+
+**`Slot` is not built.** The plan's file list named it. It has no consumer: a surface owner reaches it
+through `@acorn/plugin-api/ui/host`, a DOM-heavy barrel this host does not alias, and a tree bundle
+cannot emit a `Slot` node by design. The pane sweep is where that barrel crosses, so it goes there.
+
+## What this phase deliberately left
+
+- **A device-held install.** `{ path }` is a form the custody accepts and nothing offers, because there
+  is no surface to reach it from. `docs/future/client-plugins/`'s phase 0, on this host.
+- **The node half out of process.** As scoped: this phase is the design's proof and none of its
+  implementation. What rung 2 still owes is `ctx` as authorised calls and the plugin-scoped token behind
+  them, and `docs/security.md § Rung 2` now says which of its open questions this settled.
+- **A real bundle through the whole path.** The two plugins that ship a tree bundle are built by the
+  packaged-build pipeline rather than by `pnpm build`, so every claim here is tested against a bundle
+  the suite wrote. The first real one through will be found by phase 6 or phase 7.

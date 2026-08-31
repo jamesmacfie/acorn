@@ -5,6 +5,7 @@ import type { NodePairRequest, NodeProbeResult, NodeRecord, NodeStatus } from '@
 import type { OpenedNode } from './node/open'
 import { startNode } from './node/supervise'
 import { dataRootDir } from './node/paths'
+import { createPluginCustody } from './plugins/custody'
 
 // The platform seam, from a Node process.
 //
@@ -145,6 +146,11 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       )
       connect(handshake.nodeId)
     },
+
+    // Custody of third-party plugin bundles: a content-addressed file cache and an acknowledgement
+    // file under the TUI's config directory, hashed here rather than by a helper because there is no
+    // helper (./plugins/custody.ts). The broker is the fetcher, which is why this is built after it.
+    plugins: createPluginCustody(broker),
 
     // A terminal has no file manager to reveal a path in, so "open the data folder" is the path
     // itself. It prints on the way out rather than now, because the renderer owns the screen until

@@ -2,6 +2,7 @@ import { createComponent, createSignal, lazy, type JSX } from 'solid-js'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import type { DocumentHandle } from '../../features/editor/documentModel'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
+import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { panelRegion } from '../../features/dashboards/region'
 import { activeNodeId } from '../../infra/node/activeNode'
@@ -10,6 +11,8 @@ import { commandRegistry } from '../registries/commands/commands'
 import { pluginProjectRoutePrefix } from '../registries/commands/corePaths'
 import { keybindingRegistry } from '../registries/commands/keybindings'
 import { paneRegistry } from '../registries/panes/panes'
+import { suppliedLayout } from '../layouts/table'
+import { suppliedRemoteTree } from '../tree/table'
 import { projectImporterRegistry } from '../registries/sources/projectImporters'
 import { projectSurfaceRegistry } from '../registries/panes/projectSurfaces'
 import { clearExclusiveSlotFailures, exclusiveSlotRegistry } from '../registries/extensionPoints/exclusiveSlots'
@@ -72,13 +75,18 @@ const ExtendedPane = lazy(() => import('../chrome/ExtendedPane'))
 // The tree path's mount point, the counterpart to PluginFrame above: a region, a panel body or a slot
 // drawn from the host's own components rather than from the plugin's pixels
 // (docs/plugins.md § The tree contract).
-const RemoteTree = lazy(() => import('../tree/RemoteTree').then((module) => ({ default: module.RemoteTree })))
+//
+// Host-supplied, with the DOM's as the fallback, for the reason `paneLayouts` below is: this pass runs
+// on every host and a terminal draws a tree in cells (../tree/table.ts).
+const RemoteTree = lazy(async () => ({ default: suppliedRemoteTree() ?? (await import('../tree/RemoteTree')).RemoteTree }))
 // Lazy for the reason above, plus one more: this file is evaluated on every shell boot, and a static
 // import would put the editor and its grammars in the boot graph for a pane most sessions never open.
 const DocumentSurface = lazy(() => import('../../features/editor/DocumentSurface'))
 // The host's layouts. Its own lazy boundary rather than a branch inside the one above, so a shell that
 // only opens whole-pane documents never pulls the splitters and the tab strip in.
 const paneLayouts = () => import('../layouts')
+// Host-supplied, exactly as the compiled pane path already resolves it (../layouts/table.ts).
+const layoutComponent = async (name: PaneLayoutName) => suppliedLayout(name) ?? (await paneLayouts()).LAYOUTS[name]
 
 /** What a pane's regions are being drawn for: a task, or a routed project item. Read per call, never
  *  captured, so a region that mounts late still sees the current subject. */
@@ -244,7 +252,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         // task pane and a project pane here is what the subject is: a task, or a routed item.
         const drawLayout = (() => {
           const layout = declared.layout
-          const Draw = lazy(async () => ({ default: (await paneLayouts()).LAYOUTS[layout] }))
+          const Draw = lazy(async () => ({ default: await layoutComponent(layout) }))
           return (scope: () => LayoutScope): JSX.Element => {
             const binding = () => frameBindingFor(pluginId, surface, row, { taskId: scope().taskId, projectId: scope().projectId })
             // Held here rather than passed down, because the regions mount independently: an iframe

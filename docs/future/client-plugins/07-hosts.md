@@ -58,6 +58,15 @@ this folder adds to that list:
 Phase 0's resolution rule (device wins) applies there unchanged, and phase 4 of this folder, the
 config file, is built for that host first.
 
+**The host exists**, as of that folder's phase 5 (2026-08-31), and its custody is the design above
+rather than a variation on it: `apps/tui/src/plugins/custody.ts` builds `@acorn/custody`'s own
+`PluginCache` and `PluginTrustStore` against `$XDG_CONFIG_HOME/acorn/plugins/`, so the schemas, the
+`(pluginId, hash)` key and the refusal on a hash mismatch are the desktop's. It is the only file in
+that package that may name either class, and `client-core/host/plugins/host.ts` is still the only
+caller of `pluginCustody()`, which is checklist items 1 and 2 held on a second host. What that phase
+did **not** build is a device-held install: there is no surface to reach one from yet, so `{ path }`
+is a form the custody accepts and nothing offers. That is this folder's phase 0 on this host.
+
 ## The checklist
 
 Each phase's "doors left open" section names which of these it touched and how it held them:

@@ -1383,12 +1383,22 @@ host. It is the tree half of the same story `frames/verbs.ts` tells for the brid
 compile against, and neither end may reach for the other's copy. Nothing in it names the DOM, which is
 what lets a terminal renderer apply the same mutations to a cell buffer.
 
+**A second host exists and does exactly that.** `acorn`, the terminal client, applies these five
+mutations to cells (`apps/tui/src/plugins/TreeHost.tsx`). The rules are not written twice: the store,
+the whole-batch pre-flight check, the prop sanitiser and the one place a handler id becomes a closure
+are `packages/client-core/src/host/tree/treeState.ts`, which both hosts import, and each host owns only
+its shell — a table of components per node name, a placeholder, and when a batch flushes. What differs
+in the sandbox behind it is the realm and nothing else: a Web Worker under a CSP on the desktop, a
+`node:worker_threads` thread under `--permission` in a terminal, the same two ports and the same
+handshake either way (`docs/security.md § Rung 0 — The client sandbox`).
+
 **A node is `{ id, type, props, children }`.** `type` is a kit node name. `id` is minted by the
 sandbox adapter and is stable for the node's life; it is what events and patches address. `props` is a
 plain object. Text is its own node (`#text`), never an attribute, so the wire has one node shape
 rather than two.
 
-**Five mutation kinds, in a batch per animation frame**: `insert(parent, index, node)`, `remove(id)`,
+**Five mutation kinds, in a coalesced batch** — per animation frame on the desktop, per timer turn in
+a terminal, which is the host's decision rather than the protocol's: `insert(parent, index, node)`, `remove(id)`,
 `patch(id, props)`, `move(id, parent, index)`, `text(id, value)`. `parent: null` addresses the slot's
 root. A batch applies atomically or is dropped whole with a row on the plugin's page — half a batch is
 a tree the sandbox never described.

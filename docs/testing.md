@@ -81,8 +81,19 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   at 120 by 40, Tab walking rail to pane strip to pane, the rail collapsing at 99 cells and coming
   back at 100, the palette opening on its chord and giving the keys back where it found them, a
   notification appearing above the footer without taking focus, and `q` asking before it stops a node
-  this `acorn` started. Three files alongside need no renderer and never skip: the palette's collapse from a theme to the
-  terminal's slots, the clipboard sequence, and the boot test below.
+  this `acorn` started. Four files alongside need no renderer and never skip: the palette's collapse from a theme to the
+  terminal's slots, the clipboard sequence, the plugin suite below, and the boot test after it.
+
+  The plugin suite (`src/plugins/plugins.test.tsx`) is the sandbox, tested for real. It starts a
+  `node:worker_threads` worker under `--permission`, hands it a bundle out of a real
+  content-addressed cache, and asserts both halves of the containment claim in one frame: the batch
+  the worker sent arrives and draws, and the file it was not granted does not open. Beside it, custody
+  on its own — a bundle whose bytes do not match the hash a node advertised is refused and never
+  cached, a decision is recorded only for bundles this device holds, and re-deciding the same bundle
+  replaces the row rather than appending one. None of that needs a terminal, so it runs on whatever
+  Node the repo is on; the one case that draws — the same tree fed as a batch and written as JSX,
+  asserted to produce identical cells, which is this host's twin of client-core's `twoPaths.test.tsx`
+  — skips without FFI like everything else that renders.
   It needs a renderer to draw to, and OpenTUI's is Zig behind `node:ffi`, a Node 26.4 builtin behind
   `--experimental-ffi`: the config passes that flag only where it is accepted and the tests skip where
   there is no FFI, so an older Node reports a skip rather than failing the suite for a reason that has

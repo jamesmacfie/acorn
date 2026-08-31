@@ -666,7 +666,10 @@ describe('architecture boundaries', () => {
     // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
     // client-core/host/plugins/host.ts is the one door on the renderer side, speaking hashes and
     // decisions only.
-    const PLUGIN_STORE_OK = new Set(['packages/custody', 'apps/desktop'])
+    // Two hosts, one store each. `apps/desktop` reaches it from its helper, `apps/tui` from its own
+    // custody module, which is the only file in that package that names either class
+    // (the rule below holds it there).
+    const PLUGIN_STORE_OK = new Set(['packages/custody', 'apps/desktop', 'apps/tui'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
         .filter((f) => /\b(?:PluginCache|PluginTrustStore)\b/.test(readFileSync(f, 'utf8')))
@@ -754,7 +757,12 @@ describe('architecture boundaries', () => {
     // and this is it (docs/future/terminal/06-isolation.md § The third column). Custody — the token
     // store, the fleet store, the broker, pairing — is reachable from the process model and from the
     // seam that installs it, and from nothing that draws a cell.
-    const MAY_HOLD_A_TOKEN = /^apps\/tui\/src\/(node\/|platform\.ts$)/
+    //
+    // `plugins/custody.ts` is on the list for the same reason `platform.ts` is: it is what the seam
+    // installs, it holds bundles and consent rather than a token, and nothing in it draws. It is also
+    // the only file in this package allowed to name `PluginCache` or `PluginTrustStore` (the rule
+    // above), so widening this does not widen that.
+    const MAY_HOLD_A_TOKEN = /^apps\/tui\/src\/(node\/|platform\.ts$|plugins\/custody\.ts$)/
     const importers = [...new Set(
       EDGES
         .filter((e) => e.fromPkg.name === '@acorn/tui' && !isTestCode(e.fromFile))

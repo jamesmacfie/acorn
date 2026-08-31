@@ -29,3 +29,16 @@ export function startSpinner(): () => void {
   timer.unref?.()
   return () => clearInterval(timer)
 }
+
+// When a remote tree flushes a queued batch. The DOM host coalesces on a frame; there is no frame
+// here, so a batch lands on the next timer turn and the renderer redraws off the signals it moved
+// (../plugins/TreeHost.tsx). Unref'd for the reason the spinner is: a plugin sending batches must not
+// be the reason `acorn` will not exit.
+export const nextTick = {
+  schedule: (run: () => void): number => {
+    const timer = setTimeout(run, 0)
+    timer.unref?.()
+    return timer as unknown as number
+  },
+  cancel: (handle: number): void => clearTimeout(handle),
+}

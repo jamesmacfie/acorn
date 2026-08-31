@@ -14,6 +14,12 @@ and untrusted provider/preview content rather than implementing multi-user roles
   tools, so a compromised Node account is outside the application threat model.
 - Node child: task-scoped internal caller. It receives only an allowlisted environment and scoped
   token; its routes and task identity are checked by the Node.
+- Terminal client (`acorn`, `docs/future/terminal/`): the first two collapsed into one process. UI code
+  and the broker share a realm, so what the desktop holds as a process boundary this holds as a module
+  boundary: the device token lives in the broker's module, the plugin cache and the acknowledgement
+  file live in one custody module, and an arch rule refuses an import of either from anything in
+  `apps/tui` that draws a cell. A loaded plugin still gets a realm of its own — a worker thread under
+  `--permission` — so the boundary that matters most is the one that did not move.
 
 The application does not defend against root/other-user access to the host, a compromised Node
 account, or malicious first-party plugin code. Those are OS/deployment concerns.
@@ -334,6 +340,13 @@ hashes what arrived, and stores it content-addressed under that hash. A mismatch
 advertised value is refused and reported, never re-keyed. Every acknowledgement therefore binds a
 plugin id to a hash no one but this device computed.
 
+The terminal client has no helper to do that, so it does it itself, with the same two stores
+(`@acorn/custody`'s `PluginCache` and `PluginTrustStore`, pointed at `$XDG_CONFIG_HOME/acorn/plugins/`
+instead of the app's data directory). Same schemas, same `(pluginId, hash)` key, same refusal on a
+mismatch, same file discipline of a `0700` directory and `0600` files. A second implementation would
+have been a second set of security decisions, so there is one — and `apps/tui/src/plugins/custody.ts`
+is the only file in that package permitted to name either class.
+
 **Consent is per device and per bundle.** First sight of a `(plugin, hash)` pair prompts, naming the
 Node it came from and the permissions the manifest declared. An update arrives as a new hash and
 prompts again, showing what the permissions gained. A rejection is remembered. Pairing a new machine
@@ -352,10 +365,11 @@ The threats this closes, and the ones it does not:
 
 - **A compromised or hostile paired Node serving malicious JavaScript** — hash-verified bytes, a
   per-device acknowledgement that names the Node, and (phase 3) the sandbox the bundle runs in.
-  Nothing a Node pushes runs unprompted. The sandbox is one of two, and the trust decision covers both
-  because both are the same bytes: the iframe at `app-plugin://<hash>` for a bundle that draws its own
-  pixels, and a Web Worker for one that draws a tree (`docs/shell.md § The plugin worker`). Neither
-  path asks a second question, and neither can start without an accepted hash.
+  Nothing a Node pushes runs unprompted. The sandbox is one of three, and the trust decision covers all
+  of them because they are the same bytes: the iframe at `app-plugin://<hash>` for a bundle that draws
+  its own pixels, a Web Worker for one that draws a tree (`docs/shell.md § The plugin worker`), and — in
+  the terminal, where there is no iframe and no CSP — a `node:worker_threads` thread under
+  `--permission`. No path asks a second question, and none can start without an accepted hash.
 - **A Node lying in its listing** about hash, version or permissions — the hash is recomputed from the
   bytes. The permissions shown are the manifest as the Node's own loader read it; a Node that lies
   there also controls the bytes, so the containment rather than the disclosure is what bounds it.
@@ -584,11 +598,40 @@ here so nothing in the shipped phases forecloses them.
 #### Rung 0 — The client sandbox (shipped)
 
 Before the node-side ladder starts, the client half of a loaded plugin is already contained, and there
-are two containers rather than one. A bundle that draws pixels runs in an iframe on its own
+are three containers rather than one. A bundle that draws pixels runs in an iframe on its own
 hash-addressed origin under `plugin_scheme.rs`'s policy. A bundle that draws a tree runs in a Web
 Worker with no DOM at all, under `PLUGIN_WORKER_CSP` (`docs/shell.md § The plugin worker`). Both have
 `connect-src 'none'`, so the transferred `MessagePort` is the only way out, and both reach the host
 through the same broker, which decides every call from the manifest's scopes.
+
+**The third is the terminal's**, and it exists because a terminal has no iframe and no CSP to put one
+under (`docs/future/terminal/06-isolation.md`). A tree bundle runs in a `node:worker_threads` thread
+started with `execArgv: ['--permission', '--allow-fs-read=<bootstrap>', '--allow-fs-read=<bundle>']`,
+and the two transferred ports are the only way out of it. Three things are worth stating, because two
+of them correct what the design expected:
+
+- **A worker thread's grants are its own.** The design assumed `--permission` was process-wide and
+  inherited, and planned a child process per plugin with the ports over IPC as the fallback. Measured
+  on Node 24 and 26, `execArgv` applies the permission model to the thread: the worker is denied a read
+  the parent is allowed. So the fallback is not needed, and the TUI process itself runs with no
+  permission flags at all.
+- **Node's permission model does not cover the network.** That is the one thing the CSP gave the DOM
+  worker for free. So the bootstrap that runs before a stranger's module scope
+  (`apps/tui/src/plugins/pluginWorker.js`) installs a `module.registerHooks` resolver that refuses
+  `net`, `http`, `https`, `http2`, `tls`, `dgram`, `dns`, `quic`, `child_process`, `worker_threads`,
+  `cluster`, `module`, `vm`, `inspector` and `repl`, and deletes `fetch`, `WebSocket`,
+  `XMLHttpRequest`, `EventSource` and `navigator`. `module` is on that list so a bundle cannot register
+  a hook of its own and undo this one; `worker_threads` so it cannot start a thread that inherited
+  none of it.
+- **The permission grants are real paths.** Node compares resolved paths, so a grant naming one that
+  goes through a symlink matches nothing and the worker cannot read the bundle it was started for.
+  Both grants are `realpathSync`'d.
+
+Everything above the sandbox is shared with the desktop: the same worker host, the same handshake, the
+same heartbeat and grace, the same whole-batch pre-flight check and prop sanitiser
+(`packages/client-core/src/host/tree/treeState.ts`), and the same broker deciding every bridge call
+from the manifest's scopes. Two shells over one set of rules, which is why the terminal added no
+security decision of its own beyond the two bullets above.
 
 The tree path is the stricter of the two, and worth stating as a security property rather than a UI
 one: the sandbox never produces markup. It produces names of the host's own components and props that
@@ -669,6 +712,14 @@ The acorn-native design already exists as a pattern: the MCP server is a stdio c
 the Node over loopback with a **task-scoped internal token** and "can use only task-addressed
 routes and cannot read provider credentials or administer the Node"
 (docs/architecture-overview.md, docs/mcp.md). Apply the same shape to plugins:
+
+**There is a down payment on this rung already**, made for a different half. The terminal's client
+sandbox above is the same object: a Node realm out of the host's process, started under
+`--permission` with a named fs jail, reaching the host only through ports the host handed it. What it
+proves is the part the plan below was least sure of — that the flag set works per realm rather than
+per process, that a bundle can be loaded by path with nothing else readable, and that the network hole
+is closable with a module hook rather than only with rung 3. What it does not do is turn `ctx` into
+authorised calls, which is the remaining work below.
 
 - Each loaded plugin's node half runs as a **child process** (one per plugin: crash isolation is
   a free and valuable side effect — a segfault no longer takes the Node down).
@@ -883,6 +934,7 @@ here as the checklist reviewers should hold PRs against:
 | Trust over time | Malicious update | No auto-update, hash re-prompt, permission diff, provenance | Phase 2/5 |
 | Install on an agent's say-so | Prompt-injected agent asking for a hostile package | Request/decision split: the tool cannot install, the device does, the owner decides in shell chrome | Shipped |
 | A plugin in dev mode | Its node half runs unread on every reload | Bounded to one (plugin, node) the owner chose; badged, revocable, audited. Not closed until rung 2 | Shipped (disclosure) |
+| The terminal client's device token and plugin consent files | A process on this machine running as the user can read them | `0700` directory, `0600` files, the same discipline as the node's own keys; the token stays in the broker module and the consent file in the custody module, held by an arch rule | Shipped |
 
 ## The renderer's policy and its dangerous sinks
 

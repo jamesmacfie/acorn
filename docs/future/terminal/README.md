@@ -34,6 +34,7 @@ Decided with the owner on 2026-08-30. A phase file may not reopen them.
 | **One runtime.** The TUI runs under the same Node the node runs under. OpenTUI has a `node` export condition and a prebuilt native core per platform. | Two runtimes in one tarball is two things to pin, sign, and prebuild. | Bun as the TUI runtime. |
 | **…and that Node is 26.4 or later, started with `--experimental-ffi`.** Found in phase 0, 2026-08-31. OpenTUI reaches its Zig core over `node:ffi`, which does not exist before then. | The decision above still holds — the node needs Node 24 for `node:sqlite` and 26 satisfies that — but the floor moves onto a Current release and an experimental flag. | Running `acorn` on the machine's own Node unless it is 26.4+. The bundled runtime becomes a precondition of the headless artifact rather than a later nicety ([08-deployables.md](./08-deployables.md)). |
 | **Isolation before rendering.** The out-of-process sandbox for loaded plugins is designed as rung 2 of `docs/security.md § The containment ladder`, not as a terminal-only invention. | A terminal has no iframe. Its sandbox is a Node worker thread or child process, and that is the same object node-half containment needs. | A third trust tier that wears the frame tier's enforced-permission claims with the node half's disclosed-only weakness. |
+| **…and it is a worker thread, not a child process.** Found in phase 5, 2026-08-31. `execArgv` applies Node's permission model to the thread, so a worker's grants are its own and the host needs none. | The design assumed `--permission` was process-wide and inherited, which would have forced a child process and the two ports over an IPC channel. It is not. | The child-process fallback, and any grant on the TUI process itself. What it does not foreclose is rung 2's child process for the node half, which is a different boundary for a different reason. |
 | **The toy host goes first, before the PWA.** | `terminal.md` sequenced the PWA first. The toy host is the cheapest test that the kit is intent and not layout, and it is worth having before more panes are written. The PWA does not need it and it does not need the PWA. | Nothing in `remote.md` changes. |
 
 ## The files
@@ -63,7 +64,7 @@ Supporting documents, readable in any order:
 | 2 | [phase-2-layouts-keys-focus.md](./phase-2-layouts-keys-focus.md) | **Shipped 2026-08-31.** The seven layout components and a host-supplied layout table; the keymap's terminal adapter with all four tiers; focus regions and collections without a DOM; traps as layers; the PTY natively | Every compiled pane | 1 |
 | 3 | [phase-3-process-and-auth.md](./phase-3-process-and-auth.md) | **Shipped 2026-08-31.** The `acorn` command: attach or start, supervise, `--node` with probe, words, and pair; device token custody in a config directory; revoked on the footer; a boot test with a real node | Running against any node | 0 |
 | 4 | [phase-4-chrome.md](./phase-4-chrome.md) | **Shipped 2026-08-31.** Rail, topbar, pane strip, palette, cheat sheet, overlays, notifications, footer; task, workspace, pane and node switching; a quit that asks | A usable workspace | 2, 3 |
-| 5 | [phase-5-loaded-plugins.md](./phase-5-loaded-plugins.md) | The worker-thread sandbox, file custody, the trust prompt as a tree, the third column in `docs/security.md` | Third-party plugins in the TUI; rung 2 groundwork | 2 |
+| 5 | [phase-5-loaded-plugins.md](./phase-5-loaded-plugins.md) | **Shipped 2026-08-31.** The worker-thread sandbox under `--permission` with a module deny list; custody over files; the trust prompt as a kit tree; the batch rules split out so both hosts share one copy; the third column in `docs/security.md` | Third-party plugins in the TUI; rung 2 groundwork | 2 |
 | 6 | [phase-6-panes-sweep.md](./phase-6-panes-sweep.md) | Every first-party pane checked at 80 by 24; `$EDITOR` handoff; docker exec; the agents transcript, composer, and approvals | Parity with the plugin table in 01-why.md | 4 |
 | 7 | [phase-7-deployables.md](./phase-7-deployables.md) | `bin/acorn` in the node tarball and in the app bundle; the pack script grows the TUI entry; the native prebuild matrix gains OpenTUI's core; a bundled runtime | Shipping | 4, and `bundle.md` steps 2 to 4 |
 | 8 | [phase-8-cleanup-and-docs.md](./phase-8-cleanup-and-docs.md) | Behaviour rehomed into owning docs, a new `docs/tui.md`, this folder deleted | Done | 7 |
@@ -104,9 +105,18 @@ it — a terminal cannot press Cmd, a `Modal`'s trap was swallowing the keys its
 theme's colours have no way to reach this host — and three it deliberately left, the largest being the
 terminal drawer, which is phase 6's along with both PTY callers. Its own file says what else moved.
 
-Phases 5 and 6 can run in parallel now: the sandbox is protocol and custody work, the pane sweep is
-reading each pane at 80 by 24 and fixing what is unreadable. Phase 7 ships it. Phase 8 deletes this
-folder.
+Phase 5 shipped the same day, and it is the one that makes the tree protocol mean something on this
+host: a loaded plugin's bundle runs in a Node worker thread under `--permission`, its bytes hashed into
+a file cache this device owns, its consent asked in a kit tree, and its mutations applied to cells by
+the same rules the desktop applies to a document. Two things it found are worth reading before any
+later phase — a worker thread's permission grants are its own, which the design had wrong and which
+disposes of the child-process fallback, and Node's permission model does not cover the network, which
+the bootstrap closes with a module deny list — and three it deliberately left, the largest being
+`Slot`, which has no consumer until the pane sweep crosses the host barrel. Its own file says what else
+moved, and `docs/security.md § Rung 0` now has the terminal's column.
+
+Phase 6 is what is left before shipping: reading each pane at 80 by 24 and fixing what is unreadable.
+Phase 7 ships it. Phase 8 deletes this folder.
 
 ## How to work a phase
 

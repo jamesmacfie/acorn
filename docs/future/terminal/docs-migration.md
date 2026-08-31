@@ -97,17 +97,30 @@ built.
 | `docs/future/terminal/phase-4-chrome.md` | What shipped, What this phase deliberately left | Eight departures from the plan, and the five things it left. |
 | `docs/future/terminal/README.md` | The phases, The order of work | Phase 4 marked shipped; what it left for phases 5 and 6. |
 
-## Owed by phases 5 to 7
+## Done in phase 5 (2026-08-31)
+
+| Doc | Section | Change |
+| --- | --- | --- |
+| `docs/security.md` | Trust boundaries | The terminal client as a fifth entry: the first two boundaries collapsed into one process, held as a module boundary and an arch rule, with the plugin's own realm the one that did not move. |
+| `docs/security.md` | Third-party plugin bundles | The terminal hashes its own bytes with the same two stores under its own config directory; the sandbox is one of three rather than one of two. |
+| `docs/security.md` | The containment ladder, rung 0 | The third container: a worker thread under `--permission`, why its grants are its own, the network hole Node's model leaves and the module deny list that closes it, and why a grant is a real path. |
+| `docs/security.md` | The containment ladder, rung 2 | The down payment: which three of rung 2's open questions the terminal sandbox settled, and what is left. |
+| `docs/security.md` | Summary table | One row: the terminal's device token and consent files. |
+| `docs/plugins.md` | The tree contract | A second host exists and applies the same mutations to cells; the batch rules live in one module both hosts import; a batch is coalesced per host rather than per animation frame. |
+| `docs/future/ecosystem/blockers.md` | gate 1, the designed answer | The terminal sandbox as rung 2's down payment, and the three questions it answered. |
+| `docs/future/client-plugins/07-hosts.md` | The terminal | The host exists; its custody is the design rather than a variation; checklist items 1 and 2 held on a second host; a device-held install is still this folder's phase 0. |
+| `docs/testing.md` | Test layers | The plugin suite: what it starts for real, what it asserts about containment, and the one case in it that skips. |
+| `docs/future/terminal/findings.md` | What phase 5 did with these | One finding closed, eight new ones, three things deliberately left. |
+| `docs/future/terminal/phase-5-loaded-plugins.md` | status, What shipped | Five departures from the plan, and the three things it left. |
+| `docs/future/terminal/README.md` | Decisions taken, The phases, The order of work | The worker thread as a decision of its own; phase 5 marked shipped; what it left. |
+
+## Owed by phases 6 and 7
 
 | Doc | Section | Phase | What it says afterwards |
 | --- | --- | --- | --- |
 | `docs/testing.md` | Test layers | 6 | Pane snapshots. |
 | `docs/terminal.md` | the PTY | 6 | The editor handoff; docker exec; the two callers writing to the rectangle's handle. |
 | `docs/node-distribution.md` | reaching a node | 7 | `bin/acorn` in the tarball layout. |
-| `docs/security.md` | Trust boundaries, Transport and auth, Third-party plugin bundles, The containment ladder, summary table | 5 | The terminal column, per `06-isolation.md`. |
-| `docs/plugins.md` | The tree contract | 5 | A second host applies the same mutations to cells. |
-| `docs/future/ecosystem/blockers.md` | rung 2 | 5 | The terminal sandbox is the down payment. |
-| `docs/future/client-plugins/07-hosts.md` | The terminal | 5 | The host exists; custody is file-backed as designed. |
 | `docs/first-party-plugins.md` | per plugin | 6 | A terminal note where something is reduced or handed off. |
 | `docs/future/bundle.md` | the sections in `08-deployables.md` | 7 | Rewritten to what shipped; steps reordered. |
 | `docs/shell.md` | resources | 7 | The `acorn` resource and the link offer. |

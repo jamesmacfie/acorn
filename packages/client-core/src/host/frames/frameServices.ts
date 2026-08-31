@@ -63,6 +63,11 @@ export type FrameServiceHost = {
   // The shell's navigator, for the route rung of a link clicked inside a frame. Supplied by the component
   // because `useNavigate` is only callable while one is being set up.
   navigate(to: string): void
+  // The last two rungs of `copy` and `openUrl`, which are the only two verbs below with no answer that
+  // works on every host: a terminal reaches the clipboard over OSC 52 or not at all, and it has no
+  // window to open one in. Optional, so the desktop keeps the browser's answers by omission.
+  copy?(text: string): void
+  openExternal?(url: string): void
 }
 
 /**
@@ -111,7 +116,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     // clipboard')` used to leave a permanent bell entry; the frames and the shell now share one stack
     // and one look, which is what the API always claimed.
     toast: (title, detail) => toast(detail ? `${title} — ${detail}` : title),
-    copy: (text) => void navigator.clipboard.writeText(text),
+    copy: (text) => (host.copy ? host.copy(text) : void navigator.clipboard.writeText(text)),
     openPane: (paneId) => {
       // A pane is opened in a task's layout, so a frame with no task has nothing to open into.
       const taskId = props.binding.taskId
@@ -140,6 +145,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       // the URL to `shell.openExternal` behind the scheme allowlist, so this opens in the owner's
       // browser and never in-app, with no second policy to keep in step
       // (docs/shell.md § Navigation policy).
+      if (host.openExternal) return host.openExternal(url)
       window.open(url, '_blank', 'noopener,noreferrer')
     },
     frameHasFocus: () => host.frameHasFocus(),

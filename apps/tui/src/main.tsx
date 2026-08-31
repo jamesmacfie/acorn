@@ -56,6 +56,9 @@ const { setCacheStorage } = await import('@acorn/client-core/infra/node/fleet.ts
 const { fileCacheStorage } = await import('./node/cache')
 const { tasksRoute } = await import('@acorn/protocol/api.ts')
 const { activateTaskSignals } = await import('@acorn/client-core/features/tasks/activate.ts')
+const { syncPluginDistribution } = await import('@acorn/client-core/host/plugins/distribution.ts')
+const { syncPluginContributions } = await import('@acorn/client-core/host/plugins/syncContributions.ts')
+const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
 
 // The query cache persists to files rather than to IndexedDB, which there is none of here. Installed
 // before `selectActiveNode`, because that is what builds the first node's cache.
@@ -80,6 +83,19 @@ if (values.task) {
   }
   activateTaskSignals(task)
 }
+
+// Third-party plugins: ask every node in the fleet what it carries, hash whatever is new into this
+// device's own cache, and register the surfaces of every bundle it has already accepted. Anything it
+// has not is queued for the trust prompt, which the shell draws as an overlay.
+//
+// Not awaited, for the reason the desktop's composition root gives: a fleet with an offline machine in
+// it must not hold up the first frame, and a plugin pane appearing a moment after the shell does is
+// the right trade (docs/plugins.md § Loaded plugins: the client half).
+void syncPluginDistribution().then(syncPluginContributions).catch((error: unknown) => {
+  console.warn('[plugins] could not read the fleet\'s plugins:', error)
+})
+// …and stay reconciled: a node that reloads a plugin in place broadcasts `plugins:changed`.
+watchPluginChanges()
 
 // The renderer is built here rather than left to `render`, because the keymap's terminal adapter
 // binds to it and `render` hands it back to nobody.
