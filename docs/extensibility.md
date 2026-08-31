@@ -402,9 +402,9 @@ Roughly in order of how much they matter:
 - `command-palette-and-shortcuts.md` — commands, shortcuts, and plugin bindings.
 - `loaded-plugin-migration.md` — the review record from the first migration out of the binary.
 - `future/remote.md` — web, mobile, and remote access.
-- `future/terminal/` — the terminal client programme: `acorn` in a terminal as a second host for the same component tree, and the node + tui deployable.
+- `tui.md` — the terminal client: `acorn` in a terminal as a second host for the same component tree.
 - `future/events.md` — the three event items still unbuilt; the catalogue, the admission rule, and
   the refusals shipped into `plugins.md § Hearing another plugin`.
-- `editor.md` — a host-owned document surface: the concrete instance of `future/terminal/01-why.md`'s
-  "one host-owned template". Built through step 6 (database ships on it); editor's move is the step
+- `editor.md` — a host-owned document surface: the concrete instance of the terminal client's
+  "one host-owned template" conclusion. Built through step 6 (database ships on it); editor's move is the step
   that remains.

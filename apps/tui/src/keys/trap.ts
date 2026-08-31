@@ -8,7 +8,7 @@ import { INTENTS, type Intent } from '@acorn/client-core/kit/keys/intents.ts'
 // `client-core/kit/keys/trap.ts` contains Tab inside a modal by walking focusable DOM elements. There
 // is nothing to walk here and it is not ported. What a terminal modal is instead is two key layers:
 // one that answers `dismiss` above everything, and one that swallows the intents which would
-// otherwise drive what is behind it (docs/future/terminal/05-keys-and-focus.md § Traps).
+// otherwise drive what is behind it (docs/tui.md § Traps).
 //
 // Both are global rather than bound to the overlay's box, and that is the point: a layer with a
 // target only fires when focus is inside it, and a trap has to fire when focus is anywhere.

@@ -17,7 +17,7 @@ export type SplitDrag = {
 }
 
 /** Exported because the terminal kit declares its own `createSplitDrag` — a handle nobody can grab —
- *  against these options rather than a copy of them (docs/future/terminal/phase-6-panes-sweep.md). */
+ *  against these options rather than a copy of them (docs/tui.md). */
 export type SplitDragOptions = {
   /** The axis the handle moves along: 'x' for a vertical divider between columns. */
   axis: 'x' | 'y'

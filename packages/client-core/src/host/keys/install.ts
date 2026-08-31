@@ -45,7 +45,7 @@ export { keymap, keysFor, registerIntentLayer, type AcornKeymap } from '../../ki
  *
  *  Here rather than in `kit/keys/keymapHost.ts`, which stopped naming the DOM when the terminal host
  *  started using it: the terminal asks the same question of the focused renderable's rectangle kind
- *  (docs/future/terminal/05-keys-and-focus.md § The adapter). */
+ *  (docs/tui.md § The adapter). */
 export const isTerminalTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('.ui-rect[data-kind="pty"]')
 

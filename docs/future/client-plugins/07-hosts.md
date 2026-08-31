@@ -51,10 +51,10 @@ this folder adds to that list:
 
 ## The terminal
 
-`docs/future/terminal/` owns the host, and
-[06-isolation.md](../terminal/06-isolation.md) there owns what this section used to say: a
-`PluginCustody` over files beside the terminal's own config, device as the natural provenance with
-`{ path }` allowed, the trust prompt as a kit tree, and the terminal's column in the trust model.
+[docs/tui.md](../../tui.md) owns the host, and its §§ Custody and The trust prompt own what this
+section used to say: a `PluginCustody` over files beside the terminal's own config, device as the
+natural provenance with `{ path }` allowed, the trust prompt as a kit tree, and the terminal's column
+in the trust model.
 Phase 0's resolution rule (device wins) applies there unchanged, and phase 4 of this folder, the
 config file, is built for that host first.
 

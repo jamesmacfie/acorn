@@ -14,7 +14,7 @@ const PREFIX = 'comment-draft:'
 
 // Through `deviceStorage.ts` rather than `localStorage` directly, because a host may have nowhere to
 // keep a draft: this pane's composer threw on mount under the terminal client and took the pane with
-// it (./deviceStorage.ts, docs/future/terminal/phase-6-panes-sweep.md).
+// it (./deviceStorage.ts, docs/tui.md).
 export const readDraft = (key: string): string => readLocal(PREFIX + key) ?? ''
 
 export const writeDraft = (key: string, value: string): void => writeLocal(PREFIX + key, value)

@@ -108,7 +108,7 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   `--experimental-ffi`: the config passes that flag only where it is accepted and the tests skip where
   there is no FFI, so an older Node reports a skip rather than failing the suite for a reason that has
   nothing to do with the change under test. See
-  [docs/future/terminal/findings.md](./future/terminal/findings.md) § The runtime floor.
+  [docs/tui.md](./tui.md) § The runtime floor.
 
   The boot test (`src/node/boot.test.ts`) is the third file that needs no renderer, and it is what
   `apps/desktop/test/boot.test.ts` is for the shell: does `acorn`'s world come up. Against a fresh

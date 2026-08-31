@@ -2,7 +2,7 @@
 //
 // Textual renders the focused widget's bindings as a footer strip; the cheat sheet is the same data
 // with nothing left out. Both read this function, so nothing is declared twice
-// (docs/future/terminal/05-keys-and-focus.md § The footer).
+// (docs/tui.md § The footer).
 //
 // The source is the engine's own `getActiveKeys`, which answers for the layers that are active
 // against whatever has focus right now — so a hint disappears when the thing that offered it does,

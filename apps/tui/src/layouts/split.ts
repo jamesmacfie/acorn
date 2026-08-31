@@ -9,7 +9,7 @@ import { bindKeys } from '../keys/install'
 // keep the position in the same host-owned session signal the DOM layouts use
 // (client-core/host/layouts/state.ts), so a pane that unmounts and comes back finds its posture where
 // it left it on either host. `SplitHandle` and `SplitCell` are `absent` in the support matrix for
-// exactly this reason: the handle is a key, not a node (docs/future/terminal/04-rendering.md).
+// exactly this reason: the handle is a key, not a node (docs/tui.md).
 //
 // The chord is the platform's primary modifier with shift and an arrow, on layer 30, focus-within on
 // the layout's own box. Layer 30 is a pane's own tier and shift keeps it clear of the pane-cycling

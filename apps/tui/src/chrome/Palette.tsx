@@ -30,7 +30,7 @@ import type { ShellModel } from './model'
 //
 // What does not cross is `PaletteSurface.tsx`, which is a backdrop, a dialog and a `<ul>`. Here the
 // surface is a `Modal` holding a filter field and a list, which is what a terminal overlay is
-// (docs/future/terminal/07-chrome.md § What is drawn bespoke).
+// (docs/tui.md § What is drawn bespoke).
 //
 // Nor does the cursor come from the kit's collection, and that is the same decision the desktop made
 // for the same reason: `createOverlayPalette` handles its own arrows because the input owns the

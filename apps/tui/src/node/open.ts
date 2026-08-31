@@ -6,7 +6,7 @@ import { startNode } from './supervise'
 import { pairInteractively } from './pair'
 
 // The `acorn` command's one decision: which node this run talks to, and whether it owns that node's
-// lifetime (docs/future/terminal/03-process-model.md § Attach or start).
+// lifetime (docs/tui.md § Attach or start).
 //
 // Everything here is custody and process work. Nothing in it imports client-core, and nothing in
 // client-core imports it: the seam between them is `platform.ts`, which is handed the fleet store this

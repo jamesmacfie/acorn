@@ -26,7 +26,7 @@ export function Topbar(props: { model: ShellModel; nodeId: string }) {
     // `flexShrink={0}`, like the footer's: a pane taller than the screen makes yoga take the deficit
     // out of every child that will give, and a one-line box shrunk to half a line lands on the line
     // above it — which drew the topbar and the pane strip into each other, one character each
-    // (docs/future/terminal/phase-6-panes-sweep.md).
+    // (docs/tui.md).
     <box flexDirection="column" flexShrink={0}>
       <box flexDirection="row" gap={1}>
         <Menu

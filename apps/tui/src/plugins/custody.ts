@@ -7,8 +7,7 @@ import {
 import type { PluginCustody } from '@acorn/client-core/infra/platform/index.ts'
 import { configDir } from '../node/paths'
 
-// Custody of third-party plugin bundles, from a terminal (docs/future/terminal/06-isolation.md §
-// Custody).
+// Custody of third-party plugin bundles, from a terminal (docs/tui.md § Custody).
 //
 // The desktop's helper holds these in a process the renderer cannot reach. There is no second process
 // here, so the boundary is this module: the cache and the trust store are built once, in the composition

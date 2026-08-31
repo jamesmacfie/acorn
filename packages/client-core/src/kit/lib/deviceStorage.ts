@@ -5,7 +5,7 @@
 // Node, where `localStorage` is a flagged builtin and undefined without `--localstorage-file`. Four
 // call sites reached for it unguarded and the throw took the whole pane down — the PR pane's comment
 // box, the agents composer, the create-PR form and every `Fold` with a `persistKey`
-// (docs/future/terminal/phase-6-panes-sweep.md).
+// (docs/tui.md).
 //
 // A private browsing window, a browser set to block site data, and a sandboxed frame all throw on
 // access rather than returning undefined, which is why the probe is in a `try`. The same shape

@@ -90,7 +90,7 @@ export function Row(props: {
       {/* Words get the row's own role; a tree brought its own, and the row only decides how the parts
           sit. `stacked` is a title over a subtitle, which is what it is on the DOM — drawing both on
           one line ran the agents session titles into their model names with no space between
-          (docs/future/terminal/phase-6-panes-sweep.md). */}
+          (docs/tui.md). */}
       <Show
         when={hasNode(props.children)}
         fallback={<Line role={props.selected ? 'match' : 'body'}>{props.children}</Line>}
@@ -147,7 +147,7 @@ export function TreeRow(props: {
  *  Its children are a render prop taking the menu's own context, because a `Menu.Item` needs it to
  *  close the list — and drawing them directly handed that function to Solid, which called it with
  *  nothing and left every item with `context: undefined`. Found by the pane sweep, on the agents
- *  session list (docs/future/terminal/phase-6-panes-sweep.md).
+ *  session list (docs/tui.md).
  *
  *  The DOM's is an ellipsis button opening a menu. Here the items are the row's trailing glyphs, which
  *  is what the node's own sentence says (docs/ui-design.md § Every node at 80 by 24): there is no

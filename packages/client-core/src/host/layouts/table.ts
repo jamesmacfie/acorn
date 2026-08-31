@@ -2,9 +2,9 @@
 //
 // `index.ts` holds the DOM's, and until terminal phase 2 the pane registry named it directly: a pane
 // that declared a layout got back a component that mounted `LAYOUTS`, so `paneContributions()` handed
-// a second host a component it could not use (docs/future/terminal/findings.md, "The pane registry
-// draws DOM layouts"). This is the same seam `KIT_COMPONENTS` already has one of: the host package
-// supplies its table, and the DOM's is the fallback so nothing on the desktop had to change.
+// a second host a component it could not use (docs/tui.md § The host switch). This is the same seam
+// `KIT_COMPONENTS` already has one of: the host package supplies its table, and the DOM's is the
+// fallback so nothing on the desktop had to change.
 //
 // Types only, so a bare-Node test suite can import the pane registry without a Solid transform. The
 // component tables themselves stay behind the registry's `lazy`.

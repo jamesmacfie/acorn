@@ -33,7 +33,7 @@ const HANDSHAKE_BUDGET_MS = 120_000
 export type SupervisedNode = { handshake: Handshake; stop(): Promise<void> }
 
 /** Where the node's entry lives. Beside this bundle in a packaged artifact, which is what
- *  `bin/acorn` and the tarball give us (docs/future/terminal/08-deployables.md); in a checkout there
+ *  `bin/acorn` and the tarball give us (docs/tui.md); in a checkout there
  *  is no build, so fall back to the source entry under tsx, which is what `pnpm dev:node` runs. */
 function nodeEntry(): { command: string; args: string[]; cwd?: string } {
   // Two candidates rather than one, because this file may end up in `dist/` or in `dist/chunks/`

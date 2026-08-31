@@ -19,7 +19,7 @@ export const TASK: Task = {
   // A repo and a pull request, so the panes that are only offered on a task that has one are offered
   // here: the PR pane asks `task.pullNumber != null`, and the changes pane wants a worktree to be
   // reviewing. The pane sweep needs every row of the roster reachable from one task
-  // (docs/future/terminal/phase-6-panes-sweep.md).
+  // (docs/tui.md).
   github: { owner: 'runn-fast', name: 'acorn' },
   worktreePath: '/tmp/acorn-fixture/fix-login',
   pullNumber: 42,
@@ -100,7 +100,7 @@ const AGENT_SESSIONS = [{
 }]
 
 // One turn, a prompt, an answer, a tool card and an approval still waiting: the four things the sweep
-// has to see on the agents transcript (docs/future/terminal/phase-6-panes-sweep.md § Scope).
+// has to see on the agents transcript (docs/tui.md).
 const AGENT_TURN = {
   id: 'turn-1',
   sessionId: 'session-1',

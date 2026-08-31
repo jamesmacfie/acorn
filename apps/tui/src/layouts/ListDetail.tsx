@@ -78,7 +78,7 @@ export function ListDetail(props: LayoutProps) {
       <Show when={showDetail()}>
         {/* `minWidth={0}`, because a flex child's floor is its own content and a detail region's content
             is routinely wider than its share. Without it the row reports a width the screen does not
-            have (docs/future/terminal/phase-6-panes-sweep.md). */}
+            have (docs/tui.md). */}
         <box flexDirection="column" flexGrow={1} minWidth={0} ref={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1)}>
           {props.regions.detail?.()}
         </box>

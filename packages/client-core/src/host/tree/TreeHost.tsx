@@ -10,7 +10,7 @@ import { createTreeState } from './treeState'
 //
 // This component is the only thing standing between a stranger's code and the shell's DOM. What it is
 // not is the rules: the store, the pre-flight check and the mutation apply are ./treeState.ts, which
-// the terminal host draws from too (docs/future/terminal/phase-5-loaded-plugins.md). One set of rules,
+// the terminal host draws from too (docs/tui.md). One set of rules,
 // two shells.
 //
 // Focus, selection, scroll memory and ARIA are not implemented here and never will be. The nodes this

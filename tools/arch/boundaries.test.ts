@@ -754,7 +754,7 @@ describe('architecture boundaries', () => {
   it('the terminal client keeps custody out of everything that draws', () => {
     // The desktop runs the renderer and the broker in two processes, so "the renderer never holds a
     // token" is structural. The TUI is one process, so the same promise is a module boundary instead,
-    // and this is it (docs/future/terminal/06-isolation.md § The third column). Custody — the token
+    // and this is it (docs/tui.md § Shell and broker in one process). Custody — the token
     // store, the fleet store, the broker, pairing — is reachable from the process model and from the
     // seam that installs it, and from nothing that draws a cell.
     //

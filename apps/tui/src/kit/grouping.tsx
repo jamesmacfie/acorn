@@ -14,13 +14,13 @@ import { trapKeys } from '../keys/trap'
 // bordered box where the pane would go, a `Menu` is a list in a box under its trigger, and a
 // `Popover` is a full-width block. The keys that make them modal are the keymap's, not theirs: a
 // `Modal` and an open `Menu` push a layer above the pane's that answers `dismiss` and swallows the
-// rest (../keys/trap.ts, docs/future/terminal/05-keys-and-focus.md § Traps).
+// rest (../keys/trap.ts, docs/tui.md § Traps).
 
 // `flexShrink={0}` on every block node in this file, and on the rows in ./showing.tsx. A terminal's
 // answer to "there is not enough room" is to clip, never to squeeze: yoga's default is to take a
 // height deficit out of every child that will give, and a one-line row given half a line lands on the
 // line above it — which drew the PR pane as two screens interleaved character by character
-// (docs/future/terminal/phase-6-panes-sweep.md). The region that holds them scrolls or clips, which is
+// (docs/tui.md). The region that holds them scrolls or clips, which is
 // the reader's own answer.
 export function Stack(props: { gap?: Space; children: JSX.Element }) {
   return <box flexDirection="column" flexShrink={0} gap={spaceLines(props.gap ?? 'stack')}>{props.children}</box>
@@ -129,7 +129,7 @@ export function Timeline(props: { ariaLabel?: string; follow?: boolean; viewKey?
 /** One turn in a `Timeline`. The compound half, and it has to exist: `Timeline.Turn` on a `Timeline`
  *  with no `Turn` is `undefined` passed to `createComponent`, which is a pane that fails to draw
  *  rather than a pane that draws badly. Found by the pane sweep, on the PR conversation
- *  (docs/future/terminal/phase-6-panes-sweep.md). */
+ *  (docs/tui.md). */
 Timeline.Turn = (props: { children: JSX.Element }) => (
   <box flexDirection="column" marginTop={spaceLines('row')}>{props.children}</box>
 )
@@ -184,7 +184,7 @@ Toolbar.Group = (props: { children: JSX.Element }) => <box flexDirection="row">{
  *  What makes it modal is the key layer it owns. `keys/trap.ts` on the DOM contains Tab by walking
  *  focusable elements; there is nothing to walk here, so a modal traps by pushing a layer above the
  *  pane's that answers `dismiss` and swallows the rest until it closes
- *  (docs/future/terminal/05-keys-and-focus.md § Traps). That is what a terminal modal is, and it is
+ *  (docs/tui.md § Traps). That is what a terminal modal is, and it is
  *  the same thing the shell's overlay stack does (../chrome/state.ts). */
 export function Modal(props: {
   onDismiss: () => void
@@ -224,7 +224,7 @@ export function ModalBody(props: { children: JSX.Element }) {
  *  `ModalBody` and `Modal.Body` are the same node under two names — the kit table flattens compound
  *  halves and a pane writes whichever reads better at its call site. The DOM kit carries both; this
  *  one carried only the flat pair, so eight panes in the roster did not compile
- *  (docs/future/terminal/phase-6-panes-sweep.md). */
+ *  (docs/tui.md). */
 export function ModalActions(props: { children: JSX.Element }) {
   return (
     <box flexDirection="row" gap={1} marginTop={spaceLines('section')}>
@@ -367,7 +367,7 @@ export function ListDetail(props: {
       {/* `split` is the form where both columns are children — a `ListColumn` and a `DetailColumn` —
           rather than one of them arriving in `list`. The DOM hands those straight to its grid; this
           gated on `list ?? split` and so drew an empty 32-cell gutter beside the pr pane's navigator
-          for a `list` nobody passed (docs/future/terminal/phase-6-panes-sweep.md).
+          for a `list` nobody passed (docs/tui.md).
           Below 80 cells the two stack instead of sitting side by side, which is this node's own
           answer to "one column at a time": it has no keys of its own to switch with, and a column of
           38 cells is a column nobody can read. */}
@@ -392,7 +392,7 @@ export function ListColumn(props: { label?: string; scroll?: boolean; children: 
       {/* In a box of its own so the deficit a taller-than-the-screen column creates cannot be taken out
           of the label: a one-line run given half a line lands on the line above it, which drew this
           column's own name over the heading under it
-          (docs/future/terminal/phase-6-panes-sweep.md). */}
+          (docs/tui.md). */}
       <Show when={props.label}><box flexShrink={0}><Line role="eyebrow">{props.label!}</Line></box></Show>
       {props.children}
     </box>

@@ -10,7 +10,7 @@ import type { TreeTransport } from './TreeHost'
 // check, the mutation apply, and the coalescer that feeds them (docs/plugins.md § The tree contract).
 //
 // Split out of TreeHost.tsx when the terminal grew a tree host of its own
-// (docs/future/terminal/phase-5-loaded-plugins.md). There are two hosts and one set of rules: a batch
+// (docs/tui.md). There are two hosts and one set of rules: a batch
 // is checked whole, applied whole, and only then rendered, and nothing a message carries becomes a
 // class, a style, a URL or a function. Two copies of that would be two copies of a security decision.
 //

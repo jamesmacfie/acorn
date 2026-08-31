@@ -9,7 +9,7 @@ import type { CellTerminal } from './rectangle'
 // is only the plumbing between it and the channel the caller described. The caller's source is the same
 // either way, which is the point: docker's exec panel and the editor's `$EDITOR` window are unchanged
 // files that now work on a host with no browser in it
-// (docs/future/terminal/04-rendering.md § Rectangles).
+// (docs/tui.md § Rectangles).
 
 export function attachPty(handle: unknown, io: PtyIo): void {
   const term = handle as CellTerminal

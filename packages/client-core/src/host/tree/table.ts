@@ -2,7 +2,7 @@
 //
 // The sibling of `layouts/table.ts`, and it exists for the same reason: `frames/register.ts` turns a
 // manifest into contributions for every host, and until the terminal grew a tree host it named the
-// DOM's `RemoteTree` directly (docs/future/terminal/phase-5-loaded-plugins.md). The host package
+// DOM's `RemoteTree` directly (docs/tui.md). The host package
 // supplies its own; the DOM's is the fallback, so nothing on the desktop had to change.
 //
 // Types only, so the bare-Node suites can import the registration pass without a Solid transform.

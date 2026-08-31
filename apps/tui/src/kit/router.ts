@@ -15,7 +15,7 @@
 // URL: the rail is a signal, a pane is the task's own layout, and a plugin's own routes are
 // registered and never resolved. `RemoteTree` already spells the same answer for a loaded plugin —
 // `navigate: () => {}`, with the pane and panel rungs of a content link resolving above it — and this
-// is that answer for a compiled one. See docs/future/terminal/07-chrome.md § Navigation.
+// is that answer for a compiled one. See docs/tui.md § Navigation.
 //
 // So every hook here returns this host's truth rather than a plausible shape: no params, no query,
 // nothing matched, and a navigation that does not happen. A pane that needed one of them to work

@@ -32,7 +32,7 @@ rewrites it. Paths were checked on 2026-08-29.
 | `docs/testing.md` | smoke checklist | 0, 1, 2 | Install a device plugin, pick a replacement switcher, break it, watch core return. |
 | `docs/architecture-overview.md` | the plugin paragraph | 0 | One sentence on device provenance. |
 | `docs/future/remote.md` | § Browser-side fan-out | 0 | `WebBroker` owes a `PluginCustody`; pointer to 07-hosts.md. |
-| `docs/future/terminal/06-isolation.md` | § Custody | 0 | The file-backed custody; pointer to 07-hosts.md. |
+| `docs/tui.md` (was `docs/future/terminal/06-isolation.md`, deleted) | § Custody | 0 | The file-backed custody; pointer to 07-hosts.md. |
 | `docs/future/ecosystem/README.md` | the programmes | 0 | One line: device provenance does not change signing or discovery. |
 | `docs/future/compiled-tier.md` | the map | 1 | The switcher and rail chrome are no longer reasons a plugin stays compiled. |
 | `docs/future/README.md` | the programmes table | now | This folder's row. |

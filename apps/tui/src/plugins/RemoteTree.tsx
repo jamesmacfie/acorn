@@ -92,7 +92,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
         ...(bound.projectId ? { projectId: bound.projectId } : {}),
         // This host has one appearance and it is the reader's own terminal: no stylesheet, no tokens,
         // and no theme id to resolve until the appearance layer publishes its colours as data
-        // (../appearance.ts, docs/future/terminal/findings.md).
+        // (../appearance.ts, docs/tui.md).
         theme: 'terminal',
         style: 'terminal',
         claimsKeys: [],

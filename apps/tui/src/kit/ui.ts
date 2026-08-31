@@ -78,6 +78,6 @@ export function createSplitDrag(options: SplitDragOptions): SplitDrag {
 // Two of the barrel's exports have no answer here and are absent rather than stubbed.
 //
 // `tip` is the delegated tooltip protocol, and hover is never load-bearing anywhere
-// (docs/future/terminal/04-rendering.md § What the TUI never does). `rowHeightSm` is a pixel count for
+// (docs/tui.md § What the TUI never does). `rowHeightSm` is a pixel count for
 // a DOM virtualiser; `Rows` here counts lines instead. A pane that reaches for one fails to build,
 // which is the answer we want: the affordance is gone, not silently broken.

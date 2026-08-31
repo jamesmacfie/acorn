@@ -207,7 +207,7 @@ describe.skipIf(!hasFfi)('keys and focus in cells', () => {
       expect(terminal).toBeDefined()
       await frame.resize(100, 30)
       // The renderer handles `SIGWINCH` itself and re-lays out; this is how that reaches the PTY, and
-      // it is the only resize path there is (docs/future/terminal/03-process-model.md § Signals).
+      // it is the only resize path there is (docs/tui.md § Signals and exit).
       expect(sizes.length).toBeGreaterThan(0)
       expect(sizes[sizes.length - 1][0]).toBeGreaterThan(40)
     } finally {

@@ -14,7 +14,7 @@ and untrusted provider/preview content rather than implementing multi-user roles
   tools, so a compromised Node account is outside the application threat model.
 - Node child: task-scoped internal caller. It receives only an allowlisted environment and scoped
   token; its routes and task identity are checked by the Node.
-- Terminal client (`acorn`, `docs/future/terminal/`): the first two collapsed into one process. UI code
+- Terminal client (`acorn`, `docs/tui.md`): the first two collapsed into one process. UI code
   and the broker share a realm, so what the desktop holds as a process boundary this holds as a module
   boundary: the device token lives in the broker's module, the plugin cache and the acknowledgement
   file live in one custody module, and an arch rule refuses an import of either from anything in
@@ -31,7 +31,7 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
   helper's broker. A changed fingerprint is a hard stop.
 - The bearer rides the `/v2/events` upgrade request's headers, which a browser cannot set. On the
   desktop that is why the socket belongs to the helper rather than the renderer. The terminal client
-  (`docs/future/terminal/`) is one process running under Node, so it sets the header itself: equal to
+  (`docs/tui.md`) is one process running under Node, so it sets the header itself: equal to
   the desktop, easier than a browser. What the desktop holds as a process boundary the terminal holds
   as a module boundary, and an arch rule keeps it — nothing in `apps/tui` that draws a cell may
   import custody.
@@ -605,7 +605,7 @@ Worker with no DOM at all, under `PLUGIN_WORKER_CSP` (`docs/shell.md § The plug
 through the same broker, which decides every call from the manifest's scopes.
 
 **The third is the terminal's**, and it exists because a terminal has no iframe and no CSP to put one
-under (`docs/future/terminal/06-isolation.md`). A tree bundle runs in a `node:worker_threads` thread
+under (`docs/tui.md` § The sandbox). A tree bundle runs in a `node:worker_threads` thread
 started with `execArgv: ['--permission', '--allow-fs-read=<bootstrap>', '--allow-fs-read=<bundle>']`,
 and the two transferred ports are the only way out of it. Three things are worth stating, because two
 of them correct what the design expected:

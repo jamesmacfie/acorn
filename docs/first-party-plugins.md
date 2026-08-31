@@ -225,7 +225,7 @@ author can now do. Review findings from the move are in [loaded-plugin-migration
 
 ## What each of these loses in a terminal
 
-The terminal client draws the same panes from the same source ([future/terminal/](./future/terminal/README.md)).
+The terminal client draws the same panes from the same source ([tui.md](./tui.md)).
 A plugin writes no terminal UI and learns nothing about the host, so what follows is not a second
 implementation: it is what the kit's own `reduced` and `absent` levels come to once a pane is read at 80
 by 24. Only the plugins that lose something are listed.

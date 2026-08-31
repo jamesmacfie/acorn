@@ -33,20 +33,20 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30
 // This host's layout table, before any pane draws. Phase 0 could not do this: the pane registry named
 // client-core's DOM table directly, so `paneContributions()` handed back a component this host could
 // not use. Phase 2 made the table a seam, so a pane's own component is now the thing that draws
-// (client-core/host/layouts/table.ts, docs/future/terminal/findings.md).
+// (client-core/host/layouts/table.ts, docs/tui.md).
 setLayouts(LAYOUTS)
 
 // The loaded-plugin path, the same two seams one level up: a plugin's tree is drawn by this host's
 // `RemoteTree` into cells, and the worker it emits from is a `node:worker_threads` thread under
-// `--permission` rather than a Web Worker under a CSP (docs/future/terminal/06-isolation.md).
+// `--permission` rather than a Web Worker under a CSP (docs/tui.md).
 setRemoteTree(RemoteTree)
 installPluginWorkers()
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
-// because that is where a pane comes from on the desktop too. It is one line long because notes is
-// the one compiled pane phase 0 proved and the rest are the pane sweep's
-// (docs/future/terminal/phase-6-panes-sweep.md). A loaded plugin is not on this list and never will
-// be: it arrives from a node as a bundle, and `syncPluginDistribution` in main.tsx is what finds it.
+// because that is where a pane comes from on the desktop too. It is the same twelve the desktop
+// registers, and eight panes reach the strip (docs/tui.md § What a plugin loses here). A loaded plugin
+// is not on this list and never will be: it arrives from a node as a bundle, and
+// `syncPluginDistribution` in main.tsx is what finds it.
 // …and no landing page. `selectedSource()` resolves an unset selection to whichever registered source
 // is the default, which on the desktop is core's own home page and here is whichever plugin's browse
 // source happens to be first — so the shell would open on a repo browser instead of on the reader's

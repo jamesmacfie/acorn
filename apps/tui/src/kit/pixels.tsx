@@ -12,8 +12,8 @@ import { EditorRectangle, PtyRectangle, type CellTerminal } from './rectangle'
  *
  *  `pty` is native and is the thing a terminal does better than the desktop: a real emulator in cells
  *  with the PTY's bytes going straight into it, one tab stop from outside, Enter in, Escape out
- *  (./rectangle.tsx). `editor` is the text of the file, with the `$EDITOR` handoff still to come in
- *  phase 6.
+ *  (./rectangle.tsx). `editor` is a box naming the file, and the `$EDITOR` handoff is the editor
+ *  pane's own terminal mode drawing a PTY through the kind above.
  *
  *  `webview` and `frame` draw their `<Fallback>` child, or a line naming what is missing. Neither
  *  grows: what is inside cannot be drawn, so the box says so on one line and gives the room to the

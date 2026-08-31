@@ -1,8 +1,14 @@
 # Architecture overview
 
-acorn is a desktop client for one or more local Node services. The client owns presentation and
+acorn is a client for one or more local Node services. The client owns presentation and
 fleet membership. A Node owns the data and execution environment for the projects assigned to
 it. There is no shared database or cross-Node transaction.
+
+There are two clients over the same Node API, and a third is designed rather than built. The desktop
+app is the one this file spends most of its length on. `acorn` is the terminal client, which boots the
+same `@acorn/client-core` under Node and draws the same panes in cells
+([tui.md](./tui.md)); it collapses the renderer and the helper into one process and is otherwise the
+same graph. A browser client is [future/remote.md](./future/remote.md)'s.
 
 ## Runtime topology
 
@@ -22,6 +28,14 @@ Node
   Hono /v2 server + /v2/events
   core.sqlite + plugin SQLite files + blobs
   Git, worktrees, PTYs, agents, workflows, Docker, provider clients
+```
+
+```text
+acorn (Node 26.4, --experimental-ffi)
+  @opentui/solid reconciler: the same kit, layouts and panes, drawn to a cell buffer
+  @acorn/custody in-process: broker, fleet, tokens, plugin custody
+       │ pinned HTTPS + device bearer, one WebSocket per Node
+       └──────────────► the node for this machine's data root, attached or started
 ```
 
 The desktop helper starts the built `apps/node` artifact with `process.execPath`, which is the Node
@@ -59,6 +73,13 @@ The desktop shell owns:
   `apps/desktop/src/helper/` is the Node process Rust supervises.
 - Node endpoint records, certificate pins, device-token custody, fleet membership, and service
   supervision.
+
+The terminal client owns the same things the shell and the helper own between them, in one process:
+the screen, the endpoint records and pins, device-token custody, plugin custody, and supervision of a
+node it started. What the desktop holds as a process boundary it holds as a module boundary, and an
+arch rule refuses an import of custody from anything in `apps/tui` that draws a cell. It owns no
+window, no webview and no keychain, so the affordances those gate are absent through the platform seam
+rather than stubbed. See [the terminal client doc](./tui.md).
 
 Only serializable values cross a boundary. Product requests and streams use the broker and `/v2`.
 The service protocol is reserved for lifecycle messages.

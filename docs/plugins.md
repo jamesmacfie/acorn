@@ -1383,8 +1383,8 @@ host. It is the tree half of the same story `frames/verbs.ts` tells for the brid
 compile against, and neither end may reach for the other's copy. Nothing in it names the DOM, which is
 what lets a terminal renderer apply the same mutations to a cell buffer.
 
-**A second host exists and does exactly that.** `acorn`, the terminal client, applies these five
-mutations to cells (`apps/tui/src/plugins/TreeHost.tsx`). The rules are not written twice: the store,
+**A second host exists and does exactly that.** `acorn`, the terminal client
+([tui.md](./tui.md)), applies these five mutations to cells (`apps/tui/src/plugins/TreeHost.tsx`). The rules are not written twice: the store,
 the whole-batch pre-flight check, the prop sanitiser and the one place a handler id becomes a closure
 are `packages/client-core/src/host/tree/treeState.ts`, which both hosts import, and each host owns only
 its shell — a table of components per node name, a placeholder, and when a batch flushes. What differs

@@ -1,6 +1,6 @@
 # Phase 4: the device config file
 
-Status: not started. Waits on a terminal host with a config directory (`docs/future/terminal/phase-3-process-and-auth.md`).
+Status: not started. The terminal host it wants has a config directory already (`docs/tui.md` § Where the TUI keeps things).
 
 ## Goal
 
@@ -11,7 +11,7 @@ executed. The terminal host reads the same file format from its own path.
 ## Why this phase, and why now
 
 It waits because until there is a terminal host, every user has Settings open and the file is a
-second surface for one audience. When the `acorn` command from `docs/future/terminal/phase-3-process-and-auth.md` exists, its first
+second surface for one audience. Now that the `acorn` command exists (`docs/tui.md`), its first
 user will want this on day one. Doing it then, rather than now, means the file's first reader is the
 person it is for.
 

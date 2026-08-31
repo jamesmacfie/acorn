@@ -14,7 +14,7 @@ import { nextTick } from '../kit/tick'
 // pre-flight check, the prop sanitiser, and the one place a handler id becomes a closure. This file is
 // the shell around it, and it is the shell that differs: a different table of components behind each
 // name, a placeholder drawn as an `Alert` rather than a `<div>`, and the renderer's tick in place of a
-// frame (docs/future/terminal/04-rendering.md § Unknown nodes and failed trees).
+// frame (docs/tui.md § Unknown nodes and failed trees).
 //
 // So a loaded plugin and a compiled one are indistinguishable here, which is what the tree protocol
 // exists to make true. `plugins.test.ts` is the twin of client-core's `twoPaths.test.tsx`.

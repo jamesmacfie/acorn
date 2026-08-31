@@ -6,7 +6,7 @@ import { _setWorkerFactory } from '@acorn/client-core/host/tree/workerHost.ts'
 import { bundlePath } from './custody'
 
 // How a loaded plugin runs here: one `node:worker_threads` worker per bundle, under `--permission`
-// with read access to two files (docs/future/terminal/06-isolation.md).
+// with read access to two files (docs/tui.md).
 //
 // `workerHost.ts` above this is shared with the desktop whole — the handshake, the slot bookkeeping,
 // the 30-second grace, the heartbeat, the fail-fanout. What it exposes is `_setWorkerFactory`, and

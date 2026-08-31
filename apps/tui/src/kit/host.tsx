@@ -25,7 +25,7 @@ import { Modal, ModalBody } from './grouping'
 // same switch ./ui.ts makes and the reason a pane's source is unchanged here.
 //
 // Phase 5 left this barrel uncrossed because nothing in that phase's roster used one
-// (docs/future/terminal/phase-5-loaded-plugins.md). The pane sweep is the phase with the roster.
+// (docs/tui.md). The pane sweep is the phase with the roster.
 
 // ── Host machinery, unchanged ─────────────────────────────────────────────────────────────────────
 // Registries and pure rules. None of these draw, so both hosts spend the same module.
@@ -65,7 +65,7 @@ export function Acorn(props: { label?: string }) {
  *  A drawer is a place on the desktop's screen: between the two icon rails, above the task footer, at
  *  a height a grip dragged it to. None of those exist here — this host draws one pane, the drawer's
  *  sources are rows in the rail, and choosing one opens the PTY where the pane goes
- *  (docs/future/terminal/07-chrome.md § What is drawn bespoke). So the box stays and the geography
+ *  (docs/tui.md § What is drawn bespoke). So the box stays and the geography
  *  goes, and `height` is ignored because a pixel count is not a thing a cell host can spend. */
 export function Drawer(props: { height: number; maximized?: boolean; ariaLabel: string; ref?: (element: HTMLElement) => void; children: JSX.Element }) {
   return <box flexDirection="column" flexGrow={1}>{props.children}</box>
@@ -74,7 +74,7 @@ export function Drawer(props: { height: number; maximized?: boolean; ariaLabel: 
 /** A palette overlay somebody else owns: the editor's file finder, github's shortcut sheet.
  *
  *  The shell's own palette is `chrome/Palette.tsx` and is not this — it is core-owned and drives the
- *  overlay stack (docs/future/terminal/07-chrome.md). This is the deduped chrome a *plugin* opens,
+ *  overlay stack (docs/tui.md). This is the deduped chrome a *plugin* opens,
  *  and here it is the same `Modal` with a filter field and a list of rows, because that is what a
  *  terminal overlay is.
  *
