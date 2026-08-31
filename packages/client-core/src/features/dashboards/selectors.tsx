@@ -272,6 +272,7 @@ export function ParamInput(props: {
           <Picker<ParamChoice>
             label={choices().find((choice) => choice.id === props.value)?.label ?? ANY_CHOICE.label}
             ariaLabel={props.param.name}
+            size="sm"
             placeholder={`Filter ${props.param.name.toLowerCase()}`}
             emptyText="No match."
             results={(query) => {

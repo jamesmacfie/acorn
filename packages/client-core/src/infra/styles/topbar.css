@@ -33,24 +33,12 @@
 
 /* Searchable repo picker: a button that opens an absolute-positioned popover. */
 .repo-picker { position: relative; }
-.repo-picker-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  min-height: var(--control-h);
-  max-width: 300px;
-  box-sizing: border-box;
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: 0 var(--space-5);
-  cursor: pointer;
-}
-.repo-picker-button:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
-.repo-picker-button:disabled { opacity: 0.5; cursor: default; }
-.repo-picker-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* The trigger is a kit Button, so its height, radius, hover, focus ring and disabled state are
+   .ui-btn's and a picker lines up with any button of the same size beside it. What is left here is
+   the picker's own: a cap on how much of a bar a long repo name may take, and the truncation that
+   goes with it. */
+.repo-picker > .ui-btn { max-width: 300px; }
+.repo-picker-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .repo-picker-chevron { flex: none; color: var(--text-muted); font-size: var(--fs-2xs); }
 
 .repo-picker-popover {

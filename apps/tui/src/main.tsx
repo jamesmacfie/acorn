@@ -6,6 +6,7 @@ import type { Task } from '@acorn/protocol/api.ts'
 import { installPlatform } from './platform'
 import { openNode } from './node/open'
 import { installKeymap } from './keys/install'
+import { installRenderGuard } from './renderGuard'
 
 // `acorn`.
 //
@@ -108,6 +109,7 @@ watchPluginChanges()
 // `exitOnCtrlC` is off: Ctrl+C at the shell is the TUI's, and inside an entered PTY rectangle it is
 // the PTY's, which is the whole reason a rectangle owns its keys (docs/tui.md § Signals and exit).
 // The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
+installRenderGuard()
 const renderer = await createCliRenderer({ exitOnCtrlC: false })
 const engine = installKeymap(renderer)
 

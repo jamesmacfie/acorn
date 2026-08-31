@@ -21,8 +21,8 @@ import { installCommandLayer } from '../keys/commandLayer'
 import { bindKeys } from '../keys/install'
 import { focusedRenderable, regionFocus, setPaneCycler, takeFocus } from '../keys/regions'
 import { startSpinner } from '../kit/tick'
-import { createShellModel } from './model'
-import { closeOverlay, openOverlay, setWorkspaceMenu, topOverlay } from './state'
+import { createShellModel, type ShellModel } from './model'
+import { closeOverlay, openOverlay, topOverlay } from './state'
 import { cyclePane } from './panes'
 import { Rail, RAIL_COLLAPSE_AT } from './Rail'
 import { Topbar } from './Topbar'
@@ -120,7 +120,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     const commands = registerCommands([
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => openOverlay('palette') },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
-      { id: 'core.workspace.switch', title: 'Switch workspace', category: 'workspace', palette: true, run: () => { setWorkspaceMenu(true) } },
+      { id: 'core.workspace.switch', title: 'Switch workspace', category: 'workspace', palette: true, run: () => openOverlay('workspace') },
       { id: 'core.rail.toggle', title: 'Rail', category: 'navigation', palette: true, run: () => { setHidden((value) => !value) } },
       { id: 'core.quit', title: 'Quit', category: 'action', palette: true, run: quit },
     ])
@@ -213,6 +213,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               <Switch>
                 <Match when={name() === 'palette'}><Palette model={model} /></Match>
                 <Match when={name() === 'help'}><CheatSheet /></Match>
+                <Match when={name() === 'workspace'}><WorkspacePicker model={model} /></Match>
                 <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
                 <Match when={name() === 'trust'}><TrustPrompt /></Match>
               </Switch>
@@ -242,6 +243,32 @@ function QuitConfirm(props: { onQuit: () => void }) {
             onActivate={(key) => (key === 'quit' ? props.onQuit() : close())}
           >
             {(row, item) => <Row item={item}>{row.label}</Row>}
+          </Rows>
+        </box>
+      </ModalBody>
+    </Modal>
+  )
+}
+
+/** The workspace picker, as an overlay rather than a list under the topbar: it is the shell's chord
+ *  that opens it, the whole screen changes when a row is chosen, and a list drawn under the topbar
+ *  left the keys wherever they already were — so the reader saw a list they could not drive. An
+ *  overlay is the shape that takes the keys and gives them back (./state.ts, ../keys/regions.ts). */
+function WorkspacePicker(props: { model: ShellModel }) {
+  const close = () => closeOverlay('workspace')
+  return (
+    <Modal onDismiss={close} title="Workspace" size="sm">
+      <ModalBody>
+        <box flexDirection="column" ref={(element: BoxRenderable) => takeFocus(element)}>
+          <Rows
+            id="chrome.workspaces"
+            ariaLabel="Workspaces"
+            items={props.model.workspaces().map((workspace) => ({ key: workspace.id, ...workspace }))}
+            onActivate={(id) => { props.model.chooseWorkspace(id); close() }}
+          >
+            {(workspace, item) => (
+              <Row item={item} selected={workspace.id === props.model.workspace()?.id}>{workspace.name}</Row>
+            )}
           </Rows>
         </box>
       </ModalBody>

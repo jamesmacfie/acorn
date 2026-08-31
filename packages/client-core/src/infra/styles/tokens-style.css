@@ -52,6 +52,10 @@
 
   --pane-pad: var(--space-7);
   --pane-pad-y: var(--space-5);
+  /* How wide a column of reading gets before the pane stops giving it more. A pane can be 3700px
+     on a wide display, and a transcript line 480 characters long is a line nobody reads. A pack
+     may raise or lower it; zeroing it is not a thing, so it carries a length rather than a switch. */
+  --pane-measure: 1200px;
   --gap-inline: var(--space-3);
   --gap-row: var(--space-4);
   --gap-stack: var(--space-5);

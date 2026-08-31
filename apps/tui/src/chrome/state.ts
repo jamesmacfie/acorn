@@ -13,7 +13,7 @@ import { createSignal } from 'solid-js'
 /** The overlays the shell itself draws. A pane's own `Modal` is not one of these: it is a kit node
  *  and owns its own trap (../kit/grouping.tsx). `trust` is the one nobody opens by hand: the plugin
  *  distribution pass queues a bundle and the shell raises it (../plugins/TrustPrompt.tsx). */
-export type OverlayName = 'palette' | 'help' | 'quit' | 'trust'
+export type OverlayName = 'palette' | 'help' | 'quit' | 'trust' | 'workspace'
 
 // A stack rather than one slot, because the topmost is the one that owns the keys and closing it has
 // to reveal the one under it. In practice two are rarely open at once — `?` inside the palette types
@@ -46,15 +46,8 @@ export const isOverlayOpen = (name: OverlayName): boolean => stack().includes(na
 const [chosenWorkspace, setChosenWorkspace] = createSignal<string | null>(null)
 export { chosenWorkspace, setChosenWorkspace }
 
-// The workspace picker's open state, here rather than inside the topbar because the key that opens it
-// is a shell command and a command cannot reach into a component. Not an overlay: an overlay draws
-// where the pane would go, and a picker belongs under the thing it changes.
-const [workspaceMenu, setWorkspaceMenu] = createSignal(false)
-export { workspaceMenu, setWorkspaceMenu }
-
 /** Test seam. Module state outlives a render, so a suite must not inherit the previous one's shell. */
 export function _resetChrome(): void {
   setStack([])
   setChosenWorkspace(null)
-  setWorkspaceMenu(false)
 }

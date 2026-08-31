@@ -126,6 +126,18 @@ nature: a `Toolbar` or a `Tabs` strip, which carry that padding themselves and h
 has to reach the pane's edge; a `ListDetail`, whose divider is its columns' shared edge and whose
 columns pad themselves; and a diff, which is a canvas.
 
+`list-detail`'s detail column also takes a small pad below its last child and a gap between its
+children, because the child at the bottom of it is a composer or a row of actions: without them the
+agents composer sat on the pane's bottom border with the transcript touching it from above. A
+`ListDetail` or a diff drops both along with the inline padding.
+
+**The reading column stops at `--pane-measure`** and sits in the middle of whatever the pane has
+left. A pane is as wide as the display someone gave it, and at 3700px an agent transcript ran to
+about 480 characters a line. Two children are exempt. Chrome is, because a bar's background has to
+reach the pane's edge whatever the measure is, so a `Toolbar` and a `Tabs` strip stay full-bleed.
+So is a scroller: the cap goes on the list inside it rather than on the scroller itself, because a
+narrowed scroller leaves a dead gutter on each side that the wheel does nothing over.
+
 The host keeps the per-pane state a layout needs, under the pane ID: which tab a `tabs` pane is
 showing, where a `list-detail` or `stack-split` handle sits. It is session-only, because it is a
 reading posture rather than a preference.

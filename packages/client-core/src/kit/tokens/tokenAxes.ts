@@ -50,7 +50,8 @@ export const STYLE_TOKENS = [
   // space
   '--space-0', '--space-1', '--space-2', '--space-3', '--space-4', '--space-5',
   '--space-6', '--space-7', '--space-8', '--space-9', '--space-10', '--space-11',
-  '--pane-pad', '--pane-pad-y', '--gap-inline', '--gap-row', '--gap-stack', '--gap-section',
+  '--pane-pad', '--pane-pad-y', '--pane-measure',
+  '--gap-inline', '--gap-row', '--gap-stack', '--gap-section',
   '--pad-control', '--pad-control-lg', '--pad-chip', '--pad-cell', '--pad-surface', '--pad-body',
   // density
   '--row-h', '--row-h-sm', '--row-h-virt', '--control-h', '--control-h-sm', '--control-h-xs',

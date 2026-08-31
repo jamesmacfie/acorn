@@ -8,7 +8,7 @@ import {
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
 import AgentUsageIndicator from '../usage/AgentUsageIndicator'
-import ProviderGlyph from './ProviderGlyph'
+import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import QueuedAgentTurns from '../composer/QueuedAgentTurns'
 import RuntimeStateIcon from './RuntimeStateIcon'
 import type { AgentPaneModel } from './agentPaneModel'
@@ -29,9 +29,19 @@ function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   return (
     <Toolbar ariaLabel="Agent session">
-      <Heading level={2} eyebrow={model.selected()?.providerId}>
-        {model.selected()?.title ?? 'Agents'}
-      </Heading>
+      {/* The provider's mark, then the title, on one line. It used to be a "CLAUDE" eyebrow stacked
+          over the title, which made the bar two lines tall for a fact the mark carries in one
+          glyph. The mark takes the title here because nothing beside it names the provider. */}
+      <Show when={model.selected()?.providerId}>
+        {(providerId) => (
+          <ProviderGlyph glyph={providerMarkName(providerId())} label={providerId()} title={providerId()} />
+        )}
+      </Show>
+      <Heading level={2}>{model.selected()?.title ?? 'Agents'}</Heading>
+      {/* Right after the title, not after the session's controls: the title truncates, so a spacer
+          further along the bar never gets any width and the state and the buttons end up crowding
+          the last word of it. */}
+      <Toolbar.Spacer />
       <Show when={model.selected()}>
         {(session) => (
           <>
@@ -82,11 +92,11 @@ function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
           </>
         )}
       </Show>
-      <Toolbar.Spacer />
       <AgentUsageIndicator />
       <Picker<AgentProviderDescriptor>
         label="New"
         ariaLabel="New session"
+        size="sm"
         placement="bottom-end"
         placeholder="Filter providers…"
         emptyText="No managed providers available."
