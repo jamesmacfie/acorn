@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
+import { createEffect, createSignal, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { BoxRenderable, KeyEvent, Renderable } from '@opentui/core'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
@@ -196,10 +196,17 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
                 {(task) => <PaneStrip task={task()} focused={!!strip() && focusedRenderable() === strip()} />}
               </Show>
             </box>
-            <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>
-              <Match when={source()?.component}>{(component) => <Dynamic component={component()} />}</Match>
-              <Match when={model.task()}>{(task) => <PaneBody task={task()} />}</Match>
-            </Switch>
+            {/* Under a `Suspense`, because a browse source's component is a `lazy()` and a pending one
+                resolves to an empty string — which a cell host refuses outright, where the DOM would
+                have shrugged and drawn a text node nobody sees. The same guard the pane mount path
+                already has for the same reason (../layouts/index.ts, findings.md § A pending `lazy()`
+                region is an empty string). `null`, which is the nothing the DOM drew anyway. */}
+            <Suspense fallback={null}>
+              <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>
+                <Match when={source()?.component}>{(component) => <Dynamic component={component()} />}</Match>
+                <Match when={model.task()}>{(task) => <PaneBody task={task()} />}</Match>
+              </Switch>
+            </Suspense>
           </box>
           <Show when={topOverlay()}>
             {(name) => (

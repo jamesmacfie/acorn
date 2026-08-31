@@ -218,7 +218,44 @@ columns the pane is 77 and `list-detail` is under its own 80-cell threshold: one
 And that 77 is what every pane in the roster inherits, so it is where the phase 6 sweep will find most
 of its work.
 
-Against a real node it is the same screen with your own notes in it. Phase 0 was handed a node's boot
+Redrawn a third time after phase 6, which is the first frame with the whole roster registered. The
+fixture task carries a repo and a pull request now, so the pane it opens on is the one the task's own
+layout puts first — and `capture` takes a pane name, so any of the eight is one argument away:
+
+```
+acorn · 1 task                                                       fix-login ●
+ ◉│  [PR review]  Agent  Changes  Notes  Context  Editor                        
+──│PULL REQUEST                                                                 
+› │#42                                                                          
+  │Invalidate the old password on reset                                         
+  │State     [open]                                                             
+  │Author    [JA](jamesmacfie)                                                  
+  │Branch    (fix-login) → (main)                                               
+  │Files     2 · +16 −3                                                         
+  │Updated   689mo ago                                                          
+  │Reviewers none requested                                                     
+  │                                                                             
+  │[ squash ▾ ] [Merge] [Close] [Convert to draft]                              
+  │                                                                             
+  │▾ Description ⧉                                                              
+  │  Loads the account first so the stored hash is the one being checked.       
+  │                                                                             
+  │▾ Labels 0                                                                   
+  │  None.                                                                      
+  │  [ Add label… ▾ ]                                                           
+  │                                                                             
+  │▸ Checks 2 ●                                                                 
+  │src/session.ts                                                         ++4 −0
+j/k move · enter open · ctrl+shift+f find in files… · ctrl+0 go to github in …  
+```
+
+Two things in that frame are the sweep's own findings. The last content row is the detail column
+bleeding into the list column's last line, which is where clipping lands when a pane is taller than the
+screen. And `Files 2` is a count rather than the two names: the navigator's folds open by default and
+run past row 24, so at 80 cells the file list is a scroll away. Neither is worth a press on every host
+to fix.
+
+Against a real node it is the same screen with your own work in it. Phase 0 was handed a node's boot
 line in an environment variable; since phase 3 it finds one itself:
 
 ```
@@ -513,3 +550,126 @@ What phase 5 deliberately left:
   suite wrote, because the two plugins that ship a tree bundle, http and linear, are built by the
   packaged-build pipeline rather than by this repo's `pnpm build`. The first real one through this path
   will be found by the pane sweep or by phase 7.
+
+## What phase 6 did with these
+
+Shipped 2026-08-31. The sweep is the phase that put every first-party pane on the screen at once, so
+most of what follows is new rather than closed: nothing in the earlier list was waiting on it.
+
+Closed:
+
+- **`Slot` has no terminal sibling.** It has one now, and so does the rest of
+  `@acorn/plugin-api/ui/host` — `apps/tui/src/kit/host.tsx`, the third alias in the host switch. Twelve
+  names, and each is one of three kinds: a registry or a pure rule both hosts spend unchanged, a
+  surface this host already draws its own version of (the palette chrome, the `wizard` layout, the
+  remote tree), or a node that is honestly absent and says so on one line (the reference panel's
+  task-link control, an inline rectangle).
+
+Found here, and worth knowing:
+
+- **`@solidjs/router` cannot be imported in this process, and it is on the eager path.** `lifecycle.js`
+  reads `window.history.state` at module scope, so it throws before a line of ours runs, and github's
+  own `index.ts` reaches a router-using module through its PR pane's contribution. Answering that with a
+  `history` on the platform seam's `window` is the failure that file's header warns about, so the
+  package is removed rather than tolerated: `src/kit/router.ts` is the fourth thing the host switch
+  aliases, and it answers the five names the panes ask for with this host's truth — no params, no
+  query, nothing matched, and a navigation that does not happen. There is no URL here, which is the
+  same answer `RemoteTree` already gave a loaded plugin.
+
+- **A prop type written twice loses a prop, and four of them had.** The terminal kit's components
+  carried hand-written prop types, and with the roster in the same tsc program every pane failed to
+  compile: `tip`, `iconOnly`, `min`, `width`, `placement`, `Modal.Body`, `Menu.Item`,
+  `MentionSegment`. Nobody had noticed, because nothing compiled against them. `ButtonProps`,
+  `InputProps`, `SelectProps`, `PickerProps` and `MentionTextareaProps` are exported from the DOM kit
+  now and imported by the terminal one as types, which are erased and so keep the barrel rule intact.
+  A node's props are one contract; there is one declaration of it.
+
+- **`RowActions` and `Timeline.Turn` were drawn to the wrong shape, and only a caller could tell.**
+  `RowActions` takes a render prop over the menu's context, and drawing its children directly handed
+  that function to Solid, which called it with nothing and left every item with `context: undefined`.
+  `Timeline` had no `Turn` at all, so `Timeline.Turn` was `undefined` passed to `createComponent`. Both
+  are cases a per-node test cannot catch: the node draws, and what breaks is the shape of what a caller
+  hands it.
+
+- **Nothing in the kit may shrink.** This is the largest thing the sweep found. Yoga answers a height
+  deficit by taking it out of every child that will give, and a one-line row given half a line lands on
+  the line above it — so the PR pane at 80 by 24 drew as two screens interleaved character by
+  character, and the topbar and the rail drew as blank lines. Every block node in `kit/grouping.tsx`
+  and every row in `kit/showing.tsx` refuses to shrink now, and the pane's own box clips. A `scrollbox`
+  was the other candidate and is refused for a reason worth writing down: its content box is
+  free-sized, so every layout that measures its own box to decide whether it is narrow — which all of
+  them do — measures a width that is not on screen, and a `list-detail` pane's detail column never
+  draws at all.
+
+- **A row of `text` renderables is a row of boxes.** Same cause, one axis over: a wrapped markdown
+  paragraph is several styled runs, each of them a box, and at a width they do not fit each one clips
+  its own content. "hash but `signIn` still" came out as "hash bsignInstill". A `span` is a run inside
+  one `text`, so the line wraps and clips as one thing, and that is what the markdown pass draws with
+  (`kit/cells.tsx` § `Run`).
+
+- **`flatten` on a node prints `[object Object]`.** A pane may hand a node that draws a line another
+  kit node — a `Row` labelled with a `Text`, a `Fold` counted with a `Badge` — and there is no text to
+  read off a renderable. `Line` asks first and draws the tree instead; `Button` asks and draws its
+  `label`, which is the words an icon-only button already carries. The changes pane's file rows and the
+  context pane's item rows were both `[object Object]` before this.
+
+- **A space role has to answer both axes.** `space.row` and `space.stack` said "0 lines" and nothing
+  about cells, which read as zero — so an `Inline gap="row"` glued its children together and the
+  context pane's header drew as "context2 sections". Vertically they still spend nothing; horizontally
+  the floor is one cell, because two runs of text with nothing between them are one word.
+
+- **Two panes reached for a browser and took themselves down with it.** The PR pane's comment box
+  wrote a draft to `localStorage`, which is a flagged builtin under Node and undefined without
+  `--localstorage-file`; the editor pane listened for the window's `focus` event to reload a file the
+  agent might have changed. Both threw inside a mount, so both drew nothing at all rather than drawing
+  without the affordance. The storage half is one guarded accessor now
+  (`client-core/kit/lib/deviceStorage.ts`), on `@acorn/plugin-api/client` because a plugin's model is a
+  `.ts` file with a node-environment test; four call sites across three plugins moved onto it. The
+  focus half is a guard in the pane, because a host with no window has nothing to listen to.
+
+- **A pending `lazy()` is an empty string, again, in the two places phase 2 did not reach.** A browse
+  source's component and a pane whose contribution is a bare component rather than a set of regions are
+  both mounted by the chrome rather than by the pane registry, and neither had a `Suspense`. Both do.
+
+- **The default source is whichever plugin registered first.** `selectedSource()` resolves an unset
+  selection to the default source, which on the desktop is core's own home page and here was github's
+  browse — so the shell opened on a repo browser instead of on the reader's work. The composition root
+  starts the selection explicitly empty, because this host has no landing page.
+
+- **A row rebuilt under the keys took them with it.** `Rows` draws through `<For>`, which is keyed by
+  reference, and a pane's items are a fresh array on every render: any refetch destroyed the row focus
+  was on, and on a host with no pointer there is no way to put focus back. A collection re-lands on the
+  same key when it sees its holder destroyed.
+
+- **A terminal cannot press Cmd, and a contribution's own chord is a literal.** Phase 4 taught
+  `intentKeys` to ask this host which modifier it has. A pane's `defaultChord: 'meta+shift+r'` is not
+  an intent, so it came out of `toKeymapKey` as `super+shift+r` and advertised a chord a terminal
+  emulator keeps for itself. The command layer reads a leading `super+` as `ctrl+`.
+
+- **The `$EDITOR` handoff needed nothing built, and the design had it wrong.** This file's phase plan
+  described releasing the terminal, spawning `$EDITOR` and resuming. The editor pane already had a
+  terminal mode: one device preference swaps CodeMirror for a throwaway PTY running the reader's own
+  editor, and that PTY is on the node. In cells it just draws. What the phase built instead is
+  `attachPty`, which takes the two throwaway PTY callers off xterm and onto a channel description —
+  which is what let docker exec cross too.
+
+- **A region offers only its first collection.** The agents sidebar draws approvals above sessions, two
+  `Rows` in one region, and the keyboard reaches the first: Tab cycles regions, `j` wraps inside a
+  collection, and there is no key between them. A reader with an approval pending cannot reach the
+  session list. The desktop has the same structure and a pointer. Left open, and it belongs with focus
+  and regions rather than with the sweep.
+
+What phase 6 deliberately left:
+
+- **The read-only text view inside an `editor` rectangle.** The box draws and says the file opens
+  there, and the reader's own editor opens in it. Reading a file without leaving the pane is a smaller
+  want than editing one, and it needs the find bar wired to a text region that does not exist yet.
+
+- **A settings surface.** Four plugins register a settings page and this host draws none of them, so
+  `workflows` contributes nothing here at all. The desktop's settings modal is chrome; this host would
+  need its own, which is phase 4's kind of work rather than the sweep's.
+
+- **The chrome at 120 columns with a pane taller than the screen.** Fixed for the panes in the roster,
+  and the mechanism is fragile: it rests on nothing in the kit shrinking, and one `flexShrink` left at
+  its default anywhere on a pane's path brings the interleaving back. An arch rule over the kit's own
+  boxes would hold it; a rule that reads JSX is not a rule this repo has.

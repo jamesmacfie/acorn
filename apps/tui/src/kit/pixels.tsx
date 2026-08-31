@@ -22,7 +22,7 @@ import { EditorRectangle, PtyRectangle, type CellTerminal } from './rectangle'
 export function Rectangle(props: {
   kind: 'pty' | 'webview' | 'frame' | 'editor'
   label: string
-  mount?: (handle: unknown) => void
+  mount?: (handle: HTMLElement) => void
   children?: JSX.Element
 }) {
   return (
@@ -41,10 +41,12 @@ export function Rectangle(props: {
         <EditorRectangle label={props.label}>{slot(props.children)}</EditorRectangle>
       </Show>
     }>
-      {/* The caller is handed a terminal rather than an element, which is the whole difference
-          between the two hosts here. `mount` is typed `unknown` on this side because the kit's own
-          type is the DOM's `HTMLElement`; the caller narrows it, and the rectangle is the one place
-          in the kit where a host-specific filler is the point rather than a leak. */}
+      {/* The caller is handed a terminal rather than an element, which is the whole difference between
+          the two hosts here. The prop keeps the kit's own type — the DOM's `HTMLElement` — because a
+          node's props are one contract on both hosts and a pane compiles against one of them; what
+          arrives is this host's filler, and `attachPty` is the one thing that reads it (./pty.ts). A
+          rectangle is the kit's single admission that a host draws something of its own, and this is
+          where it is admitted. */}
       <PtyRectangle label={props.label} mount={props.mount as ((terminal: CellTerminal) => void) | undefined} />
     </Show>
   )

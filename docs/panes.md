@@ -176,6 +176,12 @@ is a kit `ListDetail` — the navigator beside the diff, the same pair the GitHu
 and that is correct rather than a pane that should have named `list-detail`. The two columns are one
 surface over one model, not two regions the host mounts apart.
 
+The node takes its two columns two ways, and both matter. A caller with an element to spare passes the
+left one as `list`; a caller that cannot — a remote tree, whose props are JSON on a message port —
+passes a `ListColumn` and a `DetailColumn` as children and sets `split`. Below 80 columns the first form
+draws the detail alone, and the second stacks its two children, because the node has no keys of its own
+to switch with and two columns of 38 cells is a column nobody can read.
+
 A wizard is the one arrangement a non-pane surface can reach for. Onboarding is a component in the
 `overlay` slot rather than a pane, so it imports `Wizard` from `@acorn/plugin-api/ui/host` and fills its
 `step` region. Every other surface names a layout on its contribution and never imports one.

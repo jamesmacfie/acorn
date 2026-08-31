@@ -17,6 +17,10 @@ export const slot = (value: JSX.Element): JSX.Element => {
   if (typeof value === 'string' || typeof value === 'number') {
     return value === '' ? null : <text>{String(value)}</text>
   }
+  // An array mixes the two, and a fragment is an array: `hint={<><Kbd>⌘↵</Kbd> to send</>}` is one node
+  // and one bare string, and the string on its own would land in a box, which is the shape a cell host
+  // refuses outright (docs/future/terminal/phase-6-panes-sweep.md).
+  if (Array.isArray(value)) return value.map((item) => slot(item as JSX.Element)) as unknown as JSX.Element
   return value
 }
 
@@ -29,13 +33,51 @@ export const flatten = (value: unknown): string => {
   return String(value)
 }
 
+/** Is there a node in here rather than words?
+ *
+ *  A pane may hand a node that draws a line another kit node: a `Row` labelled with a `Text`, a `Badge`
+ *  inside a `Chip`. `flatten` turns one into `[object Object]`, because a renderable has no text to
+ *  read off it — which is how the pane sweep found this, on the file rows of the changes pane and the
+ *  item rows of the context pane. So a line asks first, and a line whose children are a tree draws the
+ *  tree instead (docs/future/terminal/phase-6-panes-sweep.md).
+ *
+ *  Its own function so `Line` stays one expression, and exported because `Row` asks the same question
+ *  about the same children when it decides whether the `match` role is its to apply. */
+export function hasNode(value: unknown): boolean {
+  if (value === null || value === undefined || typeof value === 'boolean') return false
+  if (Array.isArray(value)) return value.some(hasNode)
+  if (typeof value === 'function') return hasNode((value as () => unknown)())
+  return typeof value === 'object'
+}
+
 /** One run of text at a role and a tone. The workhorse: no component in this package builds a `text`
- *  by hand, so no component can name a colour or an attribute of its own. */
+ *  by hand, so no component can name a colour or an attribute of its own.
+ *
+ *  Children that are a tree rather than words go through untouched, in a row: the role and the tone
+ *  belong to a run of text, and a node inside brought its own. */
 export function Line(props: { role?: TextRole; tone?: Tone; wrap?: boolean; children: JSX.Element }) {
   const run = () => styled(flatten(props.children), props.role, props.tone)
   return (
-    <text {...run().style} wrapMode={props.wrap ? 'word' : 'none'}>{run().text}</text>
+    <Show when={hasNode(props.children)} fallback={
+      <text {...run().style} wrapMode={props.wrap ? 'word' : 'none'}>{run().text}</text>
+    }>
+      <box flexDirection="row" gap={0}>{slot(props.children)}</box>
+    </Show>
   )
+}
+
+/** One styled run *inside* a line, rather than a line of its own.
+ *
+ *  A `text` renderable is a box to yoga, so a row of them is a row of boxes: at a width they do not
+ *  fit, each is shrunk and each clips its own content, which turned "hash but `signIn` still" into
+ *  "hash bsignInstill" on the agents transcript. A `span` is a run inside one `text`, so the whole
+ *  line wraps and clips as one thing — which is what a line of styled words is
+ *  (docs/future/terminal/phase-6-panes-sweep.md).
+ *
+ *  Only for a caller that owns the `text` around it. Everything else uses `Line`. */
+export function Run(props: { role?: TextRole; tone?: Tone; children: JSX.Element }) {
+  const run = () => styled(flatten(props.children), props.role, props.tone)
+  return <span {...run().style}>{run().text}</span>
 }
 
 /** A divider between two regions, along the axis it separates: a line across for `x`, a column of

@@ -42,15 +42,15 @@ plugin, read column by column against the kit's 80×24 table
 | agents | sessions, transcript, tool cards, composer, approvals | image attachments as images |
 | github | list, overview, checks, conversation, diff with annotations, merge | nothing of note |
 | changes | stage, diff, notes, commit, push | nothing |
-| editor | file tree, search, read-only text view | CodeMirror; editing hands off to `$EDITOR` |
-| terminal | the PTY, natively | nothing |
+| editor | file tree, search, tabs, the `$EDITOR` handoff | CodeMirror; the box says the file opens there |
+| terminal | the PTY, natively | the drawer, which is a place between two icon rails |
 | docker | containers, info, logs with find, stats as bars, exec natively | nothing |
 | context, memory, notes | all of it | nothing |
 | http, linear, rollbar | all of it | inline images |
 | database | SQL as a text region, results as a table | CodeMirror completions |
 | onboarding | all of it; the wizard layout has a terminal projection and the splash is already ASCII | nothing |
 | workflows | the settings page | nothing |
-| preview | URL, run state, capture filenames | the page |
+| preview | nothing | the pane. It asks for the `preview` seam and this host installs none, so it is absent from the strip rather than present and empty |
 
 model-providers, nodes-file, and browser have no client half at all. The browser plugin's tools are
 node-side, so pairing it with preview overstated it: it draws nothing to lose.
@@ -63,6 +63,12 @@ Also not: charts beyond block and braille characters, and hover, which is never 
 
 A terminal client is not a subset. It is nearly the whole workspace minus three rectangles, and the
 rectangle that defines an agent workspace, the PTY, is the one a terminal does best.
+
+The pane sweep read every row of this table at 80 by 24 on 2026-08-31 and the table survived it, with
+the three corrections above. Two rows are worth reading twice. The `$EDITOR` handoff needed nothing
+built, because the editor pane already had a terminal mode and the PTY behind it is on the node. And
+preview came off: its pane is a `WebContentsView` the shell positions, so the pane asks for the seam
+that backs it and the honest answer here is not to offer the pane.
 
 ## What it costs
 

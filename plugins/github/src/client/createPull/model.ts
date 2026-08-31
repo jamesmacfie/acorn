@@ -1,3 +1,4 @@
+import { clearLocal, readLocal, writeLocal } from '@acorn/plugin-api/client'
 import type { CompareCommit } from '../../shared/api'
 
 // Branch name → human title: last path segment, dashes/underscores to spaces, first letter upper.
@@ -45,13 +46,13 @@ export function parsePullDraft(raw: string | null): PullDraft | null {
 }
 
 export const readPullDraft = (owner: string, repo: string): PullDraft | null =>
-  parsePullDraft(localStorage.getItem(draftKey(owner, repo)))
+  parsePullDraft(readLocal(draftKey(owner, repo)))
 
 // An untouched form with no head chosen is indistinguishable from a fresh one, so do not leave a key
 // behind.
 export function writePullDraft(owner: string, repo: string, d: PullDraft): void {
-  if (d.head || d.touched || d.draft) localStorage.setItem(draftKey(owner, repo), JSON.stringify(d))
+  if (d.head || d.touched || d.draft) writeLocal(draftKey(owner, repo), JSON.stringify(d))
   else clearPullDraft(owner, repo)
 }
 
-export const clearPullDraft = (owner: string, repo: string): void => localStorage.removeItem(draftKey(owner, repo))
+export const clearPullDraft = (owner: string, repo: string): void => clearLocal(draftKey(owner, repo))

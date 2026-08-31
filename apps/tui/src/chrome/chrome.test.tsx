@@ -15,7 +15,7 @@ const caretRow = (frame: string): number => frame.split('\n').findIndex((line) =
 
 describe.skipIf(!hasFfi)('the shell', () => {
   it('draws the topbar, the rail, the pane strip and the footer at 80 by 24', async () => {
-    const screen = await renderFixture()
+    const screen = await renderFixture({ pane: 'notes' })
     const frame = await screen.frame()
     screen.done()
 
@@ -34,7 +34,7 @@ describe.skipIf(!hasFfi)('the shell', () => {
   }, 30_000)
 
   it('holds together at 120 by 40, where the rail keeps its names', async () => {
-    const screen = await renderFixture({ width: 120, height: 40 })
+    const screen = await renderFixture({ width: 120, height: 40, pane: 'notes' })
     const frame = await screen.frame()
     screen.done()
 
@@ -45,7 +45,7 @@ describe.skipIf(!hasFfi)('the shell', () => {
   }, 30_000)
 
   it('opens on a task, with the keys on the rail', async () => {
-    const screen = await renderFixture({ width: 120, height: 40 })
+    const screen = await renderFixture({ width: 120, height: 40, pane: 'notes' })
     const frame = await screen.frame()
     screen.done()
 
@@ -56,7 +56,7 @@ describe.skipIf(!hasFfi)('the shell', () => {
   }, 30_000)
 
   it('cycles rail, pane strip and pane on tab, and wraps', async () => {
-    const screen = await renderFixture({ width: 120, height: 40 })
+    const screen = await renderFixture({ width: 120, height: 40, pane: 'notes' })
     const rail = await screen.frame()
     const strip = await screen.press('TAB').then(() => screen.frame())
     const pane = await screen.press('TAB').then(() => screen.frame())

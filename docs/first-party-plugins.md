@@ -223,6 +223,27 @@ package serves provider routes through
 item to it through the host-owned descriptor promotion flow. Everything Rollbar does, an outside
 author can now do. Review findings from the move are in [loaded-plugin-migration.md](./loaded-plugin-migration.md).
 
+## What each of these loses in a terminal
+
+The terminal client draws the same panes from the same source ([future/terminal/](./future/terminal/README.md)).
+A plugin writes no terminal UI and learns nothing about the host, so what follows is not a second
+implementation: it is what the kit's own `reduced` and `absent` levels come to once a pane is read at 80
+by 24. Only the plugins that lose something are listed.
+
+| Plugin | What a reader loses |
+| --- | --- |
+| **editor** | CodeMirror. The `editor` rectangle draws a box and says the file opens there; the reader's own `$EDITOR` runs in the box instead on one device preference, and that is the better half of the pane in a terminal anyway. The file tree, the search and the tabs are unchanged. |
+| **terminal** | The drawer. It is a place on the desktop's screen between two icon rails, and there is neither. A PTY still draws — natively, in cells, wherever a pane mounts one. |
+| **docker** | Nothing of the pane. It is offered only on a task that has containers, as on the desktop, and `exec` is a native PTY. |
+| **preview** | The pane. It asks for the `preview` seam and the terminal installs none, so it is absent from the strip rather than present and empty. |
+| **agents** | Image attachments, which draw as a filename. |
+| **github** | Nothing of the five surfaces. There is no URL, so a content link resolves to a pane or a reference panel and stops there rather than falling through to a route, and the create-PR form's own draft is per device as it is everywhere. |
+| **workflows** | Its settings page has nowhere to be drawn: the terminal client has no settings surface yet. |
+
+Nothing is missing from **changes**, **context**, **memory**, **notes** or **onboarding**. The four
+plugins that ship only a tree bundle — **http**, **linear**, **rollbar**, **database** — reach the
+terminal through the worker sandbox instead, drawing the same nodes into cells.
+
 ## The honest asterisk
 
 **Every remaining route-owning first-party plugin registers routes with `ctx.routes.register`.**

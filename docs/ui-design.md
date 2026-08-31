@@ -233,9 +233,13 @@ The role tokens are the plugin-facing half of the same system. A plugin picks a 
 maps it: on the DOM to a custom property from the two axes above, on a terminal to a cell, a colour,
 or nothing. `kit/tokens/roles.ts` holds both columns and `kit/tokens/roles.test.ts` holds them to it.
 
+A space role answers both axes, because the same token spaces a column of rows and a line of words.
+`row` and `stack` are 0 lines vertically and one cell horizontally: two runs of text with nothing
+between them are one word, which is what an `Inline gap="row"` drew before the terminal read it.
+
 | Role | DOM token | Terminal |
 | --- | --- | --- |
-| `space` | `--space-0`, `--gap-inline`, `--gap-row`, `--gap-stack`, `--gap-section` | 0 lines, one cell, 0, 0, one blank line |
+| `space` | `--space-0`, `--gap-inline`, `--gap-row`, `--gap-stack`, `--gap-section` | nothing; one cell; 0 lines and one cell; 0 lines and one cell; one blank line and one cell |
 | `size` | `--control-h-xs`, `--control-h-sm`, `--control-h`, `--pad-control-lg` | one line either way; padding ignored |
 | `tone` | `--text`, `--text-muted`, `--accent`, `--state-ok`, `--state-warn`, `--state-bad` | default, dim, and the palette's accent, green, yellow and red |
 | `text` | `--fs`, `--fw-semibold`, `--text-muted`, `--font-mono`, `--label-size`, `--heading-weight` | plain, bold, dim, ignored, dim uppercase, bold |
@@ -932,8 +936,18 @@ moved. This is what the kit holds for it:
 - **The tree protocol names nothing about the DOM.** The same mutations apply to a retained tree of
   any kind ([docs/plugins.md § The tree contract](./plugins.md#the-tree-contract)).
 - **Rectangles are the only DOM-only thing**, and `kind="pty"` and `kind="editor"` are native there.
-  What crosses to a terminal plugin by plugin is in
+  A `pty` rectangle is filled through `attachPty`, which takes the channel rather than handing back a
+  box: an xterm on the DOM, OpenTUI's emulator in cells, one source in the plugin
+  ([docs/terminal.md § Client](./terminal.md)). What crosses to a terminal plugin by plugin is in
   [docs/future/terminal/01-why.md](./future/terminal/01-why.md).
+- **A prop type is declared once and both hosts compile against it.** `ButtonProps`, `InputProps`,
+  `SelectProps`, `PickerProps` and `MentionTextareaProps` are exported from the DOM kit and imported by
+  the terminal one, because a node's props are one contract and a hand-written second copy loses a prop
+  without anybody noticing. The pane sweep found four that had.
+- **Nothing in the kit shrinks to make room.** Yoga answers a height deficit by taking it out of every
+  child that will give, and a one-line row given half a line lands on the line above it. Every block
+  node and every row refuses to shrink; the region around them clips, and a pane taller than the screen
+  is the normal case at 24 rows.
 
 ## Every node at 80 by 24
 
@@ -955,15 +969,15 @@ disagree about which nodes exist or what each one does with focus.
 | `Section` | conditional | label in dim uppercase, children below |
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
-| `Timeline` | collection | cards in sequence, a dim rule between turns; `follow` is a no-op, because a column of cells pins to its last child by construction |
+| `Timeline` | collection | cards in sequence, a dim rule between turns; `follow` is a no-op, because a column of cells pins to its last child by construction. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets |
 | `Toolbar` | none | children on one line |
-| `Modal` | trap | a centred box over dimmed content; Escape dismisses |
+| `Modal` | trap | a centred box over dimmed content; Escape dismisses. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
 | `ModalBody` | none | the lines between the title rule and the actions line |
 | `ModalActions` | none | the buttons on one line, right-aligned inside the box |
 | `Menu` | trap | a vertical list in a box |
 | `Popover` | none | reduced: the panel opens as a full-width block under its anchor, not floating |
-| `ListDetail` | none | reduced: two columns above 80 cells, one at a time below it |
+| `ListDetail` | none | reduced: two columns above 80 cells. Below it, the `list` form draws the detail alone and the `split` form stacks its two column children, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read |
 | `ListColumn` | none | reduced: the left column, or the whole width when the split has collapsed |
 | `DetailColumn` | none | the right column, or the whole width |
 | `SplitHandle` | stop | absent: a terminal split moves by a key, not a grip |
@@ -980,7 +994,7 @@ disagree about which nodes exist or what each one does with focus.
 | `Link` | stop | the text, underlined, pressable |
 | `Heading` | none | eyebrow in dim uppercase, heading in bold |
 | `Rows` | collection | its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
-| `Row` | item | one line: status glyph, title, meta right-aligned; subtitle on a second line if there is room. `reveal` has no meaning, because there is no hover, so the trailing controls always show |
+| `Row` | item | one line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show |
 | `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
 | `RowActions` | none | the row's actions as glyphs at the right end, always drawn, never on hover |
 | `Badge` | none | `[text]` in the tone's colour |
@@ -1014,7 +1028,7 @@ disagree about which nodes exist or what each one does with focus.
 
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
-| `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic |
+| `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic. An icon-only button draws its `label`, because a glyph child has no text to read off it |
 | `ConfirmButton` | stop | `[ Delete? ]` after the first press; the armed button is the prompt |
 | `Input` | stop | an underlined field; owns keys while focused |
 | `Textarea` | stop | a boxed multi-line field; owns keys |

@@ -32,7 +32,7 @@ export type PickerItem = {
   removable?: boolean
 }
 
-export default function Picker<T>(props: {
+export type PickerProps<T> = {
   label: string | JSX.Element // JSX so a picker can show its current value as an icon, not just text
   ariaLabel?: string
   placeholder: string
@@ -56,7 +56,9 @@ export default function Picker<T>(props: {
   disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
   keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
   placement?: Placement // 'bottom-end' for a trigger at the right edge, so the list opens leftward
-}) {
+}
+
+export default function Picker<T>(props: PickerProps<T>) {
   const [filter, setFilter] = createSignal('')
   let rootRef: HTMLDivElement | undefined
   let inputRef: HTMLInputElement | undefined

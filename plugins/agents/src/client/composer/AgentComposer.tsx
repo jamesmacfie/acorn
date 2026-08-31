@@ -3,7 +3,7 @@ import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession }
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from '../sessions/managedClient'
-import { agentContextContributions, pickFiles } from '@acorn/plugin-api/client'
+import { agentContextContributions, clearLocal, pickFiles, readLocal, writeLocal } from '@acorn/plugin-api/client'
 import {
   Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, Inline, Kbd, MentionTextarea, Picker,
   Popover, Select, Stack, Text, Toolbar,
@@ -128,20 +128,20 @@ export default function AgentComposer(props: {
   })
 
   createEffect(on(composerSessionId, (sessionId) => {
-    hydrateManagedDraft(sessionId, localStorage.getItem(draftKey(sessionId)) ?? '')
+    hydrateManagedDraft(sessionId, readLocal(draftKey(sessionId)) ?? '')
     setError('')
     setExpanded(false)
     setContextPickerId('')
     setDismissedAutomaticPayload(undefined)
     let ids: string[] = []
     try {
-      const value = JSON.parse(localStorage.getItem(attachmentDraftKey(sessionId)) ?? '[]') as unknown
+      const value = JSON.parse(readLocal(attachmentDraftKey(sessionId)) ?? '[]') as unknown
       if (Array.isArray(value)) ids = value.filter((item): item is string => typeof item === 'string')
     } catch {
       ids = []
     }
     try {
-      const stored = JSON.parse(localStorage.getItem(contextDraftKey(sessionId)) ?? '[]') as unknown
+      const stored = JSON.parse(readLocal(contextDraftKey(sessionId)) ?? '[]') as unknown
       const restored = Array.isArray(stored)
         ? stored.filter((item): item is AgentContextSnapshot =>
             typeof item === 'object' && item != null && (item as { type?: unknown }).type === 'context')
@@ -180,14 +180,14 @@ export default function AgentComposer(props: {
     const next = typeof value === 'function' ? value(draft()) : value
     setManagedDraft(props.session.id, next)
   }
-  createEffect(() => localStorage.setItem(draftKey(props.session.id), draft()))
-  createEffect(() => localStorage.setItem(
+  createEffect(() => writeLocal(draftKey(props.session.id), draft()))
+  createEffect(() => writeLocal(
     attachmentDraftKey(props.session.id),
     JSON.stringify(attachments().map((attachment) => attachment.id)),
   ))
   createEffect(() => {
     try {
-      localStorage.setItem(contextDraftKey(props.session.id), JSON.stringify(contexts()))
+      writeLocal(contextDraftKey(props.session.id), JSON.stringify(contexts()))
     } catch {
       // A captured context can exceed localStorage. The immutable copy still persists with the turn;
       // this only means the unsent draft cannot survive a reload.
@@ -246,9 +246,9 @@ export default function AgentComposer(props: {
       setDraft('')
       setAttachments([])
       setContexts([])
-      localStorage.removeItem(draftKey(props.session.id))
-      localStorage.removeItem(attachmentDraftKey(props.session.id))
-      localStorage.removeItem(contextDraftKey(props.session.id))
+      clearLocal(draftKey(props.session.id))
+      clearLocal(attachmentDraftKey(props.session.id))
+      clearLocal(contextDraftKey(props.session.id))
       props.onSent()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to queue this turn.')

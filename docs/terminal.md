@@ -129,17 +129,35 @@ running in an app, `apps/tui/src/kit/rectangle.tsx` draws OpenTUI's own emulator
 PTY's bytes go straight into it. The PTY does not move: it stays on the Node, reached over the same
 `term` WebSocket channel, and the terminal client is a second emulator for it.
 
-What the rectangle hands its caller differs, because there is no element to hand over. The DOM hands
-an `HTMLElement` and the caller attaches xterm to it; the terminal hands the three operations a
-terminal is — bytes in, keystrokes out, and the size of the box in cells. The keyboard contract is the
-same on both, with one rule the terminal adds about its own limits: while a rectangle is entered every
-key is the PTY's, `Ctrl+C` included, Escape alone leaves, and pressing Escape twice goes back in and
-sends one through. A desktop reader can click outside; a terminal reader cannot.
+What the rectangle hands its caller differs, because there is no element to hand over. The DOM hands an
+`HTMLElement` and the terminal hands the three operations a terminal is: bytes in, keystrokes out, and
+the size of the box in cells. The keyboard contract is the same on both, with one rule the terminal
+adds about its own limits. While a rectangle is entered every key is the PTY's, `Ctrl+C` included,
+Escape alone leaves, and pressing Escape twice goes back in and sends one through. A desktop reader can
+click outside; a terminal reader cannot.
 
-The terminal plugin's own surface does not write to that handle yet, because nothing in a terminal
-mounts the drawer until the chrome exists ([future/terminal/](./future/terminal/README.md), phases 4
-and 6). The rectangle and its contract are built and tested; the two callers move when there is a
-place to mount them.
+**Neither of those shapes is a plugin's business, and `attachPty` is why.** A `Rectangle` promises the
+host draws what is inside the box, and for `pty` the DOM used to keep half of that promise: it handed
+back an element and three plugins each built their own xterm on it, with their own theme, their own fit
+and their own resize observer. The caller now describes the channel instead, in the four members of
+`PtyIo` (`client-core/kit/lib/pty.ts`): open at a size, bytes in, bytes out, and a word to print when
+the far end exits. `attachPty(handle, io)` on `@acorn/plugin-api/ui` is the host's end of it, an xterm
+on the DOM and OpenTUI's emulator in cells, and the caller's source is the same file either way.
+
+That is what let two of the three callers cross. Docker's exec panel and the editor's `$EDITOR` window
+are both throwaway PTYs, both about fifteen lines now, and both work on a host with no browser in it.
+The terminal plugin's own drawer surface keeps its own xterm, because it is not throwaway: it carries
+the app's theme, the font-size preference, the WebGL renderer and the Shift+Enter rule, and none of
+those has a meaning in cells. The drawer has no home on the terminal client anyway, which is the other
+half of why it stayed ([future/terminal/](./future/terminal/README.md) § Chrome).
+
+**The `$EDITOR` handoff needed nothing built.** The editor pane already has a terminal mode: one device
+preference swaps the CodeMirror rectangle for a throwaway PTY running the reader's own editor on the
+worktree, and the pane refetches the file when the editor exits ([editor.md](./editor.md) § Editing in
+your own editor). On the terminal client that PTY draws in cells, so the reader gets vim inside the
+terminal they were already in, and the design's suspend-the-renderer plan was never needed. What the
+terminal client draws when the preference is off is the box and a line saying the file opens there;
+the read-only text view inside it is not built.
 
 The drawer is a `drawer` slot rather than a pane, so no pane layout owns its outer box. The `Drawer`
 host component does. It draws the dock between the two icon rails and above the task footer, and it

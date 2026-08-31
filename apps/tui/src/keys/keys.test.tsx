@@ -139,7 +139,7 @@ describe.skipIf(!hasFfi)('keys and focus in cells', () => {
           regions={{
             header: () => <List />,
             body: () => <Rectangle kind="pty" label="Terminal" mount={(handle) => {
-              terminal = handle as CellTerminal
+              terminal = handle as unknown as CellTerminal
               terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
             }} />,
           }}
@@ -197,7 +197,7 @@ describe.skipIf(!hasFfi)('keys and focus in cells', () => {
         label="Test"
         regions={{
           body: () => <Rectangle kind="pty" label="Terminal" mount={(handle) => {
-            terminal = handle as CellTerminal
+            terminal = handle as unknown as CellTerminal
             terminal.onResize((cols, rows) => sizes.push([cols, rows]))
           }} />,
         }}

@@ -1,0 +1,151 @@
+/** @jsxImportSource @opentui/solid */
+import { describe, expect, it } from 'vitest'
+import { hasFfi } from './ffi'
+import { renderFixture } from './harness'
+
+// The pane sweep: every first-party pane the roster registers, opened at exactly 80 by 24 with the
+// chrome present (docs/future/terminal/phase-6-panes-sweep.md).
+//
+// One case per pane, and each asks the three questions the sweep exists to ask rather than pinning
+// every cell: can a reader find the thing this pane is for on the first screen, is nothing wider than
+// the 80 cells the kit promises, and did the pane draw itself rather than an error. A whole-buffer
+// snapshot would fail on every wording change and say nothing about whether the screen reads.
+//
+// The fixture node answers one route per pane (./fixture.ts), so a pane that starts asking for
+// something new shows up here as a missing line rather than as a silent pass.
+
+/** No line wider than the terminal, on any pane. A wider one is a node that read a width it does not
+ *  have (docs/ui-design.md § What the kit and layouts must never do). */
+const fitsIn = (frame: string, width: number): void => {
+  for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(width)
+}
+
+/** The pane drew itself. Every pane's error boundary draws an `Alert` titled with the pane's id, so a
+ *  pane that threw says `! <id>` and this is how the sweep notices (chrome/PaneRow.tsx). */
+const drewCleanly = (frame: string, paneId: string): void => {
+  expect(frame).not.toContain(`! ${paneId}`)
+}
+
+/**
+ * Open a pane and take its screen once it has drawn.
+ *
+ * `until` is the first thing the case is going to look for, and the frame is taken again until it is
+ * on screen. A pane's own data is a route and a store rather than a prop, and the first render in a
+ * fresh worker also pays for compiling everything the pane pulls in — so the settle the harness does
+ * comes back before the pane has filled, and every one of these asserted on an empty screen once
+ * (docs/future/terminal/phase-6-panes-sweep.md).
+ *
+ * Bounded, and the frame comes back either way: a pane that never fills is itself a finding, and this
+ * reports it as a missing line on a screen somebody can read rather than as a timeout.
+ */
+const screenFor = async (
+  pane: string,
+  options: { until: string; width?: number; height?: number },
+): Promise<string> => {
+  const screen = await renderFixture({ pane, ...(options.width ? { width: options.width } : {}), ...(options.height ? { height: options.height } : {}) })
+  let frame = await screen.frame()
+  for (let tries = 0; tries < 20 && !frame.includes(options.until); tries += 1) {
+    // A real wait, not just another flush: what is outstanding is a route and, on a cold worker, the
+    // compile of everything the pane imports. Turning the render loop does not make either finish.
+    await new Promise((done) => setTimeout(done, 250))
+    frame = await screen.frame()
+  }
+  screen.done()
+  drewCleanly(frame, pane)
+  fitsIn(frame, options.width ?? 80)
+  return frame
+}
+
+describe.skipIf(!hasFfi)('every pane at 80 by 24', () => {
+  it('agents: the session list, with its state and model under the title', async () => {
+    const frame = await screenFor('agents', { until: 'MANAGED SESSIONS' })
+    expect(frame).toContain('MANAGED SESSIONS')
+    expect(frame).toContain('Find why the old password still works')
+    // `Row variant="stacked"` puts the subtitle on its own line here, as it does on the DOM. Drawing
+    // both on one line ran the title into the model name with nothing between them.
+    expect(frame).toContain('claude · claude-opus-5 · idle')
+  }, 60_000)
+
+  it('github: the pull request, its state and its files', async () => {
+    const frame = await screenFor('pr', { until: '#42' })
+    expect(frame).toContain('#42')
+    expect(frame).toContain('Invalidate the old password on reset')
+    expect(frame).toContain('(fix-login) → (main)')
+    // The overview, and not the file list: at 80 by 24 the pane is 77 cells and the navigator's folds
+    // run past the bottom, so `Files 2` is a count on the first screen and the names are a scroll away.
+    // That is the pane behaving — the thing it is for is what this pull request is — and it is written
+    // down rather than fixed, because closing the folds by default would cost the reader a press on
+    // every host (docs/future/terminal/findings.md).
+    expect(frame).toContain('Description')
+  }, 60_000)
+
+  it('changes: staged and unstaged, with the commit line at the foot', async () => {
+    const frame = await screenFor('changes', { until: 'STAGED' })
+    expect(frame).toContain('STAGED')
+    expect(frame).toContain('src/login.ts')
+    expect(frame).toContain('+12 −3')
+    expect(frame).toContain('Commit staged')
+  }, 60_000)
+
+  it('notes: the three scopes and the notes in them', async () => {
+    const frame = await screenFor('notes', { until: 'Repro steps' })
+    expect(frame).toContain('TASK')
+    expect(frame).toContain('Repro steps')
+    expect(frame).toContain('Conventions')
+  }, 60_000)
+
+  it('context: the sections, what is in them, and the send at the foot', async () => {
+    const frame = await screenFor('context', { until: 'Working tree' })
+    expect(frame).toContain('2 sections')
+    expect(frame).toContain('Working tree')
+    expect(frame).toContain('Sync context')
+  }, 60_000)
+
+  it('editor: the file box, and the offer to hand the file to $EDITOR', async () => {
+    const frame = await screenFor('editor', { until: '$EDITOR' })
+    expect(frame).toContain('Editor')
+    // The handoff, as a device preference rather than a suspend-and-resume: turning it on opens the
+    // reader's own editor in a PTY on the node, and on this host that PTY draws in cells
+    // (docs/editor.md § Editing in your own editor).
+    expect(frame).toContain('$EDITOR')
+  }, 60_000)
+
+  // Wider than 80, because that is what a `reduced` node's loss is about: a pane that reads at 80 has
+  // to keep reading when the window is bigger rather than leaving a column stranded. The PR pane is
+  // the one with two columns of its own, so it is the one worth asking.
+  it('holds together at 120 by 40, where the PR pane draws both its columns', async () => {
+    const frame = await screenFor('pr', { until: 'Comments/Commits', width: 120, height: 40 })
+    expect(frame).toContain('Invalidate the old password on reset')
+    expect(frame).toContain('Diff')
+  }, 60_000)
+
+  // Driving one, rather than reading it: open a session and read what the agent said. At 120 the pane
+  // draws both its columns, which is the size this asks about — the transcript, a tool card, the
+  // approval and the composer are the four things the plugin table promises the terminal
+  // (01-why.md). At 80 the same four are behind the layout's group switch, which the layout suite owns.
+  it('agents: a session opens on a transcript, a tool card, an approval and a composer', async () => {
+    const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
+    // Tab to the session list, wherever the cycle starts, then open the row the caret is on.
+    for (let step = 0; step < 4; step += 1) {
+      const caret = (await screen.frame()).split('\n').find((line) => line.includes('\u203a')) ?? ''
+      if (caret.includes('Find why')) break
+      await screen.press('TAB')
+    }
+    await screen.press('RETURN')
+    const frame = await screen.frame()
+    screen.done()
+
+    drewCleanly(frame, 'agents')
+    fitsIn(frame, 120)
+    // The transcript, as the reader's own words and the agent's answer.
+    expect(frame).toContain('Why does the old password still work after a reset?')
+    expect(frame).toContain('signIn still checks')
+    // A tool card, folded.
+    expect(frame).toContain('Read src/login.ts')
+    // The approval, with both answers on it.
+    expect(frame).toContain('Write src/login.ts')
+    expect(frame).toContain('[Allow] [Deny]')
+    // And the composer at the foot.
+    expect(frame).toContain('Ask the agent')
+  }, 60_000)
+})

@@ -508,8 +508,14 @@ Shipped 2026-08-31. Some people have spent fifteen years
 in vim and are not going to stop for a pane. The editor pane's file view can hold their editor
 instead of CodeMirror: one device preference, `editor_mode`, and when it says `terminal` the pane
 mounts a PTY rectangle over `$EDITOR <file>` (then `$VISUAL`, then `vi`) in the task's worktree.
-Graphical is the default and stays it. It is the desktop twin of what the TUI will do by suspending
-its renderer and handing the file over.
+Graphical is the default and stays it.
+
+**On the terminal client this is the whole handoff.** The design for that host planned a suspend: release
+the terminal, run `$EDITOR`, resume, redraw. Nothing needed building. The PTY is on the node and the
+`pty` rectangle draws it in cells, so the same preference gives a reader vim inside the terminal they
+were already in, and the pane refetches the file when it exits exactly as it does here. What the
+terminal client does not have is the graphical side: with the preference off it draws the box and a line
+saying the file opens there.
 
 **The PTY is throwaway.** Its own short-lived channel on the one authenticated socket
 (`editor:pty:*`, `plugins/editor/src/shared/editorPty.ts`), a client-minted id, and a spawn that dies

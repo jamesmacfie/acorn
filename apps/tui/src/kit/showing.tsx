@@ -6,8 +6,8 @@ import type { CollectionItem } from '@acorn/client-core/kit/keys/collectionInten
 import type { CodeRow, DiffFile, Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
 import { buildDiffRows, plainTokenize } from '@acorn/client-core/kit/diff/diffModel.ts'
 import { createCellCollection, type ItemProps } from '../keys/collection'
-import { flatten, Line, pad, runStyle, slot } from './cells'
-import { markdownLines } from './markdown'
+import { flatten, hasNode, Line, pad, Run, runStyle, slot } from './cells'
+import { markdownLines, type Line as MarkdownLine } from './markdown'
 import { borderCell, rule, spaceCells } from './roles'
 import { GLYPHS } from './glyphs'
 import { spinnerFrame } from './tick'
@@ -74,6 +74,7 @@ export function Row(props: {
     <box
       flexDirection="row"
       gap={1}
+      flexShrink={0}
       paddingLeft={props.depth ? props.depth * 2 : 0}
       ref={(element: BoxRenderable) => {
         // The row is where focus lands, so the collection can put it there and a region's first stop
@@ -86,7 +87,21 @@ export function Row(props: {
     >
       <Line tone="accent">{isActive() ? '›' : ' '}</Line>
       {slot(props.leading)}
-      <Line role={props.selected ? 'match' : 'body'}>{props.children}</Line>
+      {/* Words get the row's own role; a tree brought its own, and the row only decides how the parts
+          sit. `stacked` is a title over a subtitle, which is what it is on the DOM — drawing both on
+          one line ran the agents session titles into their model names with no space between
+          (docs/future/terminal/phase-6-panes-sweep.md). */}
+      <Show
+        when={hasNode(props.children)}
+        fallback={<Line role={props.selected ? 'match' : 'body'}>{props.children}</Line>}
+      >
+        <box
+          flexDirection={props.variant === 'stacked' ? 'column' : 'row'}
+          gap={props.variant === 'stacked' ? 0 : 1}
+        >
+          {slot(props.children)}
+        </box>
+      </Show>
       <box flexGrow={1} />
       {slot(props.meta)}
       {slot(props.trailing)}
@@ -127,9 +142,20 @@ export function TreeRow(props: {
   )
 }
 
-/** The row's actions as glyphs at the right end, always drawn, never on hover. */
-export function RowActions(props: { ariaLabel: string; children: JSX.Element }) {
-  return <box flexDirection="row" gap={1}>{props.children}</box>
+/** The row's actions at the right end, always drawn, never on hover.
+ *
+ *  Its children are a render prop taking the menu's own context, because a `Menu.Item` needs it to
+ *  close the list — and drawing them directly handed that function to Solid, which called it with
+ *  nothing and left every item with `context: undefined`. Found by the pane sweep, on the agents
+ *  session list (docs/future/terminal/phase-6-panes-sweep.md).
+ *
+ *  The DOM's is an ellipsis button opening a menu. Here the items are the row's trailing glyphs, which
+ *  is what the node's own sentence says (docs/ui-design.md § Every node at 80 by 24): there is no
+ *  pointer to open a menu with, and a row of glyphs is one fewer press. So the context they are handed
+ *  closes nothing, because there is no list to close.
+ */
+export function RowActions(props: { ariaLabel: string; children: (menu: { close: () => void }) => JSX.Element }) {
+  return <box flexDirection="row" gap={1}>{props.children({ close: () => {} })}</box>
 }
 
 // How many rows a virtualised list keeps around the window, so a move by one does not have to
@@ -183,6 +209,9 @@ export function Rows<T extends CollectionItem>(props: {
   return (
     <box
       flexDirection="column"
+      // `flexShrink={0}`, like every block node in ./grouping.tsx: a terminal clips rather than
+      // squeezing, and a list given less room than its rows walks them onto each other.
+      flexShrink={0}
       ref={(element: BoxRenderable) => { box = element; setRows(element.height); collection.attach(element) }}
       onSizeChange={() => setRows(box?.height ?? 0)}
     >
@@ -373,6 +402,30 @@ export function Log(props: { lines: readonly string[]; follow?: boolean; find?: 
   )
 }
 
+/** Lines of runs, as the markdown pass produced them. Its own component because provider HTML goes
+ *  through the same pass and is drawn the same way (../kit/host.tsx § ProviderHtml). */
+export function Lines(props: { lines: MarkdownLine[] }) {
+  return (
+    <box flexDirection="column">
+      <For each={props.lines}>
+        {(line) => (
+          <Show when={!line.rule} fallback={<Line role="muted">{rule(40)}</Line>}>
+            {/* One `text` with a `span` per run, not a row of `Line`s: a row of text renderables is a
+                row of boxes to yoga, and at a width they do not fit each one is shrunk and clips its
+                own content — which cut three letters out of every run of a wrapped paragraph
+                (../kit/cells.tsx § Run). */}
+            <box flexDirection="row" paddingLeft={line.indent ?? 0}>
+              <text wrapMode="word">
+                <For each={line.runs}>{(run) => <Run role={run.role} tone={run.tone}>{run.text}</Run>}</For>
+              </text>
+            </box>
+          </Show>
+        )}
+      </For>
+    </box>
+  )
+}
+
 /** reduced: no images, and a link is its text with the URL beside it in dim. The policy is the
  *  shell's; this draws what it decided (./markdown.ts). */
 export function Markdown(props: {
@@ -383,19 +436,7 @@ export function Markdown(props: {
   onSelect?: (href: string) => void
 }) {
   const lines = createMemo(() => markdownLines(props.text))
-  return (
-    <box flexDirection="column">
-      <For each={lines()}>
-        {(line) => (
-          <Show when={!line.rule} fallback={<Line role="muted">{rule(40)}</Line>}>
-            <box flexDirection="row" paddingLeft={line.indent ?? 0}>
-              <For each={line.runs}>{(run) => <Line role={run.role} tone={run.tone}>{run.text}</Line>}</For>
-            </box>
-          </Show>
-        )}
-      </For>
-    </box>
-  )
+  return <Lines lines={lines()} />
 }
 
 // ── Tables ────────────────────────────────────────────────────────────────────────────────────

@@ -339,15 +339,102 @@ importers:
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../../plugins/agents
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
+      '@acorn/plugin-changes':
+        specifier: workspace:*
+        version: link:../../plugins/changes
+      '@acorn/plugin-context':
+        specifier: workspace:*
+        version: link:../../plugins/context
+      '@acorn/plugin-docker':
+        specifier: workspace:*
+        version: link:../../plugins/docker
+      '@acorn/plugin-editor':
+        specifier: workspace:*
+        version: link:../../plugins/editor
+      '@acorn/plugin-github':
+        specifier: workspace:*
+        version: link:../../plugins/github
+      '@acorn/plugin-memory':
+        specifier: workspace:*
+        version: link:../../plugins/memory
       '@acorn/plugin-notes':
         specifier: workspace:*
         version: link:../../plugins/notes
+      '@acorn/plugin-onboarding':
+        specifier: workspace:*
+        version: link:../../plugins/onboarding
+      '@acorn/plugin-preview':
+        specifier: workspace:*
+        version: link:../../plugins/preview
+      '@acorn/plugin-terminal':
+        specifier: workspace:*
+        version: link:../../plugins/terminal
+      '@acorn/plugin-workflows':
+        specifier: workspace:*
+        version: link:../../plugins/workflows
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@codemirror/lang-cpp':
+        specifier: ^6.0.3
+        version: 6.0.3
+      '@codemirror/lang-css':
+        specifier: ^6.3.1
+        version: 6.3.1
+      '@codemirror/lang-go':
+        specifier: ^6.0.1
+        version: 6.0.1
+      '@codemirror/lang-html':
+        specifier: ^6.4.12
+        version: 6.4.12
+      '@codemirror/lang-java':
+        specifier: ^6.0.2
+        version: 6.0.2
+      '@codemirror/lang-javascript':
+        specifier: ^6.2.5
+        version: 6.2.5
+      '@codemirror/lang-json':
+        specifier: ^6.0.2
+        version: 6.0.2
+      '@codemirror/lang-markdown':
+        specifier: ^6.5.2
+        version: 6.5.2
+      '@codemirror/lang-python':
+        specifier: ^6.2.1
+        version: 6.2.1
+      '@codemirror/lang-rust':
+        specifier: ^6.0.2
+        version: 6.0.2
+      '@codemirror/lang-sql':
+        specifier: ^6.10.0
+        version: 6.10.0
+      '@codemirror/lang-xml':
+        specifier: ^6.1.0
+        version: 6.1.0
+      '@codemirror/lang-yaml':
+        specifier: ^6.1.3
+        version: 6.1.3
+      '@codemirror/language':
+        specifier: ^6.12.4
+        version: 6.12.4
+      '@codemirror/legacy-modes':
+        specifier: ^6.5.3
+        version: 6.5.3
+      '@codemirror/state':
+        specifier: ^6.7.1
+        version: 6.7.1
+      '@codemirror/theme-one-dark':
+        specifier: ^6.1.3
+        version: 6.1.3
+      '@codemirror/view':
+        specifier: ^6.43.9
+        version: 6.43.9
       '@opentui/core':
         specifier: ^0.5.9
         version: 0.5.9(typescript@6.0.3)(web-tree-sitter@0.25.10)
@@ -360,6 +447,18 @@ importers:
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13)
+      '@xterm/addon-fit':
+        specifier: ^0.10.0
+        version: 0.10.0(@xterm/xterm@5.5.0)
+      '@xterm/addon-webgl':
+        specifier: ^0.18.0
+        version: 0.18.0(@xterm/xterm@5.5.0)
+      '@xterm/xterm':
+        specifier: ^5.5.0
+        version: 5.5.0
+      codemirror:
+        specifier: ^6.0.2
+        version: 6.0.2
       diff:
         specifier: ^9.0.0
         version: 9.0.0
@@ -372,6 +471,18 @@ importers:
       idb-keyval:
         specifier: ^6.2.5
         version: 6.2.5
+      lucide-static:
+        specifier: ^1.27.0
+        version: 1.27.0
+      seroval:
+        specifier: ^1.3.3
+        version: 1.5.4
+      seroval-plugins:
+        specifier: ^1.3.3
+        version: 1.5.4(seroval@1.5.4)
+      shiki:
+        specifier: ^4.2.0
+        version: 4.2.0
       solid-js:
         specifier: 'catalog:'
         version: 1.9.13
@@ -481,6 +592,12 @@ importers:
       '@tanstack/solid-virtual':
         specifier: ^3.13.29
         version: 3.13.29(solid-js@1.9.13)
+      '@xterm/addon-fit':
+        specifier: ^0.10.0
+        version: 0.10.0(@xterm/xterm@5.5.0)
+      '@xterm/xterm':
+        specifier: ^5.5.0
+        version: 5.5.0
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2
@@ -964,12 +1081,6 @@ importers:
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13)
-      '@xterm/addon-fit':
-        specifier: ^0.10.0
-        version: 0.10.0(@xterm/xterm@5.5.0)
-      '@xterm/xterm':
-        specifier: ^5.5.0
-        version: 5.5.0
       hono:
         specifier: 'catalog:'
         version: 4.12.32
@@ -1028,12 +1139,6 @@ importers:
       '@vscode/ripgrep':
         specifier: ^1.15.9
         version: 1.18.0
-      '@xterm/addon-fit':
-        specifier: ^0.10.0
-        version: 0.10.0(@xterm/xterm@5.5.0)
-      '@xterm/xterm':
-        specifier: ^5.5.0
-        version: 5.5.0
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2

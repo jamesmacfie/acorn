@@ -96,7 +96,14 @@ describe('docs cite paths that exist', () => {
     const broken: string[] = []
     let checked = 0
     for (const file of FILES) {
+      // Fences are skipped here and nowhere else. What is inside one is sample text or captured
+      // output, and the avatar and chip a terminal screenshot draws around an author name is not
+      // a link to a file. The path check above still reads fences, because a path in an example is a
+      // claim about the tree either way.
+      let fenced = false
       for (const [index, line] of readFileSync(file, 'utf8').split('\n').entries()) {
+        if (line.startsWith('```')) fenced = !fenced
+        if (fenced) continue
         LINK.lastIndex = 0
         let match: RegExpExecArray | null
         while ((match = LINK.exec(line))) {

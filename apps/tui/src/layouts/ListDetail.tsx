@@ -76,7 +76,10 @@ export function ListDetail(props: LayoutProps) {
       </Show>
       <Show when={showList() && showDetail()}><Rule axis="y" /></Show>
       <Show when={showDetail()}>
-        <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1)}>
+        {/* `minWidth={0}`, because a flex child's floor is its own content and a detail region's content
+            is routinely wider than its share. Without it the row reports a width the screen does not
+            have (docs/future/terminal/phase-6-panes-sweep.md). */}
+        <box flexDirection="column" flexGrow={1} minWidth={0} ref={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1)}>
           {props.regions.detail?.()}
         </box>
       </Show>

@@ -223,6 +223,11 @@ test.skipIf(!hasFfi)('a tree drawn from a batch and the same tree written as JSX
     />
   ))
   send!(ops)
+  // A real wait, not just a settle. A batch lands on the shell's own tick rather than on a frame
+  // (../kit/tick.ts), and `renderCells`'s settle resolves off the render loop in a microtask — so it
+  // comes back before that timer has run, and a renderer whose tree was still empty has never painted
+  // at all, which reads as an uninitialised buffer rather than a blank screen.
+  await new Promise((done) => setTimeout(done, 100))
   const drawn = await remote.frame()
   remote.done()
 

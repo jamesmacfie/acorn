@@ -16,8 +16,14 @@ import { trapKeys } from '../keys/trap'
 // `Modal` and an open `Menu` push a layer above the pane's that answers `dismiss` and swallows the
 // rest (../keys/trap.ts, docs/future/terminal/05-keys-and-focus.md § Traps).
 
+// `flexShrink={0}` on every block node in this file, and on the rows in ./showing.tsx. A terminal's
+// answer to "there is not enough room" is to clip, never to squeeze: yoga's default is to take a
+// height deficit out of every child that will give, and a one-line row given half a line lands on the
+// line above it — which drew the PR pane as two screens interleaved character by character
+// (docs/future/terminal/phase-6-panes-sweep.md). The region that holds them scrolls or clips, which is
+// the reader's own answer.
 export function Stack(props: { gap?: Space; children: JSX.Element }) {
-  return <box flexDirection="column" gap={spaceLines(props.gap ?? 'stack')}>{props.children}</box>
+  return <box flexDirection="column" flexShrink={0} gap={spaceLines(props.gap ?? 'stack')}>{props.children}</box>
 }
 
 export function Inline(props: { gap?: Space; wrap?: boolean; children: JSX.Element }) {
@@ -30,7 +36,7 @@ export function Inline(props: { gap?: Space; wrap?: boolean; children: JSX.Eleme
 
 export function Section(props: { label: string; count?: number; actions?: JSX.Element; sticky?: boolean; children: JSX.Element }) {
   return (
-    <box flexDirection="column" marginTop={spaceLines('section')}>
+    <box flexDirection="column" flexShrink={0} marginTop={spaceLines('section')}>
       <box flexDirection="row" gap={1}>
         <Line role="eyebrow">{props.label}</Line>
         <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
@@ -65,8 +71,8 @@ export function Fold(props: {
     props.onOpenChange?.(next)
   }
   return (
-    <box flexDirection="column">
-      <box flexDirection="row" gap={1} onMouseDown={toggle}>
+    <box flexDirection="column" flexShrink={0}>
+      <box flexDirection="row" gap={1} flexShrink={0} onMouseDown={toggle}>
         <Line role="body">{open() ? '▾' : '▸'}</Line>
         <Line role="strong">{props.label}</Line>
         <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
@@ -95,7 +101,7 @@ export function Card(props: {
 }) {
   const surface = borderCell('surface')
   return (
-    <box flexDirection="row" marginTop={isCompact() ? 0 : 1} marginBottom={isCompact() ? 0 : 1}>
+    <box flexDirection="row" flexShrink={0} marginTop={isCompact() ? 0 : 1} marginBottom={isCompact() ? 0 : 1}>
       <Show when={props.stripe}>
         {(tone) => <Line tone={tone()}>{borderCell('stripe').glyph}</Line>}
       </Show>
@@ -119,6 +125,14 @@ export function Card(props: {
 export function Timeline(props: { ariaLabel?: string; follow?: boolean; viewKey?: string; children: JSX.Element }) {
   return <box flexDirection="column" flexGrow={1}>{props.children}</box>
 }
+
+/** One turn in a `Timeline`. The compound half, and it has to exist: `Timeline.Turn` on a `Timeline`
+ *  with no `Turn` is `undefined` passed to `createComponent`, which is a pane that fails to draw
+ *  rather than a pane that draws badly. Found by the pane sweep, on the PR conversation
+ *  (docs/future/terminal/phase-6-panes-sweep.md). */
+Timeline.Turn = (props: { children: JSX.Element }) => (
+  <box flexDirection="column" marginTop={spaceLines('row')}>{props.children}</box>
+)
 
 /** `Tab  [Tab]  Tab` on one line, the selected one in brackets. */
 export function Tabs(props: {
@@ -205,7 +219,12 @@ export function ModalBody(props: { children: JSX.Element }) {
   return <box flexDirection="column" flexGrow={1}>{props.children}</box>
 }
 
-/** The buttons on one line, at the far end of the box. */
+/** The compound spellings, so a pane may write either.
+ *
+ *  `ModalBody` and `Modal.Body` are the same node under two names — the kit table flattens compound
+ *  halves and a pane writes whichever reads better at its call site. The DOM kit carries both; this
+ *  one carried only the flat pair, so eight panes in the roster did not compile
+ *  (docs/future/terminal/phase-6-panes-sweep.md). */
 export function ModalActions(props: { children: JSX.Element }) {
   return (
     <box flexDirection="row" gap={1} marginTop={spaceLines('section')}>
@@ -253,6 +272,41 @@ function MenuList(props: { close: () => void; children: JSX.Element }) {
     </box>
   )
 }
+
+Modal.Body = ModalBody
+Modal.Actions = ModalActions
+
+/** One action in a `Menu`. `onSelect` fires and the list closes.
+ *
+ *  A row rather than a button, because the only thing a reader can drive in a cell overlay is a
+ *  collection — the same reason the quit confirmation is a list (../chrome/Shell.tsx). The context is
+ *  the menu's own, so an item closes the list it is in. */
+Menu.Item = (props: {
+  context: { close: () => void }
+  onSelect: () => void
+  disabled?: boolean
+  closeOnSelect?: boolean
+  tone?: 'neutral' | 'danger'
+  leading?: JSX.Element
+  trailing?: JSX.Element
+  title?: string
+  children: JSX.Element
+}) => (
+  <box
+    flexDirection="row"
+    gap={1}
+    onMouseDown={() => {
+      if (props.disabled) return
+      props.onSelect()
+      if (props.closeOnSelect !== false) props.context.close()
+    }}
+  >
+    {slot(props.leading)}
+    <Line tone={props.disabled ? 'muted' : props.tone === 'danger' ? 'danger' : undefined}>{flatten(props.children)}</Line>
+    <box flexGrow={1} />
+    {slot(props.trailing)}
+  </box>
+)
 
 /** reduced: the panel opens as a full-width block under its anchor, not floating. That is the whole
  *  loss, and it is the one every terminal overlay takes. */
@@ -310,7 +364,16 @@ export function ListDetail(props: {
       ref={(element: BoxRenderable) => { box = element; setWidth(element.width) }}
       onSizeChange={() => setWidth(box?.width ?? NARROW_AT)}
     >
-      <Show when={props.list !== undefined || props.split} fallback={props.children}>
+      {/* `split` is the form where both columns are children — a `ListColumn` and a `DetailColumn` —
+          rather than one of them arriving in `list`. The DOM hands those straight to its grid; this
+          gated on `list ?? split` and so drew an empty 32-cell gutter beside the pr pane's navigator
+          for a `list` nobody passed (docs/future/terminal/phase-6-panes-sweep.md).
+          Below 80 cells the two stack instead of sitting side by side, which is this node's own
+          answer to "one column at a time": it has no keys of its own to switch with, and a column of
+          38 cells is a column nobody can read. */}
+      <Show when={props.list !== undefined} fallback={
+        <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1}>{props.children}</box>
+      }>
         <Show when={!narrow()}>
           <box flexDirection="column" width={LIST_CELLS}>{props.list}</box>
           <box width={1}><Line>│</Line></box>
@@ -326,7 +389,11 @@ export function ListDetail(props: {
 export function ListColumn(props: { label?: string; scroll?: boolean; children: JSX.Element }) {
   return (
     <box flexDirection="column" flexGrow={1} overflow={props.scroll ? 'scroll' : 'visible'}>
-      <Show when={props.label}><Line role="eyebrow">{props.label!}</Line></Show>
+      {/* In a box of its own so the deficit a taller-than-the-screen column creates cannot be taken out
+          of the label: a one-line run given half a line lands on the line above it, which drew this
+          column's own name over the heading under it
+          (docs/future/terminal/phase-6-panes-sweep.md). */}
+      <Show when={props.label}><box flexShrink={0}><Line role="eyebrow">{props.label!}</Line></box></Show>
       {props.children}
     </box>
   )

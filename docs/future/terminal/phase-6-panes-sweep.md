@@ -1,6 +1,6 @@
 # Phase 6: every pane at 80 by 24
 
-Status: not started. Waits on phase 4. Runs beside phase 5.
+Status: **shipped 2026-08-31.**
 
 ## Goal
 
@@ -93,3 +93,66 @@ by 24.
 - The plugin table in [01-why.md](./01-why.md) still matches the plugins in `plugins/`.
 - `plugins/editor/src/client/EditorPane.tsx` still mounts Monaco through a `Rectangle`.
 - `plugins/docker/src/client/DockerExecTerminal.tsx` still mounts through a `Rectangle`.
+
+## What shipped, and where it differs
+
+The roster is the whole of it: `apps/tui/src/App.tsx` registers the same twelve client plugins the
+desktop does, and eight panes appear in the strip. Everything else in this phase is what that cost.
+[findings.md](./findings.md) § What phase 6 did with these has the fifteen findings; these are the
+places the plan itself was wrong or short.
+
+- **The `$EDITOR` handoff was already built, and `handoff.ts` was the wrong design.** This file
+  described releasing the terminal, spawning `$EDITOR`, waiting, resuming and refetching. The editor
+  pane already has a terminal mode — one device preference swaps CodeMirror for a throwaway PTY running
+  the reader's own editor on the worktree — and that PTY lives on the node, so in cells it simply
+  draws. There is no suspend, no `handoff.ts`, and no host verb.
+
+- **What the two PTY callers moved onto is not the rectangle's handle.** The plan said docker exec and
+  the editor's PTY would write to what a `pty` rectangle hands back. They do not, and could not without
+  each of them knowing which host it is on: the DOM hands an element and the terminal hands an
+  emulator. So the promise moved instead. `attachPty(handle, io)` on `@acorn/plugin-api/ui` takes the
+  channel — open at a size, bytes in, bytes out — and the host draws the emulator, an xterm on one side
+  and OpenTUI's on the other. Both callers are about fifteen lines now and neither spells xterm. The
+  terminal plugin's own drawer surface keeps its copy, because its options are a theme, a font size, a
+  WebGL renderer and a Shift+Enter rule, none of which means anything in cells.
+
+- **Two barrels crossed, not one.** Phase 5 left `@acorn/plugin-api/ui/host` and this phase owed it.
+  It also owed `@solidjs/router`, which nobody had counted: it reads `window.history.state` at module
+  scope, so it cannot be imported in this process at all, and github's own composition reaches it
+  eagerly. The host switch has four aliases now rather than two.
+
+- **The prop types are shared rather than mirrored.** With the roster in the same tsc program the
+  terminal kit's hand-written prop types failed 135 ways, because four of them had quietly lost a prop.
+  `ButtonProps` and four siblings are exported from the DOM kit and imported as types by the terminal
+  one, which is the fix rather than a bigger copy.
+
+- **The largest finding is a layout rule, not a pane.** Nothing in the kit may shrink. A pane taller
+  than 24 rows is the normal case, and yoga's answer — take the deficit out of every child — walks rows
+  onto each other. The kit's block nodes and rows refuse to shrink and the pane's box clips.
+  `scrollbox` is refused, with the reason in `chrome/PaneRow.tsx`.
+
+- **Snapshots are strings, not buffers.** `apps/tui/src/panes.test.tsx` names one thing per pane rather
+  than pinning every cell, for the same reason the per-node cases do, and waits for that string rather
+  than for a fixed time. A whole-buffer snapshot per pane would fail on every spacing decision anybody
+  makes afterwards and name no broken promise.
+
+- **Two rows of the plugin table changed and one came off.** `preview` is absent here: its pane asks
+  for the `preview` seam and this host installs none, so it is not in the strip rather than in the strip
+  and empty. The editor's row is the handoff rather than a read-only view. The terminal's row loses the
+  drawer, which is a place between two icon rails. [01-why.md](./01-why.md) says so.
+
+## What this phase deliberately left
+
+Three things, and the third is the one to watch.
+
+- **The read-only text view inside an `editor` rectangle.** The box draws and says the file opens
+  there, and `$EDITOR` opens in it. Reading a file without leaving the pane needs a find bar wired to a
+  text region that does not exist.
+
+- **A settings surface.** Four plugins register a settings page and nothing here draws one, so
+  `workflows` contributes nothing to this host at all. That is chrome, and chrome was phase 4.
+
+- **The no-shrink rule has no test that holds it.** One `flexShrink` left at its default on a pane's
+  path brings the interleaving back, and what catches it is a pane suite noticing a string is missing
+  rather than a rule saying why. An arch rule over the kit's own boxes would hold it; a rule that reads
+  JSX is not one this repo has.
