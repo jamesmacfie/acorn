@@ -6,7 +6,6 @@ import type { Task } from '@acorn/protocol/api.ts'
 import { installPlatform } from './platform'
 import { openNode } from './node/open'
 import { installKeymap } from './keys/install'
-import { App } from './App'
 
 // `acorn`.
 //
@@ -64,6 +63,13 @@ const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/rel
 setCacheStorage(fileCacheStorage())
 
 await selectActiveNode()
+
+// The roster, and not one line earlier. `App` calls `initClientPlugins` at module scope, which runs
+// every plugin's `activate` pass, and agents' primes its session store over HTTP as it goes. A static
+// import here evaluated that before `installPlatform` had run, so `send` found no transport, took its
+// no-broker fallback into global `fetch`, and handed Node a relative path to parse. The suite's
+// harness already imports `App` this way (./harness.tsx).
+const { App } = await import('./App')
 
 const tasks = await readJson<Task[]>(tasksRoute).catch(async (error: unknown) => {
   await platform.dispose()
