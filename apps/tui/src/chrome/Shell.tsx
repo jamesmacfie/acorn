@@ -12,6 +12,7 @@ import { registerKeybindings } from '@acorn/client-core/host/registries/commands
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
+import { pendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { Dynamic } from '@opentui/solid'
 import { Line, Rule } from '../kit/cells'
 import { EmptyState, Row, Rows } from '../kit/showing'
@@ -28,6 +29,7 @@ import { Topbar } from './Topbar'
 import { PaneBody, PaneStrip } from './PaneRow'
 import { Footer } from './Footer'
 import { Notifications, dismissNotifications } from './Notifications'
+import { TrustPrompt } from '../plugins/TrustPrompt'
 import { Palette } from './Palette'
 import { CheatSheet } from './CheatSheet'
 
@@ -65,6 +67,15 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     if (activeTaskId() || selectedSource()) return
     const first = model.tasks()[0]
     if (first) activateTaskSignals(first)
+  })
+
+  // A bundle this device has never decided about. Raised rather than opened by a key, because nobody
+  // asked for it: the distribution pass found code a node is offering and nothing runs until the
+  // reader answers (../plugins/TrustPrompt.tsx). Escape drops the queue entry, which is what closes
+  // this again.
+  createEffect(() => {
+    if (pendingTrust().length) openOverlay('trust')
+    else closeOverlay('trust')
   })
 
   // The pane chords, answered by the shell because this host draws one pane and "the next pane" is a
@@ -196,6 +207,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
                 <Match when={name() === 'palette'}><Palette model={model} /></Match>
                 <Match when={name() === 'help'}><CheatSheet /></Match>
                 <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
+                <Match when={name() === 'trust'}><TrustPrompt /></Match>
               </Switch>
             )}
           </Show>

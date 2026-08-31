@@ -425,3 +425,91 @@ Found here, and worth knowing:
   only JS reader of those blocks walks the repo from `pnpm-workspace.yaml` and is test-only by
   construction. The terminal keeps its own palette until the appearance layer publishes the tokens as
   data.
+
+## What phase 5 did with these
+
+Shipped 2026-08-31. Phase 5 is the sandbox and custody, so only one of the findings above was its to
+close, and it closed it. The rest of what it found is new, and two pieces of it correct the design.
+
+Closed:
+
+- **http and linear have no compiled half.** They still do not, and now that is no longer a reason
+  they cannot be drawn: a tree bundle renders here through the same worker host, the same handshake
+  and the same mutations the desktop uses, into cells. What stands between them and the screen is a
+  built bundle to install rather than anything in this host, which is the pane sweep's and the
+  packaged-build's business rather than this folder's.
+
+Found here, and worth knowing:
+
+- **A worker thread's permission grants are its own, and the design said otherwise.**
+  [06-isolation.md](./06-isolation.md) reads "`--permission` is process-wide in Node and a worker
+  thread inherits the parent's grants", and planned a child process per plugin with the two ports over
+  IPC as the fallback. Measured on Node 24.11 and 26: `new Worker(file, { execArgv: ['--permission',
+  '--allow-fs-read=…'] })` applies the permission model **to the thread**, and the worker is denied a
+  read the parent is allowed. So the worker thread is the answer, the fallback is not needed, and the
+  TUI process itself runs with no permission flags at all — which also disposes of the note under
+  § The runtime floor above that said the host half would need `--allow-ffi` and `--allow-worker` of
+  its own before a plugin worker got none. It needs neither.
+
+- **Node's permission model does not cover the network.** It covers the filesystem, child processes,
+  worker threads and native addons. That is the one thing the DOM worker's `connect-src 'none'` gave
+  away for free, and without it a bundle could `fetch` the internet directly and route around the
+  bridge's whole scope allowlist. It is closable in the sandbox rather than only at rung 3:
+  `module.registerHooks` refuses fourteen builtins by name before a stranger's module scope runs, and
+  `fetch`, `WebSocket`, `XMLHttpRequest`, `EventSource` and `navigator` are deleted. `node:module` is
+  on the deny list so a bundle cannot register a hook of its own; `node:worker_threads` so it cannot
+  start a thread that inherited none of it.
+
+- **Node transfers a `MessagePort` by reachability, not by a transfer list.** `worker.postMessage(v,
+  [portA, portB])` in a browser delivers them at `event.ports`; in Node a port named only in the
+  transfer list arrives nowhere at all, and the bridge reads `event.ports[0]` and `[1]`. So the
+  factory puts them in the message body under `__ports` and the bootstrap puts them back where the
+  bridge looks. That translation, plus a `message` listener and a `postMessage`, is the whole of the
+  Web Worker surface a tree bundle needs.
+
+- **A permission grant is compared as a real path.** A grant naming a path that goes through a symlink
+  matches nothing, and the worker cannot read the bundle it was started for. On macOS that is every
+  path under `TMPDIR`, so the first version of the suite failed with a denial for the file the test had
+  just granted. Both grants are `realpathSync`'d.
+
+- **`TreeHost.tsx` was one file doing two jobs**, and the second host is what made that visible. The
+  store, the whole-batch pre-flight check, the mutation apply, the prop sanitiser and the coalescer are
+  `client-core/host/tree/treeState.ts` now, with no JSX in them, and each host owns a shell over it:
+  its own table of components, its own placeholder, and its own answer to when a batch flushes. Two
+  copies of that logic would have been two copies of a security decision, which is the one thing this
+  folder's "same bridge, new carrier" decision exists to prevent. It also means a bare-Node suite can
+  reach the batch rules for the first time.
+
+- **`frames/register.ts` named the DOM's `RemoteTree` and the DOM's layout table.** The same shape of
+  finding phase 0 recorded for the compiled pane path, one registry over: the loaded-plugin
+  registration pass is host-neutral `.ts` that reached for two DOM modules by name. Both are
+  host-supplied now, with the DOM's as the fallback (`client-core/host/tree/table.ts`, and
+  `layouts/table.ts` which already existed and this pass was not using).
+
+- **Two bridge verbs had no host-neutral answer.** `copy` was `navigator.clipboard` and `openUrl`'s
+  last rung was `window.open`, and there is neither here. `FrameServiceHost` takes an optional `copy`
+  and `openExternal` now, so the desktop keeps the browser's answers by omission and this host says
+  OSC 52, or prints the value, or names the URL in a notification — because shelling out to a browser
+  from a terminal somebody may be reaching over ssh would open it on the wrong machine.
+
+- **A theme still cannot cross, and a plugin frame's context has to say something.** The tree's
+  `PluginFrameContext` carries `theme` and `style` for a bundle that paints its own CSS, which is not
+  something a tree bundle does. Both are `'terminal'` here, which is honest about what this host has:
+  one appearance, and it is the reader's own terminal.
+
+What phase 5 deliberately left:
+
+- **`Slot` has no terminal sibling.** A surface owner reserving a point for another plugin's tree
+  reaches it through `@acorn/plugin-api/ui/host`, which is a DOM-heavy barrel this host does not alias,
+  and no pane in this host's roster uses one. A tree bundle cannot open a slot at all — `Slot` is not
+  one of the node names a tree may emit, by design. So the work is real but it has no consumer until
+  the pane sweep registers a compiled pane that owns a point, and it belongs with the rest of that
+  barrel's crossing rather than here.
+
+- **A device-held install.** `{ path }` is a form the custody accepts and nothing offers, because
+  there is no surface to reach it from. That is `docs/future/client-plugins/`'s phase 0 on this host.
+
+- **Nothing in the roster exercises it end to end.** Every claim above is tested against a bundle the
+  suite wrote, because the two plugins that ship a tree bundle, http and linear, are built by the
+  packaged-build pipeline rather than by this repo's `pnpm build`. The first real one through this path
+  will be found by the pane sweep or by phase 7.

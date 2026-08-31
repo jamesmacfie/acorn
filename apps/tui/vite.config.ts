@@ -65,6 +65,10 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'src/main.tsx'),
         capture: resolve(import.meta.dirname, 'src/capture.tsx'),
+        // The plugin sandbox's bootstrap, emitted beside `main.js` because a worker is pointed at it
+        // by path and it has to be one file a thread with almost no filesystem can read. Its own
+        // entry rather than a chunk, so its name is stable and `workerFactory.ts` can spell it.
+        pluginWorker: resolve(import.meta.dirname, 'src/plugins/pluginWorker.js'),
       },
       external: (id: string) => externalizeBareImports(id) || builtinModules.includes(id.replace(/^node:/, '')),
       output: { format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js' },
