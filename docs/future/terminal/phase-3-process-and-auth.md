@@ -1,6 +1,6 @@
 # Phase 3: the `acorn` command
 
-Status: not started. Waits on phase 0. Runs beside phases 1 and 2.
+Status: **shipped 2026-08-31.** What differs from the plan is at the bottom.
 
 Read [findings.md](./findings.md) first: `fleetList` is what selects a node, not the transport, and `idb-keyval` sits unconditionally on the boot path.
 
@@ -115,3 +115,45 @@ server's workspace. The boot test passes in CI.
 - `packages/node-core/src/server/transport/wsHub.ts` still reads the bearer from the upgrade request's headers.
 - `apps/desktop/test/boot.test.ts` still exists and still asks `/v2/node`.
 - `openDataRoot` still takes an exclusive lock.
+
+## What shipped, and where it differs
+
+Five departures, each with the reason.
+
+- **The supervisor is the TUI's, not the helper's.** The plan said to import
+  `packages/custody/src/supervision/`. `ServiceHost` speaks the fd-3 service RPC to `service.js`; a
+  standalone node prints one JSON line on stdout and speaks no RPC. `apps/tui/src/node/supervise.ts`
+  is forty lines and copies the one part worth sharing, SIGTERM then SIGKILL after five seconds, with
+  a pointer to where it came from. See [findings.md](./findings.md) § What phase 3 did with these.
+
+- **Attaching without a token is the pairing banner**, as the plan preferred. `acorn` prints the
+  running node's pid and the `kill -USR1 <pid>` that reopens its pairing window, then runs the same
+  probe, words and code the remote path runs, against loopback. The loopback mint route stays a door.
+
+- **There is one more file than the plan named.** `node/open.ts` holds the attach-or-start decision
+  itself, because the boot test has to call it and `main.ts` is a script. `node/cache.ts` is the
+  file-backed query-cache store, which closes a phase-0 finding the plan did not list in scope.
+
+- **`nodeAdopt` and the tunnels are not installed.** Both were named in
+  [03-process-model.md](./03-process-model.md)'s seam table; neither has a surface to be reached from
+  until phase 4, and the seam already models an absent verb as a product state rather than a crash.
+  Everything else in the `fleet` group is real: `list`, `probe`, `pair`, `rename`, `forget`,
+  `reconnect`, `restartLocal`.
+
+- **The boot test lives in `src/`, not `test/`.** This package's vitest config includes
+  `src/**/*.test.{ts,tsx}` and nothing else, and adding a second root for one file would be a
+  configuration change to avoid moving a file. It is `apps/tui/src/node/boot.test.ts`.
+
+## What this phase deliberately left
+
+- **The footer is one line, not the real one.** `App.tsx` swaps its hint line for the connection
+  state when the broker reports anything but `online`, which is enough to see a `revoked` token or a
+  node that has gone away. The footer drawn from the keymap's active layers is phase 4.
+
+- **Nothing draws the fleet.** The seam carries every verb a nodes surface needs; there is no nodes
+  surface. Phase 4 draws it from these signals.
+
+- **The device token is plain bytes at 0600.** The desktop encrypts under the platform keychain
+  through a `TokenCipher`; the TUI has no keychain and supplies a pass-through, which is what
+  [06-isolation.md](./06-isolation.md) § The third column designs and what the node beside it already
+  does with its own TLS private key and session key.

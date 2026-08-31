@@ -1,28 +1,29 @@
 /** @jsxImportSource @opentui/solid */
-import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { createCliRenderer } from '@opentui/core'
 import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { render } from '@opentui/solid'
 import type { Task } from '@acorn/protocol/api.ts'
-import { installPlatform, readHandshake } from './platform'
+import { installPlatform } from './platform'
+import { openNode } from './node/open'
 import { installKeymap } from './keys/install'
 import { App } from './App'
 
-// `acorn`, phase 0. Attach-or-start, pairing and the config directory are phase 3; this is handed the
-// node's own boot line and told which task to open.
+// `acorn`.
 //
-//   pnpm dev:node                                   # copy its first line, which is JSON
-//   ACORN_NODE_HANDSHAKE='<that line>' pnpm --filter @acorn/tui dev
+//   acorn                          the node for this machine's data root: attach if one is running,
+//                                  start and supervise one if not
+//   acorn --node <https://host>     pair with a node elsewhere, then open it
+//   acorn --node <name>             open a node this device already paired with
 //
-// `--handshake <file>` reads it from a file instead, which is easier to live with than a very long
-// environment variable.
+// Phase 3 (docs/future/terminal/phase-3-process-and-auth.md). What it still does not have is chrome:
+// one pane on one task, no rail and no task switcher, which is phase 4.
 
 const { values } = parseArgs({
   options: {
+    node: { type: 'string' },
     pane: { type: 'string', default: 'notes' },
     task: { type: 'string' },
-    handshake: { type: 'string' },
   },
   allowPositionals: false,
 })
@@ -30,7 +31,7 @@ const { values } = parseArgs({
 // OpenTUI's render core is Zig reached over `node:ffi`, a Node 26.4 builtin behind a flag. Checked
 // here rather than left to the loader, because the failure it produces otherwise is a stack trace from
 // inside a chunk. Not declared as an `engines` floor on this package: the rest of the repo builds and
-// tests this one happily on the Node it already has, and only running it needs 26.4 (FINDINGS.md,
+// tests this one happily on the Node it already has, and only running it needs 26.4 (findings.md,
 // "The runtime floor").
 const [nodeMajor = 0, nodeMinor = 0] = process.versions.node.split('.').map(Number)
 if (nodeMajor < 26 || (nodeMajor === 26 && nodeMinor < 4)) {
@@ -43,25 +44,38 @@ if (values.pane !== 'notes') {
   process.exit(2)
 }
 
-const raw = values.handshake ? readFileSync(values.handshake, 'utf8').trim() : process.env.ACORN_NODE_HANDSHAKE
-if (!raw) {
-  console.error('Set ACORN_NODE_HANDSHAKE to the JSON line `pnpm dev:node` prints first, or pass --handshake <file>.')
-  process.exit(2)
-}
+// Before the renderer: pairing asks a question on stdin, and starting a node prints its own boot
+// output. Both want a plain terminal, and neither has anything to draw.
+const opened = await openNode(values.node).catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : String(error))
+  process.exit(1)
+})
 
-const { broker } = installPlatform(readHandshake(raw))
+let leaving = false
+const platform = installPlatform(opened, () => void quit())
 
 // Nothing that reaches the node may be imported before the seam exists: an import is evaluated once,
 // and a module that reads `window.acorn` at its top level would read it before the line above ran.
 const { selectActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
 const { readJson } = await import('@acorn/client-core/infra/node/apiClient.ts')
+const { setCacheStorage } = await import('@acorn/client-core/infra/node/fleet.ts')
+const { fileCacheStorage } = await import('./node/cache')
 const { tasksRoute } = await import('@acorn/protocol/api.ts')
+
+// The query cache persists to files rather than to IndexedDB, which there is none of here. Installed
+// before `selectActiveNode`, because that is what builds the first node's cache.
+setCacheStorage(fileCacheStorage())
 
 await selectActiveNode()
 
-const tasks = await readJson<Task[]>(tasksRoute)
+const tasks = await readJson<Task[]>(tasksRoute).catch(async (error: unknown) => {
+  await platform.dispose()
+  console.error(`acorn reached ${opened.nodeId} but could not read its tasks: ${error instanceof Error ? error.message : String(error)}`)
+  process.exit(1)
+})
 const task = values.task ? tasks.find((candidate) => candidate.id === values.task) : tasks[0]
 if (!task) {
+  await platform.dispose()
   console.error(values.task ? `No task ${values.task} on this node.` : 'This node has no tasks. Make one in the app first.')
   process.exit(1)
 }
@@ -75,18 +89,27 @@ if (!task) {
 // here listens for one.
 const renderer = await createCliRenderer({ exitOnCtrlC: false })
 const engine = installKeymap(renderer)
-const quit = () => {
+
+// The terminal comes back first, then the node drains. A node that started here gets its bounded
+// SIGTERM drain; one this TUI only attached to is left running, because whoever started it owns it.
+async function quit(code = 0): Promise<never> {
+  if (leaving) return await new Promise<never>(() => {}) // a second Ctrl+C during the drain waits
+  leaving = true
   renderer.destroy()
-  broker.dispose()
-  process.exit(0)
+  await platform.dispose()
+  process.exit(code)
 }
+
 // Not an intent: quitting is the shell's, and phase 4 gives it a command and a confirm when the TUI
 // is the thing that started the node.
 engine.registerLayer({
   priority: 0,
   bindings: [
-    { key: 'q', cmd: () => { quit(); return true }, active: () => !isTyping() },
-    { key: 'ctrl+c', cmd: () => { quit(); return true } },
+    { key: 'q', cmd: () => { void quit(); return true }, active: () => !isTyping() },
+    { key: 'ctrl+c', cmd: () => { void quit(); return true } },
   ],
 })
-await render(() => <App task={task} />, renderer)
+// A supervisor's SIGTERM drains the child this process started, which is the whole reason it waits.
+process.once('SIGTERM', () => void quit())
+
+await render(() => <App task={task} nodeId={opened.nodeId} />, renderer)

@@ -261,6 +261,7 @@ describe('architecture boundaries', () => {
       // Composition roots: a login-shell PATH probe, and the supervised node's own child.
       'apps/node/src/composition/runtime.ts',
       'packages/custody/src/supervision/serviceHost.ts',
+      'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/server/terminal.ts', // PTYs
       'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
@@ -745,6 +746,24 @@ describe('architecture boundaries', () => {
     expect(readsHostGlobal('const w = window.acornish')).toBe(false)
     // And the seam itself must still be doing the reading, or it's been hollowed out.
     expect(readsHostGlobal(readFileSync(join(SEAM, 'index.ts'), 'utf8'))).toBe(true)
+  })
+
+  it('the terminal client keeps custody out of everything that draws', () => {
+    // The desktop runs the renderer and the broker in two processes, so "the renderer never holds a
+    // token" is structural. The TUI is one process, so the same promise is a module boundary instead,
+    // and this is it (docs/future/terminal/06-isolation.md § The third column). Custody — the token
+    // store, the fleet store, the broker, pairing — is reachable from the process model and from the
+    // seam that installs it, and from nothing that draws a cell.
+    const MAY_HOLD_A_TOKEN = /^apps\/tui\/src\/(node\/|platform\.ts$)/
+    const importers = [...new Set(
+      EDGES
+        .filter((e) => e.fromPkg.name === '@acorn/tui' && !isTestCode(e.fromFile))
+        .filter((e) => e.target.pkg?.name === '@acorn/custody')
+        .map((e) => rel(e.fromFile)),
+    )].sort()
+    expect(importers.filter((file) => !MAY_HOLD_A_TOKEN.test(file))).toEqual([])
+    // Anti-vacuity: the seam must still be the thing that installs the broker.
+    expect(importers).toContain('apps/tui/src/platform.ts')
   })
 
   it('client code never imports node code, and vice versa', () => {

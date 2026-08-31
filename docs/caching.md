@@ -52,9 +52,13 @@ cache.
 
 ## Renderer query cache
 
-The renderer uses TanStack Query with one `QueryClient` and one IndexedDB persister per Node. The
-persister key is scoped to the Node, not merely prefixed into every feature key. This makes the cache
-partition structural: identical task or repository IDs on separate Nodes cannot collide.
+The renderer uses TanStack Query with one `QueryClient` and one persister per Node. The persister key
+is scoped to the Node, not merely prefixed into every feature key. This makes the cache partition
+structural: identical task or repository IDs on separate Nodes cannot collide.
+
+Where a partition is written is the host's, through `setCacheStorage`. IndexedDB is the default,
+because the hosts that had one were browsers; the terminal client has none and installs a directory
+of files instead, one per partition key, before the first cache is built.
 
 The persisted cache is disposable and has a bounded lifetime. It provides fast last-known reads,
 not mutation confirmation. When a Node is reconnecting or offline, cached responses remain visible

@@ -141,10 +141,12 @@ window (`apps/node/src/entries/standalone.ts`), and that signal does not exist o
 second device there means a restart until some other trigger exists (a stdin command, or a
 device-authenticated route). The terminal client is such a trigger: a TUI attached to the local node
 is an out-of-band channel of its own and can offer "open a pairing window" as a command, which is
-noted in `terminal/phase-3`'s doors left open and designed nowhere yet. And the 0600/0700 file modes
-on the data root, `session.key` and the
-TLS key are advisory at best on NTFS; the guarantee those modes state needs restating as an ACL, or
-at least an honest doc note that Windows does not get it.
+noted in `terminal/phase-3`'s doors left open and, after that phase shipped on 2026-08-31, still
+designed nowhere. And the 0600/0700 file modes on the data root, `session.key`, the TLS key and now
+the terminal client's own device-token file are advisory at best on NTFS; the guarantee those modes
+state needs restating as an ACL, or at least an honest doc note that Windows does not get it. That
+last one matters more than it did: the TUI writes its device token in plain bytes and leans on the
+mode alone (`docs/future/terminal/06-isolation.md` § The third column).
 
 ## Whether to bundle a Node runtime
 

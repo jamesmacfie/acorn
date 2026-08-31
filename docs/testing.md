@@ -76,14 +76,25 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   region table, at the same two sizes. And a twin of client-core's `keys.test.tsx` against the terminal
   adapter, so the two adapters cannot drift: where the keys land when a pane opens, the moves and their
   wrapping, activate reaching a row, the region cycle remembering its place, a modal swallowing what is
-  behind it, and a `pty` rectangle taking every key on Enter and giving them back on Escape. Two files
-  alongside need no renderer and never skip: the palette's collapse from a theme to the terminal's
-  slots, and the clipboard sequence.
+  behind it, and a `pty` rectangle taking every key on Enter and giving them back on Escape. Three
+  files alongside need no renderer and never skip: the palette's collapse from a theme to the
+  terminal's slots, the clipboard sequence, and the boot test below.
   It needs a renderer to draw to, and OpenTUI's is Zig behind `node:ffi`, a Node 26.4 builtin behind
   `--experimental-ffi`: the config passes that flag only where it is accepted and the tests skip where
   there is no FFI, so an older Node reports a skip rather than failing the suite for a reason that has
   nothing to do with the change under test. See
-  [docs/future/terminal/findings.md](./future/terminal/findings.md) § The runtime floor;
+  [docs/future/terminal/findings.md](./future/terminal/findings.md) § The runtime floor.
+
+  The boot test (`src/node/boot.test.ts`) is the third file that needs no renderer, and it is what
+  `apps/desktop/test/boot.test.ts` is for the shell: does `acorn`'s world come up. Against a fresh
+  data root and a fresh config directory it runs the real path — a real standalone node started and
+  supervised, the real fleet store and device-token files, the real broker over pinned TLS — and asks
+  what the renderer asks first: is there a node, does a `/v2` request reach it, did the event
+  socket's upgrade authenticate. Then the three things only this host has to answer: a second `acorn`
+  attaches rather than starting a second node, a token the node refuses reads as `revoked` and stops
+  retrying, and quitting drains the child and releases the root's lock. The two boot tests are shaped
+  differently because the desktop has a helper process to talk to over a wire and the TUI is one
+  process, so this one calls the functions directly;
 - Node-core tests cover data roots, TLS, auth, pairing, idempotency, migrations, backups, audit,
   worktrees, process/filesystem guards, routes, and WebSocket behavior;
 - plugin tests cover schemas, providers, route behavior, reconciliation, and client models using

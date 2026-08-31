@@ -78,6 +78,24 @@ const caches = new Map<string, NodeCache>()
 
 export const cacheKeyFor = (nodeId: string): string => `${CACHE_KEY_PREFIX}${nodeId}`
 
+// Where a cache partition is written. IndexedDB is the default because the two hosts that had one
+// were both browsers; a host without one installs its own before the first cache is built, which is
+// what the terminal client does with a directory of files (apps/tui/src/node/cache.ts). Three
+// functions rather than an interface with two implementations: the persister already names them.
+export type CacheStorage = {
+  getItem(key: string): Promise<string | undefined | null>
+  setItem(key: string, value: string): Promise<unknown>
+  removeItem(key: string): Promise<void>
+}
+
+let cacheStorage: CacheStorage = { getItem: (key) => get<string>(key), setItem: set, removeItem: del }
+
+/** Persist query caches somewhere other than IndexedDB. Call it before anything asks for a cache: a
+ *  partition already built keeps the store it was built with. */
+export const setCacheStorage = (storage: CacheStorage): void => {
+  cacheStorage = storage
+}
+
 // The one place a QueryClient is constructed in production. Created lazily so a fleet of ten nodes
 // costs one cache for the node actually being looked at.
 export function clientFor(nodeId: string): NodeCache {
@@ -96,10 +114,16 @@ export function clientFor(nodeId: string): NodeCache {
         },
       },
     }),
-    // Persist to IndexedDB so a reload renders from last-known data. One key per node, or node A's
-    // snapshot rehydrates into node B.
+    // Persisted so a restart renders from last-known data. One key per node, or node A's snapshot
+    // rehydrates into node B.
     persister: createAsyncStoragePersister({
-      storage: { getItem: get, setItem: set, removeItem: del },
+      // Through the indirection rather than the object, so a host that swaps the store gets the swap
+      // rather than whatever was installed when this line was evaluated.
+      storage: {
+        getItem: (key) => cacheStorage.getItem(key),
+        setItem: (key, value) => cacheStorage.setItem(key, value),
+        removeItem: (key) => cacheStorage.removeItem(key),
+      },
       key: cacheKeyFor(nodeId),
       // Persistence serializes the whole dehydrated cache, so a wider coalescing window stops a burst
       // of query updates stringifying the same growing snapshot over and over.

@@ -69,15 +69,30 @@ finding that needed a fix needed it in the host or in the pane registry, not in 
 | `docs/future/terminal/phase-2-layouts-keys-focus.md` | What shipped, What this phase deliberately left | Six departures from the plan, and the two plugin callers that wait for phase 4. |
 | `docs/future/terminal/README.md` | The phases, The order of work | Phase 2 marked shipped; what it left for phases 4 and 6. |
 
-## Owed by phases 3 to 7
+## Done in phase 3 (2026-08-31)
+
+| Doc | Section | Change |
+| --- | --- | --- |
+| `docs/node-distribution.md` | Reaching a node with `acorn` (new) | What `acorn` opens, how it chooses between attaching and starting, where its device tokens live, and what `--node` does. |
+| `docs/security.md` | Transport and auth | The bearer on the `/v2/events` upgrade: why the desktop needs a helper to set it, why the terminal does not, and the arch rule that stands in for the process boundary. |
+| `docs/testing.md` | Test layers | The TUI boot test: what it runs for real, the three questions only this host answers, and why it never skips. |
+| `docs/caching.md` | Renderer query cache | Where a partition is written is the host's, through `setCacheStorage`; IndexedDB is the default and the terminal installs files. |
+| `docs/future/bundle.md` | The snags | The pairing-window command is still a door after phase 3; the TUI's own token file joins the list of things NTFS does not give the modes to. |
+| `docs/future/terminal/findings.md` | What phase 3 did with these | Two findings closed, six new ones. |
+| `docs/future/terminal/phase-3-process-and-auth.md` | What shipped, What this phase deliberately left | Five departures from the plan, and the three things it left for phase 4. |
+| `docs/future/terminal/README.md` | The phases, The order of work | Phase 3 marked shipped; what it left. |
+
+Unchanged as the phase predicted: `docs/node-enrollment.md`, because the loopback mint route was not
+built.
+
+## Owed by phases 4 to 7
 
 | Doc | Section | Phase | What it says afterwards |
 | --- | --- | --- | --- |
-| `docs/testing.md` | Test layers | 3, 6 | The TUI boot test; pane snapshots. |
+| `docs/testing.md` | Test layers | 6 | Pane snapshots. |
 | `docs/command-palette-and-shortcuts.md` | Focus and typing | 4 | The footer, drawn from the active layers. |
 | `docs/terminal.md` | the PTY | 6 | The editor handoff; docker exec; the two callers writing to the rectangle's handle. |
-| `docs/node-distribution.md` | reaching a node | 3, 7 | `acorn` beside the desktop; `bin/acorn` in the tarball layout. |
-| `docs/security.md` | Transport and auth | 3 | The terminal sets the bearer on the upgrade itself. |
+| `docs/node-distribution.md` | reaching a node | 7 | `bin/acorn` in the tarball layout. |
 | `docs/security.md` | Trust boundaries, Transport and auth, Third-party plugin bundles, The containment ladder, summary table | 5 | The terminal column, per `06-isolation.md`. |
 | `docs/plugins.md` | The tree contract | 5 | A second host applies the same mutations to cells. |
 | `docs/future/ecosystem/blockers.md` | rung 2 | 5 | The terminal sandbox is the down payment. |
