@@ -45,11 +45,31 @@ describe('the kit support matrix', () => {
     expect(Object.keys(NODE_SUPPORT).filter((name) => !barrel.includes(name)).sort()).toEqual([])
   })
 
-  it('answers for the terminal in every row, even though nothing reads it yet', () => {
+  it('answers for the terminal in every row', () => {
     const levels = new Set(['full', 'reduced', 'fallback', 'absent'])
     const missing = Object.entries(NODE_SUPPORT)
       .filter(([, row]) => !levels.has(row.tui) || !levels.has(row.dom))
       .map(([node]) => node)
     expect(missing).toEqual([])
+  })
+
+  // A level is a promise to an author reading this file: `reduced` means "drawn, with named things
+  // missing". Named is the load-bearing word, and until the terminal host existed nothing made
+  // anybody write the names down.
+  it('says what every reduced node loses, and only those', () => {
+    const rows = Object.entries(NODE_SUPPORT) as [string, { dom: string; tui: string; loss?: string }][]
+    const silent = rows.filter(([, row]) => row.tui === 'reduced' && !row.loss?.trim()).map(([node]) => node)
+    expect(silent, 'reduced with no loss written down').toEqual([])
+    const spurious = rows.filter(([, row]) => row.tui !== 'reduced' && row.loss).map(([node]) => node)
+    expect(spurious, 'a loss on a node that loses nothing').toEqual([])
+    // Anti-vacuity: a matrix with no reduced rows would pass both assertions above.
+    expect(rows.filter(([, row]) => row.tui === 'reduced').length).toBeGreaterThan(10)
+  })
+
+  it('a loss is a sentence rather than a word', () => {
+    const terse = Object.entries(NODE_SUPPORT)
+      .filter(([, row]) => 'loss' in row && (row as { loss: string }).loss.length < 20)
+      .map(([node]) => node)
+    expect(terse).toEqual([])
   })
 })

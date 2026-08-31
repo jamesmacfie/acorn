@@ -9,11 +9,19 @@
 //   fallback  not drawn; the host draws a stated substitute, and the author does nothing
 //   absent    nothing is drawn, unless the node has a <Fallback> child
 //
-// Only `dom` is implemented. The `tui` column is documentation with a test that it is filled in, so
-// a node cannot join the kit without someone deciding what it does on a host with no pixels.
+// Both columns are implemented: the DOM host draws from `client-core/host/tree/components.ts`, the
+// terminal host from `apps/tui/src/kit/components.tsx`. A node cannot join the kit without someone
+// deciding what it does on a host with no pixels, and `tools/arch/kitTable.test.ts` fails if either
+// host is missing a component for a row.
+//
+// A `reduced` node says what is lost, in the same place its level is decided, so an author reading
+// this file knows what to expect without opening a doc. The sentence is the same one that ends the
+// node's row in docs/ui-design.md § Every node at 80 by 24.
 
 export type Host = 'dom' | 'tui'
 export type SupportLevel = 'full' | 'reduced' | 'fallback' | 'absent'
+/** A row: a level per host, and what a `reduced` level costs. */
+export type NodeSupportRow = Record<Host, SupportLevel> & { loss?: string }
 
 export const NODE_SUPPORT = {
   // Grouping
@@ -31,10 +39,19 @@ export const NODE_SUPPORT = {
   ModalBody: { dom: 'full', tui: 'full' },
   ModalActions: { dom: 'full', tui: 'full' },
   Menu: { dom: 'full', tui: 'full' },
-  Popover: { dom: 'full', tui: 'reduced' },
-  ListDetail: { dom: 'full', tui: 'reduced' },
+  Popover: {
+    dom: 'full', tui: 'reduced',
+    loss: 'the panel opens as a full-width block under its anchor, not floating',
+  },
+  ListDetail: {
+    dom: 'full', tui: 'reduced',
+    loss: 'two columns above 80 cells, one at a time below',
+  },
   // The columns as nodes, for a caller that cannot put an element in ListDetail's `list` prop.
-  ListColumn: { dom: 'full', tui: 'reduced' },
+  ListColumn: {
+    dom: 'full', tui: 'reduced',
+    loss: 'the whole width when the split has collapsed, rather than a column beside the detail',
+  },
   DetailColumn: { dom: 'full', tui: 'full' },
   SplitHandle: { dom: 'full', tui: 'absent' },
   DocumentTabs: { dom: 'full', tui: 'full' },
@@ -59,28 +76,67 @@ export const NODE_SUPPORT = {
   StatusDot: { dom: 'full', tui: 'full' },
   Facts: { dom: 'full', tui: 'full' },
   DescriptionList: { dom: 'full', tui: 'full' },
-  Table: { dom: 'full', tui: 'reduced' },
+  Table: {
+    dom: 'full', tui: 'reduced',
+    loss: 'columns are truncated by the priority its heads declare',
+  },
   // Table's rows as nodes, for the reason ModalBody is one: a host cannot truncate columns it
   // receives as opaque DOM, so the promise above is only keepable if it can see the rows.
-  TableHead: { dom: 'full', tui: 'reduced' },
-  TableRow: { dom: 'full', tui: 'reduced' },
-  TableCell: { dom: 'full', tui: 'reduced' },
-  Grid: { dom: 'full', tui: 'reduced' },
+  TableHead: {
+    dom: 'full', tui: 'reduced',
+    loss: 'the lowest priority column is dropped first, and the header names what was lost',
+  },
+  TableRow: {
+    dom: 'full', tui: 'reduced',
+    loss: 'cells are separated by │ and truncated by column priority',
+  },
+  TableCell: {
+    dom: 'full', tui: 'reduced',
+    loss: 'the text is ellipsised where its column does not fit',
+  },
+  Grid: {
+    dom: 'full', tui: 'reduced',
+    loss: 'a row-range indicator instead of a scrollbar, and the same column truncation as Table',
+  },
   Meter: { dom: 'full', tui: 'full' },
   CodeBlock: { dom: 'full', tui: 'full' },
   Log: { dom: 'full', tui: 'full' },
-  Markdown: { dom: 'full', tui: 'reduced' },
-  DiffPane: { dom: 'full', tui: 'reduced' },
-  DiffLine: { dom: 'full', tui: 'reduced' },
-  FileHead: { dom: 'full', tui: 'reduced' },
-  NonCodeRow: { dom: 'full', tui: 'reduced' },
+  Markdown: {
+    dom: 'full', tui: 'reduced',
+    loss: 'no images, and a link is its text with the URL beside it in dim',
+  },
+  DiffPane: {
+    dom: 'full', tui: 'reduced',
+    loss: 'unified only, and no syntax colour',
+  },
+  DiffLine: {
+    dom: 'full', tui: 'reduced',
+    loss: 'no intra-line word highlight',
+  },
+  FileHead: {
+    dom: 'full', tui: 'reduced',
+    loss: 'no per-file collapse control; the path and the counts only',
+  },
+  NonCodeRow: {
+    dom: 'full', tui: 'reduced',
+    loss: 'a dim line saying what is not being shown, with no control to act on it',
+  },
   SplitCell: { dom: 'full', tui: 'absent' },
   EmptyState: { dom: 'full', tui: 'full' },
   Alert: { dom: 'full', tui: 'full' },
-  Spinner: { dom: 'full', tui: 'reduced' },
+  Spinner: {
+    dom: 'full', tui: 'reduced',
+    loss: 'a braille cycle, or … where motion is off',
+  },
   Kbd: { dom: 'full', tui: 'full' },
-  UserAvatar: { dom: 'full', tui: 'reduced' },
-  Icon: { dom: 'full', tui: 'reduced' },
+  UserAvatar: {
+    dom: 'full', tui: 'reduced',
+    loss: 'initials in brackets; no image',
+  },
+  Icon: {
+    dom: 'full', tui: 'reduced',
+    loss: 'a glyph from the name table, an emoji as itself, and nothing for a name with neither',
+  },
 
   // Asking
   Button: { dom: 'full', tui: 'full' },
@@ -94,7 +150,10 @@ export const NODE_SUPPORT = {
   Picker: { dom: 'full', tui: 'full' },
   PickerRow: { dom: 'full', tui: 'full' },
   Composer: { dom: 'full', tui: 'full' },
-  MentionTextarea: { dom: 'full', tui: 'reduced' },
+  MentionTextarea: {
+    dom: 'full', tui: 'reduced',
+    loss: 'no inline highlight of the completed token; the menu is a list under the field',
+  },
   KeyValueEditor: { dom: 'full', tui: 'full' },
   FindBar: { dom: 'full', tui: 'full' },
   Field: { dom: 'full', tui: 'full' },
@@ -108,7 +167,7 @@ export const NODE_SUPPORT = {
   // Host wrappers. Both are host questions by definition, so both answer on every host.
   Only: { dom: 'full', tui: 'full' },
   Fallback: { dom: 'full', tui: 'full' },
-} as const satisfies Record<string, Record<Host, SupportLevel>>
+} as const satisfies Record<string, NodeSupportRow>
 
 export type KitNode = keyof typeof NODE_SUPPORT
 

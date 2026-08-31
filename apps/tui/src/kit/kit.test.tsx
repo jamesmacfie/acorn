@@ -1,0 +1,803 @@
+/** @jsxImportSource @opentui/solid */
+import { describe, expect, it } from 'vitest'
+import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
+import { NODE_SUPPORT } from '@acorn/client-core/kit/tokens/support.ts'
+import { hasFfi } from '../ffi'
+import { renderCells, type Frame } from './render'
+import {
+  Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
+  ModalBody, Popover, Section, SectionHeader, SplitHandle, Stack, TabPanel, Tabs, Timeline, Toolbar,
+  ToolbarSpacer,
+} from './grouping'
+import {
+  Alert, Badge, Chip, ChipRow, CodeBlock, DescriptionList, DiffLine, DiffPane, EmptyState, Facts,
+  FileHead, Grid, Heading, Icon, Kbd, Link, Log, Markdown, Meter, NonCodeRow, Row, RowActions, Rows,
+  Spinner, SplitCell, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
+} from './showing'
+import {
+  Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
+  MentionTextarea, ModelConnectionPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
+  ToggleButton,
+} from './asking'
+import { Fallback, Only, Rectangle } from './pixels'
+import { _resetCollections } from './collection'
+
+// One case per kit node, asserting the sentence its row in docs/ui-design.md § Every node at 80 by 24
+// promises, against the cells it actually drew.
+//
+// A case is written as "what would a reader look for on the screen", not as a snapshot of every cell.
+// A snapshot fails on every spacing decision anybody makes afterwards and tells the next person
+// nothing about which promise broke; `Badge` draws `[text]` is the promise.
+//
+// The list is checked against the kit itself below, so a node cannot be added with a component and no
+// test any more than it can be added with a sentence and no component
+// (tools/arch/kitTable.test.ts).
+
+type Case = {
+  node: KitNodeName
+  /** What the sentence says, in the test's own words, so a failure names the promise. */
+  draws: string
+  render: () => import('solid-js').JSX.Element
+  check: (frame: Frame) => void
+  size?: { width?: number; height?: number }
+}
+
+const has = (frame: Frame, value: string) => expect(frame.text).toContain(value)
+const lacks = (frame: Frame, value: string) => expect(frame.text).not.toContain(value)
+const lineWith = (frame: Frame, value: string) => frame.lines.find((line) => line.includes(value)) ?? ''
+const rowOf = (frame: Frame, value: string) => frame.lines.findIndex((line) => line.includes(value))
+
+const noteFile = {
+  path: 'src/login.ts',
+  status: 'modified',
+  additions: 3,
+  deletions: 1,
+  sha: null,
+  viewed: false,
+  patch: '@@ -1,2 +1,3 @@\n context\n-gone\n+added\n',
+}
+
+const CASES: Case[] = [
+  // ── Grouping ────────────────────────────────────────────────────────────────────────────────
+  {
+    node: 'Stack',
+    draws: 'children on successive lines',
+    render: () => <Stack><Text>one</Text><Text>two</Text></Stack>,
+    check: (frame) => expect(rowOf(frame, 'two')).toBe(rowOf(frame, 'one') + 1),
+  },
+  {
+    node: 'Inline',
+    draws: 'children on one line separated by a space',
+    render: () => <Inline><Text>one</Text><Text>two</Text></Inline>,
+    check: (frame) => expect(lineWith(frame, 'one')).toContain('two'),
+  },
+  {
+    node: 'Section',
+    draws: 'label in dim uppercase, children below',
+    render: () => <Section label="notes" count={3}><Text>body</Text></Section>,
+    check: (frame) => {
+      has(frame, 'NOTES')
+      expect(rowOf(frame, 'body')).toBeGreaterThan(rowOf(frame, 'NOTES'))
+    },
+  },
+  {
+    node: 'Fold',
+    draws: '▸ label closed, ▾ label open, children indented two cells',
+    render: () => (
+      <Stack>
+        <Fold label="shut"><Text>hidden</Text></Fold>
+        <Fold label="open" defaultOpen><Text>shown</Text></Fold>
+      </Stack>
+    ),
+    check: (frame) => {
+      has(frame, '▸ shut')
+      has(frame, '▾ open')
+      lacks(frame, 'hidden')
+      expect(lineWith(frame, 'shown').indexOf('shown')).toBe(2)
+    },
+  },
+  {
+    node: 'Card',
+    draws: 'a box-drawing frame',
+    render: () => <Card><Text>inside</Text></Card>,
+    check: (frame) => {
+      has(frame, '─')
+      has(frame, 'inside')
+    },
+  },
+  {
+    node: 'Timeline',
+    draws: 'cards in sequence',
+    render: () => <Timeline><Text>first</Text><Text>second</Text></Timeline>,
+    check: (frame) => expect(rowOf(frame, 'second')).toBe(rowOf(frame, 'first') + 1),
+  },
+  {
+    node: 'Tabs',
+    draws: 'Tab  [Tab]  Tab on one line, the selected one in brackets',
+    render: () => (
+      <Tabs
+        idPrefix="t"
+        ariaLabel="Tabs"
+        active="b"
+        onChange={() => {}}
+        tabs={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]}
+      />
+    ),
+    check: (frame) => expect(lineWith(frame, 'one')).toContain('[two]'),
+  },
+  {
+    node: 'Toolbar',
+    draws: 'children on one line',
+    render: () => <Toolbar><Text>left</Text><Text>right</Text></Toolbar>,
+    check: (frame) => expect(lineWith(frame, 'left')).toContain('right'),
+  },
+  {
+    node: 'ToolbarSpacer',
+    draws: 'the padding that pushes what follows to the right edge',
+    render: () => <Toolbar><Text>left</Text><ToolbarSpacer /><Text>end</Text></Toolbar>,
+    check: (frame) => expect(lineWith(frame, 'left').trimEnd().endsWith('end')).toBe(true),
+  },
+  {
+    node: 'Modal',
+    draws: 'a centred box with its title',
+    render: () => <Modal onDismiss={() => {}} title="Rename"><Text>body</Text></Modal>,
+    check: (frame) => {
+      has(frame, 'Rename')
+      has(frame, 'body')
+      has(frame, '│')
+    },
+  },
+  {
+    node: 'ModalBody',
+    draws: 'the lines between the title rule and the actions line',
+    render: () => <ModalBody><Text>middle</Text></ModalBody>,
+    check: (frame) => has(frame, 'middle'),
+  },
+  {
+    node: 'ModalActions',
+    draws: 'the buttons on one line, at the far end of the box',
+    render: () => <ModalActions><Button label="Cancel" /><Button label="Save" /></ModalActions>,
+    check: (frame) => {
+      const line = lineWith(frame, '[Save]')
+      expect(line).toContain('[Cancel]')
+      expect(line.trimEnd().endsWith('[Save]')).toBe(true)
+    },
+  },
+  {
+    node: 'Menu',
+    draws: 'a vertical list in a box',
+    render: () => (
+      <Menu ariaLabel="Menu" open={() => true} trigger={() => <Text>open me</Text>}>
+        {() => <Text>choice</Text>}
+      </Menu>
+    ),
+    check: (frame) => {
+      has(frame, 'open me')
+      has(frame, 'choice')
+      has(frame, '│')
+    },
+  },
+  {
+    node: 'Popover',
+    draws: 'reduced: a full-width block under its anchor rather than a floating panel',
+    render: () => <Popover trigger={() => <Text>anchor</Text>}><Text>panel</Text></Popover>,
+    check: (frame) => {
+      has(frame, 'anchor')
+      // Shut until something opens it, which is the same state the DOM popover starts in.
+      lacks(frame, 'panel')
+    },
+  },
+  {
+    node: 'ListDetail',
+    draws: 'reduced: two columns above 80 cells',
+    render: () => <ListDetail list={<Text>the list</Text>}><Text>the detail</Text></ListDetail>,
+    size: { width: 100, height: 6 },
+    check: (frame) => {
+      const line = lineWith(frame, 'the list')
+      expect(line).toContain('│')
+      expect(line).toContain('the detail')
+    },
+  },
+  {
+    node: 'ListColumn',
+    draws: 'reduced: the left column, with its label',
+    render: () => <ListColumn label="notes"><Text>a note</Text></ListColumn>,
+    check: (frame) => {
+      has(frame, 'NOTES')
+      has(frame, 'a note')
+    },
+  },
+  {
+    node: 'DetailColumn',
+    draws: 'the right column',
+    render: () => <DetailColumn><Text>detail</Text></DetailColumn>,
+    check: (frame) => has(frame, 'detail'),
+  },
+  {
+    node: 'SplitHandle',
+    draws: 'absent: a terminal split moves by a key, not a grip',
+    render: () => <Stack><Text>above</Text><SplitHandle axis="x" drag={{}} /><Text>below</Text></Stack>,
+    check: (frame) => expect(rowOf(frame, 'below')).toBe(rowOf(frame, 'above') + 1),
+  },
+  {
+    node: 'DocumentTabs',
+    draws: 'one line of tab labels with a × on the current one',
+    render: () => (
+      <DocumentTabs
+        idPrefix="d"
+        ariaLabel="Documents"
+        active="b"
+        onActivate={() => {}}
+        onClose={() => {}}
+        tabs={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]}
+      />
+    ),
+    check: (frame) => expect(lineWith(frame, 'one')).toContain('two ×'),
+  },
+  {
+    node: 'SectionHeader',
+    draws: 'a bold line with its actions at the far end',
+    render: () => <SectionHeader actions={<Button label="New" />}>Files</SectionHeader>,
+    check: (frame) => {
+      const line = lineWith(frame, 'Files')
+      expect(line.trimEnd().endsWith('[New]')).toBe(true)
+    },
+  },
+  {
+    node: 'TabPanel',
+    draws: 'the rows under the tab strip, and nothing for a panel that is not current',
+    render: () => (
+      <Stack>
+        <TabPanel idPrefix="t" id="a" active="a"><Text>current</Text></TabPanel>
+        <TabPanel idPrefix="t" id="b" active="a"><Text>other</Text></TabPanel>
+      </Stack>
+    ),
+    check: (frame) => {
+      has(frame, 'current')
+      lacks(frame, 'other')
+    },
+  },
+
+  // ── Showing ─────────────────────────────────────────────────────────────────────────────────
+  {
+    node: 'Text',
+    draws: 'plain text',
+    render: () => <Text>words</Text>,
+    check: (frame) => has(frame, 'words'),
+  },
+  {
+    node: 'Link',
+    draws: 'the text, underlined',
+    render: () => <Link href="https://example.com">go there</Link>,
+    check: (frame) => has(frame, 'go there'),
+  },
+  {
+    node: 'Heading',
+    draws: 'eyebrow in dim uppercase, heading in bold',
+    render: () => <Heading eyebrow="task">fix login</Heading>,
+    check: (frame) => {
+      has(frame, 'TASK')
+      expect(rowOf(frame, 'fix login')).toBe(rowOf(frame, 'TASK') + 1)
+    },
+  },
+  {
+    node: 'Rows',
+    draws: 'its items on successive lines',
+    render: () => (
+      <Rows id="list" items={[{ key: 'a', label: 'alpha' }, { key: 'b', label: 'beta' }]}>
+        {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
+      </Rows>
+    ),
+    check: (frame) => expect(rowOf(frame, 'beta')).toBe(rowOf(frame, 'alpha') + 1),
+  },
+  {
+    node: 'Row',
+    draws: 'one line: status glyph, title, meta at the far end',
+    render: () => <Row leading={<StatusDot tone="ok" />} meta="2m">a title</Row>,
+    check: (frame) => {
+      const line = lineWith(frame, 'a title')
+      expect(line).toContain('●')
+      expect(line.trimEnd().endsWith('2m')).toBe(true)
+    },
+  },
+  {
+    node: 'TreeRow',
+    draws: 'Row indented depth cells with ▸ or ▾',
+    render: () => <TreeRow depth={1} expandable expanded={false}>src</TreeRow>,
+    check: (frame) => {
+      const line = lineWith(frame, 'src')
+      expect(line).toContain('▸')
+      expect(line.indexOf('▸')).toBeGreaterThanOrEqual(2)
+    },
+  },
+  {
+    node: 'RowActions',
+    draws: "the row's actions as glyphs, always drawn, never on hover",
+    render: () => <Row reveal trailing={<RowActions ariaLabel="Actions"><Icon name="x" /></RowActions>}>a row</Row>,
+    check: (frame) => expect(lineWith(frame, 'a row')).toContain('✕'),
+  },
+  {
+    node: 'Badge',
+    draws: '[text] in the tone colour',
+    render: () => <Badge tone="ok">ready</Badge>,
+    check: (frame) => has(frame, '[ready]'),
+  },
+  {
+    node: 'Chip',
+    draws: '(text), with a trailing ✕ when removable',
+    render: () => <Chip onRemove={() => {}}>bug</Chip>,
+    check: (frame) => has(frame, '(bug ✕)'),
+  },
+  {
+    node: 'ChipRow',
+    draws: 'chips on one line',
+    render: () => <ChipRow><Chip>one</Chip><Chip>two</Chip></ChipRow>,
+    check: (frame) => expect(lineWith(frame, '(one)')).toContain('(two)'),
+  },
+  {
+    node: 'StatusDot',
+    draws: '● in colour, ○ for muted',
+    render: () => <Inline><StatusDot tone="ok" /><StatusDot tone="muted" /></Inline>,
+    check: (frame) => {
+      has(frame, '●')
+      has(frame, '○')
+    },
+  },
+  {
+    node: 'Facts',
+    draws: 'two columns, labels dim',
+    render: () => <Facts items={[{ label: 'branch', value: 'main' }, { label: 'by', value: 'you' }]} />,
+    check: (frame) => {
+      expect(lineWith(frame, 'branch')).toContain('main')
+      // Padded to the widest label, so the values line up.
+      expect(lineWith(frame, 'main').indexOf('main')).toBe(lineWith(frame, 'you').indexOf('you'))
+    },
+  },
+  {
+    node: 'DescriptionList',
+    draws: 'one pair per line',
+    render: () => (
+      <DescriptionList>
+        <DescriptionList.Item label="size">21 B</DescriptionList.Item>
+      </DescriptionList>
+    ),
+    check: (frame) => expect(lineWith(frame, 'size')).toContain('21 B'),
+  },
+  {
+    node: 'Table',
+    draws: 'reduced: box-drawn, and the header names the columns it had to drop',
+    render: () => (
+      <Table>
+        <TableRow head>
+          <TableHead priority="high">name</TableHead>
+          <TableHead priority="low">when</TableHead>
+        </TableRow>
+        <TableRow><TableCell>lint</TableCell><TableCell>2m</TableCell></TableRow>
+      </Table>
+    ),
+    size: { width: 10, height: 6 },
+    check: (frame) => {
+      // Ten cells is one column's worth, so the low-priority one goes — and the header names it,
+      // because a reader who can only see that something is missing has to widen the pane to find
+      // out whether it was the column they wanted.
+      expect(lineWith(frame, 'name')).not.toContain('when')
+      has(frame, '+ when')
+    },
+  },
+  {
+    node: 'TableHead',
+    draws: "reduced: the column's label in the bold header line",
+    render: () => (
+      <Table>
+        <TableRow head><TableHead>name</TableHead><TableHead>when</TableHead></TableRow>
+      </Table>
+    ),
+    check: (frame) => expect(lineWith(frame, 'name')).toContain('when'),
+  },
+  {
+    node: 'TableRow',
+    draws: 'reduced: one line per row',
+    render: () => (
+      <Table>
+        <TableRow><TableCell>lint</TableCell><TableCell>2m</TableCell></TableRow>
+        <TableRow><TableCell>test</TableCell><TableCell>4m</TableCell></TableRow>
+      </Table>
+    ),
+    check: (frame) => expect(rowOf(frame, 'test')).toBe(rowOf(frame, 'lint') + 1),
+  },
+  {
+    node: 'TableCell',
+    draws: "reduced: the cell's text in its column's width, ellipsised where it does not fit",
+    render: () => (
+      <Table>
+        <TableRow><TableCell>a very long cell indeed</TableCell></TableRow>
+      </Table>
+    ),
+    size: { width: 12, height: 4 },
+    check: (frame) => has(frame, '…'),
+  },
+  {
+    node: 'Grid',
+    draws: 'reduced: as Table, with a row-range indicator instead of a scrollbar',
+    render: () => (
+      <Grid
+        ariaLabel="Runs"
+        columns={['name', 'when']}
+        rows={[['lint', '2m'], ['test', '4m'], ['build', '9m']]}
+        selected={0}
+      />
+    ),
+    size: { width: 30, height: 5 },
+    check: (frame) => {
+      has(frame, 'name')
+      has(frame, 'of 3')
+    },
+  },
+  {
+    node: 'Meter',
+    draws: '████░░░░ 62%',
+    render: () => <Meter value={0.5} label="Disk" />,
+    check: (frame) => {
+      const line = lineWith(frame, '50%')
+      expect(line).toContain('████')
+      expect(line).toContain('░')
+    },
+  },
+  {
+    node: 'CodeBlock',
+    draws: 'monospace lines, a dim rule above and below',
+    render: () => <CodeBlock>{'first\nsecond'}</CodeBlock>,
+    check: (frame) => {
+      expect(rowOf(frame, 'second')).toBe(rowOf(frame, 'first') + 1)
+      expect(rowOf(frame, 'first')).toBeGreaterThan(rowOf(frame, '───'))
+    },
+  },
+  {
+    node: 'Log',
+    draws: 'monospace lines, find as a bottom line',
+    render: () => <Log ariaLabel="Logs" lines={['boot', 'ready']} find={<Text>/ query</Text>} />,
+    size: { width: 30, height: 5 },
+    check: (frame) => {
+      has(frame, 'boot')
+      expect(rowOf(frame, '/ query')).toBeGreaterThan(rowOf(frame, 'ready'))
+    },
+  },
+  {
+    node: 'Markdown',
+    draws: 'reduced: headings bold, lists as •, no images, links as text with the URL',
+    render: () => (
+      <Markdown text={'# Title\n\n- one\n- two\n\n![alt](https://example.com/a.png)\n\n[docs](https://example.com)'} />
+    ),
+    size: { width: 60, height: 12 },
+    check: (frame) => {
+      has(frame, 'Title')
+      has(frame, '• one')
+      has(frame, 'docs')
+      has(frame, '(https://example.com)')
+      lacks(frame, 'a.png')
+    },
+  },
+  {
+    node: 'DiffPane',
+    draws: 'reduced: unified only',
+    render: () => <DiffPane source={{ files: () => [noteFile], loading: () => false }} />,
+    size: { width: 40, height: 10 },
+    check: (frame) => {
+      has(frame, 'src/login.ts')
+      has(frame, '+added')
+      has(frame, '-gone')
+    },
+  },
+  {
+    node: 'DiffLine',
+    draws: 'reduced: one line, +/-/space in the gutter',
+    render: () => (
+      <DiffLine r={{ kind: 'insert', path: 'a.ts', oldNo: null, newNo: 3, toks: [], raw: 'added' }} />
+    ),
+    check: (frame) => has(frame, '+added'),
+  },
+  {
+    node: 'FileHead',
+    draws: 'reduced: the path in bold with +n −m at the far end',
+    render: () => <FileHead file={noteFile} />,
+    size: { width: 40, height: 3 },
+    check: (frame) => {
+      const line = lineWith(frame, 'src/login.ts')
+      expect(line).toContain('+3')
+      expect(line.trimEnd().endsWith('−1')).toBe(true)
+    },
+  },
+  {
+    node: 'NonCodeRow',
+    draws: 'reduced: a dim line saying what is not being shown',
+    render: () => <NonCodeRow row={{ kind: 'gap', path: 'a.ts', sha: null, side: 'mid', oldStart: 1, newStart: 1, count: 12 }} />,
+    check: (frame) => has(frame, '12 unchanged lines'),
+  },
+  {
+    node: 'SplitCell',
+    draws: 'absent: side-by-side needs 160 cells',
+    render: () => (
+      <Stack>
+        <Text>above</Text>
+        <SplitCell r={null} gutter={null} />
+        <Text>below</Text>
+      </Stack>
+    ),
+    check: (frame) => expect(rowOf(frame, 'below')).toBe(rowOf(frame, 'above') + 1),
+  },
+  {
+    node: 'EmptyState',
+    draws: 'dim text',
+    render: () => <EmptyState title="Nothing yet">Make one to get started.</EmptyState>,
+    check: (frame) => {
+      has(frame, 'Nothing yet')
+      has(frame, 'Make one')
+    },
+  },
+  {
+    node: 'Alert',
+    draws: "one line prefixed with the tone's glyph",
+    render: () => <Alert tone="warn">Careful.</Alert>,
+    check: (frame) => expect(lineWith(frame, 'Careful.')).toContain('!'),
+  },
+  {
+    node: 'Spinner',
+    draws: 'reduced: a braille spinner',
+    render: () => <Spinner />,
+    check: (frame) => has(frame, '⠋'),
+  },
+  {
+    node: 'Kbd',
+    draws: 'the chord as its characters',
+    render: () => <Kbd>ctrl+k</Kbd>,
+    check: (frame) => has(frame, 'ctrl+k'),
+  },
+  {
+    node: 'UserAvatar',
+    draws: 'reduced: initials in brackets, no image',
+    render: () => <UserAvatar login="ada-lovelace" />,
+    check: (frame) => has(frame, '[AL]'),
+  },
+  {
+    node: 'Icon',
+    draws: 'reduced: a glyph from the name table, and nothing for a name with none',
+    render: () => <Inline><Icon name="check" /><Icon name="not-a-real-icon" /></Inline>,
+    check: (frame) => {
+      has(frame, '✓')
+      lacks(frame, 'not-a-real-icon')
+    },
+  },
+
+  // ── Asking ──────────────────────────────────────────────────────────────────────────────────
+  {
+    node: 'Button',
+    draws: '[ label ]',
+    render: () => <Button label="Save" />,
+    check: (frame) => has(frame, '[Save]'),
+  },
+  {
+    node: 'ConfirmButton',
+    draws: 'the label at rest; the armed button is the prompt',
+    render: () => <ConfirmButton label="Delete" onConfirm={() => {}} />,
+    check: (frame) => {
+      has(frame, '[Delete]')
+      // Arming is a press, and a button becomes a focus stop in phase 2. The armed label is
+      // `createArmedConfirm`'s, which client-core tests directly.
+      lacks(frame, 'Delete?')
+    },
+  },
+  {
+    node: 'Input',
+    draws: 'a field that takes the room its row has left',
+    render: () => <Input placeholder="Filter…" />,
+    size: { width: 30, height: 3 },
+    check: (frame) => has(frame, 'Filter'),
+  },
+  {
+    node: 'Textarea',
+    draws: 'a multi-line field holding its value',
+    render: () => <Textarea value={'first\nsecond'} rows={3} />,
+    size: { width: 30, height: 5 },
+    check: (frame) => {
+      has(frame, 'first')
+      has(frame, 'second')
+    },
+  },
+  {
+    node: 'Select',
+    draws: '[ value ▾ ], opening a Menu',
+    render: () => (
+      <Select value="b" options={[{ value: 'a', label: 'one' }, { value: 'b', label: 'two' }]} />
+    ),
+    check: (frame) => has(frame, '[ two ▾ ]'),
+  },
+  {
+    node: 'Checkbox',
+    draws: '[x] label',
+    render: () => <Checkbox checked label="Include" />,
+    check: (frame) => expect(lineWith(frame, 'Include')).toContain('[x]'),
+  },
+  {
+    node: 'SegmentedControl',
+    draws: '( a | [b] | c )',
+    render: () => (
+      <SegmentedControl
+        ariaLabel="View"
+        value="b"
+        onChange={() => {}}
+        options={[{ value: 'a' as const, label: 'a' }, { value: 'b' as const, label: 'b' }]}
+      />
+    ),
+    check: (frame) => has(frame, '( a | [b] )'),
+  },
+  {
+    node: 'ToggleButton',
+    draws: '[x] label',
+    render: () => <ToggleButton pressed label="Preview" onPressedChange={() => {}} />,
+    check: (frame) => expect(lineWith(frame, 'Preview')).toContain('[x]'),
+  },
+  {
+    node: 'Picker',
+    draws: 'a field that opens a Menu filtered by typing',
+    render: () => <Picker label="Repo" placeholder="Find…" emptyText="Nothing" items={[]} />,
+    check: (frame) => has(frame, '[ Repo ▾ ]'),
+  },
+  {
+    node: 'PickerRow',
+    draws: 'one line in that menu: glyph, label, dim hint',
+    render: () => <PickerRow label="acorn" description="runn-fast" onSelect={() => {}} />,
+    check: (frame) => expect(lineWith(frame, 'acorn')).toContain('runn-fast'),
+  },
+  {
+    node: 'Composer',
+    draws: 'a boxed field with a > prompt',
+    render: () => <Composer value="hello" onSubmit={() => {}} submitLabel="Send" />,
+    size: { width: 40, height: 8 },
+    check: (frame) => {
+      has(frame, '>')
+      has(frame, '[Send]')
+    },
+  },
+  {
+    node: 'MentionTextarea',
+    draws: 'reduced: a Textarea with the mention menu below it, no inline highlight',
+    render: () => <MentionTextarea value="ping @ad" onInput={() => {}} mentions={['ada', 'bob']} />,
+    size: { width: 40, height: 8 },
+    check: (frame) => {
+      has(frame, 'ping @ad')
+      has(frame, 'ada')
+      lacks(frame, 'bob')
+    },
+  },
+  {
+    node: 'KeyValueEditor',
+    draws: 'a two-column table with editable cells',
+    render: () => (
+      <KeyValueEditor ariaLabel="Headers" rows={[{ key: 'Accept', value: 'text/plain' }]} onChange={() => {}} />
+    ),
+    size: { width: 50, height: 6 },
+    check: (frame) => {
+      has(frame, 'Name')
+      has(frame, 'Accept')
+      has(frame, 'text/plain')
+    },
+  },
+  {
+    node: 'FindBar',
+    draws: '/ query  3/12 on one line',
+    render: () => (
+      <FindBar query="login" onQuery={() => {}} count={{ current: 3, total: 12 }} onNext={() => {}} onPrev={() => {}} />
+    ),
+    size: { width: 40, height: 3 },
+    check: (frame) => {
+      const line = lineWith(frame, '/')
+      expect(line).toContain('login')
+      expect(line).toContain('3/12')
+    },
+  },
+  {
+    node: 'Field',
+    draws: 'the label above its child',
+    render: () => <Field label="Title"><Text>a note</Text></Field>,
+    check: (frame) => expect(rowOf(frame, 'a note')).toBe(rowOf(frame, 'Title') + 1),
+  },
+  {
+    node: 'CopyButton',
+    draws: 'fallback: a control that copies where the terminal takes OSC 52, and prints otherwise',
+    render: () => <CopyButton text={() => 'copied text'} />,
+    check: (frame) => has(frame, '⧉'),
+  },
+  {
+    node: 'ModelConnectionPicker',
+    draws: 'a picker over the connected models',
+    render: () => (
+      <ModelConnectionPicker
+        connectionId="c1"
+        modelId="m1"
+        onChange={() => {}}
+        connections={[{ connection: { id: 'c1', label: 'Anthropic' }, provider: { models: [{ id: 'm1', label: 'Opus' }] } }]}
+      />
+    ),
+    check: (frame) => has(frame, '[ Opus ▾ ]'),
+  },
+
+  // ── Pixels, and the host wrappers ───────────────────────────────────────────────────────────
+  {
+    node: 'Rectangle',
+    draws: 'pty and editor native; webview and frame draw their Fallback child',
+    render: () => (
+      <Stack>
+        <Rectangle kind="pty" label="Terminal" />
+        <Rectangle kind="webview" label="Preview"><Fallback forNode="Rectangle"><Text>open it in a browser</Text></Fallback></Rectangle>
+      </Stack>
+    ),
+    size: { width: 40, height: 10 },
+    check: (frame) => {
+      has(frame, 'Terminal')
+      has(frame, 'open it in a browser')
+    },
+  },
+  {
+    node: 'Only',
+    draws: 'children on the named hosts and nowhere else',
+    render: () => (
+      <Stack>
+        <Only hosts={['tui']}><Text>here</Text></Only>
+        <Only hosts={['dom']}><Text>elsewhere</Text></Only>
+      </Stack>
+    ),
+    check: (frame) => {
+      has(frame, 'here')
+      lacks(frame, 'elsewhere')
+    },
+  },
+  {
+    node: 'Fallback',
+    draws: 'what to draw where this host cannot draw the node it is inside',
+    render: () => (
+      <Stack>
+        <Fallback forNode="SplitHandle"><Text>no grip here</Text></Fallback>
+        <Fallback forNode="Badge"><Text>never</Text></Fallback>
+      </Stack>
+    ),
+    check: (frame) => {
+      has(frame, 'no grip here')
+      lacks(frame, 'never')
+    },
+  },
+]
+
+describe.skipIf(!hasFfi)('the kit in cells', () => {
+  it('has a case for every node in the kit, and no case for a node that is gone', () => {
+    expect(CASES.map((entry) => entry.node).sort()).toEqual([...KIT_NODES].sort())
+    // Anti-vacuity: two empty lists compare equal, and the kit is not empty.
+    expect(CASES.length).toBeGreaterThan(70)
+  })
+
+  it.each(CASES.map((entry) => [`${entry.node}: ${entry.draws}`, entry] as const))('%s', async (_name, entry) => {
+    // The collection store is module state, so two renders in one process share a caret.
+    _resetCollections()
+    const frame = await renderCells(entry.render, entry.size)
+    try {
+      entry.check(frame)
+    } finally {
+      frame.done()
+    }
+  }, 20_000)
+
+  it('an absent node draws nothing at all, rather than a placeholder', async () => {
+    // The difference that makes `absent` a level rather than a bug: a node this host refuses draws a
+    // labelled placeholder, and a node the matrix says is absent draws nothing and takes no room.
+    const absent = Object.entries(NODE_SUPPORT).filter(([, row]) => row.tui === 'absent').map(([node]) => node)
+    expect(absent.sort()).toEqual(['Rectangle', 'SplitCell', 'SplitHandle'])
+    _resetCollections()
+    const frame = await renderCells(() => (
+      <Stack><SplitHandle axis="x" drag={{}} /><SplitCell r={null} gutter={null} /></Stack>
+    ), { width: 30, height: 4 })
+    try {
+      expect(frame.lines.filter((line) => line.trim().length)).toEqual([])
+    } finally {
+      frame.done()
+    }
+  }, 20_000)
+})

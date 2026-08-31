@@ -1,7 +1,7 @@
 {
   "name": "@acorn/tui",
   "version": "0.1.0",
-  "description": "The terminal client. Phase 0: client-core booted under Node, drawing the kit with OpenTUI.",
+  "description": "The terminal client: client-core booted under Node, drawing the whole kit with OpenTUI.",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,7 +21,9 @@
     "@opentui/keymap": "^0.5.9",
     "@opentui/solid": "^0.5.9",
     "@tanstack/solid-query": "^5.101.0",
+    "diff": "^9.0.0",
     "entities": "^7.0.1",
+    "gitdiff-parser": "^0.3.1",
     "idb-keyval": "^6.2.5",
     "solid-js": "catalog:",
     "ws": "^8.21.0",

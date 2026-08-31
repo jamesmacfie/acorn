@@ -1,49 +1,62 @@
 import { TextAttributes } from '@opentui/core'
-import type { Space, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import { roleCell, type CellAttribute, type CellStyle } from '@acorn/client-core/kit/tokens/roles.ts'
+import type { Border, Space, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import { isCompact, slotColor } from '../appearance'
 
 // Roles as cells: what a role token means to a terminal, as something a renderable can be handed.
 //
-// The sentences are already written, one per role value, in the `tui` column of client-core's
-// kit/tokens/roles.ts. This file is those sentences turned into numbers, and it lives here in phase 0
-// because the sentences are prose and turning them into a third column of `ROLE_MAP` is phase 1's
-// `roleCell()`. Nothing else in the TUI may name a colour or a cell count; it asks for a role.
-//
-// Colour is the terminal's own sixteen slots rather than the theme's forty-odd tokens, which is what
-// `roles.ts` says a tone collapses to. Truecolor and per-theme slots are phase 1's; a spike that
-// picks its own hexes would be measuring its own palette rather than the kit.
+// The decision is `roleCell()`'s, in client-core, beside the sentence it came from. This file is the
+// last inch: turning a `CellStyle` into the props OpenTUI's renderables take. Nothing in this package
+// names a colour, a gap or a box character — it asks for a role, and the answer arrives here.
 
-/** Cells of gap a space role spends, on the axis the node stacks along. */
-export const spaceCells: Record<Space, number> = {
-  none: 0,
-  inline: 1,
-  row: 0,
-  stack: 0,
-  section: 1,
+export type Style = {
+  fg?: string
+  attributes?: number
+  transform?: (value: string) => string
 }
 
-export const toneColor: Record<Tone, string | undefined> = {
-  neutral: undefined,
-  muted: undefined,
-  accent: 'cyan',
-  ok: 'green',
-  warn: 'yellow',
-  danger: 'red',
+const bits: Record<CellAttribute, number> = {
+  bold: TextAttributes.BOLD,
+  dim: TextAttributes.DIM,
+  underline: TextAttributes.UNDERLINE,
+  inverse: TextAttributes.INVERSE,
 }
 
-/** `muted` is dim rather than a colour, which is the one tone that is an attribute. */
-export const toneAttributes = (tone: Tone): number => (tone === 'muted' ? TextAttributes.DIM : TextAttributes.NONE)
+const attributes = (cell: CellStyle): number =>
+  (cell.attrs ?? []).reduce((mask, attr) => mask | bits[attr], TextAttributes.NONE)
 
-export const textAttributes: Record<TextRole, number> = {
-  body: TextAttributes.NONE,
-  strong: TextAttributes.BOLD,
-  muted: TextAttributes.DIM,
-  // A terminal is monospaced throughout, so asking for mono asks for what is already true.
-  mono: TextAttributes.NONE,
-  eyebrow: TextAttributes.DIM,
-  heading: TextAttributes.BOLD,
-  match: TextAttributes.INVERSE,
+/** A run of text: its colour, its weight, and whether the role changes the characters themselves. */
+export function textStyle(role: TextRole | undefined, tone?: Tone): Style {
+  const text = roleCell('text', role ?? 'body')
+  const colour = roleCell('tone', tone ?? 'neutral')
+  const fg = slotColor(colour.slot)
+  return {
+    attributes: attributes(text) | attributes(colour),
+    ...(fg ? { fg } : {}),
+    ...(text.upper ? { transform: (value: string) => value.toUpperCase() } : {}),
+  }
 }
 
-/** Eyebrow is the one text role that changes the characters rather than their attributes. */
-export const textTransform = (role: TextRole, value: string): string =>
-  role === 'eyebrow' ? value.toUpperCase() : value
+/** The whole answer for a run, with the transform already applied. Most components want this. */
+export const styled = (value: string, role?: TextRole, tone?: Tone): { text: string; style: Style } => {
+  const style = textStyle(role, tone)
+  return { text: style.transform ? style.transform(value) : value, style }
+}
+
+/** Cells of gap a space role spends along a row, and lines it spends down a column. Density decides
+ *  whether the blank line is spent at all: it is the one style axis a terminal keeps. */
+export const spaceCells = (space: Space | undefined): number => roleCell('space', space ?? 'inline').cells ?? 0
+export const spaceLines = (space: Space | undefined): number => {
+  const lines = roleCell('space', space ?? 'stack').lines ?? 0
+  return isCompact() ? 0 : lines
+}
+
+/** What a border role draws: a box around the thing, a character to repeat, or nothing. */
+export function borderCell(border: Border): { box: boolean; glyph: string; attributes: number } {
+  const cell = roleCell('border', border)
+  return { box: cell.box === true, glyph: cell.glyph ?? '', attributes: attributes(cell) }
+}
+
+/** A rule across a box, which is the `divider` role repeated. Compact density spends nothing, which
+ *  is what the role's own sentence says. */
+export const rule = (width: number): string => (isCompact() ? '' : borderCell('divider').glyph.repeat(Math.max(0, width)))

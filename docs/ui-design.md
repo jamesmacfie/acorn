@@ -316,8 +316,8 @@ with no components on it, so a node-environment test can read them.
 question is what gets in, and this is the answer that keeps it small:
 
 1. Two or more plugins need it, or one first-party pane cannot be expressed without it.
-2. It has a written rendering at 80 columns by 24 rows in monochrome, even though no terminal host is
-   built. If that sentence cannot be written, the thing is a rectangle, not a node.
+2. It has a written rendering at 80 columns by 24 rows in monochrome, and a component on the terminal
+   host that draws it. If that sentence cannot be written, the thing is a rectangle, not a node.
 3. Its props are semantic: tone, emphasis, size in three steps, grouping. Never a pixel, a colour, a
    class, or a style.
 4. If it is an extension kind, one host-owned sentence describes it in the trust prompt, and a person
@@ -338,7 +338,9 @@ custom property.
 **A node says which hosts can draw it.** `kit/tokens/support.ts` holds a row per node with a `dom`
 column and a `tui` column, at one of four levels: `full` draws it natively, `reduced` draws it with
 named things missing, `fallback` draws a stated substitute, and `absent` draws nothing unless the
-node has a `<Fallback>` child. The 80-column sentence for each one is in
+node has a `<Fallback>` child. A `reduced` row names what is missing in a `loss` beside its level,
+because "named things" is the load-bearing half of that word and an author predicting a host should
+not have to open a second file. The 80-column sentence for each one is in
 [Every node at 80 by 24](#every-node-at-80-by-24) at the end of this page.
 
 Which host a build draws to is `HOST` in the same file, supplied by the host package at build time,
@@ -348,11 +350,12 @@ by a node — it is `dom`. `Only` and `Fallback` are the only things that read i
 a node that wants to know which host it is on is a node about to draw something host-specific, and the
 answer to that is a `<Fallback>` child, not a branch.
 
-Two hosts exist. `dom` is the desktop and the browser. `tui` is the terminal, which as of 2026-08-31
-draws one pane from a spike (`apps/tui/`, `docs/future/terminal/`) and grows to the whole kit in that
-folder's phase 1. Until then the `tui` column is a mixture: read by the nodes that spike drew, and
-documentation with a test that it is filled in for the rest, so nobody adds a node without deciding
-what it does on a host with no pixels.
+Two hosts exist, and both draw the whole kit. `dom` is the desktop and the browser, from
+`client-core/host/tree/components.ts`. `tui` is the terminal, from `apps/tui/src/kit/components.tsx`,
+since that programme's phase 1 on 2026-08-31 (`docs/future/terminal/`). The two tables have the same
+keys as each other and as this matrix, held by `tools/arch/kitTable.test.ts`, so a node cannot be
+added to one host and forgotten on the other, and nobody adds a node at all without deciding what it
+does on a host with no pixels.
 
 **The classes moved inward.** A kit component keeps its `ui-*` classes and styles its own children
 by position, as in `.ui-code-wrap > .ui-btn`. Nothing exported accepts a class, `cx.ts` is internal,
@@ -882,17 +885,24 @@ Host-owned layouts make a focused mobile subset cheap; they do not decide what i
 
 A terminal host cannot run the web renderer, so it needs the tree, the kit, the layouts and the
 keymap to be honest about intent. The host that reads these is the programme in
-[docs/future/terminal/](./future/terminal/README.md), whose phase 0 shipped on 2026-08-31 and drew a
-first-party pane in cells with no change to the pane. What it found is in
-[findings.md](./future/terminal/findings.md); nothing on this list had to change. This is what the kit
-holds for it:
+[docs/future/terminal/](./future/terminal/README.md), whose phase 1 shipped on 2026-08-31 and
+draws the whole kit in cells. What phase 0 found on the way is in
+[findings.md](./future/terminal/findings.md). Drawing all seventy-four nodes cost the kit one prop:
+`Markdown` had an `onClick` beside its `onSelect`, handing over a DOM event that a remote tree cannot
+receive and a terminal has no way to raise. Its two callers wanted the link's href and the browser on
+a miss, so `onSelect` returns `false` for "I did not take it" and `onClick` is gone. Nothing else
+moved. This is what the kit holds for it:
 
 - **Every kit node has an 80×24 monochrome sentence** below and a `tui` level in
-  `packages/client-core/src/kit/tokens/support.ts`. The fifteen nodes the spike drew are read; the rest
-  are tested for presence until that folder's phase 1 draws them.
+  `packages/client-core/src/kit/tokens/support.ts`, and both are read: the TUI host draws every node
+  from its sentence, and a `reduced` one says what it loses beside its level.
+  `tools/arch/kitTable.test.ts` fails if the appendix, the matrix and either host's component table
+  disagree about which nodes exist.
 - **Every layout has a terminal projection** in [docs/panes.md](./panes.md#layout-model).
 - **Role tokens never expose pixels.** Each role has a documented terminal value, including
-  `ignored`, in `packages/client-core/src/kit/tokens/roles.ts`.
+  `ignored`, in `packages/client-core/src/kit/tokens/roles.ts`, and `roleCell()` beside `roleVar()`
+  hands the same answer to a cell renderer. A role names a colour slot, never a colour: which
+  sixteenth or which hex is the appearance layer's (`apps/tui/src/appearance.ts`).
 - **The keymap core is host-agnostic.** `@opentui/keymap`'s terminal adapter is in the same package,
   and acorn adds no key handling outside it. Nodes handle `next`, not `ArrowDown`.
 - **Collection state is host-owned**, so a cell-buffer host keeps `active`, `selected` and `offset`
@@ -923,7 +933,7 @@ disagree about which nodes exist or what each one does with focus.
 | `Section` | conditional | label in dim uppercase, children below |
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
-| `Timeline` | collection | cards in sequence, a dim rule between turns; `follow` pins the view to the last |
+| `Timeline` | collection | cards in sequence, a dim rule between turns; `follow` is a no-op, because a column of cells pins to its last child by construction |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets |
 | `Toolbar` | none | children on one line |
 | `Modal` | trap | a centred box over dimmed content; Escape dismisses |
@@ -947,8 +957,8 @@ disagree about which nodes exist or what each one does with focus.
 | `Text` | none | plain text; `mono` is a no-op, `muted` is dim, `strong` is bold |
 | `Link` | stop | the text, underlined, pressable |
 | `Heading` | none | eyebrow in dim uppercase, heading in bold |
-| `Rows` | collection | its items on successive lines; `virtual` is the scroll window and changes nothing else |
-| `Row` | item | one line: status glyph, title, meta right-aligned; subtitle on a second line if there is room |
+| `Rows` | collection | its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
+| `Row` | item | one line: status glyph, title, meta right-aligned; subtitle on a second line if there is room. `reveal` has no meaning, because there is no hover, so the trailing controls always show |
 | `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
 | `RowActions` | none | the row's actions as glyphs at the right end, always drawn, never on hover |
 | `Badge` | none | `[text]` in the tone's colour |
@@ -958,14 +968,14 @@ disagree about which nodes exist or what each one does with focus.
 | `Facts` | none | two columns, labels dim; `grouping="rows"` is one pair per line |
 | `DescriptionList` | none | as `Facts`, one pair per line |
 | `Table` | none | reduced: box-drawn, truncating columns by the priority its heads declare |
-| `TableHead` | none | reduced: the column's label in the bold header line; the lowest priority is dropped first, and the header names what was lost |
+| `TableHead` | none | reduced: the column's label in the bold header line; the lowest priority is dropped first, and a line under the table names the columns that went |
 | `TableRow` | conditional | reduced: one line, cells separated by `│`, truncated by column priority; a tab stop only when it has an action |
 | `TableCell` | none | reduced: the cell's text in its column's width, ellipsised where it does not fit; `header` makes it bold |
 | `Grid` | collection | reduced: as `Table`, with a row-range indicator instead of a scrollbar |
 | `Meter` | none | `████░░░░ 62%` |
 | `CodeBlock` | none | monospace lines, a dim rule above and below |
 | `Log` | stop | monospace lines, find as a bottom line |
-| `Markdown` | none | reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables |
+| `Markdown` | none | reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables, and a link as its text with the URL beside it in dim |
 | `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row |
 | `DiffLine` | none | reduced: one line, `+`/`-`/space in the gutter, no intra-line highlight |
 | `FileHead` | none | reduced: the path in bold with `+n −m` right-aligned |
@@ -976,7 +986,7 @@ disagree about which nodes exist or what each one does with focus.
 | `Spinner` | none | reduced: a braille spinner, or `…` where motion is off |
 | `Kbd` | none | `⌘K` or `ctrl+k`, per host |
 | `UserAvatar` | none | reduced: initials in brackets; no image |
-| `Icon` | none | reduced: a glyph from a small name table, or nothing |
+| `Icon` | none | reduced: a glyph from a small name table, an emoji as itself, or nothing for a name the table has no glyph for |
 
 ### Asking
 
@@ -997,7 +1007,7 @@ disagree about which nodes exist or what each one does with focus.
 | `KeyValueEditor` | none | a two-column table with editable cells, each cell a stop |
 | `FindBar` | stop | `/ query  3/12` on one line |
 | `Field` | none | the label above its child |
-| `CopyButton` | stop | fallback: the host prints the value on its own line to copy by hand |
+| `CopyButton` | stop | fallback: the button copies over OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
 | `ModelConnectionPicker` | stop | a `Picker` over the connected models, grouped by provider |
 
 ### Pixels, and the host wrappers

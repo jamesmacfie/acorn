@@ -59,7 +59,7 @@ Supporting documents, readable in any order:
 | Phase | File | What it delivers | What it unblocks | Waits on |
 | --- | --- | --- | --- | --- |
 | 0 | [phase-0-host-switch-and-toy.md](./phase-0-host-switch-and-toy.md) | **Shipped 2026-08-31.** `HOST` per host package; `apps/tui/` boots client-core under Node; fifteen kit nodes and both layouts on OpenTUI; the Notes pane drawn against a running `dev:node`, unchanged. Findings in [findings.md](./findings.md) | Proof the kit is intent, not layout. Everything after | Nothing |
-| 1 | [phase-1-kit-complete.md](./phase-1-kit-complete.md) | All 70 nodes at their decided level; `roleCell()`; a `tui` vitest project that asserts a cell buffer; the presence tests become behaviour tests | Any pane | 0 |
+| 1 | [phase-1-kit-complete.md](./phase-1-kit-complete.md) | **Shipped 2026-08-31.** All 74 nodes at their decided level; `roleCell()`; the theme as sixteen slots; one cell-buffer test per node; the presence tests became behaviour tests | Any pane | 0 |
 | 2 | [phase-2-layouts-keys-focus.md](./phase-2-layouts-keys-focus.md) | The seven layout components; the keymap's terminal adapter; focus regions and collections without a DOM; the PTY natively | Every compiled pane | 1 |
 | 3 | [phase-3-process-and-auth.md](./phase-3-process-and-auth.md) | The `acorn` command: attach or start, supervise, `--node` with probe, words, and pair; device token custody; reconnect and revoked states; a boot test | Running against any node | 0 |
 | 4 | [phase-4-chrome.md](./phase-4-chrome.md) | Rail, topbar, pane row, palette, overlays, footer; task and workspace switching | A usable workspace | 2, 3 |
@@ -80,9 +80,12 @@ later phase has to fix rather than work around — the pane registry names the D
 pending `lazy()` region is an empty string a cell host refuses, and OpenTUI needs Node 26.4 with
 `--experimental-ffi`. **Read it before starting any phase below.**
 
-Phases 1, 2, and 3 can run in parallel. The kit sweep and the layouts are rendering work; the process
-model is plumbing that touches nothing they touch. Phase 3 can start the day phase 0 boots client-core
-under Node.
+Phase 1 shipped the same day. Every node draws from its sentence, and the two things it deliberately
+left half-done — the clipboard button and the PTY rectangle — are both waiting on focus, which is
+phase 2. Its own file says what else moved.
+
+Phases 2 and 3 can run in parallel. The layouts are rendering work; the process model is plumbing that
+touches nothing they touch. Phase 3 can start the day phase 0 boots client-core under Node.
 
 Phase 4 waits on both, because chrome is layouts plus a live node. Phases 5 and 6 can run in parallel
 after it: the sandbox is protocol and custody work, the pane sweep is reading each pane at 80 by 24 and
