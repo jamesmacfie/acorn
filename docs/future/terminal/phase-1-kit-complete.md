@@ -2,6 +2,8 @@
 
 Status: not started. Waits on phase 0.
 
+Read [findings.md](./findings.md) first: it owns `slot()` for element-typed props, the `Markdown` and `Textarea` notes, and which fifteen nodes already exist.
+
 ## Goal
 
 Every one of the 70 kit nodes has a TUI component at its decided level, roles map to cells through

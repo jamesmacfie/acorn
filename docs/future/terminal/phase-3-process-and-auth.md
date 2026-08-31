@@ -2,6 +2,8 @@
 
 Status: not started. Waits on phase 0. Runs beside phases 1 and 2.
 
+Read [findings.md](./findings.md) first: `fleetList` is what selects a node, not the transport, and `idb-keyval` sits unconditionally on the boot path.
+
 ## Goal
 
 `acorn` attaches to the node for this machine's data root or starts one; `acorn --node <endpoint>`

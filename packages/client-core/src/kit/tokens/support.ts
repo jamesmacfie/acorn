@@ -112,6 +112,12 @@ export const NODE_SUPPORT = {
 
 export type KitNode = keyof typeof NODE_SUPPORT
 
-/** Which host this build draws to. One value today; the PWA is the same one, and a terminal
- *  renderer sets `tui`. `Only` and `Fallback` are the only things that read it. */
-export const HOST: Host = 'dom'
+/** Which host this build draws to. Supplied by the host package at build time, because it is a fact
+ *  about the bundle rather than about the run: the desktop's Vite config defines it as `dom`, the
+ *  TUI's as `tui`. Where nothing defines it — a test, a plain browser served by a node — it is `dom`,
+ *  which is what every host with a DOM is. `Only` and `Fallback` are the only things that read it.
+ *
+ *  `typeof` on an undeclared name is the one safe read in JavaScript, so this file needs no shim and
+ *  no host has to remember to call a setter before the first render. */
+declare const __ACORN_HOST__: Host
+export const HOST: Host = typeof __ACORN_HOST__ === 'undefined' ? 'dom' : __ACORN_HOST__

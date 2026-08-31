@@ -29,10 +29,17 @@ plausible and is not promised; phase 7 decides after the tarball ships.
   `@opentui/core-<triple>` packages with a prebuilt library each. Two native modules, both
   prebuilt per platform, both with Linux as the platform that needs a CI-produced build if the
   upstream prebuild does not cover a triple. `scripts/rebuild-node-abi.mjs` probes one; it probes two.
+  An available artifact is not proof of parity: OpenTUI's own Node acceptance runs on Linux x64 alone,
+  and macOS arm64 is evidenced only by phase 0 having drawn on it.
 - **"Requiring a modern Node is a reasonable ask of someone deliberately installing a headless
-  service."** It is not a reasonable ask of someone who typed `acorn`. Bundling the runtime moves from
-  the last step of `bundle.md`'s order to before the headless artifact carries the TUI. The desktop
-  already bundles it (`tauri.conf.json`, `externalBin`), so the cost is tarball size, about 50 MB.
+  service."** It is not a reasonable ask of someone who typed `acorn`, and phase 0 made it a harder ask
+  than it looked: OpenTUI reaches its render core over `node:ffi`, so the TUI needs **Node 26.4 or
+  later started with `--experimental-ffi`** ([findings.md](./findings.md) § The runtime floor). That is
+  a Current release and an experimental flag, not something to expect on a server. So bundling the
+  runtime is a precondition of the headless artifact carrying `acorn` rather than the last step of
+  `bundle.md`'s order, `bin/acorn` passes the flag itself, and the pinned version in
+  `node-runtime.json` moves to 26.4+. The desktop already bundles a runtime
+  (`tauri.conf.json`, `externalBin`), so the cost is tarball size, about 50 MB.
 - **Node SEA is still not the path.** Two native modules now instead of one.
 - **"Five tarballs on a release"** stays five. `acorn` rides inside the node tarball; it is not a
   sixth artifact.

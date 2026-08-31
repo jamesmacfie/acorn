@@ -32,6 +32,7 @@ Decided with the owner on 2026-08-30. A phase file may not reopen them.
 | **Same bridge, new carrier.** The SDK verbs and the tree protocol stay the single contract; the terminal adds a transport, a sandbox realm, and a cell renderer. | `frames/verbs.ts` and `protocol/src/tree/` are the lists both ends compile against. A second list is a second thing that drifts. | Any terminal-only message on either port. |
 | **`acorn` attaches to a running node for its data root, else starts and supervises one.** | One command covers a laptop with the desktop app running, a laptop without it, and a server reached over ssh. The desktop helper already owns the supervise-a-child code and has no shell binding. | A pure client that needs `acorn-node` started first; one node per terminal fighting over the data-root lock. |
 | **One runtime.** The TUI runs under the same Node the node runs under. OpenTUI has a `node` export condition and a prebuilt native core per platform. | Two runtimes in one tarball is two things to pin, sign, and prebuild. | Bun as the TUI runtime. |
+| **…and that Node is 26.4 or later, started with `--experimental-ffi`.** Found in phase 0, 2026-08-31. OpenTUI reaches its Zig core over `node:ffi`, which does not exist before then. | The decision above still holds — the node needs Node 24 for `node:sqlite` and 26 satisfies that — but the floor moves onto a Current release and an experimental flag. | Running `acorn` on the machine's own Node unless it is 26.4+. The bundled runtime becomes a precondition of the headless artifact rather than a later nicety ([08-deployables.md](./08-deployables.md)). |
 | **Isolation before rendering.** The out-of-process sandbox for loaded plugins is designed as rung 2 of `docs/security.md § The containment ladder`, not as a terminal-only invention. | A terminal has no iframe. Its sandbox is a Node worker thread or child process, and that is the same object node-half containment needs. | A third trust tier that wears the frame tier's enforced-permission claims with the node half's disclosed-only weakness. |
 | **The toy host goes first, before the PWA.** | `terminal.md` sequenced the PWA first. The toy host is the cheapest test that the kit is intent and not layout, and it is worth having before more panes are written. The PWA does not need it and it does not need the PWA. | Nothing in `remote.md` changes. |
 
@@ -49,6 +50,7 @@ Supporting documents, readable in any order:
 | [06-isolation.md](./06-isolation.md) | Loaded plugins in a worker thread, bundle custody over files, the trust prompt as a tree, and the third column in the trust model. |
 | [07-chrome.md](./07-chrome.md) | What the TUI draws itself: rail, topbar, pane row, palette, overlays, footer. |
 | [08-deployables.md](./08-deployables.md) | The two artifacts, what is in each, and what `bundle.md` owes them. |
+| [findings.md](./findings.md) | What phase 0 found: which decisions move, what each later phase owes, and the screenshot. |
 | [refused.md](./refused.md) | What was considered and refused, with the argument. |
 | [docs-migration.md](./docs-migration.md) | Every document under `docs/` that changes, which phase changes it, and how. |
 
@@ -56,7 +58,7 @@ Supporting documents, readable in any order:
 
 | Phase | File | What it delivers | What it unblocks | Waits on |
 | --- | --- | --- | --- | --- |
-| 0 | [phase-0-host-switch-and-toy.md](./phase-0-host-switch-and-toy.md) | `HOST` per host package; an `apps/tui/` package that boots client-core under Node; the fifteen or so kit nodes `list-detail` and `header-body-footer` need, on OpenTUI; the http and linear panes drawn against a running `dev:node` | Proof the kit is intent, not layout. Everything after | Nothing |
+| 0 | [phase-0-host-switch-and-toy.md](./phase-0-host-switch-and-toy.md) | **Shipped 2026-08-31.** `HOST` per host package; `apps/tui/` boots client-core under Node; fifteen kit nodes and both layouts on OpenTUI; the Notes pane drawn against a running `dev:node`, unchanged. Findings in [findings.md](./findings.md) | Proof the kit is intent, not layout. Everything after | Nothing |
 | 1 | [phase-1-kit-complete.md](./phase-1-kit-complete.md) | All 70 nodes at their decided level; `roleCell()`; a `tui` vitest project that asserts a cell buffer; the presence tests become behaviour tests | Any pane | 0 |
 | 2 | [phase-2-layouts-keys-focus.md](./phase-2-layouts-keys-focus.md) | The seven layout components; the keymap's terminal adapter; focus regions and collections without a DOM; the PTY natively | Every compiled pane | 1 |
 | 3 | [phase-3-process-and-auth.md](./phase-3-process-and-auth.md) | The `acorn` command: attach or start, supervise, `--node` with probe, words, and pair; device token custody; reconnect and revoked states; a boot test | Running against any node | 0 |
@@ -68,10 +70,15 @@ Supporting documents, readable in any order:
 
 ## The order of work
 
-Phase 0 stands alone and goes first. It is a spike: expect to throw half of it away. What it buys is
-the one fact every later phase rests on, that the http and linear panes, written against the kit with
-no knowledge of a terminal, draw legibly in one. If they do not, the problem is in the kit and the fix
-belongs to `docs/ui-design.md`, not to this folder. Stop and go there.
+Phase 0 stood alone and went first. It shipped on 2026-08-31 and bought the one fact every later
+phase rests on: a first-party pane, written against the kit with no knowledge of a terminal, draws
+legibly in one with no change to the pane. Nothing in the kit had to move.
+
+What it drew was Notes, not http and linear: both of those ship only a tree bundle, so drawing either
+means the phase 5 sandbox. [findings.md](./findings.md) has that and the rest, including three things a
+later phase has to fix rather than work around — the pane registry names the DOM layout table, a
+pending `lazy()` region is an empty string a cell host refuses, and OpenTUI needs Node 26.4 with
+`--experimental-ffi`. **Read it before starting any phase below.**
 
 Phases 1, 2, and 3 can run in parallel. The kit sweep and the layouts are rendering work; the process
 model is plumbing that touches nothing they touch. Phase 3 can start the day phase 0 boots client-core

@@ -2,6 +2,8 @@
 
 Status: not started. Waits on phase 2. Runs beside phase 6.
 
+Read [findings.md](./findings.md) first: the host half now needs `--allow-ffi` and `--allow-worker` of its own before a plugin worker gets none.
+
 ## Goal
 
 A loaded plugin's tree renders in the TUI from a Node worker under permission flags, its bundle held
