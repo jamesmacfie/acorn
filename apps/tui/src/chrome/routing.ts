@@ -80,10 +80,9 @@ export function installRouting(model: ShellModel): void {
   // Keep the path on a project this workspace has. Two cases, and they are the same check: nothing is
   // chosen yet, or the reader switched workspace and the path still names the old one's project.
   //
-  // Opening on the first one is the courtesy the shell already extends to tasks — it activates the
-  // first task when nothing else is open, because the alternative is an empty screen (./Shell.tsx).
-  // A browse surface with no project is that empty screen with an explanation on it, which is worse:
-  // the reader has to find `p` before anything at all works.
+  // Opening on the first one is the courtesy the shell extends to its default Menu source. A browse
+  // surface with no project is an empty screen with an explanation on it, which is worse: the reader
+  // has to find `p` before anything at all works.
   createEffect(() => {
     const projects = model.workspace()?.projects ?? []
     if (!projects.length) return

@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
-import { createMemo, createSignal, For, Index, Show, type JSX } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
+import { createEffect, createMemo, createSignal, For, Index, Show, untrack, type JSX } from 'solid-js'
+import type { BoxRenderable, MouseEvent } from '@opentui/core'
 import type { Size, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import type { CollectionItem } from '@acorn/client-core/kit/keys/collectionIntents.ts'
 import type { CodeRow, DiffFile, Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
@@ -11,6 +11,7 @@ import { markdownLines, type Line as MarkdownLine } from './markdown'
 import { borderCell, rule, spaceCells } from './roles'
 import { GLYPHS } from './glyphs'
 import { spinnerFrame } from './tick'
+import { focusRenderable, focusedRenderable } from '../keys/regions'
 
 // The kit's showing nodes in cells. One component per sentence in
 // docs/ui-design.md § Every node at 80 by 24; where a node is `reduced`, `support.ts` says what is
@@ -248,19 +249,51 @@ export function Rows<T extends CollectionItem>(props: {
   // it: centring on the active row scrolled the whole list under the reader on every press, which is
   // not what any list in a terminal does. lazygit's rule — the view holds still until the caret walks
   // off an edge, then follows by exactly as much as it has to.
-  let top = 0
+  const [top, setTop] = createSignal(0)
+  let lastActive: string | null = null
+  const clampTop = (value: number, length = items().length, fit = rows()) =>
+    Math.max(0, Math.min(value, Math.max(0, length - fit)))
+
+  // Keyboard movement remains authoritative for the caret: when the active key changes, reveal it
+  // by the smallest amount. A mouse wheel changes `top` without changing `active`, so it can inspect
+  // rows away from the selection and this effect only clamps that offset after a resize/refetch.
+  createEffect(() => {
+    const all = items()
+    const fit = rows()
+    const active = collection.active()
+    const current = clampTop(untrack(top), all.length, fit)
+    let next = current
+    if (!props.virtual || !fit || all.length <= fit) next = 0
+    else if (active !== lastActive) {
+      const at = Math.max(0, all.findIndex((item) => item.key === active))
+      next = Math.max(0, Math.min(Math.max(current, at - fit + 1), at, all.length - fit))
+    }
+    lastActive = active
+    if (next !== untrack(top)) setTop(next)
+  })
+
   const window = createMemo(() => {
     const all = items()
     const fit = rows()
     if (!props.virtual || !fit || all.length <= fit) {
-      top = 0
       return { from: 0, items: all }
     }
-    const at = Math.max(0, all.findIndex((item) => item.key === collection.active()))
-    top = Math.max(0, Math.min(Math.max(top, at - fit + 1), at, all.length - fit))
+    const from = clampTop(top(), all.length, fit)
     // Exactly what fits and no more. There is no scroll offset to overscan into: the box draws from
     // its own first row, so a row drawn beyond the window is a row drawn over the frame below it.
-    return { from: top, items: all.slice(top, top + fit) }
+    return { from, items: all.slice(from, from + fit) }
+  })
+
+  // A virtual wheel may remove the focused row from the drawn slice. The collection box holds focus
+  // while that row has no renderable; if a later wheel/key movement brings it back, restore the row
+  // and therefore its caret. The key layer is focus-within on the same box, so keyboard fallback is
+  // live in both states.
+  createEffect(() => {
+    window().from
+    queueMicrotask(() => {
+      if (!box || focusedRenderable() !== box || !collection.focusActive()) return
+      box.focusable = false
+    })
   })
 
   /** Where the thumb sits, or nothing where the whole list is on screen. */
@@ -282,6 +315,23 @@ export function Rows<T extends CollectionItem>(props: {
       {...(props.virtual ? { flexGrow: 1, flexBasis: 0, flexShrink: 1 } : { flexShrink: 0 })}
       ref={(element: BoxRenderable) => { box = element; setRows(element.height); collection.attach(element) }}
       onSizeChange={() => setRows(box?.height ?? 0)}
+      onMouseScroll={(event: MouseEvent) => {
+        if (!props.virtual) return
+        const direction = event.scroll?.direction
+        if (direction !== 'up' && direction !== 'down') return
+        const amount = Math.max(1, Math.round(event.scroll?.delta ?? 1))
+        const next = clampTop(top() + (direction === 'down' ? amount : -amount))
+        if (next === top()) return
+        if (box) {
+          // Pointer focus has no browser `focusin` to bridge into the region store. The virtual list
+          // owns that bridge because it owns the wheel offset (docs/tui.md § Collections).
+          box.focusable = true
+          focusRenderable(box)
+        }
+        setTop(next)
+        event.preventDefault()
+        event.stopPropagation()
+      }}
     >
       <box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
         <For each={window().items}>
@@ -489,16 +539,21 @@ export function Log(props: { lines: readonly string[]; follow?: boolean; find?: 
  *  through the same pass and is drawn the same way (../kit/host.tsx § ProviderHtml). */
 export function Lines(props: { lines: MarkdownLine[] }) {
   return (
-    <box flexDirection="column">
+    // A long document is clipped or scrolled by its region; it must never shrink to the viewport.
+    // Without this, yoga takes a height deficit out of every wrapped paragraph and later blocks
+    // overwrite the rows it removed — the same invariant as every block in ./grouping.tsx.
+    <box flexDirection="column" flexShrink={0}>
       <For each={props.lines}>
         {(line) => (
           <Show when={!line.rule} fallback={<Line role="muted">{rule(40)}</Line>}>
             {/* One `text` with a `span` per run, not a row of `Line`s: a row of text renderables is a
                 row of boxes to yoga, and at a width they do not fit each one is shrunk and clips its
                 own content — which cut three letters out of every run of a wrapped paragraph
-                (../kit/cells.tsx § Run). */}
-            <box flexDirection="row" paddingLeft={line.indent ?? 0}>
-              <text wrapMode="word">
+                (../kit/cells.tsx § Run). `width` and `minWidth` make yoga measure the same wrap width
+                the text buffer draws; without them it reserves one row for an unwrapped line while
+                the buffer paints several, and the next paragraph overwrites those rows. */}
+            <box flexDirection="row" flexShrink={0} width="100%" minWidth={0} paddingLeft={line.indent ?? 0}>
+              <text wrapMode="word" flexGrow={1} minWidth={0}>
                 <For each={line.runs}>{(run) => <Run role={run.role} tone={run.tone}>{run.text}</Run>}</For>
               </text>
             </box>

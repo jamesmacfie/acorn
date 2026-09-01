@@ -35,8 +35,6 @@ describe.skipIf(!hasFfi)('browsing over a slow transport', () => {
     try {
       const screen = await renderFixture({ width: 100, height: 32 })
       expect(await caretOn(screen, 'GitHub')).toBe(true)
-      await screen.press('j')
-      await screen.press('k')
       await screen.until('Invalidate')
       expect(await caretOn(screen, 'Invalidate')).toBe(true)
 

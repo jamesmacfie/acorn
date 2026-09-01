@@ -17,7 +17,7 @@ import type { TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 export type Run = { text: string; role?: TextRole; tone?: Tone }
 export type Line = { runs: Run[]; indent?: number; rule?: true }
 
-const TAG = /<\/?([a-z0-9]+)((?:\s+[a-z-]+="[^"]*")*)\s*\/?>/gi
+const TAG = /<\/?([a-z0-9-]+)((?:\s+[a-z-]+="[^"]*")*)\s*\/?>/gi
 const attr = (raw: string, name: string): string | undefined =>
   new RegExp(`${name}="([^"]*)"`).exec(raw)?.[1]
 

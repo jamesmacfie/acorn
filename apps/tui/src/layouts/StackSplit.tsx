@@ -46,10 +46,10 @@ export function StackSplit(props: LayoutProps) {
           which one has the keys is the thing a reader needs to know. The rule that used to sit
           between them is gone — two frames already meet there, and a rule beside a border is two
           lines saying one thing (../panel.tsx). */}
-      <Panel grow title="Top" onBox={regionFocus({ paneId: props.stateKey, regionId: 'top' }, 0)}>
+      <Panel grow scroll title="Top" onBox={regionFocus({ paneId: props.stateKey, regionId: 'top' }, 0)}>
         {props.regions.top?.()}
       </Panel>
-      <Panel rows={split.size()} title="Bottom" onBox={regionFocus({ paneId: props.stateKey, regionId: 'bottom' }, 1)}>
+      <Panel rows={split.size()} scroll title="Bottom" onBox={regionFocus({ paneId: props.stateKey, regionId: 'bottom' }, 1)}>
         {props.regions.bottom?.()}
       </Panel>
     </box>

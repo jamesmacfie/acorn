@@ -5,8 +5,7 @@ import type { BoxRenderable, KeyEvent, Renderable } from '@opentui/core'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { activeTaskId, selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
-import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
+import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
@@ -20,7 +19,7 @@ import { Modal, ModalBody } from '../kit/grouping'
 import { PanelBody } from '../panel'
 import { installCommandLayer } from '../keys/commandLayer'
 import { bindKeys } from '../keys/install'
-import { focusedRenderable, regionFocus, setPaneCycler, takeFocus } from '../keys/regions'
+import { focusWithin, regionFocus, setPaneCycler, takeFocus } from '../keys/regions'
 import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
 import { chooseProject, installRouting, routedProjectId } from './routing'
@@ -69,14 +68,6 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // What the path says, read into the shell: which task to open, which source claims it, and which
   // project every project-scoped browse surface reads (./routing.ts).
   installRouting(model)
-
-  // Open on something. The desktop restores `last_task` from a preference; this host persists nothing
-  // across runs, so the first task is the friendly default and the alternative is an empty screen.
-  createEffect(() => {
-    if (activeTaskId() || selectedSource()) return
-    const first = model.tasks()[0]
-    if (first) activateTaskSignals(first)
-  })
 
   // A bundle this device has never decided about. Raised rather than opened by a key, because nobody
   // asked for it: the distribution pass found code a node is offering and nothing runs until the
@@ -196,19 +187,9 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
                   ref={(element: BoxRenderable) => {
                     setStrip(element)
                     regionFocus({ paneId: 'chrome', regionId: 'panes' }, STRIP_ORDER)(element)
-                    element.focusable = true
-                    // The strip is a region you can be in, so it answers the list intents while you
-                    // are: `j`/`k` walk the panes rather than the chord alone, because a chord nobody
-                    // discovers is a chord nobody uses.
-                    bindKeys(element, [
-                      { key: 'j', cmd: () => cyclePane(model.task(), 1) },
-                      { key: 'k', cmd: () => cyclePane(model.task(), -1) },
-                      { key: 'down', cmd: () => cyclePane(model.task(), 1) },
-                      { key: 'up', cmd: () => cyclePane(model.task(), -1) },
-                    ], 40)
                   }}
                 >
-                  <PaneStrip task={task()} focused={!!strip() && focusedRenderable() === strip()} />
+                  <PaneStrip task={task()} focused={focusWithin(strip())} />
                 </box>
               )}
             </Show>

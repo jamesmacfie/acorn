@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { hasFfi } from './ffi'
 import { renderFixture } from './harness'
+import { focusedRegion } from './keys/regions'
 
 // `Sections` in cells: one declaration, the other shape.
 //
@@ -11,11 +12,12 @@ import { renderFixture } from './harness'
 // (client-core/kit/components/layout/Sections.tsx).
 //
 // Three things have to hold and each broke while this was being built: the strip has to draw every
-// tab rather than clipping half of them over whatever sits beside it, `h` and `l` have to reach the
-// node from inside whatever the current tab drew, and the main panel has to be a region Tab can get
-// to at all — it was not, so nothing in a browse surface could be driven.
+// tab rather than clipping half of them over whatever sits beside it, the strip has to be a parent
+// stop instead of stealing Left/Right from whatever its current panel contains, and the main panel
+// has to be a region Tab can get to at all — it was not, so nothing in a browse surface could be
+// driven.
 describe('a surface drawn as sections', () => {
-  it.skipIf(!hasFfi)('is a strip of tabs, walks with h and l, and takes main into the strip when narrow', async () => {
+  it.skipIf(!hasFfi)('is a strip of tabs, enters with Down, and takes main into the strip when narrow', async () => {
     const screen = await renderFixture({ width: 160, height: 38, pane: 'pr' })
     const wide = await screen.until('Comments', 45)
 
@@ -29,15 +31,15 @@ describe('a surface drawn as sections', () => {
     // The header tab is the one showing: the pull's own heading, not a fold's label.
     expect(wide).toContain('#42')
 
-    // Into the surface, then along the strip. `l` is the pane's own key tier, focus-within, so it
-    // works from wherever in the panel the keys landed — but only once the keys are in the panel at
-    // all, which is what the region around a browse surface is for (./chrome/Shell.tsx).
-    let switched = ''
-    for (let step = 0; step < 12 && !switched.includes('Loads the account first'); step += 1) {
-      await screen.press('TAB')
-      await screen.press('l')
-      switched = await screen.frame()
-    }
+    // This fixture deliberately opens a task, so it starts in Tasks. Tab reaches the outer task-pane
+    // strip; Down enters the PR pane on its own section strip; Right changes that inner strip. The old
+    // focus-within binding let the first Right change the outer strip to Agent instead.
+    await screen.press('TAB')
+    expect(focusedRegion()?.regionId).toBe('panes')
+    await screen.press('ARROW_DOWN')
+    expect(focusedRegion()?.paneId).toBe('pr')
+    await screen.press('ARROW_RIGHT')
+    const switched = await screen.frame()
     // Description is a `ProviderHtml` body, so what it draws is the pull's own text.
     expect(switched).toContain('Loads the account first')
 

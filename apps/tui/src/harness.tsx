@@ -46,13 +46,13 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   const { createTestRenderer } = await import('@opentui/core/testing')
   const { render } = await import('@opentui/solid')
   const { installKeymap } = await import('./keys/install')
-  const { installRenderGuard } = await import('./renderGuard')
+  const { installRenderGuard, RENDERER_LISTENER_CAP } = await import('./renderGuard')
   const { _resetCollections } = await import('./keys/collection')
   const { _resetRegions } = await import('./keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
   const { _resetChrome } = await import('./chrome/state')
   const { _resetRouter } = await import('./kit/router')
-  const { setSelectedSource } = await import('@acorn/client-core/features/tasks/tasks.ts')
+  const { setActiveTaskId, setSelectedSource } = await import('@acorn/client-core/features/tasks/tasks.ts')
   // The collection store, the region list, the per-pane layout state, the path and which browse
   // source is showing are all module state, so two renders in one process would share a caret, a
   // focused region, a split position, a project and a rail selection. The real host has one render
@@ -66,6 +66,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   _resetLayoutState()
   _resetChrome()
   _resetRouter()
+  setActiveTaskId(null)
   setSelectedSource(null)
   await bootFixture()
   // Which pane the fixture task opens on. The roster has eight of them now, so "the pane" is a choice
@@ -73,7 +74,12 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   // layout puts first (../chrome/panes.ts § shownPane).
   if (size.pane) {
     const { dispatchLayout } = await import('@acorn/client-core/features/tasks/tasks.ts')
+    const { activateTaskSignals } = await import('@acorn/client-core/features/tasks/activate.ts')
     const { paneContribution } = await import('@acorn/client-core/host/registries/panes/panes.ts')
+    // Naming a pane is also an explicit request for the fixture task. Production now defaults to
+    // the first Menu source, so tests of a task pane must state the other half of their setup rather
+    // than relying on the old startup side effect in Shell.
+    activateTaskSignals(TASK)
     dispatchLayout(TASK.id, { type: 'show', pane: size.pane })
     // …and wait for its code, the pane's and every region's. A pane and each of its regions is a
     // `lazy()`, and under the test transform the import is a compile rather than a read of one bundled
@@ -96,6 +102,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
     width: size.width ?? 80,
     height: size.height ?? 24,
   })
+  renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(renderer)
   let quits = 0
   await render(() => <App nodeId="node-1" supervised={size.supervised ?? false} onQuit={() => { quits += 1 }} />, renderer)

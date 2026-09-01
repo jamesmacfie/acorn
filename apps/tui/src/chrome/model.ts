@@ -13,7 +13,9 @@
 import { createMemo, type Accessor } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { tasksOptions, workspacesOptions, type Task, type Workspace } from '@acorn/client-core/infra/queries.ts'
-import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import {
+  activeTaskId, selectedSource, setActiveTaskId, setSelectedSource,
+} from '@acorn/client-core/features/tasks/tasks.ts'
 import { chosenWorkspace, setChosenWorkspace } from './state'
 
 export type ShellModel = {
@@ -27,7 +29,7 @@ export type ShellModel = {
   /** The open task, or null when a browse source has the pane instead. */
   task: Accessor<Task | null>
   /** Show a workspace's tasks. Here rather than as a bare setter so every caller — the topbar's menu
-   *  and the palette's row — makes the same two writes. */
+   *  and the palette's row — makes the same handoff. */
   chooseWorkspace: (workspaceId: string) => void
 }
 
@@ -63,10 +65,13 @@ export function createShellModel(): ShellModel {
 
   // A workspace switch is a change of roster, so whatever was open in the old one is not open in the
   // new one. Clearing the source rather than picking one leaves the shell on its empty state until a
-  // task is chosen, which is what a terminal with no browse surface registered has to say anyway.
+  // source in the new roster is ready. Clear the old view before publishing the new workspace: the
+  // Rail's defaulting effect must never observe "new workspace, old selection" and conclude that the
+  // new workspace was already initialized.
   const chooseWorkspace = (workspaceId: string): void => {
-    setChosenWorkspace(workspaceId)
+    setActiveTaskId(null)
     setSelectedSource(null)
+    setChosenWorkspace(workspaceId)
   }
 
   return { workspaces, allTasks, workspace, tasks, task, chooseWorkspace }

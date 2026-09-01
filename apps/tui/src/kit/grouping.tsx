@@ -7,6 +7,8 @@ import { flatten, Line, slot } from './cells'
 import { borderCell, boxBorder, spaceCells, spaceLines } from './roles'
 import { trapKeys } from '../keys/trap'
 import { bindKeys } from '../keys/install'
+import { markTabStop, moveFocusFrom, moveRegion } from '../keys/regions'
+import { ScrollViewport } from './scrolling'
 import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 
 // The kit's grouping nodes in cells, each drawn to its sentence in
@@ -149,14 +151,45 @@ export function Tabs(props: {
   idPrefix: string
   ariaLabel: string
   actions?: JSX.Element
+  /** This strip is the structural parent of the region content below it. */
+  entry?: boolean
 }) {
+  const step = (delta: 1 | -1): boolean => {
+    const at = props.tabs.findIndex((tab) => tab.id === props.active)
+    const next = props.tabs[at + delta]
+    // A tab edge is a wall. Escape owns the upward/back edge; letting a failed Left bubble to the
+    // region layer made the first tab unexpectedly throw the reader back into the rail.
+    if (!next) return true
+    props.onChange(next.id)
+    return true
+  }
   return (
     // Wrapped rather than clipped. A strip is only useful if every tab on it is readable, and a pull
     // request has seven — which at a hundred cells fits and at sixty does not, and the half that did
     // not fit was drawn over whatever sat beside it. Two lines of tabs cost one row and lose nothing.
     // `columnGap` rather than `gap`: yoga's `gap` sets both axes, so two cells between tabs was also
     // two blank rows between wrapped lines.
-    <box flexDirection="row" flexWrap="wrap" columnGap={2} rowGap={0} flexShrink={0} overflow="hidden">
+    <box
+      flexDirection="row"
+      flexWrap="wrap"
+      columnGap={2}
+      rowGap={0}
+      flexShrink={0}
+      overflow="hidden"
+      ref={(element: BoxRenderable) => {
+        markTabStop(element, props.entry)
+        bindKeys(element, [
+          ...['left', 'h'].map((key) => ({ key, cmd: () => step(-1) })),
+          ...['right', 'l'].map((key) => ({ key, cmd: () => step(1) })),
+          // The selected panel is the next stop in the same region. A top-level pane strip is its
+          // own region, so its Down edge continues into the following pane region instead.
+          ...['down', 'j'].map((key) => ({
+            key,
+            cmd: () => moveFocusFrom(element, 1) || moveRegion(1),
+          })),
+        ], 45, { mode: 'focus' })
+      }}
+    >
       <For each={props.tabs}>
         {(tab) => (
           // `height={1}`, because a wrapped flex line is as tall as its tallest child and a child
@@ -180,9 +213,9 @@ export function Tabs(props: {
  *  panel holds its state across a switch. */
 export function TabPanel(props: { idPrefix: string; id: string; active: string; children: JSX.Element }) {
   return (
-    <box flexDirection="column" flexGrow={1} visible={props.active === props.id}>
+    <ScrollViewport visible={props.active === props.id}>
       {props.children}
-    </box>
+    </ScrollViewport>
   )
 }
 
@@ -490,10 +523,8 @@ const MAIN_COLUMN_AT = 120
  *  `main` keeps a column of its own while there is room for one and joins the strip below that, which
  *  is the same collapse `ListDetail` makes at its own width.
  *
- *  `h` and `l` walk the strip, on the pane's own key tier, focus-within — so they work from inside
- *  whatever the current tab drew. At the strip's edges they yield to the region tier, which moves
- *  between the main pane and the rail (../keys/install.ts). The strip is drawn whether or not the
- *  keys are in it, because a strip nobody can see is a strip nobody presses `l` at. */
+ *  The strip is a real parent stop: Left/Right selects, Down enters the selected panel, Escape from
+ *  that panel comes back, and a second Escape crosses to the rail (../keys/regions.ts). */
 export function Sections(props: {
   id: string
   ariaLabel?: string
@@ -513,16 +544,6 @@ export function Sections(props: {
   // Falls back rather than storing a default, so a surface whose section set changes under it lands
   // on its first tab instead of on nothing. The same rule the `tabs` layout keeps.
   const active = () => (tabs().some((tab) => tab.id === chosen()) ? chosen() : tabs()[0]?.id ?? '')
-  const step = (delta: number): boolean => {
-    const all = tabs()
-    if (all.length < 2) return false
-    const at = all.findIndex((tab) => tab.id === active())
-    const next = at + delta
-    if (next < 0 || next >= all.length) return false
-    setChosen(all[next].id)
-    return true
-  }
-
   return (
     <box
       flexDirection="row"
@@ -530,10 +551,6 @@ export function Sections(props: {
       ref={(element: BoxRenderable) => {
         box = element
         setCells(element.width)
-        bindKeys(element, [
-          ...['left', 'h'].map((key) => ({ key, cmd: () => step(-1) })),
-          ...['right', 'l'].map((key) => ({ key, cmd: () => step(1) })),
-        ], 45)
       }}
       onSizeChange={() => setCells(box?.width ?? MAIN_COLUMN_AT)}
     >
@@ -541,11 +558,6 @@ export function Sections(props: {
         flexDirection="column"
         flexGrow={1}
         minWidth={0}
-        // The strip is where the keys land inside this node, which is what makes `h` and `l` reach it.
-        // A region's first stop is the first focusable renderable under it, and without one the stop
-        // is the region's own frame — which sits *above* this node, so a `focus-within` layer bound
-        // here never matched and the strip could not be walked at all (../keys/regions.ts § firstStop).
-        ref={(element: BoxRenderable) => { element.focusable = true }}
       >
         <Tabs
           tabs={tabs().map((tab) => ({ id: tab.id, label: tab.label, ...(tab.count === undefined ? {} : { count: tab.count }) }))}
@@ -553,13 +565,16 @@ export function Sections(props: {
           onChange={setChosen}
           idPrefix={props.id}
           ariaLabel={props.ariaLabel ?? 'Sections'}
+          entry
           {...(() => { const found = tabs().find((tab) => tab.id === active())?.actions; return found ? { actions: found() } : {} })()}
         />
-        <box flexDirection="column" flexGrow={1} overflow="scroll">
-          <For each={tabs()}>
-            {(tab) => <Show when={tab.id === active()}>{tab.render()}</Show>}
-          </For>
-        </box>
+        <For each={tabs()}>
+          {(tab) => (
+            <TabPanel idPrefix={props.id} id={tab.id} active={active()}>
+              {tab.render()}
+            </TabPanel>
+          )}
+        </For>
       </box>
       {/* `minWidth={0}` on both halves, because a flex child's floor is its own content and a diff is
           routinely wider than its share (../layouts/ListDetail.tsx). */}
@@ -567,7 +582,7 @@ export function Sections(props: {
         {(main) => (
           <box flexDirection="column" flexGrow={1} minWidth={0}>
             <SectionHeader {...(main().actions ? { actions: main().actions!() } : {})}>{main().label}</SectionHeader>
-            <box flexDirection="column" flexGrow={1} overflow="scroll">{main().render()}</box>
+            <ScrollViewport>{main().render()}</ScrollViewport>
           </box>
         )}
       </Show>

@@ -36,4 +36,32 @@ describe('the render guard', () => {
     expect(after._widthValue).toBe(1)
     expect(after._heightValue).toBe(1)
   })
+
+  it('has already clamped the stored size by the time a resize handler reads it', () => {
+    installRenderGuard()
+    const proto = Renderable.prototype as unknown as {
+      updateFromLayout: () => void
+      onLayoutResize: (width: number, height: number) => void
+    }
+    const seen: number[] = []
+    const node = {
+      ...unmeasured(),
+      _visible: true,
+      buffered: false,
+      emit: () => {},
+      requestRender: () => {},
+      handleFrameBufferResize: () => {},
+      // The patched prototype method rather than a stub, because what is under test is the order of
+      // work inside it: the fake is a plain object, so the chain has to be spelled out.
+      onLayoutResize: proto.onLayoutResize,
+      onResize() { this.onSizeChange() },
+      // What `ScrollBox` does here: read the node's own size to size its bar. Reading `NaN` poisons
+      // its scroll position permanently, because the clamp it feeds itself through keeps returning
+      // `NaN`, and its content then draws at the wrong screen position for the life of the box.
+      onSizeChange() { seen.push(this._widthValue, this._heightValue) },
+    }
+
+    proto.updateFromLayout.call(node)
+    expect(seen).toEqual([1, 1])
+  })
 })

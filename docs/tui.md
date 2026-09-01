@@ -220,6 +220,22 @@ mounts on every turn of the agents transcript, which is how switching to a works
 that pane killed `acorn`. The guard clamps an unmeasured size to one cell, and goes the day OpenTUI
 clamps its own.
 
+The clamp lands before a resize handler runs, not after, because `updateFromLayout` calls that handler
+while the raw yoga numbers are still stored on the node. `ScrollBox` reads its own height there to size
+its bar, and one `NaN` reading is permanent: its scroll position clamps itself through `Math.max(0, x)`,
+which keeps returning `NaN`, so the content node's translate never recovers and the whole subtree draws
+at the wrong screen position. A scrollbox beside a region that measures its own box, which is what
+`Sections` does at 120 cells, drew its column's content off screen for good.
+
+Nothing may write to stderr while the renderer owns the terminal, because stderr is the file it draws
+on and a stray line leaves the shell reading as garbage until the next full repaint. OpenTUI's own
+console is deactivated for the overlay it pops, and `main.tsx` holds Node's process warnings in a set
+and prints them after `renderer.destroy()` hands the terminal back. One warning this host provokes is
+worth naming rather than holding: every live `scrollbox` subscribes to the renderer's `selection`
+event, and a pull request draws well past Node's default ten listeners, so `RENDERER_LISTENER_CAP`
+raises that ceiling. `ScrollBox.destroySelf` unsubscribes, so the count is a count and not a leak, and
+the cap is raised rather than removed so a real runaway still trips it.
+
 ### Rectangles
 
 `Rectangle` is the kit's one admission that a pane needs pixels, and it has four kinds. On this host:
@@ -325,16 +341,17 @@ row, never a crash.
 
 - Read the terminal width inside a node or a layout. Breakpoints are the renderer's, and a layout asks
   "am I narrow" of its own region.
-- Draw a hover state, or handle a pointer. There is no mouse path at all.
+- Draw a hover state, drag, or open a pointer context menu. Pointer input is limited to focusing a
+  clicked viewport/control and wheel or trackpad scrolling; the keyboard remains the complete path.
 - Accept `class`, `style`, or a DOM attribute. The type-level test refuses them and the tree protocol
   drops them on the wire.
 - Invent a node. A pane that needs something the kit lacks asks the kit, and the kit answers for both
   hosts or refuses for both.
 - Shrink to make room. Yoga answers a height deficit by taking it out of every child that will give,
   and a one-line row given half a line lands on the line above it. Every block node and every row
-  refuses to shrink, and the region around them clips. A pane taller than the screen is the normal
-  case at 24 rows, and `scrollbox` is refused with the reason in `apps/tui/src/chrome/PaneRow.tsx`.
-  Nothing holds this rule but the pane suite noticing a string went missing.
+  refuses to shrink, and the region around them clips or scrolls. A `scrollbox` around the whole pane
+  is still refused with the reason in `apps/tui/src/chrome/PaneRow.tsx`: its free-sized content breaks
+  width-sensitive layouts. Constrained document/detail viewports own scrolling instead.
 
 ## The router
 
@@ -396,7 +413,9 @@ a chord nobody could press. `setKeymap` takes a `primary` and this host passes `
 region is registered by its layout with its id and its order, from the layout's own knowledge of its
 regions rather than from `compareDocumentPosition`. A region's first stop is the first renderable in
 its subtree whose focus role is `stop`, `item`, `collection` or `trap`, walked over OpenTUI's retained
-tree. Focus is OpenTUI's focus, and the renderer owns it. There is no pointer half.
+tree. Focus is OpenTUI's focus, and the renderer owns it. OpenTUI focuses mouse targets itself, while
+the viewport receiving the click mirrors that result into Acorn's region bookkeeping because there
+is no DOM `focusin` event to do it.
 
 A region with nothing in it yet lands the keys on its own frame, and that landing is never
 remembered: the list that arrives a moment later is what the next walk into the region finds. Without
@@ -408,25 +427,30 @@ pane strip while a task makes it visible, the pane's own regions, and back. Brow
 layout stability when a component-only source is selected, but registers no region without a list;
 neither it nor the absent strip becomes an empty Tab stop. The desktop draws several panes side by
 side and Tab into the next one would surprise; there is no next one here. The chrome orders itself
-around the pane by declaring orders outside the range a layout uses. `nextPane` switches which pane is
-drawn.
+around the pane by declaring orders outside the range a layout uses. `nextPane` first honours the
+rail/main edge in its direction; once focus is already in main and there is no further column, it
+switches which task pane is drawn.
 
 Regions also declare one of two columns. Menu, Browse and Tasks are `rail`; the pane strip and every
 layout/source region default to `main`. A bubbled `expand` (`right`/`l`) moves rail → main, and a
 bubbled `collapse` (`left`/`h`) moves main → rail, restoring the last group used in the destination
 column and never wrapping. Collections and layouts keep first refusal: a tree that can expand or a
 narrow `list-detail` that can switch groups consumes the intent before the region tier. `Sections`
-walks its tab strip without wrapping and yields at its first/last edge, which is how `h` from a pull
-request's first section comes home to the same Browse row. Spatial movement is disabled while an
-input owns the keys.
+is a structural parent stop: `left`/`h` and `right`/`l` walk its strip without wrapping, and an edge
+is a wall rather than an implicit trip to the rail. `down`/`j` enters the selected panel. Escape from
+its content returns to the strip; Escape from the strip returns specifically to Browse for a source
+detail, not whichever rail panel happened to be visited last. An ordinary tab control inside a list,
+such as GitHub's Open/Closed filter, remains a control but is not a structural parent: Browse still
+opens on its rows, so Up/Down reaches the collection. Spatial movement is disabled while an input
+owns the keys.
 
 ### Collections
 
 The intent half of `collection.ts` is shared. The element half has a DOM file and
-`apps/tui/src/keys/collection.ts`, where "focus the active item" sets the renderer's focus and "scroll
-into view" moves the collection's `offset` until the row is inside the visible rows. `Grid` keeps its
-documented exception: a virtualised row has no renderable, so the arrows move `selected` and the view
-follows.
+`apps/tui/src/keys/collection.ts`, where "focus the active item" sets the renderer's focus. A virtual
+`Rows` owns the visible window: keyboard movement reveals the active key by the smallest amount, and
+wheel movement changes the window without changing that key. `Grid` keeps its documented exception:
+a virtualised row has no renderable, so the arrows move `selected` and the view follows.
 
 **Moving the caret selects.** Every `Rows` on this host passes `selectOnMove`, which
 `collectionIntents.ts` already had and only `Tabs` and `Select` used. It is this host's own answer and
@@ -436,10 +460,30 @@ and a reader arrowing down a list of pull requests is asking to see them.
 Only `onSelect` fires on a move. `onActivate` still waits for Enter, so showing something is immediate
 and opening it stays deliberate, which is the split `pick` and activate already draw. A list that
 supplies no `onSelect` — the task list is one — gets nothing new. Arriving on a row is ordinarily not
-a move, so tabbing through Menu does not choose a source on the way past. Browse opts into one narrow
-exception at the region boundary: entering it runs the collection's ordinary `goTo` for the row it
-lands on, including when that row arrives after a query. That highlights and shows the first item
-without inventing a second selection path; re-entering the remembered row is idempotent.
+a move. Menu and Browse opt into one narrow exception at their region boundaries: entering either
+runs the collection's ordinary `goTo` for the row it lands on, including when that row arrives after a
+query. Menu waits until the provider and workspace-link gates have both answered, then highlights and
+shows the first available source together. Its collection place is scoped by workspace, and a
+workspace switch clears the old view before publishing the new roster, so the first visit cannot
+inherit a detached or non-first row. Browse highlights and shows its first item. Re-entering a
+remembered row is idempotent.
+
+### Scrolling viewports
+
+`apps/tui/src/kit/scrolling.tsx` is the non-virtual viewport seam. It draws a constrained OpenTUI
+`scrollbox`, which owns the vertical offset, visible scrollbar, wheel/trackpad acceleration and
+clamping. Panels opt into it for document/detail bodies; hidden tab panels keep their own offsets.
+The viewport itself is the fallback focus stop for a document with no controls. When it contains a
+row, textarea, rectangle or other real stop, it is transparent to focus and a focused child is
+revealed through every scrollbox ancestor with `scrollChildIntoView`. Arrow keys, `j`/`k`, page keys,
+Home and End scroll a viewport while the viewport itself has focus.
+
+Virtual `Rows` deliberately do not sit inside that mechanism: they render only their visible slice,
+so there is no offscreen child for a native scrollbox to move. Their own `top` offset handles wheel
+input and draws the custom thumb. A wheel can move the active row offscreen without changing
+selection; the collection container temporarily keeps the keys, and the next keyboard move reveals
+and restores the active row. This division keeps document scrolling native without replacing the
+large-list virtualizer or putting a free-sized scrollbox around an entire pane.
 
 ### Traps
 
@@ -493,9 +537,11 @@ the rest with a strip of pane labels above it, one footer line.
 The three panels are Menu, Browse and Tasks, read down the screen. Menu is the browse sources this
 workspace has, which the desktop draws under a rule below its task list. Browse is what is under the
 chosen one — the source's own `list` region, drawn here rather than inside the surface it belongs to.
-Tasks is the tasks in the workspace, and it is where the screen opens, because acorn is a workspace of
-tasks and a reader arriving on a list where `j` swaps the whole screen has been handed the wrong thing
-first. `ctrl+b` hides the whole column.
+Tasks is the tasks in the workspace. With no explicit task or source, the screen opens on the first
+available Menu source after its provider and workspace-link gates have loaded, with focus on the same
+row. Switching workspace clears the old task/source and repeats that defaulting pass for the new
+workspace; closing the picker restores focus by region when the old row was replaced. An explicit
+`--task` path still opens in Tasks. `ctrl+b` hides the whole column.
 
 The column takes about a third of the shell's width, between a floor of 20 cells and a ceiling of 34,
 which is the shape `list-detail` uses to size its own list column. A fixed number could not be right at
@@ -511,11 +557,11 @@ for the same arithmetic — a frame round one line of content is three rows of c
 
 **A panel is a place on the screen, not a wrapper round a list.** A growing panel takes the room left
 over rather than the room its contents want, so a Browse list of forty pull requests cannot push the
-Tasks panel off the bottom of the screen. What is inside it either clips or windows. A `Rows` marked
-`virtual` is handed its height by the panel, draws only the rows that fit, and puts a scrollbar down
-its right edge — the thumb is the run the window covers, which is the only thing on this host that
-says there is more below. The window holds still until the caret walks off an edge, then follows by
-exactly as much as it has to, which is lazygit's rule and not the DOM virtualizer's.
+Tasks panel off the bottom of the screen. What is inside it either clips or scrolls. A `Rows` marked
+`virtual` is handed its height by the panel, draws only the rows that fit, and puts its own scrollbar
+down the right edge. A non-virtual document/detail body uses OpenTUI's native scrollbox and scrollbar.
+The virtual window holds still until the caret walks off an edge, then follows by exactly as much as
+it has to; wheel input can inspect another part of the list without moving the caret.
 
 **A row clips, it does not squeeze.** A `text` is a box to yoga, so a row of them at a width they do
 not fit is a row of boxes each shrunk and each cutting its own content: `[ST]` drew as `[ST`, the gaps
@@ -592,17 +638,23 @@ every plugin that calls it lands on a line above the footer. They never take foc
 `Tab` and `Shift+Tab` cycle regions, beside `F6`, which is what the DOM host spells the same intent
 because the browser owns Tab. The cycle reads down the screen: Menu, Browse when it has a list,
 Tasks, the pane strip when a task is open, then the pane/source regions. `right`/`l` crosses from the
-rail to main and `left`/`h` comes back; neither wraps. In a list, `j` and `k` move and `Enter` opens.
+rail to main and `left`/`h` comes back; neither wraps. `Ctrl+Option+Right` and
+`Ctrl+Option+Left` take the same spatial edge before they cycle a task pane, so the advertised pane
+chord works from Menu, Browse, and Tasks. In a rail list, Up/Down and `j`/`k` move; `Enter` performs the
+row's ordinary activation and then enters main, and `Escape` from main returns to the remembered rail
+section. An overlay or entered PTY keeps first refusal on Escape. A tabbed detail adds one deliberate
+level: `left`/`right` (or `h`/`l`) choose a tab, `down`/`j` enters its controls, Escape returns to the
+tab strip, and the next Escape returns a source detail to Browse. Moving a focused control beyond the
+viewport reveals it automatically; mouse wheel/trackpad input scrolls the viewport independently.
 
 `w` switches workspace and `p` switches project, both through an overlay, because that is the shape
-that takes the keys off whatever had them. Neither restores what you were looking at: the desktop
-remembers a view per workspace, and this host clears the source and lets the first task open. The
-command chord opens the palette from anywhere except an entered PTY.
+that takes the keys off whatever had them. Neither restores what you were looking at. The command
+chord opens the palette from anywhere except an entered PTY.
 
 A pane opens with the keys already somewhere, because there is no click to put them there. And a
 region opens on its list where it has one rather than on the first field above it, because the first
 thing focused is the thing the bare keys drive and landing in a filter box means `j` types a `j`.
-Browse also selects the row it opens on; other regions only focus it.
+Menu and Browse also select the row they open on; other regions only focus it.
 
 ## Loaded plugins
 
@@ -706,8 +758,7 @@ modules, the runtime pin and the signing gate. What that step still owes is writ
 - **"Open a pairing window" as a TUI command.** A TUI attached to the local node is an out-of-band
   channel of its own, and it is the answer to `SIGUSR1` not existing on Windows.
 - **Tunnels through the fleet group.** The seam models them; nothing draws them.
-- **Mouse.** If it comes, it clicks to focus and scrolls a collection, and nothing else. Drag, hover
-  and context menus stay keyboard-driven.
+- **Pointer actions beyond scrolling and focus.** Drag, hover and context menus stay keyboard-driven.
 - **Sixel or Kitty graphics** for image attachments, if a terminal that supports them turns out to be
   common among readers.
 - **A container image carrying `acorn`**, so `docker exec -it <container> acorn` attaches from inside.

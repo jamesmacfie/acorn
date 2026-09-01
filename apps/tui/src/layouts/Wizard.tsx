@@ -28,7 +28,7 @@ export function Wizard(props: LayoutProps) {
           {`Step ${at() + 1} of ${steps().length} · ${steps()[at()]?.label ?? ''}`}
         </Line>
       </Show>
-      <Panel grow title={props.label} onBox={regionFocus({ paneId: props.stateKey, regionId: 'step' }, 0)}>
+      <Panel grow scroll title={props.label} onBox={regionFocus({ paneId: props.stateKey, regionId: 'step' }, 0)}>
         {props.regions.step?.()}
       </Panel>
       <box flexDirection="row" gap={1}>

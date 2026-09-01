@@ -23,6 +23,8 @@ export type Cells = Frame & {
    *  (`KeyCodes.RETURN`, `KeyCodes.ESCAPE`). Anything else is typed one letter at a time, silently,
    *  which is a good hour to save the next person. */
   press: (key: string) => Promise<Cells>
+  /** Send one terminal wheel/trackpad step at a cell. */
+  scroll: (x: number, y: number, direction: 'up' | 'down') => Promise<Cells>
   resize: (width: number, height: number) => Promise<Cells>
   done: () => void
 }
@@ -43,16 +45,19 @@ export async function renderCells(
   const { createTestRenderer } = await import('@opentui/core/testing')
   const { render } = await import('@opentui/solid')
   const { installKeymap } = await import('../keys/install')
+  const { installRenderGuard, RENDERER_LISTENER_CAP } = await import('../renderGuard')
   const { _resetCollections } = await import('../keys/collection')
   const { _resetRegions } = await import('../keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
   _resetCollections()
   _resetRegions()
   _resetLayoutState()
+  installRenderGuard()
 
   // The renderer first and the tree second, because a collection, a layout and a trap each register
   // their key layer as they draw and a layer registered against no engine is silently dropped.
   const setup = await createTestRenderer({ width: size.width ?? 40, height: size.height ?? 8 })
+  setup.renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(setup.renderer)
   await render(node, setup.renderer)
   // Bounded, and the frame is taken either way: a tree that never settles is itself a finding, and a
@@ -72,6 +77,7 @@ export async function renderCells(
       text: raw,
       frame,
       press,
+      scroll,
       resize,
       done: () => setup.renderer.destroy(),
     }
@@ -83,6 +89,10 @@ export async function renderCells(
   const press = async (key: string): Promise<Cells> => {
     setup.mockInput.pressKey(key)
     await new Promise((done) => setTimeout(done, KEY_SETTLE_MS))
+    return frame()
+  }
+  const scroll = async (x: number, y: number, direction: 'up' | 'down'): Promise<Cells> => {
+    await setup.mockMouse.scroll(x, y, direction)
     return frame()
   }
   const resize = async (width: number, height: number): Promise<Cells> => {

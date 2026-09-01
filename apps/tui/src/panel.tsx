@@ -3,6 +3,7 @@ import type { BoxRenderable, Renderable } from '@opentui/core'
 import { createSignal, ErrorBoundary, Suspense, type JSX } from 'solid-js'
 import { Line } from './kit/cells'
 import { boxBorder } from './kit/roles'
+import { ScrollViewport } from './kit/scrolling'
 import { focusWithin } from './keys/regions'
 
 // A frame with its name in the top border, lit while the keys are inside it.
@@ -62,7 +63,9 @@ export function Panel(props: {
       {/* The contents clip inside the border rather than pushing it out: OpenTUI insets a bordered
           box's scissor rect by its own sides, so this is the frame's own promise and not something
           each caller has to remember (`BoxRenderable.getScissorRect`). */}
-      <box flexDirection="column" flexGrow={1} overflow={props.scroll ? 'scroll' : 'hidden'}>{props.children}</box>
+      {props.scroll
+        ? <ScrollViewport>{props.children}</ScrollViewport>
+        : <box flexDirection="column" flexGrow={1} overflow="hidden">{props.children}</box>}
     </box>
   )
 }

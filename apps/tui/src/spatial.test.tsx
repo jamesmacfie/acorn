@@ -19,14 +19,19 @@ const caretOn = async (
 }
 
 describe.skipIf(!hasFfi)('spatial focus', () => {
-  it('moves right from Browse into detail and left from the first section back to the same row', async () => {
+  it('enters main from rail shortcuts, restores rail, and lets h/l walk detail tabs', async () => {
     const screen = await renderFixture({ width: 100, height: 32 })
 
-    // Choose GitHub from Menu. Menu does not select on entry, so a move away and back is the explicit
-    // source choice; once its list exists, entering Browse selects its first row.
+    // The ordinary startup path opens on Menu. Enter performs its normal source activation and then
+    // crosses to the content that activation opened; Escape returns to the source's Browse list.
     expect(await caretOn(screen, 'GitHub')).toBe(true)
-    await screen.press('j')
-    await screen.press('k')
+    await screen.press('RETURN')
+    expect(focusedRegion()?.regionId).toBe('source')
+    await screen.press('ESCAPE')
+    expect(focusedRegion()?.regionId).toBe('browse')
+
+    // Menu selected GitHub when it took focus; once its list exists, entering Browse selects its
+    // first row.
     await screen.until('Invalidate')
     expect(await caretOn(screen, 'Invalidate')).toBe(true)
     await screen.until('(fix-login) → (main)', 45)
@@ -34,16 +39,44 @@ describe.skipIf(!hasFfi)('spatial focus', () => {
     const browseCaret = caretLine(await screen.frame())
     expect(focusedRegion()?.regionId).toBe('browse')
 
-    // The vertical pull list has no expand action, so `l` bubbles from its collection layer to the
-    // spatial region layer. The detail's Sections strip is on its first tab, where `h` yields rather
-    // than wrapping to the last tab, and column memory restores the Browse row.
-    await screen.press('l')
+    // Ctrl+Option+Right is the shared next-pane chord. On this host the main content is spatially to
+    // the right of every rail section, so it must enter detail before the task-pane cycler gets a
+    // chance to answer. This was the dead shortcut: a source view has no active task to cycle.
+    await screen.press('ARROW_RIGHT', { ctrl: true, meta: true })
     expect(focusedRegion()?.regionId).toBe('source')
-    await screen.press('h')
+
+    // Once inside, the detail's Sections node owns bare h/l. The second tab is the PR description,
+    // proving focus moved into the content rather than only lighting its frame.
+    await screen.press('l')
+    expect(await screen.frame()).toContain('Loads the account first')
+
+    await screen.press('ARROW_LEFT', { ctrl: true, meta: true })
     const returned = await screen.frame()
 
     expect(focusedRegion()?.regionId).toBe('browse')
-    expect(caretLine(returned)).toBe(browseCaret)
+    // Compare the rail half only: the right half now deliberately still shows Description, so the
+    // whole terminal line is different even though column memory restored the same Browse row.
+    expect(caretLine(returned).split('│').slice(0, 2)).toEqual(browseCaret.split('│').slice(0, 2))
+
+    // Enter is the discoverable spelling of the same rail-to-main edge, after the Browse row's own
+    // activation. Escape is the reverse spelling when the right pane has the keys.
+    await screen.press('RETURN')
+    expect(focusedRegion()?.regionId).toBe('source')
+    await screen.press('ESCAPE')
+    expect(focusedRegion()?.regionId).toBe('browse')
+    screen.done()
+  }, 120_000)
+
+  it('enters an explicitly opened task and escapes through the pane strip to Tasks', async () => {
+    const screen = await renderFixture({ width: 100, height: 32, pane: 'notes' })
+
+    expect(focusedRegion()?.regionId).toBe('tasks')
+    await screen.press('RETURN')
+    expect(focusedRegion()?.paneId).toBe('notes')
+    await screen.press('ESCAPE')
+    expect(focusedRegion()?.regionId).toBe('panes')
+    await screen.press('ESCAPE')
+    expect(focusedRegion()?.regionId).toBe('tasks')
     screen.done()
   }, 120_000)
 })
