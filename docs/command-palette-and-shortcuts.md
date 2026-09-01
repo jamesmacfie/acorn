@@ -51,9 +51,10 @@ The shipped pane chords are contribution-owned and tested with the pane registry
 Shortcuts can override or unbind them. Persisted pane IDs remain stable because they are layout data.
 
 A pane chord is a binding gated on the focused pane, not a layer of its own. What a pane's *layout*
-binds is: a `tabs` pane registers Cmd+1 through Cmd+9 as a `focus-within` layer on its own element,
-which shadows the global task-switching chords while focus is in that pane and hands them back the
-moment focus leaves.
+binds is: a `tabs` pane registers Cmd+1 through Cmd+9 — Ctrl+1 through Ctrl+9 on the terminal, where
+the emulator keeps Cmd for itself and never delivers it — as a `focus-within` layer on its own
+element, which shadows the global task-switching chords while focus is in that pane and hands them
+back the moment focus leaves.
 
 ## Plugin shortcuts
 

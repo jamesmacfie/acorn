@@ -1,6 +1,8 @@
 /** @jsxImportSource @opentui/solid */
-import { createSignal, For, Show, type JSX } from 'solid-js'
-import type { BoxRenderable, Renderable, ScrollBoxRenderable } from '@opentui/core'
+import { createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
+import type { BoxRenderable, Renderable } from '@opentui/core'
+import { COLLECTION_INTENTS, createCollectionIntents } from '@acorn/client-core/kit/keys/collectionIntents.ts'
+import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isCompact } from '../appearance'
 import { flatten, Line, slot } from './cells'
@@ -152,6 +154,36 @@ Timeline.Turn = (props: { children: JSX.Element }) => (
   <box flexDirection="column" marginTop={spaceLines('row')}>{props.children}</box>
 )
 
+// ── Which panels a strip owns ─────────────────────────────────────────────────────────────────
+//
+// A strip and its panels are siblings, so neither can reach the other by walking the tree, and the
+// relation has to be named somewhere. `idPrefix` is that name: both nodes already require it, for
+// exactly this pairing on the DOM, where it builds the `aria-controls` ids. So the terminal reads the
+// same prop rather than asking a caller for a second one.
+//
+// Not a Solid context, which would work for `Sections` — where `Tabs` and `TabPanel` share a parent
+// component — and fail for the plugins that draw the two halves in sibling components (the editor's
+// side strip draws its Search panel from a component of its own).
+//
+// One map for the whole host, keyed by a string, and the ceiling that comes with that: two strips
+// sharing a prefix would share a panel set. Nothing on this host can do it — one pane is mounted at a
+// time (../chrome/PaneRow.tsx) — and `Sections` keys its prefix by the surface id anyway.
+const panelsByPrefix = new Map<string, Set<Renderable>>()
+
+/** Give a strip a panel to own, for as long as the caller is drawn.
+ *
+ *  `TabPanel` calls this for itself. The `tabs` layout frames its panel with `Panel` instead of a
+ *  `TabPanel` and calls this directly, which is the only other way a panel gets drawn. */
+export function registerPanel(idPrefix: string, box: Renderable): void {
+  const panels = panelsByPrefix.get(idPrefix) ?? new Set<Renderable>()
+  panels.add(box)
+  panelsByPrefix.set(idPrefix, panels)
+  onCleanup(() => {
+    panels.delete(box)
+    if (!panels.size) panelsByPrefix.delete(idPrefix)
+  })
+}
+
 /** `Tab  [Tab]  Tab` on one line, the selected one in brackets.
  *
  *  Each label in a box that refuses to shrink, for the reason `../kit/cells.tsx` § Run gives about a
@@ -167,10 +199,6 @@ export function Tabs(props: {
   idPrefix: string
   ariaLabel: string
   actions?: JSX.Element
-  /** The panels this strip owns, where it owns any. A strip with panels is a parent stop: Down enters
-   *  the one it is showing and Escape from anything inside that panel comes back here. A list's own
-   *  filter strip — GitHub's Open/Closed — passes none and stays an ordinary control. */
-  panels?: () => Renderable[]
 }) {
   const step = (delta: 1 | -1): boolean => {
     const at = props.tabs.findIndex((tab) => tab.id === props.active)
@@ -195,7 +223,11 @@ export function Tabs(props: {
       flexShrink={0}
       overflow="hidden"
       ref={(element: BoxRenderable) => {
-        markParent(element, () => props.panels?.() ?? [])
+        // A strip with panels is a parent stop: Down enters the one it is showing and Escape from
+        // anything inside that panel comes back here. A strip with none — GitHub's Open/Closed
+        // filter — owns an empty set and stays an ordinary control, which is what `markParent`'s
+        // getter is for.
+        markParent(element, () => [...(panelsByPrefix.get(props.idPrefix) ?? [])])
         bindKeys(element, [
           ...['left', 'h'].map((key) => ({ key, cmd: () => step(-1) })),
           ...['right', 'l'].map((key) => ({ key, cmd: () => step(1) })),
@@ -234,12 +266,13 @@ export function TabPanel(props: {
   idPrefix: string
   id: string
   active: string
-  /** Where the panel drew, so the strip above it can own it (../keys/regions.ts § markParent). */
-  onBox?: (box: ScrollBoxRenderable) => void
   children: JSX.Element
 }) {
   return (
-    <ScrollViewport visible={props.active === props.id} {...(props.onBox ? { onBox: props.onBox } : {})}>
+    <ScrollViewport
+      visible={props.active === props.id}
+      onBox={(box) => registerPanel(props.idPrefix, box)}
+    >
       {props.children}
     </ScrollViewport>
   )
@@ -551,8 +584,44 @@ export function DocumentTabs(props: {
   idPrefix: string
   ariaLabel: string
 }) {
+  // A horizontal collection, the same shape `SegmentedControl` is and for the same reason: there is
+  // nothing per tab to focus in one run of text, so the strip holds the keys and `←`/`→` move the
+  // value. The list rules — what wraps, where the first press lands — are the shared ones
+  // (client-core kit/keys/collectionIntents.ts).
+  //
+  // Not a parent stop, unlike a `Tabs` with panels. The document an editor tab opens is the layout's
+  // own region below the strip, not a panel this strip owns, so `↓` leaves the strip by the ordinary
+  // walk rather than entering something.
+  const keys = createCollectionIntents({
+    id: () => props.idPrefix,
+    items: () => props.tabs.map((tab) => ({ key: tab.id, label: tab.label })),
+    orientation: 'horizontal',
+    // Moving opens, which is what a document strip means: a reader walking the tabs is reading them.
+    selectOnMove: true,
+    selected: () => props.active,
+    onSelect: (id) => props.onActivate(id),
+    land: () => {},
+    onItem: () => false,
+  })
+  const control = stop({
+    on: {
+      ...Object.fromEntries(COLLECTION_INTENTS.map((intent) => [intent, () => keys.handle(intent)])),
+      // The collection declines `activate` because `onItem` is false — there is no per-tab renderable
+      // to stand on — so Enter is answered here: it re-opens whatever the caret is already on, which
+      // is how a reader gets back to the document after walking away from it.
+      activate: () => { props.onActivate(props.active); return true },
+      delete: () => {
+        if (!props.onClose) return false
+        props.onClose(props.active)
+        return true
+      },
+    } as Partial<Record<Intent, () => boolean>>,
+  })
   return (
-    <box flexDirection="row" gap={2}>
+    <box flexDirection="row" gap={2} ref={control.ref}>
+      {/* The caret every collection draws, for the reason the pane strip gives: the current tab is
+          already marked, and a mark that means two things means neither (../chrome/PaneRow.tsx). */}
+      <Line tone="accent">{control.focused() ? '\u203a' : ' '}</Line>
       <For each={props.tabs}>
         {(tab) => (
           <Line
@@ -614,9 +683,6 @@ export function Sections(props: {
   main?: KitSection
 }) {
   let box: BoxRenderable | undefined
-  // Where each panel drew, keyed by its tab, so the strip above can own them. A `TabPanel` is a
-  // sibling of the strip rather than a child of it, so nothing but the caller can make the edge.
-  const drawn = new Map<string, ScrollBoxRenderable>()
   const [cells, setCells] = createSignal(MAIN_COLUMN_AT)
   const wide = () => cells() >= MAIN_COLUMN_AT && !!props.main
   const tabs = (): KitSection[] => [
@@ -649,12 +715,11 @@ export function Sections(props: {
           onChange={setChosen}
           idPrefix={props.id}
           ariaLabel={props.ariaLabel ?? 'Sections'}
-          panels={() => [...drawn.values()]}
           {...(() => { const found = tabs().find((tab) => tab.id === active())?.actions; return found ? { actions: found() } : {} })()}
         />
         <For each={tabs()}>
           {(tab) => (
-            <TabPanel idPrefix={props.id} id={tab.id} active={active()} onBox={(panel) => drawn.set(tab.id, panel)}>
+            <TabPanel idPrefix={props.id} id={tab.id} active={active()}>
               {tab.render()}
             </TabPanel>
           )}

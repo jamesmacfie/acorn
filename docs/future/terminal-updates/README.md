@@ -25,7 +25,7 @@ traces to one of those two. [analysis.md](./analysis.md) has the evidence, numbe
 | [phase-0-controls.md](./phase-0-controls.md) | Every control is a stop: `pressable`, the asking nodes wired, `commit` submits, `Select` opens. |
 | [phase-1-focus-tree.md](./phase-1-focus-tree.md) | Shipped. A pointer at `docs/tui.md`, plus the five places the design changed on contact. |
 | [phase-2-documents.md](./phase-2-documents.md) | Shipped. A pointer at `docs/tui.md`, plus the four places the design changed. |
-| [phase-3-tabs.md](./phase-3-tabs.md) | A strip with panels is a parent whoever drew it; no chord spelled `super+`. |
+| [phase-3-tabs.md](./phase-3-tabs.md) | Shipped. A pointer at `docs/tui.md`, plus the two places the design changed. |
 | [phase-4-shell.md](./phase-4-shell.md) | The shell's contract as a topology file, the Rail without focus effects, a filter for descriptor lists. |
 | [phase-5-extensions.md](./phase-5-extensions.md) | Extension kinds in cells: the `ExtendedPane` seam, rows, diff annotations, and the losses named. |
 | [phase-6-tests-and-docs.md](./phase-6-tests-and-docs.md) | The invariants as properties over the roster, the footer's words, the doc moves, and deleting this folder. |
@@ -37,7 +37,7 @@ traces to one of those two. [analysis.md](./analysis.md) has the evidence, numbe
 | 0 | Wire every asking node so it focuses, shows focus, and acts. The pull request comments from the keyboard. | nothing | Shipped 2026-09-02. Reaching a panel's *second* stop waits on phase 2. |
 | 1 | Refactor `keys/regions.ts` into the five-level model with one settle pass and a shell-installed topology. Behaviour unchanged. | 0 for its tests | Shipped 2026-09-02. Five requirements changed on contact; the phase file lists them. |
 | 2 | Arrows move between stops inside a panel, page keys scroll, Escape climbs to the parent strip. | 0, 1 | Shipped 2026-09-02. Four requirements changed on contact; the phase file lists them. |
-| 3 | `Tabs` with `TabPanel`s is a parent strip without a prop. Linear and Rollbar catch up. `ctrl+N`. | 1 | Not started. |
+| 3 | `Tabs` with `TabPanel`s is a parent strip without a prop. Linear and Rollbar catch up. `ctrl+N`. | 1 | Shipped 2026-09-02. Two requirements changed on contact; the phase file lists them. |
 | 4 | The shell's topology file, the Rail without effects, workspace switch through the settle, `/` filters a descriptor list. | 1 | Not started. |
 | 5 | The `ExtendedPane` seam, `rows` as a collection, diff annotation marks, the loss table in `docs/tui.md`. | 0, 2 | Not started. |
 | 6 | Reachability, bounded Escape, one caret, footer truth as tests over every pane; docs rewritten; folder deleted. | all | Not started. |
@@ -78,5 +78,8 @@ footer saying what each line says, the programme is done and the folder goes.
   against a `stopsIn` that walked into a strip's panels and a `Card` that was walked into; neither is
   true. `moveStop` walls at an edge and `moveFocusFrom` does not, and a strip's Down binding still
   uses the second.
+- A strip's panels are no longer a prop. `apps/tui/src/kit/grouping.tsx` § Which panels a strip owns
+  keys them by `idPrefix`, so a phase that wants a new kind of panel registers it there rather than
+  threading a getter through a caller.
 - `packages/client-core/src/host/frames/register.ts` mounts the DOM `ExtendedPane`. If a seam has
   appeared since, phase 5 requirement 1 is done.

@@ -11,9 +11,10 @@ import { bindKeys } from '../keys/install'
 // it left it on either host. `SplitHandle` and `SplitCell` are `absent` in the support matrix for
 // exactly this reason: the handle is a key, not a node (docs/tui.md).
 //
-// The chord is the platform's primary modifier with shift and an arrow, on layer 30, focus-within on
-// the layout's own box. Layer 30 is a pane's own tier and shift keeps it clear of the pane-cycling
-// chords at layer 5.
+// The chord is Ctrl with shift and an arrow, on layer 30, focus-within on the layout's own box. Layer
+// 30 is a pane's own tier and shift keeps it clear of the pane-cycling chords at layer 5. Ctrl rather
+// than the platform's primary modifier, which on macOS is Cmd — a chord a terminal emulator keeps for
+// itself and never delivers (../keys/commandLayer.ts § asCtrl).
 
 /** How many cells or lines one press moves the split. Two, so a press is visible without being a
  *  jump: a terminal's units are big enough that one would read as a stutter. */
@@ -46,8 +47,6 @@ export function createKeySplit(options: {
   return {
     size,
     attach: (box) => bindKeys(box, [
-      { key: `super+shift+${less}`, cmd: () => nudge(-STEP) },
-      { key: `super+shift+${more}`, cmd: () => nudge(STEP) },
       { key: `ctrl+shift+${less}`, cmd: () => nudge(-STEP) },
       { key: `ctrl+shift+${more}`, cmd: () => nudge(STEP) },
     ], 30),

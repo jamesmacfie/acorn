@@ -1,9 +1,9 @@
 /** @jsxImportSource @opentui/solid */
-import { createSignal, Show } from 'solid-js'
-import type { BoxRenderable, Renderable } from '@opentui/core'
+import { Show } from 'solid-js'
+import type { BoxRenderable } from '@opentui/core'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
 import { layoutState } from '@acorn/client-core/host/layouts/state.ts'
-import { Tabs as TabStrip } from '../kit/grouping'
+import { registerPanel, Tabs as TabStrip } from '../kit/grouping'
 import { bindKeys } from '../keys/install'
 import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
@@ -27,10 +27,6 @@ export function Tabs(props: LayoutProps) {
   // Falls back rather than storing a default, so a pane whose tab set changes under a stored id lands
   // on its first tab instead of on nothing.
   const active = () => (tabs().some((tab) => tab.id === selected()) ? selected() : tabs()[0]?.id ?? '')
-  // The panel is a region of its own here, unlike a `Sections` panel, so the strip owns one box and
-  // that box is where Down lands and where Escape climbs from (../keys/regions.ts § markParent).
-  const [panel, setPanel] = createSignal<Renderable>()
-
   return (
     <box
       flexDirection="column"
@@ -38,8 +34,11 @@ export function Tabs(props: LayoutProps) {
       ref={(element: BoxRenderable) => {
         // Layer 30, the pane's own tier, focus-within on the pane box. Priority is what decides,
         // not how local the layer is (client-core host/keys/install.ts § the four tiers).
+        // Ctrl, not the platform's primary modifier. macOS keeps Cmd for the terminal emulator and
+        // never delivers it, so the desktop's Cmd+1 is Ctrl+1 here — the same substitution the
+        // command layer makes for every chord in the intent table (../keys/commandLayer.ts § asCtrl).
         bindKeys(element, Array.from({ length: CHORD_TABS }, (_, index) => ({
-          key: `super+${index + 1}`,
+          key: `ctrl+${index + 1}`,
           cmd: () => {
             const tab = tabs()[index]
             if (!tab) return false
@@ -55,7 +54,6 @@ export function Tabs(props: LayoutProps) {
         onChange={setSelected}
         idPrefix={props.stateKey}
         ariaLabel={props.label}
-        panels={() => { const box = panel(); return box ? [box] : [] }}
       />
       <Show when={active()}>
         {(id) => (
@@ -63,7 +61,14 @@ export function Tabs(props: LayoutProps) {
             grow
             scroll
             title={tabs().find((tab) => tab.id === id())?.label}
-            onBox={(box) => { setPanel(box); regionFocus({ paneId: props.stateKey, regionId: 'panel' }, 1)(box) }}
+            // The panel is a region of its own here, unlike a `Sections` panel, so the strip owns
+            // one box and that box is where Down lands and where Escape climbs from. It is framed by
+            // `Panel` rather than drawn by a `TabPanel`, so the strip is told about it here instead
+            // (../kit/grouping.tsx § Which panels a strip owns).
+            onBox={(box) => {
+              registerPanel(props.stateKey, box)
+              regionFocus({ paneId: props.stateKey, regionId: 'panel' }, 1)(box)
+            }}
           >
             {props.regions[`panel:${id()}`]?.()}
           </Panel>

@@ -459,14 +459,25 @@ a `j`. A landing on the frame is never remembered — the list that arrives a mo
 next walk into the region finds. Without that rule a reader who looked into Browse before choosing a
 source came back to a lit border, no caret, and arrows that did nothing, for the rest of the run.
 
-**A parent stop owns panels.** `markParent(node, panels)` marks one, where `panels()` returns the
-boxes whose subtrees it owns. From outside it is one stop: `left`/`h` and `right`/`l` walk it without
-wrapping and an edge is a wall rather than an implicit trip to the rail, `down`/`j` enters the panel
-it is showing, and Escape from anything inside that panel returns to it. `Sections` and the `tabs`
-layout hand their panels over. A strip that owns none, such as GitHub's Open/Closed pull filter, is an
-ordinary control, so Browse still opens on its rows and Up/Down reaches the collection. The strip is a
-sibling of its panels rather than an ancestor, so walking up from a control never reaches it: the
-panel box is what the walk reaches, and the panels list is the edge that carries the rest of the way.
+**A strip with panels is a parent stop.** `markParent(node, panels)` marks one, where `panels()`
+returns the boxes whose subtrees it owns. From outside it is one stop: `left`/`h` and `right`/`l` walk
+it without wrapping and an edge is a wall rather than an implicit trip to the rail, `down`/`j` enters
+the panel it is showing, and Escape from anything inside that panel returns to it. A strip that owns
+none, such as GitHub's Open/Closed pull filter, is an ordinary control, so Browse still opens on its
+rows and Up/Down reaches the collection. The strip is a sibling of its panels rather than an ancestor,
+so walking up from a control never reaches it: the panel box is what the walk reaches, and the panels
+list is the edge that carries the rest of the way.
+
+Which panels a strip owns is drawn rather than passed. A `TabPanel` registers its own box under the
+`idPrefix` it already carries and a `Tabs` reads the set under the same prefix, so a plugin that draws
+the two halves in sibling components gets the behaviour without knowing about any of this — which is
+how Linear's issue view, Rollbar's item view, Docker's two strips, the HTTP panes and the editor's
+side strip all came to have it. `idPrefix` is the pairing because the DOM kit already requires it on
+both nodes to build the `aria-controls` ids, so it is a relation the kit promises rather than one this
+host invented. The `tabs` layout frames its panel with `Panel` instead of a `TabPanel` and registers
+it under its own `stateKey`. `DocumentTabs` is not a parent: the document an editor tab opens is the
+layout's region below the strip, not a panel the strip owns, so it is a horizontal collection —
+`←`/`→` open the next document, Enter re-opens the current one, Delete closes it.
 
 **Arrows move between stops.** `down`/`j` and `up`/`k` on a control go to the next stop beside it in
 reading order and reveal it in every viewport around it. The neighbours are the stops of the panel the

@@ -1252,6 +1252,29 @@ const BEHAVIOURS: Behaviour[] = [
       expect(pressed).toEqual(['m2'])
     },
   },
+  {
+    node: 'DocumentTabs',
+    does: 'opens the next document with the arrows and closes the current one with Delete',
+    render: (record) => (
+      <DocumentTabs
+        idPrefix="documents"
+        ariaLabel="Open files"
+        active="a"
+        onActivate={(id) => record(`open ${id}`)}
+        onClose={(id) => record(`close ${id}`)}
+        tabs={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]}
+      />
+    ),
+    drive: async (screen, pressed) => {
+      const moved = await screen.press('ARROW_RIGHT')
+      expect(pressed).toEqual(['open b'])
+      // Delete closes what the caret is on, which is the tab the arrow just opened. The strip is
+      // uncontrolled in this fixture, so `active` is still `a` on the screen and the collection's own
+      // caret is the thing that moved — which is the state the real editor keeps in step.
+      await moved.press('DELETE')
+      expect(pressed).toEqual(['open b', 'close a'])
+    },
+  },
 ]
 
 /**
@@ -1272,7 +1295,6 @@ const NOT_DRIVEN_HERE: Partial<Record<KitNodeName, string>> = {
   Rows: 'its intents are driven against the real region store in ../keys/keys.test.tsx',
   Tabs: 'its arrows and its Down edge are driven in ../panes.test.tsx and ../spatial.test.tsx',
   Sections: 'driven in ../sections.test.tsx',
-  DocumentTabs: 'a strip with no panels of its own yet; phase 3 makes it a parent stop and drives it',
 }
 
 describe.skipIf(!hasFfi)('every control is a stop', () => {
@@ -1311,4 +1333,94 @@ describe.skipIf(!hasFfi)('every control is a stop', () => {
     expect(owed.length).toBeGreaterThan(20)
     expect(Object.keys(NOT_DRIVEN_HERE).filter((node) => !owed.includes(node as KitNodeName))).toEqual([])
   })
+})
+
+// ── A tab strip with panels ────────────────────────────────────────────────────────────────────
+//
+// Two surfaces that looked the same behaved differently, because `Sections` handed its strip a list
+// of panels and a plugin drawing `Tabs` and `TabPanel` as siblings had no way to. The pairing is
+// `idPrefix` now, which both halves already carry, so the relation is drawn rather than passed
+// (./grouping.tsx § Which panels a strip owns, docs/future/terminal-updates/phase-3-tabs.md).
+
+/** `Tabs` and its `TabPanel`s as siblings, the way a plugin writes them. */
+function TwoPanels() {
+  const [tab, setTab] = createSignal('a')
+  return (
+    <Stack>
+      <Tabs
+        idPrefix="fixture"
+        ariaLabel="Fixture"
+        active={tab()}
+        onChange={setTab}
+        tabs={[{ id: 'a', label: 'One' }, { id: 'b', label: 'Two' }]}
+      />
+      <TabPanel idPrefix="fixture" id="a" active={tab()}>
+        <Button label="Inside one" onPress={() => {}} />
+      </TabPanel>
+      <TabPanel idPrefix="fixture" id="b" active={tab()}>
+        <Button label="Inside two" onPress={() => {}} />
+      </TabPanel>
+    </Stack>
+  )
+}
+
+/** A strip with no panels above a list — GitHub's Open/Closed filter, in miniature. */
+function FilterAndRows() {
+  const [tab, setTab] = createSignal('open')
+  return (
+    <Stack>
+      <Tabs
+        idPrefix="filter"
+        ariaLabel="Filter"
+        active={tab()}
+        onChange={setTab}
+        tabs={[{ id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed' }]}
+      />
+      <Rows id="pulls" items={[{ key: 'first', label: 'first pull' }, { key: 'second', label: 'second pull' }]}>
+        {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
+      </Rows>
+    </Stack>
+  )
+}
+
+const inPane = (body: () => JSX.Element, height: number) => renderCells(
+  () => <HeaderBodyFooter stateKey="strip" label="Strip" regions={{ body }} />,
+  { width: 60, height },
+)
+
+describe.skipIf(!hasFfi)('a tab strip with panels', () => {
+  it('is a parent stop: Down enters the panel it is showing, Escape comes back', async () => {
+    const screen = await inPane(() => <TwoPanels />, 12)
+    try {
+      // Entry lands on the strip rather than in the panel, because a parent stop is what `entryStop`
+      // prefers — and the proof is that the arrows are the strip's.
+      const second = await screen.press('ARROW_RIGHT')
+      expect(second.text).toContain('[Two]')
+      expect(second.text).toContain('Inside two')
+
+      // Down into the panel this strip is showing. The button inside it draws in the focused form.
+      const inside = await second.press('ARROW_DOWN')
+      lit(inside, '[Inside two]')
+
+      // Escape climbs to the strip, and the arrows are the strip's again.
+      const back = await inside.press('ESCAPE')
+      const first = await back.press('ARROW_LEFT')
+      expect(first.text).toContain('[One]')
+      expect(first.text).toContain('Inside one')
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+
+  it('is an ordinary stop with no panels, so a region enters on the list below it', async () => {
+    const screen = await inPane(() => <FilterAndRows />, 12)
+    try {
+      // The caret is the collection's, and it is on the first row: a filter strip owns no panels, so
+      // it is not what entering the region lands on (../keys/regions.ts § entryStop).
+      const caret = screen.lines.find((line) => line.includes('\u203a')) ?? ''
+      expect(caret).toContain('first pull')
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
 })
