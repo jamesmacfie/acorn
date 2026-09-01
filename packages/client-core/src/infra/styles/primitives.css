@@ -71,6 +71,8 @@
   background: var(--input-bg);
   border: var(--control-border);
   border-radius: var(--radius-control);
+  /* The same height rungs as .ui-btn, so a select beside a button in a toolbar lines up with it. */
+  min-height: var(--control-h);
   padding: 7px var(--space-5);
 }
 .ui-input::placeholder { color: var(--text-faint); }
@@ -78,7 +80,7 @@
 .ui-input:disabled { opacity: 0.5; cursor: default; }
 .ui-input[data-width='auto'] { flex: none; }
 .ui-input[data-width='narrow'] { flex: none; width: 90px; }
-.ui-input[data-size='sm'] { padding: var(--space-2) var(--space-4); }
+.ui-input[data-size='sm'] { min-height: var(--control-h-sm); padding: var(--space-2) var(--space-4); }
 .ui-input[data-invalid] { border-color: var(--danger); }
 textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 /* Rectangle: the box something else fills with pixels (ui/Rectangle.tsx). Geometry and a focus ring,
