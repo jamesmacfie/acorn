@@ -142,6 +142,21 @@ addEventListener('message', (event) => {
 `
 
 /** Put a bundle in the cache, install the terminal's worker factory, and mount one slot. */
+test('a descriptor source keeps its region identity across chrome refreshes', async () => {
+  const { sourcePanel } = await import('./SourcePanel')
+  const descriptor = {
+    id: 'identity', label: 'Issues', glyph: 'circle', order: 10, items: '/v2/p/probe/items',
+  } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
+  const first = sourcePanel({ pluginId: 'identity-probe', descriptor })
+  const refreshed = sourcePanel({
+    pluginId: 'identity-probe',
+    descriptor: { ...descriptor, label: 'Open issues' },
+  })
+
+  expect(refreshed.regions!.list).toBe(first.regions!.list)
+  expect(refreshed.regions!.detail).toBe(first.regions!.detail)
+})
+
 test.skipIf(!hasFfi)('a descriptor source draws its list and its detail in cells', async () => {
   // What `client-core/host/chrome/sourcePanel.ts` exists for. The chrome registry used to name
   // `ChromeSourcePanel` directly, which is `<main class="panes">` and DOM kit primitives all the way
@@ -166,6 +181,22 @@ test.skipIf(!hasFfi)('a descriptor source draws its list and its detail in cells
     // it, so the list says it is loading and the detail says there is nothing to choose.
     expect(drawn.text.trim().length).toBeGreaterThan(0)
   }
+
+  // A chrome resync must update descriptor data without replacing the region functions. Dynamic
+  // treats those functions as component identities; replacing them remounts the list and loses its
+  // caret, virtual window, and active query subscriptions.
+  const refreshed = sourcePanel({
+    pluginId: 'probe',
+    descriptor: { ...descriptor, label: 'Open issues' },
+  })
+  expect(refreshed.regions!.list).toBe(panel.regions!.list)
+  expect(refreshed.regions!.detail).toBe(panel.regions!.detail)
+
+  const detail = await renderCells(() => createComponent(panel.regions!.detail, {}))
+  expect((await detail.frame()).text).toContain('Open issues')
+  sourcePanel({ pluginId: 'probe', descriptor: { ...descriptor, label: 'Tracked issues' } })
+  expect((await detail.frame()).text).toContain('Tracked issues')
+  detail.done()
 }, 30_000)
 
 async function mountProbe(source: string): Promise<{ ops: readonly TreeMutation[]; refusals: string[]; release: () => void }> {

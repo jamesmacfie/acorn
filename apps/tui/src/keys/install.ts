@@ -7,10 +7,11 @@
 //
 //   0   the command layer: acorn's resolved keybindings over the command registry, the same tier the
 //       desktop puts them on (./commandLayer.ts)
-//   5   the region and pane chords, global, because moving between regions has to work from anywhere
+//   5   region, pane and column movement, global, because moving between them starts anywhere
 //   30  a pane's own layer: the `tabs` layout's chords, and the group switch a narrow `list-detail`
 //       registers
 //   40  a collection's intents, focus-within on the collection (./collection.ts)
+//   45  a `Sections` strip, which yields left/right at its edges (../kit/grouping.tsx)
 //
 // A binding whose handler returns false is not handled, so dispatch carries on to the next layer.
 // That is how an intent bubbles: the focused collection answers it, or the region layer does, or
@@ -23,7 +24,7 @@ import type { Keymap, TargetMode } from '@opentui/keymap'
 import { isTyping, keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
-import { moveRegion, movePane } from './regions'
+import { moveColumn, moveRegion, movePane } from './regions'
 
 export type TuiKeymap = Keymap<Renderable, KeyEvent>
 
@@ -100,9 +101,22 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
     ['nextPane', () => movePane(1)],
     ['prevPane', () => movePane(-1)],
   ]
+  const columnMoves: [Intent, () => boolean][] = [
+    ['expand', () => moveColumn(1)],
+    ['collapse', () => moveColumn(-1)],
+  ]
   engine.registerLayer({
     priority: 5,
-    bindings: moves.flatMap(([intent, run]) => map[intent].map((key) => ({ key, cmd: run }))),
+    bindings: [
+      ...moves.flatMap(([intent, run]) => map[intent].map((key) => ({ key, cmd: run }))),
+      ...columnMoves.flatMap(([intent, run]) => map[intent].map((key) => ({
+        key,
+        cmd: run,
+        // Left and right inside a field move its cursor. Unlike the region and pane chords, spatial
+        // movement is therefore inactive for every typing target, including arrow-key spellings.
+        active: () => !isTyping(),
+      }))),
+    ],
   })
 
   return engine
@@ -135,4 +149,3 @@ export function bindKeys(
     })),
   }))
 }
-

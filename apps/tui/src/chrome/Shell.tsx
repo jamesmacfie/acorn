@@ -186,28 +186,32 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               throw away its queries and its model. `visible` is what a cell host has instead of a
               floating layer, and it is the same thing `TabPanel` does for a hidden tab. */}
           <box flexDirection="column" flexGrow={1} visible={!topOverlay()}>
-            <box
-              flexShrink={0}
-              flexDirection="column"
-              ref={(element: BoxRenderable) => {
-                setStrip(element)
-                regionFocus({ paneId: 'chrome', regionId: 'panes' }, STRIP_ORDER)(element)
-                element.focusable = true
-                // The strip is a region you can be in, so it answers the list intents while you are:
-                // `j`/`k` walk the panes rather than the chord alone, because a chord nobody
-                // discovers is a chord nobody uses.
-                bindKeys(element, [
-                  { key: 'j', cmd: () => cyclePane(model.task(), 1) },
-                  { key: 'k', cmd: () => cyclePane(model.task(), -1) },
-                  { key: 'down', cmd: () => cyclePane(model.task(), 1) },
-                  { key: 'up', cmd: () => cyclePane(model.task(), -1) },
-                ], 40)
-              }}
-            >
-              <Show when={model.task()}>
-                {(task) => <PaneStrip task={task()} focused={!!strip() && focusedRenderable() === strip()} />}
-              </Show>
-            </box>
+            {/* The strip is a region only while a task gives it something to draw. Keeping the ref
+                outside this Show left an empty, focusable box in the source-view Tab cycle. */}
+            <Show when={model.task()}>
+              {(task) => (
+                <box
+                  flexShrink={0}
+                  flexDirection="column"
+                  ref={(element: BoxRenderable) => {
+                    setStrip(element)
+                    regionFocus({ paneId: 'chrome', regionId: 'panes' }, STRIP_ORDER)(element)
+                    element.focusable = true
+                    // The strip is a region you can be in, so it answers the list intents while you
+                    // are: `j`/`k` walk the panes rather than the chord alone, because a chord nobody
+                    // discovers is a chord nobody uses.
+                    bindKeys(element, [
+                      { key: 'j', cmd: () => cyclePane(model.task(), 1) },
+                      { key: 'k', cmd: () => cyclePane(model.task(), -1) },
+                      { key: 'down', cmd: () => cyclePane(model.task(), 1) },
+                      { key: 'up', cmd: () => cyclePane(model.task(), -1) },
+                    ], 40)
+                  }}
+                >
+                  <PaneStrip task={task()} focused={!!strip() && focusedRenderable() === strip()} />
+                </box>
+              )}
+            </Show>
             {/* Under `PanelBody`, because a browse source's component is a `lazy()` and a pending one
                 resolves to an empty string — which a cell host refuses outright, where the DOM would
                 have shrugged and drawn a text node nobody sees. The same guard the pane mount path
