@@ -16,7 +16,7 @@
 import type { KeyEvent, Renderable } from '@opentui/core'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { hostKeysFor } from '../keys/install'
-import { focusedRenderable } from '../keys/regions'
+import { focusedItem, focusedRenderable } from '../keys/regions'
 import { openOverlays } from './state'
 
 export type Hint = {
@@ -36,10 +36,14 @@ type Spec = Hint & { probe: string }
 
 const specs = (): Spec[] => {
   const keys = hostKeysFor()
+  const onItem = () => focusedItem()
   const bare = (intent: keyof typeof keys, at = 0): string => keys[intent][at] ?? keys[intent][0] ?? ''
   return [
     { probe: bare('next', 1), keys: 'j/k', label: 'move', detail: 'and the arrows' },
-    { probe: bare('activate'), keys: 'enter', label: 'open', detail: 'or space' },
+    // `open` on a row, `press` on a control. The same key, two different promises, and a reader who
+    // is on a Merge button should not be told it opens something. Phase 6 owns the rest of the
+    // footer's words (docs/future/terminal-updates/phase-6-tests-and-docs.md).
+    { probe: bare('activate'), keys: 'enter', label: onItem() ? 'open' : 'press', detail: 'or space' },
     { probe: bare('expand', 1), keys: 'h/l', label: 'fold', detail: 'and the arrows' },
     { probe: bare('search', 1), keys: '/', label: 'filter' },
     { probe: bare('menu'), keys: 'menu', label: 'menu' },

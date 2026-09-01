@@ -110,7 +110,15 @@ watchPluginChanges()
 // the PTY's, which is the whole reason a rectangle owns its keys (docs/tui.md § Signals and exit).
 // The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
 installRenderGuard()
-const renderer = await createCliRenderer({ exitOnCtrlC: false })
+// The kitty keyboard protocol, asked for and not assumed: a terminal that does not know the request
+// ignores it, and OpenTUI pops the mode on exit either way.
+//
+// Not a nicety. Ctrl+Return is the `commit` intent on this host — send this comment, send this message
+// — and a legacy terminal sends the same single byte for Return with Ctrl and Return without it, so
+// the chord does not exist to be bound. `disambiguate` is the one flag that fixes it, and it fixes the
+// same ambiguity for a lone Escape, which the parser otherwise has to wait out
+// (docs/tui.md § The adapter, ./kit/asking.tsx § Composer).
+const renderer = await createCliRenderer({ exitOnCtrlC: false, useKittyKeyboard: { disambiguate: true } })
 // A library warning must not cover the screen. OpenTUI pops its console overlay over the frame on
 // any `console.warn`/`error` once the renderer owns the terminal, so a single stray line from a
 // dependency reads as the whole app going blank. Deactivated the same way the test harness does

@@ -110,3 +110,22 @@ export function borderCell(border: Border): { box: boolean; glyph: string; attri
 /** A rule across a box, which is the `divider` role repeated. Compact density spends nothing, which
  *  is what the role's own sentence says. */
 export const rule = (width: number): string => (isCompact() ? '' : borderCell('divider').glyph.repeat(Math.max(0, width)))
+
+/**
+ * How a control draws its state: the role and the tone a `Line` inside it takes.
+ *
+ * Focus is the one that matters and it is the caret's equivalent for something that presses — a
+ * terminal has no ring to draw, so a focused control is `strong` in the `accent` tone and everything
+ * else about its characters is unchanged (docs/tui.md § Rendering). `strong` on its own is the
+ * pressed and armed state a `Button` already drew; `disabled` wins over both, because a control that
+ * will not press should not look like the one that will.
+ */
+export const litControl = (state: {
+  focused?: boolean
+  strong?: boolean
+  disabled?: boolean
+  tone?: Tone
+}): { role: TextRole; tone: Tone | undefined } => ({
+  role: state.focused || state.strong ? 'strong' : 'body',
+  tone: state.disabled ? 'muted' : state.focused ? 'accent' : state.tone,
+})

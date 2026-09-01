@@ -199,6 +199,23 @@ and no sentence. Five prop types are the DOM kit's, imported as types rather tha
 `ButtonProps`, `InputProps`, `SelectProps`, `PickerProps` and `MentionTextareaProps`. Four of the
 hand-written copies had quietly lost a prop by the time anything compiled both sets together.
 
+A control is a stop, and on this host that has to be built rather than inherited. A `<button>` on the
+DOM is focusable, draws a ring, and raises a click on Enter; a cell renderable does none of the three.
+`apps/tui/src/keys/stops.ts` supplies all three in one call: `pressable(box, options)` sets the
+renderer's `focusable` flag unless the control is disabled, binds `activate` to the handler in `focus`
+target mode so Enter on a button inside a row belongs to the button, and adds the click-to-focus-then-
+press the pointer model allows. Its companion `stop(options)` returns the `ref` a component hands its
+box and a `focused()` accessor, because a `ref` callback cannot return a signal. The layer sits at
+priority 41, one above a collection's: both layers match when focus is on a control inside a row, and
+at equal priority `@opentui/keymap` falls back to registration order, which is the reconciler's
+business and not something to depend on.
+
+What a focused control draws is `litControl` in `apps/tui/src/kit/roles.ts`: `strong` in the `accent`
+tone, and nothing else about its characters changes. That is the caret's equivalent for something that
+presses, and the reason `apps/tui/src/kit/render.tsx` reads the frame back as coloured runs as well as
+characters. A focused `[Save]` has the same six characters as an unfocused one, so a test that only
+reads characters cannot see focus at all.
+
 Colour comes from `apps/tui/src/appearance.ts`, which collapses a theme's forty-odd tokens to the
 terminal's 16 slots plus `dim` and `bold`. `roleCell()` is `roleVar()`'s sibling and returns the
 OpenTUI style fragment for a role value, with `ignored` returning nothing. A theme picked in the app
@@ -406,6 +423,15 @@ which is the only question a binding asks about the focused thing.
 Chords are spelled with `ctrl` here. The engine reports the platform's primary modifier, which on
 macOS is `super`, and a terminal emulator keeps Cmd for itself and never delivers it, so `commit` was
 a chord nobody could press. `setKeymap` takes a `primary` and this host passes `ctrl`.
+
+Spelling it `ctrl+return` is half the answer, and `main.tsx` asks the terminal for the other half:
+`createCliRenderer({ useKittyKeyboard: { disambiguate: true } })`. A legacy terminal sends one byte,
+`\r`, for Return with Ctrl held and Return without it, so `commit` does not reach the engine as a chord
+at all. The `disambiguate` flag of the kitty keyboard protocol is what makes the two distinguishable,
+and it settles a lone Escape the same way, which the parser otherwise has to wait out. A terminal that
+does not know the request ignores it, and the mode is popped on exit either way. Both test harnesses
+ask for the same protocol, because a suite driving a different keyboard from the app is testing a
+different keyboard.
 
 ### Focus regions
 

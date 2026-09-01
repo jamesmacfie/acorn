@@ -34,7 +34,7 @@ traces to one of those two. [analysis.md](./analysis.md) has the evidence, numbe
 
 | Phase | What it is | Depends on | Status |
 | --- | --- | --- | --- |
-| 0 | Wire every asking node so it focuses, shows focus, and acts. The pull request merges and comments from the keyboard. | nothing | Not started. |
+| 0 | Wire every asking node so it focuses, shows focus, and acts. The pull request comments from the keyboard. | nothing | Shipped 2026-09-02. Reaching a panel's *second* stop waits on phase 2. |
 | 1 | Refactor `keys/regions.ts` into the five-level model with one settle pass and a shell-installed topology. Behaviour unchanged. | 0 for its tests | Not started. |
 | 2 | Arrows move between stops inside a panel, page keys scroll, Escape climbs to the parent strip. | 0, 1 | Not started. |
 | 3 | `Tabs` with `TabPanel`s is a parent strip without a prop. Linear and Rollbar catch up. `ctrl+N`. | 1 | Not started. |
@@ -42,9 +42,8 @@ traces to one of those two. [analysis.md](./analysis.md) has the evidence, numbe
 | 5 | The `ExtendedPane` seam, `rows` as a collection, diff annotation marks, the loss table in `docs/tui.md`. | 0, 2 | Not started. |
 | 6 | Reachability, bounded Escape, one caret, footer truth as tests over every pane; docs rewritten; folder deleted. | all | Not started. |
 
-Phases 2, 3, and 4 are independent of each other once 1 has landed. Phase 0 is the one to do first
-whatever else happens: it is the largest change a reader will notice and the smallest change to the
-architecture.
+Phases 2, 3, and 4 are independent of each other once 1 has landed. Phase 0 was the one to do first:
+it is the largest change a reader notices and the smallest change to the architecture.
 
 ## How to use this folder
 
@@ -76,7 +75,9 @@ footer saying what each line says, the programme is done and the folder goes.
 - `apps/tui/src/keys/regions.ts` is dirty in the working tree on 2026-09-02, with about 230 lines
   added since the last commit. The analysis reads the working-tree version. Land or discard that work
   before starting phase 1, and re-read the module's exports against phase 1 requirement 17.
-- `apps/tui/src/kit/asking.tsx` § `Button` is a `Line`. If it has grown a `pressable` since, phase 0
-  is partly done; read the file before the plan.
+- `apps/tui/src/keys/stops.ts` and `apps/tui/src/kit/roles.ts` § `litControl` are phase 0's, and every
+  asking node calls them. Phase 2 adds `next`/`prev` to `pressable` and generalises `moveStopIn`;
+  read [phase-0-controls.md](./phase-0-controls.md) § What landed first, because it says why the walk
+  is scoped to a box.
 - `packages/client-core/src/host/frames/register.ts` mounts the DOM `ExtendedPane`. If a seam has
   appeared since, phase 5 requirement 1 is done.

@@ -136,7 +136,10 @@ export function bindKeys(
   target: Renderable,
   bindings: readonly { key: string; cmd: () => boolean }[],
   priority: number,
-  options: { mode?: TargetMode } = {},
+  /** `whileTyping` lifts the bare-key gate for these bindings. One caller: a suggestions list under an
+   *  edit buffer, where the field itself is the typing target and `↓` has nothing else it could mean
+   *  (../kit/asking.tsx § MentionTextarea). */
+  options: { mode?: TargetMode; whileTyping?: boolean } = {},
 ): void {
   // Read through the singleton rather than threaded, so a layout or a modal deep in a tree can bind
   // without every component above it carrying the engine.
@@ -149,7 +152,7 @@ export function bindKeys(
     bindings: bindings.map(({ key, cmd }) => ({
       key,
       cmd,
-      ...(BARE_KEYS.has(key) ? { active: () => !isTyping() } : {}),
+      ...(BARE_KEYS.has(key) && !options.whileTyping ? { active: () => !isTyping() } : {}),
     })),
   }))
 }

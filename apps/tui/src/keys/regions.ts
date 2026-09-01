@@ -206,6 +206,13 @@ const itemPicks = new WeakMap<Renderable, () => void>()
 let itemIdentities = new WeakMap<Renderable, string>()
 const itemsByIdentity = new Map<string, Renderable>()
 
+/** Whether the keys are on a row of a collection rather than on a control. The footer asks, because
+ *  `activate` opens a row and presses a control (../chrome/bindings.ts). */
+export const focusedItem = (): boolean => {
+  const node = focusedNode()
+  return !!node && items.has(node)
+}
+
 /** Called by a collection for each row it draws (./collection.ts). */
 export const markItem = (box: Renderable, pick?: () => void, identity?: string): void => {
   items.add(box)
@@ -254,8 +261,8 @@ export function firstStop(box: Renderable): Renderable | undefined {
     // A native scrollbox is focusable so a control-free document can own the arrow keys. It is a
     // transparent viewport when it contains a real stop, though: descending through it here keeps a
     // terminal rectangle, composer or field reachable instead of landing on the scrollbar around
-    // it. `focusStops` owns that exact fallback rule for Down/Escape as well.
-    ?? focusStops(box)[0]
+    // it. `stopsIn` owns that exact fallback rule for Down/Escape as well.
+    ?? stopsIn(box)[0]
 }
 
 /** Reveal a newly focused stop in every native document viewport that contains it. */
@@ -266,14 +273,17 @@ const revealInViewports = (node: Renderable): void => {
 }
 
 /**
- * Reading-order stops inside a region.
+ * Reading-order stops inside a box, in reading order.
+ *
+ * Exported for one caller outside this module: a `Menu`'s open list moves between its own stops while
+ * the trap holds the keys, and the stops behind the overlay are not its to walk (./stops.ts).
  *
  * A scroll viewport is the fallback stop for a document with no controls. Where it does contain a
  * control or collection row, the child is the stop and the viewport stays transparent to Down.
  * Likewise a tab collection is one stop; controls drawn in its trailing slot do not sit between the
  * strip and the selected panel.
  */
-const focusStops = (box: Renderable): Renderable[] => {
+export const stopsIn = (box: Renderable): Renderable[] => {
   const found: Renderable[] = []
   const visit = (parent: Renderable): number => {
     const before = found.length
@@ -305,7 +315,7 @@ const focusStops = (box: Renderable): Renderable[] => {
 export function moveFocusFrom(node: Renderable, delta: 1 | -1): boolean {
   const group = regionOf(node)
   if (!group) return false
-  const stops = focusStops(group.box)
+  const stops = stopsIn(group.box)
   const at = stops.indexOf(node)
   if (at < 0) return false
   return focusRenderable(stops[at + delta])
@@ -455,7 +465,7 @@ export function moveBack(): boolean {
   const node = focusedNode()
   if (!current || !node) return false
 
-  const stops = focusStops(current.box)
+  const stops = stopsIn(current.box)
   const at = stops.indexOf(node)
   for (let index = at - 1; index >= 0; index -= 1) {
     if (entryTabStops.has(stops[index])) return focusRenderable(stops[index])
