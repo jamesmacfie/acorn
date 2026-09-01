@@ -80,7 +80,11 @@ export function LinearIssueView(props: LinearIssueViewProps) {
   const comment = (entry: LinearComment, isReply: boolean) => (
     <Card pad="sm" stripe={isReply ? 'accent' : undefined}>
       <Stack gap="row">
-        <Toolbar variant="bar" size="sm">
+        {/* An `Inline`, not a `Toolbar`: a bar inside a card is inset by the card's padding and then
+            pads itself again, so the author's name sat further in than their own words and the strip
+            stood taller than the line it holds. Github's inline threads put this meta line flush with
+            the comment body, and so does this one now. */}
+        <Inline>
           <Text emphasis="strong">{entry.author ?? 'Unknown'}</Text>
           <Show when={relativeTime(entry.createdAt)}>{(age) => <Text tone="muted">{age()}</Text>}</Show>
           <ToolbarSpacer />
@@ -93,7 +97,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
               Reply
             </Button>
           </Show>
-        </Toolbar>
+        </Inline>
         {/* The host renders and sanitises the markdown. What used to be an `innerHTML` write inside the
             frame is now a node with a `text` prop, which is the only way a stranger's markup can reach
             the shell's DOM at all. */}
