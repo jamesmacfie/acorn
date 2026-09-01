@@ -104,7 +104,6 @@ export function PrOverview(props: {
         <Toolbar variant="actions" ariaLabel="Pull request actions">
           <Show when={!model().pull()?.autoMergeEnabled}>
             <Select
-              size="sm"
               width="auto"
               label="Merge method"
               value={model().mergeMethod()}
