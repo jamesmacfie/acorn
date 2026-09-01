@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { createEffect, createSignal, Match, onCleanup, onMount, Show, Suspense, Switch } from 'solid-js'
+import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch, type JSX } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { BoxRenderable, KeyEvent, Renderable } from '@opentui/core'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
@@ -14,17 +14,19 @@ import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activ
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { pendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { Dynamic } from '@opentui/solid'
-import { Line, Rule } from '../kit/cells'
+import { Line } from '../kit/cells'
 import { EmptyState, Row, Rows } from '../kit/showing'
 import { Modal, ModalBody } from '../kit/grouping'
+import { PanelBody } from '../panel'
 import { installCommandLayer } from '../keys/commandLayer'
 import { bindKeys } from '../keys/install'
 import { focusedRenderable, regionFocus, setPaneCycler, takeFocus } from '../keys/regions'
 import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
+import { chooseProject, installRouting, routedProjectId } from './routing'
 import { closeOverlay, openOverlay, topOverlay } from './state'
 import { cyclePane } from './panes'
-import { Rail, RAIL_COLLAPSE_AT } from './Rail'
+import { Rail, railCells } from './Rail'
 import { Topbar } from './Topbar'
 import { PaneBody, PaneStrip } from './PaneRow'
 import { Footer } from './Footer'
@@ -52,14 +54,21 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   const prefs = createQuery(() => prefsOptions(true))
   let root: BoxRenderable | undefined
   const [strip, setStrip] = createSignal<BoxRenderable | undefined>()
-  const [width, setWidth] = createSignal(RAIL_COLLAPSE_AT)
+  // The shell's own width, so the left column can take a share of it rather than a fixed number of
+  // cells (./Rail.tsx § railCells). The one width anything in the chrome reads, and it is this box's
+  // rather than the terminal's — the same rule a layout keeps (docs/tui.md § What the TUI never does).
+  const [cells, setCells] = createSignal(80)
+  // One way to lose the left column: a reader asked, on `ctrl+b`, which is the desktop's
+  // `leftCollapsed` preference at a chord. There used to be a second — collapsing to a two-cell strip
+  // of marks below 100 columns — and it went with the icons: the strip only ever said anything
+  // because each row had a glyph in it, and most of those glyphs drew nothing (../kit/glyphs.ts).
   const [hidden, setHidden] = createSignal(false)
-  // Two ways to lose the rail and they are not the same: a reader asked, or there is no room. The
-  // desktop's `leftCollapsed` preference is the first; the second is this host's own, because a
-  // terminal can be 80 cells wide and 18 of them is a fifth of the screen.
-  const collapsed = () => hidden() || width() < RAIL_COLLAPSE_AT
 
   const source = () => sourceRegistry.get(selectedSource() ?? '')
+
+  // What the path says, read into the shell: which task to open, which source claims it, and which
+  // project every project-scoped browse surface reads (./routing.ts).
+  installRouting(model)
 
   // Open on something. The desktop restores `last_task` from a preference; this host persists nothing
   // across runs, so the first task is the friendly default and the alternative is an empty screen.
@@ -121,6 +130,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => openOverlay('palette') },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
       { id: 'core.workspace.switch', title: 'Switch workspace', category: 'workspace', palette: true, run: () => openOverlay('workspace') },
+      { id: 'core.project.switch', title: 'Switch project', category: 'workspace', palette: true, run: () => openOverlay('project') },
       { id: 'core.rail.toggle', title: 'Rail', category: 'navigation', palette: true, run: () => { setHidden((value) => !value) } },
       { id: 'core.quit', title: 'Quit', category: 'action', palette: true, run: quit },
     ])
@@ -131,6 +141,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.palette.open', command: 'core.palette.open', description: 'Commands', category: 'Global', defaultChord: 'ctrl+k', when: 'global' },
       { id: 'core.shortcuts.cheat-sheet', command: 'core.shortcuts.cheat-sheet', description: 'Help', category: 'Global', defaultChord: '?', when: 'global' },
       { id: 'core.workspace.switch', command: 'core.workspace.switch', description: 'Workspace', category: 'Global', defaultChord: 'w', when: 'global' },
+      { id: 'core.project.switch', command: 'core.project.switch', description: 'Project', category: 'Global', defaultChord: 'p', when: 'global' },
       { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
       { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
     ])
@@ -158,17 +169,18 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       flexGrow={1}
       ref={(element: BoxRenderable) => {
         root = element
-        setWidth(element.width)
+        setCells(element.width)
         // Escape with nothing open clears what is on screen. Layer 5, so a collection or a rectangle
         // that has something of its own to dismiss answers first.
         bindKeys(element, [{ key: 'escape', cmd: () => dismissNotifications() }], 5)
       }}
-      onSizeChange={() => setWidth(root?.width ?? RAIL_COLLAPSE_AT)}
+      onSizeChange={() => setCells(root?.width ?? 80)}
     >
       <Topbar model={model} nodeId={props.nodeId} />
       <box flexDirection="row" flexGrow={1}>
-        <Rail model={model} collapsed={collapsed()} />
-        <Rule axis="y" />
+        {/* No rule between the column and the pane: each panel draws its own frame, and a rule beside
+            a border is two lines saying one thing (../panel.tsx). */}
+        <Show when={!hidden()}><Rail model={model} cells={railCells(cells())} /></Show>
         <box flexDirection="column" flexGrow={1}>
           {/* Hidden, not unmounted: opening the palette must not tear down the pane behind it and
               throw away its queries and its model. `visible` is what a cell host has instead of a
@@ -196,17 +208,23 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
                 {(task) => <PaneStrip task={task()} focused={!!strip() && focusedRenderable() === strip()} />}
               </Show>
             </box>
-            {/* Under a `Suspense`, because a browse source's component is a `lazy()` and a pending one
+            {/* Under `PanelBody`, because a browse source's component is a `lazy()` and a pending one
                 resolves to an empty string — which a cell host refuses outright, where the DOM would
                 have shrugged and drawn a text node nobody sees. The same guard the pane mount path
                 already has for the same reason (../layouts/index.ts, findings.md § A pending `lazy()`
-                region is an empty string). `null`, which is the nothing the DOM drew anyway. */}
-            <Suspense fallback={null}>
+                region is an empty string). It carries the error boundary too, so a surface that
+                throws says what it threw rather than leaving the main panel blank (../panel.tsx). */}
+            <PanelBody>
               <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>
-                <Match when={source()?.component}>{(component) => <Dynamic component={component()} />}</Match>
+                {/* A source that declared regions has its list in the Browse panel already, so the
+                    main panel is its detail alone. One that did not keeps its whole surface here,
+                    which is every source that has not been migrated
+                    (client-core/host/registries/sources/sources.ts § regions). */}
+                <Match when={source()?.regions?.detail}>{(detail) => <SourceRegion><Dynamic component={detail()} /></SourceRegion>}</Match>
+                <Match when={source()?.component}>{(component) => <SourceRegion><Dynamic component={component()} /></SourceRegion>}</Match>
                 <Match when={model.task()}>{(task) => <PaneBody task={task()} />}</Match>
               </Switch>
-            </Suspense>
+            </PanelBody>
           </box>
           <Show when={topOverlay()}>
             {(name) => (
@@ -214,6 +232,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
                 <Match when={name() === 'palette'}><Palette model={model} /></Match>
                 <Match when={name() === 'help'}><CheatSheet /></Match>
                 <Match when={name() === 'workspace'}><WorkspacePicker model={model} /></Match>
+                <Match when={name() === 'project'}><ProjectPicker model={model} /></Match>
                 <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
                 <Match when={name() === 'trust'}><TrustPrompt /></Match>
               </Switch>
@@ -223,6 +242,27 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       </box>
       <Notifications />
       <Footer nodeId={props.nodeId} />
+    </box>
+  )
+}
+
+/** A browse surface in the main panel, as a region the keys can be in.
+ *
+ *  A pane registers its regions from its layout, and a browse source has no layout — so the main
+ *  panel was the one place on this screen Tab could not reach. Everything in it was unreachable with
+ *  it: the diff had no way to scroll and a `Sections` strip had no way to hear `h`
+ *  (../kit/grouping.tsx). Order 0, which is where a layout's first region sits, so the cycle still
+ *  reads down the screen: Menu, Browse, Tasks, then this.
+ */
+function SourceRegion(props: { children: JSX.Element }) {
+  return (
+    <box
+      flexDirection="column"
+      flexGrow={1}
+      minWidth={0}
+      ref={regionFocus({ paneId: 'chrome', regionId: 'source' }, 0)}
+    >
+      {props.children}
     </box>
   )
 }
@@ -244,6 +284,38 @@ function QuitConfirm(props: { onQuit: () => void }) {
           >
             {(row, item) => <Row item={item}>{row.label}</Row>}
           </Rows>
+        </box>
+      </ModalBody>
+    </Modal>
+  )
+}
+
+/** The project picker. `p` where `w` is the workspace, and an overlay for the same reason: the whole
+ *  screen changes when a row is chosen, and a list drawn under the topbar left the keys wherever they
+ *  already were.
+ *
+ *  Choosing writes a path rather than a signal. Every project-scoped surface reads `params.projectId`
+ *  — that is what makes the GitHub browse list know which repository it is listing — so there has to
+ *  be exactly one place the answer lives, and it is the path (./routing.ts). */
+function ProjectPicker(props: { model: ShellModel }) {
+  const close = () => closeOverlay('project')
+  const projects = () => props.model.workspace()?.projects ?? []
+  return (
+    <Modal onDismiss={close} title="Project" size="sm">
+      <ModalBody>
+        <box flexDirection="column" ref={(element: BoxRenderable) => takeFocus(element)}>
+          <Show when={projects().length} fallback={<Line role="muted">This workspace has no projects.</Line>}>
+            <Rows
+              id="chrome.projects"
+              ariaLabel="Projects"
+              items={projects().map((project) => ({ key: project.id, ...project }))}
+              onActivate={(id) => { chooseProject(id); close() }}
+            >
+              {(project, item) => (
+                <Row item={item} selected={project.id === routedProjectId()}>{project.name}</Row>
+              )}
+            </Rows>
+          </Show>
         </box>
       </ModalBody>
     </Modal>

@@ -1,42 +1,66 @@
 /** @jsxImportSource @opentui/solid */
 import { createEffect, For, Show } from 'solid-js'
+import { Dynamic } from '@opentui/solid'
 import { createQuery } from '@tanstack/solid-query'
 import { integrationsOptions } from '@acorn/client-core/infra/queries.ts'
 import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { availableSources } from '@acorn/client-core/features/tabs/railSources.ts'
 import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
-import { taskOriginAppearance } from '@acorn/client-core/features/tasks/origin.ts'
 import { markersFor } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'
 import { resolveRailMarkers } from '@acorn/client-core/features/tabs/railMarkers.ts'
 import { requestTaskAnnotations } from '@acorn/client-core/host/annotations/taskAnnotations.ts'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { Icon, Row, Rows, StatusDot } from '../kit/showing'
-import { Rule } from '../kit/cells'
+import { Line } from '../kit/cells'
+import { Panel, PanelBody } from '../panel'
 import { regionFocus } from '../keys/regions'
 import { ExclusiveSlot } from './slot'
 import type { ShellModel } from './model'
 
-// The rail: the tasks in this workspace, and the browse sources under a rule.
+// The left column: three framed panels, read down the screen.
 //
-// Drawn through `ExclusiveSlotHost`'s registry, exactly as the desktop's task list is, so the day a
-// plugin offers to replace `rail.taskList` its offer replaces this too and nothing here changes
-// (./slot.tsx, docs/future/client-plugins/04-replaceable-surfaces.md).
+//   Menu    the browse sources this workspace has — GitHub, Linear, Docker
+//   Browse  what is under the chosen one, which is that source's own `list` region
+//   Tasks   the tasks in this workspace
 //
-// The marks are the same ones the desktop draws around a rail control (`core:task`,
+// The shape is lazygit's and the arrangement is this host's alone, the same way `./Shell.tsx` is: the
+// desktop draws one rail with the tasks in it and the sources under a rule, because it has a URL and
+// a pointer and a browse surface fills the window. Here a browse surface is the main panel and its
+// list is a panel of its own, so the reader can see the source, the item and its detail at once —
+// which at 80 columns is the only way to see all three.
+//
+// Menu and Browse together are what the desktop's rail plus its browse surface's own list column are.
+// The list arrives through `SourceContribution.regions`, because a source that hands over one opaque
+// component cannot have its list drawn anywhere but where the component puts it
+// (client-core/host/registries/sources/sources.ts § regions).
+//
+// The marks on a task row are the same ones the desktop draws around a rail control (`core:task`,
 // features/tabs/railMarkers.ts). A corner is a pixel idea, so in cells the placement is dropped and
 // the glyphs sit in the row's trailing slot in the order the allocator put them — same data, same
 // order, one dimension fewer.
 
-/** Below this many cells across the whole shell the rail is a marker strip. The desktop's
- *  `leftCollapsed` preference at a width instead of a click, because there is no grip to drag and no
- *  room to spare (docs/tui.md § The screen). */
-export const RAIL_COLLAPSE_AT = 100
+/** Cells across, from the shell's own width: about a third of it, between a floor and a ceiling.
+ *
+ *  A fixed number could not be right at both ends. Thirty cells reads well at 120 and leaves 48 for
+ *  the pane at 80, where the agents session list starts clipping its own titles; twenty-four fits
+ *  there and wastes a wide terminal. The same shape `list-detail` uses to pick its list width, with
+ *  the fraction and the floor in the same place (../layouts/ListDetail.tsx). */
+const FRACTION = 0.3
+const MIN_CELLS = 20
+const MAX_CELLS = 34
+export const railCells = (shellCells: number): number =>
+  Math.max(MIN_CELLS, Math.min(MAX_CELLS, Math.round(shellCells * FRACTION)))
+
+/** Rows each fixed panel keeps, borders included. Browse takes what is left, because it is the panel
+ *  holding a list nobody can page through if it is four rows tall. */
+const MENU_ROWS = 7
+const TASKS_ROWS = 7
 
 /** Before every region a layout registers, so the cycle reads down the screen (./Shell.tsx). */
-const RAIL_ORDER = -100
-
-const EXPANDED_CELLS = 18
-const COLLAPSED_CELLS = 2
+const MENU_ORDER = -130
+const BROWSE_ORDER = -120
+const TASKS_ORDER = -110
 
 function Marks(props: { markers: ReturnType<typeof markersFor> }) {
   const placed = () => resolveRailMarkers(props.markers).placed
@@ -53,13 +77,14 @@ function Marks(props: { markers: ReturnType<typeof markersFor> }) {
   )
 }
 
-function TaskList(props: { model: ShellModel; collapsed: boolean }) {
+function TaskList(props: { model: ShellModel }) {
   // What other plugins have to say about the rows on screen: one request for the whole list, re-asked
   // when the list changes. Nothing here reads the answers — they come back as markers.
   createEffect(() => requestTaskAnnotations(props.model.tasks().map((task) => task.id)))
 
   return (
     <Rows
+      virtual
       id="chrome.rail.tasks"
       ariaLabel="Tasks"
       items={props.model.tasks().map((task) => ({ key: task.id, task }))}
@@ -68,50 +93,68 @@ function TaskList(props: { model: ShellModel; collapsed: boolean }) {
         if (task) activateTaskSignals(task)
       }}
     >
+      {/* No leading icon. A task's glyph is a Lucide name and this host draws a name it has no
+          character for as nothing, so the column was a ragged left edge: two blanks and one mark
+          (../kit/glyphs.ts). The marks on the right carry the state that mattered. */}
       {(row, item) => (
         <Row
           item={item}
           selected={!selectedSource() && row.task.id === activeTaskId()}
-          leading={<Icon name={row.task.icon ?? taskOriginAppearance(row.task.origin).glyph} />}
           trailing={<Marks markers={markersFor({ kind: 'task', id: row.task.id })} />}
         >
-          {props.collapsed ? '' : row.task.title}
+          {row.task.title}
         </Row>
       )}
     </Rows>
   )
 }
 
-export function Rail(props: { model: ShellModel; collapsed: boolean }) {
+export function Rail(props: { model: ShellModel; cells: number }) {
   const integrations = createQuery(() => integrationsOptions(true))
   const scope = createSourceScope(() => props.model.workspace()?.id)
   const sources = () => availableSources(integrations.data?.integrations, scope())
+  const source = () => sourceRegistry.get(selectedSource() ?? '')
 
   return (
-    <box
-      flexDirection="column"
-      width={props.collapsed ? COLLAPSED_CELLS : EXPANDED_CELLS}
-      flexShrink={0}
-      ref={regionFocus({ paneId: 'chrome', regionId: 'rail' }, RAIL_ORDER)}
-    >
-      <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} collapsed={props.collapsed} />} />
-      {/* Only where there is something under it. A rule with nothing below is a line that means
-          nothing, and how many browse sources the roster registers is the roster's business. */}
-      <Show when={sources().length}>
-        <Rule />
-        <Rows
-          id="chrome.rail.sources"
-          ariaLabel="Sources"
-          items={sources().map((source) => ({ key: source.id, ...source }))}
-          onActivate={setSelectedSource}
-        >
-          {(source, item) => (
-            <Row item={item} selected={selectedSource() === source.id} leading={<Icon name={source.glyph} />}>
-              {props.collapsed ? '' : source.label}
-            </Row>
-          )}
-        </Rows>
-      </Show>
+    <box flexDirection="column" width={props.cells} flexShrink={0}>
+      <Panel title="Menu" rows={MENU_ROWS} onBox={regionFocus({ paneId: 'chrome', regionId: 'menu' }, MENU_ORDER)}>
+        <Show when={sources().length} fallback={<Line role="muted">No sources here.</Line>}>
+          <Rows
+            virtual
+            id="chrome.rail.sources"
+            ariaLabel="Sources"
+            items={sources().map((entry) => ({ key: entry.id, ...entry }))}
+            selected={selectedSource()}
+            onSelect={setSelectedSource}
+            onActivate={setSelectedSource}
+          >
+            {(entry, item) => (
+              <Row item={item} selected={selectedSource() === entry.id}>{entry.label}</Row>
+            )}
+          </Rows>
+        </Show>
+      </Panel>
+      {/* The chosen source's own list, drawn here rather than in the surface it belongs to. A source
+          that has not declared regions keeps its whole surface in the main panel and this panel says
+          so, which is the honest answer and not an error. */}
+      <Panel title="Browse" grow onBox={regionFocus({ paneId: 'chrome', regionId: 'browse' }, BROWSE_ORDER)}>
+        {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this panel
+            draws for each of those rather than the blank frame both used to leave (../panel.tsx). */}
+        <PanelBody>
+          <Show when={source()?.regions?.list} fallback={
+            <Line role="muted">{source() ? 'Nothing to list here.' : 'Choose a source.'}</Line>
+          }>
+            {(list) => <Dynamic component={list()} />}
+          </Show>
+        </PanelBody>
+      </Panel>
+      {/* The screen opens here. Menu is drawn first and would otherwise take the keys, and a reader
+          arriving on a list where `j` swaps the whole screen has been handed the wrong thing first:
+          acorn is a workspace of tasks, and the task is what the desktop opens on too
+          (../keys/regions.ts § regionFocus). */}
+      <Panel title="Tasks" rows={TASKS_ROWS} onBox={regionFocus({ paneId: 'chrome', regionId: 'tasks' }, TASKS_ORDER, { opensHere: true })}>
+        <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} />} />
+      </Panel>
     </box>
   )
 }

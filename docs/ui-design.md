@@ -241,12 +241,17 @@ between them are one word, which is what an `Inline gap="row"` drew before the t
 | --- | --- | --- |
 | `space` | `--space-0`, `--gap-inline`, `--gap-row`, `--gap-stack`, `--gap-section` | nothing; one cell; 0 lines and one cell; 0 lines and one cell; one blank line and one cell |
 | `size` | `--control-h-xs`, `--control-h-sm`, `--control-h`, `--pad-control-lg` | one line either way; padding ignored |
-| `tone` | `--text`, `--text-muted`, `--accent`, `--state-ok`, `--state-warn`, `--state-bad` | default, dim, and the palette's accent, green, yellow and red |
-| `text` | `--fs`, `--fw-semibold`, `--text-muted`, `--font-mono`, `--label-size`, `--heading-weight` | plain, bold, dim, ignored, dim uppercase, bold |
+| `tone` | `--text`, `--text-muted`, `--accent`, `--state-ok`, `--state-warn`, `--state-bad` | default, and the palette's grey, accent, green, yellow and red |
+| `text` | `--fs`, `--fw-semibold`, `--text-muted`, `--font-mono`, `--label-size`, `--heading-weight` | plain, bold, grey, ignored, grey uppercase, bold |
 | `border` | `--bw-0`, `--divider`, `--control-border`, `--surface-border`, `--stripe-w` | nothing, a rule, an underline, box corners, a stripe |
 | `radius` | `--radius-control`, `--radius-surface`, `--radius-chip`, `--radius-pill` | ignored |
 
-So a theme stays 40-odd colours, and on a terminal it is 16 of them plus dim and bold. Most of a
+`muted` is a palette slot rather than the `dim` attribute, and the difference matters on a light
+terminal: dim tells the emulator to blend a run toward the background, which on white paper is white
+on white. Slot 8 is the palette's own grey, so the colour still comes from the theme the person
+chose.
+
+So a theme stays 40-odd colours, and on a terminal it is 16 of them plus bold. Most of a
 style pack is shape and padding a terminal has no answer for, which is honest: density is the one
 style axis it keeps.
 
@@ -965,10 +970,10 @@ disagree about which nodes exist or what each one does with focus.
 | --- | --- | --- |
 | `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines |
 | `Inline` | none | children on one line separated by a space; wraps to a `Stack` when too wide |
-| `Section` | conditional | label in dim uppercase, children below |
+| `Section` | conditional | label in grey uppercase, children below |
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
-| `Timeline` | collection | cards in sequence, a dim rule between turns; `follow` is a no-op, because a column of cells pins to its last child by construction. `Timeline.Turn` is a node of its own on both hosts |
+| `Timeline` | collection | cards in sequence, a grey rule between turns; `follow` is a no-op, because a column of cells pins to its last child by construction. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets |
 | `Toolbar` | none | children on one line; a `Heading` in a bar is cut short rather than wrapped, as it is on the DOM, so the bar stays one line tall and the controls at the far end stay on screen |
 | `Modal` | trap | a centred box over dimmed content; Escape dismisses. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
@@ -979,6 +984,7 @@ disagree about which nodes exist or what each one does with focus.
 | `ListDetail` | none | reduced: two columns above 80 cells. Below it, the `list` form draws the detail alone and the `split` form stacks its two column children, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read |
 | `ListColumn` | none | reduced: the left column, or the whole width when the split has collapsed |
 | `DetailColumn` | none | the right column, or the whole width |
+| `Sections` | collection | reduced: a strip of tabs over one panel — the header first, then each section, then `main` below 120 cells, where a diff in half the width is a diff wrapped at 45 columns. `h` and `l` walk the strip. A section's `meta` is not drawn: a strip has room for a label and a count |
 | `SplitHandle` | stop | absent: a terminal split moves by a key, not a grip |
 | `DocumentTabs` | collection | one line of tab labels with a `×` on the current one |
 | `SectionHeader` | none | a bold line with its actions right-aligned |
@@ -989,9 +995,9 @@ disagree about which nodes exist or what each one does with focus.
 
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
-| `Text` | none | plain text; `mono` is a no-op, `muted` is dim, `strong` is bold |
+| `Text` | none | plain text; `mono` is a no-op, `muted` is the palette grey, `strong` is bold |
 | `Link` | stop | the text, underlined, pressable |
-| `Heading` | none | eyebrow in dim uppercase, heading in bold |
+| `Heading` | none | eyebrow in grey uppercase, heading in bold |
 | `Rows` | collection | its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
 | `Row` | item | one line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show |
 | `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
@@ -1000,7 +1006,7 @@ disagree about which nodes exist or what each one does with focus.
 | `Chip` | conditional | `(text)`, with a trailing `×` when removable |
 | `ChipRow` | collection | chips on one line, wrapping |
 | `StatusDot` | none | `●` in colour, `○` for neutral |
-| `Facts` | none | two columns, labels dim; `grouping="rows"` is one pair per line |
+| `Facts` | none | two columns, labels grey; `grouping="rows"` is one pair per line |
 | `DescriptionList` | none | as `Facts`, one pair per line |
 | `Table` | none | reduced: box-drawn, truncating columns by the priority its heads declare |
 | `TableHead` | none | reduced: the column's label in the bold header line; the lowest priority is dropped first, and a line under the table names the columns that went |
@@ -1008,15 +1014,15 @@ disagree about which nodes exist or what each one does with focus.
 | `TableCell` | none | reduced: the cell's text in its column's width, ellipsised where it does not fit; `header` makes it bold |
 | `Grid` | collection | reduced: as `Table`, with a row-range indicator instead of a scrollbar |
 | `Meter` | none | `████░░░░ 62%` |
-| `CodeBlock` | none | monospace lines, a dim rule above and below |
+| `CodeBlock` | none | monospace lines, a grey rule above and below |
 | `Log` | stop | monospace lines, find as a bottom line |
-| `Markdown` | none | reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables, and a link as its text with the URL beside it in dim |
+| `Markdown` | none | reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables, and a link as its text with the URL beside it in grey |
 | `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row |
 | `DiffLine` | none | reduced: one line, `+`/`-`/space in the gutter, no intra-line highlight |
 | `FileHead` | none | reduced: the path in bold with `+n −m` right-aligned |
-| `NonCodeRow` | none | reduced: a dim line saying what is not being shown, such as `binary file` |
+| `NonCodeRow` | none | reduced: a grey line saying what is not being shown, such as `binary file` |
 | `SplitCell` | none | absent: side-by-side needs 160 cells, so a terminal diff is unified |
-| `EmptyState` | none | centred dim text |
+| `EmptyState` | none | centred grey text |
 | `Alert` | none | one line prefixed with the tone's glyph |
 | `Spinner` | none | reduced: a braille spinner, or `…` where motion is off |
 | `Kbd` | none | `⌘K` or `ctrl+k`, per host |
@@ -1036,7 +1042,7 @@ disagree about which nodes exist or what each one does with focus.
 | `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets |
 | `ToggleButton` | stop | `[x] label` |
 | `Picker` | stop | a field that opens a `Menu` filtered by typing |
-| `PickerRow` | item | one line in that menu: glyph, label, dim hint |
+| `PickerRow` | item | one line in that menu: glyph, label, grey hint |
 | `Composer` | stop | a boxed field with a `> ` prompt; commit submits |
 | `MentionTextarea` | stop | reduced: a `Textarea` with the mention menu below it; no inline highlight of the token |
 | `KeyValueEditor` | none | a two-column table with editable cells, each cell a stop |

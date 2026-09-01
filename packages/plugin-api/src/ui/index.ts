@@ -25,6 +25,10 @@ export { Menu } from '@acorn/client-core/kit/components/overlays/Menu.tsx'
 // reveals on the same rules in a plugin's list as in a first-party one.
 export { RowActions } from '@acorn/client-core/kit/components/layout/RowActions.tsx'
 export { Fold } from '@acorn/client-core/kit/components/layout/Fold.tsx'
+// A header, its named sections, and the region they are about. One declaration, two shapes: folds
+// beside a column here, a strip of tabs over one panel in a terminal.
+export { Sections } from '@acorn/client-core/kit/components/layout/Sections.tsx'
+export type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 export { Composer } from '@acorn/client-core/kit/components/inputs/Composer.tsx'
 export { DocumentTabs } from '@acorn/client-core/kit/components/layout/DocumentTabs.tsx'
 export { FindBar } from '@acorn/client-core/kit/components/inputs/FindBar.tsx'

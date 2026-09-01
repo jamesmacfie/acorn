@@ -13,7 +13,7 @@ describe('the palette', () => {
   it('asks the terminal for every slot, including the one no role names', () => {
     expect(slotColor('default').intent).toBe('default')
     expect(slotColor(undefined).intent).toBe('default')
-    for (const slot of ['accent', 'ok', 'warn', 'danger'] as const) {
+    for (const slot of ['muted', 'accent', 'ok', 'warn', 'danger'] as const) {
       expect(slotColor(slot).intent).toBe('indexed')
     }
   })

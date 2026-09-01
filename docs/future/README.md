@@ -23,6 +23,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [performance/](./performance/README.md) | Two performance reads, surfaces and shapes, merged into six phases: unblock the red renderer budget and instrument, paint before the node boots, stop the event amplifiers, terminals work only when watched, the live surfaces, then re-measure. | Plan, 2026-08-31. Not started. The renderer build is over budget. |
+| [terminal-fixes/](./terminal-fixes/README.md) | The TUI browse investigation: the Suspense/OpenTUI destroy race (fixed; tui.md owns it) and the focus/navigation programme it uncovered — spatial `right`/`left`, pick-on-enter, the dead strip stop, descriptor region identity, component-only sources. | Analysis 2026-09-01. Rendering fix shipped; interaction steps 2–6 designed, not built. |
 
 ## The single files
 

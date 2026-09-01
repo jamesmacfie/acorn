@@ -16,7 +16,7 @@ const caretRow = (frame: string): number => frame.split('\n').findIndex((line) =
 describe.skipIf(!hasFfi)('the shell', () => {
   it('draws the topbar, the rail, the pane strip and the footer at 80 by 24', async () => {
     const screen = await renderFixture({ pane: 'notes' })
-    const frame = await screen.frame()
+    const frame = await screen.until('Scratchpad')
     screen.done()
 
     const lines = frame.split('\n')
@@ -67,17 +67,35 @@ describe.skipIf(!hasFfi)('the shell', () => {
     expect(pane.split('\n')[caretRow(pane)]).toContain('Scratchpad')
   }, 30_000)
 
-  it('collapses the rail below 100 cells and brings it back above', async () => {
-    const wide = await renderFixture({ width: 100, height: 28 })
-    expect(await wide.frame()).toContain('fix-login  ')
-    wide.done()
+  it('hides the left column on the chord and brings it back', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    expect(await screen.frame()).toContain('Browse')
 
-    const narrow = await renderFixture({ width: 99, height: 28 })
-    const frame = await narrow.frame()
-    narrow.done()
-    // The task's own glyph survives; its name does not, and the rail is two cells of marks.
-    expect(frame).not.toContain('◉ fix-login')
-    expect(frame).toContain('◉')
+    // One way to lose the column, and it is a chord: the two-cell strip of marks that used to replace
+    // it below 100 cells went with the icons, because the strip only said anything when every row had
+    // a glyph and most of those glyphs drew nothing (../kit/glyphs.ts).
+    await screen.press('b', { ctrl: true })
+    const hidden = await screen.frame()
+    expect(hidden).not.toContain('Browse')
+    expect(hidden).not.toContain('Tasks')
+
+    await screen.press('b', { ctrl: true })
+    const back = await screen.frame()
+    screen.done()
+    expect(back).toContain('Browse')
+  }, 30_000)
+
+  it('names the workspace and the project in the topbar, and p picks a project', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    // `Workspace > Project`. The project is not visible anywhere else on this host — the desktop
+    // carries it in the address bar — so a reader with an empty browse list can tell a missing
+    // integration from the wrong project (./Topbar.tsx).
+    expect((await screen.frame()).split('\n')[0]).toContain('>')
+
+    await screen.press('p')
+    const open = await screen.frame()
+    screen.done()
+    expect(open).toContain('Project')
   }, 30_000)
 
   it('opens the palette on the chord, filters, and gives the keys back on escape', async () => {
@@ -121,7 +139,8 @@ describe.skipIf(!hasFfi)('the shell', () => {
 
   it('draws a notification above the footer, and never takes the keys for it', async () => {
     const screen = await renderFixture({ width: 100, height: 28 })
-    const before = caretRow(await screen.frame())
+    const opening = await screen.frame()
+    const before = opening.split('\n')[caretRow(opening)]
     toast('Saved.')
     const frame = await screen.frame()
 
@@ -130,7 +149,11 @@ describe.skipIf(!hasFfi)('the shell', () => {
     expect(at).toBeGreaterThan(0)
     // Above the footer, which is the last drawn line.
     expect(lines[at + 1]).toContain('j/k move')
-    expect(caretRow(frame)).toBe(before)
+    // The keys are where they were. Compared by what the caret is on rather than by which row it is
+    // on: the screen opens on the Tasks panel at the foot of the left column, so a notification
+    // taking a row moves that panel up with it, and the row number would be testing the arithmetic
+    // instead of the focus.
+    expect(lines[caretRow(frame)]).toBe(before)
 
     await screen.press('ESCAPE')
     const cleared = await screen.frame()

@@ -4,7 +4,6 @@
 import { createEffect, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
-import { Dynamic } from 'solid-js/web'
 import { clear } from 'idb-keyval'
 import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
@@ -46,6 +45,7 @@ import { SlotHost, type UiSlotContext } from '@acorn/client-core/host/registries
 import { createAppStartupRestore } from '@acorn/client-core/infra/persistence/appStartup.ts'
 import { createTaskDeepLink } from '@acorn/client-core/features/tasks/taskDeepLink.ts'
 import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
+import { SourceSurface } from '@acorn/client-core/host/registries/sources/SourceSurface.tsx'
 import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands/corePaths.ts'
 import { availableSources } from '@acorn/client-core/features/tabs/railSources.ts'
 import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
@@ -341,6 +341,14 @@ export default function App() {
   const showProjectPicker = () => scopedProjects().length > 0
     && (inTaskView() || sourceIsProjectScoped(selectedSource()))
 
+  // The source on screen, when it has something to draw. A source that contributed neither a component
+  // nor regions is a rail row and nothing else, and the Switch's empty state below is the honest
+  // answer for it — which is what asking for `?.component` used to get us before `regions` existed.
+  const drawnSource = () => {
+    const source = sourceRegistry.get(selectedSource() ?? '')
+    return source && (source.component || source.regions) ? source : undefined
+  }
+
   const toggleCollapsed = () => setCollapsed((value) => !value)
 
   // New-task mode: core's own route, so the pattern is a constant rather than a registry lookup.
@@ -437,8 +445,8 @@ export default function App() {
       </header>
       <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}
       >
-        <Match when={sourceRegistry.get(selectedSource() ?? '')?.component}>
-          {(component) => <Dynamic component={component()} />}
+        <Match when={drawnSource()}>
+          {(source) => <SourceSurface source={source()} />}
         </Match>
         <Match when={!selectedSource() && activeTask()}>
           {/* Key the task surface by id so changing tasks disposes the old task scope before the new

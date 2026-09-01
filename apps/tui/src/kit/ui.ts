@@ -10,8 +10,8 @@
 // of saying which node has not been drawn yet.
 export {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
-  ModalBody, Popover, Section, SectionHeader, SplitHandle, Stack, TabPanel, Tabs, Timeline, Toolbar,
-  ToolbarSpacer,
+  ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
+  Toolbar, ToolbarSpacer,
 } from './grouping'
 export {
   Alert, Badge, ChipRow, Chip, CodeBlock, DescriptionList, DiffLine, DiffPane, EmptyState, Facts,
@@ -34,6 +34,7 @@ export type { ItemProps } from '../keys/collection'
 // declarations, so the two hosts cannot disagree about what a node takes.
 export type { ButtonProps, InputProps, SelectOption, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
 export type { PickerItem, PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
+export type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 export type {
   MentionSegment, MentionSource, MentionSuggestion, MentionTextareaProps,
 } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'

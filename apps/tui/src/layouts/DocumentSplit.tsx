@@ -2,8 +2,8 @@
 import { createSignal } from 'solid-js'
 import type { BoxRenderable } from '@opentui/core'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
-import { Rule } from '../kit/cells'
 import { createKeySplit } from './split'
+import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
 
 // `document-over-frame` and `frame-beside-document`: a host-owned editor and a plugin's region, with
@@ -49,17 +49,25 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
       }}
       onSizeChange={() => { if (box) measure(box) }}
     >
+      {/* Two named regions, two frames, no rule between them (../panel.tsx). Only the stacked axis
+          can set a row count; across the axis the width is the box's own and the frame takes what it
+          is given. */}
       <box
         flexDirection="column"
-        {...(axis === 'x' ? { width: split.size() } : { height: split.size() })}
-        ref={regionFocus({ paneId: props.stateKey, regionId: 'document' }, 0)}
+        {...(axis === 'x' ? { width: split.size() } : {})}
       >
-        {props.regions.document?.()}
+        <Panel
+          grow
+          title="Document"
+          {...(axis === 'y' ? { rows: split.size() } : {})}
+          onBox={regionFocus({ paneId: props.stateKey, regionId: 'document' }, 0)}
+        >
+          {props.regions.document?.()}
+        </Panel>
       </box>
-      <Rule axis={axis === 'x' ? 'y' : 'x'} />
-      <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: props.stateKey, regionId: 'frame' }, 1)}>
+      <Panel grow title="Frame" onBox={regionFocus({ paneId: props.stateKey, regionId: 'frame' }, 1)}>
         {props.regions.frame?.()}
-      </box>
+      </Panel>
     </box>
   )
 }

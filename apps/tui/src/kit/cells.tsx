@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { Show, type JSX } from 'solid-js'
 import type { TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
-import { borderCell, styled, textStyle } from './roles'
+import { borderCell, spanStyle, styled, textStyle } from './roles'
 import { slotColor } from '../appearance'
 
 // The three things every component in this package needs, and the reason each exists.
@@ -18,9 +18,16 @@ export const slot = (value: JSX.Element): JSX.Element => {
   if (typeof value === 'string' || typeof value === 'number') {
     return value === '' ? null : <text>{String(value)}</text>
   }
-  // An array mixes the two, and a fragment is an array: `hint={<><Kbd>⌘↵</Kbd> to send</>}` is one node
-  // and one bare string, and the string on its own would land in a box, which is the shape a cell host
-  // refuses outright (docs/tui.md).
+  // An accessor, which is what Solid compiles a dynamic child to: `<Line><Icon />{count()}</Line>` is
+  // an array of one element and one function. Read it and wrap what comes back, the same thing
+  // `flatten` and `hasNode` below do with the same shape — this was the one of the three that did not,
+  // so the string went through untouched, Solid inserted it raw, and a row holding a node beside a
+  // count threw "Orphan text error" from inside whatever signal had just moved. Reading it here is
+  // tracked, because `slot` is called from inside the JSX that renders it.
+  if (typeof value === 'function') return slot((value as () => unknown)() as JSX.Element)
+  // An array mixes the three, and a fragment is an array: `hint={<><Kbd>⌘↵</Kbd> to send</>}` is one
+  // node and one bare string, and the string on its own would land in a box, which is the shape a cell
+  // host refuses outright (docs/tui.md).
   if (Array.isArray(value)) return value.map((item) => slot(item as JSX.Element)) as unknown as JSX.Element
   return value
 }
@@ -75,10 +82,13 @@ export function Line(props: { role?: TextRole; tone?: Tone; wrap?: boolean; chil
  *  line wraps and clips as one thing — which is what a line of styled words is
  *  (docs/tui.md).
  *
- *  Only for a caller that owns the `text` around it. Everything else uses `Line`. */
+ *  Only for a caller that owns the `text` around it. Everything else uses `Line`.
+ *
+ *  `style`, not the spread props `Line` uses. A span takes its colour in one object and drops
+ *  anything else in silence (./roles.ts § spanStyle). */
 export function Run(props: { role?: TextRole; tone?: Tone; children: JSX.Element }) {
   const run = () => styled(flatten(props.children), props.role, props.tone)
-  return <span {...run().style}>{run().text}</span>
+  return <span style={spanStyle(props.role, props.tone)}>{run().text}</span>
 }
 
 /** A divider between two regions, along the axis it separates: a line across for `x`, a column of

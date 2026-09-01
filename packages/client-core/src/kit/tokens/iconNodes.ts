@@ -7,5 +7,10 @@ import rawNodes from 'lucide-static/icon-nodes.json'
 // the declaration was invisible to every consumer compiling client-core's source. An ordinary module
 // travels with the import graph instead.
 //
+// No import attribute on it, and that is not an oversight: the TypeScript transform drops
+// `with { type: 'json' }` before the bundler sees it, so writing one changes no output anywhere. Every
+// host that draws this bundles it. The one host that does not draw it swaps the whole file out
+// (apps/tui/vite.config.ts § lucide-static).
+//
 // `[tag, attrs]` pairs: lucide uses path, circle, rect, polyline, line, ellipse and polygon.
 export const iconNodes = rawNodes as unknown as Record<string, [string, Record<string, string>][]>

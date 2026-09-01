@@ -83,7 +83,18 @@ export default function PullList() {
     label: `#${pull.number} ${pull.title}`,
   })))
   const byNumber = createMemo(() => new Map(shown().map((pull) => [String(pull.number), pull])))
-  const open = (number: string) => navigate(`${githubBrowsePath(params.projectId ?? '')}/${number}`)
+  // A pull's own URL, or nothing at all without a project to hang it off. `githubBrowsePath('')` is
+  // `/p/`, so the old `?? ''` built `/p//42` — which is not a broken path, it is a *different* one:
+  // the empty segment falls out of the split and `/p/:projectId` matches with the pull number as the
+  // project. The shell then finds no such project in the workspace and navigates to the first one,
+  // and the list the reader was moving through reloads for another repository
+  // (apps/tui/src/chrome/routing.ts).
+  const pullPath = (number: string): string | null =>
+    params.projectId ? `${githubBrowsePath(params.projectId)}/${number}` : null
+  const open = (number: string) => {
+    const path = pullPath(number)
+    if (path) navigate(path)
+  }
 
   // Promotes a pull into a task: origin github-pr, branch = headRef, pullNumber
   // (docs/workspaces-and-tasks.md § Task creation and navigation).
@@ -171,51 +182,62 @@ export default function PullList() {
             onActivate={open}
           >
             {(item, itemProps, selected, place) => {
-              const pull = () => byNumber().get(item.key)!
+              // Not `byNumber().get(item.key)!`. A row outlives the list it was built from by the
+              // width of one update: the pull list refetches under the reader — a prefetch on the row
+              // they just moved to, a websocket invalidation, the refresh button — and a row whose
+              // pull has left the map runs its own accessors once more before it is disposed. With
+              // the assertion that read `undefined.title`, and a throw inside a row takes the whole
+              // list down with it, which in a terminal is a browse panel that goes blank and says
+              // nothing (apps/tui/src/panel.tsx).
+              const pull = () => byNumber().get(item.key)
               // Reactively read the warmed detail cache (enabled:false → no fetch) so the rolled-up
               // checks dot appears as prefetchOpenPulls seeds each pull. No checks → no dot.
               const detail = createQuery(() => pullDetailOptions(owner(), repo(), item.key, false))
               const checks = () => detail.data?.checks ?? []
               return (
-                <Row
-                  item={itemProps}
-                  // `href` keeps the real link for middle-click and copy address; `onPress` routes
-                  // the plain click.
-                  href={`${githubBrowsePath(params.projectId ?? '')}/${item.key}`}
-                  onPress={() => open(item.key)}
-                  selected={selected()}
-                  onHover={(entered) => (entered ? queueRowPrefetch(pull().number) : cancelRowPrefetch())}
-                  offset={place.offset}
-                  height={place.height}
-                  title={pull().title}
-                  label={item.label}
-                  leading={
-                    <>
-                      <Show when={checks().length}>
-                        <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={`Checks: ${checksState(checks())}`} />
-                      </Show>
-                      <Icon name={PR_STATE_ICON[prState(pull())]} title={prState(pull())} size={14} />
-                      {/* The author column is gone, so the avatar carries the login on hover. */}
-                      <UserAvatar login={pull().author} />
-                      <Text emphasis="muted">#{item.key}</Text>
-                    </>
-                  }
-                  meta={<Text emphasis="muted">{formatRelativeTime(pull().updatedAt)}</Text>}
-                  metaFields={1}
-                  trailing={
-                    <Show when={pull().headRef}>
-                      <RowActions ariaLabel={`Actions for pull request #${item.key}`}>
-                        {(menu) => (
-                          <Menu.Item context={menu} onSelect={() => void openAsTask(pull())}>
-                            Create task
-                          </Menu.Item>
-                        )}
-                      </RowActions>
-                    </Show>
-                  }
-                >
-                  {pull().title}
-                </Row>
+                <Show when={pull()}>
+                  {(pull) => (
+                    <Row
+                      item={itemProps}
+                      // `href` keeps the real link for middle-click and copy address; `onPress` routes
+                      // the plain click.
+                      {...(pullPath(item.key) ? { href: pullPath(item.key)! } : {})}
+                      onPress={() => open(item.key)}
+                      selected={selected()}
+                      onHover={(entered) => (entered ? queueRowPrefetch(pull().number) : cancelRowPrefetch())}
+                      offset={place.offset}
+                      height={place.height}
+                      title={pull().title}
+                      label={item.label}
+                      leading={
+                        <>
+                          <Show when={checks().length}>
+                            <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={`Checks: ${checksState(checks())}`} />
+                          </Show>
+                          <Icon name={PR_STATE_ICON[prState(pull())]} title={prState(pull())} size={14} />
+                          {/* The author column is gone, so the avatar carries the login on hover. */}
+                          <UserAvatar login={pull().author} />
+                          <Text emphasis="muted">#{item.key}</Text>
+                        </>
+                      }
+                      meta={<Text emphasis="muted">{formatRelativeTime(pull().updatedAt)}</Text>}
+                      metaFields={1}
+                      trailing={
+                        <Show when={pull().headRef}>
+                          <RowActions ariaLabel={`Actions for pull request #${item.key}`}>
+                            {(menu) => (
+                              <Menu.Item context={menu} onSelect={() => void openAsTask(pull())}>
+                                Create task
+                              </Menu.Item>
+                            )}
+                          </RowActions>
+                        </Show>
+                      }
+                    >
+                      {pull().title}
+                    </Row>
+                  )}
+                </Show>
               )
             }}
           </Rows>

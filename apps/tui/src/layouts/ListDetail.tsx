@@ -2,7 +2,7 @@
 import { createSignal, Show } from 'solid-js'
 import type { BoxRenderable } from '@opentui/core'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
-import { Rule } from '../kit/cells'
+import { Panel } from '../panel'
 import { bindKeys } from '../keys/install'
 import { regionFocus } from '../keys/regions'
 import { createKeySplit } from './split'
@@ -62,25 +62,30 @@ export function ListDetail(props: LayoutProps) {
       }}
       onSizeChange={() => setWidth(box?.width ?? NARROW_AT)}
     >
+      {/* Two named frames and no rule between them: the columns' borders already meet there
+          (../panel.tsx). The header and footer strips stay inside the list's frame, where they were,
+          because they are the list's own chrome and not regions a reader moves to. */}
       <Show when={showList()}>
         <box
           flexDirection="column"
           width={narrow() ? undefined : split.size()}
           flexGrow={narrow() ? 1 : 0}
-          ref={regionFocus({ paneId: props.stateKey, regionId: 'list' }, 0)}
         >
-          {props.regions['list-header']?.()}
-          <box flexDirection="column" flexGrow={1} overflow="scroll">{props.regions.list?.()}</box>
-          {props.regions['list-footer']?.()}
+          <Panel grow title="List" onBox={regionFocus({ paneId: props.stateKey, regionId: 'list' }, 0)}>
+            {props.regions['list-header']?.()}
+            <box flexDirection="column" flexGrow={1} overflow="scroll">{props.regions.list?.()}</box>
+            {props.regions['list-footer']?.()}
+          </Panel>
         </box>
       </Show>
-      <Show when={showList() && showDetail()}><Rule axis="y" /></Show>
       <Show when={showDetail()}>
         {/* `minWidth={0}`, because a flex child's floor is its own content and a detail region's content
             is routinely wider than its share. Without it the row reports a width the screen does not
             have (docs/tui.md). */}
-        <box flexDirection="column" flexGrow={1} minWidth={0} ref={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1)}>
-          {props.regions.detail?.()}
+        <box flexDirection="column" flexGrow={1} minWidth={0}>
+          <Panel grow title="Detail" onBox={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1)}>
+            {props.regions.detail?.()}
+          </Panel>
         </box>
       </Show>
     </box>

@@ -39,7 +39,10 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
  *  What it draws is the fixture node's one task and its notes pane, because that is the roster
  *  `App.tsx` registers. The chrome around it is real: the same rail, strip, palette and footer a
  *  person gets. */
-export async function renderFixture(size: { width?: number; height?: number; supervised?: boolean; pane?: string } = {}): Promise<{ frame: () => Promise<string>; press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<void>; resize: (width: number, height: number) => void; quits: () => number; done: () => void }> {
+/** One run of cells in a captured frame: what it says and what colour it says it in. */
+export type Span = { text: string; fg: { r: number; g: number; b: number }; attributes: number }
+
+export async function renderFixture(size: { width?: number; height?: number; supervised?: boolean; pane?: string } = {}): Promise<{ frame: () => Promise<string>; until: (text: string, seconds?: number) => Promise<string>; press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<void>; spans: () => Promise<Span[][]>; resize: (width: number, height: number) => void; quits: () => number; done: () => void }> {
   const { createTestRenderer } = await import('@opentui/core/testing')
   const { render } = await import('@opentui/solid')
   const { installKeymap } = await import('./keys/install')
@@ -48,13 +51,22 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   const { _resetRegions } = await import('./keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
   const { _resetChrome } = await import('./chrome/state')
-  // The collection store, the region list and the per-pane layout state are all module state, so two
-  // renders in one process would share a caret, a focused region and a split position. The real host
-  // has one render for its lifetime; a suite has one per test.
+  const { _resetRouter } = await import('./kit/router')
+  const { setSelectedSource } = await import('@acorn/client-core/features/tasks/tasks.ts')
+  // The collection store, the region list, the per-pane layout state, the path and which browse
+  // source is showing are all module state, so two renders in one process would share a caret, a
+  // focused region, a split position, a project and a rail selection. The real host has one render
+  // for its lifetime; a suite has one per test.
+  //
+  // The last two came with the router: a path that survives a render is a project the next test did
+  // not choose, and a source claimed off that path is a main panel the next test did not open
+  // (./kit/router.ts, ./chrome/routing.ts).
   _resetCollections()
   _resetRegions()
   _resetLayoutState()
   _resetChrome()
+  _resetRouter()
+  setSelectedSource(null)
   await bootFixture()
   // Which pane the fixture task opens on. The roster has eight of them now, so "the pane" is a choice
   // rather than the only one there is, and a test that does not make it gets whatever the task's saved
@@ -80,7 +92,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   // keymap has to be installed before anything mounts: a layout, a collection and a trap all register
   // their layer as they draw, and a layer registered against no engine is silently dropped.
   installRenderGuard()
-  const { renderer, mockInput, flush, captureCharFrame, resize } = await createTestRenderer({
+  const { renderer, mockInput, flush, captureCharFrame, captureSpans, resize } = await createTestRenderer({
     width: size.width ?? 80,
     height: size.height ?? 24,
   })
@@ -103,10 +115,31 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   // resolves as soon as the render loop is idle, so this is twenty chances for a promise to land rather
   // than four seconds of waiting.
   for (let turn = 0; turn < 20; turn += 1) await settle(200)
+  const frame = async (): Promise<string> => {
+    await settle(500)
+    return captureCharFrame()
+  }
+
   return {
-    frame: async () => {
-      await settle(500)
-      return captureCharFrame()
+    frame,
+    /**
+     * The frame, once it holds this text, or the last one taken if it never does.
+     *
+     * A real wait, not another flush: what is outstanding is a query and, on a cold worker, the
+     * compile of a `lazy()` and everything it imports. Turning the render loop makes neither finish.
+     *
+     * Take one where a test reads a pane's own data. `frame()` alone is a race that passes on a quiet
+     * machine and fails when the suite runs beside eleven others, which is exactly the failure that
+     * says nothing about the change under test. Fifteen seconds by default, because a cold compile of
+     * the agents pane is seconds; `seconds` raises it for a test that mounts more than one lazy tree.
+     */
+    until: async (text: string, seconds = 15): Promise<string> => {
+      let drawn = await frame()
+      for (let tries = 0; tries < seconds * 4 && !drawn.includes(text); tries += 1) {
+        await new Promise((done) => setTimeout(done, 250))
+        drawn = await frame()
+      }
+      return drawn
     },
     // A single character is itself; a named key is OpenTUI's own spelling for one, which is upper
     // case (`KeyCodes.RETURN`). Anything else is typed one letter at a time, silently, which is a
@@ -119,6 +152,21 @@ export async function renderFixture(size: { width?: number; height?: number; sup
       // follows; flushing the render loop does not make that timer run.
       await new Promise((done) => setTimeout(done, 80))
       await settle(500)
+    },
+    /** The frame as coloured runs rather than characters.
+     *
+     *  `frame()` answers what is on the screen and nothing about what colour it is, so every rule in
+     *  the role table — the accent on a focused border, the green on an inserted line, the grey on a
+     *  muted one — was untested. A terminal that draws the right characters in the wrong colour is a
+     *  terminal a reader cannot use, which is the whole of the light-background bug
+     *  (./appearance.ts). */
+    spans: async (): Promise<Span[][]> => {
+      await settle(500)
+      return captureSpans().lines.map((line) => line.spans.map((span) => ({
+        text: span.text,
+        fg: { r: span.fg.r, g: span.fg.g, b: span.fg.b },
+        attributes: span.attributes,
+      })))
     },
     resize,
     /** How many times the shell asked to quit. Counted rather than performed: a suite that really

@@ -27,12 +27,13 @@ const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 // pnpm-workspace.yaml's catalog says the same thing about solid-js for the same reason.
 // `@opentui/core` stays external: it is the native half, and bundling it would not help.
 const isReactiveRuntime = (id: string) =>
-  id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/') || id === '@opentui/solid'
+  id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/') || id.startsWith('@opentui/solid')
 // Aliased to something local, so it must not be externalized first: the `external` callback sees the
 // raw specifier and a `true` there wins before `resolve.alias` runs, which left `@solidjs/router` in the
 // output as a bare import of a package this host deliberately does not have
 // (src/kit/router.ts, docs/future/terminal/phase-6-panes-sweep.md).
-const isAliased = (id: string) => id === '@solidjs/router' || id.startsWith('@acorn/plugin-api/ui')
+const isAliased = (id: string) => id === '@solidjs/router' || id === 'lucide-static/icon-nodes.json'
+  || id.startsWith('@acorn/plugin-api/ui')
 const externalizeBareImports = (id: string) =>
   !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id) && !isAliased(id)
 
@@ -47,6 +48,10 @@ export default defineConfig({
       // reference-panel box and the two cooperative-extension nodes, and the DOM's copies of them are
       // portals and `<ul>`s (src/kit/host.tsx).
       { find: /^@acorn\/plugin-api\/ui\/host$/, replacement: resolve(import.meta.dirname, 'src/kit/host.tsx') },
+      // lucide's icon geometry, removed rather than replaced: 706 KB of SVG paths, and this host has
+      // no SVG. Left alone it is externalised, and Node's loader refuses a JSON module with no import
+      // attribute on it (src/kit/iconNodes.ts).
+      { find: /^lucide-static\/icon-nodes\.json$/, replacement: resolve(import.meta.dirname, 'src/kit/iconNodes.ts') },
       // The router, removed rather than replaced. `@solidjs/router` reads `window.history.state` at
       // module scope, so a pane that imports it cannot even be loaded here, and there is no URL behind
       // it to answer with (src/kit/router.ts).
@@ -56,10 +61,18 @@ export default defineConfig({
       // own Node harness does the same (references/opentui/packages/solid/scripts/solid-transform.ts).
       { find: /^solid-js$/, replacement: 'solid-js/dist/solid.js' },
       { find: /^solid-js\/store$/, replacement: 'solid-js/store/dist/store.js' },
-      // Absolute, because client-core's own components are compiled with this transform too and reach
-      // for the reconciler from a package that does not depend on it. They are not drawn here — the
-      // TUI has its own kit and its own layouts — but they are in the graph, so they have to resolve.
-      { find: /^@opentui\/solid$/, replacement: fileURLToPath(import.meta.resolve('@opentui/solid')) },
+      // The reconciler, with loose text wrapped on the way in. `src/kit/reconciler.ts` re-exports all of
+      // `@opentui/solid` and replaces one function, and it is aliased rather than imported because the
+      // Solid transform emits its calls by module name (`moduleName` below) — so this is the only way
+      // to sit in front of every one of them, including the ones client-core's own components make.
+      //
+      // Absolute inside it, because client-core's components are compiled with this transform too and
+      // reach for the reconciler from a package that does not depend on it. They are not drawn here —
+      // the TUI has its own kit and its own layouts — but they are in the graph, so they have to
+      // resolve, and they have to resolve to the same instance.
+      { find: /^@opentui\/solid$/, replacement: resolve(import.meta.dirname, 'src/kit/reconciler.ts') },
+      // …and the real one behind it, which only `src/kit/reconciler.ts` names.
+      { find: /^@opentui\/solid\/index\.js$/, replacement: fileURLToPath(import.meta.resolve('@opentui/solid')) },
     ],
   },
   plugins: [solid({ solid: { generate: 'universal', moduleName: '@opentui/solid' } })],

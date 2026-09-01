@@ -3,6 +3,7 @@ import { Show } from 'solid-js'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
 import { Button } from '../kit/asking'
 import { Line } from '../kit/cells'
+import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
 
 // `wizard`: one step at a time, the step count on the header line, the actions on the footer line
@@ -27,9 +28,9 @@ export function Wizard(props: LayoutProps) {
           {`Step ${at() + 1} of ${steps().length} · ${steps()[at()]?.label ?? ''}`}
         </Line>
       </Show>
-      <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: props.stateKey, regionId: 'step' }, 0)}>
+      <Panel grow title={props.label} onBox={regionFocus({ paneId: props.stateKey, regionId: 'step' }, 0)}>
         {props.regions.step?.()}
-      </box>
+      </Panel>
       <box flexDirection="row" gap={1}>
         <box flexGrow={1} />
         <Show when={at() > 0}><Button variant="bare" onPress={() => step(-1)}>Back</Button></Show>

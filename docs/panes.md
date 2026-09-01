@@ -82,14 +82,20 @@ the answer; a new named layout is.
 
 | Layout | Regions | Desktop | Narrow | Terminal |
 | --- | --- | --- | --- | --- |
-| `single` | `body` | one region, the pane's padding and focus group | unchanged | unchanged |
-| `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups |
-| `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer | body scrolls, header and footer pinned | unchanged; the footer stays pinned | the same |
-| `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar | the bar, then one panel at a time | the bar scrolls horizontally | the bar is one line |
-| `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | both halves, with a rule between; the document is a host text view, read-only for now |
+| `single` | `body` | one region, the pane's padding and focus group | unchanged | one frame, titled with the pane's name |
+| `list-detail` | `list`, `detail`, optional `list-header`, `list-footer` | two columns, host-drawn split and drag handle; the list width is a style token | one region at a time: selecting in the list pushes the detail, and a back affordance returns | as narrow below 80 columns, two columns above it; a key switches groups. Two frames, `List` and `Detail`, and the header and footer strips stay inside the list's |
+| `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer | body scrolls, header and footer pinned | unchanged; the footer stays pinned | the body is framed and titled with the pane's name; the two pinned strips are bare, because a frame round one line is three rows of chrome |
+| `tabs` | one `panel:<tab id>` per entry in `tabs`; the host draws the bar | the bar, then one panel at a time | the bar scrolls horizontally | the bar is one line; the panel is framed and titled with the open tab |
+| `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | both halves, each framed; the document is a host text view, read-only for now |
 | `frame-beside-document` | the same two, with the axis flipped by the name rather than by a prop | side by side | as `document-over-frame` | the same |
-| `stack-split` | `top`, `bottom` | two stacked regions with a handle | `bottom` becomes a full-height sheet | native, as on desktop |
-| `wizard` | `step`; the host draws the indicator and the back and next controls | one step at a time | unchanged | unchanged |
+| `stack-split` | `top`, `bottom` | two stacked regions with a handle | `bottom` becomes a full-height sheet | native, as on desktop, each region framed |
+| `wizard` | `step`; the host draws the indicator and the back and next controls | one step at a time | unchanged | the step is framed and titled with the pane's name |
+
+**Every terminal region draws a frame, and no rule between two of them.** A frame carries the region's
+name in its top border and lights while the keys are inside it, which is what a landmark's label and
+`:focus-within` do on the desktop. Two frames meeting already draw a line, so the rules that used to
+separate regions are gone. Frames go one level deep only: the region is framed, the pane around it is
+not ([docs/tui.md](./tui.md) § The screen).
 
 Every region is a focus group: one chord moves between them, focus inside one is roving, and each
 remembers the node it was last on
@@ -184,9 +190,16 @@ task-shaped key and nothing to subscribe to, it belongs here.
 **A split inside a region is the plugin's.** A pane's regions are its *outer* arrangement; a `ListDetail`
 drawn inside one region is a different object with a different owner, which is why `ListDetail` and
 `DocumentTabs` are kit nodes as well as layout names. The PR pane is a `single` layout whose one region
-is a kit `ListDetail` — the navigator beside the diff, the same pair the GitHub browse surface draws —
-and that is correct rather than a pane that should have named `list-detail`. The two columns are one
-surface over one model, not two regions the host mounts apart.
+is a kit `Sections` — the pull request's own parts beside its diff, the same node the GitHub browse
+surface draws — and that is correct rather than a pane that should have named `list-detail` or `tabs`.
+The parts are one surface over one model, not regions the host mounts apart.
+
+`Sections` is where that distinction pays. A pane layout is arranged by the host and its regions are
+named by the pane contribution, so a surface that wants a different arrangement per host but the same
+regions everywhere has to be a layout — except a browse source's detail region is not a pane and cannot
+name one. So the shape is a kit node instead, and both call sites reach it: the desktop draws a header
+over a column of folds beside the main region, and the terminal draws a strip of tabs over one panel
+([ui-design.md § The closed kit](./ui-design.md)).
 
 The node takes its two columns two ways, and both matter. A caller with an element to spare passes the
 left one as `list`; a caller that cannot — a remote tree, whose props are JSON on a message port —

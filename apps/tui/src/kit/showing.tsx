@@ -38,6 +38,35 @@ export function Heading(props: { level?: 1 | 2 | 3; eyebrow?: string; children: 
 
 // ── Lists ─────────────────────────────────────────────────────────────────────────────────────
 
+/** The fewest cells a row's own words are worth. Below it the row stops giving and runs off the right
+ *  edge instead, where the frame cuts it — so in a twenty-eight cell rail a pull request reads as its
+ *  number and its title, and the timestamp and the row actions are simply not there. The alternative
+ *  is a row where every field is present and none of them is legible, which is what this host drew
+ *  while its parts still shrank. */
+const TITLE_CELLS = 16
+
+/** The order a row gives up cells in when it is wider than the panel it is drawn in: the trailing
+ *  controls first, then the meta, then the title, and never the caret or the leading glyphs. Yoga
+ *  shrinks a child in proportion to `flexShrink` times its width, so these are ranks rather than
+ *  ratios — a row action gives up its last cell before the title gives up its first. */
+const SHRINK = { title: 1, meta: 20, trailing: 100 }
+
+/** One of a row's fixed parts, in a box that holds its own width.
+ *
+ *  A component rather than a function returning JSX, and the difference matters on a retained
+ *  renderer: a function called from inside the row's JSX runs again whenever the row's props are read
+ *  again, and each run tries to put the caller's *same* renderables inside a *new* box — reparenting
+ *  the whole part on every read, which used to surface as "already destroyed, skipping add" and now
+ *  is merely churn the retained tree never needed. The `Show` builds the box once and only the
+ *  contents move. */
+function Part(props: { shrink: number; children: JSX.Element }) {
+  return (
+    <Show when={props.children}>
+      <box flexDirection="row" gap={1} flexShrink={props.shrink} overflow="hidden">{slot(props.children)}</box>
+    </Show>
+  )
+}
+
 /** One line: the caret for where the keys are, the leading slot, the title, the meta at the far end.
  *
  *  `reveal` hides the trailing controls until hover on the DOM. There is no hover, so they always
@@ -70,11 +99,18 @@ export function Row(props: {
   // a button and Enter on it raises a click by itself, and there is no element here to do that
   // (../keys/collection.ts).
   if (props.item) props.item.press(() => props.onPress?.())
+  // The parts of a row that keep their cells when the row is wider than the panel it is in. A `text`
+  // is a box to yoga, so a row of them at a width they do not fit is a row of boxes each shrunk and
+  // each clipping its own content — the failure ../kit/cells.tsx § Run already names, one level up:
+  // `[ST]` drew as `[ST`, the gaps closed, and the one-cell caret column shrank to nothing, so a
+  // focused list looked exactly like an unfocused one. Only the title gives; everything else holds
+  // its width and the row clips at the frame.
   return (
     <box
       flexDirection="row"
       gap={1}
       flexShrink={0}
+      overflow="hidden"
       paddingLeft={props.depth ? props.depth * 2 : 0}
       ref={(element: BoxRenderable) => {
         // The row is where focus lands, so the collection can put it there and a region's first stop
@@ -85,26 +121,29 @@ export function Row(props: {
         props.item.ref(element)
       }}
     >
-      <Line tone="accent">{isActive() ? '›' : ' '}</Line>
-      {slot(props.leading)}
+      <box flexShrink={0}><Line tone="accent">{isActive() ? '›' : ' '}</Line></box>
+      <Part shrink={0}>{props.leading}</Part>
       {/* Words get the row's own role; a tree brought its own, and the row only decides how the parts
           sit. `stacked` is a title over a subtitle, which is what it is on the DOM — drawing both on
           one line ran the agents session titles into their model names with no space between
           (docs/tui.md). */}
-      <Show
-        when={hasNode(props.children)}
-        fallback={<Line role={props.selected ? 'match' : 'body'}>{props.children}</Line>}
+      <box
+        flexShrink={SHRINK.title}
+        minWidth={TITLE_CELLS}
+        overflow="hidden"
+        flexDirection={props.variant === 'stacked' ? 'column' : 'row'}
+        gap={props.variant === 'stacked' ? 0 : 1}
       >
-        <box
-          flexDirection={props.variant === 'stacked' ? 'column' : 'row'}
-          gap={props.variant === 'stacked' ? 0 : 1}
+        <Show
+          when={hasNode(props.children)}
+          fallback={<Line role={props.selected ? 'match' : 'body'}>{props.children}</Line>}
         >
           {slot(props.children)}
-        </box>
-      </Show>
+        </Show>
+      </box>
       <box flexGrow={1} />
-      {slot(props.meta)}
-      {slot(props.trailing)}
+      <Part shrink={SHRINK.meta}>{props.meta}</Part>
+      <Part shrink={SHRINK.trailing}>{props.trailing}</Part>
     </box>
   )
 }
@@ -158,10 +197,12 @@ export function RowActions(props: { ariaLabel: string; children: (menu: { close:
   return <box flexDirection="row" gap={1}>{props.children({ close: () => {} })}</box>
 }
 
-// How many rows a virtualised list keeps around the window, so a move by one does not have to
-// re-measure. Same idea as the DOM virtualizer's overscan, one tenth the size: a terminal window is
-// tens of rows, not hundreds.
-const OVERSCAN = 2
+/** The scrollbar's two cells: the run the window covers, and the rest of the list under it. lazygit
+ *  draws the same bar down the right edge of a panel that has more in it than it can show, and it is
+ *  the only thing on this host that says "there is more below" — a terminal has no scroll position a
+ *  reader can feel for. */
+const THUMB = '█'
+const TRACK = '│'
 
 /** Items on successive lines. `virtual` is the scroll window and changes nothing else: the component
  *  is the virtualiser, because OpenTUI has none, and it draws only the rows that fit. */
@@ -185,6 +226,14 @@ export function Rows<T extends CollectionItem>(props: {
   const collection = createCellCollection({
     id: () => props.id,
     items,
+    // Moving the caret selects. This host's own answer, and the same kind of departure the focus
+    // rules already make: with no pointer there is nothing else the caret could mean, and a reader
+    // arrowing down a list of pull requests is asking to see them (docs/tui.md § Collections).
+    //
+    // Only `onSelect` fires on a move. `onActivate` still waits for Enter, so showing something is
+    // immediate and opening it stays deliberate — which is the split `collectionIntents.ts` already
+    // draws between `pick` and activate.
+    selectOnMove: true,
     ...(props.selected === undefined ? {} : { selected: () => props.selected }),
     ...(props.onSelect ? { onSelect: props.onSelect } : {}),
     ...(props.onActivate ? { onActivate: props.onActivate } : {}),
@@ -195,29 +244,63 @@ export function Rows<T extends CollectionItem>(props: {
 
   let box: BoxRenderable | undefined
   const [rows, setRows] = createSignal(0)
-  // The window follows the active row rather than a scroll position, because in a terminal there is
-  // no pointer to scroll with: the keys move the caret and the view goes where the caret is.
+  // Where the window starts. Kept rather than derived, so it moves only when the caret would leave
+  // it: centring on the active row scrolled the whole list under the reader on every press, which is
+  // not what any list in a terminal does. lazygit's rule — the view holds still until the caret walks
+  // off an edge, then follows by exactly as much as it has to.
+  let top = 0
   const window = createMemo(() => {
     const all = items()
     const fit = rows()
-    if (!props.virtual || !fit || all.length <= fit) return { from: 0, items: all }
+    if (!props.virtual || !fit || all.length <= fit) {
+      top = 0
+      return { from: 0, items: all }
+    }
     const at = Math.max(0, all.findIndex((item) => item.key === collection.active()))
-    const from = Math.min(Math.max(0, at - Math.floor(fit / 2)), Math.max(0, all.length - fit))
-    return { from, items: all.slice(Math.max(0, from - OVERSCAN), from + fit + OVERSCAN) }
+    top = Math.max(0, Math.min(Math.max(top, at - fit + 1), at, all.length - fit))
+    // Exactly what fits and no more. There is no scroll offset to overscan into: the box draws from
+    // its own first row, so a row drawn beyond the window is a row drawn over the frame below it.
+    return { from: top, items: all.slice(top, top + fit) }
+  })
+
+  /** Where the thumb sits, or nothing where the whole list is on screen. */
+  const bar = createMemo(() => {
+    const all = items().length
+    const fit = rows()
+    if (!props.virtual || !fit || all <= fit) return null
+    const size = Math.max(1, Math.round((fit * fit) / all))
+    return { fit, size, at: Math.round((window().from * (fit - size)) / (all - fit)) }
   })
 
   return (
     <box
-      flexDirection="column"
-      // `flexShrink={0}`, like every block node in ./grouping.tsx: a terminal clips rather than
-      // squeezing, and a list given less room than its rows walks them onto each other.
-      flexShrink={0}
+      flexDirection="row"
+      // A virtual list is given its height by the panel it is in and windows to it. Left to size
+      // itself it is as tall as its contents, which is the same number it then measures to decide how
+      // many rows fit — so it always fitted, always drew everything, and overflowed the frame
+      // (../panel.tsx). Every other list keeps the kit's rule and takes the room its rows need.
+      {...(props.virtual ? { flexGrow: 1, flexBasis: 0, flexShrink: 1 } : { flexShrink: 0 })}
       ref={(element: BoxRenderable) => { box = element; setRows(element.height); collection.attach(element) }}
       onSizeChange={() => setRows(box?.height ?? 0)}
     >
-      <For each={window().items}>
-        {(item) => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)}
-      </For>
+      <box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
+        <For each={window().items}>
+          {(item) => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)}
+        </For>
+      </box>
+      <Show when={bar()}>
+        {(place) => (
+          <box flexDirection="column" flexShrink={0}>
+            <Index each={Array.from({ length: place().fit })}>
+              {(_cell, row) => (
+                <Line role={row >= place().at && row < place().at + place().size ? 'strong' : 'muted'}>
+                  {row >= place().at && row < place().at + place().size ? THUMB : TRACK}
+                </Line>
+              )}
+            </Index>
+          </box>
+        )}
+      </Show>
     </box>
   )
 }
@@ -579,22 +662,30 @@ export function Grid(props: {
 
 // ── Diff ──────────────────────────────────────────────────────────────────────────────────────
 
-/** reduced: no intra-line word highlight. The gutter is the change, the colour is the direction. */
+/** reduced: no intra-line word highlight. The gutter is the change, the colour is the direction.
+ *
+ *  One `text` with two runs in it, and `flexShrink={0}` on it, and both halves of that are the same
+ *  bug in two directions. A row of two `Line`s is a row of two boxes, so a line wider than the column
+ *  shrank both and each clipped its own content, which put the gutter's last digit against the `+`
+ *  and lost the space between them; a run inside one `text` clips once, at the end, where a reader
+ *  expects it (../kit/cells.tsx § Run). And a column of rows taller than the panel shrank every row
+ *  instead of scrolling, so four hundred diff lines were drawn into thirty rows on top of each other
+ *  — the smear this node shipped with. A diff row is one line high and never less. */
 export function DiffLine(props: { r: CodeRow; canAdd?: boolean; highlight?: unknown }) {
   const mark = () => (props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '-' : ' ')
   const tone = () => (props.r.kind === 'insert' ? 'ok' : props.r.kind === 'delete' ? 'danger' : undefined)
   return (
-    <box flexDirection="row">
-      <Line role="muted">{`${String(props.r.oldNo ?? '').padStart(4)} ${String(props.r.newNo ?? '').padStart(4)} `}</Line>
-      <Line tone={tone()}>{`${mark()}${props.r.raw}`}</Line>
-    </box>
+    <text flexShrink={0} wrapMode="none">
+      <Run role="muted">{`${String(props.r.oldNo ?? '').padStart(4)} ${String(props.r.newNo ?? '').padStart(4)} `}</Run>
+      <Run tone={tone()}>{`${mark()}${props.r.raw}`}</Run>
+    </text>
   )
 }
 
 /** reduced: the path in bold with `+n −m` at the far end, and no collapse control. */
 export function FileHead(props: { file: DiffFile; anchorId?: string; collapsed?: boolean; onToggleCollapse?: (path: string) => void }) {
   return (
-    <box flexDirection="row" gap={1}>
+    <box flexDirection="row" gap={1} flexShrink={0}>
       <Line role="strong">{props.file.path}</Line>
       <box flexGrow={1} />
       <Line tone="ok">{`+${props.file.additions ?? 0}`}</Line>
@@ -617,7 +708,7 @@ export function NonCodeRow(props: { row: Exclude<DiffRowT, CodeRow> }) {
       default: return ''
     }
   }
-  return <Line role="muted">{text()}</Line>
+  return <text flexShrink={0} wrapMode="none" {...runStyle('muted')}>{text()}</text>
 }
 
 /** absent: side-by-side needs 160 cells, so a terminal diff is unified. */
@@ -632,7 +723,10 @@ export function DiffPane(props: { source: { files: () => DiffFile[] | undefined;
         {(files) => (
           <For each={files()}>
             {(file) => (
-              <box flexDirection="column">
+              /* `flexShrink={0}` for the reason each row inside carries it: a column of files taller
+                 than the panel is squeezed rather than scrolled, and one file's rows are then drawn
+                 over the next file's. The scroll is this pane's, at the box above. */
+              <box flexDirection="column" flexShrink={0}>
                 <FileHead file={file} />
                 <For each={buildDiffRows(file, plainTokenize)}>
                   {(row) => (

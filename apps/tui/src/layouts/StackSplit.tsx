@@ -2,8 +2,8 @@
 import { createSignal } from 'solid-js'
 import type { BoxRenderable } from '@opentui/core'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
-import { Rule } from '../kit/cells'
 import { createKeySplit } from './split'
+import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
 
 // `stack-split`: `top` over `bottom` with a rule between them, the split moved by a key. Its
@@ -42,13 +42,16 @@ export function StackSplit(props: LayoutProps) {
       }}
       onSizeChange={() => setLines(box?.height ?? 0)}
     >
-      <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: props.stateKey, regionId: 'top' }, 0)}>
+      {/* Each region's border carries its own name rather than the pane's: this layout has two, and
+          which one has the keys is the thing a reader needs to know. The rule that used to sit
+          between them is gone — two frames already meet there, and a rule beside a border is two
+          lines saying one thing (../panel.tsx). */}
+      <Panel grow title="Top" onBox={regionFocus({ paneId: props.stateKey, regionId: 'top' }, 0)}>
         {props.regions.top?.()}
-      </box>
-      <Rule />
-      <box flexDirection="column" height={split.size()} ref={regionFocus({ paneId: props.stateKey, regionId: 'bottom' }, 1)}>
+      </Panel>
+      <Panel rows={split.size()} title="Bottom" onBox={regionFocus({ paneId: props.stateKey, regionId: 'bottom' }, 1)}>
         {props.regions.bottom?.()}
-      </box>
+      </Panel>
     </box>
   )
 }

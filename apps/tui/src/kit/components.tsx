@@ -2,7 +2,8 @@ import type { Component } from 'solid-js'
 import type { KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
-  ModalBody, Popover, Section, SectionHeader, SplitHandle, Stack, TabPanel, Tabs, Timeline, Toolbar,
+  ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
+  Toolbar,
   ToolbarSpacer,
 } from './grouping'
 import {
@@ -36,7 +37,7 @@ type AnyKitComponent = Component<any>
 
 export const KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {
   Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar,
-  Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs, SectionHeader,
+  Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, Sections, SplitHandle, DocumentTabs, SectionHeader,
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
   // remote tree only under a name of their own.
   ModalBody, ModalActions, TabPanel, ToolbarSpacer,

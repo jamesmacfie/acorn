@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
+import { createComponent } from 'solid-js'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { hasFfi } from '../ffi'
@@ -141,6 +142,32 @@ addEventListener('message', (event) => {
 `
 
 /** Put a bundle in the cache, install the terminal's worker factory, and mount one slot. */
+test.skipIf(!hasFfi)('a descriptor source draws its list and its detail in cells', async () => {
+  // What `client-core/host/chrome/sourcePanel.ts` exists for. The chrome registry used to name
+  // `ChromeSourcePanel` directly, which is `<main class="panes">` and DOM kit primitives all the way
+  // down, so selecting a descriptor source here threw "[Reconciler] Unknown component type: main"
+  // instead of drawing anything. Both regions render, which is the whole claim.
+  const { sourcePanel } = await import('./SourcePanel')
+  const descriptor = {
+    id: 'issues', label: 'Issues', glyph: 'circle', order: 10, items: '/v2/p/probe/items',
+  } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
+  const panel = sourcePanel({ pluginId: 'probe', descriptor })
+  expect(panel.regions).toBeDefined()
+  expect(panel.component).toBeUndefined()
+
+  for (const region of [panel.regions!.list, panel.regions!.detail]) {
+    const screen = await renderCells(() => createComponent(region, {}))
+    // A real wait: the list runs a fan-out query and the detail asks the surface registry, and both
+    // answer off a tick rather than off a frame.
+    await new Promise((done) => setTimeout(done, 150))
+    const drawn = await screen.frame()
+    screen.done()
+    // Anything at all, drawn without the reconciler refusing a node. A bare render has no node behind
+    // it, so the list says it is loading and the detail says there is nothing to choose.
+    expect(drawn.text.trim().length).toBeGreaterThan(0)
+  }
+}, 30_000)
+
 async function mountProbe(source: string): Promise<{ ops: readonly TreeMutation[]; refusals: string[]; release: () => void }> {
   const { createPluginCustody } = await import('./custody')
   const { installPluginWorkers } = await import('./workerFactory')

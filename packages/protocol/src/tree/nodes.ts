@@ -23,6 +23,7 @@ export const KIT_NODES = [
   // Grouping
   'Stack', 'Inline', 'Section', 'Fold', 'Card', 'Timeline', 'Tabs', 'Toolbar',
   'Modal', 'ModalBody', 'ModalActions', 'Menu', 'Popover', 'ListDetail', 'ListColumn', 'DetailColumn',
+  'Sections',
   'SplitHandle', 'DocumentTabs', 'SectionHeader', 'TabPanel', 'ToolbarSpacer',
   // Showing
   'Text', 'Link', 'Heading', 'Rows', 'Row', 'TreeRow', 'RowActions', 'Badge', 'Chip', 'ChipRow', 'StatusDot', 'Facts',
