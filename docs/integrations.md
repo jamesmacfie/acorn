@@ -161,7 +161,9 @@ host's normal in-app or browser handling.
 ## Rollbar
 
 Rollbar is a read-focused provider. It lists active items, loads item/occurrence details, promotes an
-item to a task, and contributes a task pane/source. Payloads are normalized through a strict privacy
+item to a task, and contributes a task pane, a project-scoped pane and a source. Picking a row from
+the rail draws the item beside the list at `/p/:projectId/x/rollbar/items/:item`, with no task
+involved; the task pane is the linked-items view. Payloads are normalized through a strict privacy
 allowlist before persistence or rendering. List, detail, occurrence history, and occurrence detail
 have independent freshness.
 

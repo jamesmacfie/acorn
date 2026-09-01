@@ -77,7 +77,7 @@ describe('loading rollbar from disk', () => {
       expect(installed[0]?.client).toMatchObject({ hash: expect.stringMatching(/^[0-9a-f]{64}$/) })
       expect(installed[0]?.client?.bytes).toBeGreaterThan(1_000)
       expect(installed[0]?.manifest.contributions).toMatchObject({
-        frames: [{ target: 'pane', id: 'rollbar' }],
+        frames: [{ target: 'pane', id: 'rollbar' }, { target: 'pane', id: 'rollbar-item', scope: 'project' }],
         sources: [{ id: 'rollbar-items', items: '/v2/p/rollbar/rail-items' }],
       })
 

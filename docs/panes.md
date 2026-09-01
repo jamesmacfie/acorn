@@ -18,7 +18,7 @@ string owned by the contribution; core does not maintain a closed union of featu
 | `http` | 76 | loaded HTTP tree; API request client for this task |
 | `preview` | 80 | browser preview |
 | `linear` | 90 | loaded Linear tree; linked issue, selected descriptor row, or content-link target |
-| `rollbar` | 100 | loaded Rollbar tree; linked item or selected descriptor row |
+| `rollbar` | 100 | loaded Rollbar tree; linked item |
 
 Compiled provider panes appear when their linked provider is connected and the task has relevant
 data. The four loaded ones, `database`, `http`, `linear`, and `rollbar`, are declared in a manifest and
@@ -38,10 +38,11 @@ both halves of that pane are now host-drawn components; the region keeps the nam
 is the point: the reader has one rectangle, and the row knows nothing about the split inside it
 (`docs/plugins.md` § Document surfaces).
 
-Two of those plugins also declare a project-scoped pane, which is not in this table because it is not
-part of a task's layout. `http-project` and `linear-issue` are drawn beside their plugin's rail list
-at `/p/:projectId`, addressed by a manifest route under `/p/:projectId/x/<plugin-id>/`. They exist
-because a rail row click often has no task, and `openPane` needs one.
+Three of those plugins also declare a project-scoped pane, which is not in this table because it is
+not part of a task's layout. `http-project`, `linear-issue` and `rollbar-item` are drawn beside their
+plugin's rail list at `/p/:projectId`, addressed by a manifest route under
+`/p/:projectId/x/<plugin-id>/`. They exist because a rail row click often has no task, and `openPane`
+needs one.
 
 ## Layout model
 
