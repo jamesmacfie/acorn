@@ -23,6 +23,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [performance/](./performance/README.md) | Two performance reads, surfaces and shapes, merged into six phases: unblock the red renderer budget and instrument, paint before the node boots, stop the event amplifiers, terminals work only when watched, the live surfaces, then re-measure. | Plan, 2026-08-31. Not started. The renderer build is over budget. |
+| [terminal-updates/](./terminal-updates/README.md) | The terminal client's keyboard, finished: an analysis of what is sound and what was hacked, a five-level focus model with one settle pass and eight invariants, and seven phases from wiring every control to properties over the whole pane roster. Also which plugin extension kinds cross into cells and which are named as lost. | Plan, 2026-09-02. Not started. Phase 0 is the one to do first. |
 
 ## The single files
 
