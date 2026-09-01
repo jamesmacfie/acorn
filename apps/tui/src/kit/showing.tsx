@@ -8,6 +8,9 @@ import {
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import type { CodeRow, DiffFile, Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
 import { buildDiffRows, plainTokenize } from '@acorn/client-core/kit/diff/diffModel.ts'
+import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
+import { annotationKey } from '@acorn/client-core/host/annotations/annotationKey.ts'
+import { annotationsFor, requestAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'
 import { createCellCollection, type ItemProps } from '../keys/collection'
 import { stop } from '../keys/stops'
 import { flatten, hasNode, Line, pad, Run, runStyle, slot } from './cells'
@@ -847,33 +850,99 @@ export function NonCodeRow(props: { row: Exclude<DiffRowT, CodeRow> }) {
 /** absent: side-by-side needs 160 cells, so a terminal diff is unified. */
 export const SplitCell = (_props: { r: CodeRow | null; gutter: number | null }) => null
 
+/** One item's marks, drawn where the owner put them. The DOM stacks icon, text and owner in a row of
+ *  spans; here they are the same three in the same order, on one line.
+ *
+ *  Here rather than on `../kit/host.tsx` with the other cooperative nodes, because `DiffPane` below
+ *  draws it and that barrel imports this file. Re-exported from there, so a pane spells the same
+ *  import on both hosts. */
+export function AnnotationMarks(props: { point: string; itemKey: PluginAnnotationKey }) {
+  const marks = () => annotationsFor(props.point, props.itemKey)
+  return (
+    <box flexDirection="row" gap={1} flexShrink={0}>
+      <For each={marks()}>
+        {(mark) => (
+          <box flexDirection="row" gap={1} flexShrink={0}>
+            <Show when={mark.icon}>{(name) => <Icon name={name()} />}</Show>
+            <Line tone={mark.severity === 'danger' ? 'danger' : mark.severity === 'warn' ? 'warn' : undefined}>{mark.text}</Line>
+            <Line role="muted">{mark.pluginId}</Line>
+          </box>
+        )}
+      </For>
+    </box>
+  )
+}
+
 /** reduced: unified only, and no syntax colour. `buildDiffRows` is the same parse the DOM viewer
- *  runs; what is dropped is the highlighter it feeds, which needs a grammar and a theme. */
+ *  runs; what is dropped is the highlighter it feeds, which needs a grammar and a theme.
+ *
+ *  `annotations` is a point id, and it is a prop rather than something the source supplies for the
+ *  reason the DOM viewer gives: the marks are drawn inside the row, so their placement is this
+ *  component's business. A mark is text — it is not a stop and it changes nothing about how the diff
+ *  is driven (docs/tui.md § What a plugin loses here). */
 export function DiffPane(props: { source: { files: () => DiffFile[] | undefined; loading: () => boolean }; annotations?: string }) {
+  const rows = createMemo(() =>
+    (props.source.files() ?? []).map((file) => ({ file, rows: buildDiffRows(file, plainTokenize) })))
+
+  // Every code row this pane holds, asked about in one request per contributor rather than one per
+  // line. There is no virtual window here — the pane is one scrolling box and every row is built — so
+  // "the visible rows" is all of them. `requestAnnotations` compares the key set and does nothing when
+  // it has already asked, so a redraw costs a string compare (client-core/host/annotations).
+  createEffect(() => {
+    const point = props.annotations
+    if (!point) return
+    requestAnnotations(point, rows().flatMap((entry) => entry.rows.flatMap((row) =>
+      (row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete' ? [annotationKey(row as CodeRow)] : []))))
+  })
+
   return (
     <box flexDirection="column" flexGrow={1} overflow="scroll">
       <Show when={props.source.files()} fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}>
-        {(files) => (
-          <For each={files()}>
-            {(file) => (
-              /* `flexShrink={0}` for the reason each row inside carries it: a column of files taller
-                 than the panel is squeezed rather than scrolled, and one file's rows are then drawn
-                 over the next file's. The scroll is this pane's, at the box above. */
-              <box flexDirection="column" flexShrink={0}>
-                <FileHead file={file} />
-                <For each={buildDiffRows(file, plainTokenize)}>
-                  {(row) => (
-                    <Show when={row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete'} fallback={<NonCodeRow row={row as Exclude<DiffRowT, CodeRow>} />}>
-                      <DiffLine r={row as CodeRow} />
-                    </Show>
-                  )}
-                </For>
-              </box>
-            )}
-          </For>
-        )}
+        <For each={rows()}>
+          {(entry) => (
+            /* `flexShrink={0}` for the reason each row inside carries it: a column of files taller
+               than the panel is squeezed rather than scrolled, and one file's rows are then drawn
+               over the next file's. The scroll is this pane's, at the box above. */
+            <box flexDirection="column" flexShrink={0}>
+              <FileHead file={entry.file} />
+              <For each={entry.rows}>
+                {(row) => (
+                  <Show when={row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete'} fallback={<NonCodeRow row={row as Exclude<DiffRowT, CodeRow>} />}>
+                    <AnnotatedDiffLine r={row as CodeRow} point={props.annotations} />
+                  </Show>
+                )}
+              </For>
+            </box>
+          )}
+        </For>
       </Show>
     </box>
+  )
+}
+
+/** A diff line, plus whatever another plugin knows about it, on the line below it.
+ *
+ *  Below rather than at the end of the code, which is where this was written and where nobody could
+ *  read it: a diff line is `wrapMode="none"` and as wide as the patch, so anything after it is past
+ *  the frame and clipped. It is also where the DOM puts them — `lineExtra`, under the row, inside the
+ *  row's measured height — so the two hosts now agree. Indented past the gutter so a reader can see
+ *  which line it is about (§ DiffLine mints the same two four-cell columns).
+ *
+ *  Only a marked line gets the wrapper. `DiffLine` is one `text` on purpose, and an unmarked line is
+ *  the node it always was. */
+const GUTTER_CELLS = 10
+
+function AnnotatedDiffLine(props: { r: CodeRow; point?: string }) {
+  const marks = () => (props.point ? annotationsFor(props.point, annotationKey(props.r)).length : 0)
+  return (
+    <Show when={props.point && marks()} fallback={<DiffLine r={props.r} />}>
+      <box flexDirection="column" flexShrink={0}>
+        <DiffLine r={props.r} />
+        <box flexDirection="row" paddingLeft={GUTTER_CELLS} flexShrink={0} overflow="hidden">
+          <AnnotationMarks point={props.point!} itemKey={annotationKey(props.r)} />
+        </box>
+      </box>
+    </Show>
   )
 }
 

@@ -240,6 +240,12 @@ by 24. Only the plugins that lose something are listed.
 | **github** | Nothing of the five surfaces. There is no URL, so a content link resolves to a pane or a reference panel and stops there rather than falling through to a route, and the create-PR form's own draft is per device as it is everywhere. |
 | **workflows** | Its settings page has nowhere to be drawn: the terminal client has no settings surface yet. |
 
+What another plugin brings *into* these panes crosses too: github's diff-line marks and the badges
+beside a pull request's state draw in cells, and the changes pane's own diff point behaves the same
+way. What is still absent is the host UI slots — the editor's and github's palettes and the terminal
+drawer are registered and not drawn — and that is one row of [tui.md](./tui.md) § What a plugin loses
+here rather than a property of any plugin here.
+
 Nothing is missing from **changes**, **context**, **memory**, **notes** or **onboarding**. The four
 plugins that ship only a tree bundle — **http**, **linear**, **rollbar**, **database** — reach the
 terminal through the worker sandbox instead, drawing the same nodes into cells.

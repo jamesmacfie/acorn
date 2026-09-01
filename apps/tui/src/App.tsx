@@ -17,6 +17,8 @@ import { setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { setLayouts } from '@acorn/client-core/host/layouts/table.ts'
 import { setSourcePanel } from '@acorn/client-core/host/chrome/sourcePanel.ts'
 import { sourcePanel } from './plugins/SourcePanel'
+import { setExtendedPane } from '@acorn/client-core/host/chrome/extendedPane.ts'
+import { ExtendedPane } from './plugins/ExtendedPane'
 import { setRemoteTree } from '@acorn/client-core/host/tree/table.ts'
 import { LAYOUTS } from './layouts'
 import { RemoteTree } from './plugins/RemoteTree'
@@ -51,6 +53,13 @@ installPluginWorkers()
 // than one surface, because the two go in different panels here
 // (client-core/host/chrome/sourcePanel.ts, ./plugins/SourcePanel.tsx).
 setSourcePanel(sourcePanel)
+
+// …and the fourth, which was a crash rather than a gap. A loaded plugin's pane that reserved a
+// `pane.footer` or a `pane.aside` was wrapped in the DOM's `ExtendedPane` — a `div` and an `aside`
+// around a `PanelGrid` — so the reconciler refused the pane rather than drawing it. This host's
+// wrapper puts the reserved regions under the owner's tree in reading order
+// (client-core/host/chrome/extendedPane.ts, ./plugins/ExtendedPane.tsx).
+setExtendedPane(ExtendedPane)
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
 // because that is where a pane comes from on the desktop too. It is the same twelve the desktop

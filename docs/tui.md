@@ -813,6 +813,18 @@ the pre-flight check, `apply()`, the prop sanitiser and the coalescer with no JS
 host writes a shell over it. Two copies of those rules would have been two copies of a security
 decision. The coalescer's tick is the renderer's here and `requestAnimationFrame` there.
 
+### Reserved regions
+
+A pane that reserved a `pane.footer` or a `pane.aside` is wrapped by the frame registry, and until the
+wrapper became a seam that wrapper was the DOM's: a `div` around an `aside` holding a `PanelGrid` sized
+in pixels. Registering such a pane here handed the reconciler a `div` and it refused, so the pane threw
+rather than drawing — the same failure the descriptor rail list had, and the same fix.
+`client-core/host/chrome/extendedPane.ts` is the seam, `apps/tui/src/plugins/ExtendedPane.tsx` is this
+host's answer, and `App.tsx` installs it beside `setLayouts`, `setRemoteTree` and `setSourcePanel`. It
+draws the reserved regions under the owner's own tree in reading order: a terminal pane is one
+rectangle, and there is no second column for an aside and no row to spare for a strip that is empty
+most of the time.
+
 ### Custody
 
 There is no helper process to hash bytes, so the TUI implements `PluginCustody` over files
@@ -845,8 +857,40 @@ the UI, which the desktop does not, and it holds it in a file with real modes, w
 
 ## What a plugin loses here
 
-Nothing, from the plugin author's side: a plugin writes no terminal UI, declares no `tui` surface, and
-learns nothing about the host. What a *reader* loses is one row per plugin in
+A plugin writes no terminal UI, declares no `tui` surface, and learns nothing about the host. What
+crosses is decided here, and the table below is the whole of it: one row per cooperative extension
+kind and per host UI slot, what the desktop does with it, what this host does, and where the answer
+lives.
+
+| Kind or slot | Desktop | Terminal | Where the answer lives |
+| --- | --- | --- | --- |
+| `rows` (`pane.footer`) | A strip of rows under the pane's frame | A `Rows` collection at the end of the pane, one per contributor, headed by its label and the contributing plugin's id | `apps/tui/src/kit/host.tsx` § `ExtensionRows`, drawn by `apps/tui/src/plugins/ExtendedPane.tsx` |
+| `annotation` | Marks inside the diff row, under the code | The same marks on the line below the code, indented past the gutter | `apps/tui/src/kit/showing.tsx` § `AnnotatedDiffLine` |
+| `remote` (a `Slot`) | The contributor's tree, in the owner's surface | The same tree, in the same place, drawn from the same batch | `apps/tui/src/kit/host.tsx` § `Slot` |
+| `rectangle` (`pane.inline-*`) | Another plugin's iframe | One muted line naming the point | § Rectangles |
+| `hook` | Runs on the node | Runs on the node | Nothing to draw on either host |
+| `pane.aside` | A dashboard grid the user composed, beside the pane | One muted line naming the point | [future/dashboards/README.md](./future/dashboards/README.md) |
+| `rail.taskList` (exclusive slot) | The replacement draws in place of core's list | The same, through the same arbitration | `apps/tui/src/chrome/slot.tsx` |
+| `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [future/client-plugins/04-replaceable-surfaces.md](./future/client-plugins/04-replaceable-surfaces.md) |
+
+The last row costs five first-party registrations: github's pull-file palette, the editor's file
+palette and onboarding's first-run screen all take `overlay`; the terminal plugin takes `drawer`; and
+docker takes `task.footer`. The terminal's overlays are a fixed set the shell draws and its drawer is
+the rail, so giving a plugin those places is a contract for both hosts rather than a component for
+this one.
+
+**A contribution is as reachable as the nodes it draws.** A contributor that draws a `Button` inside a
+`Slot` is a stop, reached with `↓` from the strip above it and pressed with Enter, inside the region
+its host registered. A contributor that draws only `Text` is not a stop, and `↓` walks past it. The
+kit decides which is which, on both hosts, and a plugin cannot say otherwise (`focusRoles.ts`).
+
+**A plugin's own chord is pressed with Ctrl here.** A manifest chord is `meta+ctrl+alt+shift+key` and
+`meta` is the platform command key, which a terminal emulator keeps for itself. The command layer
+rewrites the leading `super` to `ctrl` for every chord (§ Keys and focus), so a plugin that declared
+`meta+shift+p` is pressed as Ctrl+Shift+P, and one that declared `meta+ctrl+alt+shift+d` is pressed as
+Ctrl+Option+Shift+D. Nothing in the manifest changes.
+
+What a *reader* loses beyond that is one row per plugin in
 [first-party-plugins.md](./first-party-plugins.md) § What each of these loses in a terminal, and it is
 short. The whole workspace crosses except three rectangles, and the rectangle that defines an agent
 workspace, the PTY, is the one a terminal does best.

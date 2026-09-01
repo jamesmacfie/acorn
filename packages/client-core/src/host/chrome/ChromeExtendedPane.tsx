@@ -1,28 +1,18 @@
-import { Show, type JSX } from 'solid-js'
+import { Show } from 'solid-js'
 import PanelGrid from '../../features/dashboards/PanelGrid'
-import { regionScope, type PanelRegion } from '../../features/dashboards/region'
+import { regionScope } from '../../features/dashboards/region'
 import ExtensionPointHost from './ExtensionPointHost'
 import { InlineSlot } from '../frames/InlineSlot'
+import type { ExtendedPaneProps } from './extendedPane'
 import './extension-points.css'
 
 // A pane whose owner reserved part of its rectangle for somebody else, drawn as `pane.footer` and
 // `pane.aside` extension points (docs/plugins.md § Cooperative extension points). The host draws both
 // regions; the owner's layout only reserves them, and needs no `layout` template entry for it.
-export default function ExtendedPane(props: {
-  /** The qualified point id of a `pane.footer`, when this pane reserved one. */
-  footerPointId?: string
-  /** The reserved `pane.aside`: its qualified point id, which is also the placement's owner id, and
-   *  the owner's declared constraints. */
-  aside?: { pointId: string; region: PanelRegion }
-  /** The reserved `pane.inline-below` and `pane.inline-beside` rectangles, each holding another
-   *  plugin's iframe (./InlineSlot.tsx). Two names rather than one plus an orientation, because the
-   *  position is a property of the location the owner declared. */
-  inlineBelowPointId?: string
-  inlineBesidePointId?: string
-  taskId?: string
-  projectId?: string | null
-  children: JSX.Element
-}) {
+//
+// The DOM's answer to `chrome/extendedPane.ts`, which is the seam the terminal supplies its own
+// through. The props are that module's, so the two hosts cannot drift.
+export default function ExtendedPane(props: ExtendedPaneProps) {
   const scope = () => ({
     ...(props.taskId ? { taskId: props.taskId } : {}),
     ...(props.projectId ? { projectId: props.projectId } : {}),

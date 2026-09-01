@@ -11,6 +11,7 @@ import { commandRegistry } from '../registries/commands/commands'
 import { pluginProjectRoutePrefix } from '../registries/commands/corePaths'
 import { keybindingRegistry } from '../registries/commands/keybindings'
 import { paneRegistry } from '../registries/panes/panes'
+import { suppliedExtendedPane } from '../chrome/extendedPane'
 import { suppliedLayout } from '../layouts/table'
 import { suppliedRemoteTree } from '../tree/table'
 import { projectImporterRegistry } from '../registries/sources/projectImporters'
@@ -71,7 +72,7 @@ const PluginRefPanel = lazy(() => import('./PluginRefPanel'))
 const PluginOverlay = lazy(() => import('./PluginOverlay'))
 // The pane wrapper for an owner that reserved a strip for other plugins' rows. Only reached by a
 // manifest that declared a point: a pane with no point renders the bare frame.
-const ExtendedPane = lazy(() => import('../chrome/ExtendedPane'))
+const DomExtendedPane = lazy(() => import('../chrome/ChromeExtendedPane'))
 // The tree path's mount point, the counterpart to PluginFrame above: a region, a panel body or a slot
 // drawn from the host's own components rather than from the plugin's pixels
 // (docs/plugins.md § The tree contract).
@@ -374,7 +375,10 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
             // aside column belong to the pane rather than to whatever fills it.
             const frame = paneDraw(() => ({ taskId: props.task.id, projectId: props.task.projectId ?? undefined }))
             if (!pointId && !aside && !inlineBelow && !inlineBeside) return frame
-            return createComponent(ExtendedPane, {
+            // The host seam, for the same reason the layout table and the remote tree are seams:
+            // the DOM's wrapper is a `div` and an `aside` and would be handed to whatever reconciler
+            // this host runs (../chrome/extendedPane.ts).
+            return createComponent(suppliedExtendedPane() ?? DomExtendedPane, {
               ...(pointId ? { footerPointId: pointId } : {}),
               ...(aside ? { aside } : {}),
               ...(inlineBelow ? { inlineBelowPointId: inlineBelow } : {}),
