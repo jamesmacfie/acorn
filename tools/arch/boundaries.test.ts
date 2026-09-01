@@ -774,6 +774,23 @@ describe('architecture boundaries', () => {
     expect(importers).toContain('apps/tui/src/platform.ts')
   })
 
+  it('the terminal focus store knows the keyboard and not the screen', () => {
+    // `apps/tui/src/keys/` is the keyboard's: five levels, one settle pass, and no idea which region
+    // is the rail (docs/tui.md § Focus regions). Everything the shell knows about its own
+    // arrangement arrives through `setTopology` and `setPaneCycler`, installed from `chrome/Shell.tsx`.
+    // An import the other way is how `moveBack` came to find Browse by spelling its id.
+    const reaching = EDGES
+      .filter((e) => e.fromPkg.name === '@acorn/tui' && !isTestCode(e.fromFile))
+      .filter((e) => /\/src\/keys\//.test(e.fromFile))
+      .filter((e) => e.target.pkg?.name === '@acorn/tui')
+      .filter((e) => !!e.target.file && /\/src\/(chrome|kit)\//.test(e.target.file))
+      .map((e) => `${rel(e.fromFile)} => ${rel(e.target.file!)}`)
+    expect([...new Set(reaching)].sort()).toEqual([])
+    // Anti-vacuity: the scan must still be seeing this package's key modules at all.
+    const scanned = EDGES.filter((e) => e.fromPkg.name === '@acorn/tui' && /\/src\/keys\//.test(e.fromFile))
+    expect(scanned.length).toBeGreaterThan(5)
+  })
+
   it('client code never imports node code, and vice versa', () => {
     const crossed = firstParty
       .filter((e) => !e.isTest)

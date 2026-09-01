@@ -16,7 +16,7 @@
 // collection per `Rows`, keyed by the collection's own id, which is what the host store has always
 // been keyed by (client-core/kit/keys/collectionState.ts).
 
-import { createEffect, onCleanup } from 'solid-js'
+import { onCleanup } from 'solid-js'
 import type { Renderable } from '@opentui/core'
 import { _resetCollectionState } from '@acorn/client-core/kit/keys/collectionState.ts'
 import {
@@ -24,8 +24,7 @@ import {
 } from '@acorn/client-core/kit/keys/collectionIntents.ts'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import {
-  activationEntersMain, claimIfProvisional, focusedRenderable, markItem, moveColumn, noteFocus,
-  replaceFocusable,
+  activationEntersMain, focusedRenderable, markItem, moveColumn, noteFocus, scheduleSettle,
 } from './regions'
 
 /**
@@ -94,15 +93,15 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
         const previous = boxes.get(key)
         boxes.set(key, box)
         // A row, so a region opening on this pane lands on the list rather than on the filter above
-        // it (./regions.ts § firstStop).
+        // it (./regions.ts § entryStop).
         // Browse opts into picking when its region is entered. Hand it the collection's ordinary
         // move rather than a second selection path, so select-on-move remains the one rule.
         markItem(box, () => keys.goTo(key), `${options.id()}\u0000${key}`)
         // Solid keys rows by their data-object reference, while collection state keys them by this
-        // logical key. A refresh may therefore redraw the same row as a new renderable. Advance live
-        // focus only when this collection replaced its own row; the region-wide identity registry
-        // remains responsible for restoring the logical item when a whole collection remounts.
-        replaceFocusable(previous, box)
+        // logical key. A refresh may therefore redraw the same row as a new renderable, and the
+        // renderer's focus goes with the one it destroyed. The settle pass re-lands on the same
+        // logical row, because the identity registry now points at this box.
+        if (previous && previous !== box) scheduleSettle()
         onCleanup(() => { if (boxes.get(key) === box) boxes.delete(key) })
       },
       press: (run) => {
@@ -122,36 +121,6 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       // Layer 40, focus-within on the collection, exactly as on the desktop (client-core
       // host/keys/install.ts § the four tiers). Priority decides, not locality.
       onCleanup(registerIntentLayer(box, COLLECTION_INTENTS, keys.handle))
-      // A region's contents are `lazy` and its rows come from a query, so a pane opens before its list
-      // exists and the region lands the keys on its own box for want of anything better. This is the
-      // list arriving and taking them off it (./regions.ts § claimIfProvisional).
-      //
-      // An effect on the items rather than a one-shot, because "the list exists" happens when the
-      // response does, which is several frames after the container. It re-runs when the list is
-      // rebuilt and claims nothing once something real has the keys, so a second list on the same
-      // screen does not steal them. The microtask is because the rows are mounted by the render that
-      // gave us the container.
-      createEffect(() => {
-        if (!options.items().length) return
-        queueMicrotask(() => {
-          const key = keys.active()
-          if (!key) return
-          const box = boxes.get(key)
-          if (!box) return
-          // …and this is the other thing that effect has to catch: the rebuild took the keys with it.
-          // `Rows` draws through `<For>`, which is keyed by reference, and a pane's items are a fresh
-          // array on every render — so any refetch destroys the row focus was on, the renderer's focus
-          // goes with it, and on a host with no pointer there is no way to put it back. Re-land on the
-          // same key, which is the row the reader was on.
-          const holder = focusedRenderable()
-          if (holder?.isDestroyed) {
-            box.focus()
-            noteFocus(box)
-            return
-          }
-          claimIfProvisional(box)
-        })
-      })
     },
   }
 }

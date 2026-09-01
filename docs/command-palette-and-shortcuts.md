@@ -118,27 +118,13 @@ panes, and each group remembers the node focus was last on, so coming back lands
 `client-core/host/keys/focusRegions.ts` holds that, writes `focusedPane`, and emits `runtime:focus-changed`
 with the task, pane and region.
 
-The terminal keeps the contract and replaces the mechanism, in `apps/tui/src/keys/regions.ts`: a
-layout registers each region with the order it draws it rather than having it derived from document
-position, a region's first stop is found by walking the retained renderable tree, and focus is the
-renderer's. Two rules are the terminal's own, and both are about a host with no pointer. A pane opens
-with the keys already somewhere, because there is no click to put them there. And a region opens on
-its list where it has one, rather than on the first field above it: on the desktop a reader clicks
-what they meant, and here the first thing focused is the thing the bare keys drive, so landing in a
-filter box would mean `j` types a `j`.
-
-Two more are the terminal's own and both come from drawing one pane. The cycle is the whole screen
-rather than the focused pane — rail, pane strip, the pane's own regions, and back — because there is no
-second pane to be surprised by, and the chrome joins it by declaring orders outside the range a layout
-uses. The pane chord first crosses the spatial rail/main edge, then cycles the one task-pane strip when
-there is no column left in that direction. Activating a Menu, Browse or Tasks row with Enter performs
-the row's normal action and then enters the main column. A structural tab strip is a parent stop:
-Left/Right chooses, Down enters the selected panel, Escape from a child returns to the strip, and
-Escape from a source strip returns specifically to Browse. In-content filter tabs remain ordinary
-controls and do not displace a region's row collection as its entry stop. Overlays and entered PTYs
-retain first refusal. And Tab is `nextRegion` there, beside F6: the browser owns Tab and a terminal
-does not, and a reader in one presses it first. The intent is the shared one and `intentKeys` is still
-the table; a host adding a key to an intent it already has is what a per-host key table is for.
+The terminal keeps the contract and replaces the mechanism, and
+[tui.md](./tui.md) § Focus regions owns the whole of how: five levels, a shell-installed topology, and
+one settle pass. Two things there belong to this table rather than to that one. Tab is `nextRegion`
+on that host, beside F6, because the browser owns Tab and a terminal does not, and a reader in one
+presses it first; the intent is the shared one and `intentKeys` is still the table, and a host adding
+a key to an intent it already has is what a per-host key table is for. And overlays and entered PTYs
+retain first refusal there as everywhere.
 
 **Collection state is the host's.** A run of `Row`s inside a `Rows`, a tab strip, a menu, a chip row,
 a segmented control, a timeline and a grid are all one collection with roving focus inside, and the

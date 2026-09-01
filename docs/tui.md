@@ -435,18 +435,61 @@ different keyboard.
 
 ### Focus regions
 
-`apps/tui/src/keys/regions.ts` keeps the DOM host's contract and replaces every mechanism in it. A
-region is registered by its layout with its id and its order, from the layout's own knowledge of its
-regions rather than from `compareDocumentPosition`. A region's first stop is the first renderable in
-its subtree whose focus role is `stop`, `item`, `collection` or `trap`, walked over OpenTUI's retained
-tree. Focus is OpenTUI's focus, and the renderer owns it. OpenTUI focuses mouse targets itself, while
-the viewport receiving the click mirrors that result into Acorn's region bookkeeping because there
-is no DOM `focusin` event to do it.
+`apps/tui/src/keys/regions.ts` keeps the DOM host's contract and replaces every mechanism in it. It
+describes five levels and nothing else:
 
-A region with nothing in it yet lands the keys on its own frame, and that landing is never
-remembered: the list that arrives a moment later is what the next walk into the region finds. Without
-that rule a reader who looked into Browse before choosing a source came back to a lit border, no
-caret, and arrows that did nothing, for the rest of the run.
+```text
+Screen
+└─ Column           rail | main                                    right/left cross, no wrap
+   └─ Region        Menu, Browse, Tasks, the pane strip, a layout's own regions   Tab cycles them
+      └─ Parent stop   a strip that owns panels                    Down enters, Escape returns
+         └─ Stop    a row, a control, a viewport holding no other stop
+```
+
+A region is registered by its layout with its id and its order, from the layout's own knowledge of
+its regions rather than from `compareDocumentPosition`. Focus is OpenTUI's focus and the renderer owns
+it. OpenTUI focuses mouse targets itself, and the viewport receiving the click mirrors that result
+into the region bookkeeping, because there is no DOM `focusin` event to do it.
+
+Entering a region lands on its first parent stop, else its first collection row, else its first stop,
+else the region's own frame, walking OpenTUI's retained tree depth first. The middle step is this
+host's own: on the desktop a reader arrives with a pointer and clicks what they meant, and here the
+first thing focused is the thing the bare keys drive, so landing in a filter box would mean `j` types
+a `j`. A landing on the frame is never remembered — the list that arrives a moment later is what the
+next walk into the region finds. Without that rule a reader who looked into Browse before choosing a
+source came back to a lit border, no caret, and arrows that did nothing, for the rest of the run.
+
+**A parent stop owns panels.** `markParent(node, panels)` marks one, where `panels()` returns the
+boxes whose subtrees it owns. From outside it is one stop: `left`/`h` and `right`/`l` walk it without
+wrapping and an edge is a wall rather than an implicit trip to the rail, `down`/`j` enters the panel
+it is showing, and Escape from anything inside that panel returns to it. `Sections` and the `tabs`
+layout hand their panels over. A strip that owns none, such as GitHub's Open/Closed pull filter, is an
+ordinary control, so Browse still opens on its rows and Up/Down reaches the collection. The strip is a
+sibling of its panels rather than an ancestor, so walking up from a control never reaches it: the
+panel box is what the walk reaches, and the panels list is the edge that carries the rest of the way.
+
+**One deferred decision.** A focus decision that needs a renderable the current render has not
+produced yet waits in `settleFocus`, queued at most once per turn by `scheduleSettle`. It runs five
+steps in order: re-enter a region whose focused row was destroyed, by the row's logical identity;
+open the screen if nothing holds the keys; take the keys off a region that was only holding them for
+want of anything better; land in an overlay that opened or restore what one gave back; then reveal
+the focused stop in every viewport around it. A microtask rather than a frame event, because a test
+renderer under `flush()` may render several times before a frame, while Solid commits synchronously
+and every renderable of the current render exists at the end of the current task.
+
+There were six of these and each was a correct fix for a real bug. Together they were a state machine
+nobody had written down, and the class of bug they produced was always the same: two of them ran in an
+order the author had not pictured, and the reader got a lit frame with no caret or a caret on a
+destroyed row. `apps/tui/src/invariants.test.ts` holds the folder to one `queueMicrotask` and the kit
+to none.
+
+**The shell installs what the keys cannot know.** `setTopology` takes three answers and
+`setPaneCycler` takes a fourth, both from `chrome/Shell.tsx`: where Escape goes from the top of a
+region, which region takes the keys when the screen first has any, which regions a first crossing into
+a column passes over, and what "the next pane" means when only one is drawn. No chrome id is spelled in
+the keys module. It used to find Browse by comparing its id to a string, and the pane strip by
+comparing another, which is how a module whose own header forbids reaching into the shell came to
+depend on it anyway.
 
 The region cycle is the whole screen rather than the focused pane: the registered rail panels, the
 pane strip while a task makes it visible, the pane's own regions, and back. Browse keeps its frame for
@@ -458,17 +501,15 @@ rail/main edge in its direction; once focus is already in main and there is no f
 switches which task pane is drawn.
 
 Regions also declare one of two columns. Menu, Browse and Tasks are `rail`; the pane strip and every
-layout/source region default to `main`. A bubbled `expand` (`right`/`l`) moves rail → main, and a
-bubbled `collapse` (`left`/`h`) moves main → rail, restoring the last group used in the destination
-column and never wrapping. Collections and layouts keep first refusal: a tree that can expand or a
-narrow `list-detail` that can switch groups consumes the intent before the region tier. `Sections`
-is a structural parent stop: `left`/`h` and `right`/`l` walk its strip without wrapping, and an edge
-is a wall rather than an implicit trip to the rail. `down`/`j` enters the selected panel. Escape from
-its content returns to the strip; Escape from the strip returns specifically to Browse for a source
-detail, not whichever rail panel happened to be visited last. An ordinary tab control inside a list,
-such as GitHub's Open/Closed filter, remains a control but is not a structural parent: Browse still
-opens on its rows, so Up/Down reaches the collection. Spatial movement is disabled while an input
-owns the keys.
+layout or source region default to `main`. A bubbled `expand` (`right`/`l`) moves rail to main, and a
+bubbled `collapse` (`left`/`h`) moves main to rail, restoring the last group used in the destination
+column and never wrapping. A first crossing into main passes over the pane strip and enters the pane
+itself, because the strip is a line above the pane rather than a place to work. Collections and
+layouts keep first refusal: a tree that can expand, or a narrow `list-detail` that can switch groups,
+consumes the intent before the region tier. Escape from a source detail returns specifically to
+Browse, and from a task pane to the pane strip, because the shell says so rather than because
+something remembers the last rail panel visited. Spatial movement is disabled while an input owns the
+keys.
 
 ### Collections
 

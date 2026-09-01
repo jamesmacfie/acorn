@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
-import { Show } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
+import { createSignal, Show } from 'solid-js'
+import type { BoxRenderable, Renderable } from '@opentui/core'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
 import { layoutState } from '@acorn/client-core/host/layouts/state.ts'
 import { Tabs as TabStrip } from '../kit/grouping'
@@ -27,6 +27,9 @@ export function Tabs(props: LayoutProps) {
   // Falls back rather than storing a default, so a pane whose tab set changes under a stored id lands
   // on its first tab instead of on nothing.
   const active = () => (tabs().some((tab) => tab.id === selected()) ? selected() : tabs()[0]?.id ?? '')
+  // The panel is a region of its own here, unlike a `Sections` panel, so the strip owns one box and
+  // that box is where Down lands and where Escape climbs from (../keys/regions.ts § markParent).
+  const [panel, setPanel] = createSignal<Renderable>()
 
   return (
     <box
@@ -46,14 +49,21 @@ export function Tabs(props: LayoutProps) {
         })), 30)
       }}
     >
-      <TabStrip tabs={tabs()} active={active()} onChange={setSelected} idPrefix={props.stateKey} ariaLabel={props.label} entry />
+      <TabStrip
+        tabs={tabs()}
+        active={active()}
+        onChange={setSelected}
+        idPrefix={props.stateKey}
+        ariaLabel={props.label}
+        panels={() => { const box = panel(); return box ? [box] : [] }}
+      />
       <Show when={active()}>
         {(id) => (
           <Panel
             grow
             scroll
             title={tabs().find((tab) => tab.id === id())?.label}
-            onBox={regionFocus({ paneId: props.stateKey, regionId: 'panel' }, 1)}
+            onBox={(box) => { setPanel(box); regionFocus({ paneId: props.stateKey, regionId: 'panel' }, 1)(box) }}
           >
             {props.regions[`panel:${id()}`]?.()}
           </Panel>
