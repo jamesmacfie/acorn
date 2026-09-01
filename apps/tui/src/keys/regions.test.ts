@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Renderable } from '@opentui/core'
-import { _resetRegions, focusedRenderable, markItem, moveRegion, registerRegion } from './regions'
+import {
+  _resetRegions, claimIfProvisional, focusedRenderable, markItem, moveColumn, moveRegion,
+  registerRegion,
+} from './regions'
 
 // Fakes rather than a rendered shell, because what is under test is bookkeeping: which node a region
 // hands the keys to when you walk into it. The real thing is exercised end to end in ../browse.test.tsx.
@@ -35,5 +38,64 @@ describe('moveRegion', () => {
     markItem(row)
     moveRegion(1)
     expect(focusedRenderable()).toBe(row)
+  })
+
+  it('selects a row when entering an opted-in region, including after a late mount', () => {
+    const menu = node()
+    const rows: Renderable[] = []
+    const browse = node(rows)
+    const main = node()
+    let picked = 0
+    registerRegion(menu, { paneId: 'chrome', regionId: 'menu' }, -130, { column: 'rail' })
+    registerRegion(
+      browse,
+      { paneId: 'chrome', regionId: 'browse' },
+      -120,
+      { column: 'rail', pickOnEnter: true },
+    )
+    registerRegion(main, { paneId: 'chrome', regionId: 'source' }, 0)
+
+    // Browse opens before its query has produced a row, so its frame provisionally holds focus.
+    moveRegion(1)
+    expect(focusedRenderable()).toBe(browse)
+
+    const row = node()
+    row.parent = browse
+    rows.push(row)
+    markItem(row, () => { picked += 1 })
+    expect(claimIfProvisional(row)).toBe(true)
+    expect(focusedRenderable()).toBe(row)
+    expect(picked).toBe(1)
+
+    // Leaving and coming home restores and selects the remembered row through the same handler.
+    expect(moveColumn(1)).toBe(true)
+    expect(focusedRenderable()).toBe(main)
+    expect(moveColumn(-1)).toBe(true)
+    expect(focusedRenderable()).toBe(row)
+    expect(picked).toBe(2)
+  })
+
+  it('moves between declared columns without wrapping', () => {
+    const menu = node()
+    const railRow = node()
+    const rail = node([railRow])
+    railRow.parent = rail
+    const mainRow = node()
+    const main = node([mainRow])
+    mainRow.parent = main
+    markItem(railRow)
+    markItem(mainRow)
+    registerRegion(menu, { paneId: 'chrome', regionId: 'menu' }, -130, { column: 'rail' })
+    registerRegion(rail, { paneId: 'chrome', regionId: 'browse' }, -120, { column: 'rail' })
+    registerRegion(main, { paneId: 'chrome', regionId: 'source' }, 0)
+
+    moveRegion(1)
+    expect(focusedRenderable()).toBe(railRow)
+    expect(moveColumn(-1)).toBe(false)
+    expect(moveColumn(1)).toBe(true)
+    expect(focusedRenderable()).toBe(mainRow)
+    expect(moveColumn(1)).toBe(false)
+    expect(moveColumn(-1)).toBe(true)
+    expect(focusedRenderable()).toBe(railRow)
   })
 })

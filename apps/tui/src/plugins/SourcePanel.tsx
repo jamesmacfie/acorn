@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { createMemo, Show } from 'solid-js'
+import { createMemo, createSignal, Show } from 'solid-js'
 import { Dynamic } from '@opentui/solid'
 import { useNavigate, useParams } from '@solidjs/router'
 import type { PluginRailItem, PluginSourceDescriptor } from '@acorn/protocol/api.ts'
@@ -151,10 +151,47 @@ function SourceDetail(props: { descriptor: PluginSourceDescriptor }) {
   )
 }
 
-/** What the chrome registry asks this host for, once per descriptor source. */
-export const sourcePanel = (input: { pluginId: string; descriptor: PluginSourceDescriptor }): SourcePanel => ({
-  regions: {
-    list: () => <SourceList pluginId={input.pluginId} descriptor={input.descriptor} />,
-    detail: () => <SourceDetail descriptor={input.descriptor} />,
-  },
-})
+type SourcePanelInput = { pluginId: string; descriptor: PluginSourceDescriptor }
+
+type CachedSourcePanel = {
+  panel: SourcePanel
+  update: (input: SourcePanelInput) => void
+}
+
+// Chrome contributions are rebuilt when distribution, trust, or the node's plugin roster changes.
+// SourceContribution treats region functions as component identities, so minting new closures on
+// every rebuild remounted both halves and discarded their caret, window, and query subscriptions.
+// Descriptor identity is stable within one plugin; current descriptor data stays reactive beneath
+// the stable functions.
+const panels = new Map<string, CachedSourcePanel>()
+
+const createSourcePanel = (input: SourcePanelInput): CachedSourcePanel => {
+  const [current, setCurrent] = createSignal(input)
+  return {
+    panel: {
+      regions: {
+        list: () => (
+          <SourceList
+            pluginId={current().pluginId}
+            descriptor={current().descriptor}
+          />
+        ),
+        detail: () => <SourceDetail descriptor={current().descriptor} />,
+      },
+    },
+    update: setCurrent,
+  }
+}
+
+/** What the chrome registry asks this host for, keyed so a descriptor refresh updates in place. */
+export const sourcePanel = (input: SourcePanelInput): SourcePanel => {
+  const key = `${input.pluginId}\0${input.descriptor.id}`
+  const cached = panels.get(key)
+  if (cached) {
+    cached.update(input)
+    return cached.panel
+  }
+  const created = createSourcePanel(input)
+  panels.set(key, created)
+  return created.panel
+}

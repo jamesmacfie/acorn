@@ -491,9 +491,9 @@ const MAIN_COLUMN_AT = 120
  *  is the same collapse `ListDetail` makes at its own width.
  *
  *  `h` and `l` walk the strip, on the pane's own key tier, focus-within — so they work from inside
- *  whatever the current tab drew, and a collection that wants them for a tree answers first and this
- *  never sees them (../keys/install.ts § the four tiers). The strip is drawn whether or not the keys
- *  are in it, because a strip nobody can see is a strip nobody presses `l` at. */
+ *  whatever the current tab drew. At the strip's edges they yield to the region tier, which moves
+ *  between the main pane and the rail (../keys/install.ts). The strip is drawn whether or not the
+ *  keys are in it, because a strip nobody can see is a strip nobody presses `l` at. */
 export function Sections(props: {
   id: string
   ariaLabel?: string
@@ -517,7 +517,9 @@ export function Sections(props: {
     const all = tabs()
     if (all.length < 2) return false
     const at = all.findIndex((tab) => tab.id === active())
-    setChosen(all[(at + delta + all.length) % all.length].id)
+    const next = at + delta
+    if (next < 0 || next >= all.length) return false
+    setChosen(all[next].id)
     return true
   }
 

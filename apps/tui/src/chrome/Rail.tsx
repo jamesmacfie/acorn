@@ -117,7 +117,11 @@ export function Rail(props: { model: ShellModel; cells: number }) {
 
   return (
     <box flexDirection="column" width={props.cells} flexShrink={0}>
-      <Panel title="Menu" rows={MENU_ROWS} onBox={regionFocus({ paneId: 'chrome', regionId: 'menu' }, MENU_ORDER)}>
+      <Panel
+        title="Menu"
+        rows={MENU_ROWS}
+        onBox={regionFocus({ paneId: 'chrome', regionId: 'menu' }, MENU_ORDER, { column: 'rail' })}
+      >
         <Show when={sources().length} fallback={<Line role="muted">No sources here.</Line>}>
           <Rows
             virtual
@@ -137,22 +141,48 @@ export function Rail(props: { model: ShellModel; cells: number }) {
       {/* The chosen source's own list, drawn here rather than in the surface it belongs to. A source
           that has not declared regions keeps its whole surface in the main panel and this panel says
           so, which is the honest answer and not an error. */}
-      <Panel title="Browse" grow onBox={regionFocus({ paneId: 'chrome', regionId: 'browse' }, BROWSE_ORDER)}>
-        {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this panel
-            draws for each of those rather than the blank frame both used to leave (../panel.tsx). */}
-        <PanelBody>
-          <Show when={source()?.regions?.list} fallback={
-            <Line role="muted">{source() ? 'Nothing to list here.' : 'Choose a source.'}</Line>
-          }>
-            {(list) => <Dynamic component={list()} />}
-          </Show>
-        </PanelBody>
+      <Panel title="Browse" grow>
+        <Show
+          when={source()?.regions?.list}
+          fallback={
+            <PanelBody>
+              <Line role="muted">{source() ? 'Nothing to list here.' : 'Choose a source.'}</Line>
+            </PanelBody>
+          }
+        >
+          {(list) => (
+            // Keep the frame in the layout for component-only sources, but only register a region
+            // around a list a reader can actually drive. The Show owns cleanup when that list goes.
+            <box
+              flexDirection="column"
+              flexGrow={1}
+              ref={regionFocus(
+                { paneId: 'chrome', regionId: 'browse' },
+                BROWSE_ORDER,
+                { column: 'rail', pickOnEnter: true },
+              )}
+            >
+              {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this
+                  panel draws for each of those rather than the blank frame both used to leave
+                  (../panel.tsx). */}
+              <PanelBody><Dynamic component={list()} /></PanelBody>
+            </box>
+          )}
+        </Show>
       </Panel>
       {/* The screen opens here. Menu is drawn first and would otherwise take the keys, and a reader
           arriving on a list where `j` swaps the whole screen has been handed the wrong thing first:
           acorn is a workspace of tasks, and the task is what the desktop opens on too
           (../keys/regions.ts § regionFocus). */}
-      <Panel title="Tasks" rows={TASKS_ROWS} onBox={regionFocus({ paneId: 'chrome', regionId: 'tasks' }, TASKS_ORDER, { opensHere: true })}>
+      <Panel
+        title="Tasks"
+        rows={TASKS_ROWS}
+        onBox={regionFocus(
+          { paneId: 'chrome', regionId: 'tasks' },
+          TASKS_ORDER,
+          { column: 'rail', opensHere: true },
+        )}
+      >
         <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} />} />
       </Panel>
     </box>

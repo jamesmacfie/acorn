@@ -85,7 +85,9 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
         boxes.set(key, box)
         // A row, so a region opening on this pane lands on the list rather than on the filter above
         // it (./regions.ts § firstStop).
-        markItem(box)
+        // Browse opts into picking when its region is entered. Hand it the collection's ordinary
+        // move rather than a second selection path, so select-on-move remains the one rule.
+        markItem(box, () => keys.goTo(key))
         onCleanup(() => { if (boxes.get(key) === box) boxes.delete(key) })
       },
       press: (run) => {

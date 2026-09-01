@@ -21,9 +21,21 @@ import { createSignal, onCleanup } from 'solid-js'
 import type { Renderable } from '@opentui/core'
 
 export type RegionRef = { paneId: string; regionId: string }
+export type RegionColumn = 'rail' | 'main'
+
+type RegionOptions = {
+  /** The column spatial left/right navigation treats this region as belonging to. */
+  column?: RegionColumn
+  /** This region takes the initial focus after every region has mounted. */
+  opensHere?: boolean
+  /** Landing on one of this region's rows also selects it. Browse is the sole caller. */
+  pickOnEnter?: boolean
+}
 
 type Group = RegionRef & {
   box: Renderable
+  column: RegionColumn
+  pickOnEnter: boolean
   /** Where this region drew in its layout, so the cycle walks the screen rather than mount order. */
   order: number
   /** What focus was last on inside this group, so re-entering restores rather than resets. */
@@ -31,6 +43,7 @@ type Group = RegionRef & {
 }
 
 const groups: Group[] = []
+const lastByColumn: Partial<Record<RegionColumn, Group>> = {}
 let focused: RegionRef | null = null
 // Whether the focused region is only holding the keys because it had nothing better when it opened.
 //
@@ -78,20 +91,27 @@ export const focusedRegion = (): RegionRef | null => focused
  *  strip, the pane's own regions (../chrome/Shell.tsx). */
 const ordered = (): Group[] => [...groups].sort((a, b) => a.order - b.order)
 
-export function registerRegion(box: Renderable, ref: RegionRef, order: number): () => void {
-  const group: Group = { ...ref, box, order }
+export function registerRegion(box: Renderable, ref: RegionRef, order: number, options: RegionOptions = {}): () => void {
+  const group: Group = {
+    ...ref,
+    box,
+    order,
+    column: options.column ?? 'main',
+    pickOnEnter: options.pickOnEnter ?? false,
+  }
   groups.push(group)
   return () => {
     const at = groups.indexOf(group)
     if (at >= 0) groups.splice(at, 1)
+    if (lastByColumn[group.column] === group) delete lastByColumn[group.column]
   }
 }
 
 /** The helper a layout calls in setup, where the DOM layout uses the `use:regionFocus` directive.
  *  There is no directive mechanism outside the DOM renderer, so this is a function and the layout
  *  calls it from the region box's `ref`. */
-export const regionFocus = (ref: RegionRef, order: number, options: { opensHere?: boolean } = {}) => (box: Renderable) => {
-  onCleanup(registerRegion(box, ref, order))
+export const regionFocus = (ref: RegionRef, order: number, options: RegionOptions = {}) => (box: Renderable) => {
+  onCleanup(registerRegion(box, ref, order, options))
   // Something has to have the keys when a pane opens, and on this host nothing else will decide: the
   // desktop lands focus with a click or a Tab and there is neither here. The first region to register
   // takes it, once its own children exist, which is a microtask later — unless a region has said the
@@ -124,15 +144,20 @@ export function noteFocus(node: Renderable): void {
   const group = regionOf(node)
   if (!group) return
   group.last = node
+  lastByColumn[group.column] = group
   focused = { paneId: group.paneId, regionId: group.regionId }
 }
 
 // Which renderables are a collection's rows. A region opens on its list where it has one, and this is
 // how a region tells a row from a field without asking the kit what node drew it.
 const items = new WeakSet<Renderable>()
+const itemPicks = new WeakMap<Renderable, () => void>()
 
 /** Called by a collection for each row it draws (./collection.ts). */
-export const markItem = (box: Renderable): void => { items.add(box) }
+export const markItem = (box: Renderable, pick?: () => void): void => {
+  items.add(box)
+  if (pick) itemPicks.set(box, pick)
+}
 
 const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable | undefined => {
   for (const child of box.getChildren()) {
@@ -175,7 +200,9 @@ const enter = (group: Group | undefined): boolean => {
   setFocusedNode(target)
   provisional = target === group.box
   group.last = target
+  lastByColumn[group.column] = group
   focused = { paneId: group.paneId, regionId: group.regionId }
+  if (group.pickOnEnter) itemPicks.get(target)?.()
   return true
 }
 
@@ -210,13 +237,14 @@ export function takeFocus(box: Renderable): void {
  *  that has them is only holding them for want of anything better. */
 export function claimIfProvisional(node: Renderable | undefined): boolean {
   if (!node) return false
+  const group = regionOf(node)
   if (focused) {
     if (!provisional) return false
-    const group = regionOf(node)
     if (!group || group.paneId !== focused.paneId || group.regionId !== focused.regionId) return false
   }
   node.focus()
   noteFocus(node)
+  if (group?.pickOnEnter) itemPicks.get(node)?.()
   return true
 }
 
@@ -237,7 +265,31 @@ export function moveRegion(delta: 1 | -1): boolean {
   const all = ordered()
   if (all.length < 2) return false
   const at = all.findIndex((group) => group.paneId === focused?.paneId && group.regionId === focused?.regionId)
+  // A conditional region can disappear while it holds focus (the task strip when a source opens,
+  // or Browse when a component-only source replaces a split source). Recover at the start of the
+  // cycle instead of treating the missing group as an imaginary item before it.
+  if (at < 0 && focused) return enter(all[0])
   return enter(all[(((at < 0 ? 0 : at) + delta) + all.length) % all.length])
+}
+
+/** Move between the rail and main columns without wrapping.
+ *
+ * The destination remembers the group last used in that column. On a first visit, main skips the
+ * pane strip and enters the first real content region; rail enters its first panel. */
+export function moveColumn(delta: 1 | -1): boolean {
+  const current = groups.find((group) =>
+    group.paneId === focused?.paneId && group.regionId === focused?.regionId)
+  if (!current) return false
+  if ((current.column === 'rail' && delta < 0) || (current.column === 'main' && delta > 0)) return false
+
+  const destination: RegionColumn = current.column === 'rail' ? 'main' : 'rail'
+  const remembered = lastByColumn[destination]
+  if (remembered && groups.includes(remembered)) return enter(remembered)
+
+  const all = ordered()
+  return enter(destination === 'main'
+    ? all.find((group) => group.column === 'main' && group.order >= 0)
+    : all.find((group) => group.column === 'rail'))
 }
 
 // What the shell does when there is no second pane mounted to move to. A terminal shows one pane at
@@ -261,6 +313,8 @@ export function movePane(delta: 1 | -1): boolean {
 /** Test seam. The list is module-level, so a suite must not inherit the previous one's regions. */
 export function _resetRegions(): void {
   groups.length = 0
+  delete lastByColumn.rail
+  delete lastByColumn.main
   focused = null
   provisional = false
   opened = false

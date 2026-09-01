@@ -307,7 +307,8 @@ destroying tick, so the zero-latency fixture passed every browse test while the 
 panels. `ACORN_FIXTURE_DELAY_MS` is how a test reaches the shape the app lives in. The same change
 retired the liveness guards that grew around the symptom — a destroyed edit buffer read from a live
 effect cannot happen any more, because an owner's effects are disposed before its nodes are
-destroyed.
+destroyed. The override matches `@opentui/solid`'s 0.5.9 lifecycle, so an OpenTUI upgrade must run
+`browseSlow.test.tsx` before removing or changing it.
 
 One residue on purpose: `main.tsx` deactivates OpenTUI's console overlay the way the harness always
 has, because a single stray library warning drawing over the frame reads as the whole app failing,
@@ -402,10 +403,22 @@ remembered: the list that arrives a moment later is what the next walk into the 
 that rule a reader who looked into Browse before choosing a source came back to a lit border, no
 caret, and arrows that did nothing, for the rest of the run.
 
-The region cycle is the whole screen rather than the focused pane: rail, pane strip, the pane's own
-regions, and back. The desktop draws several panes side by side and Tab into the next one would
-surprise; there is no next one here. The chrome orders itself around the pane by declaring orders
-outside the range a layout uses. `nextPane` switches which pane is drawn.
+The region cycle is the whole screen rather than the focused pane: the registered rail panels, the
+pane strip while a task makes it visible, the pane's own regions, and back. Browse keeps its frame for
+layout stability when a component-only source is selected, but registers no region without a list;
+neither it nor the absent strip becomes an empty Tab stop. The desktop draws several panes side by
+side and Tab into the next one would surprise; there is no next one here. The chrome orders itself
+around the pane by declaring orders outside the range a layout uses. `nextPane` switches which pane is
+drawn.
+
+Regions also declare one of two columns. Menu, Browse and Tasks are `rail`; the pane strip and every
+layout/source region default to `main`. A bubbled `expand` (`right`/`l`) moves rail → main, and a
+bubbled `collapse` (`left`/`h`) moves main → rail, restoring the last group used in the destination
+column and never wrapping. Collections and layouts keep first refusal: a tree that can expand or a
+narrow `list-detail` that can switch groups consumes the intent before the region tier. `Sections`
+walks its tab strip without wrapping and yields at its first/last edge, which is how `h` from a pull
+request's first section comes home to the same Browse row. Spatial movement is disabled while an
+input owns the keys.
 
 ### Collections
 
@@ -422,8 +435,11 @@ and a reader arrowing down a list of pull requests is asking to see them.
 
 Only `onSelect` fires on a move. `onActivate` still waits for Enter, so showing something is immediate
 and opening it stays deliberate, which is the split `pick` and activate already draw. A list that
-supplies no `onSelect` — the task list is one — gets nothing new. And arriving on a row is not a move,
-so tabbing into a list does not choose its first row on the way past.
+supplies no `onSelect` — the task list is one — gets nothing new. Arriving on a row is ordinarily not
+a move, so tabbing through Menu does not choose a source on the way past. Browse opts into one narrow
+exception at the region boundary: entering it runs the collection's ordinary `goTo` for the row it
+lands on, including when that row arrives after a query. That highlights and shows the first item
+without inventing a second selection path; re-entering the remembered row is idempotent.
 
 ### Traps
 
@@ -543,6 +559,12 @@ are omissions rather than gaps in the seam: the title filter, the create-task me
 dashboard panels beside the list. The filter is the one worth adding first, because a list of a
 hundred issues is a list nobody can page through.
 
+The source-panel factory is keyed by `(pluginId, descriptorId)`. Chrome contribution resyncs update a
+signal holding the current descriptor and return the same `regions.list` and `regions.detail`
+functions. `Dynamic` therefore updates labels and descriptor props in place instead of treating a
+roster/trust refresh as a new component and remounting the list, which would discard its caret,
+virtual window and query subscriptions.
+
 ### What is drawn bespoke
 
 The rail's task list goes through the same `rail.taskList` exclusive slot the desktop's does, so a
@@ -568,9 +590,9 @@ every plugin that calls it lands on a line above the footer. They never take foc
 ### Navigation
 
 `Tab` and `Shift+Tab` cycle regions, beside `F6`, which is what the DOM host spells the same intent
-because the browser owns Tab. The cycle reads down the screen and the chrome takes five places in it
-before a pane's own: Menu, Browse, Tasks, then the pane strip. In a list, `j` and `k` move and `Enter`
-opens.
+because the browser owns Tab. The cycle reads down the screen: Menu, Browse when it has a list,
+Tasks, the pane strip when a task is open, then the pane/source regions. `right`/`l` crosses from the
+rail to main and `left`/`h` comes back; neither wraps. In a list, `j` and `k` move and `Enter` opens.
 
 `w` switches workspace and `p` switches project, both through an overlay, because that is the shape
 that takes the keys off whatever had them. Neither restores what you were looking at: the desktop
@@ -580,6 +602,7 @@ command chord opens the palette from anywhere except an entered PTY.
 A pane opens with the keys already somewhere, because there is no click to put them there. And a
 region opens on its list where it has one rather than on the first field above it, because the first
 thing focused is the thing the bare keys drive and landing in a filter box means `j` types a `j`.
+Browse also selects the row it opens on; other regions only focus it.
 
 ## Loaded plugins
 
