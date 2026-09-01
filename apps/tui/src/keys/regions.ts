@@ -39,6 +39,12 @@ let focused: RegionRef | null = null
 // one, and the wrong one the moment a list arrives — so it is remembered rather than settled, and a
 // collection mounting into that region takes the keys off it (`claimIfProvisional`).
 let provisional = false
+// Whether the region that asked to be opened on has had its turn. A screen opens on the first region
+// to register, which is the first one drawn, and that is the right default everywhere except the
+// shell: the left column draws Menu, Browse and Tasks in that order, and a reader arriving on Menu
+// would find `j` swapping the whole screen before they had chosen anything. One region per screen
+// says `opensHere` and takes the keys off whichever got them first (../chrome/Rail.tsx).
+let opened = false
 // What has the keys, as a signal, because it is what a row draws its caret from: in a terminal the
 // caret is not decoration, it is where focus is. The renderer owns focus and has no signal for it, so
 // this is written here, at the one place that moves it.
@@ -46,6 +52,23 @@ const [focusedNode, setFocusedNode] = createSignal<Renderable | null>(null)
 
 /** The renderable that has the keys. */
 export const focusedRenderable = focusedNode
+
+/**
+ * Whether the keys are inside this box.
+ *
+ * The question a frame asks to draw itself as the active one. OpenTUI answers a version of it for
+ * free — `focusedBorderColor` fires when a box is focused or holds the focus — but only for a box
+ * that is itself `focusable`, and marking every frame focusable would put a stop in the cycle for
+ * every frame: `firstStop` walks children for anything focusable, so a region containing another
+ * frame would open on the frame instead of on the list inside it. Reading the signal and walking up
+ * costs a few parent hops and adds nothing to the cycle.
+ */
+export const focusWithin = (box: Renderable | undefined): boolean => {
+  const node = focusedNode()
+  if (!box || !node) return false
+  for (let at: Renderable | null = node; at; at = at.parent) if (at === box) return true
+  return false
+}
 
 /** Which region has focus, or null before anything in a layout has been focused. */
 export const focusedRegion = (): RegionRef | null => focused
@@ -67,15 +90,19 @@ export function registerRegion(box: Renderable, ref: RegionRef, order: number): 
 /** The helper a layout calls in setup, where the DOM layout uses the `use:regionFocus` directive.
  *  There is no directive mechanism outside the DOM renderer, so this is a function and the layout
  *  calls it from the region box's `ref`. */
-export const regionFocus = (ref: RegionRef, order: number) => (box: Renderable) => {
+export const regionFocus = (ref: RegionRef, order: number, options: { opensHere?: boolean } = {}) => (box: Renderable) => {
   onCleanup(registerRegion(box, ref, order))
   // Something has to have the keys when a pane opens, and on this host nothing else will decide: the
   // desktop lands focus with a click or a Tab and there is neither here. The first region to register
-  // takes it, once its own children exist, which is a microtask later.
+  // takes it, once its own children exist, which is a microtask later — unless a region has said the
+  // screen opens on it, in which case it takes them back. Both happen in the same microtask batch at
+  // boot, so there is no window where a reader could be typing into the one that loses.
   queueMicrotask(() => {
-    if (focused) return
     const group = groups.find((candidate) => candidate.box === box)
-    if (group) enter(group)
+    if (!group) return
+    if (focused && !(options.opensHere && !opened)) return
+    if (options.opensHere) opened = true
+    enter(group)
   })
 }
 
@@ -136,9 +163,13 @@ const enter = (group: Group | undefined): boolean => {
   // The region's own box is the last resort, as it is on the DOM: a region with nothing focusable in
   // it still has to be reachable, or the cycle has a hole and the layout's own chords — the group
   // switch, the split — have nothing to be focus-within of.
-  const target = (group.last && !group.last.isDestroyed ? group.last : undefined)
-    ?? firstStop(group.box)
-    ?? group.box
+  // A remembered target, unless what was remembered is the region's own box: that is the last resort
+  // below, taken when the region had nothing in it yet, and remembering it pins the keys to the frame
+  // for the rest of the run. A reader who looked into Browse before choosing a source came back to a
+  // lit border, no caret and dead arrows, because the list that arrived in between was never asked
+  // for (`claimIfProvisional` only fires while the region still holds the keys).
+  const remembered = group.last && !group.last.isDestroyed && group.last !== group.box ? group.last : undefined
+  const target = remembered ?? firstStop(group.box) ?? group.box
   if (target === group.box) group.box.focusable = true
   target.focus()
   setFocusedNode(target)
@@ -232,6 +263,7 @@ export function _resetRegions(): void {
   groups.length = 0
   focused = null
   provisional = false
+  opened = false
   cycler = null
   setFocusedNode(null)
 }

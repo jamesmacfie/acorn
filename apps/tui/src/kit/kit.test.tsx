@@ -1,4 +1,5 @@
 /** @jsxImportSource @opentui/solid */
+import { createSignal, type JSX } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import { NODE_SUPPORT } from '@acorn/client-core/kit/tokens/support.ts'
@@ -6,7 +7,8 @@ import { hasFfi } from '../ffi'
 import { renderCells, type Frame } from './render'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
-  ModalBody, Popover, Section, SectionHeader, SplitHandle, Stack, TabPanel, Tabs, Timeline, Toolbar,
+  ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
+  Toolbar,
   ToolbarSpacer,
 } from './grouping'
 import {
@@ -20,6 +22,7 @@ import {
   ToggleButton,
 } from './asking'
 import { Fallback, Only, Rectangle } from './pixels'
+import { Line } from './cells'
 import { _resetCollections } from '../keys/collection'
 
 // One case per kit node, asserting the sentence its row in docs/ui-design.md § Every node at 80 by 24
@@ -196,6 +199,32 @@ const CASES: Case[] = [
       const line = lineWith(frame, 'the list')
       expect(line).toContain('│')
       expect(line).toContain('the detail')
+    },
+  },
+  {
+    node: 'Sections',
+    draws: 'reduced: a strip of tabs over one panel, with main beside it while there is room',
+    render: () => (
+      <Sections
+        id="case"
+        ariaLabel="Sections"
+        header={{ id: 'summary', label: 'Summary', render: () => <Text>what it is about</Text> }}
+        sections={[
+          { id: 'one', label: 'One', count: 2, render: () => <Text>first section</Text> },
+          { id: 'two', label: 'Two', render: () => <Text>second section</Text> },
+        ]}
+        main={{ id: 'body', label: 'Body', render: () => <Text>the main region</Text> }}
+      />
+    ),
+    size: { width: 140, height: 8 },
+    check: (frame) => {
+      const strip = lineWith(frame, 'Summary')
+      expect(strip).toContain('One 2')
+      expect(strip).toContain('Two')
+      // The header is the tab that opens, and `main` keeps a column of its own at 140 cells.
+      const body = lineWith(frame, 'what it is about')
+      expect(body).toContain('the main region')
+      expect(lineWith(frame, 'first section')).toBe('')
     },
   },
   {
@@ -786,6 +815,51 @@ describe.skipIf(!hasFfi)('the kit in cells', () => {
     const frame = await renderCells(entry.render, entry.size)
     try {
       entry.check(frame)
+    } finally {
+      frame.done()
+    }
+  }, 20_000)
+
+  it('draws loose text wherever it lands, in every shape that has thrown', async () => {
+    // The class, not an instance. A run of text needs a `text` parent here and on the DOM a bare
+    // string anywhere is a text node nobody thinks about, so `<Stack>{count()}</Stack>` is correct kit
+    // that used to throw — out of `insertNode`, inside a signal write, which aborts the update pass
+    // and stops the screen following with nothing to say why.
+    //
+    // Every case below is one that reached a reader before `kit/reconciler.ts` answered it in one
+    // place. They stay together because what is being tested is the boundary, not the six components.
+    const [count, setCount] = createSignal(7)
+    const cases: [string, () => JSX.Element][] = [
+      ['loose text in a Stack', () => <Stack>hello</Stack>],
+      ['a dynamic string in a Stack', () => <Stack>{count()}</Stack>],
+      ['a node beside a dynamic string', () => <Line><Icon name="copy" />{count()}</Line>],
+      ['a node beside text in an Inline', () => <Inline><Icon name="copy" />{'x'}</Inline>],
+      ['an empty string in a Card', () => <Card>{''}</Card>],
+    ]
+    for (const [, render] of cases) {
+      _resetCollections()
+      const frame = await renderCells(render, { width: 20, height: 4 })
+      frame.done()
+    }
+    setCount(8)
+  }, 30_000)
+
+  it('draws a node beside a value that changes, and keeps drawing it when it does', async () => {
+    // The shape every element-typed prop and every mixed line is: one node and one dynamic string.
+    // Solid compiles the string half to an accessor, and `slot` used to hand that straight back — so
+    // the renderer inserted a bare string into a box, which is the one structure a cell host refuses.
+    // It threw from inside whatever signal had just moved, which on a row holding a count meant the
+    // whole update pass died and the screen stopped following (./cells.tsx § slot).
+    //
+    // Reactive, not just first paint: reading the accessor inside `slot` has to be a tracked read, or
+    // the fix trades a crash for a number that never changes.
+    _resetCollections()
+    const [count, setCount] = createSignal(7)
+    const frame = await renderCells(() => <Line><Icon name="copy" />{count()}</Line>, { width: 20, height: 3 })
+    try {
+      expect(frame.text).toContain('7')
+      setCount(8)
+      expect((await frame.frame()).text).toContain('8')
     } finally {
       frame.done()
     }

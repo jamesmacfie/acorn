@@ -63,7 +63,13 @@ describe.skipIf(!hasFfi)('every pane at 80 by 24', () => {
     expect(frame).toContain('Find why the old password still works')
     // `Row variant="stacked"` puts the subtitle on its own line here, as it does on the DOM. Drawing
     // both on one line ran the title into the model name with nothing between them.
-    expect(frame).toContain('claude · claude-opus-5 · idle')
+    //
+    // The state is off the end of it at this size and that is the pane behaving. The left column takes
+    // about a third of the shell, so at 80 the pane is 54 cells and a stacked row splits what is left
+    // with its own trailing actions — which leaves the subtitle 30. Written down rather than fixed,
+    // the same way the PR pane's folded navigator is: the row still says which session and which
+    // model, which is what the reader came for (../chrome/Rail.tsx § railCells).
+    expect(frame).toContain('claude · claude-opus-5')
   }, 60_000)
 
   it('github: the pull request, its state and its files', async () => {
@@ -126,20 +132,34 @@ describe.skipIf(!hasFfi)('every pane at 80 by 24', () => {
   it('agents: a session opens on a transcript, a tool card, an approval and a composer', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     // Tab to the session list, wherever the cycle starts, then open the row the caret is on.
-    for (let step = 0; step < 4; step += 1) {
+    //
+    // Two things this loop learned. The bound is the whole cycle and then some, because the shell puts
+    // three regions down the left before the pane strip and a fixed four presses stopped short — the
+    // `RETURN` then landed on the Menu and opened a browse source, which drew a blank pane and failed
+    // naming the wrong thing (../chrome/Rail.tsx).
+    //
+    // And what it waits for is the row's own title. `Find why…` is the *subtitle* of the first row, on
+    // the line below the caret's, so a loop looking for it never matched and fell through to whichever
+    // region it ended on. It passed anyway, on the region the fall-through happened to leave it in.
+    let found = false
+    for (let step = 0; step < 10 && !found; step += 1) {
       const caret = (await screen.frame()).split('\n').find((line) => line.includes('\u203a')) ?? ''
-      if (caret.includes('Find why')) break
-      await screen.press('TAB')
+      found = caret.includes('Write src/login.ts')
+      if (!found) await screen.press('TAB')
     }
+    expect(found).toBe(true)
     await screen.press('RETURN')
     const frame = await screen.frame()
     screen.done()
 
     drewCleanly(frame, 'agents')
     fitsIn(frame, 120)
-    // The transcript, as the reader's own words and the agent's answer.
-    expect(frame).toContain('Why does the old password still work after a reset?')
-    expect(frame).toContain('signIn still checks')
+    // The transcript, as the reader's own words and the agent's answer. Asserted to where the turn
+    // wraps: the left column takes about a third of the shell, so the detail column is 52 cells here
+    // and a message longer than that runs onto a second line — which is the transcript working, not
+    // failing (../chrome/Rail.tsx § railCells).
+    expect(frame).toContain('Why does the old password still work')
+    expect(frame).toContain('The reset writes a new hash but signIn still')
     // A tool card, folded.
     expect(frame).toContain('Read src/login.ts')
     // The approval, with both answers on it.

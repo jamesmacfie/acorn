@@ -45,6 +45,24 @@ export type SourceContribution<Item = unknown> = {
   // Core's Fleet home is the one user of it (docs/frontend.md § Registries and plugins).
   when?: () => boolean
   component?: Component
+  /**
+   * The surface as a list beside a detail, for a host that draws the two halves in different places.
+   *
+   * A source has always been one opaque component, and on the desktop that is fine: it draws its own
+   * `ListDetail` and the shell hands it the whole width. A terminal shell puts the list in a panel of
+   * its own down the left and the detail in the main panel, and it cannot reach inside a component to
+   * separate them — the `split` form of `ListDetail` takes both columns as `children`, so even the
+   * kit node does not know which of its children is which.
+   *
+   * So a source says it, in the same shape a pane already declares: `list-detail` with a `list` and a
+   * `detail` (@acorn/protocol/paneLayouts.ts). Both hosts read the same field and each draws it where
+   * it draws such things; the desktop's rendering is the `ListDetail` the source used to write by
+   * hand (./SourceSurface.tsx).
+   *
+   * Optional, and a source without it keeps every previous behaviour: `component` fills the surface
+   * and a terminal's list panel stays empty.
+   */
+  regions?: { list: Component; detail: Component }
   // The task origins this source creates, as origin id → Lucide glyph (features/tasks/origin.ts). A
   // source whose origin is its own id needs nothing here; github's rail is `github` and the tasks it
   // makes carry `github-pr`, so it says so.
@@ -105,18 +123,35 @@ export const sourceRouteContributions = (): SourceRouteContribution[] => sourceR
 // `noop` component and App picks the surface off the rail, so navigating to a source's route while
 // another source is selected changes the address bar and nothing else.
 //
-// Segment-count and `:param` matching, not the router's grammar. Every contributed pattern is a plain
-// `/p/:projectId/…` form. If one needs optional or splat segments, ask the router to match instead.
-const matchesRoute = (pattern: string, path: string): boolean => {
+/**
+ * The parameters a pattern pulls out of a path, or `null` where it does not match.
+ *
+ * Segment-count and `:param` matching, not the router's grammar. Every contributed pattern is a plain
+ * `/p/:projectId/…` form. If one needs optional or splat segments, ask the router to match instead.
+ *
+ * Exported because the terminal has no router and matches with this instead: `apps/tui/src/kit/router.ts`
+ * resolves `useParams` against the same patterns the desktop's Router is built from, so the two hosts
+ * cannot disagree about what a path means (docs/tui.md § The router).
+ */
+export function matchRoute(pattern: string, path: string): Record<string, string> | null {
   const expected = pattern.split('/').filter(Boolean)
-  const actual = path.split('/').filter(Boolean)
-  return expected.length === actual.length
-    && expected.every((segment, index) => (segment.startsWith(':') ? !!actual[index] : segment === actual[index]))
+  const actual = path.split(/[?#]/)[0].split('/').filter(Boolean)
+  if (expected.length !== actual.length) return null
+  const params: Record<string, string> = {}
+  for (const [index, segment] of expected.entries()) {
+    if (!segment.startsWith(':')) {
+      if (segment !== actual[index]) return null
+      continue
+    }
+    if (!actual[index]) return null
+    params[segment.slice(1)] = decodeURIComponent(actual[index])
+  }
+  return params
 }
 
 export function sourceIdForPath(path: string): string | undefined {
   const clean = path.split(/[?#]/)[0]
-  return sourceRegistry.entries().find((source) => source.routes?.some((route) => matchesRoute(route.path, clean)))?.id
+  return sourceRegistry.entries().find((source) => source.routes?.some((route) => matchRoute(route.path, clean)))?.id
 }
 
 // Ask every source whether it owns this task's URL. Registry order breaks a tie between two sources

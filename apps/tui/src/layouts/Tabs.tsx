@@ -5,6 +5,7 @@ import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
 import { layoutState } from '@acorn/client-core/host/layouts/state.ts'
 import { Tabs as TabStrip } from '../kit/grouping'
 import { bindKeys } from '../keys/install'
+import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
 
 // `tabs`: the bar is one line, the current panel below (docs/panes.md § Layout model).
@@ -48,9 +49,13 @@ export function Tabs(props: LayoutProps) {
       <TabStrip tabs={tabs()} active={active()} onChange={setSelected} idPrefix={props.stateKey} ariaLabel={props.label} />
       <Show when={active()}>
         {(id) => (
-          <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: props.stateKey, regionId: 'panel' }, 1)}>
+          <Panel
+            grow
+            title={tabs().find((tab) => tab.id === id())?.label}
+            onBox={regionFocus({ paneId: props.stateKey, regionId: 'panel' }, 1)}
+          >
             {props.regions[`panel:${id()}`]?.()}
-          </box>
+          </Panel>
         )}
       </Show>
     </box>

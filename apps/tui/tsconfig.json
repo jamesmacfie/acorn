@@ -15,7 +15,9 @@
     "paths": {
       "@acorn/plugin-api/ui": ["./src/kit/ui.ts"],
       "@acorn/plugin-api/ui/host": ["./src/kit/host.tsx"],
-      "@solidjs/router": ["./src/kit/router.ts"]
+      "@solidjs/router": ["./src/kit/router.ts"],
+      "lucide-static/icon-nodes.json": ["./src/kit/iconNodes.ts"],
+      "@opentui/solid/index.js": ["./node_modules/@opentui/solid/index.d.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

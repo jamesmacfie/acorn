@@ -20,10 +20,10 @@ deleted once it shipped. Find it with `git log --follow -- docs/future/terminal/
 ## What it is, in one screen
 
 ```text
-Topbar:   one line. Workspace, task count, the open branch, the node's state as a dot
-Rail:     a column of tasks, browse sources under a rule; two cells of marks below 100 columns
-Main:     one pane, with a strip of pane labels above it
-Overlays: the palette, the cheat sheet and a quit confirmation, drawn where the pane is
+Topbar:   one line. Workspace > project, task count, the open branch, the node's state as a dot
+Left:     three framed panels — Menu, the sources; Browse, what is under the chosen one; Tasks
+Main:     one pane, or the chosen source's detail, with a strip of pane labels above it
+Overlays: the palette, the cheat sheet, the two pickers and a quit confirmation, where the pane is
 Footer:   one line. What the keyboard will do, and the node's state when it needs a sentence
 ```
 
@@ -145,7 +145,7 @@ process's own globals under a browser's name.
 
 ## The host switch
 
-Four aliases in `apps/tui/vite.config.ts`, mirrored in the package's `tsconfig.json` paths. That is
+Six aliases in `apps/tui/vite.config.ts`, mirrored in the package's `tsconfig.json` paths. That is
 the whole of what makes a compiled pane draw in cells:
 
 - `@acorn/plugin-api/ui` resolves to `apps/tui/src/kit/ui.ts`, this package's kit. A pane imports the
@@ -153,11 +153,28 @@ the whole of what makes a compiled pane draw in cells:
 - `@acorn/plugin-api/ui/host` resolves to `apps/tui/src/kit/host.tsx`: the palette chrome, the drawer,
   the reference-panel box and the two cooperative-extension nodes, whose DOM copies are portals and
   `<ul>`s.
-- `@solidjs/router` is removed rather than replaced. It reads `window.history.state` at module scope,
-  so a pane that imports it cannot be loaded in this process, and there is no URL behind it to answer
-  with.
+- `@solidjs/router` is replaced by a path in a signal. The package itself still has to go: it reads
+  `window.history.state` at module scope, so a pane that imports it cannot be loaded in this process.
+  See The router below for what stands in its place.
 - `solid-js` points at the client build, because Solid's `node` export condition is its server
   renderer and has no reactivity.
+- `@opentui/solid` resolves to `src/kit/reconciler.ts`, which is the package re-exported with two
+  things replaced: `insert`, and `createElement`. The transform emits its calls by module name, so
+  this is the only place that sits in front of every one of them. See Loose text under a box for the
+  first and Destroy on disposal for the second, and why both are here rather than in each component.
+- `lucide-static/icon-nodes.json` resolves to an empty table. It is 706 KB of SVG path data and there
+  is no SVG here: `Icon` on this host is a lookup from a Lucide name to one character, and the DOM
+  component that reads the table is in the graph because client-core's components have to resolve,
+  not because any of them draw.
+
+  That last one is a crash, not a saving, and it is worth knowing why. **The bundle externalises every
+  bare import of a package outside the workspace**, so an import left alone is one Node resolves at
+  run time — and Node's loader refuses a JSON module with no `with { type: 'json' }` on it. Writing
+  the attribute does not help, because the TypeScript transform drops it before the bundler sees it.
+  So a JSON import anywhere in the graph is `ERR_IMPORT_ATTRIBUTE_MISSING` thrown from inside a lazily
+  loaded chunk, which is to say the first time a reader opens the one surface that pulls it. This one
+  went off when somebody opened Linear. If another arrives, alias it or inline it; there is no third
+  answer, and `apps/tui/dist` can be grepped for `from "….json"` to find one.
 
 Beside the aliases, two build facts. `vite-plugin-solid`'s `generate: 'universal'` sends JSX to
 OpenTUI's reconciler instead of to the DOM. And `__ACORN_HOST__` is `'tui'`, which is what `Only` and
@@ -224,6 +241,78 @@ clamps its own.
 natively rather than handing an element back. The `rectangle` extension kind — a sibling region an
 iframe fills — is absent entirely.
 
+### Loose text under a box
+
+A run of text must have a `text` parent here, and on the DOM a bare string anywhere is a text node
+nobody thinks about. It is the one structural difference between the hosts, and it belongs to the host
+rather than to the caller: `<Stack>{count()}</Stack>` is correct kit, and a plugin has no way to know
+which of its two readers will refuse it.
+
+**`apps/tui/src/kit/reconciler.ts` answers it once**, for everything. It is `@opentui/solid`
+re-exported with `insert` replaced, aliased into the Solid transform's `moduleName` so every JSX call
+in the process passes through it, and it wraps a bare string or number in a `text` when the parent is
+a box. An empty string becomes nothing, which is what the DOM draws for one.
+
+It was not always one place. `cells.tsx` answers the same question three times — `flatten` for a node
+that draws a line, `hasNode` to ask which it is, `slot` for a child that lands in a box — and each of
+the seventy-six kit nodes had to reach for the right one. That is a convention, not a guarantee, and
+four crashes in one week came through the gaps in it, wearing four different values: a count beside an
+icon, a pending `lazy()` resolving to `""`, a remote tree's text node, a plugin's own row. None of the
+three helpers covered the chrome, the layouts, the tree host, or a plugin's tree, none of which are
+kit.
+
+The failure mode is what made it worth fixing at the boundary rather than per node. The refusal comes
+out of `insertNode` deep inside a signal write, and an exception there aborts the whole update pass —
+so every other reader of that signal is left un-notified, the screen stops following, and nothing says
+why. One bad child read as "the router does not work" for an afternoon.
+
+Two notes on the seam. `insert` and not `insertNode`, because OpenTUI builds its renderer from a
+node-ops object and exports neither it nor `createRenderer`, so the function that throws cannot be
+replaced — but everything reaches it through `insert`, which is exported. And the wrap follows nested
+accessors, because a value can arrive from deeper than the first read: a `lazy()` is a memo inside the
+memo `insert` was handed.
+
+The three helpers stay. They are how a node says what a run of text *means* — its role and its tone —
+and the reconciler only says where it may live. A `Suspense` round a `lazy()` stays too, for the same
+reason: it decides what shows while a chunk loads, which is a question the reconciler does not answer.
+
+**What this does not forgive.** A component type this host has no renderable for. `<main>` from a DOM
+component is still "Unknown component type", and it should be: that is a surface on the wrong host,
+not a shape the DOM absorbs.
+
+### Destroy on disposal
+
+The reconciler's second replacement, and the worse of the two bugs it ends. OpenTUI destroys a
+renderable one `process.nextTick` after it leaves the tree, and that tick always runs before any
+promise settles. Solid's `Suspense` removes its children when it suspends and hands the *same
+instances* back when it resolves — its children memo is created once, which is the whole reason
+suspending is cheap on the DOM. Put the two together and any boundary that has shown content and then
+suspends again is gone for good: children removed, destroyed a tick later, refused on the way back in
+("was already destroyed, skipping add"), and the panel is blank until the process exits. Reading an
+uncached query's `data` is a suspension — even a disabled query suspends for one microtask, and one
+microtask loses to the tick — so the shapes that hit it were the ordinary ones: the caret landing on a
+pull whose detail had not loaded, a browse window sliding onto rows whose queries had not run.
+
+**The fix is that removal no longer decides destruction; disposal does.** `createElement` ties every
+node it makes to the reactive owner that made it. Detached with a live owner means a `Suspense` may
+hand the node back, so it is kept. Owner disposed — a `For` row dropped, a `Show` flipped, a route
+change — destroys on the next tick if the node is still detached. Attached teardown (the renderer
+destroying its tree child-first) still destroys promptly. This is what the DOM gives Solid for free —
+removal detaches, garbage collection destroys — restated in a runtime with explicit destruction. A
+node created outside any owner keeps OpenTUI's prompt destroy.
+
+The test that pins it is `apps/tui/src/browseSlow.test.tsx`, and its fixture knob matters as much as
+the assertion: a transport that answers in a microtask can never hold a `Suspense` open across the
+destroying tick, so the zero-latency fixture passed every browse test while the app drew blank
+panels. `ACORN_FIXTURE_DELAY_MS` is how a test reaches the shape the app lives in. The same change
+retired the liveness guards that grew around the symptom — a destroyed edit buffer read from a live
+effect cannot happen any more, because an owner's effects are disposed before its nodes are
+destroyed.
+
+One residue on purpose: `main.tsx` deactivates OpenTUI's console overlay the way the harness always
+has, because a single stray library warning drawing over the frame reads as the whole app failing,
+and the terminal's scrollback after quit is where a log line belongs.
+
 ### Unknown nodes and failed trees
 
 Three behaviours, the same on both hosts. A node type this build cannot draw renders as a labelled
@@ -245,6 +334,40 @@ row, never a crash.
   refuses to shrink, and the region around them clips. A pane taller than the screen is the normal
   case at 24 rows, and `scrollbox` is refused with the reason in `apps/tui/src/chrome/PaneRow.tsx`.
   Nothing holds this rule but the pane suite noticing a string went missing.
+
+## The router
+
+`apps/tui/src/kit/router.ts` is one module-level path signal and the five hooks a pane asks for. It
+matches with `matchRoute`, which is client-core's and is what the source registry already resolves a
+path with, against core's three patterns and every pattern a source contributed. So the two hosts
+cannot disagree about what `/p/:projectId/pulls/:number` means.
+
+It used to be inert — no params, no match, and a navigation that did not happen — on the argument that
+there was nothing behind it to answer. That was right during the pane sweep, where an honest blank
+column beat a plausible wrong one. It stopped being right when browse became a surface a reader drives
+from the shell, because a browse surface carries its project and its open item in the path and nowhere
+else: the GitHub surface reads `params.projectId` to decide it has a repository at all, and its list
+opens a pull by navigating to it. With an inert shim under both, that surface drew "Select a project"
+for ever.
+
+Three details are load-bearing.
+
+`useParams` answers a **proxy**, not an object. Every caller reads a field inside a derivation after
+calling `useParams()` once in setup, so the reactivity has to be in the property access; an object
+built at call time resolves once and never changes, which is the inert shim in a better disguise.
+
+**Order decides a match.** Core's patterns come first, then the contributed ones in the order they were
+declared, which `sourceRouteContributions` already sorts. That is what puts `/p/:id/pulls/new` in front
+of `/p/:id/pulls/:number`, and it is why a route contribution carries an `order` at all.
+
+**The query string is still absent.** Carrying it would be a few more lines and no caller needs them:
+the surfaces that keep view state in the query on the desktop already pass `router: false` here.
+
+What a path *means* is not in that file. `apps/tui/src/chrome/routing.ts` holds the shell's reading of
+it — open the task a path names, move the rail to the source that claims it, and keep the path on a
+project the open workspace has — because the router is aliased as `@solidjs/router` and every plugin in
+the graph imports it, so it must not reach into the chrome. That is the separation `keys/regions.ts`
+keeps when it takes a pane cycler rather than importing the shell.
 
 ## Keys and focus
 
@@ -274,6 +397,11 @@ regions rather than from `compareDocumentPosition`. A region's first stop is the
 its subtree whose focus role is `stop`, `item`, `collection` or `trap`, walked over OpenTUI's retained
 tree. Focus is OpenTUI's focus, and the renderer owns it. There is no pointer half.
 
+A region with nothing in it yet lands the keys on its own frame, and that landing is never
+remembered: the list that arrives a moment later is what the next walk into the region finds. Without
+that rule a reader who looked into Browse before choosing a source came back to a lit border, no
+caret, and arrows that did nothing, for the rest of the run.
+
 The region cycle is the whole screen rather than the focused pane: rail, pane strip, the pane's own
 regions, and back. The desktop draws several panes side by side and Tab into the next one would
 surprise; there is no next one here. The chrome orders itself around the pane by declaring orders
@@ -286,6 +414,16 @@ The intent half of `collection.ts` is shared. The element half has a DOM file an
 into view" moves the collection's `offset` until the row is inside the visible rows. `Grid` keeps its
 documented exception: a virtualised row has no renderable, so the arrows move `selected` and the view
 follows.
+
+**Moving the caret selects.** Every `Rows` on this host passes `selectOnMove`, which
+`collectionIntents.ts` already had and only `Tabs` and `Select` used. It is this host's own answer and
+the same kind of departure as opening a region on its list: with no pointer the caret is the selection,
+and a reader arrowing down a list of pull requests is asking to see them.
+
+Only `onSelect` fires on a move. `onActivate` still waits for Enter, so showing something is immediate
+and opening it stays deliberate, which is the split `pick` and activate already draw. A list that
+supplies no `onSelect` — the task list is one — gets nothing new. And arriving on a row is not a move,
+so tabbing into a list does not choose its first row on the way past.
 
 ### Traps
 
@@ -333,14 +471,77 @@ than kit. [ui-design.md](./ui-design.md) § Shell hierarchy has the two hierarch
 
 ### The screen
 
-Left to right and top to bottom: one topbar line, a rail column of task rows with browse sources under
-a rule, the active pane in the rest with a strip of pane labels above it, one footer line. Below 100
-columns the rail collapses to a two-cell strip of marks, the same collapse the desktop's
-`leftCollapsed` preference does.
+Left to right and top to bottom: one topbar line, a column of three framed panels, the active pane in
+the rest with a strip of pane labels above it, one footer line.
 
-The chrome spends three cells, so at 80 columns the pane is 77 — under `list-detail`'s own 80-cell
-threshold, which means one group at a time with `expand` switching between them. Every pane in the
-roster inherits that 77.
+The three panels are Menu, Browse and Tasks, read down the screen. Menu is the browse sources this
+workspace has, which the desktop draws under a rule below its task list. Browse is what is under the
+chosen one — the source's own `list` region, drawn here rather than inside the surface it belongs to.
+Tasks is the tasks in the workspace, and it is where the screen opens, because acorn is a workspace of
+tasks and a reader arriving on a list where `j` swaps the whole screen has been handed the wrong thing
+first. `ctrl+b` hides the whole column.
+
+The column takes about a third of the shell's width, between a floor of 20 cells and a ceiling of 34,
+which is the shape `list-detail` uses to size its own list column. A fixed number could not be right at
+both ends: thirty reads well at 120 and leaves the agents session list clipping its own titles at 80.
+So at 80 columns the pane is 54 and every pane in the roster inherits that — well under `list-detail`'s
+own 80-cell threshold, which means one group at a time with `expand` switching between them.
+
+**Frames, one level deep.** Each panel is a box with its name in the top border, drawn in the accent
+tone while the keys are inside it, in `apps/tui/src/panel.tsx`. Each layout puts one round every region
+it holds, and nothing wraps a frame round something that already has one: a frame costs two rows and
+two columns, and at 24 rows the body has 22 to spend. `header-body-footer`'s pinned strips stay bare
+for the same arithmetic — a frame round one line of content is three rows of chrome.
+
+**A panel is a place on the screen, not a wrapper round a list.** A growing panel takes the room left
+over rather than the room its contents want, so a Browse list of forty pull requests cannot push the
+Tasks panel off the bottom of the screen. What is inside it either clips or windows. A `Rows` marked
+`virtual` is handed its height by the panel, draws only the rows that fit, and puts a scrollbar down
+its right edge — the thumb is the run the window covers, which is the only thing on this host that
+says there is more below. The window holds still until the caret walks off an edge, then follows by
+exactly as much as it has to, which is lazygit's rule and not the DOM virtualizer's.
+
+**A row clips, it does not squeeze.** A `text` is a box to yoga, so a row of them at a width they do
+not fit is a row of boxes each shrunk and each cutting its own content: `[ST]` drew as `[ST`, the gaps
+between the fields closed up, and the one-cell caret column shrank to nothing, so a focused list
+looked exactly like an unfocused one. The parts of a row now give up cells in an order — the trailing
+controls first, then the meta, then the title down to sixteen cells, and never the caret or the
+leading glyphs. Past that the row runs off the right edge and the frame cuts it. In a 28-cell rail
+that means a pull request reads as its number and its title, and its timestamp is simply not there.
+
+The name in the border is the string the DOM host puts in a region's `aria-label`, and the lit border
+is what `:focus-within` does to a region's edge there. Same two facts, one rendering each. The lit
+border is read off the focus signal rather than from OpenTUI's own `focusedBorderColor`, which needs
+the box to be `focusable` — and a focusable frame is a stop in the cycle, so a region holding another
+frame would open on the frame instead of on the list inside it.
+
+There is no collapse to a strip of marks below 100 columns any more. It only ever said anything because
+every row carried a glyph, and most of those glyphs drew nothing: a source's glyph is a Lucide name,
+this host has no brand marks at all, and `Icon` draws a name it has no character for as nothing. The
+rail's leading icons went with it. `ctrl+b` is the one way to lose the column.
+
+### A descriptor source's list
+
+A plugin contributes a rail source in one of two ways, and only one of them shipped with a terminal
+answer. A compiled plugin hands over a component, which is kit and draws here. A plugin that
+contributes by manifest hands over a *descriptor*, and the host draws the list — through
+`ChromeSourcePanel`, which is `<main class="panes">` around `<section>`s and the DOM kit's primitives.
+The chrome registry named it directly, so selecting Linear or any other descriptor source in `acorn`
+handed the reconciler a `main` and it refused.
+
+`client-core/host/chrome/sourcePanel.ts` is the seam, and it is the third of exactly this shape after
+`KIT_COMPONENTS` and the layout table: the host package supplies its own and the DOM's is the
+fallback, so nothing on the desktop moved. It hands back a whole contribution rather than a component,
+because the two hosts do not put the halves in the same place — the desktop draws one surface across
+the window, and this host puts the list in the Browse panel and the detail in the main one.
+
+`apps/tui/src/plugins/SourcePanel.tsx` is this host's. Everything that is not drawing is imported
+rather than rewritten: `readRailItems` and `chromeKey` are the query, so both hosts share one cache
+entry; `runChromeAction` is what a row press does; and `projectSurfaceRegistry` is what the detail is,
+which is the same surface the desktop draws beside its own list. Three things are left out and they
+are omissions rather than gaps in the seam: the title filter, the create-task menu on a row, and the
+dashboard panels beside the list. The filter is the one worth adding first, because a list of a
+hundred issues is a list nobody can page through.
 
 ### What is drawn bespoke
 
@@ -367,11 +568,14 @@ every plugin that calls it lands on a line above the footer. They never take foc
 ### Navigation
 
 `Tab` and `Shift+Tab` cycle regions, beside `F6`, which is what the DOM host spells the same intent
-because the browser owns Tab. In the rail, `j` and `k` move and `Enter` opens the task. `w` switches
-workspace through an overlay, because that is the shape that takes the keys off whatever had them; it
-does not restore what you were looking at, since the desktop remembers a view per workspace and this
-host clears the source and lets the first task open. The command chord opens the palette from anywhere
-except an entered PTY.
+because the browser owns Tab. The cycle reads down the screen and the chrome takes five places in it
+before a pane's own: Menu, Browse, Tasks, then the pane strip. In a list, `j` and `k` move and `Enter`
+opens.
+
+`w` switches workspace and `p` switches project, both through an overlay, because that is the shape
+that takes the keys off whatever had them. Neither restores what you were looking at: the desktop
+remembers a view per workspace, and this host clears the source and lets the first task open. The
+command chord opens the palette from anywhere except an entered PTY.
 
 A pane opens with the keys already somewhere, because there is no click to put them there. And a
 region opens on its list where it has one rather than on the first field above it, because the first

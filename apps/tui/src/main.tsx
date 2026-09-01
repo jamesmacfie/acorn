@@ -111,6 +111,12 @@ watchPluginChanges()
 // The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
 installRenderGuard()
 const renderer = await createCliRenderer({ exitOnCtrlC: false })
+// A library warning must not cover the screen. OpenTUI pops its console overlay over the frame on
+// any `console.warn`/`error` once the renderer owns the terminal, so a single stray line from a
+// dependency reads as the whole app going blank. Deactivated the same way the test harness does
+// (./harness.tsx); anything logged still lands in the terminal's scrollback after quit.
+renderer.console.deactivate()
+renderer.console.hide()
 const engine = installKeymap(renderer)
 
 // The terminal comes back first, then the node drains. A node that started here gets its bounded

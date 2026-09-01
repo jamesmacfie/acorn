@@ -1,19 +1,19 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, For, Show } from 'solid-js'
+import { formatRelativeTime, splitRefTokens } from '@acorn/plugin-api/client'
 import {
-  CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, formatRelativeTime, railDotProps,
-  splitRefTokens,
-} from '@acorn/plugin-api/client'
-import {
-  Alert, Badge, Button, Chip, ChipRow, ConfirmButton, CopyButton, Facts, Fold, Heading, Inline, Link,
-  Picker, Row, Rows, Select, Stack, StatusDot, Text, Toolbar, UserAvatar,
+  Alert, Badge, Button, Chip, ConfirmButton, Facts, Heading, Inline, Link, Row, Rows, Select, Stack,
+  Text, Toolbar, UserAvatar,
 } from '@acorn/plugin-api/ui'
-import { ProviderHtml, Slot } from '@acorn/plugin-api/ui/host'
-import type { Label } from '../../shared/api'
+import { Slot } from '@acorn/plugin-api/ui/host'
 import { SUMMARY_BADGES_POINT } from '../extensionPoints'
 import type { PrModel } from './prModel'
 
-// The Overview tab of the pull-request pane, and the top of the browse navigator: what this pull is,
-// what state it is in, and every verb that changes that state.
+// What this pull request is, what state it is in, and every verb that changes that state.
+//
+// The header of the surface rather than a section of it, which is why it is not in ./prSections.tsx
+// with the rest: a desktop pins it above the folds and a terminal makes it the first tab, and both
+// of those are the host's call. What it is not is a fold — the seven that used to be written down the
+// middle of this file are in ./prSections.tsx now, one list for both surfaces.
 //
 // The Solid-rendered twin of the host's `linkifyRefs`: same split, different mechanism, because a
 // pull's title is text this component owns and its body is opaque provider HTML. The twin used to
@@ -39,7 +39,6 @@ export function PrOverview(props: {
   onLinkClick: (event: MouseEvent) => void
 }) {
   const model = () => props.model
-  const [descriptionText, setDescriptionText] = createSignal('')
 
   const state = () => {
     const pull = model().pull()
@@ -170,161 +169,6 @@ export function PrOverview(props: {
         </Alert>
       </Show>
 
-      <Show when={model().pull()?.body}>
-        {(body) => (
-          <Fold
-            persistKey="description"
-            defaultOpen
-            label="Description"
-            actions={<CopyButton text={descriptionText} title="Copy description" />}
-          >
-            <ProviderHtml
-              html={body()}
-              refs={model().refPrefixes()}
-              onLinkClick={props.onLinkClick}
-              onText={setDescriptionText}
-            />
-          </Fold>
-        )}
-      </Show>
-
-      <Show when={model().linearRefs().length}>
-        <Fold persistKey="integrations" defaultOpen label="Integrations" count={model().linearRefs().length}>
-          <Rows
-            id={`gh-integrations:${model().scope.number}`}
-            ariaLabel="Linked tickets"
-            items={model().linearRefs().map((ref) => ({ key: ref.item, label: ref.item }))}
-          >
-            {(item, itemProps) => {
-              const summary = () => model().linearSummary().get(item.key)
-              const url = () => model().linearRefs().find((ref) => ref.item === item.key)?.url ?? ''
-              return (
-                <Row
-                  item={itemProps}
-                  density="compact"
-                  label={item.key}
-                  {...(model().linearConnected() ? { onPress: () => model().showLinearIssue(item.key) } : { href: url() })}
-                  leading={<Text emphasis="mono">{item.key}</Text>}
-                  meta={
-                    <Show when={summary()?.state}>
-                      {/* The same visual the linear frame draws. */}
-                      {(state) => <Chip size="xs" color={state().color}>{state().name}</Chip>}
-                    </Show>
-                  }
-                >
-                  <Show
-                    when={model().linearConnected()}
-                    fallback={<Text emphasis="muted">Connect Linear to see titles.</Text>}
-                  >
-                    <Text emphasis={summary() ? 'body' : 'muted'}>
-                      {summary()?.label ?? (model().linearIssues.isLoading ? 'Loading…' : '')}
-                    </Text>
-                  </Show>
-                </Row>
-              )
-            }}
-          </Rows>
-        </Fold>
-      </Show>
-
-      <Fold persistKey="labels" defaultOpen label="Labels" count={model().labels().length}>
-        <Stack>
-          <Show when={model().labels().length} fallback={<Text emphasis="muted">None.</Text>}>
-            <ChipRow ariaLabel="Labels">
-              <For each={model().labels()}>
-                {(label) => (
-                  <Chip
-                    reveal
-                    color={label.color ? `#${label.color}` : undefined}
-                    {...(model().readOnly ? {} : { onRemove: () => model().removeLabel(label.name) })}
-                  >{label.name}</Chip>
-                )}
-              </For>
-            </ChipRow>
-          </Show>
-          <Show when={!model().readOnly}>
-            <Picker<Label>
-              label="Add label…"
-              placeholder="Filter labels…"
-              emptyText={model().labelsLoading() ? 'Loading labels…' : 'No labels available.'}
-              results={model().labelResults}
-              rowLabel={(label) => label.name}
-              isActive={() => false}
-              onSelect={(label) => model().addLabel(label.name)}
-            />
-          </Show>
-        </Stack>
-      </Fold>
-
-      <Show when={model().checks().length}>
-        <Fold
-          persistKey="checks"
-          label="Checks"
-          count={model().checks().length}
-          meta={<StatusDot {...railDotProps(CHECK_TONE[checksState(model().checks())])} />}
-        >
-          <Rows
-            id={`gh-checks:${model().scope.number}`}
-            ariaLabel="Checks"
-            items={model().checks().map((check, index) => ({ key: `${index}:${check.name}`, label: check.name }))}
-          >
-            {(item, itemProps) => {
-              const check = () => model().checks()[Number(item.key.split(':')[0])]
-              return (
-                <Row
-                  item={itemProps}
-                  density="compact"
-                  label={check()?.name}
-                  leading={<StatusDot tone={checkStatusTone(check()?.status)} />}
-                  {...(check()?.runId != null
-                    ? { onPress: () => model().setOpenCheck({ runId: check()!.runId!, name: check()!.name }) }
-                    : {})}
-                  meta={<Text emphasis="muted">{check()?.status}</Text>}
-                  trailing={
-                    <Show when={!model().readOnly && FAILED_STATUSES.has((check()?.status ?? '').toLowerCase()) && check()?.runId != null}>
-                      <Button
-                        size="sm"
-                        disabled={model().rerunned().has(check()!.runId!)}
-                        onPress={() => model().triggerRerun(check()!.runId!)}
-                      >{model().rerunned().has(check()!.runId!) ? 'Queued' : 'Rerun'}</Button>
-                    </Show>
-                  }
-                >{check()?.name}</Row>
-              )
-            }}
-          </Rows>
-        </Fold>
-      </Show>
-
-      <Fold persistKey="reviewers" defaultOpen label="Reviewers" count={model().reviewers().length}>
-        <Stack>
-          <Show when={model().reviewers().length} fallback={<Text emphasis="muted">No reviewers requested.</Text>}>
-            <ChipRow ariaLabel="Requested reviewers">
-              <For each={model().reviewers()}>
-                {(login) => (
-                  <Chip
-                    reveal
-                    leading={<UserAvatar login={login} />}
-                    {...(model().readOnly ? {} : { onRemove: () => model().removeReviewer(login) })}
-                  >{login}</Chip>
-                )}
-              </For>
-            </ChipRow>
-          </Show>
-          <Show when={!model().readOnly}>
-            <Picker<string>
-              label="Request review…"
-              placeholder="Filter people…"
-              emptyText={model().mentionsLoading() ? 'Loading people…' : 'No one to request.'}
-              results={model().reviewerResults}
-              rowLabel={(login) => login}
-              isActive={() => false}
-              onSelect={(login) => model().requestReviewer(login)}
-              leading={(login) => <UserAvatar login={login} />}
-            />
-          </Show>
-        </Stack>
-      </Fold>
     </Stack>
   )
 }

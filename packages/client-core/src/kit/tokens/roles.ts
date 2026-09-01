@@ -10,7 +10,7 @@ import type { Border, Radius, RoleName, Size, Space, TextRole, Tone } from './to
 /** The colours a role may ask for, named by what they mean rather than by an ANSI index. The host
  *  turns one into a colour: the terminal's own slot, or the theme's hex where the terminal says it
  *  can take one (apps/tui/src/appearance.ts). */
-export type Slot = 'default' | 'accent' | 'ok' | 'warn' | 'danger'
+export type Slot = 'default' | 'muted' | 'accent' | 'ok' | 'warn' | 'danger'
 
 /** What a run of cells can be, beyond its colour. */
 export type CellAttribute = 'bold' | 'dim' | 'inverse' | 'underline'
@@ -84,9 +84,12 @@ const tone: Mapping<Tone> = {
   },
   tui: {
     neutral: { said: 'default', slot: 'default' },
-    // The one tone that is an attribute rather than a colour, so it reads as quiet on a terminal
-    // whose palette we did not choose.
-    muted: { said: 'dim', attrs: ['dim'] },
+    // A slot rather than the `dim` attribute, and that is the light-terminal bug's second half. Dim
+    // is not "a quieter colour" to an emulator, it is "blend this toward the background": on a dark
+    // terminal that reads as grey and on a light one it reads as white on white, which is what a
+    // pull request's description looked like. Slot 8 is the palette's own grey, so the colour still
+    // comes from the theme the person chose (apps/tui/src/appearance.ts).
+    muted: { said: 'the palette grey, per theme', slot: 'muted' },
     accent: { said: 'the palette accent, per theme', slot: 'accent' },
     ok: { said: 'the palette green, per theme', slot: 'ok' },
     warn: { said: 'the palette yellow, per theme', slot: 'warn' },
@@ -107,10 +110,10 @@ const text: Mapping<TextRole> = {
   tui: {
     body: { said: 'plain' },
     strong: { said: 'bold', attrs: ['bold'] },
-    muted: { said: 'dim', attrs: ['dim'] },
+    muted: { said: 'the palette grey', slot: 'muted' },
     // A terminal is monospaced throughout, so asking for mono asks for what is already true.
     mono: { said: 'ignored' },
-    eyebrow: { said: 'dim uppercase', attrs: ['dim'], upper: true },
+    eyebrow: { said: 'the palette grey, uppercase', slot: 'muted', upper: true },
     heading: { said: 'bold', attrs: ['bold'] },
     match: { said: 'reverse', attrs: ['inverse'] },
   },

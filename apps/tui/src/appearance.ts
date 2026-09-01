@@ -20,7 +20,7 @@ import type { Slot } from '@acorn/client-core/kit/tokens/roles.ts'
 // change to make, not this file's. `paletteFor` is written and tested against the tokens, so the day
 // they are published this is a call site rather than a design.
 
-/** The five colours a role can ask for. `default` is the terminal's own foreground. */
+/** The six colours a role can ask for. `default` is the terminal's own foreground. */
 export type Palette = Record<Slot, RGBA>
 
 /** The terminal's own slots, as the two colours OpenTUI has that mean "ask the terminal": the default
@@ -34,16 +34,21 @@ export type Palette = Record<Slot, RGBA>
  *  terminal rather than the palette's own sixth slot. */
 export const TERMINAL_PALETTE: Palette = {
   default: RGBA.defaultForeground(),
+  // Slot 8, the palette's own grey, is what `muted` is instead of the `dim` attribute: dim blends a
+  // run toward the background, so on a light terminal it drew white on white
+  // (client-core/kit/tokens/roles.ts § tone).
+  muted: RGBA.fromIndex(8),
   accent: RGBA.fromIndex(6),
   ok: RGBA.fromIndex(2),
   warn: RGBA.fromIndex(3),
   danger: RGBA.fromIndex(1),
 }
 
-/** Which theme token feeds which slot. Five of the forty; the rest are backgrounds, borders and diff
+/** Which theme token feeds which slot. Six of the forty; the rest are backgrounds, borders and diff
  *  colours, and a terminal has no surface to paint. */
 const FROM_TOKEN: Record<Slot, string> = {
   default: '--text',
+  muted: '--text-muted',
   accent: '--accent',
   ok: '--state-ok',
   warn: '--state-warn',

@@ -13,7 +13,11 @@ import { githubIntegrationFlow } from './integrationFlow'
 import { githubBrowsePath, githubRouteContributions } from './clientRoutes'
 import GithubImporter from './GithubImporter'
 
-const GithubBrowse = lazy(() => import('./GithubBrowse'))
+// Two lazy chunks off one module, because the source declares its list and its detail separately and
+// a terminal shell draws them in two different panels (./GithubBrowse.tsx). Both resolve the same
+// import, so the second is already in memory by the time it is asked for.
+const GithubBrowseList = lazy(() => import('./GithubBrowse').then((module) => ({ default: module.GithubBrowseList })))
+const GithubBrowseDetail = lazy(() => import('./GithubBrowse').then((module) => ({ default: module.GithubBrowseDetail })))
 // Lazy: a panel nobody has opened should not be in the first paint's bundle.
 const PullRefPanel = lazy(() => import('./PullRefPanel'))
 
@@ -33,7 +37,8 @@ export const githubClientPlugin: ClientPlugin = {
     // as it goes, rather than through PromoteToTaskModal. The client host enforces `providerId` and
     // gates the source on the GitHub integration.
     ctx.sources.register({
-      id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', component: GithubBrowse, defaultPane: 'pr',
+      id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', defaultPane: 'pr',
+      regions: { list: GithubBrowseList, detail: GithubBrowseDetail },
       // The rail is `github`; the tasks it makes carry `github-pr` (client/pullTasks.ts). Core used to
       // keep the glyph for that origin in a built-in table, which meant a task drawn by name here and
       // by hand there (client-core/features/tasks/origin.ts).

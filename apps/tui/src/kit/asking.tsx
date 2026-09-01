@@ -79,7 +79,10 @@ export function Input(props: InputProps) {
   let field: InputRenderable | undefined
   const text = () => (props.value === undefined ? '' : String(props.value))
   // An edit buffer owns its text once it has it, so a value set from outside is written in and only
-  // when it differs. Without the guard every keystroke rewrites the buffer under the cursor.
+  // when it differs. Without the guard every keystroke rewrites the buffer under the cursor. There
+  // used to be a liveness guard beside this one, for a field destroyed while its component's effects
+  // still ran; a node now outlives its removal for as long as its owner does, so that shape is gone
+  // (./reconciler.ts § Destroy on disposal).
   createEffect(() => {
     const value = text()
     if (field && field.value !== value) field.value = value
@@ -143,7 +146,7 @@ export function Textarea(props: {
       ref={(element: TextareaRenderable) => { area = element }}
       // The change event carries no payload — OpenTUI's own comment on it says to ask the renderable
       // for the text — so this is the one node in the kit that needs a handle on what it drew.
-      onContentChange={() => props.onInput?.(area?.plainText ?? '')}
+      onContentChange={() => props.onInput?.(area ? area.plainText : '')}
     />
   )
 }

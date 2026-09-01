@@ -2,17 +2,15 @@ import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { PaneLayoutContribution, Task } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Chip, ChipRow, DetailColumn, EmptyState, Fold, Icon, ListColumn, ListDetail, Menu,
-  SectionHeader, Stack,
+  Alert, Button, Chip, ChipRow, EmptyState, Icon, Menu, Sections, Stack,
 } from '@acorn/plugin-api/ui'
 import { useChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
 import { requestFileScroll, routeKey } from '../fileNavigation'
 import ChecksPanel from '../checks/ChecksPanel'
 import { DiffForPull } from '../DiffForPull'
-import { PrConversation } from './Conversation'
-import { PrFileList } from './PrFiles'
 import { PrOverview } from './PrOverview'
+import { prSections } from './prSections'
 import { prModel, type PrModel } from './prModel'
 import { destinationKind, prTabsModel, type PrTabsModel } from './prTabs'
 import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
@@ -21,10 +19,11 @@ import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 // column beside the diff (../GithubBrowse.tsx). Browse reaches the same pair through its own pull
 // list; a task already knows which pull it is about, so the list is a strip of related pulls instead.
 //
-// A `single` layout holding the kit's split, not the host's `list-detail`: the two columns are one
-// surface with a shared model rather than two regions, which is exactly the case the kit's ListDetail
-// exists for, and it is what makes this look like browse rather than like a second design
-// (docs/panes.md § Layout model).
+// A `single` layout holding one kit node, not the host's `list-detail`: the halves are one surface
+// with a shared model rather than two regions, and `Sections` is the node that arranges them — folds
+// beside the diff on a desktop, a strip of tabs in a terminal
+// (client-core/kit/components/layout/Sections.tsx). It is what makes this look like browse rather
+// than like a second design, because browse draws the same node from the same list.
 //
 // A task can be about more than one pull — the one it was made from, the ones that mention it, the
 // ones stacked on it — so the navigator opens with the strip that switches between them (./prTabs.ts).
@@ -109,44 +108,6 @@ function PullStrip(props: { tabs: PrTabsModel }) {
   )
 }
 
-/** The navigator column: the same three trees browse stacks, over the pull strip. */
-function PrNavigator(props: {
-  model: PrModel
-  current: () => string | undefined
-  onSelect: (path: string) => void
-  onLinkClick: (event: MouseEvent) => void
-}) {
-  const model = () => props.model
-  return (
-    <Stack gap="section">
-      <PrOverview model={model()} onOpenFile={props.onSelect} onLinkClick={props.onLinkClick} />
-      <Fold persistKey="files" defaultOpen label="Files" count={model().files().length}>
-        <PrFileList model={model()} current={props.current} onSelect={props.onSelect} />
-      </Fold>
-      <Fold
-        persistKey="conversation"
-        defaultOpen
-        label="Comments/Commits"
-        count={model().conversationEntries().length}
-      >
-        <PrConversation model={model()} onOpenFile={props.onSelect} onLinkClick={props.onLinkClick} />
-      </Fold>
-      {/* The one overlay this pane owns. It is a run's step log, opened from a check row. */}
-      <Show when={model().openCheck()}>
-        {(check) => (
-          <ChecksPanel
-            owner={model().scope.owner}
-            repo={model().scope.repo}
-            runId={check().runId}
-            jobName={check().name}
-            onClose={() => model().setOpenCheck(null)}
-          />
-        )}
-      </Show>
-    </Stack>
-  )
-}
-
 export function PrPane(props: { task: Task }) {
   const navigate = useNavigate()
   const tabs = prTabsModel(props.task)
@@ -178,41 +139,61 @@ export function PrPane(props: { task: Task }) {
   }
 
   return (
-    <ListDetail split listWidth="wide">
-      {/* No "Navigator" header: the tree under it opens with the pull's own heading, which names the
-          column better than a label ever did. The same call browse makes. */}
-      <ListColumn scroll label="Pull request">
-        <PullStrip tabs={tabs} />
-        <Show when={model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
-          {(loaded) => (
-            <PrNavigator
-              model={loaded()}
-              current={changedFiles.currentFile}
-              onSelect={select}
-              onLinkClick={onLinkClick}
-            />
-          )}
-        </Show>
-      </ListColumn>
-      <DetailColumn>
-        <SectionHeader>Diff</SectionHeader>
-        <Show when={tabs.selected()?.pull} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
-          {(pull) => (
-            <DiffForPull
-              route={{
-                owner: pull().owner,
-                repo: pull().repo,
-                number: pull().number,
-                key: routeKey(pull().owner, pull().repo, pull().number),
-              }}
-              router={false}
-              taskId={props.task.id}
-              readOnly={!tabs.isPrimary()}
-            />
-          )}
-        </Show>
-      </DetailColumn>
-    </ListDetail>
+    <Show when={model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
+      {(loaded) => (
+        <>
+          <Sections
+            id="github.pull"
+            ariaLabel="Pull request"
+            header={{
+              id: 'details',
+              label: 'Details',
+              render: () => (
+                <Stack gap="section">
+                  <PullStrip tabs={tabs} />
+                  <PrOverview model={loaded()} onOpenFile={select} onLinkClick={onLinkClick} />
+                </Stack>
+              ),
+            }}
+            sections={prSections({
+              model: loaded(),
+              currentFile: changedFiles.currentFile,
+              onOpenFile: select,
+              onLinkClick,
+            })}
+            main={{
+              id: 'diff',
+              label: 'Diff',
+              render: () => (
+                <DiffForPull
+                  route={{
+                    owner: loaded().scope.owner,
+                    repo: loaded().scope.repo,
+                    number: loaded().scope.number,
+                    key: routeKey(loaded().scope.owner, loaded().scope.repo, loaded().scope.number),
+                  }}
+                  router={false}
+                  taskId={props.task.id}
+                  readOnly={!tabs.isPrimary()}
+                />
+              ),
+            }}
+          />
+          {/* The one overlay this pane owns. It is a run's step log, opened from a check row. */}
+          <Show when={loaded().openCheck()}>
+            {(check) => (
+              <ChecksPanel
+                owner={loaded().scope.owner}
+                repo={loaded().scope.repo}
+                runId={check().runId}
+                jobName={check().name}
+                onClose={() => loaded().setOpenCheck(null)}
+              />
+            )}
+          </Show>
+        </>
+      )}
+    </Show>
   )
 }
 

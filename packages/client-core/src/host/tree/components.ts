@@ -25,6 +25,7 @@ import Markdown from '../../kit/components/content/Markdown.tsx'
 import { Menu } from '../../kit/components/overlays/Menu'
 import { RowActions } from '../../kit/components/layout/RowActions'
 import { Fold } from '../../kit/components/layout/Fold'
+import { Sections } from '../../kit/components/layout/Sections'
 import { Composer } from '../../kit/components/inputs/Composer'
 import { DocumentTabs } from '../../kit/components/layout/DocumentTabs'
 import { FindBar } from '../../kit/components/inputs/FindBar'
@@ -59,7 +60,7 @@ type AnyKitComponent = Component<any>
 
 export const KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {
   Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar,
-  Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs, SectionHeader,
+  Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, Sections, SplitHandle, DocumentTabs, SectionHeader,
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
   // remote tree only under a name of their own.
   ModalBody: Modal.Body, ModalActions: Modal.Actions, TabPanel: Tabs.Panel, ToolbarSpacer: Toolbar.Spacer,

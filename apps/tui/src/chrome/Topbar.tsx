@@ -4,21 +4,29 @@ import { nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { StatusDot } from '../kit/showing'
 import { Line } from '../kit/cells'
 import { nodeTone } from './nodeState'
+import { routedProjectId } from './routing'
 import type { ShellModel } from './model'
 
-// One line: which workspace, how many tasks in it, which branch is open, and how the node is.
+// One line: which workspace and project, how many tasks are in it, which branch is open, and how the
+// node is.
 //
 // Bespoke rather than a contribution, and that is what it will stop being: the topbar is one of the
 // four surfaces `docs/future/client-plugins/04-replaceable-surfaces.md` turns into a slot, and when it
 // does this becomes core's provider. It is kit nodes and one props object already, which is the shape
 // that contract asks for, so the day the slot opens nothing here moves except its registration.
 //
-// The workspace name is a label here and nothing more: `w` opens the picker as an overlay, because a
-// list under this line does not take the keys and a picker nobody can drive is worse than no picker
-// (./Shell.tsx § WorkspacePicker).
+// Both names are labels here and nothing more: `w` opens the workspace picker and `p` the project
+// one, as overlays, because a list under this line does not take the keys and a picker nobody can
+// drive is worse than no picker (./Shell.tsx § WorkspacePicker).
+//
+// `Workspace > Project` rather than the workspace alone, because on this host the project is not
+// visible anywhere else. The desktop carries it in the address bar and draws a picker beside the
+// breadcrumb; a terminal has neither, so a reader whose browse list is empty has no way to tell a
+// missing integration from the wrong project.
 export function Topbar(props: { model: ShellModel; nodeId: string }) {
   const count = () => props.model.tasks().length
   const state = () => nodeState(props.nodeId)
+  const project = () => props.model.workspace()?.projects.find((entry) => entry.id === routedProjectId())
 
   return (
     // `flexShrink={0}`, like the footer's: a pane taller than the screen makes yoga take the deficit
@@ -28,6 +36,14 @@ export function Topbar(props: { model: ShellModel; nodeId: string }) {
     <box flexDirection="column" flexShrink={0}>
       <box flexDirection="row" gap={1}>
         <Line role="strong">{props.model.workspace()?.name ?? 'acorn'}</Line>
+        <Show when={project()}>
+          {(named) => (
+            <>
+              <Line role="muted">{'>'}</Line>
+              <Line role="strong">{named().name}</Line>
+            </>
+          )}
+        </Show>
         <Line role="muted">{`· ${count()} ${count() === 1 ? 'task' : 'tasks'}`}</Line>
         <box flexGrow={1} />
         <Show when={props.model.task()?.branch}>

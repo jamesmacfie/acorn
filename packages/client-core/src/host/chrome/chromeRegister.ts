@@ -20,6 +20,7 @@ import {
 } from '../plugins/distribution'
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, type DeclaredSurfaces } from '../plugins/contributions'
 import { runChromeAction } from './actions'
+import { suppliedSourcePanel } from './sourcePanel'
 import {
   captureAgentContext,
   ownsRoute,
@@ -228,7 +229,11 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       ...(descriptor.projectScoped ? { projectScoped: true } : {}),
       ...(defaultPane ? { defaultPane } : {}),
       when: () => pluginEnabledOnNode(chromeNode(), pluginId),
-      component: () => createComponent(ChromeSourcePanel, { pluginId, descriptor }),
+      // The rail list, from whichever host is drawing. `ChromeSourcePanel` is the DOM's and stays the
+      // fallback, so nothing on the desktop moved; a cell host supplies its own and gets a list
+      // instead of a reconciler refusing a `<main>` (./sourcePanel.ts).
+      ...(suppliedSourcePanel()?.({ pluginId, descriptor })
+        ?? { component: () => createComponent(ChromeSourcePanel, { pluginId, descriptor }) }),
       // A row's `task` block is the promotion capability. Registered independently of row selection, so
       // an integration can use the row click for detail navigation and a separate host-drawn "+Task"
       // affordance for promotion.

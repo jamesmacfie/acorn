@@ -6,6 +6,8 @@ import { isCompact } from '../appearance'
 import { flatten, Line, slot } from './cells'
 import { borderCell, boxBorder, spaceCells, spaceLines } from './roles'
 import { trapKeys } from '../keys/trap'
+import { bindKeys } from '../keys/install'
+import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 
 // The kit's grouping nodes in cells, each drawn to its sentence in
 // docs/ui-design.md § Every node at 80 by 24 and no further.
@@ -132,7 +134,14 @@ Timeline.Turn = (props: { children: JSX.Element }) => (
   <box flexDirection="column" marginTop={spaceLines('row')}>{props.children}</box>
 )
 
-/** `Tab  [Tab]  Tab` on one line, the selected one in brackets. */
+/** `Tab  [Tab]  Tab` on one line, the selected one in brackets.
+ *
+ *  Each label in a box that refuses to shrink, for the reason `../kit/cells.tsx` § Run gives about a
+ *  row of `text` renderables: yoga takes a width deficit out of every child that will give, and a
+ *  `text` shrunk below its content clips itself rather than the row. A strip too narrow for its tabs
+ *  drew `[PR review]Agent` with the gap eaten and every later gap down to one cell. Refusing to
+ *  shrink means the row clips at its end instead, which is the answer every block node in this file
+ *  gives and the one a terminal gives. */
 export function Tabs(props: {
   tabs: readonly { id: string; label: string; count?: number }[]
   active: string
@@ -142,13 +151,23 @@ export function Tabs(props: {
   actions?: JSX.Element
 }) {
   return (
-    <box flexDirection="row" gap={2}>
+    // Wrapped rather than clipped. A strip is only useful if every tab on it is readable, and a pull
+    // request has seven — which at a hundred cells fits and at sixty does not, and the half that did
+    // not fit was drawn over whatever sat beside it. Two lines of tabs cost one row and lose nothing.
+    // `columnGap` rather than `gap`: yoga's `gap` sets both axes, so two cells between tabs was also
+    // two blank rows between wrapped lines.
+    <box flexDirection="row" flexWrap="wrap" columnGap={2} rowGap={0} flexShrink={0} overflow="hidden">
       <For each={props.tabs}>
         {(tab) => (
-          <Line role={props.active === tab.id ? 'strong' : 'body'} tone={props.active === tab.id ? 'accent' : undefined}>
-            {props.active === tab.id ? `[${tab.label}]` : tab.label}
-            {tab.count === undefined ? '' : ` ${tab.count}`}
-          </Line>
+          // `height={1}`, because a wrapped flex line is as tall as its tallest child and a child
+          // with no height of its own takes the container's — which drew the second row of tabs three
+          // rows below the first.
+          <box flexShrink={0} height={1}>
+            <Line role={props.active === tab.id ? 'strong' : 'body'} tone={props.active === tab.id ? 'accent' : undefined}>
+              {props.active === tab.id ? `[${tab.label}]` : tab.label}
+              {tab.count === undefined ? '' : ` ${tab.count}`}
+            </Line>
+          </box>
         )}
       </For>
       <box flexGrow={1} />
@@ -450,6 +469,106 @@ export function SectionHeader(props: {
       <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
       <box flexGrow={1} />
       {slot(props.actions)}
+    </box>
+  )
+}
+
+// ── Sections ──────────────────────────────────────────────────────────────────────────────────
+
+/** Cells below which `main` stops being a column of its own and becomes the last tab.
+ *
+ *  Higher than `ListDetail`'s 80, and for a reason the two columns do not share. A list beside a
+ *  detail is a picker beside a document, and a picker reads fine in thirty cells. Here both halves
+ *  hold a document — a pull request's checks beside its diff — and a diff in half of 100 cells is a
+ *  diff wrapped at 45, which is not a diff anybody reads. */
+const MAIN_COLUMN_AT = 120
+
+/** reduced: a strip of tabs over one panel, because a terminal has no second column to spend on six
+ *  folds nobody can see the bottom of.
+ *
+ *  The tab order is the reading order the DOM draws down its column: the header, then each section.
+ *  `main` keeps a column of its own while there is room for one and joins the strip below that, which
+ *  is the same collapse `ListDetail` makes at its own width.
+ *
+ *  `h` and `l` walk the strip, on the pane's own key tier, focus-within — so they work from inside
+ *  whatever the current tab drew, and a collection that wants them for a tree answers first and this
+ *  never sees them (../keys/install.ts § the four tiers). The strip is drawn whether or not the keys
+ *  are in it, because a strip nobody can see is a strip nobody presses `l` at. */
+export function Sections(props: {
+  id: string
+  ariaLabel?: string
+  header?: KitSection
+  sections: readonly KitSection[]
+  main?: KitSection
+}) {
+  let box: BoxRenderable | undefined
+  const [cells, setCells] = createSignal(MAIN_COLUMN_AT)
+  const wide = () => cells() >= MAIN_COLUMN_AT && !!props.main
+  const tabs = (): KitSection[] => [
+    ...(props.header ? [props.header] : []),
+    ...props.sections,
+    ...(props.main && !wide() ? [props.main] : []),
+  ]
+  const [chosen, setChosen] = createSignal('')
+  // Falls back rather than storing a default, so a surface whose section set changes under it lands
+  // on its first tab instead of on nothing. The same rule the `tabs` layout keeps.
+  const active = () => (tabs().some((tab) => tab.id === chosen()) ? chosen() : tabs()[0]?.id ?? '')
+  const step = (delta: number): boolean => {
+    const all = tabs()
+    if (all.length < 2) return false
+    const at = all.findIndex((tab) => tab.id === active())
+    setChosen(all[(at + delta + all.length) % all.length].id)
+    return true
+  }
+
+  return (
+    <box
+      flexDirection="row"
+      flexGrow={1}
+      ref={(element: BoxRenderable) => {
+        box = element
+        setCells(element.width)
+        bindKeys(element, [
+          ...['left', 'h'].map((key) => ({ key, cmd: () => step(-1) })),
+          ...['right', 'l'].map((key) => ({ key, cmd: () => step(1) })),
+        ], 45)
+      }}
+      onSizeChange={() => setCells(box?.width ?? MAIN_COLUMN_AT)}
+    >
+      <box
+        flexDirection="column"
+        flexGrow={1}
+        minWidth={0}
+        // The strip is where the keys land inside this node, which is what makes `h` and `l` reach it.
+        // A region's first stop is the first focusable renderable under it, and without one the stop
+        // is the region's own frame — which sits *above* this node, so a `focus-within` layer bound
+        // here never matched and the strip could not be walked at all (../keys/regions.ts § firstStop).
+        ref={(element: BoxRenderable) => { element.focusable = true }}
+      >
+        <Tabs
+          tabs={tabs().map((tab) => ({ id: tab.id, label: tab.label, ...(tab.count === undefined ? {} : { count: tab.count }) }))}
+          active={active()}
+          onChange={setChosen}
+          idPrefix={props.id}
+          ariaLabel={props.ariaLabel ?? 'Sections'}
+          {...(() => { const found = tabs().find((tab) => tab.id === active())?.actions; return found ? { actions: found() } : {} })()}
+        />
+        <box flexDirection="column" flexGrow={1} overflow="scroll">
+          <For each={tabs()}>
+            {(tab) => <Show when={tab.id === active()}>{tab.render()}</Show>}
+          </For>
+        </box>
+      </box>
+      {/* `minWidth={0}` on both halves, because a flex child's floor is its own content and a diff is
+          routinely wider than its share (../layouts/ListDetail.tsx). */}
+      <Show when={wide() && props.main}>
+        {(main) => (
+          <box flexDirection="column" flexGrow={1} minWidth={0}>
+            <SectionHeader {...(main().actions ? { actions: main().actions!() } : {})}>{main().label}</SectionHeader>
+            <box flexDirection="column" flexGrow={1} overflow="scroll">{main().render()}</box>
+          </box>
+        )}
+      </Show>
     </box>
   )
 }

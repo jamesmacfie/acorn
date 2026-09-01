@@ -20,7 +20,10 @@ const intoPane = async (screen: { press: (key: string) => Promise<void> }): Prom
 
 test.skipIf(!hasFfi)('the notes pane draws its list at 80 by 24', async () => {
   const screen = await renderFixture({ pane: 'notes' })
-  const frame = await screen.frame()
+  // `until`, not `frame`: the pane's rows are a query away and the shell has more to draw than it
+  // used to, so reading the first frame is a race that passes alone and fails beside eleven other
+  // files (./harness.tsx § until).
+  const frame = await screen.until('TASK')
   screen.done()
 
   expect(frame).toContain('TASK')

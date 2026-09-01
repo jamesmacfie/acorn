@@ -15,6 +15,8 @@ import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
 import { setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { setLayouts } from '@acorn/client-core/host/layouts/table.ts'
+import { setSourcePanel } from '@acorn/client-core/host/chrome/sourcePanel.ts'
+import { sourcePanel } from './plugins/SourcePanel'
 import { setRemoteTree } from '@acorn/client-core/host/tree/table.ts'
 import { LAYOUTS } from './layouts'
 import { RemoteTree } from './plugins/RemoteTree'
@@ -41,6 +43,14 @@ setLayouts(LAYOUTS)
 // `--permission` rather than a Web Worker under a CSP (docs/tui.md).
 setRemoteTree(RemoteTree)
 installPluginWorkers()
+
+// …and the third seam of the same shape. A plugin that contributes a rail source by descriptor rather
+// than by code gets `ChromeSourcePanel` on the desktop, which is `<main class="panes">` and DOM kit
+// primitives all the way down — so registering it here handed the reconciler a `main` and selecting
+// Linear threw instead of drawing a list. This host supplies its own, as a list and a detail rather
+// than one surface, because the two go in different panels here
+// (client-core/host/chrome/sourcePanel.ts, ./plugins/SourcePanel.tsx).
+setSourcePanel(sourcePanel)
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
 // because that is where a pane comes from on the desktop too. It is the same twelve the desktop

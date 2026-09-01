@@ -43,6 +43,28 @@ const BODY = '# Repro steps\n\n1. Sign in as a new account.\n2. Change the passw
 // ── Per-pane fixtures ──────────────────────────────────────────────────────────────────────────────
 // Kept beside the transport rather than in each test, so every pane's snapshot is of the same node.
 
+/** A second project, and one that is not the first.
+ *
+ *  A workspace with one project cannot show the shell reading the path wrongly: "keep the path on a
+ *  project this workspace has" is a no-op when there is only one to keep it on. With two, a path the
+ *  router could not match reads as no project at all and the shell navigates to the first — off
+ *  whatever the reader had chosen (./chrome/routing.ts § routedProjectId).
+ *
+ *  Second, so the shell still opens on the repository the other tests browse; and with no GitHub
+ *  remote, so a test can tell which project the shell ended up on by what the Browse panel says. */
+const OTHER_PROJECT = {
+  id: 'project-2',
+  name: 'sibling',
+  path: '/tmp/acorn-sibling',
+  workspaceId: 'ws-1',
+  sort: 0,
+  hidden: false,
+  color: null,
+  vcs: 'git' as const,
+  defaultBranch: 'main',
+  remoteUrl: 'git@example.com:someone/sibling.git',
+}
+
 const PROJECT = {
   id: 'project-1',
   name: 'acorn',
@@ -199,6 +221,16 @@ const TASK_CONTEXT = {
 
 const PULL_REF = { owner: 'runn-fast', repo: 'acorn', number: 42 }
 
+/** How many pull requests the browse list answers with. One, unless a test asks for more: a list
+ *  longer than the panel it draws in is its own case — the window, the scrollbar, and the panels
+ *  below it staying on the screen (./panel.tsx, ./kit/showing.tsx § Rows). */
+const pulls = () => {
+  const count = Number(process.env.ACORN_FIXTURE_PULLS ?? 1)
+  return count > 1
+    ? [PULL, ...Array.from({ length: count - 1 }, (_unused, at) => ({ ...PULL, number: 100 + at, title: `Older pull ${100 + at}` }))]
+    : [PULL]
+}
+
 const PULL = {
   number: 42,
   title: 'Invalidate the old password on reset',
@@ -224,8 +256,41 @@ const PULL_DETAIL = {
   threads: [],
 }
 
+/** A patch as long as a test asks for, in place of the short one below.
+ *
+ *  A diff longer than the panel it draws in is its own case, and it is the case the terminal diff
+ *  shipped broken: a column of rows that does not fit is shrunk rather than scrolled, so four hundred
+ *  lines were drawn into thirty rows on top of each other (./diffLong.test.tsx). The lines are long
+ *  as well as many, because the other half of the same bug is horizontal. */
+const longPatch = (): string | null => {
+  const lines = Number(process.env.ACORN_FIXTURE_PATCH_LINES ?? 0)
+  if (!lines) return null
+  const mark = (at: number) => (at % 3 === 0 ? '+' : at % 3 === 1 ? '-' : ' ')
+  return [`@@ -1,${lines} +1,${lines} @@`, ...Array.from({ length: lines }, (_unused, at) =>
+    `${mark(at)}  const somethingRatherLongIndeed${at} = await loadAccountByEmailAddress(email.toLowerCase().trim(), ${at})`)].join('\n')
+}
+
+/** A real patch body on one of the two changed files, so the diff column has something to draw.
+ *
+ *  Both files answered `patch: null` before, which is the legitimate shape for a binary or an
+ *  over-large file — and it meant every test that opened a pull was asserting on "no changes". */
+const LOGIN_PATCH = [
+  '@@ -1,4 +1,5 @@',
+  ' export async function signIn(email: string, password: string) {',
+  '-  const account = await loadAccountByEmailAddressWithoutAnyCaching(email.toLowerCase().trim())',
+  '+  const account = await loadAccountByEmailAddressWithTheSessionCacheInFront(email.toLowerCase().trim())',
+  '+  if (!account) throw new AuthenticationError("no account for that email address", { email })',
+  '   return check(account.passwordHash, password)',
+  ' }',
+].join('\n')
+
+const pullFiles = () => {
+  const long = longPatch()
+  return long ? [{ ...PULL_FILES[0], patch: long }, PULL_FILES[1]] : PULL_FILES
+}
+
 const PULL_FILES = [
-  { path: 'src/login.ts', status: 'modified', additions: 12, deletions: 3, sha: 'a', viewed: false, patch: null },
+  { path: 'src/login.ts', status: 'modified', additions: 12, deletions: 3, sha: 'a', viewed: false, patch: LOGIN_PATCH },
   { path: 'src/session.ts', status: 'modified', additions: 4, deletions: 0, sha: 'b', viewed: false, patch: null },
 ]
 
@@ -240,23 +305,49 @@ const FILE_TEXT = 'export async function signIn(email: string, password: string)
 /** A transport that answers the routes the panes ask for and 404s the rest, so a route the pane
  *  starts asking for shows up as an empty region rather than as a silent pass. */
 export function stubTransport(): { fetch: (nodeId: string, request: { path: string; method?: string }) => Promise<{ status: number; headers: Record<string, string>; body: Uint8Array }> } {
-  const json = (value: unknown) => ({
+  // Connected, with the one capability the pull list asks for. `providers` stays empty beside it, which
+// is what switches off the "does this workspace link a project of its?" gate — that gate only applies
+// to a provider that enumerates projects, and nothing here says GitHub does.
+const GITHUB_INTEGRATION = {
+  id: 'github',
+  providerId: 'github' as const,
+  label: 'GitHub',
+  status: 'connected' as const,
+  authKind: 'token' as const,
+  account: null,
+  scopes: [],
+  capabilities: {},
+  createdAt: 0,
+  updatedAt: 0,
+}
+
+const json = (value: unknown) => ({
     status: 200,
     headers: { 'content-type': 'application/json' },
     body: new TextEncoder().encode(JSON.stringify(value)),
   })
   return {
     fetch: async (_nodeId, request) => {
+      // A transport that answers in a microtask can never hold a `Suspense` open past the tick that
+      // destroys its subtree, so the failure the real app lives with — content removed, destroyed,
+      // then handed back dead (kit/reconciler.ts § Destroy on disposal) — was unreachable from a
+      // test. The delay is opt-in per test, like ACORN_FIXTURE_PULLS above.
+      const delay = Number(process.env.ACORN_FIXTURE_DELAY_MS ?? 0)
+      if (delay) await new Promise((resolve) => setTimeout(resolve, delay))
       const path = request.path
       // The shell asks for these on mount. Answering them keeps a suite's output free of query
-      // errors that say nothing about what is under test; both are empty, which is what a node with
-      // no integrations and no saved preferences would say.
+      // errors that say nothing about what is under test.
+      //
+      // One integration, and it is GitHub, because the rail gates a browse source on the integration
+      // behind it being connected (features/tabs/railSources.ts) — with none, the Menu holds only the
+      // sources that need no provider and the Browse panel has nothing to draw. The pull routes below
+      // were always answered here; this is the row that lets a reader reach them.
       if (path === '/v2/core/prefs') return json({})
-      if (path === '/v2/core/integrations') return json({ integrations: [], providers: [] })
-      if (path === '/v2/core/workspaces') return json([{ id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }] }])
+      if (path === '/v2/core/integrations') return json({ integrations: [GITHUB_INTEGRATION], providers: [] })
+      if (path === '/v2/core/workspaces') return json([{ id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }, { id: 'project-2', name: 'sibling' }] }])
       if (path === '/v2/core/workspaces/ws-1/external-projects') return json([])
       if (path === '/v2/core/tasks') return json([TASK])
-      if (path === '/v2/core/projects') return json({ projects: [PROJECT] })
+      if (path === '/v2/core/projects') return json({ projects: [PROJECT, OTHER_PROJECT] })
       if (path === `/v2/p/notes/tasks/${TASK.id}/notes`) return json(TASK_NOTES)
       if (path === '/v2/p/notes/workspaces/ws-1/notes') return json(WORKSPACE_NOTES)
       if (path === '/v2/p/notes/workspaces/global/notes') return json([])
@@ -280,9 +371,11 @@ export function stubTransport(): { fetch: (nodeId: string, request: { path: stri
       if (path === `/v2/p/editor/tasks/${TASK.id}/editor/files`) return json(['src/login.ts', 'src/session.ts'])
       if (path.startsWith(`/v2/p/editor/tasks/${TASK.id}/editor/read`)) return json({ text: FILE_TEXT })
       if (path === `/v2/p/github/tasks/${TASK.id}/pulls`) return json({ pulls: [{ pull: PULL_REF, role: 'primary', provenance: 'agent', sessionId: 'session-1' }] })
-      if (path === '/v2/p/github/repos/runn-fast/acorn/pulls/42') return json(PULL_DETAIL)
-      if (path.startsWith('/v2/p/github/repos/runn-fast/acorn/pulls/42/files')) return json(PULL_FILES)
-      if (path.startsWith('/v2/p/github/repos/runn-fast/acorn/pulls?')) return json([PULL])
+      // Any number, not only 42, so a test that walks a long list gets a loaded detail on every row
+      // rather than "Not found" on all but the first.
+      if (/^\/v2\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+$/.test(path)) return json(PULL_DETAIL)
+      if (/^\/v2\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path)) return json(pullFiles())
+      if (path.startsWith('/v2/p/github/repos/runn-fast/acorn/pulls?')) return json(pulls())
       if (path === '/v2/p/github/repos/runn-fast/acorn/labels') return json([])
       if (path === '/v2/p/github/repos/runn-fast/acorn/mentions') return json([])
       // `ACORN_FIXTURE_LOG=1` prints what went unanswered. A pane that starts asking for a new route

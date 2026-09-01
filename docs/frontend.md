@@ -190,6 +190,19 @@ that declares it also gets `?project=` on its items route and the project in its
 does not is fetched once and shared across projects, because its rows are the same rows either way.
 The picker still appears in a task view, where nothing else names the task's project.
 
+**A source may hand over its two halves instead of one component.** `SourceContribution.regions` takes
+a `list` and a `detail`, which is the same shape a pane declares when it names the `list-detail` layout.
+A source that declares it renders identically on the desktop — `SourceSurface` composes the
+`ListDetail split` the source used to write by hand — and gains the ability to be drawn in two places
+at once, which is what the terminal shell does: the list goes in a panel of its own down the left and
+the detail fills the main panel ([docs/tui.md](./tui.md) § The screen).
+
+It exists because a host cannot pull two columns out of one opaque component. Even the kit node cannot:
+the `split` form of `ListDetail` takes both columns as `children`, so it does not know which of its
+children is which. Naming them is the only honest answer, and the name to use is the one panes already
+use. `component` stays, and a source that keeps it renders as it always did on both hosts, with the
+terminal's Browse panel empty.
+
 The one thing core asks a plugin for is where a task lives. `SourceContribution.taskPath` lets a
 source claim a task's URL, so GitHub puts a PR-backed task at its PR URL, and `pathForTask` falls
 back to `/t/:taskId`. The alternative, asking the registry for whichever source owned a route `kind`,

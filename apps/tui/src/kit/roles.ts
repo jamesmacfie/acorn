@@ -29,13 +29,43 @@ const attributes = (cell: CellStyle): number =>
 /** A run of text: its colour, its weight, and whether the role changes the characters themselves. */
 export function textStyle(role: TextRole | undefined, tone?: Tone): Style {
   const text = roleCell('text', role ?? 'body')
-  const colour = roleCell('tone', tone ?? 'neutral')
+  const colour = tone ? roleCell('tone', tone) : undefined
   return {
     // Always a colour, never omitted: an unset `fg` is opaque white to OpenTUI rather than the
-    // terminal's own foreground, and `muted` is the tone that names no slot (../appearance.ts).
-    fg: slotColor(colour.slot),
-    attributes: attributes(text) | attributes(colour),
+    // terminal's own foreground (../appearance.ts).
+    //
+    // The tone decides where one is given, and the text role decides where one is not. Both name a
+    // slot now, and a caller that passes neither still lands on `default` — which is what makes
+    // `role="muted"` a grey rather than the default foreground with the dim bit set.
+    fg: slotColor(colour?.slot ?? text.slot),
+    attributes: attributes(text) | (colour ? attributes(colour) : 0),
     ...(text.upper ? { transform: (value: string) => value.toUpperCase() } : {}),
+  }
+}
+
+/** The same answer as a `span` takes, which is not the same shape a `text` takes.
+ *
+ *  A `text` renderable gets `fg` and an attribute bitmask as props. A `span` inside one gets neither:
+ *  the Solid reconciler ignores every prop on a text node except `href` and `style`, and reads the
+ *  colour and the attributes out of that one object as booleans
+ *  (`@opentui/solid` § setProperty, `@opentui/core` § createTextAttributes). A `fg` handed to a span
+ *  is dropped without a word, so the run inherits its parent `text`'s colour — and a parent that was
+ *  given none draws opaque white, which on a light terminal is white on white. That was every
+ *  markdown paragraph and every line of every diff. */
+export const spanStyle = (role: TextRole | undefined, tone?: Tone): {
+  fg: RGBA
+  bold?: boolean
+  dim?: boolean
+  underline?: boolean
+  inverse?: boolean
+} => {
+  const style = textStyle(role, tone)
+  return {
+    fg: style.fg,
+    ...(style.attributes! & TextAttributes.BOLD ? { bold: true } : {}),
+    ...(style.attributes! & TextAttributes.DIM ? { dim: true } : {}),
+    ...(style.attributes! & TextAttributes.UNDERLINE ? { underline: true } : {}),
+    ...(style.attributes! & TextAttributes.INVERSE ? { inverse: true } : {}),
   }
 }
 

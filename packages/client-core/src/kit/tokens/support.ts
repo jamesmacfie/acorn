@@ -53,6 +53,12 @@ export const NODE_SUPPORT = {
     loss: 'the whole width when the split has collapsed, rather than a column beside the detail',
   },
   DetailColumn: { dom: 'full', tui: 'full' },
+  // A header, its named sections, and the one region that gets the room. Two shapes for one
+  // declaration, which is the node's whole reason to exist.
+  Sections: {
+    dom: 'full', tui: 'reduced',
+    loss: 'the sections are a strip of tabs over one panel rather than folds beside the main region, and a section\'s `meta` is not drawn — a strip has room for a label and a count',
+  },
   SplitHandle: { dom: 'full', tui: 'absent' },
   DocumentTabs: { dom: 'full', tui: 'full' },
   SectionHeader: { dom: 'full', tui: 'full' },

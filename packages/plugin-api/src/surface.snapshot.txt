@@ -561,6 +561,7 @@ ui: Inline
 ui: Input
 ui: Kbd
 ui: KeyValueEditor
+ui: KitSection
 ui: LineComposerController
 ui: Link
 ui: ListColumn
@@ -591,6 +592,7 @@ ui: RowActions
 ui: Rows
 ui: Section
 ui: SectionHeader
+ui: Sections
 ui: SegmentedControl
 ui: Select
 ui: Spinner

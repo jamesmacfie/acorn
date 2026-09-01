@@ -40,6 +40,7 @@ export const NODE_FOCUS = {
   Menu: 'trap',
   Popover: 'none',
   ListDetail: 'none',
+  Sections: 'collection',
   ListColumn: 'none',
   DetailColumn: 'none',
   SplitHandle: 'stop',

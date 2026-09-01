@@ -7,6 +7,12 @@
 // Small on purpose. This is every name the app and the bundled plugins actually spend, read off the
 // tree, plus the handful a person reaches for first. A name that is missing is a one-line addition,
 // and a name nobody uses is a character somebody had to choose for no reader.
+//
+// **Every glyph here is one cell wide, and that is a rule rather than a coincidence.** A character
+// with `Emoji_Presentation` takes two cells in most terminals and one in the rest, so a row holding
+// one is a row whose width the layout cannot predict: eight of these used to be emoji, and they drew
+// the rail's names a cell to the right of every other row's. Before adding a name, check the mark
+// against `\p{Emoji_Presentation}` — if it matches, pick a different mark.
 export const GLYPHS: Readonly<Record<string, string>> = {
   // Actions
   x: '✕',
@@ -21,11 +27,11 @@ export const GLYPHS: Readonly<Record<string, string>> = {
   send: '➤',
   play: '▶',
   ellipsis: '…',
-  paperclip: '📎',
+  paperclip: '⇗',
   ban: '⊘',
   archive: '🗀',
-  pin: '📌',
-  'pin-off': '📌',
+  pin: '⌖',
+  'pin-off': '⌖',
   // Movement
   'chevron-up': '▴',
   'chevron-down': '▾',
@@ -60,18 +66,18 @@ export const GLYPHS: Readonly<Record<string, string>> = {
   'file-cog': '🗎',
   'notepad-text': '🗒',
   database: '🗃',
-  globe: '🌐',
+  globe: '⊕',
   house: '⌂',
   network: '⧉',
   monitor: '🖵',
   'app-window': '🖵',
   'square-terminal': '❯',
   keyboard: '⌨',
-  'key-round': '🔑',
-  puzzle: '🧩',
-  bot: '🤖',
+  'key-round': '⚿',
+  puzzle: '⊞',
+  bot: '⌬',
   sparkles: '✦',
-  rocket: '🚀',
+  rocket: '↟',
   dices: '⚄',
   braces: '{',
   'user-round': '☺',
