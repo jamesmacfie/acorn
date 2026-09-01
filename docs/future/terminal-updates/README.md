@@ -1,0 +1,82 @@
+# Terminal updates
+
+A programme, 2026-09-02. Nothing here is scheduled and nothing in it has started. It follows the
+terminal programme (`docs/future/terminal/`, deleted 2026-08-31) and the terminal-fixes analysis
+(`docs/future/terminal-fixes/`, deleted 2026-09-01), both in git history, and it starts from what
+they left: a terminal client whose architecture is right and whose keyboard is not finished.
+
+## The verdict, in a paragraph
+
+The seams are sound. One engine, intents in front of every component, a component table and a
+layout table per host, a source-panel seam, a remote-tree seam, a region contract the terminal keeps
+while replacing every DOM mechanism under it. Two things are hacked. The asking half of the kit draws
+controls and wires none of them, so the pull-request pane's Merge, its composer, and its label chips
+are pictures. And the focus store grew six deferred decisions and four flags in fourteen commits to
+encode the shell's topology, and now knows the chrome by string. Everything janky a reader has felt
+traces to one of those two. [analysis.md](./analysis.md) has the evidence, numbered.
+
+## What is in the folder
+
+| File | What it is |
+| --- | --- |
+| [analysis.md](./analysis.md) | The read: the boxes and seams as drawn, what is good and stays, and twelve numbered findings with the file each was read from. |
+| [focus-model.md](./focus-model.md) | The target: five levels, five key groups, one settle pass, eight invariants, and the pull request walked press by press. Every phase points here. |
+| [refused.md](./refused.md) | What the programme decided not to do, with the terminal-fixes refusals carried forward. |
+| [phase-0-controls.md](./phase-0-controls.md) | Every control is a stop: `pressable`, the asking nodes wired, `commit` submits, `Select` opens. |
+| [phase-1-focus-tree.md](./phase-1-focus-tree.md) | One focus tree in `regions.ts`, a topology the shell installs, parent stops as a role, one settle pass. |
+| [phase-2-documents.md](./phase-2-documents.md) | Stops inside scrolling content: arrows move, page keys scroll, Escape climbs one level. |
+| [phase-3-tabs.md](./phase-3-tabs.md) | A strip with panels is a parent whoever drew it; no chord spelled `super+`. |
+| [phase-4-shell.md](./phase-4-shell.md) | The shell's contract as a topology file, the Rail without focus effects, a filter for descriptor lists. |
+| [phase-5-extensions.md](./phase-5-extensions.md) | Extension kinds in cells: the `ExtendedPane` seam, rows, diff annotations, and the losses named. |
+| [phase-6-tests-and-docs.md](./phase-6-tests-and-docs.md) | The invariants as properties over the roster, the footer's words, the doc moves, and deleting this folder. |
+
+## The phases, in one line each
+
+| Phase | What it is | Depends on | Status |
+| --- | --- | --- | --- |
+| 0 | Wire every asking node so it focuses, shows focus, and acts. The pull request merges and comments from the keyboard. | nothing | Not started. |
+| 1 | Refactor `keys/regions.ts` into the five-level model with one settle pass and a shell-installed topology. Behaviour unchanged. | 0 for its tests | Not started. |
+| 2 | Arrows move between stops inside a panel, page keys scroll, Escape climbs to the parent strip. | 0, 1 | Not started. |
+| 3 | `Tabs` with `TabPanel`s is a parent strip without a prop. Linear and Rollbar catch up. `ctrl+N`. | 1 | Not started. |
+| 4 | The shell's topology file, the Rail without effects, workspace switch through the settle, `/` filters a descriptor list. | 1 | Not started. |
+| 5 | The `ExtendedPane` seam, `rows` as a collection, diff annotation marks, the loss table in `docs/tui.md`. | 0, 2 | Not started. |
+| 6 | Reachability, bounded Escape, one caret, footer truth as tests over every pane; docs rewritten; folder deleted. | all | Not started. |
+
+Phases 2, 3, and 4 are independent of each other once 1 has landed. Phase 0 is the one to do first
+whatever else happens: it is the largest change a reader will notice and the smallest change to the
+architecture.
+
+## How to use this folder
+
+Each phase file has the same sections: goal, why, numbered requirements, design notes, files,
+tests, acceptance, and doc moves. The requirements are the contract. If the code turns out not to
+match a requirement's premise, change the requirement in the file and say why in the same commit,
+so the next person argues with a reason. Paths are hints and every phase says to verify them; the
+docs path check (`tools/arch/docPaths.test.ts`) refuses a backticked path that does not exist, so a
+file a phase proposes is marked `(new)` on its line.
+
+The user-facing test of the whole programme is the worked example at the end of
+[focus-model.md](./focus-model.md). When that sequence passes as written, at 100 by 32, with the
+footer saying what each line says, the programme is done and the folder goes.
+
+## What this touches elsewhere
+
+- `docs/tui.md` owns the terminal client and is the destination for every behaviour here. Its
+  §§ Keys and focus and What a plugin loses here are the sections that change most.
+- `docs/command-palette-and-shortcuts.md` § Focus and typing owns the shared rules and keeps them;
+  its terminal paragraphs shrink to a pointer.
+- `packages/client-core/src/kit/tokens/focusRoles.ts` and `support.ts` are not edited. The programme
+  makes the code agree with them.
+- `docs/future/client-plugins/04-replaceable-surfaces.md` owns the host UI slots this programme
+  leaves undrawn.
+- `docs/future/dashboards/README.md` owns the `pane.aside` region this programme leaves undrawn.
+
+## Verify before building
+
+- `apps/tui/src/keys/regions.ts` is dirty in the working tree on 2026-09-02, with about 230 lines
+  added since the last commit. The analysis reads the working-tree version. Land or discard that work
+  before starting phase 1, and re-read the module's exports against phase 1 requirement 17.
+- `apps/tui/src/kit/asking.tsx` § `Button` is a `Line`. If it has grown a `pressable` since, phase 0
+  is partly done; read the file before the plan.
+- `packages/client-core/src/host/frames/register.ts` mounts the DOM `ExtendedPane`. If a seam has
+  appeared since, phase 5 requirement 1 is done.
