@@ -192,6 +192,26 @@ describe.skipIf(!hasFfi)('the layouts in cells', () => {
     }
   }, 30_000)
 
+  it('the tabs layout switches on Ctrl+N, and the strip and the chord agree', async () => {
+    // Ctrl rather than the desktop's Cmd: macOS terminal emulators keep Cmd and never deliver it, so
+    // the chord as written on the desktop is one nobody can press here (../keys/commandLayer.ts §
+    // asCtrl). Both the chord and the strip's own arrows write the same stored selection, so a reader
+    // who switches one way and then the other does not find two answers (./Tabs.tsx).
+    const frame = await draw(CASES.find((entry) => entry.layout === 'tabs')!, { width: 80, height: 24 })
+    try {
+      const second = await frame.press('2', { ctrl: true })
+      expect(second.lines[0]).toContain('[Checks]')
+      expect(second.text).toContain('the checks')
+      // Escape climbs out of the panel to the strip that owns it, which is the only way in: the strip
+      // is not a region of its own, so a reader reaches it from below (../keys/regions.ts § parentOf).
+      const strip = await second.press('ESCAPE')
+      const back = await strip.press('ARROW_LEFT')
+      expect(back.lines[0]).toContain('[Overview]')
+    } finally {
+      frame.done()
+    }
+  }, 30_000)
+
   it('a layout re-lays out when the terminal is resized', async () => {
     // `SIGWINCH` is the renderer's: it listens for the signal itself and re-lays out, and no layout
     // reads the terminal's size, so a resize is one thing rather than eight

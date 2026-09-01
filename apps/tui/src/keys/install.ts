@@ -75,9 +75,9 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
   // (../kit/rectangle.tsx § The Rectangle contract).
   setKeymap(engine, {
     // Ctrl, whatever platform this is. The engine reports the *platform's* primary modifier and on
-    // macOS that is `super`, which a terminal emulator keeps for itself and never delivers — so
-    // `super+return` would be a chord nobody can press. Every chord in the intent table is spelled
-    // with Ctrl here, and so is every chord the shell registers.
+    // macOS that is Cmd, which a terminal emulator keeps for itself and never delivers — so Cmd+Return
+    // would be a chord nobody can press. Every chord in the intent table is spelled with Ctrl here,
+    // and so is every chord the shell registers.
     primary: 'ctrl',
     typing: () => {
       const focused = renderer.currentFocusedRenderable
