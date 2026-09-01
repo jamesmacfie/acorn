@@ -1006,7 +1006,7 @@ disagree about which nodes exist or what each one does with focus.
 | `Chip` | conditional | `(text)`, with a trailing `×` when removable |
 | `ChipRow` | collection | chips on one line, wrapping |
 | `StatusDot` | none | `●` in colour, `○` for neutral |
-| `Facts` | none | two columns, labels grey; `grouping="rows"` is one pair per line |
+| `Facts` | none | two columns, labels grey; `grouping="rows"` is one pair per line; `wide` on an item is a desktop-only full-row tile |
 | `DescriptionList` | none | as `Facts`, one pair per line |
 | `Table` | none | reduced: box-drawn, truncating columns by the priority its heads declare |
 | `TableHead` | none | reduced: the column's label in the bold header line; the lowest priority is dropped first, and a line under the table names the columns that went |

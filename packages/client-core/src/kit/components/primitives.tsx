@@ -1068,9 +1068,9 @@ export function DescriptionList(props: {
   )
 }
 
-DescriptionList.Item = (props: { label: JSX.Element; mono?: boolean; children: JSX.Element }) => (
+DescriptionList.Item = (props: { label: JSX.Element; mono?: boolean; wide?: boolean; children: JSX.Element }) => (
   // The wrapping div is what makes grid placement work for the `facts` layout. `<dl>` permits it.
-  <div class="ui-dl-item">
+  <div class="ui-dl-item" data-wide={props.wide ? '' : undefined}>
     <dt class="ui-dl-label">{props.label}</dt>
     <dd class="ui-dl-value" data-mono={props.mono ? '' : undefined}>{props.children}</dd>
   </div>

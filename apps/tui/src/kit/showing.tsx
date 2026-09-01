@@ -449,7 +449,7 @@ export function Spinner(_props: { size?: 'sm' | 'md'; label?: string }) {
 /** Two columns, labels dim; `grouping="rows"` is one pair per line, which in cells is what both
  *  groupings are. */
 export function Facts(props: {
-  items: readonly { label: string; value: JSX.Element; mono?: boolean }[]
+  items: readonly { label: string; value: JSX.Element; mono?: boolean; wide?: boolean }[]
   size?: 'sm' | 'md'
   grouping?: 'tiles' | 'rows'
 }) {
