@@ -264,6 +264,22 @@ export const markItem = (box: Renderable, pick?: () => void, identity?: string):
   })
 }
 
+// Which renderable is a collection's container, and which of its rows is the roving one. A list is
+// one stop from outside — a reader walking a panel passes it once, and its own layer 40 takes the
+// arrows from there — so the reading-order walk has to be able to say "this box is a list" without
+// asking the kit what node drew it, the same way `items` says "this box is a row".
+let containers: { box: Renderable; active: () => Renderable | undefined }[] = []
+
+/** Called by a collection for its container (./collection.ts). `active` is the row the caret is on. */
+export function markCollection(box: Renderable, active: () => Renderable | undefined): void {
+  const entry = { box, active }
+  containers.push(entry)
+  onCleanup(() => {
+    const at = containers.indexOf(entry)
+    if (at >= 0) containers.splice(at, 1)
+  })
+}
+
 // ── Reading the tree ──────────────────────────────────────────────────────────────────────────
 
 const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable | undefined => {
@@ -300,25 +316,44 @@ const revealInViewports = (node: Renderable): void => {
   }
 }
 
+/** Whether a box is some parent stop's panel, and so belongs to the level below this walk. */
+const isPanel = (node: Renderable): boolean =>
+  parents.some((parent) => parent.node !== node && parent.panels().includes(node))
+
 /**
  * Reading-order stops inside a box, in reading order.
  *
- * Exported for one caller outside this module: a `Menu`'s open list moves between its own stops while
- * the trap holds the keys, and the stops behind the overlay are not its to walk (./stops.ts).
+ * Exported for two callers outside this module: a `Menu`'s open list moves between its own stops
+ * while the trap holds the keys, and the stops behind the overlay are not its to walk (./stops.ts).
  *
- * A scroll viewport is the fallback stop for a document with no controls. Where it does contain a
- * control or collection row, the child is the stop and the viewport stays transparent to Down.
- * Likewise a parent stop is one stop; controls drawn in a strip's trailing slot do not sit between
- * the strip and the panel it is showing.
+ * Five rules, and each one is a level of the model showing through:
+ *
+ *   a parent stop      one stop, and its panels are not walked. A panel is the level below this one,
+ *                      reached with Down and left with Escape, so a strip and the controls inside the
+ *                      panel it happens to be showing are never neighbours in one list.
+ *   a collection       one stop, drawn as its roving row. A list is one place a reader passes
+ *                      through; the arrows inside it are the collection's own layer.
+ *   a scroll viewport  transparent while it holds a stop, and the stop itself otherwise. That is how
+ *                      a document with no controls keeps the arrows for scrolling.
+ *   a focusable node   one stop, not walked into.
+ *   anything else      walked through.
  */
 export const stopsIn = (box: Renderable): Renderable[] => {
   const found: Renderable[] = []
-  const visit = (parent: Renderable): number => {
-    const before = found.length
+  const visit = (parent: Renderable): void => {
     for (const child of parent.getChildren()) {
-      if (!child.visible || child.isDestroyed) continue
+      if (!child.visible || child.isDestroyed || isPanel(child)) continue
       if (parentEntry(child)) {
         found.push(child)
+        continue
+      }
+      const container = containers.find((entry) => entry.box === child)
+      if (container) {
+        // A virtual list whose active row is off its drawn window has no renderable for it, and the
+        // container itself holds the keys until one arrives (../kit/showing.tsx § Rows).
+        const row = container.active()
+        if (row && !row.isDestroyed && row.visible) found.push(row)
+        else if (child.focusable) found.push(child)
         continue
       }
       if (child instanceof ScrollBoxRenderable) {
@@ -333,14 +368,55 @@ export const stopsIn = (box: Renderable): Renderable[] => {
       }
       visit(child)
     }
-    return found.length - before
   }
   visit(box)
   return found
 }
 
-/** Move from one stop to the adjacent stop in its current region, without wrapping. Phase 2 of
- *  docs/future/terminal-updates/ replaces this with a walk scoped to the enclosing panel. */
+/**
+ * The box a stop's neighbours live in: the panel it is inside, else its region's own box.
+ *
+ * The same walk `parentOf` makes, keeping the ancestor rather than the strip that owns it. A stop
+ * that is not in a panel has the whole region for neighbours, which is what a filter strip above a
+ * list wants.
+ */
+const boxAround = (node: Renderable): Renderable | undefined => {
+  for (let at: Renderable | null = node; at; at = at.parent) if (isPanel(at)) return at
+  return regionOf(node)?.box
+}
+
+/**
+ * Move to the next or previous stop beside the focused one, and reveal it.
+ *
+ * An edge is a wall: `true` and nothing moves, the same answer a tab strip gives at its last tab.
+ * Letting a failed Down bubble to the region tier would make an arrow cross regions, which is Tab's
+ * job and which surprised readers the one time a strip did it.
+ *
+ * `false` means "not mine": the focused thing is not in the walk at all, which is a row of a
+ * collection or a viewport with nothing in it. Both have their own answer to the arrows and both sit
+ * on a lower layer, so returning false is what lets them have it.
+ */
+export function moveStop(delta: 1 | -1): boolean {
+  const node = focusedNode()
+  // A row of a collection is in the walk — a list is drawn there as the row its caret is on — and it
+  // is still not this function's to move. The list owns its own arrows and wraps by its own rules.
+  if (!node || items.has(node)) return false
+  const box = boxAround(node)
+  if (!box) return false
+  const stops = stopsIn(box)
+  const at = stops.indexOf(node)
+  if (at < 0) return false
+  return focusRenderable(stops[at + delta]) || true
+}
+
+/**
+ * Move from one stop to the adjacent stop in its current region, without wrapping.
+ *
+ * `moveStop` is the reader-facing version of this and walls at an edge. This one does not, and that
+ * is the whole difference and the reason both exist: its caller is a tab strip that owns no panels —
+ * GitHub's Open/Closed filter, the task-pane strip — where Down means "into the panel, else the next
+ * stop beside me, else the next region", and a wall would make the last term dead.
+ */
 export function moveFocusFrom(node: Renderable, delta: 1 | -1): boolean {
   const group = regionOf(node)
   if (!group) return false
@@ -603,6 +679,7 @@ export function _resetRegions(): void {
   parents = []
   overlayOpening = null
   overlayClosing = null
+  containers = []
   items = new WeakSet<Renderable>()
   itemIdentities = new WeakMap<Renderable, string>()
   itemsByIdentity.clear()

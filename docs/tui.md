@@ -468,6 +468,17 @@ ordinary control, so Browse still opens on its rows and Up/Down reaches the coll
 sibling of its panels rather than an ancestor, so walking up from a control never reaches it: the
 panel box is what the walk reaches, and the panels list is the edge that carries the rest of the way.
 
+**Arrows move between stops.** `down`/`j` and `up`/`k` on a control go to the next stop beside it in
+reading order and reveal it in every viewport around it. The neighbours are the stops of the panel the
+control is in, or of its region where no panel owns it, and an edge is a wall: an arrow never crosses
+a region, because Tab already does that and a strip that did it surprised readers. `stopsIn` is the
+walk, depth first over the retained tree, and each of its rules is a level of the model showing
+through. A parent stop counts once and its panels are skipped, since a panel is the level below and
+Down is the way in. A collection counts once, drawn as the row its caret is on. A scroll viewport is
+transparent while it holds a stop and is the stop itself otherwise. Anything else focusable counts
+once. `moveStop` answers false for whatever the walk does not own, which is how a row hands the arrows
+back to its collection and a document with no controls keeps them for scrolling.
+
 **One deferred decision.** A focus decision that needs a renderable the current render has not
 produced yet waits in `settleFocus`, queued at most once per turn by `scheduleSettle`. It runs five
 steps in order: re-enter a region whose focused row was destroyed, by the row's logical identity;
@@ -519,6 +530,12 @@ The intent half of `collection.ts` is shared. The element half has a DOM file an
 wheel movement changes the window without changing that key. `Grid` keeps its documented exception:
 a virtualised row has no renderable, so the arrows move `selected` and the view follows.
 
+`Timeline` is the exception that goes the other way. `focusRoles.ts` calls it a collection and the DOM
+host roves over its turns; here a turn is a `Card`, and a card is a stop only where it takes an
+`onPress`. So the stops in a pull request's conversation are the controls and composers inside the
+turns rather than the turns themselves, and nothing roves. A reader moves through them with the arrows
+and reads the text between with the page keys, which is what every other document here does.
+
 **Moving the caret selects.** Every `Rows` on this host passes `selectOnMove`, which
 `collectionIntents.ts` already had and only `Tabs` and `Select` used. It is this host's own answer and
 the same kind of departure as opening a region on its list: with no pointer the caret is the selection,
@@ -542,8 +559,16 @@ remembered row is idempotent.
 clamping. Panels opt into it for document/detail bodies; hidden tab panels keep their own offsets.
 The viewport itself is the fallback focus stop for a document with no controls. When it contains a
 row, textarea, rectangle or other real stop, it is transparent to focus and a focused child is
-revealed through every scrollbox ancestor with `scrollChildIntoView`. Arrow keys, `j`/`k`, page keys,
-Home and End scroll a viewport while the viewport itself has focus.
+revealed through every scrollbox ancestor with `scrollChildIntoView`.
+
+Arrows move and page keys scroll, which is the one sentence the footer has to be able to say
+everywhere. Arrow keys and `j`/`k` scroll a viewport only while the viewport itself has the keys, and
+it has them only where the document holds no other stop. `pgup`, `pgdn`, Home and End scroll it from
+anywhere inside it, so a reader on a control halfway down a long panel can see the rest of the panel
+without giving up their place. A collection inside the viewport answers those four first, so Home in a
+list still goes to its first row. A long description with a copy button at the top is therefore read
+with the page keys and the wheel: `↓` lands on the button and stops there, because the text between
+two stops is not a place the keys can be.
 
 Virtual `Rows` deliberately do not sit inside that mechanism: they render only their visible slice,
 so there is no offscreen child for a native scrollbox to move. Their own `top` offset handles wheel
@@ -791,6 +816,10 @@ learns nothing about the host. What a *reader* loses is one row per plugin in
 [first-party-plugins.md](./first-party-plugins.md) § What each of these loses in a terminal, and it is
 short. The whole workspace crosses except three rectangles, and the rectangle that defines an agent
 workspace, the PTY, is the one a terminal does best.
+
+A `Card` that takes an `onPress` is one stop and the walk does not go inside it, so a pressable card
+with its own controls in it reaches the card and nothing else. No first-party pane draws one; a card
+that holds controls holds them instead of a press.
 
 Two things nothing draws yet rather than draws worse. There is no settings surface, so the four
 plugins that register a settings page contribute nothing through it, and `workflows` contributes
