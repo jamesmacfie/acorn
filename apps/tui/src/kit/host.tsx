@@ -2,19 +2,23 @@
 import { createMemo, For, Show, type JSX } from 'solid-js'
 import { Dynamic } from '@opentui/solid'
 import { createQuery } from '@tanstack/solid-query'
-import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
+import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
-import { extensionPointRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
+import { createFleetQuery } from '@acorn/client-core/infra/node/fanout.ts'
+import {
+  extensionDeliveries, extensionPointRegistry, type ExtensionContribution,
+} from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome/chromeData.ts'
 import { resolveSlot, slotChoiceFor, slotChoices } from '@acorn/client-core/host/tree/arbitration.ts'
-import { annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
 import type { OverlayPalette } from '@acorn/client-core/host/palette/overlay.ts'
 import { RemoteTree } from '../plugins/RemoteTree'
 import { htmlLines } from './markdown'
 import { Line } from './cells'
-import { Icon, Lines, Row } from './showing'
+import { Badge, Icon, Lines, Row, Rows } from './showing'
 import { Input } from './asking'
-import { Modal, ModalBody } from './grouping'
+import { Modal, ModalBody, SectionHeader } from './grouping'
 
 // What `@acorn/plugin-api/ui/host` is on this host.
 //
@@ -233,22 +237,80 @@ export function Slot(props: SlotProps) {
   )
 }
 
-/** One item's marks, drawn where the owner put them. The DOM stacks icon, text and owner in a row of
- *  spans; here they are the same three in the same order, on one line. */
-export function AnnotationMarks(props: { point: string; itemKey: PluginAnnotationKey }) {
-  const marks = () => annotationsFor(props.point, props.itemKey)
+/** One item's marks, drawn where the owner put them. In `./showing.tsx` beside the diff line that
+ *  draws them, because a `text` node cannot hold a component from a module that imports it back. */
+export { AnnotationMarks } from './showing'
+
+/**
+ * The `rows` extension kind, in cells.
+ *
+ * The counterpart of `client-core/host/chrome/ExtensionPointHost.tsx`, and the same division of
+ * labour every other node on this barrel keeps: `extensionPoints.ts` decides which contributions are
+ * eligible and in what order, and only the drawing is the host's.
+ *
+ * A `Rows` collection per contributor, at the end of the region that hosts the point, rather than a
+ * pinned strip of buttons under the pane: a strip is one more row of chrome on a 24-row screen, and a
+ * collection is the one thing on this host every reader already knows how to drive
+ * (docs/tui.md § What a plugin loses here). It draws nothing and registers no stop when the point has
+ * no deliveries, so an owner who reserved a footer nobody fills sees the pane exactly as it was.
+ */
+export function ExtensionRows(props: { point: string }) {
   return (
-    <box flexDirection="row" gap={1}>
-      <For each={marks()}>
-        {(mark) => (
-          <box flexDirection="row" gap={1}>
-            <Show when={mark.icon}>{(name) => <Icon name={name()} />}</Show>
-            <Line tone={mark.severity === 'danger' ? 'danger' : mark.severity === 'warn' ? 'warn' : undefined}>{mark.text}</Line>
-            <Line role="muted">{mark.pluginId}</Line>
-          </box>
-        )}
-      </For>
-    </box>
+    <For each={extensionDeliveries(props.point)}>
+      {(contribution) => <ExtensionGroupRows contribution={contribution} />}
+    </For>
+  )
+}
+
+/** One contributor's items. Its own component because each contributor is its own fetch, which is the
+ *  same shape the DOM's `ExtensionGroup` has and the reason the two cannot be one `<For>`. */
+function ExtensionGroupRows(props: { contribution: ExtensionContribution }) {
+  const nodeId = activeNodeId() ?? ''
+  const [result] = createFleetQuery(
+    () => chromeKey(props.contribution.pluginId, props.contribution.id),
+    // A contributor whose node is unreachable contributes nothing, which is the same answer as a
+    // contributor with nothing to say. Identical to the DOM host's, and for its reasons.
+    (_node, _revision, signal) =>
+      props.contribution.fetch?.(signal).catch((): PluginExtensionItem[] => []) ?? Promise.resolve([]),
+    () => chromeDeps(props.contribution.pluginId),
+    { nodeIds: [nodeId] },
+  )
+  const items = createMemo(() =>
+    (result().rows[0]?.data ?? []).map((item) => ({ ...item, key: item.id, label: item.title })))
+
+  return (
+    <Show when={items().length}>
+      <box flexDirection="column" flexShrink={0}>
+        {/* The stamp, on the header rather than on every row: provenance is drawn and not only
+            recorded (docs/plugins.md § Cooperative extension points), and a terminal row has one line
+            to spend on the item itself. */}
+        <SectionHeader level="group" actions={<Line role="muted">{props.contribution.pluginId}</Line>}>
+          {props.contribution.label}
+        </SectionHeader>
+        <Rows
+          id={`extension:${props.contribution.point}:${props.contribution.id}`}
+          ariaLabel={props.contribution.label}
+          items={items()}
+          onActivate={(key) => {
+            const item = items().find((candidate) => candidate.key === key)
+            if (item) props.contribution.run?.(item)
+          }}
+        >
+          {(item, itemProps) => (
+            <Row
+              item={itemProps}
+              density="compact"
+              leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
+              trailing={<Show when={item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>}
+              meta={<Show when={item.subtitle}>{(subtitle) => <Line role="muted">{subtitle()}</Line>}</Show>}
+              {...(props.contribution.run ? { onPress: () => props.contribution.run!(item) } : {})}
+            >
+              {item.title}
+            </Row>
+          )}
+        </Rows>
+      </box>
+    </Show>
   )
 }
 

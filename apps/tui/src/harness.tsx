@@ -53,6 +53,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
   const { _resetChrome } = await import('./chrome/state')
   const { _resetRouter } = await import('./kit/router')
+  const { clearAnnotations } = await import('@acorn/client-core/host/annotations/annotations.ts')
   const { setActiveTaskId, setSelectedSource } = await import('@acorn/client-core/features/tasks/tasks.ts')
   // The collection store, the region list, the per-pane layout state, the path and which browse
   // source is showing are all module state, so two renders in one process would share a caret, a
@@ -67,6 +68,10 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   _resetLayoutState()
   _resetChrome()
   _resetRouter()
+  // …and the marks another plugin put on this one's rows. The store remembers which key set it has
+  // already asked about, so a render whose fixture contributes marks would be told the previous
+  // render's answer — an empty one — and never ask (client-core/host/annotations).
+  clearAnnotations()
   setActiveTaskId(null)
   setSelectedSource(null)
   await bootFixture()
@@ -94,6 +99,12 @@ export async function renderFixture(size: { width?: number; height?: number; sup
       .map((entry) => entry?.preload?.()))
   }
   const { App } = await import('./App')
+  // Contributions nobody ships, and nothing at all unless a test asked for one
+  // (./fixtureExtensions.tsx). After the roster `App.tsx` registers, because a delivery needs the point
+  // its owner declared while activating, and before the render, because a chord has to be in the
+  // keybinding registry when the command layer builds its first table.
+  const { installFixtureExtensions } = await import('./fixtureExtensions')
+  installFixtureExtensions()
 
   // The renderer first and the tree second, rather than `testRender`, which builds both at once. The
   // keymap has to be installed before anything mounts: a layout, a collection and a trap all register

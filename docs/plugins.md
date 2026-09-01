@@ -1789,6 +1789,15 @@ All five obey the same four rules:
 
 `kind` defaults to `rows`, so a manifest written before this field parses to the kind it meant.
 
+**What each kind does in a terminal.** Both hosts read the same registry and the same arbitration; only
+the drawing differs. `rows` becomes a keyboard-driven collection at the end of the owning pane rather
+than a strip under it. `annotation` marks draw on the line below the item they key, because a diff line
+in cells is already as wide as the panel. `remote` trees cross with full parity, and a contributor's
+nodes are as reachable as the kit says they are — a `Button` is a stop, a `Text` is not. `rectangle` is
+one muted line naming the point, because there is no iframe. `hook` runs on the node and neither host
+draws it. `docs/tui.md` § What a plugin loses here is the table, and it is the one place that answer
+lives.
+
 ### Rows
 
 **A declares the point it hosts.** One entry, and it is all the code A writes:

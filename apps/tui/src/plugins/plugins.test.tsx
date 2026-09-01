@@ -258,6 +258,66 @@ test('a worker that dies at module scope fails its slot rather than hanging', as
   expect(refusals.join(' ')).toContain('this bundle is broken')
 }, 30_000)
 
+// ── Reserved regions ──────────────────────────────────────────────────────────────────────────────
+
+test.skipIf(!hasFfi)('a pane that reserved a footer draws the rows delivered into it', async () => {
+  // What `client-core/host/chrome/extendedPane.ts` exists for. The frame registry wrapped a loaded
+  // plugin's pane in the DOM's `ExtendedPane` — a `div` around an `aside` holding a `PanelGrid` — so a
+  // pane that declared a `pane.footer` or a `pane.aside` was refused by the reconciler rather than
+  // drawn. This host's wrapper puts both under the owner's own tree (./ExtendedPane.tsx).
+  // A node, because a contributor's rows come through the fleet fan-out and a fan-out over no nodes
+  // answers with none (client-core/infra/node/fanout.ts).
+  const { bootFixture } = await import('../harness')
+  await bootFixture()
+  const { extensionPointRegistry, extensionRegistry } = await import('@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts')
+  const { ExtendedPane } = await import('./ExtendedPane')
+  const point = { pointId: 'board:card-links', region: { columns: 2, rows: 2 } } as never
+
+  const points = extensionPointRegistry.register({
+    id: 'board:card-links',
+    ownerId: 'board',
+    label: 'Linked items',
+    kind: 'rows' as const,
+    location: 'pane.footer' as const,
+    surface: 'board',
+    max: 4,
+  })
+  const rows = extensionRegistry.register({
+    id: 'tracker:links',
+    pluginId: 'tracker',
+    point: 'board:card-links',
+    label: 'Tracked items',
+    order: 10,
+    carrier: 'items' as const,
+    fetch: async () => [{ id: 'i-1', title: 'ACORN-14', subtitle: 'in review' }],
+  })
+
+  try {
+    const screen = await renderCells(() => (
+      <ExtendedPane footerPointId="board:card-links" aside={point}>
+        <Text>the pane itself</Text>
+      </ExtendedPane>
+    ))
+    // A real wait: the rows come off a fan-out query, which answers on a tick rather than on a frame.
+    await new Promise((done) => setTimeout(done, 200))
+    const drawn = await screen.frame()
+    screen.done()
+
+    expect(drawn.text).not.toContain('Unknown component type')
+    expect(drawn.text).toContain('the pane itself')
+    // The contributor's rows, its label, and the stamp saying whose they are.
+    expect(drawn.text).toContain('ACORN-14')
+    expect(drawn.text).toContain('Tracked items')
+    expect(drawn.text).toContain('tracker')
+    // …and the aside named rather than drawn: a dashboard is a grid sized in pixels, and its terminal
+    // projection is the dashboards programme's question (docs/tui.md § What a plugin loses here).
+    expect(drawn.text).toContain('board:card-links is a dashboard')
+  } finally {
+    rows.dispose()
+    points.dispose()
+  }
+}, 30_000)
+
 // ── Two paths, one kit ────────────────────────────────────────────────────────────────────────────
 
 test.skipIf(!hasFfi)('a tree drawn from a batch and the same tree written as JSX draw the same cells', async () => {

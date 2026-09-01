@@ -211,7 +211,7 @@ Read against `docs/plugins.md` § Cooperative extension points and the registrie
 | exclusive slot (`rail.taskList`) | `host/plugins/ExclusiveSlotHost.tsx` | `apps/tui/src/chrome/slot.tsx`, full parity |
 | `annotation` marks | `host/annotations/AnnotationMarks.tsx` | `kit/host.tsx` § `AnnotationMarks`, drawn; but `apps/tui/src/kit/showing.tsx` § `DiffPane` takes `annotations` and never reads it, so `github:diff-line` and `changes:diff-line` deliver nothing |
 | `rows` (`pane.footer`) | `host/chrome/ExtensionPointHost.tsx` | absent, no counterpart and no seam |
-| `pane.aside` dashboards region | `host/chrome/ExtendedPane.tsx` | absent |
+| `pane.aside` dashboards region | `host/chrome/ChromeExtendedPane.tsx` | absent |
 | `rectangle` (`pane.inline-*`) | `host/frames/InlineSlot.tsx` | one muted line, by design |
 | host UI slots (`overlay`, `drawer`, `task.footer`, `topbar.*`) | `host/registries/extensionPoints/uiSlots.tsx` | absent; onboarding's overlay, the terminal drawer, docker's task badge draw nothing |
 
