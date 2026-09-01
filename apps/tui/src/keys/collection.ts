@@ -24,7 +24,8 @@ import {
 } from '@acorn/client-core/kit/keys/collectionIntents.ts'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import {
-  activationEntersMain, focusedRenderable, markItem, moveColumn, noteFocus, scheduleSettle,
+  activationEntersMain, focusedRenderable, markCollection, markItem, moveColumn, noteFocus,
+  scheduleSettle,
 } from './regions'
 
 /**
@@ -121,6 +122,9 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       // Layer 40, focus-within on the collection, exactly as on the desktop (client-core
       // host/keys/install.ts § the four tiers). Priority decides, not locality.
       onCleanup(registerIntentLayer(box, COLLECTION_INTENTS, keys.handle))
+      // And one stop from outside: a reader walking a panel with `↓` passes the list once, on the row
+      // the caret is already on, rather than through every row of it (./regions.ts § stopsIn).
+      markCollection(box, () => { const key = keys.active(); return key ? boxes.get(key) : undefined })
     },
   }
 }

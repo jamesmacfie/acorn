@@ -24,7 +24,7 @@ traces to one of those two. [analysis.md](./analysis.md) has the evidence, numbe
 | [refused.md](./refused.md) | What the programme decided not to do, with the terminal-fixes refusals carried forward. |
 | [phase-0-controls.md](./phase-0-controls.md) | Every control is a stop: `pressable`, the asking nodes wired, `commit` submits, `Select` opens. |
 | [phase-1-focus-tree.md](./phase-1-focus-tree.md) | Shipped. A pointer at `docs/tui.md`, plus the five places the design changed on contact. |
-| [phase-2-documents.md](./phase-2-documents.md) | Stops inside scrolling content: arrows move, page keys scroll, Escape climbs one level. |
+| [phase-2-documents.md](./phase-2-documents.md) | Shipped. A pointer at `docs/tui.md`, plus the four places the design changed. |
 | [phase-3-tabs.md](./phase-3-tabs.md) | A strip with panels is a parent whoever drew it; no chord spelled `super+`. |
 | [phase-4-shell.md](./phase-4-shell.md) | The shell's contract as a topology file, the Rail without focus effects, a filter for descriptor lists. |
 | [phase-5-extensions.md](./phase-5-extensions.md) | Extension kinds in cells: the `ExtendedPane` seam, rows, diff annotations, and the losses named. |
@@ -36,7 +36,7 @@ traces to one of those two. [analysis.md](./analysis.md) has the evidence, numbe
 | --- | --- | --- | --- |
 | 0 | Wire every asking node so it focuses, shows focus, and acts. The pull request comments from the keyboard. | nothing | Shipped 2026-09-02. Reaching a panel's *second* stop waits on phase 2. |
 | 1 | Refactor `keys/regions.ts` into the five-level model with one settle pass and a shell-installed topology. Behaviour unchanged. | 0 for its tests | Shipped 2026-09-02. Five requirements changed on contact; the phase file lists them. |
-| 2 | Arrows move between stops inside a panel, page keys scroll, Escape climbs to the parent strip. | 0, 1 | Not started. |
+| 2 | Arrows move between stops inside a panel, page keys scroll, Escape climbs to the parent strip. | 0, 1 | Shipped 2026-09-02. Four requirements changed on contact; the phase file lists them. |
 | 3 | `Tabs` with `TabPanel`s is a parent strip without a prop. Linear and Rollbar catch up. `ctrl+N`. | 1 | Not started. |
 | 4 | The shell's topology file, the Rail without effects, workspace switch through the settle, `/` filters a descriptor list. | 1 | Not started. |
 | 5 | The `ExtendedPane` seam, `rows` as a collection, diff annotation marks, the loss table in `docs/tui.md`. | 0, 2 | Not started. |
@@ -74,10 +74,9 @@ footer saying what each line says, the programme is done and the folder goes.
 
 - Read [phase-1-focus-tree.md](./phase-1-focus-tree.md) § Where the design changed first. Five of its
   requirements did not survive contact, and phases 2 to 6 were written against the versions that lost.
-- `apps/tui/src/keys/stops.ts` and `apps/tui/src/kit/roles.ts` § `litControl` are phase 0's, and every
-  asking node calls them. Phase 2 adds `next`/`prev` to `pressable`, generalises `moveStopIn`, and
-  takes the `moveFocusFrom` term out of the `Tabs` Down binding; read
-  [phase-0-controls.md](./phase-0-controls.md) § What landed first, because it says why the walk
-  is scoped to a box.
+- Read [phase-2-documents.md](./phase-2-documents.md) § Where the design changed. Phase 5 was written
+  against a `stopsIn` that walked into a strip's panels and a `Card` that was walked into; neither is
+  true. `moveStop` walls at an edge and `moveFocusFrom` does not, and a strip's Down binding still
+  uses the second.
 - `packages/client-core/src/host/frames/register.ts` mounts the DOM `ExtendedPane`. If a seam has
   appeared since, phase 5 requirement 1 is done.

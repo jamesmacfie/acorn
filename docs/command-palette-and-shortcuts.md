@@ -146,6 +146,11 @@ shortcut. Most of its rows have no element, so roving focus cannot be DOM focus:
 `selected` index the caller owns and scroll it into view. The intents and the single tab stop are the
 same as every other collection's, which is the part the role promises; where the place is kept is not.
 
+`Timeline` is the terminal's own exception, and it drops the tab stop rather than the place. In cells a
+turn is a `Card`, and a card is a stop only where it takes an `onPress`, so a conversation's stops are
+the controls and composers inside its turns and nothing roves over the turns themselves. The DOM host
+is unchanged. [tui.md](./tui.md) § Collections has the whole of it.
+
 `DiffPane` and `KeyValueEditor` are not collections at all, and the focus table says so. A diff is a
 scroller of text whose focusable parts — the per-line comment control, the toolbar — are ordinary stops,
 and finding a line is the `search` intent rather than a rove. A key-value grid is every cell a stop

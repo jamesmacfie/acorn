@@ -17,7 +17,7 @@ import { createEffect, createSignal, onCleanup } from 'solid-js'
 import type { Renderable } from '@opentui/core'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
-import { focusedRenderable, focusRenderable, stopsIn } from './regions'
+import { focusedRenderable, focusRenderable, moveStop, stopsIn } from './regions'
 
 /**
  * Just above the collection tier, and the one number in this file worth an argument.
@@ -46,9 +46,20 @@ export type StopOptions = {
 export function pressable(box: Renderable, options: StopOptions): void {
   const off = () => options.disabled?.() ?? false
   createEffect(() => { box.focusable = !off() })
+  const given = options.on ?? {}
   const runs: Partial<Record<Intent, () => boolean>> = {
     ...(options.onPress ? { activate: () => { options.onPress!(); return true } } : {}),
-    ...options.on,
+    ...given,
+    // Every stop moves to the next one beside it, after whatever the node wanted the arrows for.
+    // `SegmentedControl` is a whole collection reached through `on` and answers them itself; a node
+    // that declines gets the walk.
+    //
+    // At the stop's own priority rather than at the collection tier below it, which the design asked
+    // for. `moveStop` returns false for anything it does not own, so a `Button` drawn inside a `Row`
+    // hands the arrows straight back to the list. A second layer one number lower would buy the same
+    // answer and one more layer per control on screen.
+    next: () => given.next?.() || moveStop(1),
+    prev: () => given.prev?.() || moveStop(-1),
   }
   onCleanup(registerIntentLayer(box, Object.keys(runs) as Intent[], (intent) => {
     if (off()) return false
