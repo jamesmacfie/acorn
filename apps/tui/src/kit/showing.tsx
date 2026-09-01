@@ -2,13 +2,17 @@
 import { createEffect, createMemo, createSignal, For, Index, Show, untrack, type JSX } from 'solid-js'
 import type { BoxRenderable, MouseEvent } from '@opentui/core'
 import type { Size, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
-import type { CollectionItem } from '@acorn/client-core/kit/keys/collectionIntents.ts'
+import {
+  COLLECTION_INTENTS, createCollectionIntents, type CollectionItem,
+} from '@acorn/client-core/kit/keys/collectionIntents.ts'
+import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import type { CodeRow, DiffFile, Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
 import { buildDiffRows, plainTokenize } from '@acorn/client-core/kit/diff/diffModel.ts'
 import { createCellCollection, type ItemProps } from '../keys/collection'
+import { stop } from '../keys/stops'
 import { flatten, hasNode, Line, pad, Run, runStyle, slot } from './cells'
 import { markdownLines, type Line as MarkdownLine } from './markdown'
-import { borderCell, rule, spaceCells } from './roles'
+import { borderCell, litControl, rule, spaceCells } from './roles'
 import { GLYPHS } from './glyphs'
 import { spinnerFrame } from './tick'
 import { focusRenderable, focusedRenderable } from '../keys/regions'
@@ -24,8 +28,27 @@ export function Text(props: { emphasis?: TextRole; tone?: Tone; wrap?: boolean; 
 /** The text, underlined, pressable. Underline is the `control` border role's answer, which is what a
  *  link is: a run of text with an edge under it. */
 export function Link(props: { href?: string; onPress?: () => void; children: JSX.Element }) {
-  const style = () => ({ ...runStyle('body', 'accent'), attributes: (runStyle('body', 'accent').attributes ?? 0) | borderCell('control').attributes })
-  return <text {...style()}>{flatten(props.children)}</text>
+  // A link with a handler presses it. A link with only an `href` prints the URL on the line below,
+  // which is what this host already does with anything it cannot open for you (../kit/copy.ts) —
+  // there is no browser to hand it to and a terminal's own OSC 8 support is not something to guess at.
+  const [shown, setShown] = createSignal(false)
+  const control = stop({
+    onPress: () => {
+      if (props.onPress) return props.onPress()
+      if (props.href) setShown(true)
+    },
+  })
+  const role = () => (control.focused() ? 'strong' : 'body')
+  const style = () => ({
+    ...runStyle(role(), 'accent'),
+    attributes: (runStyle(role(), 'accent').attributes ?? 0) | borderCell('control').attributes,
+  })
+  return (
+    <box flexDirection="column" flexShrink={0} ref={control.ref}>
+      <text {...style()}>{flatten(props.children)}</text>
+      <Show when={shown()}><Line role="mono">{props.href!}</Line></Show>
+    </box>
+  )
 }
 
 export function Heading(props: { level?: 1 | 2 | 3; eyebrow?: string; children: JSX.Element }) {
@@ -382,10 +405,21 @@ export function Chip(props: {
   title?: string
   children: JSX.Element
 }) {
+  // `conditional`, as the table says: a chip with neither handler is text, and takes no place in the
+  // cycle. `activate` presses it and `delete` removes it, which is the split the `✕` already drew.
+  const control = stop({
+    ...(props.onPress ? { onPress: () => props.onPress!() } : {}),
+    ...(props.onRemove ? { on: { delete: () => { props.onRemove!(); return true } } } : {}),
+  })
+  const acts = () => !!props.onPress || !!props.onRemove
   return (
-    <box flexDirection="row">
+    <box
+      flexDirection="row"
+      flexShrink={0}
+      ref={(element: BoxRenderable) => { if (acts()) control.ref(element) }}
+    >
       {slot(props.leading)}
-      <Line role={props.selected ? 'match' : 'body'} tone={props.tone}>
+      <Line {...litControl({ focused: control.focused(), strong: props.selected, tone: props.tone })}>
         {`(${flatten(props.children)}${props.onRemove ? ' ✕' : ''})`}
       </Line>
     </box>
@@ -660,7 +694,21 @@ export function TableHead(props: { align?: 'start' | 'center' | 'end'; priority?
 
 /** reduced: one line, cells separated by `│`, truncated by column priority. */
 export function TableRow(props: { head?: boolean; onPress?: () => void; children: JSX.Element }) {
-  return <box flexDirection="row" gap={1}>{props.children}</box>
+  const control = stop({ onPress: () => props.onPress?.() })
+  return (
+    <box
+      flexDirection="row"
+      gap={1}
+      ref={(element: BoxRenderable) => { if (props.onPress) control.ref(element) }}
+    >
+      {props.children}
+      {/* The caret goes after the cells rather than before them, and it is the one place in the kit
+          where it does: a table's columns line up across rows, and a cell of caret in front of the
+          first one would move every column of the focused row one to the right. The cells themselves
+          are the caller's `TableCell`s, so this row cannot restyle them. */}
+      <Show when={control.focused()}><Line tone="accent">›</Line></Show>
+    </box>
+  )
 }
 
 /** reduced: the cell's text in its column's width, ellipsised where it does not fit. */
@@ -694,11 +742,34 @@ export function Grid(props: {
   }
   const line = (cells: readonly string[]) => shown().map((_column, index) => pad(cells[index] ?? '', columnWidth())).join('│')
 
+  // The exception `focusRoles.ts` writes down, realised. A grid's rows are strings rather than
+  // renderables — that is what makes its arithmetic possible at all — so there is nothing per row to
+  // focus: the grid is the one stop, `↑`/`↓` move the `selected` index the caller holds, and the
+  // window follows it. Same intents, same wrapping, same page keys as every other collection, because
+  // they are the shared ones (client-core kit/keys/collectionIntents.ts).
+  const keys = createCollectionIntents({
+    id: () => props.ariaLabel,
+    items: () => props.rows.map((_row, index) => ({ key: String(index) })),
+    selectOnMove: true,
+    selected: () => (props.selected === null || props.selected === undefined ? null : String(props.selected)),
+    onSelect: (key) => props.onSelect?.(Number(key)),
+    land: () => {},
+    onItem: () => false,
+  })
+  const control = stop({
+    on: Object.fromEntries(COLLECTION_INTENTS.map((intent) => [intent, () => keys.handle(intent)])) as
+      Partial<Record<Intent, () => boolean>>,
+  })
+
   return (
     <box
       flexDirection="column"
       flexGrow={1}
-      ref={(element: BoxRenderable) => { box = element; measure(element) }}
+      ref={(element: BoxRenderable) => {
+        box = element
+        measure(element)
+        control.ref(element)
+      }}
       onSizeChange={() => measure(box)}
     >
       <Line role="strong">{line(props.columns)}</Line>

@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { stubTransport, TASK } from './fixture'
+import { _resetRequests, stubTransport, TASK } from './fixture'
 
 // Booting client-core under Node against no node at all: the same seam, the same boot, a transport
 // that answers from a fixture. Shared by the smoke test and the capture script so both draw the same
@@ -8,6 +8,7 @@ import { stubTransport, TASK } from './fixture'
 // Everything client-core is imported dynamically, for the reason `main.tsx` gives: a module that
 // reads `window.acorn` at its top level must not be evaluated before the seam exists.
 export async function bootFixture(): Promise<{ task: typeof TASK }> {
+  _resetRequests()
   const transport = stubTransport()
   ;(globalThis as { window?: unknown }).window = {
     acorn: {
@@ -101,6 +102,10 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   const { renderer, mockInput, flush, captureCharFrame, captureSpans, resize } = await createTestRenderer({
     width: size.width ?? 80,
     height: size.height ?? 24,
+    // The keyboard protocol the app asks for (./main.tsx). Without it a legacy terminal sends one byte
+    // for Return with Ctrl and Return without it, so `commit` is a chord nobody can press — and a
+    // suite driving a different protocol from production is testing a different keyboard.
+    kittyKeyboard: true,
   })
   renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(renderer)

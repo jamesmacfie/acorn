@@ -318,6 +318,18 @@ const EDITOR_ENTRIES = [
 
 const FILE_TEXT = 'export async function signIn(email: string, password: string) {\n  const account = await load(email)\n  return check(account.passwordHash, password)\n}\n'
 
+// Every request the fixture was asked for, in order, so a test can assert that a control acted rather
+// than only that it drew. A control's whole job is to make one of these; the answer it gets back is
+// the route's business and mostly a 404 here, which is the right shape for "the press left the
+// building" (docs/future/terminal-updates/phase-0-controls.md).
+const recorded: { path: string; method: string }[] = []
+
+/** What the fixture has been asked for since the last reset. */
+export const recordedRequests = (): readonly { path: string; method: string }[] => recorded
+
+/** Test seam: the list is module state, so a suite must not inherit the previous test's traffic. */
+export const _resetRequests = (): void => { recorded.length = 0 }
+
 /** A transport that answers the routes the panes ask for and 404s the rest, so a route the pane
  *  starts asking for shows up as an empty region rather than as a silent pass. */
 export function stubTransport(): { fetch: (nodeId: string, request: { path: string; method?: string }) => Promise<{ status: number; headers: Record<string, string>; body: Uint8Array }> } {
@@ -351,6 +363,7 @@ const json = (value: unknown) => ({
       const delay = Number(process.env.ACORN_FIXTURE_DELAY_MS ?? 0)
       if (delay) await new Promise((resolve) => setTimeout(resolve, delay))
       const path = request.path
+      recorded.push({ path, method: request.method ?? 'GET' })
       // The shell asks for these on mount. Answering them keeps a suite's output free of query
       // errors that say nothing about what is under test.
       //

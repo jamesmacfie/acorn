@@ -4,10 +4,11 @@ import type { BoxRenderable } from '@opentui/core'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isCompact } from '../appearance'
 import { flatten, Line, slot } from './cells'
-import { borderCell, boxBorder, spaceCells, spaceLines } from './roles'
+import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from './roles'
 import { trapKeys } from '../keys/trap'
 import { bindKeys } from '../keys/install'
-import { markTabStop, moveFocusFrom, moveRegion } from '../keys/regions'
+import { markTabStop, moveFocusFrom, moveRegion, takeFocus } from '../keys/regions'
+import { moveStopIn, stop } from '../keys/stops'
 import { ScrollViewport } from './scrolling'
 import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 
@@ -67,18 +68,19 @@ export function Fold(props: {
 }) {
   const [local, setLocal] = createSignal(props.defaultOpen ?? false)
   const open = () => (props.onOpenChange ? props.open ?? false : local())
-  // Registered so `activate` can reach it once phase 2 gives a fold its own focus stop. Until then a
-  // fold opens where its pane sets `open`, which is what the controlled panes already do.
   const toggle = () => {
     const next = !open()
     setLocal(next)
     props.onOpenChange?.(next)
   }
+  // The header row is the stop, and the children stay after it as siblings, so reading order runs
+  // header then contents: `↓` from an open fold's header enters its first child.
+  const control = stop({ onPress: toggle })
   return (
     <box flexDirection="column" flexShrink={0}>
-      <box flexDirection="row" gap={1} flexShrink={0} onMouseDown={toggle}>
-        <Line role="body">{open() ? '▾' : '▸'}</Line>
-        <Line role="strong">{props.label}</Line>
+      <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
+        <Line {...litControl({ focused: control.focused() })}>{open() ? '▾' : '▸'}</Line>
+        <Line {...litControl({ focused: control.focused(), strong: true })}>{props.label}</Line>
         <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
         {slot(props.meta)}
         {slot(props.actions)}
@@ -103,15 +105,29 @@ export function Card(props: {
   focus?: boolean
   children: JSX.Element
 }) {
+  const control = stop({
+    onPress: () => props.onPress?.(),
+    disabled: () => !!props.disabled,
+  })
+  // A focused card draws its own frame in the accent tone, which is the nearest thing a box has to a
+  // focus ring. Compact density draws no frame at all, so there the stripe column stands in — the same
+  // one cell of `▍` a toned card already spends (../kit/roles.ts § borderCell).
+  const lit = () => control.focused()
   return (
-    <box flexDirection="row" flexShrink={0} marginTop={isCompact() ? 0 : 1} marginBottom={isCompact() ? 0 : 1}>
-      <Show when={props.stripe}>
-        {(tone) => <Line tone={tone()}>{borderCell('stripe').glyph}</Line>}
+    <box
+      flexDirection="row"
+      flexShrink={0}
+      marginTop={isCompact() ? 0 : 1}
+      marginBottom={isCompact() ? 0 : 1}
+      ref={(element: BoxRenderable) => { if (props.onPress) control.ref(element) }}
+    >
+      <Show when={props.stripe || lit()}>
+        <Line tone={lit() ? 'accent' : props.stripe}>{borderCell('stripe').glyph}</Line>
       </Show>
       <box
         flexGrow={1}
         flexDirection="column"
-        {...boxBorder('surface', { when: !isCompact() })}
+        {...boxBorder('surface', { when: !isCompact(), ...(lit() ? { tone: 'accent' as const } : {}) })}
         title={props.title}
         paddingLeft={isCompact() ? 0 : 1}
         paddingRight={isCompact() ? 0 : 1}
@@ -286,11 +302,14 @@ export function ModalActions(props: { children: JSX.Element }) {
 /** A vertical list in a box. The trigger draws in place; the list opens under it rather than over
  *  anything, because there is no layer to open over. */
 export function Menu(props: {
-  trigger: (state: { open: () => boolean; toggle: () => void }) => JSX.Element
+  /** `focused` is this host's addition to the shared trigger state, and it is the one thing a cell
+   *  trigger cannot work out for itself: the box the keys are bound to is the menu's, not its. */
+  trigger: (state: { open: () => boolean; toggle: () => void; focused: () => boolean }) => JSX.Element
   placement?: string
   ariaLabel: string
   open?: () => boolean
   onOpenChange?: (open: boolean) => void
+  disabled?: () => boolean
   children: (context: { close: () => void }) => JSX.Element
 }) {
   const [local, setLocal] = createSignal(false)
@@ -299,9 +318,16 @@ export function Menu(props: {
     setLocal(next)
     props.onOpenChange?.(next)
   }
+  const control = stop({
+    onPress: () => set(!open()),
+    disabled: () => props.disabled?.() ?? false,
+  })
   return (
     <box flexDirection="column">
-      {props.trigger({ open, toggle: () => set(!open()) })}
+      {/* The trigger's characters are the caller's; the box around them is the stop. */}
+      <box flexDirection="row" flexShrink={0} ref={control.ref}>
+        {props.trigger({ open, toggle: () => set(!open()), focused: control.focused })}
+      </box>
       <Show when={open()}>
         {/* Open, so it owns the layer: the same trap a `Modal` is, mounted and unmounted with the
             list rather than with the trigger. */}
@@ -311,12 +337,49 @@ export function Menu(props: {
   )
 }
 
+/**
+ * Where an open menu's own `↓` and `↑` sit: above the trap's swallow at 35, below a collection at 40.
+ *
+ * Below 40 on purpose. A menu whose caller drew a real `Rows` inside it has a collection with the
+ * arrows already, and that collection should answer them; the walk here is for the ordinary case,
+ * where the list is a run of stops and nothing owns the arrows at all.
+ */
+const LIST_PRIORITY = 36
+
 /** The open half of a `Menu`, so the trap's life is the list's rather than the trigger's: a component
  *  that only exists while the list is open takes the keys on mount and gives them back on unmount. */
 function MenuList(props: { close: () => void; children: JSX.Element }) {
   trapKeys(() => props.close())
   return (
-    <box flexDirection="column" {...boxBorder('surface')} paddingLeft={1} paddingRight={1}>
+    <box
+      flexDirection="column"
+      {...boxBorder('surface')}
+      paddingLeft={1}
+      paddingRight={1}
+      ref={(element: BoxRenderable) => {
+        // The keys go into the list and come back to the trigger when it closes, which is what an
+        // overlay is (../keys/regions.ts § takeFocus).
+        takeFocus(element)
+        // `↓` and `↑` walk the list's own stops. Not a collection, because a menu's children are
+        // whatever opened it — a run of options, a filter field and a list of rows, a plugin's own
+        // nodes — and there is no item list to key one by. The design asked for a `Rows` here; a
+        // `Rows` needs the items, and `MenuList` is handed a tree.
+        //
+        // Twice, because the two answers differ inside a filter field. The bare letters are gated on
+        // "is somebody typing", which is right — `j` in a picker's filter is a `j`. The arrows are
+        // not, because a list under a field is the only thing an arrow there could mean, and that is
+        // the same exception the palette takes above the trap (../keys/trap.ts § overlayKeys).
+        const walk = (delta: 1 | -1) => () => moveStopIn(element, delta)
+        bindKeys(element, [
+          { key: 'j', cmd: walk(1) },
+          { key: 'k', cmd: walk(-1) },
+        ], LIST_PRIORITY)
+        bindKeys(element, [
+          { key: 'down', cmd: walk(1) },
+          { key: 'up', cmd: walk(-1) },
+        ], LIST_PRIORITY, { whileTyping: true })
+      }}
+    >
       {props.children}
     </box>
   )
@@ -340,22 +403,30 @@ Menu.Item = (props: {
   trailing?: JSX.Element
   title?: string
   children: JSX.Element
-}) => (
-  <box
-    flexDirection="row"
-    gap={1}
-    onMouseDown={() => {
-      if (props.disabled) return
+}) => {
+  const control = stop({
+    onPress: () => {
       props.onSelect()
       if (props.closeOnSelect !== false) props.context.close()
-    }}
-  >
-    {slot(props.leading)}
-    <Line tone={props.disabled ? 'muted' : props.tone === 'danger' ? 'danger' : undefined}>{flatten(props.children)}</Line>
-    <box flexGrow={1} />
-    {slot(props.trailing)}
-  </box>
-)
+    },
+    disabled: () => !!props.disabled,
+  })
+  return (
+    <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
+      <Line tone="accent">{control.focused() ? '›' : ' '}</Line>
+      {slot(props.leading)}
+      <Line {...litControl({
+        focused: control.focused(),
+        disabled: props.disabled,
+        tone: props.tone === 'danger' ? 'danger' : undefined,
+      })}>
+        {flatten(props.children)}
+      </Line>
+      <box flexGrow={1} />
+      {slot(props.trailing)}
+    </box>
+  )
+}
 
 /** reduced: the panel opens as a full-width block under its anchor, not floating. That is the whole
  *  loss, and it is the one every terminal overlay takes. */

@@ -16,13 +16,22 @@ export type Frame = {
   text: string
 }
 
+/** One run of cells: what it says, what colour it says it in, and OpenTUI's attribute bitmask.
+ *
+ *  A char frame answers what is on the screen and nothing about how it is drawn, and this host's
+ *  answer to "this control has focus" is a colour and a weight rather than a character — so without
+ *  this the whole of `litControl` would be untested (../harness.tsx has the same pair for the shell). */
+export type Run = { text: string; fg: { r: number; g: number; b: number }; attributes: number }
+
 export type Cells = Frame & {
+  /** The frame as coloured runs rather than characters. */
+  runs: () => Run[]
   /** Read the buffer again after something has moved. */
   frame: () => Promise<Cells>
   /** A single character is itself; a named key is OpenTUI's own spelling for one, which is upper case
    *  (`KeyCodes.RETURN`, `KeyCodes.ESCAPE`). Anything else is typed one letter at a time, silently,
    *  which is a good hour to save the next person. */
-  press: (key: string) => Promise<Cells>
+  press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<Cells>
   /** Send one terminal wheel/trackpad step at a cell. */
   scroll: (x: number, y: number, direction: 'up' | 'down') => Promise<Cells>
   resize: (width: number, height: number) => Promise<Cells>
@@ -56,7 +65,9 @@ export async function renderCells(
 
   // The renderer first and the tree second, because a collection, a layout and a trap each register
   // their key layer as they draw and a layer registered against no engine is silently dropped.
-  const setup = await createTestRenderer({ width: size.width ?? 40, height: size.height ?? 8 })
+  // The same keyboard protocol the app asks for (../main.tsx), because without it Ctrl+Return is the
+  // same byte as Return and half of what this suite presses would not exist.
+  const setup = await createTestRenderer({ width: size.width ?? 40, height: size.height ?? 8, kittyKeyboard: true })
   setup.renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(setup.renderer)
   await render(node, setup.renderer)
@@ -75,6 +86,11 @@ export async function renderCells(
     return {
       lines: raw.split('\n').map((line) => line.replace(/\s+$/, '')),
       text: raw,
+      runs: () => setup.captureSpans().lines.flatMap((line) => line.spans.map((span) => ({
+        text: span.text,
+        fg: { r: span.fg.r, g: span.fg.g, b: span.fg.b },
+        attributes: span.attributes,
+      }))),
       frame,
       press,
       scroll,
@@ -86,8 +102,11 @@ export async function renderCells(
     await settle(500)
     return read()
   }
-  const press = async (key: string): Promise<Cells> => {
-    setup.mockInput.pressKey(key)
+  const press = async (
+    key: string,
+    modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean },
+  ): Promise<Cells> => {
+    setup.mockInput.pressKey(key, modifiers)
     await new Promise((done) => setTimeout(done, KEY_SETTLE_MS))
     return frame()
   }

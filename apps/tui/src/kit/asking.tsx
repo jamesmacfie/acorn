@@ -1,7 +1,12 @@
 /** @jsxImportSource @opentui/solid */
-import { createEffect, createSignal, For, Index, Show, type JSX } from 'solid-js'
-import type { InputRenderable, TextareaRenderable } from '@opentui/core'
+import { createEffect, createSignal, For, Index, onCleanup, Show, type JSX } from 'solid-js'
+import type { BoxRenderable, InputRenderable, Renderable, TextareaRenderable } from '@opentui/core'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
+import {
+  COLLECTION_INTENTS, createCollectionIntents,
+} from '@acorn/client-core/kit/keys/collectionIntents.ts'
+import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import type { Size } from '@acorn/client-core/kit/tokens/tokens.ts'
 // The prop types, not the components. A node's props are one contract on both hosts — a pane compiles
 // against one of them and runs on either — and this host had hand-written copies that had quietly lost
@@ -13,13 +18,21 @@ import type { ButtonProps, InputProps, SelectProps } from '@acorn/client-core/ki
 import type { PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import type { MentionTextareaProps } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 import type { ItemProps } from '../keys/collection'
+import { moveStopIn, stop, STOP_PRIORITY } from '../keys/stops'
+import { bindKeys } from '../keys/install'
 import { flatten, hasNode, Line, slot } from './cells'
-import { boxBorder } from './roles'
+import { boxBorder, litControl } from './roles'
 import { slotColor } from '../appearance'
 import { Menu } from './grouping'
 import { copyToTerminal } from './copy'
 
 // The kit's asking nodes in cells.
+//
+// A control is also a stop, and on this host that has to be said out loud: a `<button>` is focusable
+// and raises a click on Enter by itself, and a cell renderable does neither. So every node below whose
+// focus role is a stop hands its box to `stop()`, which makes it focusable, binds `activate` to the
+// handler the prop already carried, and answers whether it has the keys — which is what `litControl`
+// draws (../keys/stops.ts).
 //
 // Two things are true of every control here and of nothing on the DOM. A control has no intrinsic
 // width in a terminal — `Input` draws three characters wide and scrolls its own content unless it is
@@ -33,14 +46,24 @@ export function Button(props: ButtonProps) {
   // header read before the sweep — and the kit makes such a button carry `label`, which is the words
   // (docs/ui-design.md § The closed kit).
   const body = () => (hasNode(props.children) ? props.label ?? '' : flatten(props.children) || props.label || '')
+  const control = stop({
+    onPress: () => props.onPress?.(),
+    disabled: () => !!props.disabled,
+  })
   return (
     <Show when={!props.hidden}>
-      <Line
-        role={props.pressed || props.armed ? 'strong' : 'body'}
-        tone={props.disabled ? 'muted' : props.tone}
-      >
-        {props.variant === 'bare' ? body() : `[${body()}]`}
-      </Line>
+      {/* A box around the line, because the keys are bound to a renderable and a `Line` may be a tree
+          the caller handed in. A row containing one run of text is as wide as the run. */}
+      <box flexDirection="row" flexShrink={0} ref={control.ref}>
+        <Line {...litControl({
+          focused: control.focused(),
+          strong: props.pressed || props.armed,
+          disabled: props.disabled,
+          tone: props.tone,
+        })}>
+          {props.variant === 'bare' ? body() : `[${body()}]`}
+        </Line>
+      </box>
     </Show>
   )
 }
@@ -127,6 +150,10 @@ export function Textarea(props: {
   maxLength?: number
   onInput?: (value: string) => void
   onChange?: (value: string) => void
+  /** The `commit` intent, with the buffer's own text. Not on the shared `TextareaProps`, which has no
+   *  submit at all: on the DOM a composer's Enter is a `keydown` the caller reads, and here it is an
+   *  intent the field has to bind because nothing else can reach a focused edit buffer. */
+  onSubmit?: (value: string) => void
   onBlur?: () => void
   onFocus?: () => void
   ref?: unknown
@@ -143,7 +170,20 @@ export function Textarea(props: {
       // `initialValue`, not a child: a string child of an edit buffer is an orphan text node.
       initialValue={props.value ?? ''}
       placeholder={props.placeholder ?? ''}
-      ref={(element: TextareaRenderable) => { area = element }}
+      ref={(element: TextareaRenderable) => {
+        area = element
+        // The `ref` prop was decorative until something needed the renderable: a `Composer` reads the
+        // buffer's text when its submit button is pressed, and there is no other way to ask.
+        if (typeof props.ref === 'function') (props.ref as (node: TextareaRenderable) => void)(element)
+        // `commit` is a chord — Ctrl+Return on this host — so it reaches a focused field: it is one of
+        // the typing-exempt intents by design (client-core kit/keys/intents.ts § TYPING_EXEMPT). Bound
+        // in `focus` mode, so a composer inside a list does not answer for the list.
+        onCleanup(registerIntentLayer(element, ['commit'], () => {
+          if (props.disabled || !props.onSubmit) return false
+          props.onSubmit(element.plainText)
+          return true
+        }, { priority: STOP_PRIORITY, mode: 'focus' }))
+      }}
       // The change event carries no payload — OpenTUI's own comment on it says to ask the renderable
       // for the text — so this is the one node in the kit that needs a handle on what it drew.
       onContentChange={() => props.onInput?.(area ? area.plainText : '')}
@@ -157,21 +197,46 @@ export function Select(props: SelectProps) {
   return (
     <Menu
       ariaLabel={props.label ?? 'Select'}
-      trigger={() => <Line tone={props.disabled ? 'muted' : undefined}>{`[ ${current()?.label ?? ''} ▾ ]`}</Line>}
+      disabled={() => !!props.disabled}
+      trigger={(state) => (
+        <Line {...litControl({ focused: state.focused(), disabled: props.disabled })}>
+          {`[ ${current()?.label ?? ''} ▾ ]`}
+        </Line>
+      )}
     >
-      {() => (
+      {(context) => (
         <For each={props.options}>
           {(option) => (
-            <Line
-              role={option.value === props.value ? 'match' : 'body'}
-              tone={option.disabled ? 'muted' : undefined}
-            >
-              {option.label}
-            </Line>
+            <Option
+              label={option.label}
+              chosen={option.value === props.value}
+              disabled={option.disabled}
+              onPress={() => {
+                props.onChange?.(option.value)
+                context.close()
+              }}
+            />
           )}
         </For>
       )}
     </Menu>
+  )
+}
+
+/** One line of an open list: a stop, so `↓` and `↑` reach it and `activate` picks it.
+ *
+ *  Shared by `Select` and anything else that draws a plain list inside a `Menu`. The chosen row keeps
+ *  the `match` role it has everywhere else in the kit; focus wins over it, because a reader moving
+ *  through a list needs to see where they are more than what they had. */
+function Option(props: { label: string; chosen?: boolean; disabled?: boolean; onPress: () => void }) {
+  const control = stop({ onPress: () => props.onPress(), disabled: () => !!props.disabled })
+  const lit = () => (control.focused()
+    ? { role: 'strong' as const, tone: 'accent' as const }
+    : { role: props.chosen ? 'match' as const : 'body' as const, tone: props.disabled ? 'muted' as const : undefined })
+  return (
+    <box flexDirection="row" flexShrink={0} ref={control.ref}>
+      <Line {...lit()}>{props.label}</Line>
+    </box>
   )
 }
 
@@ -192,9 +257,13 @@ export function Checkbox(props: {
   onChange?: (checked: boolean) => void
 }) {
   const mark = () => (props.indeterminate ? '[-]' : props.checked ? '[x]' : '[ ]')
+  const control = stop({
+    onPress: () => props.onChange?.(!props.checked),
+    disabled: () => !!props.disabled,
+  })
   return (
-    <box flexDirection="row" gap={1}>
-      <Line tone={props.disabled ? 'muted' : undefined}>{mark()}</Line>
+    <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
+      <Line {...litControl({ focused: control.focused(), disabled: props.disabled })}>{mark()}</Line>
       <Show when={props.label}><Line>{props.label}</Line></Show>
       <Show when={props.hint}><Line role="muted">{props.hint!}</Line></Show>
     </box>
@@ -204,10 +273,16 @@ export function Checkbox(props: {
 /** `[x] label`, the same two cells as a Checkbox, because in a terminal a switch is a checkbox that
  *  took a different route to the same state. */
 export function ToggleButton(props: ButtonProps & { pressed: boolean; onPressedChange: (pressed: boolean) => void }) {
+  const control = stop({
+    onPress: () => props.onPressedChange(!props.pressed),
+    disabled: () => !!props.disabled,
+  })
   return (
-    <box flexDirection="row" gap={1}>
-      <Line tone={props.disabled ? 'muted' : undefined}>{props.pressed ? '[x]' : '[ ]'}</Line>
-      <Line tone={props.disabled ? 'muted' : props.tone}>{flatten(props.children) || props.label || ''}</Line>
+    <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
+      <Line {...litControl({ focused: control.focused(), disabled: props.disabled })}>{props.pressed ? '[x]' : '[ ]'}</Line>
+      <Line {...litControl({ focused: control.focused(), disabled: props.disabled, tone: props.tone })}>
+        {flatten(props.children) || props.label || ''}
+      </Line>
     </box>
   )
 }
@@ -221,39 +296,90 @@ export function SegmentedControl<T extends string>(props: {
   ariaLabel: string
 }) {
   const body = () => `( ${props.options.map((option) => (option.value === props.value ? `[${option.label}]` : option.label)).join(' | ')} )`
-  return <Line>{body()}</Line>
+  // A collection whose roving place is its value rather than a renderable, which is the exception
+  // `focusRoles.ts` writes down for `Grid`: there is nothing per option to focus in one run of text,
+  // so the strip holds the keys and `←`/`→` move the value. The list rules — what wraps, what Home
+  // and End do, how far a page key moves — are the shared ones, so a segmented control cannot drift
+  // from every other collection in the app (client-core kit/keys/collectionIntents.ts).
+  const keys = createCollectionIntents({
+    id: () => props.ariaLabel,
+    items: () => props.options.map((option) => ({ key: option.value, label: option.label })),
+    orientation: 'horizontal',
+    // Moving picks, which is what a segmented control is: there is nothing else its arrows could mean.
+    selectOnMove: true,
+    selected: () => props.value,
+    onSelect: (key) => props.onChange(key as T),
+    // Nothing to land on and nothing to activate: the strip is the one stop and the value is the caret.
+    land: () => {},
+    onItem: () => false,
+  })
+  const control = stop({
+    on: Object.fromEntries(COLLECTION_INTENTS.map((intent) => [intent, () => keys.handle(intent)])) as
+      Partial<Record<Intent, () => boolean>>,
+  })
+  return (
+    <box flexDirection="row" flexShrink={0} ref={control.ref}>
+      <Line {...litControl({ focused: control.focused() })}>{body()}</Line>
+    </box>
+  )
 }
 
 /** A field that opens a `Menu` filtered by typing. */
 export function Picker<T>(props: PickerProps<T>) {
   const [query, setQuery] = createSignal('')
+  // Each row carries its own pick, because the two forms this node takes identify a row differently:
+  // the data form by id, the callback form by the caller's own opaque item. The DOM half maps an index
+  // back to the item for the same reason; keeping the closure is the same answer with less arithmetic.
   const rows = () => {
     if (props.items) {
       const needle = query().trim().toLowerCase()
       return props.items
         .filter((item) => !needle || `${item.label} ${item.note ?? ''}`.toLowerCase().includes(needle))
-        .map((item) => ({ label: item.label, description: item.note, active: item.active, disabled: item.disabled }))
+        .map((item) => ({
+          label: item.label,
+          description: item.note,
+          active: item.active,
+          disabled: item.disabled,
+          pick: () => props.onPick?.(item.id),
+        }))
     }
     return (props.results?.(query()) ?? []).map((item) => ({
       label: props.rowLabel?.(item) ?? '',
       description: props.rowDescription?.(item),
       active: props.isActive?.(item) ?? false,
       disabled: props.isDisabled?.(item) ?? false,
+      pick: () => props.onSelect?.(item),
     }))
   }
   return (
     <Menu
       ariaLabel={props.ariaLabel ?? flatten(props.label)}
-      trigger={() => <Line tone={props.disabled ? 'muted' : undefined}>{`[ ${flatten(props.label)} ▾ ]`}</Line>}
+      disabled={() => !!props.disabled}
+      trigger={(state) => (
+        <Line {...litControl({ focused: state.focused(), disabled: props.disabled })}>
+          {`[ ${flatten(props.label)} ▾ ]`}
+        </Line>
+      )}
     >
-      {() => (
+      {(context) => (
         <box flexDirection="column">
           <Input kind="filter" placeholder={props.placeholder} value={query()} onInput={setQuery} />
           {slot(props.tools)}
           {slot(props.status)}
           <Show when={rows().length} fallback={<Line role="muted">{props.emptyText}</Line>}>
             <For each={rows()}>
-              {(row) => <PickerRow label={row.label} description={row.description} active={row.active} disabled={row.disabled} onSelect={() => {}} />}
+              {(row) => (
+                <PickerRow
+                  label={row.label}
+                  description={row.description}
+                  active={row.active}
+                  disabled={row.disabled}
+                  onSelect={() => {
+                    row.pick()
+                    if (!props.keepOpen) context.close()
+                  }}
+                />
+              )}
             </For>
           </Show>
         </box>
@@ -273,11 +399,15 @@ export function PickerRow(props: {
   onSelect: () => void
   onHover?: () => void
 }) {
+  // `focusRoles.ts` calls this an item, and inside a `Rows` it is one. Inside an open `Menu` there is
+  // no collection to be an item of — the list is drawn by whoever opened it — so here it is a stop and
+  // the menu's own `↓`/`↑` walk its stops (../keys/stops.ts § moveStopIn).
+  const control = stop({ onPress: () => props.onSelect(), disabled: () => !!props.disabled })
   return (
-    <box flexDirection="row" gap={1}>
-      <Line tone="accent">{props.active ? '›' : ' '}</Line>
+    <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
+      <Line tone="accent">{control.focused() || props.active ? '›' : ' '}</Line>
       {slot(props.leading)}
-      <Line tone={props.disabled ? 'muted' : undefined}>{props.label}</Line>
+      <Line {...litControl({ focused: control.focused(), disabled: props.disabled })}>{props.label}</Line>
       <Show when={props.description}><Line role="muted">{props.description!}</Line></Show>
     </box>
   )
@@ -299,6 +429,14 @@ export function Composer(props: {
   hint?: JSX.Element
   rows?: number
 }) {
+  let area: TextareaRenderable | undefined
+  // One send, two ways in: `commit` inside the field, and the button. Both read the buffer rather than
+  // the prop, because a caller that draws a composer without wiring `onInput` still has the text in
+  // front of the reader — and `busy` and `disabled` refuse both, in one place.
+  const send = (value?: string) => {
+    if (props.disabled || props.busy) return
+    props.onSubmit(value ?? (area ? area.plainText : props.value))
+  }
   return (
     <box flexDirection="column" {...boxBorder('surface')} paddingLeft={1} paddingRight={1}>
       <box flexDirection="row" gap={1}>
@@ -309,7 +447,9 @@ export function Composer(props: {
           disabled={props.disabled}
           rows={props.rows ?? 3}
           grow
+          ref={(element: TextareaRenderable) => { area = element }}
           onInput={(value) => props.onInput?.(value)}
+          onSubmit={(value) => send(value)}
         />
       </box>
       <Show when={props.error}><Line tone="danger">{props.error!}</Line></Show>
@@ -317,7 +457,9 @@ export function Composer(props: {
         {slot(props.hint)}
         <box flexGrow={1} />
         {slot(props.secondary)}
-        <Button tone="accent" disabled={props.disabled || props.busy}>{props.submitLabel ?? 'Comment'}</Button>
+        <Button tone="accent" disabled={props.disabled || props.busy} onPress={() => send()}>
+          {props.submitLabel ?? 'Comment'}
+        </Button>
       </box>
     </box>
   )
@@ -344,6 +486,14 @@ export function MentionTextarea(props: MentionTextareaProps) {
       .slice(0, 8)
       .map((name) => ({ value: `@${name}`, label: name }))
   }
+  // Completing the word being typed, which is what choosing a suggestion means. The DOM half splices
+  // by cursor offset; there is no cursor to ask here, so it replaces the trailing word — which is the
+  // same edit for every case `active()` recognises, because that is the word it found.
+  const complete = (value: string) => {
+    if (!active()) return
+    props.onInput(props.value.replace(/\S+$/, `${value} `))
+  }
+  let list: BoxRenderable | undefined
   return (
     <box flexDirection="column">
       {slot(props.overlay)}
@@ -352,12 +502,36 @@ export function MentionTextarea(props: MentionTextareaProps) {
         placeholder={props.placeholder}
         disabled={props.disabled}
         rows={props.rows ?? 3}
+        // The agents composer is a `MentionTextarea` rather than a `Composer`, and it wants the same
+        // send. The shared prop calls this "Enter without a modifier", which is the DOM's chat-style
+        // Enter; in a terminal Enter in a text field is a newline and nothing else can be, so it is
+        // the `commit` chord here — the same key the footer already names beside a focused field.
+        {...(props.onSubmit ? { onSubmit: () => props.onSubmit!() } : {})}
+        ref={(element: Renderable) => {
+          // The one arrow key in the kit bound past the typing gate, and the reason is the shape: the
+          // field IS the typing target and the list under it is the field's own, so `↓` cannot mean
+          // "type a ↓" and there is nothing else for it to reach. The palette needs the same thing for
+          // the same reason and gets it above the trap instead (../keys/trap.ts § overlayKeys).
+          bindKeys(element, [{
+            key: 'down',
+            cmd: () => {
+              if (!list || !suggestions().length) return false
+              return moveStopIn(list, 1)
+            },
+          }], STOP_PRIORITY, { mode: 'focus', whileTyping: true })
+        }}
         onInput={props.onInput}
       />
       <Show when={suggestions().length}>
-        <box flexDirection="column" paddingLeft={2}>
+        <box flexDirection="column" paddingLeft={2} ref={(element: BoxRenderable) => { list = element }}>
           <For each={suggestions()}>
-            {(suggestion) => <PickerRow label={suggestion.label} description={'detail' in suggestion ? suggestion.detail : undefined} onSelect={() => {}} />}
+            {(suggestion) => (
+              <PickerRow
+                label={suggestion.label}
+                description={'detail' in suggestion ? suggestion.detail : undefined}
+                onSelect={() => complete(suggestion.value)}
+              />
+            )}
           </For>
         </box>
       </Show>

@@ -1,0 +1,89 @@
+/** @jsxImportSource @opentui/solid */
+import { describe, expect, it } from 'vitest'
+import { hasFfi } from './ffi'
+import { renderFixture } from './harness'
+import { recordedRequests } from './fixture'
+
+// The pull request, driven from the keyboard, on the real shell.
+//
+// `kit/kit.test.tsx` § every control is a stop asserts that each node presses when the keys are on it.
+// This asserts the other half, which no unit case can: that a reader arriving at a pane can get the
+// keys onto a control at all, and that pressing it reaches the node
+// (docs/future/terminal-updates/phase-0-controls.md).
+//
+// The worked example in that folder's focus-model.md is the sequence below, and this file is that
+// sequence as far as phase 0 takes it. Moving between two stops inside one panel is phase 2, so the
+// first stop of a panel is where the caret can reach today; `[Merge]`, which is the second stop in
+// Details, waits for it.
+
+/** Every run drawn in the focused form: `strong` in the `accent` tone (../kit/roles.ts § litControl).
+ *
+ *  Accent is the palette's own sixth slot and the default foreground is white, so a red channel below
+ *  the green is "this is the accent slot" without naming a colour (./appearance.ts). */
+const litRuns = async (screen: { spans: () => Promise<{ text: string; fg: { r: number; g: number; b: number }; attributes: number }[][]> }): Promise<string[]> =>
+  (await screen.spans()).flat()
+    .filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1)
+    .map((run) => run.text)
+
+describe.skipIf(!hasFfi)('the pull request from the keyboard', () => {
+  it('lands the keys on a control in the Details panel, and says which one has them', async () => {
+    const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
+    try {
+      const opened = await screen.until('[Merge]', 45)
+      expect(opened).toContain('[ squash ▾ ]')
+      const { focusedRegion } = await import('./keys/regions')
+
+      // Tab to the pane strip, Down into the pane's own region, which lands on the Details strip.
+      await screen.press('TAB')
+      expect(focusedRegion()).toEqual({ paneId: 'chrome', regionId: 'panes' })
+      await screen.press('ARROW_DOWN')
+      expect(focusedRegion()).toEqual({ paneId: 'pr', regionId: 'body' })
+
+      // …and Down again into the panel under the strip, where before this phase there was nothing
+      // focusable at all: the merge-method `Select` is the panel's first stop.
+      await screen.press('ARROW_DOWN')
+      expect(await litRuns(screen)).toContain('[ squash ▾ ]')
+
+      // The footer says `press`, not `open`: the keys are on a control rather than on a row.
+      const onControl = await screen.frame()
+      expect(onControl).toContain('enter press')
+
+      // And pressing it opens the method list, which is what a `Select` does.
+      await screen.press('RETURN')
+      const list = await screen.frame()
+      expect(list).toContain('rebase')
+    } finally {
+      screen.done()
+    }
+  }, 180_000)
+
+  it('posts a comment typed into the composer', async () => {
+    const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
+    try {
+      await screen.until('[Merge]', 45)
+      await screen.press('TAB')
+      await screen.press('ARROW_DOWN')
+      // Right along the strip to Comments, which is the seventh tab.
+      for (let step = 0; step < 6; step += 1) await screen.press('ARROW_RIGHT')
+      expect(await screen.frame()).toContain('[Comments/Commits]')
+
+      // Down into the panel lands on the composer's field, because it is the first stop in it.
+      await screen.press('ARROW_DOWN')
+      await screen.press('h')
+      await screen.press('i')
+      const typed = await screen.frame()
+      expect(typed).toContain('> hi')
+      // The footer names the key that sends, at the field that takes it.
+      expect(typed).toContain('ctrl+return commit')
+
+      // Ctrl+Return is a chord only because the app asks the terminal for the kitty keyboard
+      // protocol; without it a terminal sends one byte for Return either way (./main.tsx).
+      await screen.press('RETURN', { ctrl: true })
+      expect(recordedRequests().filter((request) => request.method === 'POST')).toEqual([
+        { path: '/v2/p/github/repos/runn-fast/acorn/pulls/42/comments', method: 'POST' },
+      ])
+    } finally {
+      screen.done()
+    }
+  }, 180_000)
+})

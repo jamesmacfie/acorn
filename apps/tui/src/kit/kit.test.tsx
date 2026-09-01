@@ -1,10 +1,13 @@
 /** @jsxImportSource @opentui/solid */
 import { createSignal, type JSX } from 'solid-js'
 import { describe, expect, it } from 'vitest'
+import { TextAttributes } from '@opentui/core'
 import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import { NODE_SUPPORT } from '@acorn/client-core/kit/tokens/support.ts'
+import { NODE_FOCUS } from '@acorn/client-core/kit/tokens/focusRoles.ts'
 import { hasFfi } from '../ffi'
-import { renderCells, type Frame } from './render'
+import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
+import { renderCells, type Cells, type Frame } from './render'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
   ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
@@ -880,4 +883,432 @@ describe.skipIf(!hasFfi)('the kit in cells', () => {
       frame.done()
     }
   }, 20_000)
+})
+
+// ── Behaviour: every control is a stop ─────────────────────────────────────────────────────────
+//
+// The cases above assert the characters a node draws. These assert that it does something: the keys
+// land on it, it says so, and the handler its props have always carried is called
+// (docs/future/terminal-updates/phase-0-controls.md).
+//
+// Each case is drawn as the whole body of a pane, and nothing presses Tab first: a region takes the
+// keys when the pane opens, because this host has no pointer to click with
+// (../keys/regions.ts § regionFocus). So the node under test has to be the region's first stop, which
+// for one control in an empty body it is.
+
+type Behaviour = {
+  node: KitNodeName
+  /** The promise, in the test's own words, so a failure names it rather than a line number. */
+  does: string
+  /** The node, wired so its handlers write into the list `drive` reads. */
+  render: (record: (what: string) => void) => JSX.Element
+  /** Press keys and assert. `pressed` is everything recorded so far, in order. */
+  drive: (screen: Cells, pressed: string[]) => Promise<void>
+  size?: { width?: number; height?: number }
+}
+
+/** The run containing this text is drawn in the focused form: `strong` in the `accent` tone.
+ *
+ *  Read off the colours rather than the characters, because that is where the answer is — a focused
+ *  `[Save]` has the same six characters as an unfocused one. Accent is the palette's own sixth slot
+ *  and the default foreground is white, so "the red channel is below the green" is "this is the accent
+ *  slot" without naming a hex anywhere (../appearance.ts § TERMINAL_PALETTE). */
+const lit = (screen: Cells, text: string) => {
+  const run = screen.runs().find((entry) => entry.text.includes(text))
+  expect(run, `no run containing ${JSON.stringify(text)}`).toBeDefined()
+  expect(run!.fg.r).toBeLessThan(run!.fg.g)
+  expect(run!.attributes & TextAttributes.BOLD).toBe(TextAttributes.BOLD)
+}
+
+const BEHAVIOURS: Behaviour[] = [
+  {
+    node: 'Button',
+    does: 'presses on Enter, and draws the focused form while it has the keys',
+    render: (record) => <Button label="Save" onPress={() => record('press')} />,
+    drive: async (screen, pressed) => {
+      lit(screen, '[Save]')
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['press'])
+    },
+  },
+  {
+    node: 'ConfirmButton',
+    does: 'arms on the first press and confirms on the second',
+    render: (record) => <ConfirmButton label="Delete" onConfirm={() => record('confirm')} />,
+    drive: async (screen, pressed) => {
+      const armed = await screen.press('RETURN')
+      expect(armed.text).toContain('Delete?')
+      expect(pressed).toEqual([])
+      await armed.press('RETURN')
+      expect(pressed).toEqual(['confirm'])
+    },
+  },
+  {
+    node: 'CopyButton',
+    does: 'copies on Enter',
+    render: (record) => <CopyButton text={() => 'copied text'} onCopy={record} />,
+    drive: async (screen, pressed) => {
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['copied text'])
+    },
+  },
+  {
+    node: 'Link',
+    does: 'presses on Enter where it was given a handler',
+    render: (record) => <Link onPress={() => record('press')}>go there</Link>,
+    drive: async (screen, pressed) => {
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['press'])
+    },
+  },
+  {
+    node: 'Link',
+    does: 'prints the URL on the line below where all it has is an href',
+    render: () => <Link href="https://example.com">go there</Link>,
+    size: { width: 30, height: 4 },
+    drive: async (screen) => {
+      expect(screen.text).not.toContain('example.com')
+      expect((await screen.press('RETURN')).text).toContain('https://example.com')
+    },
+  },
+  {
+    node: 'Checkbox',
+    does: 'toggles on Space and on Enter, because both are activate',
+    render: (record) => <Checkbox label="Include" onChange={(checked) => record(String(checked))} />,
+    drive: async (screen, pressed) => {
+      // A literal space, because `KeyCodes` has no name for it — a named key there is one with an
+      // escape sequence, and space is a character.
+      const spaced = await screen.press(' ')
+      expect(pressed).toEqual(['true'])
+      await spaced.press('RETURN')
+      expect(pressed).toEqual(['true', 'true'])
+    },
+  },
+  {
+    node: 'ToggleButton',
+    does: 'toggles on Enter',
+    render: (record) => (
+      <ToggleButton pressed={false} label="Preview" onPressedChange={(pressed) => record(String(pressed))} />
+    ),
+    drive: async (screen, pressed) => {
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['true'])
+    },
+  },
+  {
+    node: 'Chip',
+    does: 'presses on Enter and removes on Delete',
+    render: (record) => (
+      <Chip onPress={() => record('press')} onRemove={() => record('remove')}>bug</Chip>
+    ),
+    drive: async (screen, pressed) => {
+      const after = await screen.press('RETURN')
+      expect(pressed).toEqual(['press'])
+      await after.press('DELETE')
+      expect(pressed).toEqual(['press', 'remove'])
+    },
+  },
+  {
+    node: 'Fold',
+    does: 'opens on Enter with the header keeping the keys',
+    render: () => <Fold label="notes"><Text>shown</Text></Fold>,
+    drive: async (screen) => {
+      expect(screen.text).toContain('▸ notes')
+      lit(screen, 'notes')
+      const open = await screen.press('RETURN')
+      expect(open.text).toContain('▾ notes')
+      expect(open.text).toContain('shown')
+    },
+  },
+  {
+    node: 'Card',
+    does: 'presses on Enter where it was given a handler',
+    render: (record) => <Card onPress={() => record('press')}><Text>inside</Text></Card>,
+    drive: async (screen, pressed) => {
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['press'])
+    },
+  },
+  {
+    node: 'TableRow',
+    does: 'presses on Enter, marking the focused row at its end',
+    render: (record) => (
+      <Table>
+        <TableRow onPress={() => record('press')}><TableCell>lint</TableCell></TableRow>
+      </Table>
+    ),
+    size: { width: 30, height: 4 },
+    drive: async (screen, pressed) => {
+      expect(screen.text).toContain('›')
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['press'])
+    },
+  },
+  {
+    node: 'SegmentedControl',
+    does: 'changes its value on the horizontal arrows, one stop from outside',
+    render: (record) => {
+      const [value, setValue] = createSignal<'a' | 'b'>('a')
+      return (
+        <SegmentedControl
+          ariaLabel="View"
+          value={value()}
+          options={[{ value: 'a' as const, label: 'a' }, { value: 'b' as const, label: 'b' }]}
+          onChange={(next) => { setValue(next); record(next) }}
+        />
+      )
+    },
+    drive: async (screen, pressed) => {
+      expect(screen.text).toContain('( [a] | b )')
+      const moved = await screen.press('ARROW_RIGHT')
+      expect(pressed).toEqual(['b'])
+      expect(moved.text).toContain('( a | [b] )')
+    },
+  },
+  {
+    node: 'Grid',
+    does: 'moves its selected row on the arrows, the index the caller holds',
+    render: (record) => {
+      const [selected, setSelected] = createSignal(0)
+      return (
+        <Grid
+          ariaLabel="Runs"
+          columns={['name']}
+          rows={[['lint'], ['test']]}
+          selected={selected()}
+          onSelect={(index) => { setSelected(index); record(String(index)) }}
+        />
+      )
+    },
+    size: { width: 30, height: 6 },
+    drive: async (screen, pressed) => {
+      await screen.press('ARROW_DOWN')
+      expect(pressed).toEqual(['1'])
+    },
+  },
+  {
+    node: 'Menu',
+    does: 'opens on Enter and runs the item the keys are on',
+    render: (record) => (
+      <Menu ariaLabel="Menu" trigger={() => <Line>open me</Line>}>
+        {(context) => (
+          <Menu.Item context={context} onSelect={() => record('chosen')}>choice</Menu.Item>
+        )}
+      </Menu>
+    ),
+    drive: async (screen, pressed) => {
+      expect(screen.text).not.toContain('choice')
+      const open = await screen.press('RETURN')
+      expect(open.text).toContain('choice')
+      const chosen = await open.press('RETURN')
+      expect(pressed).toEqual(['chosen'])
+      expect(chosen.text).not.toContain('choice')
+    },
+  },
+  {
+    node: 'Select',
+    does: 'opens a list on Enter, moves in it, and changes the value',
+    render: (record) => {
+      const [value, setValue] = createSignal('a')
+      return (
+        <Select
+          value={value()}
+          options={[{ value: 'a', label: 'one' }, { value: 'b', label: 'two' }]}
+          onChange={(next) => { setValue(next); record(next) }}
+        />
+      )
+    },
+    size: { width: 30, height: 8 },
+    drive: async (screen, pressed) => {
+      expect(screen.text).toContain('[ one ▾ ]')
+      const open = await screen.press('RETURN')
+      expect(open.text).toContain('two')
+      const moved = await open.press('ARROW_DOWN')
+      const chosen = await moved.press('RETURN')
+      expect(pressed).toEqual(['b'])
+      // The trigger now says `two`, so the list is gone when the *other* label has left the screen.
+      expect(chosen.text).not.toContain('one')
+      expect(chosen.text).toContain('[ two ▾ ]')
+    },
+  },
+  {
+    node: 'Picker',
+    does: 'opens a filtered list on Enter and picks a row from it',
+    render: (record) => (
+      <Picker
+        label="Repo"
+        placeholder="Find…"
+        emptyText="Nothing"
+        items={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]}
+        onPick={record}
+      />
+    ),
+    size: { width: 30, height: 10 },
+    drive: async (screen, pressed) => {
+      const open = await screen.press('RETURN')
+      expect(open.text).toContain('one')
+      expect(open.text).toContain('two')
+      const moved = await open.press('ARROW_DOWN')
+      const picked = await moved.press('RETURN')
+      expect(pressed.length).toBe(1)
+      expect(picked.text).not.toContain('two')
+    },
+  },
+  {
+    node: 'PickerRow',
+    does: 'selects on Enter',
+    render: (record) => <PickerRow label="acorn" onSelect={() => record('selected')} />,
+    drive: async (screen, pressed) => {
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['selected'])
+    },
+  },
+  {
+    node: 'Composer',
+    does: 'submits what is in the box on commit',
+    render: (record) => {
+      const [value, setValue] = createSignal('')
+      return <Composer value={value()} onInput={setValue} onSubmit={record} submitLabel="Send" />
+    },
+    size: { width: 40, height: 8 },
+    drive: async (screen, pressed) => {
+      const typed = await (await screen.press('h')).press('i')
+      expect(typed.text).toContain('hi')
+      // Ctrl+Return, which is a chord only because the app asks the terminal for the kitty keyboard
+      // protocol: without it a terminal sends the same single byte for Return either way
+      // (../main.tsx, ./render.tsx).
+      await typed.press('RETURN', { ctrl: true })
+      expect(pressed).toEqual(['hi'])
+    },
+  },
+  {
+    node: 'MentionTextarea',
+    does: 'completes the word being typed from the list under the field',
+    render: (record) => (
+      <MentionTextarea value="ping @ad" onInput={record} mentions={['ada', 'bob']} />
+    ),
+    size: { width: 40, height: 8 },
+    drive: async (screen, pressed) => {
+      expect(screen.text).toContain('ada')
+      const inList = await screen.press('ARROW_DOWN')
+      await inList.press('RETURN')
+      // The last value, for the mount-time content change `Textarea` above explains.
+      expect(pressed.at(-1)).toBe('ping @ada ')
+    },
+  },
+  {
+    node: 'Input',
+    does: 'takes what is typed at it',
+    render: (record) => <Input value="" onInput={record} />,
+    size: { width: 30, height: 3 },
+    drive: async (screen, pressed) => {
+      await screen.press('a')
+      expect(pressed).toEqual(['a'])
+    },
+  },
+  {
+    node: 'Textarea',
+    does: 'takes what is typed at it',
+    render: (record) => <Textarea value="" onInput={record} />,
+    size: { width: 30, height: 5 },
+    drive: async (screen, pressed) => {
+      await screen.press('a')
+      // The last value, not the only one: an OpenTUI textarea raises one content change as it mounts,
+      // with the text it was built with. Harmless — the value it reports is the value it was given —
+      // and pre-existing, so it is not this phase's to change.
+      expect(pressed.at(-1)).toBe('a')
+    },
+  },
+  {
+    node: 'FindBar',
+    does: 'takes a query typed at it',
+    render: (record) => <FindBar query="" onQuery={record} onNext={() => {}} onPrev={() => {}} />,
+    size: { width: 30, height: 3 },
+    drive: async (screen, pressed) => {
+      await screen.press('a')
+      expect(pressed).toEqual(['a'])
+    },
+  },
+  {
+    node: 'ModelConnectionPicker',
+    does: 'opens its model list on Enter',
+    render: (record) => (
+      <ModelConnectionPicker
+        connectionId="c1"
+        modelId="m1"
+        onChange={(selection) => record(selection.modelId)}
+        connections={[{
+          connection: { id: 'c1', label: 'Anthropic' },
+          provider: { models: [{ id: 'm1', label: 'Opus' }, { id: 'm2', label: 'Sonnet' }] },
+        }]}
+      />
+    ),
+    size: { width: 40, height: 8 },
+    drive: async (screen, pressed) => {
+      const open = await screen.press('RETURN')
+      expect(open.text).toContain('Sonnet')
+      const moved = await open.press('ARROW_DOWN')
+      await moved.press('RETURN')
+      expect(pressed).toEqual(['m2'])
+    },
+  },
+]
+
+/**
+ * A node the focus table calls a stop, a collection or a conditional stop, and that no case above
+ * drives. Each line is the reason, and the reason has to be one of two kinds: there is no handler to
+ * press, or the keys are driven in a named suite of their own.
+ *
+ * The point of the table below is that this list cannot grow quietly. A node cannot join the kit as a
+ * stop without somebody deciding whether this host presses it.
+ */
+const NOT_DRIVEN_HERE: Partial<Record<KitNodeName, string>> = {
+  // No handler to press.
+  Section: 'takes no press on either host: `conditional` is for the DOM, where a collapsing header is a button',
+  Timeline: 'reduced to a column of cards; the cards are the caller’s and each is its own stop',
+  ChipRow: 'a wrapper around chips; each chip is the stop, and `Chip` is driven above',
+  Log: 'a document, not a control: the viewport under it owns the scroll (./scrolling.test.tsx)',
+  // Driven in a suite of its own, because what they do needs a pane or a shell around them.
+  Rows: 'its intents are driven against the real region store in ../keys/keys.test.tsx',
+  Tabs: 'its arrows and its Down edge are driven in ../panes.test.tsx and ../spatial.test.tsx',
+  Sections: 'driven in ../sections.test.tsx',
+  DocumentTabs: 'a strip with no panels of its own yet; phase 3 makes it a parent stop and drives it',
+}
+
+describe.skipIf(!hasFfi)('every control is a stop', () => {
+  it.each(BEHAVIOURS.map((entry) => [`${entry.node}: ${entry.does}`, entry] as const))('%s', async (_name, entry) => {
+    _resetCollections()
+    const pressed: string[] = []
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="controls"
+          label="Controls"
+          regions={{ body: () => entry.render((what) => pressed.push(what)) }}
+        />
+      ),
+      { width: entry.size?.width ?? 40, height: entry.size?.height ?? 6 },
+    )
+    try {
+      await entry.drive(screen, pressed)
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+
+  it('drives every node the focus table calls a stop, or says why not', () => {
+    const owed = (Object.keys(NODE_FOCUS) as KitNodeName[]).filter((node) => {
+      const role = NODE_FOCUS[node]
+      if (role !== 'stop' && role !== 'collection' && role !== 'conditional') return false
+      // A node this host does not draw cannot be pressed on it, and `support.ts` is where that is said.
+      return NODE_SUPPORT[node].tui !== 'absent'
+    })
+    const driven = new Set(BEHAVIOURS.map((entry) => entry.node))
+    const missing = owed.filter((node) => !driven.has(node) && !NOT_DRIVEN_HERE[node])
+    expect(missing).toEqual([])
+    // Anti-vacuity, both ways: the table is not empty, and an excuse for a node that is no longer a
+    // stop is an excuse nobody will read.
+    expect(owed.length).toBeGreaterThan(20)
+    expect(Object.keys(NOT_DRIVEN_HERE).filter((node) => !owed.includes(node as KitNodeName))).toEqual([])
+  })
 })
