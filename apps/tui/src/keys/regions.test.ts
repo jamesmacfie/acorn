@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Renderable } from '@opentui/core'
 import {
-  _resetRegions, claimIfProvisional, focusedRenderable, markItem, moveColumn, moveRegion,
-  registerRegion,
+  _resetRegions, activationEntersMain, claimIfProvisional, firstStop, focusRenderable, focusedRenderable,
+  markItem, markTabStop, moveBack, moveColumn, movePane, moveRegion, registerRegion,
+  replaceFocusable,
 } from './regions'
 
 // Fakes rather than a rendered shell, because what is under test is bookkeeping: which node a region
@@ -38,6 +39,29 @@ describe('moveRegion', () => {
     markItem(row)
     moveRegion(1)
     expect(focusedRenderable()).toBe(row)
+  })
+
+  it('advances focus and region memory when a keyed row gets a new renderable', () => {
+    const first = node()
+    const rows = [first]
+    const browse = node(rows)
+    const menu = node()
+    first.parent = browse
+    markItem(first)
+    registerRegion(browse, { paneId: 'chrome', regionId: 'browse' }, 0)
+    registerRegion(menu, { paneId: 'chrome', regionId: 'menu' }, 1)
+
+    expect(claimIfProvisional(first)).toBe(true)
+    const replacement = node()
+    replacement.parent = browse
+    rows[0] = replacement
+    markItem(replacement)
+    replaceFocusable(first, replacement)
+    expect(focusedRenderable()).toBe(replacement)
+
+    expect(moveRegion(1)).toBe(true)
+    expect(moveRegion(1)).toBe(true)
+    expect(focusedRenderable()).toBe(replacement)
   })
 
   it('selects a row when entering an opted-in region, including after a late mount', () => {
@@ -97,5 +121,84 @@ describe('moveRegion', () => {
     expect(moveColumn(1)).toBe(false)
     expect(moveColumn(-1)).toBe(true)
     expect(focusedRenderable()).toBe(railRow)
+  })
+
+  it('treats the main content as the pane to the right of every rail region', () => {
+    const menuRow = node()
+    const menu = node([menuRow])
+    menuRow.parent = menu
+    const mainRow = node()
+    const main = node([mainRow])
+    mainRow.parent = main
+    markItem(menuRow)
+    markItem(mainRow)
+    registerRegion(
+      menu,
+      { paneId: 'chrome', regionId: 'menu' },
+      -130,
+      { column: 'rail', enterMainOnActivate: true },
+    )
+    registerRegion(main, { paneId: 'chrome', regionId: 'source' }, 0)
+
+    expect(claimIfProvisional(menuRow)).toBe(true)
+    expect(focusedRenderable()).toBe(menuRow)
+    expect(activationEntersMain()).toBe(true)
+    expect(movePane(1)).toBe(true)
+    expect(focusedRenderable()).toBe(mainRow)
+    expect(activationEntersMain()).toBe(false)
+    expect(movePane(-1)).toBe(true)
+    expect(focusedRenderable()).toBe(menuRow)
+  })
+
+  it('climbs content to its tabs, then crosses back to the rail', () => {
+    const railRow = node()
+    const rail = node([railRow])
+    railRow.parent = rail
+    const taskRow = node()
+    const tasks = node([taskRow])
+    taskRow.parent = tasks
+    const tabs = node()
+    const control = node()
+    const main = node([tabs, control])
+    tabs.parent = main
+    control.parent = main
+    markItem(railRow)
+    markItem(taskRow)
+    markTabStop(tabs, true)
+    control.focusable = true
+    registerRegion(rail, { paneId: 'chrome', regionId: 'browse' }, -120, { column: 'rail' })
+    registerRegion(tasks, { paneId: 'chrome', regionId: 'tasks' }, -110, { column: 'rail' })
+    registerRegion(main, { paneId: 'chrome', regionId: 'source' }, 0)
+
+    expect(claimIfProvisional(railRow)).toBe(true)
+    // Visit Tasks on the way across, as the shell's Tab order does. Escape from a source detail still
+    // means Browse, not merely "the most recent thing in the rail".
+    expect(moveRegion(1)).toBe(true)
+    expect(focusedRenderable()).toBe(taskRow)
+    expect(moveColumn(1)).toBe(true)
+    expect(focusedRenderable()).toBe(tabs)
+    expect(focusRenderable(control)).toBe(true)
+
+    expect(moveBack()).toBe(true)
+    expect(focusedRenderable()).toBe(tabs)
+    expect(moveBack()).toBe(true)
+    expect(focusedRenderable()).toBe(railRow)
+  })
+
+  it('enters a list on its rows while structural detail tabs remain the parent stop', () => {
+    const tabs = node()
+    const row = node()
+    const region = node([tabs, row])
+    tabs.parent = region
+    row.parent = region
+    markTabStop(tabs)
+    markItem(row)
+
+    // An in-content filter such as GitHub Open/Closed does not displace Browse's row collection.
+    expect(firstStop(region)).toBe(row)
+
+    // A Sections strip is structural and therefore owns entry before the controls in its panel.
+    markTabStop(tabs, true)
+    expect(firstStop(region)).toBe(tabs)
   })
 })

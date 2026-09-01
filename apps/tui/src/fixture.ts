@@ -79,6 +79,22 @@ const PROJECT = {
   github: { owner: 'runn-fast', name: 'acorn', repoId: 1 },
 }
 
+/** Opt-in second workspace for focus handoff tests. Kept out of the default fixture so screenshots
+ *  and tests that intentionally describe its one-workspace shell do not gain unrelated choices. */
+const SECOND_PROJECT = {
+  id: 'project-3',
+  name: 'second-project',
+  path: '/tmp/acorn-second',
+  workspaceId: 'ws-2',
+  sort: 0,
+  hidden: false,
+  color: null,
+  vcs: 'git' as const,
+  defaultBranch: 'main',
+  remoteUrl: 'git@github.com:runn-fast/second.git',
+  github: { owner: 'runn-fast', name: 'second', repoId: 2 },
+}
+
 const AGENT_PROVIDERS = [{
   id: 'claude',
   profileId: 'claude',
@@ -344,10 +360,18 @@ const json = (value: unknown) => ({
       // were always answered here; this is the row that lets a reader reach them.
       if (path === '/v2/core/prefs') return json({})
       if (path === '/v2/core/integrations') return json({ integrations: [GITHUB_INTEGRATION], providers: [] })
-      if (path === '/v2/core/workspaces') return json([{ id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }, { id: 'project-2', name: 'sibling' }] }])
-      if (path === '/v2/core/workspaces/ws-1/external-projects') return json([])
+      if (path === '/v2/core/workspaces') return json([
+        { id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }, { id: 'project-2', name: 'sibling' }] },
+        ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE
+          ? [{ id: 'ws-2', name: 'second', projects: [{ id: SECOND_PROJECT.id, name: SECOND_PROJECT.name }] }]
+          : []),
+      ])
+      if (path === '/v2/core/workspaces/ws-1/external-projects') return json({ projects: [] })
+      if (path === '/v2/core/workspaces/ws-2/external-projects') return json({ projects: [] })
       if (path === '/v2/core/tasks') return json([TASK])
-      if (path === '/v2/core/projects') return json({ projects: [PROJECT, OTHER_PROJECT] })
+      if (path === '/v2/core/projects') return json({
+        projects: [PROJECT, OTHER_PROJECT, ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE ? [SECOND_PROJECT] : [])],
+      })
       if (path === `/v2/p/notes/tasks/${TASK.id}/notes`) return json(TASK_NOTES)
       if (path === '/v2/p/notes/workspaces/ws-1/notes') return json(WORKSPACE_NOTES)
       if (path === '/v2/p/notes/workspaces/global/notes') return json([])

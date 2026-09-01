@@ -31,13 +31,18 @@ describe.skipIf(!hasFfi)('a browse list longer than its panel', () => {
     try {
       const screen = await renderFixture({ width: 100, height: 32 })
       expect(await caretOn(screen, 'GitHub')).toBe(true)
-      await screen.press('j')
-      await screen.press('k')
       await screen.until('Older pull')
 
       // Into Browse, and the caret is on a row rather than on the frame.
       expect(await caretOn(screen, 'Invalidate')).toBe(true)
       const drawn = await screen.frame()
+
+      // Both terminal arrow spellings drive the Browse collection. This is asserted before the long
+      // walk so a dead collection cannot pass merely because its initial row and scrollbar drew.
+      await screen.press('ARROW_DOWN')
+      expect(caretLine(await screen.frame())).toContain('#100 Older pull')
+      await screen.press('ARROW_UP')
+      expect(caretLine(await screen.frame())).toContain('Invalidate')
 
       // Then walk it. Each move loads a different pull into the main panel. The 'destroyed' filter
       // below is a canary from the era when a re-suspending boundary destroyed its own subtree
@@ -47,7 +52,7 @@ describe.skipIf(!hasFfi)('a browse list longer than its panel', () => {
       const [error, warn] = [console.error, console.warn]
       console.error = (...args: unknown[]) => { logged.push(args.map(String).join(' ')) }
       console.warn = (...args: unknown[]) => { logged.push(args.map(String).join(' ')) }
-      for (let step = 0; step < 6; step += 1) await screen.press('j')
+      for (let step = 0; step < 6; step += 1) await screen.press('ARROW_DOWN')
       await screen.frame()
       screen.done()
       console.error = error

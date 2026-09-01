@@ -44,15 +44,16 @@ describe.skipIf(!hasFfi)('the shell', () => {
     for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(120)
   }, 30_000)
 
-  it('opens on a task, with the keys on the rail', async () => {
-    const screen = await renderFixture({ width: 120, height: 40, pane: 'notes' })
-    const frame = await screen.frame()
+  it('opens on the first Menu source, with the keys on that row', async () => {
+    const screen = await renderFixture({ width: 120, height: 40 })
+    const frame = await screen.until('Reviews')
     screen.done()
 
-    // There is no click to put the keys anywhere, so the shell opens with them on the rail and the
-    // rail opens on its list (../keys/regions.ts § firstStop).
+    // There is no click to put the keys anywhere. Startup waits for provider/workspace gates, picks
+    // the first source the Menu actually draws, and lands the caret on the same row.
     const row = frame.split('\n')[caretRow(frame)] ?? ''
-    expect(row).toContain('fix-login')
+    expect(row).toContain('GitHub')
+    expect(frame).toContain('Reviews')
   }, 30_000)
 
   it('cycles rail, pane strip and pane on tab, and wraps', async () => {
@@ -118,7 +119,7 @@ describe.skipIf(!hasFfi)('the shell', () => {
     screen.done()
 
     expect(closed).not.toContain('Switch workspace')
-    expect(closed).toContain('Scratchpad')
+    expect(closed).toContain('Reviews')
     // Back where they were, which is what the DOM palette's `prevFocus` does with an element.
     expect(caretRow(closed)).toBe(before)
   }, 30_000)
@@ -149,10 +150,8 @@ describe.skipIf(!hasFfi)('the shell', () => {
     expect(at).toBeGreaterThan(0)
     // Above the footer, which is the last drawn line.
     expect(lines[at + 1]).toContain('j/k move')
-    // The keys are where they were. Compared by what the caret is on rather than by which row it is
-    // on: the screen opens on the Tasks panel at the foot of the left column, so a notification
-    // taking a row moves that panel up with it, and the row number would be testing the arithmetic
-    // instead of the focus.
+    // The keys are where they were. Compared by what the caret is on rather than its row number, so
+    // a notification taking one line tests focus rather than panel arithmetic.
     expect(lines[caretRow(frame)]).toBe(before)
 
     await screen.press('ESCAPE')

@@ -57,11 +57,9 @@ setSourcePanel(sourcePanel)
 // registers, and eight panes reach the strip (docs/tui.md § What a plugin loses here). A loaded plugin
 // is not on this list and never will be: it arrives from a node as a bundle, and
 // `syncPluginDistribution` in main.tsx is what finds it.
-// …and no landing page. `selectedSource()` resolves an unset selection to whichever registered source
-// is the default, which on the desktop is core's own home page and here is whichever plugin's browse
-// source happens to be first — so the shell would open on a repo browser instead of on the reader's
-// work. This host opens on a task (chrome/Shell.tsx § Open on something), so the selection starts
-// explicitly empty and only the rail puts a source in it.
+// …and no core Home source. `selectedSource()` otherwise resolves an unset selection against the raw
+// registry before provider/workspace gates have loaded. Keep it explicitly empty so the rail can
+// choose the first source it actually draws once those gates are ready (chrome/Rail.tsx).
 setSelectedSource(null)
 
 initClientPlugins([

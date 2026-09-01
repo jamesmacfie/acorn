@@ -83,7 +83,7 @@ export function ListDetail(props: LayoutProps) {
             is routinely wider than its share. Without it the row reports a width the screen does not
             have (docs/tui.md). */}
         <box flexDirection="column" flexGrow={1} minWidth={0}>
-          <Panel grow title="Detail" onBox={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1)}>
+          <Panel grow scroll title="Detail" onBox={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1)}>
             {props.regions.detail?.()}
           </Panel>
         </box>

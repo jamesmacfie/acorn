@@ -58,6 +58,7 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
       >
         <Panel
           grow
+          scroll
           title="Document"
           {...(axis === 'y' ? { rows: split.size() } : {})}
           onBox={regionFocus({ paneId: props.stateKey, regionId: 'document' }, 0)}
@@ -65,7 +66,7 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
           {props.regions.document?.()}
         </Panel>
       </box>
-      <Panel grow title="Frame" onBox={regionFocus({ paneId: props.stateKey, regionId: 'frame' }, 1)}>
+      <Panel grow scroll title="Frame" onBox={regionFocus({ paneId: props.stateKey, regionId: 'frame' }, 1)}>
         {props.regions.frame?.()}
       </Panel>
     </box>

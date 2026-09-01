@@ -24,7 +24,7 @@ import type { Keymap, TargetMode } from '@opentui/keymap'
 import { isTyping, keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
-import { moveColumn, moveRegion, movePane } from './regions'
+import { moveBack, moveColumn, moveRegion, movePane } from './regions'
 
 export type TuiKeymap = Keymap<Renderable, KeyEvent>
 
@@ -100,6 +100,10 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
     ['prevRegion', () => moveRegion(-1)],
     ['nextPane', () => movePane(1)],
     ['prevPane', () => movePane(-1)],
+    // An overlay's dismiss layer and an entered PTY sit above this one. With neither active, Escape
+    // from main is the terse spelling of the same spatial edge as Ctrl+Option+Left; from the rail it
+    // returns false so the shell can still dismiss a notification.
+    ['dismiss', moveBack],
   ]
   const columnMoves: [Intent, () => boolean][] = [
     ['expand', () => moveColumn(1)],

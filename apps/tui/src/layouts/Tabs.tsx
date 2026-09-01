@@ -46,11 +46,12 @@ export function Tabs(props: LayoutProps) {
         })), 30)
       }}
     >
-      <TabStrip tabs={tabs()} active={active()} onChange={setSelected} idPrefix={props.stateKey} ariaLabel={props.label} />
+      <TabStrip tabs={tabs()} active={active()} onChange={setSelected} idPrefix={props.stateKey} ariaLabel={props.label} entry />
       <Show when={active()}>
         {(id) => (
           <Panel
             grow
+            scroll
             title={tabs().find((tab) => tab.id === id())?.label}
             onBox={regionFocus({ paneId: props.stateKey, regionId: 'panel' }, 1)}
           >

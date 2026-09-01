@@ -1,8 +1,9 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
+import { TextareaRenderable } from '@opentui/core'
 import { hasFfi } from './ffi'
 import { renderFixture } from './harness'
-import { focusedRegion } from './keys/regions'
+import { focusedRegion, focusedRenderable } from './keys/regions'
 
 // Menu, Browse, detail: the one path through the shell that needs every piece of this host at once.
 //
@@ -39,17 +40,14 @@ describe.skipIf(!hasFfi)('browsing a source', () => {
     // reports the integration connected (./fixture.ts).
     expect(await caretOn(screen, 'GitHub')).toBe(true)
 
-    // Off the row and back on it, because select-on-move is a move: arriving on a row is not choosing
-    // it, or tabbing through the Menu would swap the screen on the way past.
-    await screen.press('j')
-    await screen.press('k')
+    // Menu selects the row it opens on. A terminal has no pointer to make a second selection, so a
+    // highlighted source and the source shown in Browse are one state from the first frame.
     const browsing = await screen.until('Invalidate')
     expect(browsing).toContain('Reviews')
     expect(browsing).toContain('Invalidate')
 
     // Into the Browse panel, onto the pull, and the main panel follows with no Enter or arrow press.
-    // Browse opts into picking on entry; Menu deliberately does not, which is why the source choice
-    // above still takes a move rather than Tab changing the screen on its way through.
+    // Browse opts into picking on entry too, so entering its list opens the highlighted pull.
     expect(await caretOn(screen, 'Invalidate')).toBe(true)
     // Wait on something only the loaded detail draws. `PULL REQUEST` is the detail's heading and it
     // draws before the pull arrives, and `#42` is on the list row itself, so either one is a race that
@@ -78,6 +76,46 @@ describe.skipIf(!hasFfi)('browsing a source', () => {
     expect(cycle).toEqual(['tasks', 'source', 'menu', 'browse'])
   }, 120_000)
 
+  it('enters pull-detail controls below the tabs and escapes back through Browse', async () => {
+    const screen = await renderFixture({ width: 100, height: 32 })
+    try {
+      // The default source is GitHub. Reach Browse and move its one-row list once so the row's
+      // select-on-move contract opens the pull; then wait for the branch pair because it belongs to
+      // the loaded detail rather than to the list row beside it.
+      for (let step = 0; step < 6 && focusedRegion()?.regionId !== 'browse'; step += 1) {
+        await screen.press('TAB')
+      }
+      expect(focusedRegion()?.regionId).toBe('browse')
+      await screen.press('ARROW_DOWN')
+      expect(await screen.until('(fix-login) → (main)', 45)).toContain('Invalidate the old password')
+
+      // Reach the source region from whichever rail region won the asynchronous startup race. Its
+      // first stop is the section strip; Right moves that strip and not the row of task panes.
+      for (let step = 0; step < 6 && focusedRegion()?.regionId !== 'source'; step += 1) {
+        await screen.press('TAB')
+      }
+      expect(focusedRegion()?.regionId).toBe('source')
+      let comments = await screen.frame()
+      for (let step = 0; step < 8 && !comments.includes('[Comments/Commits] 1'); step += 1) {
+        await screen.press('ARROW_RIGHT')
+        comments = await screen.frame()
+      }
+      expect(comments).toContain('[Comments/Commits] 1')
+
+      // Down enters the active panel's first real control. Escape returns to the strip (proved by
+      // Left changing tabs), and the next Escape restores the Browse row in the left column.
+      await screen.press('ARROW_DOWN')
+      expect(focusedRenderable()).toBeInstanceOf(TextareaRenderable)
+      await screen.press('ESCAPE')
+      await screen.press('ARROW_LEFT')
+      expect(await screen.frame()).toContain('[Files] 2')
+      await screen.press('ESCAPE')
+      expect(focusedRegion()?.regionId).toBe('browse')
+    } finally {
+      screen.done()
+    }
+  }, 120_000)
+
   it('lets the Menu leave a source whose path is still showing', async () => {
     const screen = await renderFixture({ width: 100, height: 32 })
 
@@ -86,8 +124,6 @@ describe.skipIf(!hasFfi)('browsing a source', () => {
     // Menu choice re-ran it, the path's owner was still GitHub, and the choice was snapped straight
     // back (../chrome/routing.ts).
     expect(await caretOn(screen, 'GitHub')).toBe(true)
-    await screen.press('j')
-    await screen.press('k')
     await screen.until('Invalidate')
     expect(await caretOn(screen, 'Invalidate')).toBe(true)
     await screen.until('(fix-login) → (main)', 45)

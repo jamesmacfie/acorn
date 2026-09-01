@@ -17,7 +17,7 @@ describe('a diff longer than its column', () => {
   it.skipIf(!hasFfi)('draws one line per row, in order, with the gutter clear of the code', async () => {
     process.env.ACORN_FIXTURE_PATCH_LINES = '2500'
     try {
-      const screen = await renderFixture({ width: 160, height: 40 })
+      const screen = await renderFixture({ width: 160, height: 40, pane: 'pr' })
       const opened = await screen.until('somethingRatherLongIndeed', 45)
       const runs = (await screen.spans()).flat()
       screen.done()

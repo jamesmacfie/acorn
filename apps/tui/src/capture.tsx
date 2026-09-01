@@ -3,7 +3,7 @@ import { renderFixture } from './harness'
 
 // The screenshot, on a machine with no TTY. Same tree as the pane suite; printed instead of asserted.
 //
-//   pnpm --filter @acorn/tui capture              the pane the task opens on
+//   pnpm --filter @acorn/tui capture              the first available Menu source
 //   pnpm --filter @acorn/tui capture -- notes     one pane by name
 //
 // A pane's own data is a route and a store rather than a prop, so the frame is taken again until

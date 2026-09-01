@@ -13,7 +13,7 @@ import { regionFocus } from '../keys/regions'
 // thing to write in its border is which pane it is (../panel.tsx).
 export function Single(props: LayoutProps) {
   return (
-    <Panel grow title={props.label} onBox={regionFocus({ paneId: props.stateKey, regionId: 'body' }, 0)}>
+    <Panel grow scroll title={props.label} onBox={regionFocus({ paneId: props.stateKey, regionId: 'body' }, 0)}>
       {props.regions.body?.()}
     </Panel>
   )

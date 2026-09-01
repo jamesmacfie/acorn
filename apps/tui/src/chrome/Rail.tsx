@@ -112,20 +112,65 @@ function TaskList(props: { model: ShellModel }) {
 export function Rail(props: { model: ShellModel; cells: number }) {
   const integrations = createQuery(() => integrationsOptions(true))
   const scope = createSourceScope(() => props.model.workspace()?.id)
-  const sources = () => availableSources(integrations.data?.integrations, scope())
+  // Do not draw a partial Menu while its two gates are loading. Docker needs no provider, so it was
+  // briefly the only row, took the caret, and remained the collection's remembered active row after
+  // GitHub arrived above it. The shell then selected GitHub while visibly focusing Docker. Waiting
+  // here makes the first drawn row the same first row the defaulting effect below selects.
+  const sourcesReady = () => {
+    const scoped = scope()
+    return !!integrations.data && scoped.providers !== undefined && scoped.linked !== undefined
+  }
+  const sources = () => sourcesReady()
+    ? availableSources(integrations.data?.integrations, scope())
+    : []
   const source = () => sourceRegistry.get(selectedSource() ?? '')
+
+  // Start each workspace on the first source the Menu actually draws. Provider and workspace-link
+  // gates both load asynchronously, so wait for both before choosing: picking Docker from the partial
+  // list and then replacing it with GitHub would make the answer depend on which query won a race.
+  // An explicit task path or source selection wins for that workspace. `chooseWorkspace` clears both,
+  // so the new workspace receives the same default instead of the first one-shot being spent forever.
+  let defaultedWorkspace: string | null = null
+  createEffect(() => {
+    const workspace = props.model.workspace()
+    if (!workspace || defaultedWorkspace === workspace.id) return
+    if (activeTaskId() || selectedSource()) {
+      defaultedWorkspace = workspace.id
+      return
+    }
+    const scoped = scope()
+    if (!integrations.data) return
+    if (scoped.providers === undefined || scoped.linked === undefined) return
+    const first = sources()[0]
+    if (!first) return
+    defaultedWorkspace = workspace.id
+    setSelectedSource(first.id)
+  })
+
+  // A task opened deliberately still starts in Tasks. With no explicit view, Menu owns the initial
+  // focus so its selected first source and the caret agree about where the session began.
+  const menuOpens = () => !!selectedSource() || !activeTaskId()
 
   return (
     <box flexDirection="column" width={props.cells} flexShrink={0}>
       <Panel
         title="Menu"
         rows={MENU_ROWS}
-        onBox={regionFocus({ paneId: 'chrome', regionId: 'menu' }, MENU_ORDER, { column: 'rail' })}
+        onBox={regionFocus(
+          { paneId: 'chrome', regionId: 'menu' },
+          MENU_ORDER,
+          {
+            column: 'rail', enterMainOnActivate: true, opensHere: menuOpens(), pickOnEnter: true,
+          },
+        )}
       >
         <Show when={sources().length} fallback={<Line role="muted">No sources here.</Line>}>
           <Rows
             virtual
-            id="chrome.rail.sources"
+            // Collection state is a place within one roster. A workspace switch replaces that
+            // roster, so a workspace being visited for the first time starts on its first row
+            // instead of inheriting the previous workspace's active source.
+            id={`chrome.rail.sources.${props.model.workspace()?.id ?? 'loading'}`}
             ariaLabel="Sources"
             items={sources().map((entry) => ({ key: entry.id, ...entry }))}
             selected={selectedSource()}
@@ -159,7 +204,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
               ref={regionFocus(
                 { paneId: 'chrome', regionId: 'browse' },
                 BROWSE_ORDER,
-                { column: 'rail', pickOnEnter: true },
+                { column: 'rail', enterMainOnActivate: true, pickOnEnter: true },
               )}
             >
               {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this
@@ -170,17 +215,16 @@ export function Rail(props: { model: ShellModel; cells: number }) {
           )}
         </Show>
       </Panel>
-      {/* The screen opens here. Menu is drawn first and would otherwise take the keys, and a reader
-          arriving on a list where `j` swaps the whole screen has been handed the wrong thing first:
-          acorn is a workspace of tasks, and the task is what the desktop opens on too
-          (../keys/regions.ts § regionFocus). */}
+      {/* An explicitly opened task starts here. The ordinary startup path begins in Menu above, on
+          its first available source; keeping this conditional preserves task routes and test/capture
+          requests that deliberately choose a pane. */}
       <Panel
         title="Tasks"
         rows={TASKS_ROWS}
         onBox={regionFocus(
           { paneId: 'chrome', regionId: 'tasks' },
           TASKS_ORDER,
-          { column: 'rail', opensHere: true },
+          { column: 'rail', enterMainOnActivate: true, opensHere: !menuOpens() },
         )}
       >
         <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} />} />

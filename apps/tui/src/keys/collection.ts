@@ -23,7 +23,10 @@ import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionIntentOptions, type CollectionItem,
 } from '@acorn/client-core/kit/keys/collectionIntents.ts'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { claimIfProvisional, focusedRenderable, markItem, noteFocus } from './regions'
+import {
+  activationEntersMain, claimIfProvisional, focusedRenderable, markItem, moveColumn, noteFocus,
+  replaceFocusable,
+} from './regions'
 
 /**
  * What one item of a collection is handed.
@@ -48,6 +51,8 @@ export type CellCollection = {
   itemProps: (key: string) => ItemProps
   /** The layer the collection's container registers. Called from the container's `ref`. */
   attach: (box: Renderable) => void
+  /** Restore renderer focus after a virtual mouse window brings the active row back on screen. */
+  focusActive: () => boolean
 }
 
 export function createCellCollection(options: CellCollectionOptions): CellCollection {
@@ -66,8 +71,12 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
     },
     onItem: () => true,
     onActivate: (key) => {
+      // Capture this before activation. A rail row can replace the source/task surface, but Enter
+      // still means "open this row, then work in what opened" rather than merely moving focus.
+      const enterMain = activationEntersMain()
       options.onActivate?.(key)
       presses.get(key)?.()
+      if (enterMain) moveColumn(1)
     },
   })
 
@@ -82,12 +91,18 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       // keys; focus decides whether this collection has them.
       active: () => keys.active() === key && focusedRenderable() === boxes.get(key),
       ref: (box) => {
+        const previous = boxes.get(key)
         boxes.set(key, box)
         // A row, so a region opening on this pane lands on the list rather than on the filter above
         // it (./regions.ts § firstStop).
         // Browse opts into picking when its region is entered. Hand it the collection's ordinary
         // move rather than a second selection path, so select-on-move remains the one rule.
-        markItem(box, () => keys.goTo(key))
+        markItem(box, () => keys.goTo(key), `${options.id()}\u0000${key}`)
+        // Solid keys rows by their data-object reference, while collection state keys them by this
+        // logical key. A refresh may therefore redraw the same row as a new renderable. Advance live
+        // focus only when this collection replaced its own row; the region-wide identity registry
+        // remains responsible for restoring the logical item when a whole collection remounts.
+        replaceFocusable(previous, box)
         onCleanup(() => { if (boxes.get(key) === box) boxes.delete(key) })
       },
       press: (run) => {
@@ -95,6 +110,14 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
         onCleanup(() => { if (presses.get(key) === run) presses.delete(key) })
       },
     }),
+    focusActive: () => {
+      const key = keys.active()
+      const box = key ? boxes.get(key) : undefined
+      if (!box) return false
+      box.focus()
+      noteFocus(box)
+      return true
+    },
     attach: (box) => {
       // Layer 40, focus-within on the collection, exactly as on the desktop (client-core
       // host/keys/install.ts § the four tiers). Priority decides, not locality.

@@ -130,9 +130,15 @@ filter box would mean `j` types a `j`.
 Two more are the terminal's own and both come from drawing one pane. The cycle is the whole screen
 rather than the focused pane — rail, pane strip, the pane's own regions, and back — because there is no
 second pane to be surprised by, and the chrome joins it by declaring orders outside the range a layout
-uses. And Tab is `nextRegion` there, beside F6: the browser owns Tab and a terminal does not, and a
-reader in one presses it first. The intent is the shared one and `intentKeys` is still the table; a
-host adding a key to an intent it already has is what a per-host key table is for.
+uses. The pane chord first crosses the spatial rail/main edge, then cycles the one task-pane strip when
+there is no column left in that direction. Activating a Menu, Browse or Tasks row with Enter performs
+the row's normal action and then enters the main column. A structural tab strip is a parent stop:
+Left/Right chooses, Down enters the selected panel, Escape from a child returns to the strip, and
+Escape from a source strip returns specifically to Browse. In-content filter tabs remain ordinary
+controls and do not displace a region's row collection as its entry stop. Overlays and entered PTYs
+retain first refusal. And Tab is `nextRegion` there, beside F6: the browser owns Tab and a terminal
+does not, and a reader in one presses it first. The intent is the shared one and `intentKeys` is still
+the table; a host adding a key to an intent it already has is what a per-host key table is for.
 
 **Collection state is the host's.** A run of `Row`s inside a `Rows`, a tab strip, a menu, a chip row,
 a segmented control, a timeline and a grid are all one collection with roving focus inside, and the
@@ -145,7 +151,9 @@ activate picks, what a page key moves by. Each host supplies two things and noth
 on an item, and say whether the item itself holds focus rather than a control inside it.
 `collection.ts` beside it is the DOM's half: `focus()`, `scrollIntoView`, the `aria-*` attributes and
 the roving `tabindex`. `apps/tui/src/keys/collection.ts` is the terminal's, where a row hands its
-renderable back as it draws and the caret is drawn wherever focus is.
+renderable back as it draws and the caret is drawn wherever focus is. Non-virtual documents use a
+native OpenTUI scrollbox; a virtual `Rows` keeps its own window so wheel input can move the viewport
+without changing the active key and keyboard movement can reveal that key again.
 
 `Grid` is the one documented exception, and it is a consequence of virtualisation rather than a
 shortcut. Most of its rows have no element, so roving focus cannot be DOM focus: the arrows move a
