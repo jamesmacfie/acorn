@@ -265,7 +265,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   padding: var(--pad-control);
   font-size: var(--fs-xs);
 }
-.ui-row-leading { flex: none; display: inline-flex; align-items: center; }
+.ui-row-leading { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); }
 .ui-row-body { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-row-meta { flex: none; color: var(--text-muted); font-variant-numeric: var(--tabular); }
 /* See docs/ui-design.md § How the kit is built (Row) for data-fields and minmax(0, …). */
@@ -497,6 +497,10 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   border-bottom: var(--chrome-divider);
 }
 .ui-toolbar[data-size='sm'] { min-height: var(--control-h-sm); gap: var(--space-3); padding: 0 var(--space-4); }
+/* A filter strip is an input, not a row of buttons, and an input flush against the divider above
+   and the first row below reads as part of the list. Only the filter strip gets the inset, so the
+   button strips keep their height. */
+.ui-toolbar[data-size='sm']:has(> .ui-input[data-kind='filter']) { padding-block: var(--space-3); }
 /* Form and modal footers: no strip, items to the end. Subsumes .ui-modal-actions' role. */
 .ui-toolbar[data-variant='actions'] {
   justify-content: flex-end;
