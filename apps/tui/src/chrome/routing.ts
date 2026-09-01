@@ -20,6 +20,7 @@ import { projectPath } from '@acorn/client-core/host/registries/commands/corePat
 import { sourceIdForPath } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import { scheduleSettle } from '../keys/regions'
 import { currentPath, useNavigate, useParams } from '../kit/router'
 import type { ShellModel } from './model'
 
@@ -44,8 +45,15 @@ export const routedProjectId = (): string | null => {
 }
 
 /** Show a project. A navigation rather than a signal of its own, because the surfaces that care read
- *  `params.projectId` and there must be exactly one place that is true. */
-export const chooseProject = (projectId: string): void => { navigate(projectPath(projectId)) }
+ *  `params.projectId` and there must be exactly one place that is true.
+ *
+ *  The settle is for the Browse list, which is project-scoped: its rows are replaced wholesale, and
+ *  the one that had the keys goes with them. Focus returns to where it was if that renderable
+ *  survived and re-enters the region by identity if it did not (../keys/regions.ts § settle). */
+export const chooseProject = (projectId: string): void => {
+  navigate(projectPath(projectId))
+  scheduleSettle()
+}
 
 /**
  * Wire the path to the shell. Called once, from `Shell.tsx`, inside its reactive root.

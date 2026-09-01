@@ -1,12 +1,8 @@
 /** @jsxImportSource @opentui/solid */
 import { createEffect, For, Show } from 'solid-js'
 import { Dynamic } from '@opentui/solid'
-import { createQuery } from '@tanstack/solid-query'
-import { integrationsOptions } from '@acorn/client-core/infra/queries.ts'
 import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
-import { availableSources } from '@acorn/client-core/features/tabs/railSources.ts'
-import { createSourceScope } from '@acorn/client-core/features/tabs/sourceScope.ts'
 import { markersFor } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'
 import { resolveRailMarkers } from '@acorn/client-core/features/tabs/railMarkers.ts'
 import { requestTaskAnnotations } from '@acorn/client-core/host/annotations/taskAnnotations.ts'
@@ -16,6 +12,7 @@ import { Line } from '../kit/cells'
 import { Panel, PanelBody } from '../panel'
 import { regionFocus } from '../keys/regions'
 import { ExclusiveSlot } from './slot'
+import { BROWSE, MENU, TASKS } from './topology'
 import type { ShellModel } from './model'
 
 // The left column: three framed panels, read down the screen.
@@ -56,13 +53,6 @@ export const railCells = (shellCells: number): number =>
  *  holding a list nobody can page through if it is four rows tall. */
 const MENU_ROWS = 7
 const TASKS_ROWS = 7
-
-/** Which rail panel the screen opens on.
- *
- *  A task opened deliberately starts in Tasks. With no explicit view, Menu owns the initial focus so
- *  its selected first source and the caret agree about where the session began. Read by the shell,
- *  which hands it to the keys module as part of the topology (./Shell.tsx, ../keys/regions.ts). */
-export const menuOpens = (): boolean => !!selectedSource() || !activeTaskId()
 
 /** Before every region a layout registers, so the cycle reads down the screen (./Shell.tsx). */
 const MENU_ORDER = -130
@@ -117,42 +107,11 @@ function TaskList(props: { model: ShellModel }) {
 }
 
 export function Rail(props: { model: ShellModel; cells: number }) {
-  const integrations = createQuery(() => integrationsOptions(true))
-  const scope = createSourceScope(() => props.model.workspace()?.id)
-  // Do not draw a partial Menu while its two gates are loading. Docker needs no provider, so it was
-  // briefly the only row, took the caret, and remained the collection's remembered active row after
-  // GitHub arrived above it. The shell then selected GitHub while visibly focusing Docker. Waiting
-  // here makes the first drawn row the same first row the defaulting effect below selects.
-  const sourcesReady = () => {
-    const scoped = scope()
-    return !!integrations.data && scoped.providers !== undefined && scoped.linked !== undefined
-  }
-  const sources = () => sourcesReady()
-    ? availableSources(integrations.data?.integrations, scope())
-    : []
+  // Three panels and nothing else: which sources this workspace has, and which of them the session
+  // starts on, are both the model's (./model.ts § defaultSource). A component that draws is a
+  // component that cannot race the thing it draws.
+  const sources = () => props.model.sources()
   const source = () => sourceRegistry.get(selectedSource() ?? '')
-
-  // Start each workspace on the first source the Menu actually draws. Provider and workspace-link
-  // gates both load asynchronously, so wait for both before choosing: picking Docker from the partial
-  // list and then replacing it with GitHub would make the answer depend on which query won a race.
-  // An explicit task path or source selection wins for that workspace. `chooseWorkspace` clears both,
-  // so the new workspace receives the same default instead of the first one-shot being spent forever.
-  let defaultedWorkspace: string | null = null
-  createEffect(() => {
-    const workspace = props.model.workspace()
-    if (!workspace || defaultedWorkspace === workspace.id) return
-    if (activeTaskId() || selectedSource()) {
-      defaultedWorkspace = workspace.id
-      return
-    }
-    const scoped = scope()
-    if (!integrations.data) return
-    if (scoped.providers === undefined || scoped.linked === undefined) return
-    const first = sources()[0]
-    if (!first) return
-    defaultedWorkspace = workspace.id
-    setSelectedSource(first.id)
-  })
 
   return (
     <box flexDirection="column" width={props.cells} flexShrink={0}>
@@ -160,11 +119,14 @@ export function Rail(props: { model: ShellModel; cells: number }) {
         title="Menu"
         rows={MENU_ROWS}
         onBox={regionFocus(
-          { paneId: 'chrome', regionId: 'menu' },
+          MENU,
           MENU_ORDER,
           { column: 'rail', enterMainOnActivate: true, pickOnEnter: true },
         )}
       >
+        {/* Empty while the provider and workspace-link gates are still loading, which is a rendering
+            decision and not a focus one: a partial Menu draws a row that is about to move
+            (./model.ts § sourcesReady). */}
         <Show when={sources().length} fallback={<Line role="muted">No sources here.</Line>}>
           <Rows
             virtual
@@ -203,7 +165,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
               flexDirection="column"
               flexGrow={1}
               ref={regionFocus(
-                { paneId: 'chrome', regionId: 'browse' },
+                BROWSE,
                 BROWSE_ORDER,
                 { column: 'rail', enterMainOnActivate: true, pickOnEnter: true },
               )}
@@ -222,7 +184,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
         title="Tasks"
         rows={TASKS_ROWS}
         onBox={regionFocus(
-          { paneId: 'chrome', regionId: 'tasks' },
+          TASKS,
           TASKS_ORDER,
           { column: 'rail', enterMainOnActivate: true },
         )}

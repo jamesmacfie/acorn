@@ -382,6 +382,14 @@ const json = (value: unknown) => ({
       if (path === '/v2/core/workspaces/ws-1/external-projects') return json({ projects: [] })
       if (path === '/v2/core/workspaces/ws-2/external-projects') return json({ projects: [] })
       if (path === '/v2/core/tasks') return json([TASK])
+      // A descriptor source's items, for the one test that drives a `SourcePanel` list rather than a
+      // first-party source's own regions (./sourceFilter.test.tsx). Three titles, two of which share a
+      // word, so a filter can be shown to keep some rows and drop others.
+      if (path === '/v2/p/probe/items') return json({ items: [
+        { id: 'reset', title: 'Invalidate the old password on reset' },
+        { id: 'rotate', title: 'Rotate the signing key' },
+        { id: 'copy', title: 'Password reset copy' },
+      ] })
       if (path === '/v2/core/projects') return json({
         projects: [PROJECT, OTHER_PROJECT, ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE ? [SECOND_PROJECT] : [])],
       })

@@ -22,12 +22,12 @@ describe.skipIf(!hasFfi)('workspace focus handoff', () => {
       await screen.press('ARROW_DOWN')
       await screen.press('RETURN')
 
+      // Two waits and no polling. The topbar says the switch landed; the Browse list says the new
+      // workspace's default source was chosen, which is the model's own effect and the settle it
+      // schedules (./chrome/model.ts § defaultSource). Before those existed this loop asked twenty
+      // times whether the caret had caught up yet.
       await screen.until('second > second-project')
-      let switched = await screen.frame()
-      for (let turn = 0; turn < 20 && selectedSource() !== 'github'; turn += 1) {
-        await new Promise((done) => setTimeout(done, 100))
-        switched = await screen.frame()
-      }
+      const switched = await screen.until('Reviews')
       expect(focusedRegion()?.regionId).toBe('menu')
       expect(selectedSource()).toBe('github')
       expect(caretLine(switched)).toContain('GitHub')
