@@ -15,7 +15,7 @@ import { markdownLines, type Line as MarkdownLine } from './markdown'
 import { borderCell, litControl, rule, spaceCells } from './roles'
 import { GLYPHS } from './glyphs'
 import { spinnerFrame } from './tick'
-import { focusRenderable, focusedRenderable } from '../keys/regions'
+import { focusRenderable, focusedRenderable, scheduleSettle } from '../keys/regions'
 
 // The kit's showing nodes in cells. One component per sentence in
 // docs/ui-design.md § Every node at 80 by 24; where a node is `reduced`, `support.ts` says what is
@@ -313,10 +313,17 @@ export function Rows<T extends CollectionItem>(props: {
   // live in both states.
   createEffect(() => {
     window().from
-    queueMicrotask(() => {
-      if (!box || focusedRenderable() !== box || !collection.focusActive()) return
-      box.focusable = false
-    })
+    if (!box || focusedRenderable() !== box || !collection.focusActive()) return
+    box.focusable = false
+  })
+
+  // A region's contents are `lazy` and its rows come from a query, so a pane opens before its list
+  // exists and the region lands the keys on its own box for want of anything better. Every arrival of
+  // rows — the first response and every refetch after it — is a reason for the store to look again
+  // (../keys/regions.ts § The settle pass).
+  createEffect(() => {
+    items()
+    scheduleSettle()
   })
 
   /** Where the thumb sits, or nothing where the whole list is on screen. */
@@ -336,7 +343,7 @@ export function Rows<T extends CollectionItem>(props: {
       // many rows fit — so it always fitted, always drew everything, and overflowed the frame
       // (../panel.tsx). Every other list keeps the kit's rule and takes the room its rows need.
       {...(props.virtual ? { flexGrow: 1, flexBasis: 0, flexShrink: 1 } : { flexShrink: 0 })}
-      ref={(element: BoxRenderable) => { box = element; setRows(element.height); collection.attach(element) }}
+      ref={(element: BoxRenderable) => { box = element; setRows(element.height); collection.attach(element); scheduleSettle() }}
       onSizeChange={() => setRows(box?.height ?? 0)}
       onMouseScroll={(event: MouseEvent) => {
         if (!props.virtual) return

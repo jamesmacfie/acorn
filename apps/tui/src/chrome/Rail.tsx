@@ -57,6 +57,13 @@ export const railCells = (shellCells: number): number =>
 const MENU_ROWS = 7
 const TASKS_ROWS = 7
 
+/** Which rail panel the screen opens on.
+ *
+ *  A task opened deliberately starts in Tasks. With no explicit view, Menu owns the initial focus so
+ *  its selected first source and the caret agree about where the session began. Read by the shell,
+ *  which hands it to the keys module as part of the topology (./Shell.tsx, ../keys/regions.ts). */
+export const menuOpens = (): boolean => !!selectedSource() || !activeTaskId()
+
 /** Before every region a layout registers, so the cycle reads down the screen (./Shell.tsx). */
 const MENU_ORDER = -130
 const BROWSE_ORDER = -120
@@ -147,10 +154,6 @@ export function Rail(props: { model: ShellModel; cells: number }) {
     setSelectedSource(first.id)
   })
 
-  // A task opened deliberately still starts in Tasks. With no explicit view, Menu owns the initial
-  // focus so its selected first source and the caret agree about where the session began.
-  const menuOpens = () => !!selectedSource() || !activeTaskId()
-
   return (
     <box flexDirection="column" width={props.cells} flexShrink={0}>
       <Panel
@@ -159,9 +162,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
         onBox={regionFocus(
           { paneId: 'chrome', regionId: 'menu' },
           MENU_ORDER,
-          {
-            column: 'rail', enterMainOnActivate: true, opensHere: menuOpens(), pickOnEnter: true,
-          },
+          { column: 'rail', enterMainOnActivate: true, pickOnEnter: true },
         )}
       >
         <Show when={sources().length} fallback={<Line role="muted">No sources here.</Line>}>
@@ -215,16 +216,15 @@ export function Rail(props: { model: ShellModel; cells: number }) {
           )}
         </Show>
       </Panel>
-      {/* An explicitly opened task starts here. The ordinary startup path begins in Menu above, on
-          its first available source; keeping this conditional preserves task routes and test/capture
-          requests that deliberately choose a pane. */}
+      {/* An explicitly opened task starts here, through the shell's topology; the ordinary startup
+          path begins in Menu above, on its first available source. */}
       <Panel
         title="Tasks"
         rows={TASKS_ROWS}
         onBox={regionFocus(
           { paneId: 'chrome', regionId: 'tasks' },
           TASKS_ORDER,
-          { column: 'rail', enterMainOnActivate: true, opensHere: !menuOpens() },
+          { column: 'rail', enterMainOnActivate: true },
         )}
       >
         <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} />} />

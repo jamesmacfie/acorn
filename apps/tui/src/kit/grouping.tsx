@@ -1,13 +1,13 @@
 /** @jsxImportSource @opentui/solid */
 import { createSignal, For, Show, type JSX } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
+import type { BoxRenderable, Renderable, ScrollBoxRenderable } from '@opentui/core'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isCompact } from '../appearance'
 import { flatten, Line, slot } from './cells'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from './roles'
 import { trapKeys } from '../keys/trap'
 import { bindKeys } from '../keys/install'
-import { markTabStop, moveFocusFrom, moveRegion, takeFocus } from '../keys/regions'
+import { enterParent, markParent, moveFocusFrom, moveRegion, takeFocus } from '../keys/regions'
 import { moveStopIn, stop } from '../keys/stops'
 import { ScrollViewport } from './scrolling'
 import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
@@ -167,8 +167,10 @@ export function Tabs(props: {
   idPrefix: string
   ariaLabel: string
   actions?: JSX.Element
-  /** This strip is the structural parent of the region content below it. */
-  entry?: boolean
+  /** The panels this strip owns, where it owns any. A strip with panels is a parent stop: Down enters
+   *  the one it is showing and Escape from anything inside that panel comes back here. A list's own
+   *  filter strip — GitHub's Open/Closed — passes none and stays an ordinary control. */
+  panels?: () => Renderable[]
 }) {
   const step = (delta: 1 | -1): boolean => {
     const at = props.tabs.findIndex((tab) => tab.id === props.active)
@@ -193,15 +195,16 @@ export function Tabs(props: {
       flexShrink={0}
       overflow="hidden"
       ref={(element: BoxRenderable) => {
-        markTabStop(element, props.entry)
+        markParent(element, () => props.panels?.() ?? [])
         bindKeys(element, [
           ...['left', 'h'].map((key) => ({ key, cmd: () => step(-1) })),
           ...['right', 'l'].map((key) => ({ key, cmd: () => step(1) })),
-          // The selected panel is the next stop in the same region. A top-level pane strip is its
-          // own region, so its Down edge continues into the following pane region instead.
+          // Into the panel this strip is showing. A strip with no panels — a filter — falls through
+          // to the next stop beside it, and a top-level pane strip is its own region, so its Down
+          // edge continues into the following pane region instead.
           ...['down', 'j'].map((key) => ({
             key,
-            cmd: () => moveFocusFrom(element, 1) || moveRegion(1),
+            cmd: () => enterParent(element) || moveFocusFrom(element, 1) || moveRegion(1),
           })),
         ], 45, { mode: 'focus' })
       }}
@@ -227,9 +230,16 @@ export function Tabs(props: {
 
 /** The panel half. `hidden` rather than unmounting, the same thunk rule the DOM layout keeps, so a
  *  panel holds its state across a switch. */
-export function TabPanel(props: { idPrefix: string; id: string; active: string; children: JSX.Element }) {
+export function TabPanel(props: {
+  idPrefix: string
+  id: string
+  active: string
+  /** Where the panel drew, so the strip above it can own it (../keys/regions.ts § markParent). */
+  onBox?: (box: ScrollBoxRenderable) => void
+  children: JSX.Element
+}) {
   return (
-    <ScrollViewport visible={props.active === props.id}>
+    <ScrollViewport visible={props.active === props.id} {...(props.onBox ? { onBox: props.onBox } : {})}>
       {props.children}
     </ScrollViewport>
   )
@@ -604,6 +614,9 @@ export function Sections(props: {
   main?: KitSection
 }) {
   let box: BoxRenderable | undefined
+  // Where each panel drew, keyed by its tab, so the strip above can own them. A `TabPanel` is a
+  // sibling of the strip rather than a child of it, so nothing but the caller can make the edge.
+  const drawn = new Map<string, ScrollBoxRenderable>()
   const [cells, setCells] = createSignal(MAIN_COLUMN_AT)
   const wide = () => cells() >= MAIN_COLUMN_AT && !!props.main
   const tabs = (): KitSection[] => [
@@ -636,12 +649,12 @@ export function Sections(props: {
           onChange={setChosen}
           idPrefix={props.id}
           ariaLabel={props.ariaLabel ?? 'Sections'}
-          entry
+          panels={() => [...drawn.values()]}
           {...(() => { const found = tabs().find((tab) => tab.id === active())?.actions; return found ? { actions: found() } : {} })()}
         />
         <For each={tabs()}>
           {(tab) => (
-            <TabPanel idPrefix={props.id} id={tab.id} active={active()}>
+            <TabPanel idPrefix={props.id} id={tab.id} active={active()} onBox={(panel) => drawn.set(tab.id, panel)}>
               {tab.render()}
             </TabPanel>
           )}
