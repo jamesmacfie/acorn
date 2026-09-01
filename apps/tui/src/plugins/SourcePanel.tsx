@@ -1,6 +1,8 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, createSignal, Show } from 'solid-js'
 import { Dynamic } from '@opentui/solid'
+import type { Renderable } from '@opentui/core'
+import { bindIntents } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { useNavigate, useParams } from '@solidjs/router'
 import type { PluginRailItem, PluginSourceDescriptor } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
@@ -10,7 +12,11 @@ import { runChromeAction } from '@acorn/client-core/host/chrome/actions.ts'
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
 import type { SourcePanel } from '@acorn/client-core/host/chrome/sourcePanel.ts'
 import { Alert, Badge, EmptyState, Row, Rows } from '../kit/showing'
+import { Input } from '../kit/asking'
 import { Line } from '../kit/cells'
+import { bindKeys } from '../keys/install'
+import { focusedRenderable, focusRenderable, moveFocusFrom, moveStop, stopsIn } from '../keys/regions'
+import { STOP_PRIORITY } from '../keys/stops'
 
 // A descriptor source's rail list, in cells.
 //
@@ -27,10 +33,10 @@ import { Line } from '../kit/cells'
 // main one (docs/tui.md § The screen), which is why this exports a `regions` pair rather than a
 // component.
 //
-// Three parts of the DOM panel are not here, and they are omissions rather than gaps in the seam:
-// the title filter, the create-task menu on a row, and the dashboard panels beside the list. Each is
-// a surface of its own on this host and none of them is what a rail list is for. The filter is the one
-// worth adding first, because a list of a hundred issues is a list nobody can page through.
+// Two parts of the DOM panel are not here, and they are omissions rather than gaps in the seam: the
+// create-task menu on a row, and the dashboard panels beside the list. Each is a surface of its own on
+// this host and neither is what a rail list is for. The third, the title filter, is below: a list of a
+// hundred issues is a list nobody can page through.
 
 /** One row's secondary text: the aligned fields where a source sends them, the pre-joined line where
  *  it sends that instead. The DOM reserves a track per field so the Nth lines up down the list; in
@@ -42,6 +48,11 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
   const params = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const nodeId = activeNodeId() ?? ''
+  // Per source, and it resets when the source changes because the source change unmounts this: a
+  // descriptor's `regions.list` is one stable closure per source and `Dynamic` swaps components when
+  // the reader picks another one. A refresh of the same descriptor keeps the field, which is the point
+  // of the cache below.
+  const [query, setQuery] = createSignal('')
 
   // The same fan-out the DOM panel runs, pinned to one node, with the project in the dependency rather
   // than read inside the fetch so it reaches the cache key too. Both hosts build the key with
@@ -63,7 +74,13 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
   )
 
   const row = () => result().rows[0]
-  const items = createMemo<PluginRailItem[]>(() => row()?.data ?? [])
+  const all = createMemo<PluginRailItem[]>(() => row()?.data ?? [])
+  // Title only. The secondary line is whatever fields the source chose to send and a reader filtering
+  // a list is looking for the thing they can read down the left edge.
+  const items = createMemo<PluginRailItem[]>(() => {
+    const text = query().trim().toLowerCase()
+    return text ? all().filter((item) => item.title.toLowerCase().includes(text)) : all()
+  })
   const unavailable = () => result().unavailable[0]
 
   const select = (id: string): void => {
@@ -81,8 +98,50 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
     })
   }
 
+  // `/` anywhere in the panel puts the keys in the field, which is the first stop in it. Read off the
+  // tree rather than kept in a variable, because the kit's `Input` owns its own renderable and the
+  // walk already has to be able to say what a stop is (../keys/regions.ts § stopsIn).
+  const openFilter = (panel: Renderable): boolean => focusRenderable(stopsIn(panel)[0])
+
+  // Down and Escape both leave the field for the list below it: the field and the rows are two stops
+  // in one region, so the stop after the field is the row the caret was on. Bound `whileTyping`,
+  // because a field is a typing target and a bare `down` is inactive in one — which is exactly why a
+  // reader would otherwise be stuck in it.
+  //
+  // Two walks, and the difference is the one the model draws. Down walls, so a filter that matched
+  // nothing leaves the caret where it is rather than throwing it into the next region. Escape does
+  // not, so the same reader can still climb out of the panel (../keys/regions.ts § moveStop).
+  const bindField = (element: Renderable): void => {
+    bindKeys(element, [
+      { key: 'down', cmd: () => moveStop(1) },
+      { key: 'escape', cmd: () => {
+        // The focused renderable, not `element`: the kit's `Input` owns its own box and this is the
+        // wrapper the layer is bound to, which is not itself a stop in the walk.
+        const focused = focusedRenderable()
+        return !!focused && moveFocusFrom(focused, 1)
+      } },
+    ], STOP_PRIORITY, { whileTyping: true })
+  }
+
   return (
-    <>
+    // `flexBasis` 0 with the growth, so the virtual list below takes the room left after the field
+    // rather than the room its own rows want (../panel.tsx § Panel).
+    <box
+      flexDirection="column"
+      flexGrow={1}
+      flexBasis={0}
+      ref={(element: Renderable) => bindIntents(element, ['search'], () => openFilter(element))}
+    >
+      {/* Only once there is a list to filter, and that is a focus rule rather than a tidiness one:
+          entering a region lands on its first collection row, else on its first stop, so a field drawn
+          above an empty list takes the keys the moment the panel opens and `j` types a `j`
+          (../keys/regions.ts § entryStop). It stays while a filter matches nothing, because the list
+          it filters is still there. */}
+      <Show when={all().length}>
+        <box flexShrink={0} ref={bindField}>
+          <Input kind="filter" placeholder="Filter" value={query()} onInput={setQuery} />
+        </box>
+      </Show>
       {/* A node that did not answer and had nothing cached is a banner, never a failed pane — the same
           call the DOM panel makes, because "nothing is assigned to you" is a claim the host cannot make
           on a failed fetch. */}
@@ -121,7 +180,7 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
           </Rows>
         </Show>
       </Show>
-    </>
+    </box>
   )
 }
 

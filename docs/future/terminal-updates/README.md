@@ -26,7 +26,7 @@ traces to one of those two. [analysis.md](./analysis.md) has the evidence, numbe
 | [phase-1-focus-tree.md](./phase-1-focus-tree.md) | Shipped. A pointer at `docs/tui.md`, plus the five places the design changed on contact. |
 | [phase-2-documents.md](./phase-2-documents.md) | Shipped. A pointer at `docs/tui.md`, plus the four places the design changed. |
 | [phase-3-tabs.md](./phase-3-tabs.md) | Shipped. A pointer at `docs/tui.md`, plus the two places the design changed. |
-| [phase-4-shell.md](./phase-4-shell.md) | The shell's contract as a topology file, the Rail without focus effects, a filter for descriptor lists. |
+| [phase-4-shell.md](./phase-4-shell.md) | Shipped. A pointer at `docs/tui.md`, plus the four places the design changed. |
 | [phase-5-extensions.md](./phase-5-extensions.md) | Extension kinds in cells: the `ExtendedPane` seam, rows, diff annotations, and the losses named. |
 | [phase-6-tests-and-docs.md](./phase-6-tests-and-docs.md) | The invariants as properties over the roster, the footer's words, the doc moves, and deleting this folder. |
 
@@ -38,7 +38,7 @@ traces to one of those two. [analysis.md](./analysis.md) has the evidence, numbe
 | 1 | Refactor `keys/regions.ts` into the five-level model with one settle pass and a shell-installed topology. Behaviour unchanged. | 0 for its tests | Shipped 2026-09-02. Five requirements changed on contact; the phase file lists them. |
 | 2 | Arrows move between stops inside a panel, page keys scroll, Escape climbs to the parent strip. | 0, 1 | Shipped 2026-09-02. Four requirements changed on contact; the phase file lists them. |
 | 3 | `Tabs` with `TabPanel`s is a parent strip without a prop. Linear and Rollbar catch up. `ctrl+N`. | 1 | Shipped 2026-09-02. Two requirements changed on contact; the phase file lists them. |
-| 4 | The shell's topology file, the Rail without effects, workspace switch through the settle, `/` filters a descriptor list. | 1 | Not started. |
+| 4 | The shell's topology file, the Rail without effects, workspace switch through the settle, `/` filters a descriptor list. | 1 | Shipped 2026-09-02. Four requirements changed on contact; the phase file lists them. |
 | 5 | The `ExtendedPane` seam, `rows` as a collection, diff annotation marks, the loss table in `docs/tui.md`. | 0, 2 | Not started. |
 | 6 | Reachability, bounded Escape, one caret, footer truth as tests over every pane; docs rewritten; folder deleted. | all | Not started. |
 
@@ -83,3 +83,6 @@ footer saying what each line says, the programme is done and the folder goes.
   threading a getter through a caller.
 - `packages/client-core/src/host/frames/register.ts` mounts the DOM `ExtendedPane`. If a seam has
   appeared since, phase 5 requirement 1 is done.
+- Region ids in the chrome now come from `apps/tui/src/chrome/topology.ts`, which exports one `RegionRef`
+  per region as well as the topology itself. Phase 6 asserts over the roster, and a test that spells
+  `{ paneId: 'chrome', regionId: 'browse' }` by hand is spelling one of those a second time.

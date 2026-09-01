@@ -25,7 +25,8 @@ import { createShellModel, type ShellModel } from './model'
 import { chooseProject, installRouting, routedProjectId } from './routing'
 import { closeOverlay, openOverlay, topOverlay } from './state'
 import { cyclePane } from './panes'
-import { menuOpens, Rail, railCells } from './Rail'
+import { Rail, railCells } from './Rail'
+import { PANES, SOURCE, topology } from './topology'
 import { Topbar } from './Topbar'
 import { PaneBody, PaneStrip } from './PaneRow'
 import { Footer } from './Footer'
@@ -47,11 +48,6 @@ import { CheatSheet } from './CheatSheet'
 // down the screen: rail, pane strip, the pane's own regions. The footer is not in it — it is a label,
 // and a stop that does nothing is a hole a reader falls into (../keys/regions.ts § moveRegion).
 const STRIP_ORDER = -50
-
-/** The three panels of the left column, named here because the shell is what drew them: the keys
- *  module answers Escape from a rail region with the column edge and knows none of these by name
- *  (../keys/regions.ts § Topology). */
-const RAIL_REGIONS = new Set(['menu', 'browse', 'tasks'])
 
 export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void }) {
   const model = createShellModel()
@@ -91,23 +87,9 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // The arrangement, as the three questions the keys module cannot answer for itself: where Escape
   // goes from the top of a region, which region takes the keys when the screen first has any, and
   // which of them is chrome a first crossing passes over. Installed rather than imported, for the
-  // same reason the pane cycler is: that module is the keys' and must not reach into this one.
-  setTopology({
-    opensOn: () => ({ paneId: 'chrome', regionId: menuOpens() ? 'menu' : 'tasks' }),
-    // The pane strip is a line above the pane, so Ctrl+Option+Right from the rail enters the pane's
-    // own first region. Tab still stops on the strip, which is where its Left/Right belong.
-    skips: (region) => region.paneId === 'chrome' && region.regionId === 'panes',
-    home: (region) => {
-      // From the rail there is nowhere further left, so Escape falls through to the shell's own
-      // layer and clears a notification instead.
-      if (region.paneId === 'chrome' && RAIL_REGIONS.has(region.regionId)) return null
-      // A source detail climbs to the list it came from; a task pane, which never has one beside it,
-      // climbs to the strip that chose it.
-      if (source()?.regions?.list) return { paneId: 'chrome', regionId: 'browse' }
-      if (region.paneId !== 'chrome') return { paneId: 'chrome', regionId: 'panes' }
-      return null
-    },
-  })
+  // same reason the pane cycler is: that module is the keys' and must not reach into this one
+  // (./topology.ts).
+  setTopology(topology)
   onCleanup(() => setTopology(null))
 
   // One tick for every spinner on screen (../kit/tick.ts).
@@ -213,7 +195,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
                   flexDirection="column"
                   ref={(element: BoxRenderable) => {
                     setStrip(element)
-                    regionFocus({ paneId: 'chrome', regionId: 'panes' }, STRIP_ORDER)(element)
+                    regionFocus(PANES, STRIP_ORDER)(element)
                   }}
                 >
                   <PaneStrip task={task()} focused={focusWithin(strip())} />
@@ -272,7 +254,7 @@ function SourceRegion(props: { children: JSX.Element }) {
       flexDirection="column"
       flexGrow={1}
       minWidth={0}
-      ref={regionFocus({ paneId: 'chrome', regionId: 'source' }, 0)}
+      ref={regionFocus(SOURCE, 0)}
     >
       {props.children}
     </box>

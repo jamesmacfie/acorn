@@ -703,10 +703,18 @@ the window, and this host puts the list in the Browse panel and the detail in th
 `apps/tui/src/plugins/SourcePanel.tsx` is this host's. Everything that is not drawing is imported
 rather than rewritten: `readRailItems` and `chromeKey` are the query, so both hosts share one cache
 entry; `runChromeAction` is what a row press does; and `projectSurfaceRegistry` is what the detail is,
-which is the same surface the desktop draws beside its own list. Three things are left out and they
-are omissions rather than gaps in the seam: the title filter, the create-task menu on a row, and the
-dashboard panels beside the list. The filter is the one worth adding first, because a list of a
-hundred issues is a list nobody can page through.
+which is the same surface the desktop draws beside its own list. Two things are left out and they are
+omissions rather than gaps in the seam: the create-task menu on a row, and the dashboard panels beside
+the list. Each is a surface of its own on this host and neither is what a rail list is for.
+
+The title filter is here. `/` — the `search` intent, so `Ctrl+F` reaches it too — puts the keys in a
+field above the rows, what is typed narrows the list by title, `↓` goes back to the rows and `Escape`
+leaves the panel. The field is drawn only once there is a list to filter, and that is a focus rule
+rather than a tidy one: entering a region lands on its first collection row, else on its first stop, so
+a field above an empty list takes the keys the moment the panel opens and `j` types a `j`. The two
+walks out of the field differ on purpose — `↓` walls at the last stop so a filter matching nothing
+leaves the caret where it is, and Escape does not, so the same reader can still climb out. The filter
+is per source and goes when the source does, because a source change unmounts the panel.
 
 The source-panel factory is keyed by `(pluginId, descriptorId)`. Chrome contribution resyncs update a
 signal holding the current descriptor and return the same `regions.list` and `regions.detail`
@@ -744,20 +752,35 @@ Tasks, the pane strip when a task is open, then the pane/source regions. `right`
 rail to main and `left`/`h` comes back; neither wraps. `Ctrl+Option+Right` and
 `Ctrl+Option+Left` take the same spatial edge before they cycle a task pane, so the advertised pane
 chord works from Menu, Browse, and Tasks. In a rail list, Up/Down and `j`/`k` move; `Enter` performs the
-row's ordinary activation and then enters main, and `Escape` from main returns to the remembered rail
-section. An overlay or entered PTY keeps first refusal on Escape. A tabbed detail adds one deliberate
-level: `left`/`right` (or `h`/`l`) choose a tab, `down`/`j` enters its controls, Escape returns to the
-tab strip, and the next Escape returns a source detail to Browse. Moving a focused control beyond the
-viewport reveals it automatically; mouse wheel/trackpad input scrolls the viewport independently.
+row's ordinary activation and then enters main. An overlay or entered PTY keeps first refusal on
+Escape. A tabbed detail adds one deliberate level: `left`/`right` (or `h`/`l`) choose a tab, `down`/`j`
+enters its controls, and Escape returns to the tab strip. Moving a focused control beyond the viewport
+reveals it automatically; mouse wheel/trackpad input scrolls the viewport independently.
+
+Escape climbs one level each press, and where it goes at the top of a region is the shell's to say
+rather than the keys module's. `apps/tui/src/chrome/topology.ts` is the whole of it, and it is the one
+file in the chrome that names a region by string anywhere but where it declares one. A source detail
+goes to the Browse list it came from, or to the Menu row that chose the source when the source draws no
+list of its own. A task pane's own regions go to the strip above them, and the strip goes to the Tasks
+list the task was opened from. From the rail there is nowhere further left, so Escape falls through to
+the shell's own layer and clears a notification instead. The same file says which region takes the keys
+when the screen first has any — Tasks when the session opened with a task and no source, Menu otherwise
+— and which regions a first crossing into a column passes over, which is the pane strip and nothing
+else.
 
 `w` switches workspace and `p` switches project, both through an overlay, because that is the shape
-that takes the keys off whatever had them. Neither restores what you were looking at. The command
-chord opens the palette from anywhere except an entered PTY.
+that takes the keys off whatever had them. Neither restores what you were looking at. Both schedule a
+settle, so the caret lands on the first row of the roster that replaced the old one rather than on
+whatever survived the switch. The command chord opens the palette from anywhere except an entered PTY.
 
 A pane opens with the keys already somewhere, because there is no click to put them there. And a
 region opens on its list where it has one rather than on the first field above it, because the first
 thing focused is the thing the bare keys drive and landing in a filter box means `j` types a `j`.
-Menu and Browse also select the row they open on; other regions only focus it.
+Menu and Browse also select the row they open on; other regions only focus it. Which source a
+workspace opens on is one derivation in `apps/tui/src/chrome/model.ts`: the first source the Menu
+actually draws, once both gates behind that list have answered. The Rail reads it and draws. It used
+to be an effect in the Rail, and the shell and the Rail agreed about the answer only because one of
+them waited for the other.
 
 ## Loaded plugins
 
