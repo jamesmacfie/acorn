@@ -198,7 +198,14 @@
   white-space: normal;
 }
 
+/* Sticky-left and one scrollport wide, like the file head above: the row under it is as wide as the
+   diff canvas, so a thread left to fill it laid its prose out past the right edge of the pane and
+   rode off the left edge as soon as a reader scrolled to the code it is about. The code still
+   scrolls; the conversation stays where it can be read. */
 .diff-thread {
+  position: sticky;
+  left: var(--pane-pad);
+  width: calc(100cqw - 2 * var(--pane-pad));
   margin: 6px var(--pane-pad);
   padding: 9px var(--space-5);
   background: var(--bg);
