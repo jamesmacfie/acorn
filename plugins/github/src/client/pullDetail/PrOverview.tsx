@@ -57,6 +57,7 @@ export function PrOverview(props: {
       ...(pull?.author ? [{ label: 'Author', value: <Chip leading={<UserAvatar login={pull.author} />}>{pull.author}</Chip> }] : []),
       {
         label: 'Branch',
+        wide: true,
         value: (
           <Inline>
             <Chip reveal title={pull?.headRef ?? 'head'}>{pull?.headRef ?? 'head'}</Chip>

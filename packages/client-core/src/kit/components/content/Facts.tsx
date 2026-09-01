@@ -13,7 +13,8 @@ import { DescriptionList } from '../primitives'
 
    At 80×24: two columns, the labels dim. */
 export function Facts(props: {
-  items: readonly { label: string; value: JSX.Element; mono?: boolean }[]
+  /** `wide` spans the whole row in the tiles layout, for a value no single tile can hold. */
+  items: readonly { label: string; value: JSX.Element; mono?: boolean; wide?: boolean }[]
   size?: 'sm' | 'md'
   grouping?: 'tiles' | 'rows'
 }) {
@@ -21,7 +22,7 @@ export function Facts(props: {
     <DescriptionList layout={props.grouping === 'rows' ? 'columns' : 'facts'} size={props.size}>
       <For each={props.items}>
         {(item) => (
-          <DescriptionList.Item label={item.label} mono={item.mono}>{item.value}</DescriptionList.Item>
+          <DescriptionList.Item label={item.label} mono={item.mono} wide={item.wide}>{item.value}</DescriptionList.Item>
         )}
       </For>
     </DescriptionList>

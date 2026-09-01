@@ -504,6 +504,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 /* Form and modal footers: no strip, items to the end. Subsumes .ui-modal-actions' role. */
 .ui-toolbar[data-variant='actions'] {
   justify-content: flex-end;
+  /* A narrow pane wraps the actions onto a second line rather than pushing the first off its edge. */
+  flex-wrap: wrap;
   min-height: 0;
   padding: 0;
   background: none;
@@ -600,6 +602,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-dl[data-layout='columns'] .ui-dl-item { display: grid; grid-template-columns: max-content 1fr; gap: inherit; }
 .ui-dl[data-layout='facts'] { grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr)); }
 .ui-dl[data-layout='facts'] .ui-dl-item { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+/* A value too wide for one tile takes the whole row: a head → base branch pair spilled across the
+   neighbouring tile because a chip never shrinks. Chips in a fact value may shrink so that a long
+   branch name ellipsizes rather than overflowing. */
+.ui-dl[data-layout='facts'] .ui-dl-item[data-wide] { grid-column: 1 / -1; }
+.ui-dl-value .ui-inline > .ui-chip { flex: 0 1 auto; min-width: 0; }
 .ui-dl-label { color: var(--text-muted); }
 .ui-dl[data-layout='facts'] .ui-dl-label { font-size: var(--fs-2xs); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); }
 .ui-dl-value { margin: 0; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
@@ -1242,7 +1249,7 @@ a.ui-row:hover { background: var(--bg-hover); }
 }
 .ui-link:hover { text-decoration: underline; }
 
-.ui-heading { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.ui-heading { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .ui-heading-eyebrow {
   color: var(--text-muted);
   font-size: var(--fs-2xs);
