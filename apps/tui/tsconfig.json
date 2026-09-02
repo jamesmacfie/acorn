@@ -15,6 +15,7 @@
     "paths": {
       "@acorn/plugin-api/ui": ["./src/kit/ui.ts"],
       "@acorn/plugin-api/ui/host": ["./src/kit/host.tsx"],
+      "@acorn/plugin-api/ui/editor": ["./src/kit/editor.ts"],
       "@solidjs/router": ["./src/kit/router.ts"],
       "lucide-static/icon-nodes.json": ["./src/kit/iconNodes.ts"],
       "@opentui/solid/index.js": ["./node_modules/@opentui/solid/index.d.ts"]

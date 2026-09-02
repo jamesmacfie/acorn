@@ -1,7 +1,7 @@
 import { createSignal, onMount, onCleanup, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import { basicSetup } from 'codemirror'
-import { EditorState, Prec, Text } from '@codemirror/state'
+import { EditorState, Prec, Text, type Extension } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { prefsKey } from '@acorn/protocol/api.ts'
@@ -107,7 +107,14 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   const writePath = props.region.write ? resolveDocumentRoute(props.region.write, props.scope) : null
   // A language id the manifest parser already checked, re-checked because the manifest reached this
   // device as a roster row, which is bytes a node sent (the rule chrome/data.ts states).
+  //
+  // Started here and awaited beside the document's text below, because the grammar is a download of
+  // its own (./language.ts fetches one per language). Kicked off at mount so it is in flight while the
+  // read route answers, and the two land together.
+  // `.catch` rather than a rejection the load block has to handle: a grammar that will not download
+  // means no highlighting, and no highlighting beats no document.
   const language = languageFor(isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext')
+    .catch(() => [] as Extension)
 
   let host: HTMLElement | undefined
   let view: EditorView | undefined
@@ -265,13 +272,15 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       setReady(true) // renders the host div synchronously
       if (!host) return
 
+      const grammar = await language
+      if (disposed || !host) return
       const autocomplete = completions()
       const state = EditorState.create({
         doc: text,
         extensions: [
           basicSetup,
           editorTheme(),
-          language,
+          grammar,
           // Highest precedence, so a surface action wins over whatever the editor would have done with
           // the same chord.
           Prec.highest(EditorView.domEventHandlers({ keydown: onEditorKeyDown })),

@@ -6,7 +6,7 @@ import { PULL_INVOLVEMENT, PULLS_COLLECTION_ID, pullsCollectionRoute, pullsColle
 import { pullRefMatchesTask } from '../shared/pullRef'
 import { DIFF_LINE_KEY, SUMMARY_BADGES_MAX } from './extensionPoints'
 import { prFiltersSlice } from './pullList/filterStore'
-import { prPaneContribution } from './pullDetail/PrPane'
+import { prPaneContribution } from './pullDetail/paneContribution'
 import { pullFilePaletteSlotContribution } from './slotContribution'
 import { githubContentLinkContributions } from './contentLinks'
 import { githubIntegrationFlow } from './integrationFlow'

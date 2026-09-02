@@ -1,6 +1,17 @@
 # Phase 1: registries hold loaders
 
-Status: not started. Waits on phase 0 for the denylist that turns green here.
+Status: shipped 2026-09-03, except the terminal client's byte target. The DOM host's kit table and the
+CodeMirror language map hold loaders, both tree hosts draw each root under `Suspense fallback={null}`,
+the terminal client aliases `@acorn/plugin-api/ui/editor` to a stub, and the GitHub plugin's PR pane
+contribution is lazy. The renderer's startup list is 654,403 B, down from 974,732 B, with no
+denylisted chunk in it and both `KNOWN` allowance lists emptied. The editor's lazy chunk is 60,861 B,
+down from 954,915 B; a `.ts` file fetches one grammar. **The terminal client's eager graph is
+1,024,422 B, not the under-550 KB this file asked for**, because two of its premises were false: that
+host's kit table was never in its eager graph (`RemoteTree` there is already lazy), and what is in the
+graph is the thirteen client plugin barrels `App.tsx` imports so their `init` can register — phase 4's
+work, not a table's shape. Its ceiling is now 1,060,000 B. `remoteSolid.ts` was not touched, because it
+holds node factories rather than components. See
+[measurements.md](./measurements.md) § 2026-09-03.
 
 ## Goal
 

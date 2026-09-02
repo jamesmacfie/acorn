@@ -1,7 +1,8 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/plugin-api/client'
-import { prPaneContribution } from './PrPane'
+import { PrPane } from './PrPane'
+import { prPaneContribution } from './paneContribution'
 import { _resetPrTabs } from './prTabs'
 
 // The PR pane is the navigator beside the diff, the same pair the browse surface draws
@@ -74,9 +75,12 @@ describe('the PR pane', () => {
     expect(Object.keys(prPaneContribution.regions)).toEqual(['body'])
   })
 
+  // The pane itself, not `regions.body`, which is the `lazy()` the contribution registers: a pending
+  // lazy component needs the `Suspense` the pane registry puts around every region
+  // (client-core host/registries/panes/panes.ts), and the assertion above is what holds the two to
+  // the same component.
   const draw = () => {
-    const Body = prPaneContribution.regions.body!
-    disposers.push(render(() => <Body task={task} model={undefined} />, host))
+    disposers.push(render(() => <PrPane task={task} />, host))
     return host
   }
 

@@ -40,6 +40,13 @@ const harness = () => {
 
 // The host coalesces per frame, so every assertion waits one.
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+// …and a heavy node is a dynamic import, which lands some number of frames later depending on how
+// busy the machine is. Waited for rather than counted, because a fixed count is a test that goes red
+// under load and tells you nothing about the code.
+const settled = async (drawn: () => boolean) => {
+  for (let i = 0; i < 200 && !drawn(); i++) await frame()
+  return drawn()
+}
 
 beforeEach(() => {
   host = document.createElement('div')
@@ -138,6 +145,41 @@ describe('a tree becomes the host’s own components', () => {
     expect(card.classList.contains('pane')).toBe(false)
     expect(card.getAttribute('style')).toBeNull()
     expect(h.refused.join(' ')).toContain('dropped props')
+  })
+})
+
+describe('a heavy node arrives one frame late', () => {
+  // `Markdown` and `DiffPane` are loaders in the table rather than components, so the diff viewer and
+  // the syntax highlighter behind them are not in the renderer's first paint (./components.ts). What
+  // that costs is one empty frame, absorbed by the `Suspense` the host puts around each root, and this
+  // is the test that the frame is all it costs — a tree that names a heavy node still draws it.
+  //
+  // `Markdown` rather than `DiffPane`: both go through the same loader path, and the diff viewer wants
+  // a virtualizer, a worker and a scroll container that jsdom does not give it. Which entries are
+  // loaders is `./components.test.tsx`, and that one entry becomes one memoized `lazy()` is too.
+  it('draws nothing for a tick, then the node', async () => {
+    const h = harness()
+    h.mount()
+    h.apply([{ op: 'insert', parent: null, index: 0, node: node('n1', 'Markdown', { text: '# shipped' }) }])
+    await frame()
+    // The batch has been applied and the loader has been asked for; the module has not arrived, so the
+    // boundary is showing its `null` fallback rather than a spinner or a gap that reflows.
+    expect(host.querySelector('.ui-markdown')).toBeNull()
+    expect(await settled(() => !!host.querySelector('.ui-markdown'))).toBe(true)
+    expect(host.querySelector('.ui-markdown')!.textContent).toContain('shipped')
+  })
+
+  it('draws two of them together, off one load', async () => {
+    const h = harness()
+    h.mount()
+    h.apply([{ op: 'insert', parent: null, index: 0, node: node('n1', 'Card', {}, [
+      node('n2', 'Markdown', { text: 'first' }),
+      node('n3', 'Markdown', { text: 'second' }),
+    ]) }])
+    expect(await settled(() => host.querySelectorAll('.ui-markdown').length > 0)).toBe(true)
+    // Both, in the same frame. A table that wrapped its loader per mount would give each node its own
+    // load state and each root its own wait.
+    expect([...host.querySelectorAll('.ui-markdown')].map((n) => n.textContent?.trim())).toEqual(['first', 'second'])
   })
 })
 

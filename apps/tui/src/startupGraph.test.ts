@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -51,20 +51,18 @@ describe('check-startup-graph', () => {
     expect(output).toContain('viewState-bbbb.js')
   })
 
-  it('reports a chunk phase 1 still owes without failing the build', () => {
+  it('fails on the pull-request model, which phase 0 allowed and phase 1 removed', () => {
     chunk('App-aaaa.js', 'import "./prModel-bbbb.js";\n')
     chunk('prModel-bbbb.js', 'export const p = 1;\n')
     const { code, output } = run(dist)
-    expect(code).toBe(0)
-    expect(output).toContain('KNOWN FAILURE: prModel-bbbb.js')
+    expect(code).toBe(1)
+    expect(output).toContain('prModel-bbbb.js')
   })
 
-  it('fails when a known failure is fixed, so the allowance cannot outlive it', () => {
-    chunk('App-aaaa.js', 'const open = () => import("./prModel-bbbb.js");\n')
-    chunk('prModel-bbbb.js', 'export const p = 1;\n')
-    const { code, output } = run(dist)
-    expect(code).toBe(1)
-    expect(output).toContain('Out of the eager graph now: prModel')
+  it('excuses nothing', () => {
+    // The allowance list is the one thing in the script that can turn a red graph green, so it is
+    // asserted rather than trusted. It held `prModel` while phase 1 was owed and has been empty since.
+    expect(readFileSync(SCRIPT, 'utf8')).toContain('const KNOWN = []')
   })
 
   it('fails over the byte ceiling', () => {
@@ -72,7 +70,7 @@ describe('check-startup-graph', () => {
     chunk('big-bbbb.js', 'x'.repeat(1_200_000))
     const { code, output } = run(dist)
     expect(code).toBe(1)
-    expect(output).toContain('over its 1150000B ceiling')
+    expect(output).toContain('over its 1060000B ceiling')
   })
 
   it('refuses to guess when there is no single App chunk to walk from', () => {

@@ -1,5 +1,4 @@
-import type { Component } from 'solid-js'
-import type { KitNodeName } from '@acorn/protocol/tree/nodes.ts'
+import type { KitTable } from '@acorn/client-core/host/tree/kitEntry.ts'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
   ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
@@ -30,12 +29,13 @@ import { Fallback, Only, Rectangle } from './pixels'
 // `reduced` one loses is written beside its level in client-core's kit/tokens/support.ts.
 // `tools/arch/kitTable.test.ts` fails if this table, that matrix and that appendix disagree.
 
-// `Component<any>` and not a union of every node's props, for the reason the DOM table gives: the
-// typing that matters is the key set, which is exhaustive.
-// oxlint-disable-next-line no-explicit-any
-type AnyKitComponent = Component<any>
-
-export const KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {
+// Every entry is a component, and the DOM table's are not. `KitTable` allows either (client-core
+// host/tree/kitEntry.ts) and the reason to reach for a loader is absent here: this table is not in
+// this host's eager graph at all — `../plugins/RemoteTree.tsx` is lazy, so nothing below is fetched
+// until a loaded plugin draws a tree — and the heavy nodes share `./showing.tsx` with the cheap ones,
+// so a loader would cost a frame of blank and save no bytes. Splitting that file is the change that
+// would make loaders worth having here, and nothing has asked for it.
+export const KIT_COMPONENTS: KitTable = {
   Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar,
   Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, Sections, SplitHandle, DocumentTabs, SectionHeader,
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a

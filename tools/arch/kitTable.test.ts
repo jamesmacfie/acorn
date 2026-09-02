@@ -42,12 +42,14 @@ const keysOf = (source: string, name: string): string[] => {
 
 const SUPPORT = keysOf(read(`${KIT}/support.ts`), 'NODE_SUPPORT')
 
-/** The keys of a host's `KIT_COMPONENTS`. Entries are comma-separated and either shorthand (`Stack`)
- *  or a rename onto a compound half (`ModalBody: Modal.Body`), so the name is what stands before the
- *  colon. Read as text for the reason above: importing either table pulls in a renderer. */
+/** The keys of a host's `KIT_COMPONENTS`. Entries are comma-separated and either shorthand (`Stack`),
+ *  a rename onto a compound half (`ModalBody: Modal.Body`), or a loader (`DiffPane: load(() => …)`),
+ *  so the name is what stands before the first colon. That is also why a loader is written on one line
+ *  with no comma in it. Read as text for the reason above: importing either table pulls in a
+ *  renderer. */
 const componentKeys = (path: string): string[] => {
   const source = read(path)
-  const start = source.indexOf('KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {')
+  const start = source.indexOf('KIT_COMPONENTS: KitTable = {')
   if (start === -1) throw new Error(`${path} has no KIT_COMPONENTS`)
   const body = source
     .slice(source.indexOf('{', start) + 1, source.indexOf('\n}', start))

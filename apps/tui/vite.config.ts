@@ -48,6 +48,11 @@ export default defineConfig({
       // reference-panel box and the two cooperative-extension nodes, and the DOM's copies of them are
       // portals and `<ul>`s (src/kit/host.tsx).
       { find: /^@acorn\/plugin-api\/ui\/host$/, replacement: resolve(import.meta.dirname, 'src/kit/host.tsx') },
+      // …and the editor surface, which on this host is a stub. The facade's real half is CodeMirror's
+      // theme and a grammar per language, and cells have neither: the `editor` rectangle draws the
+      // file read-only and hands `$EDITOR` a PTY (src/kit/rectangle.tsx). Left unaliased, the editor
+      // pane pulled seventeen grammars into a process that never highlights (src/kit/editor.ts).
+      { find: /^@acorn\/plugin-api\/ui\/editor$/, replacement: resolve(import.meta.dirname, 'src/kit/editor.ts') },
       // lucide's icon geometry, removed rather than replaced: 706 KB of SVG paths, and this host has
       // no SVG. Left alone it is externalised, and Node's loader refuses a JSON module with no import
       // attribute on it (src/kit/iconNodes.ts).

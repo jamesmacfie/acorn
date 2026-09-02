@@ -6,6 +6,7 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { createRemoteRoot, insertNode, type RemoteNode } from './remoteRoot'
 import { KIT_NODE_COMPONENTS } from './remoteSolid'
 import { KIT_COMPONENTS } from '../tree/components'
+import { kitComponent } from '../tree/kitEntry'
 import { TreeHost, type TreeTransport } from '../tree/TreeHost'
 
 // The kit, written by a plugin and drawn by the host: `remoteSolid.ts`'s node components against
@@ -23,8 +24,11 @@ import { TreeHost, type TreeTransport } from '../tree/TreeHost'
 const node = (type: string, props: Record<string, unknown>): RemoteNode =>
   (KIT_NODE_COMPONENTS[type as keyof typeof KIT_NODE_COMPONENTS] as unknown as (p: Record<string, unknown>) => RemoteNode)(props)
 
+// Through `kitComponent`, because a table entry is a component or a loader for one and the host
+// resolves it in one place (../tree/kitEntry.ts). Every node below is a cheap primitive, so what
+// comes back is always the component itself.
 const direct = (type: string, props: Record<string, unknown>): JSX.Element =>
-  createComponent(KIT_COMPONENTS[type as keyof typeof KIT_COMPONENTS], props)
+  createComponent(kitComponent(KIT_COMPONENTS[type as keyof typeof KIT_COMPONENTS])!, props)
 
 let host: HTMLElement
 let shell: HTMLElement

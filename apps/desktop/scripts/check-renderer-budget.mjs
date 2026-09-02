@@ -26,14 +26,23 @@ const limits = {
 // Chunk-name prefixes that must not be fetched at startup, whatever they weigh. Each one is a lazy
 // surface that leaked into the eager graph through a registry holding values instead of loaders
 // (docs/future/performance/decisions.md § Registries hold loaders).
-const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'viewState', 'icon-nodes']
+//
+// A chunk's name is the name of one module in it, so a name here can move when the graph changes: the
+// pull-request model was `prModel` until phase 1 made the PR pane's contribution lazy, after which
+// rolldown gave the same modules a chunk called `prSections`. Both are listed. A prefix that no
+// longer names any chunk is not an error — see `inBuild` below — so a stale one is harmless, and
+// leaving it in is what catches the module coming back under its old name.
+const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes']
 
-// The denylist entries that are still in the startup list today. Phase 1 of the performance programme
-// is what fixes them, so they report loudly rather than failing the build, and this list may only
-// shrink: once a chunk with that name exists in the build and is no longer fetched at startup, the
-// build fails until the prefix is deleted from here. That is what makes a fix stick rather than
-// quietly regress a month later.
-const KNOWN = ['shiki', 'DiffPane', 'prModel']
+// The denylist entries that are allowed in the startup list for now, reported loudly rather than
+// failing the build. This list may only shrink: once a chunk with that name exists in the build and is
+// no longer fetched at startup, the build fails until the prefix is deleted from here. That is what
+// makes a fix stick rather than quietly regress a month later.
+//
+// Empty since phase 1 of the performance programme, which was the phase that owed the three it held —
+// `shiki`, `DiffPane` and `prModel`. Nothing on the denylist is fetched at startup any more, so a
+// name that reappears fails the build outright and this list should stay empty.
+const KNOWN = []
 
 const html = await readFile(resolve(clientDir, 'index.html'), 'utf8')
 const assetPaths = (pattern) => [...html.matchAll(pattern)].map((match) => match[1])

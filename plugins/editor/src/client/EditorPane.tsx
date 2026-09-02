@@ -100,10 +100,14 @@ export default function EditorPane(props: { task: Task }) {
   // Everything a file's own state carries beyond its text: the grammar, the theme, autosave, and the
   // explicit-flush chord. Built per path, because the language is the file's and the update listener
   // has to name the file it is reporting on.
-  const perFile = (path: string): Extension[] => [
+  //
+  // The grammar is passed in rather than fetched here, because fetching it is a network round trip
+  // (client-core features/editor/language.ts downloads one grammar per file) and `stateFor` below
+  // already awaits the file's text. One `Promise.all` there, and this stays synchronous.
+  const perFile = (path: string, language: Extension): Extension[] => [
     basicSetup,
     editorTheme(),
-    languageForPath(path),
+    language,
     EditorView.updateListener.of((update) => {
       if (!update.docChanged) return
       // Dirty derives from the text versus the last saved text, so undoing back to the saved state
@@ -203,9 +207,14 @@ export default function EditorPane(props: { task: Task }) {
     if (disposed) return null
     const cached = states.get(relPath)
     if (cached) return cached
-    const content = (await api?.read(taskId, relPath).catch(() => '')) ?? ''
+    const [content, language] = await Promise.all([
+      api?.read(taskId, relPath).catch(() => '').then((text) => text ?? '') ?? Promise.resolve(''),
+      // No highlighting beats no file, so a grammar that will not download is an empty extension
+      // rather than a throw that takes `show()` down with it.
+      languageForPath(relPath).catch(() => [] as Extension),
+    ])
     if (disposed) return null
-    const state = EditorState.create({ doc: content, extensions: perFile(relPath) })
+    const state = EditorState.create({ doc: content, extensions: perFile(relPath, language) })
     saved.set(relPath, state.doc)
     states.set(relPath, state)
     return state

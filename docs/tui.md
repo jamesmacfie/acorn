@@ -145,14 +145,25 @@ process's own globals under a browser's name.
 
 ## The host switch
 
-Six aliases in `apps/tui/vite.config.ts`, mirrored in the package's `tsconfig.json` paths. That is
-the whole of what makes a compiled pane draw in cells:
+Seven aliases in `apps/tui/vite.config.ts`, mirrored in the package's `tsconfig.json` paths. Both, or
+tsc and the bundle disagree and nothing says so. That is the whole of what makes a compiled pane draw
+in cells:
 
 - `@acorn/plugin-api/ui` resolves to `apps/tui/src/kit/ui.ts`, this package's kit. A pane imports the
   kit through that facade and nothing else.
 - `@acorn/plugin-api/ui/host` resolves to `apps/tui/src/kit/host.tsx`: the palette chrome, the drawer,
   the reference-panel box and the two cooperative-extension nodes, whose DOM copies are portals and
   `<ul>`s.
+- `@acorn/plugin-api/ui/editor` resolves to `apps/tui/src/kit/editor.ts`, a stub. The facade's real
+  half is CodeMirror's theme and a grammar per language, and neither means anything here: the `editor`
+  rectangle draws the file read-only and hands the reader's own `$EDITOR` a PTY (§ Editing in your own
+  editor in [editor.md](./editor.md)). Left unaliased, `EditorPane.tsx` reached the real module and
+  this bundle carried seventeen CodeMirror grammars and a colour theme nothing here can draw. The stub
+  exports the facade's names with the facade's types — `languageForPath` resolving to no extension,
+  the theme accessors returning nothing to apply, no-op view-state helpers — so the pane compiles and
+  runs unchanged. CodeMirror itself still arrives, because the pane imports `basicSetup`, `EditorState`
+  and `EditorView` directly rather than through the facade; nothing on this host calls the code that
+  uses them, so it is bytes in a lazy chunk rather than work.
 - `@solidjs/router` is replaced by a path in a signal. The package itself still has to go: it reads
   `window.history.state` at module scope, so a pane that imports it cannot be loaded in this process.
   See The router below for what stands in its place.
@@ -194,7 +205,14 @@ host decides.
 
 The component table is `apps/tui/src/kit/components.tsx`, keyed by `KitNodeName` exactly as the DOM
 host's is, and `tools/arch/kitTable.test.ts` holds three lists to one: the 80×24 appendix, the support
-matrix, and both hosts' tables. A node cannot be added with a sentence and no component, or a component
+matrix, and both hosts' tables. An entry may be a component or a loader for one
+(`client-core/host/tree/kitEntry.ts`), and on this host every entry is the component: the table is not
+in the eager graph at all, because `src/plugins/RemoteTree.tsx` is lazy, and the heavy nodes share
+`src/kit/showing.tsx` with the cheap ones, so a loader would cost a frame of blank and save no bytes.
+The DOM host's table does hold loaders, because its copy is fetched on every cold window
+([plugins.md](./plugins.md) § The tree contract). `TreeHost` draws each root under a `Suspense` with a
+`null` fallback either way, which is safe here only because § Destroy on disposal ties a node's
+destruction to its creating owner rather than to being detached. A node cannot be added with a sentence and no component, or a component
 and no sentence. Five prop types are the DOM kit's, imported as types rather than rewritten:
 `ButtonProps`, `InputProps`, `SelectProps`, `PickerProps` and `MentionTextareaProps`. Four of the
 hand-written copies had quietly lost a prop by the time anything compiled both sets together.
