@@ -78,7 +78,7 @@ async function listen(secure: boolean): Promise<{ origin: string; server: Server
 }
 
 function makeBroker(): NodeBroker {
-  const broker = new NodeBroker({ frame: () => {}, status: (s) => statuses.push(s) })
+  const broker = new NodeBroker({ frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) })
   brokers.push(broker)
   return broker
 }
@@ -325,7 +325,7 @@ describe('broker WebSocket', () => {
     })
 
     const frames: unknown[] = []
-    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), status: (s) => statuses.push(s) })
+    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), bytes: () => {}, status: (s) => statuses.push(s) })
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 'acorn_dt_ws' })
 
@@ -333,6 +333,32 @@ describe('broker WebSocket', () => {
     expect(upgrades).toEqual(['Bearer acorn_dt_ws'])
     expect(frames[0]).toEqual({ channel: 'term:status', seq: 1 })
     await waitFor(() => statuses.some((s) => s.state === 'online'), 'the online transition')
+  })
+
+  // Terminal output is the one thing on this socket that is not JSON (@acorn/protocol/ws.ts § The one
+  // binary frame). The broker's job is to hand it over untouched: it does not read the session id
+  // inside, does not count the frame against `seq`, and does not turn it into a string.
+  it('forwards a binary frame byte for byte, and does not count it against seq', async () => {
+    const { origin, server } = await listen(false)
+    const payload = Buffer.concat([Buffer.from('11111111-2222-3333-4444-555555555555', 'ascii'), Buffer.from([0x1b, 0x5b, 0x32, 0x4a, 0xf0, 0x9f, 0x8c, 0xb0])])
+    const wss = new WebSocketServer({ server, path: WS_PATH })
+    wss.on('connection', (socket) => {
+      socket.send(JSON.stringify({ channel: 'term:status', seq: 1 }))
+      socket.send(payload, { binary: true })
+      socket.send(JSON.stringify({ channel: 'tasks:changed', seq: 2 }))
+    })
+
+    const frames: unknown[] = []
+    const bytes: Uint8Array[] = []
+    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), bytes: (_n, f) => bytes.push(f), status: () => {} })
+    brokers.push(broker)
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+
+    await waitFor(() => bytes.length > 0 && frames.length >= 2, 'the binary frame and the two pings')
+    expect(Buffer.from(bytes[0]).equals(payload)).toBe(true)
+    // Still contiguous, and the socket is still up: a binary frame between two numbered frames is not
+    // a gap.
+    expect(frames).toEqual([{ channel: 'term:status', seq: 1 }, { channel: 'tasks:changed', seq: 2 }])
   })
 
   it('queues frames sent before the socket opens and flushes them on open', async () => {
@@ -364,7 +390,7 @@ describe('broker WebSocket', () => {
     })
 
     const frames: unknown[] = []
-    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), status: () => {} })
+    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), bytes: () => {}, status: () => {} })
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
 
@@ -389,7 +415,7 @@ describe('broker WebSocket', () => {
     })
 
     const frames: unknown[] = []
-    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), status: () => {} })
+    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), bytes: () => {}, status: () => {} })
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
 
@@ -414,7 +440,7 @@ describe('broker WebSocket', () => {
       connections += 1
     })
 
-    const broker = new NodeBroker({ frame: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
+    const broker = new NodeBroker({ frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
 
@@ -436,7 +462,7 @@ describe('broker WebSocket', () => {
       connections += 1
     })
 
-    const broker = new NodeBroker({ frame: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
+    const broker = new NodeBroker({ frame: () => {}, bytes: () => {}, status: (s) => statuses.push(s) }, { pingIntervalMs: 20 })
     brokers.push(broker)
     broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
 

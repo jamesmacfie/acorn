@@ -86,6 +86,10 @@ textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 /* Rectangle: the box something else fills with pixels (ui/Rectangle.tsx). Geometry and a focus ring,
    and nothing about what is inside it — that is the whole point of the node. */
 .ui-rect { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* `display: flex` above beats the browser's own [hidden] rule, so the kit has to say it. Same shape
+   as .ui-tab-panel[hidden] in tabs.css, and for the same reason: a box kept in the DOM to keep what is
+   inside it alive. */
+.ui-rect[hidden] { display: none; }
 .ui-rect:focus-visible { outline: var(--control-bw) solid var(--accent); outline-offset: calc(-1 * var(--control-bw)); }
 .ui-rect > * { flex: 1; min-height: 0; min-width: 0; }
 /* The element a library attaches to, when the caller passed `mount` rather than children. Its only

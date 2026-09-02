@@ -271,6 +271,18 @@ the platform seam reads: broker request and response bytes, stream frames and st
 operations, lifecycle actions, the three file dialogs, the notification group, and the webview
 commands. It never exposes a node token, a certificate, a database handle, or a process object.
 
+One thing on that socket is not JSON: terminal output. The helper's push channel carries a binary
+frame beside the JSON messages, tagged with the node id, wrapping the frame the node sent, which is
+itself tagged with the session id (`packages/protocol/src/ws.ts` § The one binary frame). The bridge
+sets `binaryType = 'arraybuffer'`, peels the node id, and hands the rest to
+`packages/client-core/src/infra/node/wsClient.ts` through the seam's `onBytes`, which is the one module
+that reads the session id and the one place the bytes become text. So a busy build's output crosses two
+process boundaries with two copies and no parse, where it used to be JSON-escaped once per attached
+socket on the node and stringified again here. Request and response bodies stay base64 in the JSON
+messages: nothing else on this wire is measured in frames per second
+([docs/future/performance/refused.md](./future/performance/refused.md) § Replacing base64 on the helper
+wire ahead of a measurement).
+
 The file dialogs are the folder picker, `pick_files`, and `save_file`. The last two carry bytes, not
 paths: the renderer sends a byte array to save and receives one per file it picked, base64 in both
 directions because the Tauri channel is JSON. Bytes rather than paths because the node this renderer

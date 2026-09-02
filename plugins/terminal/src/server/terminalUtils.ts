@@ -5,8 +5,64 @@
 
 export const RING_CAP = 256 * 1024 // bytes of recent raw output kept for prompt detection / transcript-tail analysis
 
-// Keep only the last RING_CAP bytes of raw output used by non-display consumers.
-export const trimRing = (ring: string): string => (ring.length > RING_CAP ? ring.slice(ring.length - RING_CAP) : ring)
+/**
+ * Recent raw output, kept as the chunks it arrived in.
+ *
+ * It used to be one string, rebuilt as `ring = trimRing(ring + data)` on every chunk the
+ * pseudo-terminal produced. That copies up to 256 KB per chunk to serve readers that ask for the last
+ * four or ten kilobytes of it (docs/future/performance/architecture.md § 3). Now a chunk is pushed,
+ * the oldest are dropped once the budget is spent, and a reader concatenates only the tail it asked
+ * for.
+ *
+ * Bytes, not characters. node-pty hands over decoded strings, so each chunk is encoded once on the way
+ * in, and `tail` joins the buffers before decoding — a multi-byte character split across two chunks
+ * still reads back whole, which is the one thing a per-chunk decode would get wrong. The only place a
+ * character can still be cut is the head, where the budget bites, and the string version cut it in
+ * exactly the same place.
+ */
+export class OutputRing {
+  private readonly chunks: Buffer[] = []
+  private total = 0
+
+  /** How many bytes are kept. At most RING_CAP. */
+  get bytes(): number {
+    return this.total
+  }
+
+  push(data: string): void {
+    if (!data) return
+    const chunk = Buffer.from(data, 'utf8')
+    this.chunks.push(chunk)
+    this.total += chunk.length
+    while (this.total > RING_CAP) {
+      const head = this.chunks[0]
+      const over = this.total - RING_CAP
+      if (head.length <= over) {
+        this.chunks.shift()
+        this.total -= head.length
+      } else {
+        // Trim the head chunk rather than dropping it whole, so the ring holds exactly its budget and
+        // a reader asking for the whole thing sees the same bytes the string version kept.
+        this.chunks[0] = head.subarray(over)
+        this.total -= over
+      }
+    }
+  }
+
+  /** The last `bytes` bytes, decoded. Defaults to everything kept. */
+  tail(bytes: number = RING_CAP): string {
+    if (bytes <= 0 || this.total === 0) return ''
+    let want = Math.min(bytes, this.total)
+    const parts: Buffer[] = []
+    for (let i = this.chunks.length - 1; i >= 0 && want > 0; i -= 1) {
+      const chunk = this.chunks[i]
+      parts.push(chunk.length <= want ? chunk : chunk.subarray(chunk.length - want))
+      want -= Math.min(chunk.length, want)
+    }
+    parts.reverse()
+    return Buffer.concat(parts).toString('utf8')
+  }
+}
 
 // Sanitize cols/rows from the (less-trusted) client to a sane integer (docs/security.md).
 export const clampDim = (n: unknown, fallback: number): number =>

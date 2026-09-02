@@ -17,6 +17,7 @@ const fullHost = () => ({
   nodeAbort: vi.fn(),
   nodeSend: vi.fn(),
   onNodeFrame: vi.fn(() => () => {}),
+  onNodeBytes: vi.fn(() => () => {}),
   onNodeStatus: vi.fn(() => () => {}),
   fleetList: vi.fn(async () => ({ nodes: [], statuses: [] })),
   nodeProbe: vi.fn(),
@@ -96,6 +97,7 @@ describe('the platform seam contract', () => {
       expect(() => transport?.abort('r1')).not.toThrow()
       expect(() => transport?.send('n1', { channel: 'x' } as never)).not.toThrow()
       expect(transport?.onFrame(() => {})).toBeTypeOf('function')
+      expect(transport?.onBytes(() => {})).toBeTypeOf('function')
       expect(transport?.onStatus(() => {})).toBeTypeOf('function')
     })
 

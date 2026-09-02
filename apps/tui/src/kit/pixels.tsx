@@ -22,6 +22,10 @@ import { EditorRectangle, PtyRectangle, type CellTerminal } from './rectangle'
 export function Rectangle(props: {
   kind: 'pty' | 'webview' | 'frame' | 'editor'
   label: string
+  /** Drawn but off the screen. Honoured for `pty`, which is the kind that costs something to rebuild
+   *  and the reason the prop exists (docs/terminal.md § Client); the other three are cheap enough
+   *  that a caller hiding one would unmount it. */
+  hidden?: boolean
   mount?: (handle: HTMLElement) => void
   children?: JSX.Element
 }) {
@@ -46,7 +50,7 @@ export function Rectangle(props: {
           arrives is this host's filler, and `attachPty` is the one thing that reads it (./pty.ts). A
           rectangle is the kit's single admission that a host draws something of its own, and this is
           where it is admitted. */}
-      <PtyRectangle label={props.label} mount={props.mount as ((terminal: CellTerminal) => void) | undefined} />
+      <PtyRectangle label={props.label} hidden={props.hidden} mount={props.mount as ((terminal: CellTerminal) => void) | undefined} />
     </Show>
   )
 }

@@ -5,7 +5,7 @@ import { WebSocket } from 'ws'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DeviceService } from '../auth/deviceTokens'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
-import { WS_PATH, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
+import { decodeIdFrame, WS_BINARY_ID_BYTES, WS_PATH, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
 import { _resetWsHub, attachWsHub, disposeWsHub, registerWsChannelHandler, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
 
 // Headless verification of the delicate transport bits the smoke suite (S4) can't cover in a unit:
@@ -87,10 +87,36 @@ function open(headers: Record<string, string>): Promise<WebSocket> {
 
 const authHeaders = () => ({ host, authorization: `Bearer ${DEVICE_TOKEN}` })
 
+// JSON frames only. Terminal output is a binary frame now (@acorn/protocol/ws.ts § The one binary
+// frame), and `binaries` below is how a case reads those.
 const frames = (ws: WebSocket): WsServerWireFrame[] => {
   const out: WsServerWireFrame[] = []
-  ws.on('message', (d) => out.push(JSON.parse(d.toString()) as WsServerWireFrame))
+  ws.on('message', (d, isBinary) => {
+    if (isBinary) return
+    out.push(JSON.parse(d.toString()) as WsServerWireFrame)
+  })
   return out
+}
+
+// Every binary frame this socket received, as it arrived. Kept whole rather than decoded, so a case
+// can compare two sockets' frames byte for byte.
+const binaries = (ws: WebSocket): Buffer[] => {
+  const out: Buffer[] = []
+  ws.on('message', (d, isBinary) => {
+    if (isBinary) out.push(Buffer.isBuffer(d) ? d : Buffer.concat(d as Buffer[]))
+  })
+  return out
+}
+
+// Terminal session ids are UUIDs (plugins/terminal/src/server/terminal.ts), which is what the frame's
+// fixed-width id field is sized for. Spelled out here so a case is not quietly testing the JSON
+// fallback for a two-character id.
+const SESSION = '11111111-2222-3333-4444-555555555555'
+const OTHER_SESSION = '99999999-8888-7777-6666-555555555555'
+const decodeText = (frame: Buffer): { id: string; text: string } => {
+  const tagged = decodeIdFrame(frame)
+  if (!tagged) throw new Error('not an id-tagged frame')
+  return { id: tagged.id, text: new TextDecoder().decode(tagged.payload) }
 }
 // Resolves once the socket has closed, so a revocation assertion waits for the real close rather than
 // polling readyState.
@@ -242,7 +268,7 @@ describe('wsHub streaming', () => {
       input: (_id, data) => inputs.push(data),
       attach: (_id, sink) => {
         liveSink = sink
-        sink({ type: 'ready', session: { id: 's1' } as never, replayed: true })
+        sink({ type: 'ready', session: { id: SESSION } as never, replayed: true })
         sink({ type: 'output', data: 'SCREEN' })
       },
       detach: () => {},
@@ -250,22 +276,112 @@ describe('wsHub streaming', () => {
     })
     const ws = await open(authHeaders())
     const got = frames(ws)
-    ws.send(JSON.stringify({ channel: 'term:attach', id: 's1' }))
+    const bin = binaries(ws)
+    ws.send(JSON.stringify({ channel: 'term:attach', id: SESSION }))
     // Load-bearing: LIVE must be pushed only after ready and SCREEN have been delivered, or the
     // ordering assertion below proves nothing.
-    await waitFor(() => got.length >= 2, 'ready + initial screen')
+    await waitFor(() => got.length >= 1 && bin.length >= 1, 'ready + initial screen')
     liveSink!({ type: 'output', data: 'LIVE' } satisfies ServerMsg)
-    await waitFor(() => got.length >= 3, 'the live frame')
-    // Spelled out rather than Extract<>'d: the frame envelope is open now, so there is no union left to
-    // discriminate. The shape asserted here is terminal's, and this is a terminal test.
+    await waitFor(() => bin.length >= 2, 'the live frame')
+    // `ready` carries a session object, so it is still JSON. Spelled out rather than Extract<>'d: the
+    // frame envelope is open now, so there is no union left to discriminate. The shape asserted here
+    // is terminal's, and this is a terminal test.
     const outs = got.filter((f) => f.channel === 'term:out') as unknown as { channel: 'term:out'; id: string; msg: ServerMsg }[]
-    expect(outs.map((f) => f.msg.type)).toEqual(['ready', 'output', 'output'])
-    expect(outs[1].msg).toMatchObject({ data: 'SCREEN' })
-    expect(outs[2].msg).toMatchObject({ data: 'LIVE' }) // live strictly after the screen restore
+    expect(outs.map((f) => f.msg.type)).toEqual(['ready'])
+    // …and the output is bytes, tagged with the session, in order: live strictly after the restore.
+    expect(bin.map(decodeText)).toEqual([
+      { id: SESSION, text: 'SCREEN' },
+      { id: SESSION, text: 'LIVE' },
+    ])
 
-    ws.send(JSON.stringify({ channel: 'term:input', id: 's1', data: 'ls\n' }))
+    ws.send(JSON.stringify({ channel: 'term:input', id: SESSION, data: 'ls\n' }))
     await waitFor(() => inputs.length > 0, 'input to reach the stream handler')
     expect(inputs).toEqual(['ls\n'])
+    ws.close()
+  })
+
+  // Phase 6 of the performance programme: output crosses the wire once per broadcast as bytes rather
+  // than once per socket as escaped JSON
+  // (docs/future/performance/phase-6-terminals-work-only-when-watched.md).
+  it('sends one binary frame per attached socket, byte for byte the same', async () => {
+    const sinks: StreamSink[] = []
+    setStreamHandlers({
+      input: () => {},
+      attach: (_id, sink) => sinks.push(sink),
+      detach: () => {},
+      streamTaskId: () => 'task-1',
+    })
+    const first = await open(authHeaders())
+    const second = await open(authHeaders())
+    const firstBin = binaries(first)
+    const secondBin = binaries(second)
+    first.send(JSON.stringify({ channel: 'term:attach', id: SESSION }))
+    second.send(JSON.stringify({ channel: 'term:attach', id: SESSION }))
+    await waitFor(() => sinks.length === 2, 'both attaches')
+
+    // One ServerMsg handed to every sink, which is what the engine does on its coalescing tick, so the
+    // frame is built once and both sockets get that same frame.
+    const msg: ServerMsg = { type: 'output', data: 'ünïcøde 🌰 "quoted"\r\n' }
+    for (const sink of sinks) sink(msg)
+    await waitFor(() => firstBin.length >= 1 && secondBin.length >= 1, 'both sockets to receive the frame')
+
+    expect(firstBin).toHaveLength(1)
+    expect(firstBin[0].equals(secondBin[0])).toBe(true)
+    expect(decodeText(firstBin[0])).toEqual({ id: SESSION, text: msg.type === 'output' ? msg.data : '' })
+    // The payload is the bytes and nothing else: no escaping, no base64, no envelope.
+    expect(firstBin[0].length).toBe(WS_BINARY_ID_BYTES + Buffer.byteLength('ünïcøde 🌰 "quoted"\r\n', 'utf8'))
+    first.close()
+    second.close()
+  })
+
+  it('takes no sequence number, so the invalidation channel stays contiguous', async () => {
+    let sink: StreamSink | null = null
+    setStreamHandlers({
+      input: () => {},
+      attach: (_id, s) => void (sink = s),
+      detach: () => {},
+      streamTaskId: () => 'task-1',
+    })
+    const ws = await open(authHeaders())
+    const got = frames(ws)
+    const bin = binaries(ws)
+    ws.send(JSON.stringify({ channel: 'term:attach', id: SESSION }))
+    await waitFor(() => sink !== null, 'the attach')
+
+    wsBroadcast({ channel: 'tasks:changed' })
+    for (let i = 0; i < 5; i += 1) sink!({ type: 'output', data: `chunk ${i}` })
+    wsBroadcast({ channel: 'plugins:changed' })
+    await waitFor(() => bin.length >= 5 && got.length >= 2, 'five binary frames between two pings')
+
+    // Five frames of output in the middle, and the two pings around them are still 1 and 2. A gap is
+    // what the broker reads as loss (docs/terminal.md § Backpressure), and output was never part of
+    // that count.
+    expect(got.map((f) => [f.channel, f.seq])).toEqual([
+      ['tasks:changed', 1],
+      ['plugins:changed', 2],
+    ])
+    ws.close()
+  })
+
+  it('falls back to a JSON frame for a stream id the binary frame cannot spell', async () => {
+    let sink: StreamSink | null = null
+    setStreamHandlers({
+      input: () => {},
+      attach: (_id, s) => void (sink = s),
+      detach: () => {},
+      streamTaskId: () => 'task-1',
+    })
+    const ws = await open(authHeaders())
+    const got = frames(ws)
+    const bin = binaries(ws)
+    // Not a UUID, so it does not fit the fixed-width id field. The output still has to arrive.
+    ws.send(JSON.stringify({ channel: 'term:attach', id: 'short-id' }))
+    await waitFor(() => sink !== null, 'the attach')
+    sink!({ type: 'output', data: 'STILL DELIVERED' })
+    await waitFor(() => got.length >= 1, 'the JSON fallback')
+
+    expect(bin).toEqual([])
+    expect(got[0]).toMatchObject({ channel: 'term:out', id: 'short-id', msg: { type: 'output', data: 'STILL DELIVERED' } })
     ws.close()
   })
 
@@ -544,6 +660,36 @@ describe('wsHub backpressure', () => {
     ws.terminate()
     await waitFor(() => paused.some(([, isPaused]) => !isPaused), 'the PTY to be resumed on close')
     expect(paused.at(-1)).toEqual(['s2', false])
+  })
+
+  // The same decision on the binary path, which is the one production actually takes: output reaches a
+  // socket through its per-session sink, never through wsBroadcast.
+  it('pauses the producer behind a binary frame over the mark, and still sends it', async () => {
+    let sink: StreamSink | null = null
+    setStreamHandlers({
+      input: () => {},
+      attach: (_id, s) => void (sink = s),
+      detach: () => {},
+      streamTaskId: () => 'task-1',
+      flowControl: (id, isPaused) => void paused.push([id, isPaused]),
+    })
+    const ws = await openTiny()
+    const bin = binaries(ws)
+    ws.send(JSON.stringify({ channel: 'term:attach', id: OTHER_SESSION }))
+    await waitFor(() => sink !== null, 'the attach')
+    ws.pause()
+
+    const big = 'x'.repeat(1_000_000)
+    for (let i = 0; i < 4; i += 1) sink!({ type: 'output', data: big })
+    await waitFor(() => paused.some(([, isPaused]) => isPaused), 'the PTY to be paused')
+    expect(paused.filter(([, isPaused]) => isPaused)).toEqual([[OTHER_SESSION, true]])
+
+    ws.resume()
+    await waitFor(() => paused.some(([, isPaused]) => !isPaused), 'the PTY to be resumed on drain')
+    // Nothing was dropped: there is no cursor to replay a hole in a terminal stream from.
+    await waitFor(() => bin.length >= 4, 'all four frames')
+    expect(bin.map((frame) => decodeText(frame).text.length)).toEqual([big.length, big.length, big.length, big.length])
+    ws.close()
   })
 
   // An invalidation ping has no producer to slow down, so it is the one thing still shed. What must not

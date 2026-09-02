@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { decodeIdFrame } from '@acorn/protocol/ws.ts'
 import {
   decodeBytes,
   encodeBytes,
@@ -28,6 +29,7 @@ type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => vo
 
 const pending = new Map<number, Pending>()
 const frameListeners = new Set<(nodeId: string, frame: unknown) => void>()
+const byteListeners = new Set<(nodeId: string, frame: Uint8Array) => void>()
 const statusListeners = new Set<(status: unknown) => void>()
 let nextId = 1
 let socket: Promise<WebSocket> | null = null
@@ -53,7 +55,14 @@ const connect = (): Promise<WebSocket> => {
           }
           socket = null
         }
-        ws.onmessage = (event) => receive(JSON.parse(String(event.data)) as HelperMessage)
+        // Terminal output arrives as bytes rather than as a JSON push (./wire.ts § The binary push),
+        // so the socket is asked for buffers instead of the default blobs, which would only be
+        // readable asynchronously.
+        ws.binaryType = 'arraybuffer'
+        ws.onmessage = (event) => {
+          if (event.data instanceof ArrayBuffer) return receiveBytes(new Uint8Array(event.data))
+          receive(JSON.parse(String(event.data)) as HelperMessage)
+        }
       }),
   )
   return socket
@@ -74,6 +83,15 @@ const receive = (message: HelperMessage): void => {
   pending.delete(message.id)
   if (message.ok) call.resolve(message.value)
   else call.reject(new Error(message.error))
+}
+
+// The node id is this end's business; the frame inside still holds the session id and is passed on
+// whole, so the format is read in one place on this side of the wire
+// (@acorn/client-core/infra/node/wsClient.ts).
+const receiveBytes = (frame: Uint8Array): void => {
+  const tagged = decodeIdFrame(frame)
+  if (!tagged) return
+  for (const cb of byteListeners) cb(tagged.id, tagged.payload)
 }
 
 const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
@@ -164,6 +182,7 @@ const acorn = {
   nodeAbort: (requestId: string) => tell('node-abort', { requestId }),
   nodeSend: (nodeId: string, frame: unknown) => tell('node-send', { nodeId, frame }),
   onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => subscribe(frameListeners, cb),
+  onNodeBytes: (cb: (nodeId: string, frame: Uint8Array) => void) => subscribe(byteListeners, cb),
   onNodeStatus: (cb: (status: unknown) => void) => subscribe(statusListeners, cb),
 
   // Owner-initiated fleet mutations. Every one is a request, never a write: the helper owns fleet.json

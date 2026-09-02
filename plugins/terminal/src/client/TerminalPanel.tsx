@@ -37,6 +37,10 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     return id ? sessions().filter((s) => s.taskId === id) : []
   })
 
+  // The surfaces below are keyed on these, not on the session rows, so a roster refresh that changes
+  // nothing does not rebuild an xterm. See the comment on the list itself.
+  const visibleIds = createMemo(() => visibleSessions().map((session) => session.id))
+
   // Keep the active session in sync with what's visible (e.g. after switching tasks). On a fresh
   // mount (task/workspace switch back) prefer the tab we last viewed for this task, so you return to
   // the same terminal instead of the first one; fall back to the first visible session.
@@ -313,17 +317,39 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
       <Show when={error()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
 
       {/* The session draws its own `Rectangle kind="pty"` (./TerminalSurface.tsx): a terminal is the
-          rectangle, and an empty drawer has no pixels for one to hold. */}
+          rectangle, and an empty drawer has no pixels for one to hold.
+
+          Every open session gets a surface and all but one is hidden. This used to mount the active
+          tab alone, keyed on its id, so each switch threw away an xterm and its WebGL context, asked
+          the node to serialize a thousand-line framebuffer, shipped it as one frame and parsed it into
+          a fresh emulator — for the most common thing anyone does in this drawer
+          (docs/future/performance/architecture.md § 3). A hidden xterm stays attached and stays
+          current, so a switch is a repaint. What it costs is one xterm per open tab, which is what a
+          terminal application spends.
+
+          `<For>` over the ids rather than over the sessions, and rather than `<Index>`. The sessions
+          are replaced wholesale on every roster refresh, so `<For>` over them would rebuild every row
+          and take the xterms with it; `<Index>` keys by position, so closing the first tab would hand
+          the second session to the first tab's live xterm. An id is a string, which `<For>` compares by
+          value, so a refresh that changes nothing keeps every element. */}
       <Show
-        when={activeId()}
+        when={visibleIds().length > 0}
         fallback={
           <EmptyState busy={launching() || !!pendingTitle()}>
             {launching() || pendingTitle() ? 'Launching…' : 'No sessions. Press + to open one.'}
           </EmptyState>
         }
-        keyed
       >
-        {(id) => <TerminalSurface sessionId={id} fontSize={surfaceFontSize()} onExit={() => void refreshSessions()} />}
+        <For each={visibleIds()}>
+          {(id) => (
+            <TerminalSurface
+              sessionId={id}
+              fontSize={surfaceFontSize()}
+              hidden={id !== activeId()}
+              onExit={() => void refreshSessions()}
+            />
+          )}
+        </For>
       </Show>
     </Drawer>
   )

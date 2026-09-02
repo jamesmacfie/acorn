@@ -15,7 +15,7 @@ import {
 } from '@acorn/protocol/broker.ts'
 import { coreNodeAdoptRoute } from '@acorn/protocol/api.ts'
 import { nodeAdoptResultSchema } from '@acorn/protocol/nodeProviders.ts'
-import type { WsClientFrame } from '@acorn/protocol/ws.ts'
+import { encodeIdFrame, type WsClientFrame } from '@acorn/protocol/ws.ts'
 import type { Helper } from '@acorn/custody/index.ts'
 import { toNodeRecord } from '@acorn/custody/broker/fleetStore.ts'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
@@ -55,6 +55,10 @@ export type HelperServer = {
   // push target as a function of the window: there may be no renderer yet, and there may be a
   // different one later.
   push(message: HelperPush): void
+  // Terminal output, forwarded as the one binary frame this wire carries. Separate from `push`
+  // because it is not a JSON message and never becomes one: it arrives from the node already tagged
+  // with its session id, and this end tags the node id around it (../shell/wire.ts § The binary push).
+  pushBytes(nodeId: string, frame: Uint8Array): void
   close(): Promise<void>
 }
 
@@ -102,6 +106,16 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     if ('push' in message && message.push === 'node-frame' && addressed !== null && message.nodeId !== addressed) return
     const payload = JSON.stringify(message)
     for (const socket of sockets) if (socket.readyState === socket.OPEN) socket.send(payload)
+  }
+
+  // The same filter as `push` above, and the same reason: an N-node fleet used to deliver every node's
+  // terminal output to a renderer that drops all but the active one's. Tagged with the node id rather
+  // than wrapped in JSON, so what came off the node's socket is copied once and forwarded.
+  const pushBytes = (nodeId: string, frame: Uint8Array): void => {
+    if (addressed !== null && nodeId !== addressed) return
+    const tagged = encodeIdFrame(nodeId, frame)
+    if (!tagged) return // a node id this frame cannot spell; the renderer hears nothing rather than nonsense
+    for (const socket of sockets) if (socket.readyState === socket.OPEN) socket.send(tagged, { binary: true })
   }
 
   // Bring a remembered node's connection up (or back up). Idempotent, so this doubles as the Reconnect
@@ -358,6 +372,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         port: address.port,
         secret,
         push,
+        pushBytes,
         close: () =>
           new Promise<void>((done) => {
             for (const socket of sockets) socket.close()

@@ -32,6 +32,14 @@ export function Rectangle(props: {
    * and the one a plugin must not spell, so the host draws the element and the caller is given it.
    */
   mount?: (element: HTMLElement) => void
+  /**
+   * Drawn but not shown. The one thing a rectangle's caller cannot get any other way: what a
+   * rectangle holds is expensive to build and expensive to throw away — an xterm carries a WebGL
+   * context and a screen the node had to serialize — so a tab strip over several of them keeps them
+   * all and hides the ones nobody is looking at, the same trade `Tabs.Panel` makes for scroll
+   * position (docs/terminal.md § Client).
+   */
+  hidden?: boolean
   children?: JSX.Element
 }) {
   const [inside, setInside] = createSignal(false)
@@ -51,6 +59,7 @@ export function Rectangle(props: {
       class="ui-rect"
       data-kind={props.kind}
       data-inside={inside() ? '' : undefined}
+      hidden={props.hidden}
       role="group"
       aria-label={props.label}
       tabindex={inside() ? -1 : 0}

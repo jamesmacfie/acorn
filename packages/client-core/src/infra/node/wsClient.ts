@@ -11,7 +11,7 @@
 // `docker:` and `agent:` are registered by the plugins that own them.
 import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
-import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
+import { decodeIdFrame, type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
 import { activeNodeId } from './activeNode'
 import { registerWsChannel, routeWsFrame, wsReattachFrames, _resetWsChannels } from './wsChannels'
@@ -53,6 +53,8 @@ const noticeSubs = new Set<NoticeCb>()
 const stepEventSubs = new Set<StepEventCb>()
 const reconnectSubs = new Set<() => void>()
 
+const decoder = new TextDecoder()
+
 let bridged = false
 // Which nodes' sockets have been up at least once. A later transition to online is a reconnect, which
 // means re-attach and refetch. The first connect means neither.
@@ -93,6 +95,21 @@ function connect(): void {
   transport.onFrame((nodeId, raw) => {
     if (nodeId !== activeNodeId()) return
     dispatch(raw)
+  })
+  // Terminal output, which does not arrive as a frame at all: it is bytes, tagged with the session
+  // they belong to (@acorn/protocol/ws.ts § The one binary frame). One decode instead of a JSON parse
+  // on the way in, and the same node filter as above, for the same reason.
+  transport.onBytes((nodeId, frame) => {
+    if (nodeId !== activeNodeId()) return
+    const tagged = decodeIdFrame(frame)
+    if (!tagged) return
+    const subs = outputSubs.get(tagged.id)
+    if (!subs) return
+    // Decoded here rather than at each subscriber: `ServerMsg` output is text, which is what xterm and
+    // the terminal client's emulator both take. One frame is one complete flush from the node, so a
+    // plain decode is exact — there is no character split across two of them to carry over.
+    const msg: ServerMsg = { type: 'output', data: decoder.decode(tagged.payload) }
+    subs.forEach((cb) => cb(msg))
   })
   transport.onStatus((status) => {
     if (status.state !== 'online') return

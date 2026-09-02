@@ -22,7 +22,7 @@ import {
   tmuxAttachArgs,
   tmuxName,
   tmuxNewSessionArgs,
-  trimRing,
+  OutputRing,
 } from './terminalUtils'
 import { fileURLToPath } from 'node:url'
 import type { RunSessionGlue } from './runChannel'
@@ -43,7 +43,7 @@ import { TerminalDisplay } from './terminalDisplay'
 type Session = {
   meta: TerminalSession
   pty: IPty
-  ring: string
+  ring: OutputRing
   display: TerminalDisplay
   lastActivityAt: number
   sawIdle: boolean // has this session ever gone idle? the first idle uses a shorter window (FIRST_IDLE_MS)
@@ -150,17 +150,14 @@ function emit(s: Session, msg: ServerMsg) {
   s.display.publish(msg)
 }
 
-// Buffer PTY output. The raw ring feeds transcript-tail analysis, while the display emulator owns
-// canonical client restoration, and the live wire frame is coalesced onto the next tick.
+// Buffer PTY output. The raw ring feeds transcript-tail analysis and, since phase 6 of the
+// performance programme, rebuilds the display emulator whenever a client attaches; the live wire frame
+// is coalesced onto the next tick.
 function queueOutput(s: Session, data: string) {
-  appendRing(s, data)
-  s.display.write(data)
+  s.ring.push(data)
+  s.display.write(data) // a no-op while nobody is attached: there is no emulator to feed
   s.pendingOut += data
   if (!s.flushTimer) s.flushTimer = setTimeout(() => flushOutput(s), OUTPUT_COALESCE_MS)
-}
-
-function appendRing(s: Session, data: string) {
-  s.ring = trimRing(s.ring + data)
 }
 
 // --- tmux process plumbing. execFileSync with arg arrays, so no shell: the command is a fixed profile
@@ -274,7 +271,7 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
   const s: Session = {
     meta,
     pty,
-    ring: '',
+    ring: new OutputRing(),
     display: new TerminalDisplay(meta.cols, meta.rows),
     lastActivityAt: Date.now(),
     sawIdle: false,
@@ -301,7 +298,7 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
     if (s.meta.backend === 'tmux') void markExited(s.meta.id, exitCode)
     worktreeSettled(s)
     // Task-completion trigger (docs/notes-and-memory.md): an agent session ending is the extraction moment.
-    if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') void memoryReviewTrigger?.(s.meta.taskId, s.ring.slice(-10_000))
+    if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') void memoryReviewTrigger?.(s.meta.taskId, s.ring.tail(10_000))
     statusBroadcast()
   })
   return s
@@ -317,7 +314,7 @@ function startIdleWatch() {
         s.meta.idle = true
         s.sawIdle = true
         // An idle session showing an input prompt in its tail is blocked, not done.
-        s.meta.agentState = matchBlockedPrompt(s.ring.slice(-4000)) ? 'blocked' : 'idle'
+        s.meta.agentState = matchBlockedPrompt(s.ring.tail(4000)) ? 'blocked' : 'idle'
         agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
         // The OS toast lives in the client now, focus-gated with cooldown and dedup there.
         statusBroadcast()
@@ -693,7 +690,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
         const timer = setTimeout(() => killSession(s), TEARDOWN_TIMEOUT_MS)
         s.pty.onExit(({ exitCode }) => {
           clearTimeout(timer)
-          resolveTeardown({ exitCode, output: s.ring })
+          resolveTeardown({ exitCode, output: s.ring.tail() })
         })
       })
     },
@@ -724,7 +721,9 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
       const s = sessions.get(id)
       if (!s) return
       flushOutput(s)
-      s.display.attach(sink, s.meta)
+      // The ring is what a cold attach rebuilds the screen from, and it is read only when there is no
+      // emulator yet (./terminalDisplay.ts § TerminalDisplay).
+      s.display.attach(sink, s.meta, () => s.ring.tail())
     },
     detach: (id, sink) => {
       sessions.get(id)?.display.detach(sink)

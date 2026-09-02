@@ -50,7 +50,17 @@ export default defineConfig({
           // server build from the `node` condition and every reactive primitive renders once, dead.
           conditions: ['browser', 'development'],
         },
-        test: { ...common, name: 'hosts', environment: 'jsdom', include: ['src/**/*.test.tsx'] },
+        test: {
+          ...common,
+          name: 'hosts',
+          environment: 'jsdom',
+          include: ['src/**/*.test.tsx'],
+          // `@solidjs/router` ships `.jsx` source and no build. Externalized, Node is handed a file
+          // extension it has no loader for; inlined, vite-plugin-solid compiles it like any other
+          // source in the graph. A plugin panel reaches it through the host chrome it draws inside, so
+          // this is the difference between a panel being testable here and not.
+          server: { deps: { inline: [/@solidjs\/router/] } },
+        },
       },
     ],
   },
