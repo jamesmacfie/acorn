@@ -24,11 +24,11 @@ export type AttentionInbox = {
   unavailable: FleetUnavailable[]
 }
 
-// Acknowledge on view. `completed` is a state the node keeps until the owner speaks again, so a
-// finished session sits in "Needs you" long after they have read it. Looking at it, in a focused
-// window, is the acknowledgement.
+// Acknowledging a row. A finished session, or an unreviewed memory proposal, is a state the node
+// keeps until someone acts on it, so it sits in "Needs you" long after they have read it. Looking at
+// it in a focused window acknowledges it, and so does "Mark all read" in the bell.
 //
-// The key carries `at`, which is the session's `updatedAt`: an ack keyed on the row alone would
+// The key carries `at`, which for a session is its `updatedAt`: an ack keyed on the row alone would
 // never re-arm, and a session that completes a second time is news again.
 const [seen, setSeen] = createSignal<ReadonlySet<string>>(new Set())
 
@@ -39,10 +39,11 @@ export function markAttentionSeen(nodeId: string, itemId: string, at: number): v
   setSeen((current) => (current.has(key) ? current : new Set<string>(current).add(key)))
 }
 
-// Only `completed` is retirable. A permission, a question, a gate or an error describes a block that
-// looking at it does not lift.
+// Only a nudge is retirable, and `severity` is the vocabulary for that: `info` means nothing is
+// blocked — a turn that finished, a proposal nobody has read. A permission, a question, a gate or an
+// error is `warn` or `danger` and describes a block that acknowledging it does not lift.
 export const attentionIsAcknowledged = (nodeId: string, item: AttentionItem): boolean =>
-  item.attentionReason === 'completed' && seen().has(seenKey(nodeId, item.id, item.at))
+  item.severity === 'info' && seen().has(seenKey(nodeId, item.id, item.at))
 
 // Node-scoped like every other node-minted id (docs/state-ownership.md § Scope rules).
 onScopeEvicted((e) => {

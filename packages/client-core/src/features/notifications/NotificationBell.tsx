@@ -1,7 +1,7 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount, type Notice } from './notifications'
-import { createAttentionInbox } from './attentionInbox'
+import { createAttentionInbox, markAttentionSeen } from './attentionInbox'
 import { parseNotificationSettings } from './settings'
 import { onNoticeActivated } from '../../infra/platform'
 import { trackBadge } from './badge'
@@ -43,6 +43,14 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
   // it is added rather than max()'d with the unread notices.
   const pill = () => unreadCount() + inbox().rows.length
 
+  // "Mark all read" means the number the bell shows, and the bell shows both sections. Notices go
+  // read; an attention row retires only if it is a nudge, which is the rule `attentionIsAcknowledged`
+  // keeps — a block is still a block after you have read about it.
+  const clearAll = () => {
+    markAllRead()
+    for (const row of inbox().rows) markAttentionSeen(row.nodeId, row.item.id, row.item.at)
+  }
+
   // Opening a notice, from the row below and from a click on the system banner it raised. One
   // function because the two are the same act: the banner is the row, drawn by the OS.
   const openNotice = (notice: Notice) => {
@@ -76,8 +84,8 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
       ariaLabel="Notifications"
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <Button variant="bare" title="Notifications" expanded={open()} onPress={toggle}>
-          ◔
+        <Button variant="bare" title="Notifications" label="Notifications" expanded={open()} onPress={toggle}>
+          <Icon name="bell" />
           <Show when={pill()}>
             {(count) => <span class="notify-count">{count()}</span>}
           </Show>
@@ -130,7 +138,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
           </Show>
           <div class="notify-head">
             <span>Notifications</span>
-            <Button variant="bare" onPress={markAllRead}>Mark all read</Button>
+            <Button variant="bare" onPress={clearAll}>Mark all read</Button>
           </div>
           <ul class="notify-list">
             <For each={noticesForActiveNode()} fallback={<li class="notify-empty muted">No notifications.</li>}>

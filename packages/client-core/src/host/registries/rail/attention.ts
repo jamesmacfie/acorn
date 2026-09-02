@@ -18,13 +18,12 @@ export type AttentionItem = {
   taskId?: string
   title: string
   detail?: string
+  // Urgency, and with it whether the row can be retired: `info` means nothing is blocked, so the
+  // owner can acknowledge it away (attentionInbox.ts § the seen set). `warn` and `danger` name a
+  // block only they can lift, so the row stays until they do.
   severity: 'info' | 'warn' | 'danger'
   // When the state began, for the relative time on the row.
   at: number
-  // Why the source raised it, in the source's own words. The inbox reads one value: `completed`
-  // marks a row the owner can retire by looking at it (attentionInbox.ts § the seen set). Every
-  // other reason describes a block only the owner can lift, so the row stays until they do.
-  attentionReason?: string
   // Where clicking should land. Reuses the notice target vocabulary and its handler table
   // (notifications/notifications.ts), since "open the thing this is about" is the same problem
   // already solved.

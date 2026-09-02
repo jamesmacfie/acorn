@@ -8,9 +8,9 @@ const item = (over: Partial<AttentionItem>): AttentionItem =>
   ({ id: 'agents.sessions:s1', taskId: 't1', title: 'claude finished', severity: 'info', at: 7, ...over })
 
 describe('acknowledge on view', () => {
-  it('retires a completed row the owner has looked at, and nothing else', () => {
-    const completed = item({ attentionReason: 'completed' })
-    const permission = item({ attentionReason: 'permission' })
+  it('retires a nudge the owner has acknowledged, and nothing else', () => {
+    const completed = item({})
+    const permission = item({ severity: 'warn' })
     expect(attentionIsAcknowledged('n1', completed)).toBe(false)
 
     markAttentionSeen('n1', completed.id, completed.at)
@@ -24,13 +24,21 @@ describe('acknowledge on view', () => {
   // gouda's rule: an ack keyed on the row alone never re-arms, so a second completion is silent
   // forever. The key carries the session's `updatedAt`.
   it('re-arms when the session completes again', () => {
-    const first = item({ id: 'agents.sessions:s2', attentionReason: 'completed', at: 1 })
+    const first = item({ id: 'agents.sessions:s2', at: 1 })
     markAttentionSeen('n1', first.id, first.at)
     expect(attentionIsAcknowledged('n1', { ...first, at: 2 })).toBe(false)
   })
 
+  // The bell's "Mark all read" acknowledges the rows it is showing, so an unreviewed proposal — a
+  // nudge from a source that has no reason to give — leaves the pill.
+  it('retires an info row that names no reason', () => {
+    const proposal = item({ id: 'memory.proposals:p1', at: 3 })
+    markAttentionSeen('n1', proposal.id, proposal.at)
+    expect(attentionIsAcknowledged('n1', proposal)).toBe(true)
+  })
+
   it('empties on a node switch', () => {
-    const row = item({ id: 'agents.sessions:s3', attentionReason: 'completed' })
+    const row = item({ id: 'agents.sessions:s3' })
     markAttentionSeen('n1', row.id, row.at)
     evictScope({ scope: 'node-switched' })
     expect(attentionIsAcknowledged('n1', row)).toBe(false)

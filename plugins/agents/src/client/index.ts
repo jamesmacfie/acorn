@@ -97,10 +97,9 @@ export const agentsClientPlugin: ClientPlugin = {
             taskId: session.taskId,
             title: `${session.title || session.providerId} ${copy.title}`,
             detail: session.runtimeState,
+            // `completed` is the one `info` in the table, and info is what the inbox lets the owner
+            // retire by looking at it; every other attention names a block only they can lift.
             severity: copy.severity,
-            // The inbox retires a `completed` row once the owner has looked at it; every other
-            // reason names a block only they can lift.
-            attentionReason: session.attention,
             // `updatedAt`, not now(): the row shows how long this has been waiting, which is the number
             // that decides whether the owner should care.
             at: session.updatedAt,

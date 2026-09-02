@@ -1,18 +1,16 @@
-/* Notification bell + popover (docs/terminal-and-agents.md). Popovers are the only elevated surface. */
+/* Notification bell + popover (docs/notifications.md). Popovers are the only elevated surface. */
+/* Beside the bell, inside the button's own flex row. It used to be `position: absolute`, which needs
+   a positioned ancestor the kit's button does not give it, so the count escaped the topbar and drew
+   itself in the corner of the window. A capsule the button lays out cannot land anywhere else. */
 .notify-count {
-  position: absolute;
-  top: 0;
-  right: -2px;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
+  min-width: 16px;
+  padding: 0 4px;
   font-size: var(--fs-2xs);
-  line-height: 14px;
+  line-height: 16px;
   text-align: center;
   color: var(--bg);
-  background: var(--del-marker);
+  background: var(--danger);
   border-radius: var(--radius-pill-fixed);
-  pointer-events: none;
 }
 /* Popover owns the surface (portal, position, elevation, dismissal). This is only the inbox's width
    and the fact that its own rows supply all the padding. It reaches the surface through the wrapper
