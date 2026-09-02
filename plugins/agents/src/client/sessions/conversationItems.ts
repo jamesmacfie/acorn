@@ -3,8 +3,11 @@ import type {
   AgentNormalizedEvent,
   AgentSubagentUpdate,
   AgentToolCall,
-  AgentUsage,
 } from '@acorn/protocol/managedAgents.ts'
+// The same merge the node's snapshot fold and the transcript store apply. This fold is now defensive:
+// both sources hand the transcript one usage record a turn already, and it still runs so that a
+// replayed page, an older node, or a subagent's roster usage folds the way it always did.
+import { mergeAgentUsage as mergeUsage } from '../../shared/usageFold'
 
 export type AgentConversationItem = {
   key: string
@@ -65,14 +68,6 @@ const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): AgentToolC
   subagentId: next.subagentId ?? previous.subagentId,
 })
 
-const mergeUsage = (previous: AgentUsage, next: AgentUsage): AgentUsage => ({
-  inputTokens: next.inputTokens ?? previous.inputTokens,
-  outputTokens: next.outputTokens ?? previous.outputTokens,
-  cachedInputTokens: next.cachedInputTokens ?? previous.cachedInputTokens,
-  contextUsed: next.contextUsed ?? previous.contextUsed,
-  contextSize: next.contextSize ?? previous.contextSize,
-  cost: next.cost ?? previous.cost,
-})
 
 // Same convention. A harness that only learns the model at completion must not wipe the title it
 // reported at spawn, and one that reports usage twice must not lose the first half of it.
@@ -170,6 +165,9 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
     return update
   }
 
+  // Copied and sorted unconditionally, and left that way after measuring it: on a 1,850-row session
+  // both this and an in-order check that would skip it come in around 0.05 ms, because V8's sort walks
+  // an already-ordered array in one pass. Guarding it buys nothing worth a branch.
   for (const record of [...events].sort((a, b) => a.seq - b.seq)) {
     const owner = subagentIdOf(record.event)
     // An orphan stays visible at the top rather than being dropped: the subagent card is normally the

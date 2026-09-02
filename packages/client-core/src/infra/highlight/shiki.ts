@@ -28,6 +28,44 @@ export async function getHighlighter(lang?: string): Promise<HighlighterCore> {
   return hl
 }
 
+// A fence's highlighted html, keyed by its language and its exact text.
+//
+// The transcript re-renders a streaming message about 25 times a second, and a message can hold
+// several code fences. Block-level reuse in kit Markdown.tsx already stops an unchanged fence from
+// being re-tokenized while the message is on screen; this catches the rest — the same fence coming
+// back after a scroll, a view switch or a remount, and the same snippet appearing twice.
+//
+// Exact keys rather than a hash, because a hash collision would show a reader the wrong code. The
+// ceiling that buys is memory, so the window is small and a fence over 16 KB is not kept at all: the
+// cache is a window over what is on screen, not a record. If a surface ever needs a bigger one, hash
+// the text and accept the collision risk, or move the store off the module.
+const HTML_CACHE_ENTRIES = 200
+const HTML_CACHE_MAX_BYTES = 16 * 1024
+const htmlCache = new Map<string, string>()
+
+/**
+ * Highlight one whole fence to html, dual-themed, loading its grammar first. It can reject — a grammar
+ * that will not load is a rejected dynamic import — so a caller catches and renders the fence plain.
+ */
+export async function highlightToHtml(code: string, lang: string): Promise<string> {
+  const key = `${lang}\u0000${code}`
+  const hit = htmlCache.get(key)
+  if (hit !== undefined) return hit
+  const hl = await getHighlighter(lang)
+  const html = hl.codeToHtml(code, { lang, themes: { light: 'github-light', dark: 'github-dark' } })
+  if (code.length > HTML_CACHE_MAX_BYTES) return html
+  // First in, first out. A Map iterates in insertion order, so the oldest key is the first one.
+  if (htmlCache.size >= HTML_CACHE_ENTRIES) {
+    const oldest = htmlCache.keys().next()
+    if (!oldest.done) htmlCache.delete(oldest.value)
+  }
+  htmlCache.set(key, html)
+  return html
+}
+
+/** Tests only: forget what has been highlighted so a spy can count calls from a known state. */
+export const resetHighlightHtmlCache = (): void => htmlCache.clear()
+
 // The vocabulary lives in langs.ts, because the worker needs it too and must not import this
 // module. Re-exported because this is where callers look for it.
 export { langFor, LANGS } from './langs'

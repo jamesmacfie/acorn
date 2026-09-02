@@ -256,6 +256,16 @@ export class AgentStore extends AgentSessionRepository {
     return mapAgentTurn(row)
   }
 
+  /**
+   * One turn row by id, or `null` if it has gone. This is what a `turn_completed` frame carries, so a
+   * client learns the turn's status, stop reason and usage without refetching the session
+   * (../../client/sessions/managedStore.ts).
+   */
+  async turn(turnId: string): Promise<AgentTurn | null> {
+    const [row] = await this.db.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, turnId)).limit(1)
+    return row ? mapAgentTurn(row) : null
+  }
+
   async nextQueuedTurn(sessionId: string): Promise<AgentTurn | null> {
     const [row] = await this.db
       .select()

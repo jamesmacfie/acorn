@@ -1,6 +1,18 @@
 # Phase 7: streaming surfaces render incrementally
 
-Status: not started. Waits on phase 0 for a profile of a real long session.
+Status: **shipped 2026-09-03.** All five pieces landed: constant-time `appendEvent`, the usage fold on
+the Node's snapshot route and in the transcript store, a memoized turn map, `agent:turn` and
+`agent:request` frames in place of the projected-event refetch, and `Markdown` rendering block by
+block. Owned from here by [docs/managed-agents.md](../../managed-agents.md) § The transcript store and
+[docs/ui-design.md](../../ui-design.md) § How the kit is built; numbers in
+[measurements.md](./measurements.md) § 2026-09-03 — phase 7.
+
+Two things the phase file got wrong, both recorded in measurements.md rather than fixed here. The 2 ms
+per-event budget was **already met before the work** — a 2,727-event session cost 0.33 ms an event
+outside the DOM, so what this phase bought is 21.6 µs of bookkeeping down to 0.1 µs and 33 highlighter
+calls down to 3, not a budget rescue. And the highlighter cache does not sit "in front of `codeToHtml`
+in `infra/highlight/worker.ts`": that module is the diff tokenizer and has no `codeToHtml` in it. The
+cache is in `infra/highlight/shiki.ts`, which is where `Markdown` actually reaches the highlighter.
 
 ## Goal
 

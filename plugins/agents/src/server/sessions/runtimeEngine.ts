@@ -488,9 +488,35 @@ export class ManagedAgentEngine {
   ): Promise<AgentEventRecord> {
     const record = await this.store.recordEvent(sessionId, turnId, event)
     this.emit({ channel: 'agent:event', event: record })
+    await this.emitProjection(sessionId, turnId, event)
     const session = await this.store.requireSession(sessionId)
     this.emit({ channel: 'agent:session', session })
     return record
+  }
+
+  // The row a projected event changed, sent with the event.
+  //
+  // `recordEvent` writes the request row in the same transaction as the event, and a turn's status is
+  // already committed by the time its `turn_completed` is recorded, so the node knows what changed. It
+  // used to say nothing, and every client answered a `turn_completed` by refetching the whole snapshot
+  // — up to 2,000 event rows and a JSON body parsed per row — to learn one turn's stop reason
+  // (../../client/sessions/managedStore.ts § PROJECTED_EVENT_TYPES).
+  //
+  // `error` is deliberately not here: it also expires this session's pending requests, which is a set
+  // this projection cannot name, so the client still refetches for that one.
+  protected async emitProjection(
+    sessionId: string,
+    turnId: string | null,
+    event: AgentNormalizedEvent,
+  ): Promise<void> {
+    if (event.type === 'request' || event.type === 'request_resolved') {
+      const request = await this.store.request(sessionId, event.requestId)
+      if (request) this.emit({ channel: 'agent:request', request })
+      return
+    }
+    if (!turnId || (event.type !== 'user_message' && event.type !== 'turn_completed')) return
+    const turn = await this.store.turn(turnId)
+    if (turn) this.emit({ channel: 'agent:turn', turn })
   }
 
   protected emit(frame: AgentWsFrame): void {

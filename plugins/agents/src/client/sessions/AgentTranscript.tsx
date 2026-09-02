@@ -29,6 +29,10 @@ export default function AgentTranscript(props: {
   const prefs = createQuery(() => prefsOptions(true))
   const foldSetting = createAgentToolFoldSetting(() => prefs.data, queryClient)
   const conversation = createMemo(() => buildConversationItems(props.snapshot.events))
+  // One map above the list, not `turns.find` inside it. The row body ran that find once per row per
+  // render, so a streamed event cost rows times turns; a long session is thousands of rows and hundreds
+  // of turns, twenty-five times a second.
+  const turnsById = createMemo(() => new Map(props.snapshot.turns.map((turn) => [turn.id, turn])))
   // The selected subagent's card, when there is one. A complex child run does not fit in a box inside
   // its parent's stream, so selecting it moves the whole window onto that run: the transcript renders
   // the card's own children as its top level, which the projection already built as a tree.
@@ -113,7 +117,7 @@ export default function AgentTranscript(props: {
                     taskId={props.taskId}
                     sessionId={sessionId()}
                     sessionModel={sessionModel()}
-                    turn={props.snapshot.turns.find((turn) => turn.id === item().turnId)}
+                    turn={turnsById().get(item().turnId ?? '')}
                   />
                 </Timeline.Turn>
               )}
