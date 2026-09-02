@@ -7,6 +7,7 @@ const WorkspaceSettings = lazy(() => import('@acorn/client-core/features/setting
 const McpSettings = lazy(() => import('@acorn/client-core/features/settings/McpSettings.tsx'))
 const AgentToolsSettings = lazy(() => import('@acorn/client-core/features/settings/AgentToolsSettings.tsx'))
 const AppearanceSettings = lazy(() => import('@acorn/client-core/features/settings/AppearanceSettings.tsx'))
+const NotificationSettings = lazy(() => import('@acorn/client-core/features/settings/NotificationSettings.tsx'))
 const ShortcutsSettings = lazy(() => import('@acorn/client-core/features/settings/ShortcutsSettings.tsx'))
 const NodesSettings = lazy(() => import('@acorn/client-core/features/settings/nodes/NodesSettings.tsx'))
 const PluginsSettings = lazy(() => import('@acorn/client-core/features/settings/PluginsSettings.tsx'))
@@ -27,6 +28,9 @@ export const settingsPageContributions: SettingsContribution[] = [
       : null,
   },
   { id: 'appearance', label: 'Appearance', group: 'general', order: 10, component: () => <AppearanceSettings /> },
+  // Beside Appearance, because both describe this screen rather than the node: which notifications
+  // this machine makes is a device preference, like the theme.
+  { id: 'notifications', label: 'Notifications', group: 'general', order: 15, component: () => <NotificationSettings /> },
   { id: 'integrations', label: 'Integrations', group: 'general', order: 20, component: () => <IntegrationsSettings /> },
   { id: 'mcp', label: 'MCP', group: 'general', order: 30, component: () => <McpSettings /> },
   // Core's, not agents': the tool registry it edits permissions for is projected from every plugin's

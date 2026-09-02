@@ -72,6 +72,12 @@ export const PrefKeys = {
   // composition above. The board belongs to the node, but which tab you are on is view state, and
   // syncing it would move another machine's screen under its owner.
   homeTab: 'home_tab',
+  // Which notification channels and which events are on (features/notifications/settings.ts). One
+  // JSON blob in one key, like `docker_prefs`, because the gate reads all six together.
+  //
+  // The device's, like `theme`: a sound on this machine is not a fact about the node, and the other
+  // client paired with the same node may not even be able to make one.
+  notifications: 'notifications',
 } as const
 
 export type PrefKey = (typeof PrefKeys)[keyof typeof PrefKeys]
