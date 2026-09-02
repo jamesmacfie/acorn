@@ -14,8 +14,13 @@ import { HELPER_PROTOCOL, type HelperMethod } from '../src/shell/wire'
 // It runs the real thing — the staged helper bundle under the bundled Node runtime, spawning the real
 // `service.js` over the fd-3 service protocol against a fresh data root — and then asks it the first
 // two questions the renderer asks: which nodes are there, and can a `/v2` request reach one. That is
-// phase 2's exit criterion minus the window, and it is what catches "the shell cannot load its world"
+// the exit criterion minus the window, and it is what catches "the shell cannot load its world"
 // the way `apps/node/test/integration/mainBarrelLoad.test.ts` catches barrel poisoning.
+//
+// It also holds the boot ORDER, which is the thing a reader is most likely to undo by accident. The
+// ready line goes out when the helper is listening, not when the node is up
+// (docs/shell.md § The shell process), so the window can open on the persisted cache. `ACORN_PERF=1`
+// makes the helper print its own marks on stderr and this test reads their order back.
 //
 // What it deliberately does not do is drive the Rust shell. A headless Tauri app needs a display
 // server, and the parts of the shell that could be wrong without one — the CSP, the traversal guard,
@@ -37,6 +42,9 @@ let dataDir: string
 let ready: Ready
 let socket: WebSocket
 let nextId = 1
+// The helper's `[helper:boot] <label> +<ms>ms` marks, in the order they were printed.
+const bootMarks: string[] = []
+const markIndex = (label: string): number => bootMarks.indexOf(label)
 
 // One round trip on the same channel the renderer uses. Not a shared client: the point is that the
 // wire works, so this test speaks it directly rather than through the bridge, which cannot run outside
@@ -61,7 +69,17 @@ beforeAll(async () => {
   }
   dataDir = mkdtempSync(join(tmpdir(), 'acorn-tauri-boot-'))
 
-  helper = spawn(nodeBinary(), [join(STAGING, 'helper.js')], { stdio: ['pipe', 'pipe', 'inherit'] })
+  // stderr piped rather than inherited, because that is where the boot marks are and the order of
+  // them is an assertion below. They are still echoed, so a failing run reads the same as before.
+  helper = spawn(nodeBinary(), [join(STAGING, 'helper.js')], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, ACORN_PERF: '1' },
+  })
+  createInterface({ input: helper.stderr! }).on('line', (line) => {
+    console.error(line)
+    const mark = /^\[helper:boot] (.+?) \+\d+ms/.exec(line)
+    if (mark) bootMarks.push(mark[1])
+  })
   const readyLine = new Promise<Ready>((resolve_, reject) => {
     const timer = setTimeout(() => reject(new Error('the helper never printed a ready line')), 120_000)
     createInterface({ input: helper.stdout! }).on('line', (line) => {
@@ -99,7 +117,23 @@ beforeAll(async () => {
     socket.once('open', done)
     socket.once('error', fail)
   })
+  // The node boots behind the ready line, so the fleet is empty for a moment after this socket opens.
+  // The renderer lives with that by drawing its persisted cache; a test that wants to ask the node
+  // something has to wait, which is also how it observes that adoption happened at all.
+  await waitFor(async () => (await call<{ nodes: { local: boolean }[] }>('fleet-list')).nodes.some((node) => node.local), 'the local node was never adopted')
+  await waitFor(() => markIndex('service.start') !== -1, 'the helper never recorded starting the node')
 }, 180_000)
+
+// Poll until it is true, or say what never happened. No fake timers: everything here is a real
+// process coming up.
+async function waitFor(condition: () => boolean | Promise<boolean>, complaint: string, timeoutMs = 60_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await condition()) return
+    await new Promise((done) => setTimeout(done, 50))
+  }
+  throw new Error(complaint)
+}
 
 afterAll(async () => {
   socket?.close()
@@ -124,7 +158,18 @@ describe('the Tauri shell boots its world', () => {
     expect(ready.protocol).toBe(HELPER_PROTOCOL)
   })
 
-  it('adopts the local node into the fleet before the renderer connects', async () => {
+  it('says it is ready when it is listening, not when the node is up', () => {
+    // The whole of phase 2's desktop half, in three offsets. Rust blocks on the ready line and opens
+    // the window on it, so anything the helper does after that mark is behind the first paint. The
+    // node's boot is `service.start`, and it has to be one of those things.
+    expect(bootMarks).toContain('ready line')
+    expect(bootMarks).toContain('service.start')
+    expect(markIndex('ws bound')).toBeLessThan(markIndex('ready line'))
+    expect(markIndex('ready line')).toBeLessThan(markIndex('service.start'))
+    expect(markIndex('service.start')).toBeLessThan(markIndex('node adopted'))
+  })
+
+  it('adopts the local node into the fleet behind the ready line', async () => {
     const fleet = await call<{ nodes: { nodeId: string; local: boolean }[]; statuses: unknown[] }>('fleet-list')
     const local = fleet.nodes.filter((node) => node.local)
     // Exactly one, and it cannot be unpaired: the app's own data root is what defines it.

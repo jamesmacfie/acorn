@@ -12,10 +12,24 @@ deleted once every phase landed; git history holds that record.
 ## The shell process
 
 `apps/desktop/src-tauri/src/lib.rs` registers the `app://acorn` and `app-plugin://` schemes,
-supervises the helper, and opens the window. Boot order is the reverse of what a Tauri app usually
-does: `setup` blocks on the helper, so the broker is warm and the node is listening before the
-window exists. The renderer's first act is to ask for the fleet, and a window that opened first
-would have nothing to render but the recovery screen.
+supervises the helper, and opens the window. `setup` blocks on the helper and no further. The
+renderer's first act is to ask which nodes there are, the fleet is a file on the helper's disk, and a
+window that opened before the helper existed could not ask.
+
+**The ready line means "the helper is listening", not "the node is up.**" `boot()` in
+`apps/desktop/src/helper/helperMain.ts` adopts any legacy custody, loads the env files, builds the
+helper, binds the WebSocket server, and prints the ready line. Only then does it start the node, with
+`helper.startInBackground()`. So the window opens on a helper that can answer the fleet question, and
+the node's own boot — a few hundred milliseconds of plugin loading and migrations — happens behind the
+first frame and arrives as a `node-status` push the renderer already handles. The shell draws that
+node's persisted query cache in the meantime ([frontend.md](./frontend.md) § Painting before the node).
+
+`startInBackground` rather than a bare `void helper.start()`, and the difference is the failure path.
+A `start()` that rejects never spawned a child, so `unexpectedExit` cannot fire and nothing would
+retry; it routes that case into the same crash budget and recovery dialog a later crash reaches. The
+budget and the dialog are unchanged. What changed is where the dialog appears: over the shell, rather
+than instead of it. A helper that never becomes ready at all is still fatal, because nothing in the
+window can reach a node without one — Rust says why and quits.
 
 The Rust half is deliberately small. Three modules serve content (`app_scheme.rs`,
 `plugin_scheme.rs`, `webviews.rs`), one supervises the helper (`helper.rs`), one holds the data key
@@ -136,6 +150,21 @@ parses as JSON is the worst answer available.
 
 Development proxies the Vite dev server through this same handler rather than loading `devUrl`
 directly, so developers exercise the origin the shipped app uses.
+
+The handler is registered asynchronously and answers each request on its own thread. The synchronous
+form runs the whole response on the thread that delivered the request, which is the thread the webview
+draws on, and a cold window asks for well over a hundred module scripts: each blocking `fs::read` sat
+in front of the next request, and under `pnpm dev` each blocking HTTP call to Vite did the same. A
+thread per request is fine for the tens of reads a launch makes; a pool behind the same responder is
+the upgrade if that changes.
+
+**Cache headers depend on the build.** A packaged build serves `/assets/<name>-<hash>.<ext>` with
+`public, max-age=31536000, immutable`, because the bundler content-hashes every file it writes there —
+the name is the version, so a rebuild emits a different one. Everything else is `no-store`, and
+`index.html` above all: it is the one name a rebuild does not change, so a cached copy would keep
+pointing the window at the previous build's chunks forever. A dev build is `no-store` throughout, from
+the same branch that widens the policy, because Vite rewrites those files under the same names while
+the developer works. A Rust test asserts all four cases.
 
 The CSP is a response header rather than an `index.html` meta tag, because a header cannot be
 overridden by markup injected into the document, and a meta tag can be preceded by content it

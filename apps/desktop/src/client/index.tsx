@@ -8,7 +8,7 @@ import App from './App'
 import '@acorn/client-core/infra/styles/styles.css'
 import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
 import { activeCacheId, activeNodeId, nodeReady, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
-import { clientFor } from '@acorn/client-core/infra/node/fleet.ts'
+import { clientFor, nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/infra/node/wsClient.ts'
 import { sourceRouteContributions } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes/projectSurfaces.ts'
@@ -54,18 +54,41 @@ bootMark('script start')
 // client needs invalidating: no other node has a mounted query to refetch.
 wsOnReconnect(() => void clientFor(activeCacheId()).client.invalidateQueries({ refetchType: 'active' }))
 
-// Resolve which node to talk to before the first render. Every request is node-addressed now, and the
-// shell's onMount side effects (session tracking, pollers) do not sit behind NodeGate's <Show>, so
-// rendering first would fire requests with no node selected.
-await selectActiveNode()
-bootMark('node selected')
+// Which node to talk to, started and not awaited. The device remembers the last one
+// (node/activeNode.ts), so `activeNodeId()` already answers on this tick and the cache partition below
+// is the right one before the helper has said a word; this call confirms it against the fleet and
+// re-homes the window if that node has gone. A first-ever launch has nothing to remember, and
+// `nodeGateHolds()` puts the onboarding screen up until this resolves.
+void selectActiveNode().then(() => bootMark('node selected'))
 
-// …and then which of that node's plugins are on, before anything renders a pane switcher. A node switch
-// re-applies it (App.tsx), which is safe because the plugin host replaces a plugin's contributions rather
-// than appending them. Not awaited-and-fatal: `applyNodePlugins` swallows a read failure and leaves the
-// full contribution set active, because a node that cannot answer must not cost the owner their UI.
-await applyNodePlugins(activeNodeId() ?? undefined)
-bootMark('plugins applied')
+// Membership can now arrive after the first paint. On a first-ever launch the fleet is empty when the
+// call above reads it, because the local node has not been adopted yet, and `fleet.ts` re-reads
+// membership when the first status for an unknown node lands. This is what turns that into a
+// selection; once there is one it is a no-op.
+createRoot(() => {
+  createEffect(() => {
+    if (nodes().length && !activeNodeId()) void selectActiveNode()
+  })
+})
+
+// Which of that node's plugins are on. Not awaited either, and it will usually fail on a cold start,
+// because it is a request to a node that is still booting: `applyNodePlugins` swallows a read failure
+// and leaves the full contribution set active rather than costing the owner their UI, and App.tsx
+// re-runs it when the node reports itself online. That is what activate.ts's own comment says the
+// whole design is for — register everything and correct later, never wait.
+void applyNodePlugins(activeNodeId() ?? undefined).then(() => bootMark('plugins applied'))
+
+// The node's arrival, which is behind the first paint now. Whatever the shell asked for while nothing
+// was listening came back as an error, and the first `online` push is when those are worth asking
+// again. `wsOnReconnect` above cannot do this: it deliberately ignores a node's FIRST connect, which
+// used to be in front of the window and no longer is.
+createRoot(() => {
+  createEffect(() => {
+    const nodeId = activeNodeId()
+    if (!nodeId || nodeState(nodeId) === 'offline') return
+    void clientFor(activeCacheId()).client.invalidateQueries({ refetchType: 'active' })
+  })
+})
 
 // Third-party plugin bundles, across the whole fleet rather than just the active node
 // (docs/plugins.md). Not awaited: it talks to every remembered node, and a fleet with an offline
@@ -137,9 +160,12 @@ render(
 )
 
 // After the frame the tree above produced, which is the first thing the owner sees, and separately the
-// moment the node answered — the two are far apart today and phase 2 of the performance programme is
-// what pulls them apart further on purpose (docs/future/performance/decisions.md § Every host draws
+// moment a node was selected. The two are far apart on purpose: nothing between `script start` and
+// this frame waits on the helper or the node (docs/future/performance/decisions.md § Every host draws
 // first).
+// A background window never records this: macOS pauses `requestAnimationFrame` while the window is
+// occluded, so a launch watched from a terminal prints the other four marks and not this one
+// (docs/local-development.md § Timing a cold start).
 requestAnimationFrame(() => bootMark('first paint'))
 createRoot((dispose) => {
   createEffect(() => {

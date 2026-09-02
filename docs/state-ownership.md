@@ -24,6 +24,8 @@ selection scope, layout scope, and fleet aggregate input.
 The desktop persists:
 
 - paired Node records, labels, endpoints, certificate fingerprints, and local-node identity;
+- which Node this window talked to last, so the next launch can pick its cache partition before
+  the fleet answers ([frontend.md](./frontend.md) § Painting before the node);
 - device-scoped appearance, shortcuts, rail order, collapse state, and window geometry;
 - the per-Node IndexedDB query cache;
 - selection/restore state and local drafts.
@@ -38,7 +40,8 @@ while a Node is offline.
 per-user prefs, so every client renders it; state about this machine or the person at it — theme,
 style, keybindings, window and collapse state, notices, caches, trust, tokens — stays device-local on
 purpose. There is no "home node" to store things on: `homeNode()` picks which Node a fresh window
-opens on and nothing else. Drafts stay device-local by a separate recorded decision, because losable
+opens on and nothing else, and the remembered last Node is an id this device draws a cache for,
+not a place preferences live. Drafts stay device-local by a separate recorded decision, because losable
 is acceptable for a draft and not for a composition.
 
 Use the persistence scope that owns the state:
@@ -50,7 +53,7 @@ Use the persistence scope that owns the state:
 | Query cache | Node |
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
 | Dashboard panel definitions and their placements | owning Node's prefs, one app-scoped slice |
-| Last path, last task, last source | device |
+| Last path, last task, last source, last Node | device |
 | Workspace/task selection | Node + workspace/task |
 | Draft editor/comment text | client + current task |
 | Provider data and task mutations | owning Node |

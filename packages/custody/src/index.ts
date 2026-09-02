@@ -19,8 +19,11 @@ import { ServiceHost } from './supervision/serviceHost'
 // seam through the options below.
 //
 // The shell drives boot order: build the helper, register whatever the renderer talks to, then
-// `start()`, then `bootComplete()`. Between the two an unexpected exit is a failed boot, not a crash
-// to recover from.
+// `bootComplete()`, then start the node. The desktop starts it with `startInBackground()` so the
+// window opens on the helper listening rather than on the node being up
+// (docs/future/performance/decisions.md § Every host draws first). A host that has a reason to wait
+// still awaits `start()`, and until `bootComplete()` an unexpected exit is a failed boot rather than
+// a crash to recover from.
 
 export type HelperOptions = {
   // The staged service.js, and the config it starts with. @acorn/protocol specs the config.
@@ -57,6 +60,12 @@ export type Helper = {
   // Start the node and adopt it into the fleet. Resolves when its migrations, bridge installation,
   // and loopback listener are done. Durable reconciliation continues in the background over there.
   start(): Promise<ServiceStartResult>
+  // The same start, for a caller that has already opened its window and has nowhere to report a
+  // rejection to. A rejected `start()` never spawned a child, so `unexpectedExit` cannot fire and
+  // nothing else would ever retry — this routes that case into the crash budget and the recovery
+  // dialog a later crash reaches. Call `bootComplete()` first, or the first exit is read as a failed
+  // boot and ignored.
+  startInBackground(): void
   // Boot succeeded. Until this is called an unexpected exit is left to the caller's error path.
   bootComplete(): void
   // Settings → Plugins' Restart button.
@@ -244,6 +253,18 @@ export function createHelper(options: HelperOptions): Helper {
     pluginCache,
     pluginTrust,
     start,
+    // The desktop's boot path (docs/shell.md § The shell process). The window is already open, so the
+    // only place a failure can be reported is the recovery dialog, and the only thing that can put it
+    // there is `recover()`. Its own guards make a double entry harmless: a child that spawned and then
+    // died reaches `recover()` through `unexpectedExit` as well, and the second call returns at the
+    // `recovering` check.
+    startInBackground: () => {
+      void start().catch((error: unknown) => {
+        console.error('[service-host] the background service did not start:', error)
+        lastFailure ??= error instanceof Error ? error.message : String(error)
+        void recover()
+      })
+    },
     bootComplete: () => {
       booted = true
     },

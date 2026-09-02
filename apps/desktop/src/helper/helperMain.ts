@@ -18,6 +18,10 @@ import { HELPER_PROTOCOL } from '../shell/wire'
 // The command reader is installed before the handshake is read, because Rust can send `stop` while
 // the node is still booting. A helper that installed its reader after `service.start` resolved
 // dropped that line and was killed for not quitting.
+//
+// The ready line means "this process is listening", not "the node is up". The node's boot runs behind
+// it and reports itself through the `node-status` pushes below, which is what lets the window open on
+// a persisted cache instead of on a 400 ms node boot (docs/shell.md § The shell process).
 
 // Every line Rust is meant to read carries this key. Everything else on stdout is a log.
 const TAG = 'acorn-helper'
@@ -126,10 +130,18 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
     },
   })
 
-  await helper.start()
   server = await startHelperServer(helper, { secret: randomBytes(32).toString('hex'), appOrigin: handshake.appOrigin })
   helperMark('ws bound')
+  // Everything the renderer's first questions need is now in place: the fleet is a file on this
+  // process's disk and the broker, the plugin cache and the trust store are all built. So the ready
+  // line goes out here, and Rust opens the window on the helper being *listening* rather than on the
+  // node being up.
   helper.bootComplete()
+  // The node boots behind the window (docs/future/performance/decisions.md § Every host draws first).
+  // `startInBackground` rather than `void helper.start()`, because a start that rejects before it
+  // spawns anything has to reach the recovery dialog — with the window already open there is nowhere
+  // else to report it.
+  helper.startInBackground()
   return { helper, server }
 }
 

@@ -1,9 +1,24 @@
 import { createSignal } from 'solid-js'
 import { fleetBridge } from '../platform'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
+import { readLocal, writeLocal } from '../../kit/lib/deviceStorage'
 import { homeNode, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
 
-const [activeNodeId, setActiveNodeIdSignal] = createSignal<string | null>(null)
+// The node this window talked to last, remembered on the device so the next launch has one before the
+// fleet answers.
+//
+// It has to be readable synchronously, because it picks the query cache's partition
+// (`activeCacheId()` below, node/fleet.ts § clientFor) and the window now renders before anything has
+// asked the helper anything (docs/future/performance/decisions.md § Every host draws first). Reading
+// it a tick late would mount the shell on the `origin` partition and then remount it on the real one,
+// which is a flash and a thrown-away first paint.
+//
+// Device state, and a hint rather than a fact: it says which machine's window this is, not anything
+// about a node's data (docs/state-ownership.md § Scope rules). `selectActiveNode` below corrects it
+// against the fleet, and a node that has gone reaches the `node-replaced` reload.
+const LAST_NODE_KEY = 'acorn.last-node'
+
+const [activeNodeId, setActiveNodeIdSignal] = createSignal<string | null>(readLocal(LAST_NODE_KEY))
 
 export { activeNodeId }
 
@@ -11,6 +26,8 @@ export function setActiveNode(nodeId: string | null): void {
   const previous = activeNodeId()
   if (previous === nodeId) return
   setActiveNodeIdSignal(nodeId)
+  // Before the event below, so a listener that reads the device's answer back gets this one.
+  writeLocal(LAST_NODE_KEY, nodeId ?? '')
   // Announced, not performed here: which module signals hold node-scoped state is a composition question
   // (apps/desktop's scopedEviction.ts owns the list), and client-core must not import a plugin's store to
   // clear it.
@@ -36,7 +53,22 @@ export { nodeReadiness }
 
 export const nodeReady = (): boolean => nodeReadiness().kind === 'ready'
 
-// Pick the node this window talks to. Called once before the first render, and again by the recovery
+// Whether the gate holds the screen, or the shell draws behind it.
+//
+// Not `nodeReady()`, which is the fleet's answer and now arrives after the first paint. A warm window
+// knows which node it talked to last before it has asked anything, and that is enough to draw: the
+// persisted cache for that node fills the rail and the panes, and the chip says the node is starting
+// (docs/frontend.md § Painting before the node).
+//
+// Two states still have nothing to draw. A broker that could not answer at all is the diagnostics
+// screen, because nothing in the window will work. And a launch with no node to address is the
+// onboarding path — a first-ever launch has no cache either, so there is nothing behind the gate but
+// an empty shell.
+export const nodeGateHolds = (): boolean =>
+  nodeReadiness().kind === 'failed' || (activeNodeId() === null && !nodeReady())
+
+// Pick the node this window talks to. Started at boot and not awaited, so the first paint does not
+// wait on the round trip; called again when the fleet gains its first node, and by the recovery
 // screen's Retry, which is what makes `starting` a state the user can observe.
 export async function selectActiveNode(): Promise<void> {
   const bridge = fleetBridge()

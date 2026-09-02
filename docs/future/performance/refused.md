@@ -124,3 +124,11 @@ What the same measurement found instead is that **82% of the node's cold boot is
 each bundle and running its migrations chain — and it runs in front of plugin init, so no amount of
 concurrency in the init pass touches it. Phase 3's target is the loader. Exit condition for revisiting
 this entry: a node whose plugin passes measure over 300 ms after the loader has been dealt with.
+
+**The refusal stands; that last paragraph does not.** Phase 2 took the re-measurement phase 0's own
+caveat asked for, against the staged `service.js` rather than under `tsx`, and `graph` is 47 ms — most
+of the 338 ms was transpiling TypeScript the loader pulled in. Two costs the breakdown does not see
+are larger: 449 ms spawning the node and evaluating its one-chunk bundle before the boot timer starts,
+and 220 ms of `migrate` on a first-ever boot. Phase 3 should pick its target from
+measurements.md § 2026-09-03 — phase 2 rather than from the `tsx` figure. The plugin passes are still
+46 ms cold, so the wire contract is still refused for the reason above.
