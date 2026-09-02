@@ -1,6 +1,6 @@
 import { createSignal, For, Show, type JSX } from 'solid-js'
 import {
-  Badge, Button, Card, Chip, ChipRow, Composer, EmptyState, Facts, Heading, Inline, Markdown,
+  Badge, Button, Card, Chip, ChipRow, Composer, CopyButton, EmptyState, Facts, Heading, Inline, Markdown,
   Meter, Row, Section, Stack, TabPanel, Tabs, Text, Toolbar, ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { LinearComment, LinearIssueDetail, LinearRelatedIssue } from '../shared/api'
@@ -165,11 +165,17 @@ export function LinearIssueView(props: LinearIssueViewProps) {
       <TabPanel idPrefix="linear" id="overview" active={props.activeTab}>
         <Stack gap="section">
           <Facts items={facts()} />
+          {/* `CopyButton` rather than a `Button` reading "Copy": the branch name is the whole point of
+              the bar, and a word beside it competes with it for the eye. `always`, because the kit
+              takes no class and this tree has no way to give the bar the `.copyable` the button's
+              hover reveal keys off. No `onCopy` either — the host draws this button in the shell's
+              own DOM, so it reaches the real clipboard, and `onCopy` is not one of the eleven event
+              names a handler may cross the wire under. */}
           <Show when={issue().branchName}>
             {(branch) => (
               <Toolbar variant="bar" size="sm">
                 <Text emphasis="mono">{branch()}</Text>
-                <Button size="sm" variant="bare" onPress={() => props.onCopy(branch())}>Copy</Button>
+                <CopyButton text={branch()} always title="Copy the branch name" />
               </Toolbar>
             )}
           </Show>

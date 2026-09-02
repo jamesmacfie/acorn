@@ -11,7 +11,10 @@
   opacity: 0;
   transition: opacity 0.1s ease;
 }
+/* `data-always` is for a button with no `.copyable` ancestor to hover: a bar of its own, or a plugin
+   tree, which cannot set a class on anything. */
 .copyable:hover .copy-btn,
+.copy-btn[data-always],
 .copy-btn:focus-visible {
   opacity: 1;
 }

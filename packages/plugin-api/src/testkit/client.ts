@@ -25,3 +25,9 @@ export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/ho
 export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 // What every registry hands back, so a suite can put its registrations away again.
 export type { Disposable } from '@acorn/client-core/kit/lib/registry.ts'
+
+// A tree driven offline: the root `solidTree` renders into, with the mutations it emits handed to the
+// test. This is how a pane test sees exactly what the sandbox would post, with no worker and no host on
+// the other side. Production code never builds one; the SDK's `mountTree` does, per slot.
+export { createRemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
+export type { RemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'

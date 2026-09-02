@@ -127,11 +127,30 @@ and a frame region is not one. Both halves are drawn.
 **The host owns a region's inset.** A region's contents are a plugin's tree, and the kit takes no
 `class`, so a chip row or a composer sitting flush against the pane's border is the one thing a plugin
 cannot fix from inside. Every region that holds content takes the pane's inline padding: the scrolling
-bodies of `single`, `header-body-footer` and `tabs`, both pinned strips of `header-body-footer`, and
-`list-detail`'s detail column. Three kinds of child take it back, because they are edge-to-edge by
-nature: a `Toolbar` or a `Tabs` strip, which carry that padding themselves and have a background that
-has to reach the pane's edge; a `ListDetail`, whose divider is its columns' shared edge and whose
-columns pad themselves; and a diff, which is a canvas.
+bodies of `single`, `header-body-footer` and `tabs`, both pinned strips of `header-body-footer`,
+`list-detail`'s detail column, and a `ListDetail`'s own detail column when it says `scroll`.
+
+Two kinds of child drop the region's padding altogether, because the whole region is theirs: a
+`ListDetail`, whose divider is its columns' shared edge and whose columns pad themselves, and a diff,
+which is a canvas.
+
+Everything else that is edge-to-edge by nature pulls the same padding back out with a negative margin,
+at whatever depth it sits: a `Toolbar`, a `Tabs` strip, a pane-level `SectionHeader` and a `Row`. Each
+carries the pane's padding itself and each has a background — a bar's tint and rule, a row's selection
+and its accent marker — that has to reach the pane's edge. Depth matters because a plugin's tree is one
+`Stack` at its root and its bars hang off that, so a direct-child rule reached almost none of them.
+
+Two things stop the pull-back. A `Card` owns its own inset, so a bar or a row inside one belongs to the
+card's edge rather than the pane's; and an `actions` `Toolbar` is a footer with no background and no
+padding of its own, so it has nothing to take back.
+
+A scroller in between hands the padding on rather than clipping it. `overflow` clips at the padding
+box, so a bar pulled a pane-pad left of a `TabPanel`'s content box lands outside it, with nothing to
+scroll to, because a browser will not scroll to negative inline-start. That cut the first character
+off Linear's branch name. So `TabPanel`, `Rows`, `Timeline` and the grid scroller each take the
+region's padding over, out by a pane-pad and in by a pane-pad, which leaves a bar inside one sitting
+exactly on the clip edge. It nests: a `Rows` scroller inside a `TabPanel` does the same against the
+panel.
 
 `list-detail`'s detail column also takes a small pad below its last child and a gap between its
 children, because the child at the bottom of it is a composer or a row of actions: without them the

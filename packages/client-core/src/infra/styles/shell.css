@@ -198,9 +198,7 @@
 .layout-region-bottom { flex: none; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
 /* The detail column holds a pane's content rather than a list, so it takes the pane's inline padding
-   the same way every scrolling body above does. Chrome takes it back: a `Toolbar` and a `Tabs` strip
-   carry that padding themselves and have a background that has to reach the pane's edge, so they are
-   pulled back out by the same amount rather than being inset twice. */
+   the same way every scrolling body above does. What takes it back is the shared block below. */
 /* The block end and the gap are the same argument one step further: the column's last child is a
    composer or a row of actions, and with neither it sat on the pane's bottom border with the
    transcript above it touching it. */
@@ -209,8 +207,85 @@
   padding-block-end: var(--space-4);
   row-gap: var(--gap-stack);
 }
-.layout-region-detail > .ui-toolbar,
-.layout-region-detail > .ui-tabs { margin-inline: calc(-1 * var(--pane-pad)); }
+/* ── Chrome takes the inline padding back ───────────────────────────────────────────────────
+   Every padded region above insets its contents, which is right for a paragraph and wrong for a bar:
+   a `Toolbar`, a `Tabs` strip, a pane-level `SectionHeader` and a `Row` each carry `--pane-pad`
+   themselves and each have a background that belongs to the pane's edge. Inset, they were padded
+   twice and their backgrounds stopped short of the border — which is docs/panes.md § The host owns a
+   region's inset promising something only `list-detail` delivered, and only to its own children.
+
+   A `Row` is in the set for the same two reasons, one of them quieter: its selected tint and its left
+   accent marker are the rail's full-bleed look, and inset they read as a different component from the
+   identical row in the rail beside them.
+
+   Descendants, not children. A plugin's tree is one `Stack` at its root and its bars hang off that, so
+   `>` reached almost none of them: Linear's header, its tab strip and its branch bar were all a
+   `Stack` away (plugins/linear/src/tree/LinearIssueView.tsx).
+
+   A region whose child pads itself is skipped rather than pulled back, because there is no padding
+   there to take. Those are the same `:has()` escapes each rule above already spells out.
+
+   `:where()` round the regions so the whole selector weighs what the chrome list alone weighs, which
+   is what lets the two cancels below out-specify it on one class. */
+:where(
+  .layout-single-body:not(:has(> .ui-listdetail, > .ui-rect)),
+  .layout-hbf-body:not(:has(> .ui-listdetail)),
+  .layout-hbf-header,
+  .layout-hbf-footer,
+  .layout-tabs-panel:not(:has(> .ui-listdetail)),
+  .layout-region-detail:not(:has(> .ui-listdetail, > .diff-toolbar)),
+  .ui-listdetail-detail[data-scroll]
+) :is(.ui-toolbar, .ui-tabs, .section-header[data-level='pane'], .ui-row) {
+  margin-inline: calc(-1 * var(--pane-pad));
+  /* `Row` is the one of the four with a `width: 100%`, and a percentage resolves against the padded
+     box: pulled left by a pane-pad it kept its old width and hung a pane-pad short on the right.
+     `auto` hands the width back to the flex stretch it was there to stand in for. */
+  width: auto;
+}
+/* A scroller in the middle hands the padding on rather than clipping it. `overflow` clips at the
+   padding box, and a bar pulled a pane-pad left of a scroller's content box lands outside it: the
+   first character of Linear's branch name was cut in half and there was nothing to scroll to, because
+   a browser will not scroll to negative inline-start. So each of these takes the region's padding over
+   — out by a pane-pad, in by a pane-pad — which leaves a bar inside it sitting exactly on the clip
+   edge. It nests: a `Rows` scroller inside a `TabPanel` does the same trick against the panel. */
+:where(
+  .layout-single-body:not(:has(> .ui-listdetail, > .ui-rect)),
+  .layout-hbf-body:not(:has(> .ui-listdetail)),
+  .layout-tabs-panel:not(:has(> .ui-listdetail)),
+  .layout-region-detail:not(:has(> .ui-listdetail, > .diff-toolbar)),
+  .ui-listdetail-detail[data-scroll],
+  .ui-tab-panel,
+  .ui-rows-scroll
+) :is(.ui-tab-panel, .ui-rows-scroll, .ui-timeline-scroll, .ui-grid-scroll) {
+  margin-inline: calc(-1 * var(--pane-pad));
+  padding-inline: var(--pane-pad);
+}
+
+/* One bar pads itself by less than the pane does: `sm`, at `--space-4`. Bled, that hung Linear's
+   branch name six pixels left of the facts above it, which reads as a misprint rather than as a
+   tighter bar. At the pane's edge it takes the pane's own pad; inside a card it keeps `--space-4`,
+   because a card's inset is smaller and a byline bar should sit inside it. `:is()` rather than
+   `:where()` here, because `.ui-toolbar[data-size='sm']` in primitives.css loads after this file and
+   a weightless selector would lose the tie. Every region is named by its bare class for the same
+   reason in reverse: one `[data-scroll]` in the list would out-weigh the card rule below it. */
+:is(
+  .layout-single-body,
+  .layout-hbf-body,
+  .layout-hbf-header,
+  .layout-hbf-footer,
+  .layout-tabs-panel,
+  .layout-region-detail,
+  .ui-listdetail-detail
+) .ui-toolbar[data-size='sm'] { padding-inline: var(--pane-pad); }
+:is(.ui-card, .ui-listdetail-list) .ui-toolbar[data-size='sm'] { padding-inline: var(--space-4); }
+
+/* Three exceptions. A card owns its own inset, so a bar or a row inside it belongs to the card's edge
+   and not the pane's — Linear draws every comment as a card with a byline bar in it. A list column is
+   flush already. And an `actions` toolbar is a footer with no background and no padding of its own,
+   so it has nothing to take back. */
+:is(.ui-card, .ui-listdetail-list) :is(.ui-toolbar, .ui-tabs, .section-header[data-level='pane'], .ui-row),
+.ui-toolbar[data-variant='actions'] { margin-inline: 0; }
+
 /* The reading column stops at `--pane-measure` and sits in the middle of whatever is left. A pane
    is as wide as the display someone gave it, and on a 3700px one a transcript line runs to about
    480 characters, which is a line nobody reads. Chrome is exempt, because a bar's background has to
