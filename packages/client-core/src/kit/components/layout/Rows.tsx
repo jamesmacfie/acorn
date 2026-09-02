@@ -43,7 +43,7 @@ export function Rows<T extends CollectionItem>(props: {
   selected?: string | null
   onSelect?: (key: string) => void
   onActivate?: (key: string) => void
-  onExpand?: (key: string, expand: boolean) => void
+  onExpand?: (key: string, expand: boolean) => boolean | void
   onMenu?: (key: string) => void
   /** `selected` is an accessor, not a boolean: a `<For>` body runs once per row, so a value read
    *  there would never change again. Read it inside the JSX prop. */

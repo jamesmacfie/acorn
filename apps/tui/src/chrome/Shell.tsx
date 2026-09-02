@@ -20,8 +20,7 @@ import { EmptyState, Row, Rows } from '../kit/showing'
 import { Modal, ModalBody } from '../kit/grouping'
 import { PanelBody } from '../panel'
 import { installCommandLayer } from '../keys/commandLayer'
-import { bindKeys } from '../keys/install'
-import { focusWithin, regionFocus, setPaneCycler, setTopology } from '../keys/regions'
+import { focusWithin, regionFocus, scheduleSettle, setPaneCycler, setTopology } from '../keys/regions'
 import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
 import { chooseProject, installRouting, routedProjectId } from './routing'
@@ -32,7 +31,7 @@ import { PANES, SOURCE, topology } from './topology'
 import { Topbar } from './Topbar'
 import { PaneBody, PaneStrip } from './PaneRow'
 import { Footer } from './Footer'
-import { Notifications, dismissNotifications } from './Notifications'
+import { Notifications } from './Notifications'
 import { Inbox, initInbox } from './Inbox'
 import { TrustPrompt } from '../plugins/TrustPrompt'
 import { Palette } from './Palette'
@@ -94,6 +93,15 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // (./topology.ts).
   setTopology(topology)
   onCleanup(() => setTopology(null))
+
+  // Hiding the main row is one of the two ways the keys can go off screen without anybody being told.
+  // `visible` is per node in OpenTUI: setting it false here blurs this box and leaves a focused
+  // descendant of it reporting itself focused and visible, so the landing rule never hears that its
+  // node has gone behind the overlay. Asking for a pass is the whole fix, because the pass already
+  // walks the parents before it decides (../keys/regions.ts § The landing rule, § onScreen).
+  createEffect(() => {
+    if (topOverlay()) scheduleSettle()
+  })
 
   // One tick for every spinner on screen (../kit/tick.ts).
   onMount(() => onCleanup(startSpinner()))
@@ -190,9 +198,6 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       ref={(element: BoxRenderable) => {
         root = element
         setCells(element.width)
-        // Escape with nothing open clears what is on screen. Layer 5, so a collection or a rectangle
-        // that has something of its own to dismiss answers first.
-        bindKeys(element, [{ key: 'escape', cmd: () => dismissNotifications() }], 5)
       }}
       onSizeChange={() => setCells(root?.width ?? 80)}
     >

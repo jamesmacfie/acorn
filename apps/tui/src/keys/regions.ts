@@ -2,8 +2,8 @@
 //
 // `client-core/host/keys/focusRegions.ts` keeps the same contract and is DOM all the way down: it
 // orders regions by `compareDocumentPosition`, finds a region's first stop with `querySelector`,
-// focuses with `element.focus()`, and listens for `focusin` and `pointerdown`. None of that exists
-// here (docs/tui.md § Focus regions).
+// focuses the element itself, and listens for `focusin` and `pointerdown`. None of that exists here
+// (docs/tui.md § Focus regions).
 //
 // What replaces each:
 //
@@ -12,25 +12,36 @@
 //   first stop  the first renderable in the region's subtree that OpenTUI will focus. The kit marks
 //               those as it draws them — `focusRoles.ts` says which nodes are a stop, an item, a
 //               collection or a trap — and the renderer's own `focusable` flag is what that becomes.
-//   focus       the renderer's. There is one focused renderable at a time and it owns which.
-//   pointer     absent. Mouse in a terminal, if it ever comes, clicks to focus and does nothing else.
+//   focus       the renderer's. There is one focused renderable at a time and it owns which, and the
+//               store's own signal is a view of the renderer's `focused_renderable` event.
+//   pointer     the renderer's too. It focuses the nearest focusable ancestor of a left click and
+//               emits the same event, so a click needs no bridge of its own (§ The one writer).
 //
 // Five levels and nothing else: screen, column, region, parent stop, stop. A parent stop is a
 // renderable that owns panels — a `Sections` strip owns the panel under it — so Down enters and
 // Escape climbs. Everything the shell knows and this module must not, arrives through `setTopology`
 // and `setPaneCycler`: no chrome id is spelled here.
 //
-// Every decision that needs a renderable the current render has not produced yet waits in one place,
-// `settleFocus`, scheduled by `scheduleSettle`. That is the only `queueMicrotask` in this folder, and
-// the reason is that six of them raced each other.
+// There is one question about where the keys are and one rule for putting them somewhere better,
+// `ensureFocus`, scheduled by `scheduleSettle`. That is the only `queueMicrotask` in this folder, and
+// the reason is that six of them raced each other (§ The landing rule).
 //
 // The pane and region chords live on the same layer 5 the desktop uses, so priority decides here too.
 
 import { createSignal, onCleanup } from 'solid-js'
-import { ScrollBoxRenderable, type Renderable } from '@opentui/core'
+import { ScrollBoxRenderable, type CliRenderer, type Renderable } from '@opentui/core'
 
 export type RegionRef = { paneId: string; regionId: string }
-export type RegionColumn = 'rail' | 'main'
+
+/** The leftmost column. Two facts about the screen are two too many for this module to know, so this
+ *  is the one: the column at the far left is the chrome's and has no pane behind it, which is what
+ *  makes a pane cycle from there a cycle of a pane the reader is not in (§ movePane). Which regions
+ *  are there is still the shell's to declare, and it declares it by passing this (../chrome/Rail.tsx). */
+const RAIL_COLUMN = 0
+
+/** Where a region that says nothing sits: one column right of the rail. Every region a layout
+ *  registers is here unless the layout draws it beside another one (../layouts/ListDetail.tsx). */
+const MAIN_COLUMN = 1
 
 /** What the shell knows about its own arrangement and this module deliberately does not. Installed
  *  once from ../chrome/Shell.tsx, the same way the pane cycler is. */
@@ -44,37 +55,50 @@ export type Topology = {
 }
 
 type RegionOptions = {
-  /** The column spatial left/right navigation treats this region as belonging to. */
-  column?: RegionColumn
+  /** Which column, left to right, spatial left/right navigation treats this region as belonging to.
+   *
+   *  An integer rather than the pair `'rail' | 'main'` it replaced, because two frames drawn side by
+   *  side inside one pane are two columns and the pair could not say so: every region a layout
+   *  registered was `'main'`, so Right in a `list-detail` had nothing to cross to and did nothing at
+   *  all (docs/tui.md § Focus regions). The rail's three panels pass 0, a layout's
+   *  regions default to 1, and a layout with side-by-side regions declares the second one 2. Nothing
+   *  reads the number except `moveColumn`, which walks to the nearest one in the direction asked, so
+   *  the values only have to be ordered and not contiguous. */
+  x?: number
   /** Activating a row in this region also hands the keys to the main column. Rail lists opt in. */
   enterMainOnActivate?: boolean
   /** Landing on one of this region's rows also selects it. Browse is the sole caller. */
   pickOnEnter?: boolean
 }
 
-type Group = RegionRef & {
+/** Where something that holds the keys left them, so coming back restores rather than resets. A
+ *  region has one and so does a scope, and one focus move writes exactly one of them: whichever of
+ *  the two the keys are in (§ The one writer). */
+type Memory = {
+  last?: Renderable
+  /** The collection's own key for `last`, because a query refresh replaces its renderable. */
+  lastIdentity?: string
+}
+
+type Group = RegionRef & Memory & {
   box: Renderable
-  column: RegionColumn
+  x: number
   enterMainOnActivate: boolean
   pickOnEnter: boolean
   /** Where this region drew in its layout, so the cycle walks the screen rather than mount order. */
   order: number
-  /** What focus was last on inside this group, so re-entering restores rather than resets. */
-  last?: Renderable
-  /** Stable collection identity for `last`, because queries may replace its renderable. */
-  lastIdentity?: string
 }
 
 const groups: Group[] = []
-const lastByColumn: Partial<Record<RegionColumn, Group>> = {}
+// How many times a region has come or gone, as a signal, because the footer's answers depend on the
+// list and not only on where the keys are: the rail hides on Ctrl+B, the pane strip draws only while
+// a task is open, and neither has to move focus to change what Tab can reach. A counter rather than a
+// signal holding the list, because nothing reads the list reactively — the questions are "how many"
+// and "which columns" — and copying an array on every mount to answer them would be a cost per region
+// for no reader (§ regionsInScope, ../chrome/bindings.ts § activeHints).
+const [mounted, setMounted] = createSignal(0)
+const lastByColumn = new Map<number, Group>()
 let focused: RegionRef | null = null
-// Whether the focused region is only holding the keys because it had nothing better when it opened.
-//
-// A region's contents are `lazy`, so when a pane opens there is often nothing in it yet and the
-// region's own box is the only stop there is. That is the right answer for a region that never grows
-// one, and the wrong one the moment a list arrives — so it is remembered rather than settled, and the
-// settle pass takes the keys off it once the region has an entry stop.
-let provisional = false
 // What has the keys, as a signal, because it is what a row draws its caret from: in a terminal the
 // caret is not decoration, it is where focus is. The renderer owns focus and has no signal for it, so
 // this is written here, at the one place that moves it.
@@ -84,27 +108,162 @@ const [focusedNode, setFocusedNode] = createSignal<Renderable | null>(null)
 export const focusedRenderable = focusedNode
 
 /**
+ * Whether a renderable is still on screen: alive, visible, and visible all the way up.
+ *
+ * The parent walk is the whole point. OpenTUI's `visible` is per node, so a focused descendant of a
+ * hidden box goes on reporting `visible: true` about itself, and two things here hide a whole subtree
+ * rather than unmounting it: the shell's main row behind an overlay, and the `TabPanel` that is not
+ * showing. Asking the node alone said the keys were fine while they sat behind a dialog
+ * (../chrome/Shell.tsx, ../kit/grouping.tsx, @opentui/core § Renderable.visible).
+ *
+ * Exported because the reachability property asks it after every press, and two answers to one
+ * question is the drift this module exists to remove (../reachability.test.tsx).
+ */
+export const onScreen = (node: Renderable | null | undefined): boolean => {
+  if (!node || node.isDestroyed || !node.visible) return false
+  for (let at: Renderable | null = node.parent; at; at = at.parent) if (!at.visible) return false
+  return true
+}
+
+/**
  * Whether the keys are inside this box.
  *
  * The question a frame asks to draw itself as the active one. OpenTUI answers a version of it for
- * free — `focusedBorderColor` fires when a box is focused or holds the focus — but only for a box
- * that is itself `focusable`, and marking every frame focusable would put a stop in the cycle for
- * every frame: entry walks children for anything focusable, so a region containing another frame
- * would open on the frame instead of on the list inside it. Reading the signal and walking up
- * costs a few parent hops and adds nothing to the cycle.
+ * free, since `focusedBorderColor` fires when a box is focused or holds the focus, but only for a box
+ * that is itself `focusable`, and it answers about the box alone: a `Panel` that is not a region has
+ * no flag of its own and never lights. Reading the signal and walking up costs a few parent hops and
+ * answers for every frame the same way.
  */
 export const focusWithin = (box: Renderable | undefined): boolean => {
   const node = focusedNode()
-  if (!box || !node) return false
-  for (let at: Renderable | null = node; at; at = at.parent) if (at === box) return true
-  return false
+  return !!box && !!node && within(box, node)
 }
 
 /** Which region has focus, or null before anything in a layout has been focused. */
 export const focusedRegion = (): RegionRef | null => focused
 
-const groupAt = (ref: RegionRef | null | undefined): Group | undefined =>
-  ref ? groups.find((group) => group.paneId === ref.paneId && group.regionId === ref.regionId) : undefined
+/** The region a ref names, while the keys can still reach it.
+ *
+ *  Out of scope is out of the question. With a dialog up the region behind it still holds the
+ *  claim, because the claim is how closing the dialog knows where to give the keys back. Every walk
+ *  that reads the claim would otherwise move them behind the dialog (§ Scopes). */
+const groupAt = (ref: RegionRef | null | undefined): Group | undefined => {
+  const group = ref
+    ? groups.find((candidate) => candidate.paneId === ref.paneId && candidate.regionId === ref.regionId)
+    : undefined
+  return group && inScope(group.box) ? group : undefined
+}
+
+// ── Scopes ────────────────────────────────────────────────────────────────────────────────────
+//
+// A trap is a scope, not a swallow. The bottom of the stack is the screen, which contains
+// everything; a `Modal` or an open `MenuList` pushes its own box while it is drawn. Every question
+// this module answers is answered inside the top scope and nowhere else: which regions are on
+// screen, which stops a walk can see, where Tab goes, where Left goes. Nothing behind the top scope
+// exists as far as the keys are concerned (docs/tui.md § Traps).
+//
+// That is what makes a dialog a dialog on a host with no scrim, and it names no keys. What it
+// replaced was a layer that named them all and leaked the one it got wrong; ./trap.ts holds that
+// history, because that is the file the swallow was in.
+//
+// A stack rather than one box, because a `Menu` inside a `Modal` is a second scope over the first
+// and closing it must leave the modal still holding the keys.
+
+type Scope = Memory & {
+  /** The box that contains the keys. Null for the screen, which contains everything. */
+  box: Renderable | null
+}
+
+const screenScope = (): Scope => ({ box: null })
+
+// A signal rather than a plain array, because the depth is a question the footer asks: the hints
+// re-read the store's signals to know when to re-draw, and "how many regions are in scope" has to be
+// one of them. A pane's own `Modal` never touches ../chrome/state.ts, so the shell's overlay stack
+// cannot answer this one (../chrome/bindings.ts).
+const [scopes, setScopes] = createSignal<readonly Scope[]>([screenScope()])
+
+const top = (): Scope => scopes()[scopes().length - 1] ?? screenScope()
+
+/** Whether a renderable is inside a box, by walking the retained tree up. */
+const within = (box: Renderable, node: Renderable): boolean => {
+  for (let at: Renderable | null = node; at; at = at.parent) if (at === box) return true
+  return false
+}
+
+/** Whether the keys can reach this node at all: the screen reaches everything, and a scope reaches
+ *  its own subtree and nothing else. */
+const inScope = (node: Renderable): boolean => {
+  const box = top().box
+  return !box || within(box, node)
+}
+
+/** How many scopes deep the keys are: 1 is the screen, 2 is one dialog over it, and so on.
+ *
+ *  Read by the trace flag, which reports it per key so that "the dialog is up and nothing answers"
+ *  is a line in a log rather than a guess, and by the command layer, whose bare keys belong to the
+ *  screen (./install.ts, ./commandLayer.ts, docs/tui.md § Keys and focus). */
+export const scopeDepth = (): number => scopes().length
+
+/** How many regions the keys can reach.
+ *
+ *  The footer asks. Inside a dialog the region layer's Tab is still registered and the engine still
+ *  reports it live, because a layer knows nothing about scopes, so only the store can say that Tab
+ *  has nowhere to go (../chrome/bindings.ts).
+ *
+ *  Reads `mounted()` so the answer is reactive. `groups` is a plain array, so a region registering or
+ *  unregistering without moving focus left the footer offering `tab region` on a screen with one
+ *  region, or hiding it on a screen with three. Hiding the rail happens to move focus as well, which
+ *  is why nobody saw it; that was luck rather than a rule. */
+export const regionsInScope = (): number => {
+  mounted()
+  return ordered().length
+}
+
+/** Whether the keys are inside the top scope, which is invariant 10. The reachability property asks
+ *  it after every press on a surface with a dialog up (../reachability.test.tsx). */
+export const focusedInScope = (): boolean => {
+  const node = focusedNode()
+  return !node || inScope(node)
+}
+
+/**
+ * Contain the keys in this box until it is gone, and hand them back where they came from.
+ *
+ * A `Modal` pushes a scope by being drawn and pops it by being disposed, so a dialog contains the
+ * keys and lands them without its caller reaching for anything: that used to be two jobs and every
+ * modal a plugin drew did only the first, leaving a reader a dialog they could not answer.
+ *
+ * Handing them back needs nothing recorded here. The scope holds the keys and so holds the memory of
+ * where they were inside it, and the region behind it still claims them and still remembers its own
+ * last stop, so closing a `Menu` is the region re-entered on the trigger that opened it and closing
+ * one drawn inside a `Modal` is the modal re-entered on its own last stop (§ The one writer). The DOM
+ * palette keeps a `prevFocus` element instead (client-core/host/palette/overlay.ts).
+ *
+ * The caller owns the pop, which is `onCleanup(pushScope(box))` in the box's own `ref`
+ * (../kit/grouping.tsx).
+ */
+export function pushScope(box: Renderable): () => void {
+  // Focusable from the push, for the reason a region's frame is focusable from registration: a scope
+  // with nothing focusable in it, such as the cheat sheet, which is lines of text, still has to hold
+  // the keys, or the dialog is on screen with the keys behind it (§ registerRegion).
+  box.focusable = true
+  const scope: Scope = { box }
+  setScopes((all) => [...all, scope])
+  scheduleSettle()
+  return () => {
+    // By identity rather than by position: a `Menu` inside a `Modal` can be disposed after the modal
+    // that drew it, and popping the top of the stack would then pop the wrong scope.
+    setScopes((all) => all.filter((entry) => entry !== scope))
+    // The keys leave the box that is going, said here rather than read off the tree. The tree is
+    // still telling the truth of the last render: the reconciler defers destruction to
+    // `process.nextTick` for Suspense's sake, so the pass below would find a dying dialog attached,
+    // visible, and, its own scope gone, inside the screen's, and would leave the keys on it
+    // (../kit/reconciler.ts, docs/tui.md § Destroy on disposal).
+    const at = focusedNode()
+    if (at && within(box, at)) at.blur()
+    scheduleSettle()
+  }
+}
 
 // ── The topology and the pane cycler ──────────────────────────────────────────────────────────
 
@@ -129,9 +288,12 @@ let parents: { node: Renderable; panels: () => Renderable[] }[] = []
 
 const parentEntry = (node: Renderable) => parents.find((parent) => parent.node === node)
 
-/** Mark a renderable as one stop that owns the panels `panels()` returns. */
+/** Mark a renderable as one stop that owns the panels `panels()` returns.
+ *
+ *  Marking does not make it focusable. Which nodes are reachable is declared where a node is built,
+ *  and for a strip that is the `Tabs` ref that calls this (../kit/grouping.tsx,
+ *  ../invariants.test.ts § the renderer is the only truth about focus). */
 export function markParent(node: Renderable, panels: () => Renderable[]): void {
-  node.focusable = true
   const entry = { node, panels }
   parents.push(entry)
   onCleanup(() => {
@@ -157,37 +319,53 @@ export function parentOf(node: Renderable): Renderable | undefined {
 
 /** Down from a parent stop: into the first stop of the panel it is showing. */
 export function enterParent(parent: Renderable): boolean {
-  const panel = parentEntry(parent)?.panels().find((box) => box.visible && !box.isDestroyed)
+  const panel = parentEntry(parent)?.panels().find((box) => onScreen(box))
   if (!panel) return false
   return focusRenderable(entryStop(panel) ?? panel)
 }
 
-/** Every region on screen, in the order it draws. A layout hands its own order in and the chrome
- *  takes numbers outside the range a layout uses, so the sort reads down the screen: rail, pane
- *  strip, the pane's own regions (../chrome/Shell.tsx). */
-const ordered = (): Group[] => [...groups].sort((a, b) => a.order - b.order)
+/** Every region the keys can reach, in the order it draws. A layout hands its own order in and the
+ *  chrome takes numbers outside the range a layout uses, so the sort reads down the screen: rail,
+ *  pane strip, the pane's own regions (../chrome/Shell.tsx).
+ *
+ *  Scoped, and one filter is the whole of what a trap does to the region tier: with a `Modal` up no
+ *  region is in scope, so `moveRegion` has nothing to move to and Tab does nothing rather than
+ *  walking the keys onto a rail row behind the dialog. Nothing here names Tab (§ Scopes). */
+const ordered = (): Group[] => groups.filter((group) => inScope(group.box)).sort((a, b) => a.order - b.order)
 
 export function registerRegion(box: Renderable, ref: RegionRef, order: number, options: RegionOptions = {}): () => void {
+  // Focusable from here, and never flipped again. A region with nothing focusable in it still has to
+  // be reachable or the Tab cycle has a hole, and a pane's regions are `lazy()`, so most start that
+  // way. The flag used to be set by whichever walk first needed it, and since `blur()` refuses a node
+  // that is not focusable, a node that held the keys and then lost the flag kept them for the rest of
+  // the run (@opentui/core § Renderable.blur).
+  box.focusable = true
   const group: Group = {
     ...ref,
     box,
     order,
-    column: options.column ?? 'main',
+    x: options.x ?? MAIN_COLUMN,
     enterMainOnActivate: options.enterMainOnActivate ?? false,
     pickOnEnter: options.pickOnEnter ?? false,
   }
   groups.push(group)
+  setMounted((count) => count + 1)
   return () => {
     const at = groups.indexOf(group)
     if (at >= 0) groups.splice(at, 1)
-    if (lastByColumn[group.column] === group) delete lastByColumn[group.column]
+    if (lastByColumn.get(group.x) === group) lastByColumn.delete(group.x)
+    setMounted((count) => count + 1)
+    // A conditional region can go while it holds the keys: the rail hides on Ctrl+B, the pane strip
+    // draws only while a task is open, and Browse registers nothing without a list. Look again, or
+    // the keys sit inside a subtree the reader can no longer see.
+    scheduleSettle()
   }
 }
 
 /** The helper a layout calls in setup, where the DOM layout uses the `use:regionFocus` directive.
  *  There is no directive mechanism outside the DOM renderer, so this is a function and the layout
- *  calls it from the region box's `ref`. Who opens the screen is the settle pass's answer, not this
- *  one's: every region of a boot registers before the first settle runs. */
+ *  calls it from the region box's `ref`. Who opens the screen is the landing rule's answer, not this
+ *  one's: every region of a boot registers before the first pass runs. */
 export const regionFocus = (ref: RegionRef, order: number, options: RegionOptions = {}) => (box: Renderable) => {
   onCleanup(registerRegion(box, ref, order, options))
   scheduleSettle()
@@ -203,26 +381,151 @@ const regionOf = (node: Renderable): Group | undefined => {
   return undefined
 }
 
-/** Called when focus lands on something. Idempotent, and a no-op for a node in no region, which is
- *  a run of text or a strip nothing focuses. The chrome registers its own (../chrome/Shell.tsx). */
-export function noteFocus(node: Renderable): void {
-  setFocusedNode(node)
-  provisional = false
-  const group = regionOf(node)
-  if (!group) return
-  group.last = node
-  group.lastIdentity = itemIdentities.get(node)
-  lastByColumn[group.column] = group
-  focused = { paneId: group.paneId, regionId: group.regionId }
-  revealInViewports(node)
+// ── The one writer ────────────────────────────────────────────────────────────────────────────
+//
+// `focused_renderable` is this host's `focusin`. The DOM half listens for that event and writes the
+// same bookkeeping from it; the renderer emits this one for every focus change it makes, whichever
+// of a binding, a landing or a left click caused it. So there is one writer of the signal and
+// nothing for a second one to disagree with, and the mouse arrives through the same door as a key
+// (docs/tui.md § Focus regions).
+
+/** Remember a stop, unless it is the frame that was holding the keys for want of anything better.
+ *
+ *  A landing on a frame is never remembered. The frame is the last resort, taken when the thing had
+ *  nothing in it yet, and remembering it pins the keys to a border for the rest of the run: a reader
+ *  who looked into Browse before choosing a source came back to a lit border with dead arrows
+ *  (§ enter, docs/tui.md § Focus regions). */
+const remember = (of: Memory, node: Renderable, frame: Renderable | null): void => {
+  if (node === frame) return
+  of.last = node
+  of.lastIdentity = itemIdentities.get(node)
 }
 
-/** Put focus on a known renderable through the region store, including scroll reveal. */
+/** The store's view of the renderer's focus. Called from the listener below and nowhere else. */
+const writeFocus = (node: Renderable | null): void => {
+  setFocusedNode(node)
+  if (!node) {
+    // The keys are nowhere, which is the pass's own invitation. What took them is not always
+    // something that commits: the reconciler destroys a removed renderable on `process.nextTick`,
+    // after every microtask the render that removed it scheduled, and the blur it ends with is the
+    // last anyone hears. Asking here is why nothing in focus has to know when that lands. The region
+    // claim is left alone, because a node going away is not the reader choosing to leave and the
+    // claim is how the landing knows which region to re-enter (../kit/reconciler.ts).
+    scheduleSettle()
+    return
+  }
+  revealInViewports(node)
+  // And once more after the next layout, because the geometry this one read may not exist yet
+  // (§ The second reveal).
+  pendingReveal = node
+  // One memory per move, and it belongs to whichever of the two levels holds the keys. A `Modal` or
+  // an open `Menu` is drawn inside whatever region had them, so a region that also remembered a
+  // dialog's rows would give the keys back to a destroyed row when the dialog closed rather than to
+  // the trigger that opened it, and its claim would say the reader had changed region while they were
+  // answering a dialog (docs/tui.md § Focus regions).
+  const scope = top()
+  if (scope.box) {
+    remember(scope, node, scope.box)
+    return
+  }
+  const group = regionOf(node)
+  if (!group) return
+  remember(group, node, group.box)
+  lastByColumn.set(group.x, group)
+  focused = { paneId: group.paneId, regionId: group.regionId }
+}
+
+// ── The second reveal ─────────────────────────────────────────────────────────────────────────
+//
+// `scrollChildIntoView` compares a child's laid-out `y` and `height` against its viewport's, and
+// `Renderable.y` is whatever the last completed layout pass left there. So for a row that did not
+// exist in the previous frame the reveal above reads stale or zero geometry, computes the wrong
+// delta, and nothing corrects it: the caret ends up below the fold on a viewport that never moved.
+// A reader meets that three ways: a region entered on a freshly mounted list, a refetch replacing a
+// row by identity, and a virtual window shift. The fix for all three is to ask again once the layout
+// has run (docs/tui.md § Scrolling viewports).
+//
+// This is not a second landing rule and must not become one. It decides nothing about where the keys
+// go and it never moves them; it only makes the viewport show where they already are. The landing
+// rule is still one microtask in `ensureFocus` and nothing else (§ The landing rule).
+//
+// One renderer listener for the whole store rather than one per viewport, which is what the design
+// first asked for. Every live `scrollbox` already carries a `selection` listener and a pull request
+// draws enough of them that `RENDERER_LISTENER_CAP` is 200; one more each would double that count to
+// do the same work this does once (../renderGuard.ts).
+
+/** The node the post-layout reveal still owes a scroll to, or null.
+ *
+ *  One slot and not a queue. The reveal is about where the keys are now, and where they were two
+ *  frames ago is not a question anyone is asking. */
+let pendingReveal: Renderable | null = null
+
+// The live subscription, so installing twice in one process does not leave the first listener
+// running: a suite is one worker with a renderer per test (../harness.tsx).
+let stopListening = (): void => {}
+
+/**
+ * Subscribe the store to the renderer's focus event.
+ *
+ * Called by `installKeymap`, because "install the keyboard on this renderer" is one thing and which
+ * renderable the keys are on is half of it (./install.ts).
+ */
+export function installRegions(renderer: CliRenderer): void {
+  stopListening()
+  // `CliRenderer` extends an untyped `EventEmitter`, so the payload is annotated here rather than
+  // read off a signature. The current renderable comes first and both it and the previous one may be
+  // null (@opentui/core § CliRenderer.focusRenderable).
+  const listener = (node: Renderable | null): void => writeFocus(node)
+  renderer.on('focused_renderable', listener)
+  // `frame` fires once per render-loop iteration and after the render, which is the side of layout
+  // where a child's geometry is real. `onLifecyclePass` and `setFrameCallback` both run before it and
+  // would read the same stale numbers the synchronous reveal already read
+  // (@opentui/core § CliRenderer.FRAME).
+  const afterFrame = (): void => {
+    const node = pendingReveal
+    pendingReveal = null
+    // Still there and still holding the keys. A frame later either can be false: the reconciler
+    // destroys a removed renderable on `process.nextTick`, and a landing may have moved on.
+    if (!node || node.isDestroyed || !node.focused) return
+    revealInViewports(node)
+  }
+  renderer.on('frame', afterFrame)
+  stopListening = () => {
+    renderer.off('focused_renderable', listener)
+    renderer.off('frame', afterFrame)
+    pendingReveal = null
+    stopListening = () => {}
+  }
+}
+
+/**
+ * Put the keys on a renderable and say whether they went.
+ *
+ * The only place in this package that asks the renderer to move focus, so every caller learns what
+ * the renderer did rather than what it was asked for: a refused move is a `false` to walk on from,
+ * instead of a highlight nobody can answer. `Renderable.focus` refuses a destroyed or unfocusable
+ * node itself and does not look at `visible` at all, which is why `onScreen` is asked here.
+ */
 export function focusRenderable(node: Renderable | undefined): boolean {
-  if (!node || node.isDestroyed || !node.visible) return false
+  if (!node || !onScreen(node) || !node.focusable) return false
   node.focus()
-  noteFocus(node)
-  return true
+  return node.focused
+}
+
+/** Whether a renderable could hold the keys right now: on screen, focusable, and inside the top
+ *  scope. What `ensureFocus` asks about the node that has them, and `focusRenderable` about a node
+ *  it is asked to move them to. */
+const reachable = (node: Renderable | null | undefined): node is Renderable =>
+  !!node && onScreen(node) && node.focusable && inScope(node)
+
+/** Where a region or a scope left the keys, while that stop can still take them.
+ *
+ *  By collection identity first, because a query refresh replaces the renderable for the same logical
+ *  row, and never a placeholder, because the stand-in a region settled for is not what a reader
+ *  coming back is looking for (§ onPlaceholder). */
+const remembered = (of: Memory): Renderable | undefined => {
+  const node = of.lastIdentity ? itemsByIdentity.get(of.lastIdentity) : of.last
+  return reachable(node) && !onPlaceholder(node) ? node : undefined
 }
 
 // ── Collections ───────────────────────────────────────────────────────────────────────────────
@@ -254,32 +557,55 @@ export const markItem = (box: Renderable, pick?: () => void, identity?: string):
   itemsByIdentity.set(identity, box)
   onCleanup(() => {
     if (itemsByIdentity.get(identity) === box) itemsByIdentity.delete(identity)
-    // The row that had the keys is going. Mark the region as holding them for want of anything
-    // better and let the settle pass re-enter it once reconciliation has produced the replacement:
-    // at cleanup time the old row still reports itself live even though its disposal has begun.
-    if (focusedNode() !== box) return
-    // Only a region can hold the keys for want of anything better; a row inside an overlay has no
-    // region behind it, and the settle still has to run so the overlay lands on a live stop.
-    const group = groups.find((candidate) => candidate.last === box) ?? regionOf(box)
-    if (group) provisional = true
-    scheduleSettle()
+    // The row that had the keys is going. Look again once reconciliation has produced the
+    // replacement, because at cleanup time the old row still reports itself live even though its
+    // disposal has begun, so nothing else on this turn would notice (§ The landing rule).
+    if (focusedNode() === box) scheduleSettle()
   })
 }
 
 // Which renderable is a collection's container, and which of its rows is the roving one. A list is
-// one stop from outside — a reader walking a panel passes it once, and its own layer 40 takes the
-// arrows from there — so the reading-order walk has to be able to say "this box is a list" without
-// asking the kit what node drew it, the same way `items` says "this box is a row".
-let containers: { box: Renderable; active: () => Renderable | undefined }[] = []
+// one stop from outside — a reader walking a panel passes it once, and its own collection layer takes
+// the arrows from there — so the reading-order walk has to be able to say "this box is a list"
+// without asking the kit what node drew it, the same way `items` says "this box is a row".
+let containers: {
+  box: Renderable
+  active: () => Renderable | undefined
+  expands: () => boolean
+}[] = []
 
-/** Called by a collection for its container (./collection.ts). `active` is the row the caret is on. */
-export function markCollection(box: Renderable, active: () => Renderable | undefined): void {
-  const entry = { box, active }
+/** Called by a collection for its container (./collection.ts).
+ *
+ *  `active` is the row the caret is on. `expands` is whether the collection folds its rows, which is
+ *  a question about the horizontal pair rather than about focus: a tree row's Left and Right fold and
+ *  a plain list's bubble to the region tier and move a column, and the footer has to say which
+ *  (§ focusedExpands, ../chrome/bindings.ts). */
+export function markCollection(
+  box: Renderable,
+  active: () => Renderable | undefined,
+  expands: () => boolean = () => false,
+): void {
+  const entry = { box, active, expands }
   containers.push(entry)
   onCleanup(() => {
     const at = containers.indexOf(entry)
     if (at >= 0) containers.splice(at, 1)
   })
+}
+
+/** Whether the collection the keys are in folds its rows.
+ *
+ *  Asked by the footer, which says `fold` beside `h/l` where it is true and `column` where it is not.
+ *  The answer is the collection's own and not the row's: a tree passes `onExpand` for the whole list
+ *  (../chrome/bindings.ts, client-core kit/keys/collectionIntents.ts § expand). */
+export const focusedExpands = (): boolean => {
+  const node = focusedNode()
+  if (!node) return false
+  for (let at: Renderable | null = node; at; at = at.parent) {
+    const container = containers.find((entry) => entry.box === at)
+    if (container) return container.expands()
+  }
+  return false
 }
 
 // ── Reading the tree ──────────────────────────────────────────────────────────────────────────
@@ -326,10 +652,13 @@ const isPanel = (node: Renderable): boolean =>
  * Reading-order stops inside a box, in reading order.
  *
  * Exported for two callers outside this module: a `Menu`'s open list moves between its own stops
- * while the trap holds the keys, and the stops behind the overlay are not its to walk (./stops.ts).
+ * while its scope holds the keys, and the stops behind it are not its to walk (./stops.ts).
  *
- * Five rules, and each one is a level of the model showing through:
+ * Six rules, and each one is a level of the model showing through:
  *
+ *   another region     walked through, as it was before its frame became focusable. A region is a
+ *                      level of its own, reached with Tab. The walk starts at a box's children, so a
+ *                      region's own frame is never a stop inside itself and this is about nesting.
  *   a parent stop      one stop, and its panels are not walked. A panel is the level below this one,
  *                      reached with Down and left with Escape, so a strip and the controls inside the
  *                      panel it happens to be showing are never neighbours in one list.
@@ -345,6 +674,10 @@ export const stopsIn = (box: Renderable): Renderable[] => {
   const visit = (parent: Renderable): void => {
     for (const child of parent.getChildren()) {
       if (!child.visible || child.isDestroyed || isPanel(child)) continue
+      if (groups.some((group) => group.box === child)) {
+        visit(child)
+        continue
+      }
       if (parentEntry(child)) {
         found.push(child)
         continue
@@ -383,20 +716,61 @@ export const stopsIn = (box: Renderable): Renderable[] => {
  * list wants.
  */
 const boxAround = (node: Renderable): Renderable | undefined => {
-  for (let at: Renderable | null = node; at; at = at.parent) if (isPanel(at)) return at
-  return regionOf(node)?.box
+  // Either answer only counts while the keys can reach it. A dialog drawn inside a region has that
+  // region as an ancestor, and the stops behind the dialog are not its neighbours (§ Scopes).
+  for (let at: Renderable | null = node; at; at = at.parent) if (isPanel(at)) return inScope(at) ? at : undefined
+  const group = regionOf(node)
+  return group && inScope(group.box) ? group.box : undefined
+}
+
+// ── Moving ────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Step from one stop to the next inside a box, and say whether the keys moved.
+ *
+ * The one walk. Three of them used to index into `stopsIn`: the reader-facing arrows, a tab strip's
+ * Down, and a `Menu` list's own arrows. Each had picked up its own answer to what an edge does, which
+ * is how one key came to mean three things at three levels of one screen.
+ *
+ * `within` defaults to the neighbours of `from`: the panel it sits in, else its region's box. A
+ * caller passes one only where the walk is not about the tree the node sits in, which is an open list
+ * holding a scope of its own.
+ *
+ * `false` at an edge, and `false` when the walk does not contain `from` at all, which a collection's
+ * row and a region's frame do not, so the key carries on to the tier that does own it. Whether a
+ * caller turns that into a wall is the caller's.
+ *
+ * `wrap` has no caller yet: every stop walk on this screen walls or bubbles, and only a collection
+ * wraps, by its own rules. It is here because the key contract decides which walks wrap
+ * (docs/tui.md § The five key groups).
+ */
+export function walkStops(
+  from: Renderable | null | undefined,
+  delta: 1 | -1,
+  options: { within?: Renderable; wrap?: boolean } = {},
+): boolean {
+  if (!from) return false
+  const box = options.within ?? boxAround(from)
+  if (!box) return false
+  const stops = stopsIn(box)
+  const at = stops.indexOf(from)
+  if (at < 0) return false
+  const next = options.wrap ? stops[(at + delta + stops.length) % stops.length] : stops[at + delta]
+  return focusRenderable(next)
 }
 
 /**
- * Move to the next or previous stop beside the focused one, and reveal it.
+ * The reader-facing arrows: the next or previous stop beside the focused one, walling at an edge.
  *
- * An edge is a wall: `true` and nothing moves, the same answer a tab strip gives at its last tab.
- * Letting a failed Down bubble to the region tier would make an arrow cross regions, which is Tab's
- * job and which surprised readers the one time a strip did it.
+ * A wall is `true` and nothing moved, the same answer a tab strip gives at its last tab. Letting a
+ * failed Down bubble to the region tier would make an arrow cross regions, which is Tab's job and
+ * which surprised readers the one time a strip did it. So the `|| true` below is a claim on a key
+ * that moved nothing, and it stays because an arrow edge is a wall on purpose
+ * (docs/tui.md § The five key groups).
  *
- * `false` means "not mine": the focused thing is not in the walk at all, which is a row of a
- * collection or a viewport with nothing in it. Both have their own answer to the arrows and both sit
- * on a lower layer, so returning false is what lets them have it.
+ * The wall is here rather than in `walkStops` because the walk answers `false` for two things and
+ * only one is an edge: a stop the walk does not contain has to bubble to the tier that does own it,
+ * so the membership check below is what keeps the wall off that case.
  */
 export function moveStop(delta: 1 | -1): boolean {
   const node = focusedNode()
@@ -404,228 +778,33 @@ export function moveStop(delta: 1 | -1): boolean {
   // is still not this function's to move. The list owns its own arrows and wraps by its own rules.
   if (!node || items.has(node)) return false
   const box = boxAround(node)
-  if (!box) return false
-  const stops = stopsIn(box)
-  const at = stops.indexOf(node)
-  if (at < 0) return false
-  return focusRenderable(stops[at + delta]) || true
+  if (!box || !stopsIn(box).includes(node)) return false
+  return walkStops(node, delta, { within: box }) || true
 }
 
 /**
- * Move from one stop to the adjacent stop in its current region, without wrapping.
+ * Put the keys in a region, on the best thing it has: where it left them, else its entry stop, else
+ * its own frame. The frame is the last resort as it is on the DOM, so a region with nothing focusable
+ * in it is still reachable and the cycle has no hole.
  *
- * `moveStop` is the reader-facing version of this and walls at an edge. This one does not, and that
- * is the whole difference and the reason both exist: its caller is a tab strip that owns no panels —
- * GitHub's Open/Closed filter, the task-pane strip — where Down means "into the panel, else the next
- * stop beside me, else the next region", and a wall would make the last term dead.
+ * Nothing here writes the region's memory or its claim. Both belong to the renderer event listener,
+ * so both are written when the move happens rather than when it is asked for: `enter` used to write
+ * them from its target, and a target whose `focus()` was refused then left the store pointing at a
+ * region the keys were not in, so the first Tab after that looked lost
+ * (docs/tui.md § Focus regions).
  */
-export function moveFocusFrom(node: Renderable, delta: 1 | -1): boolean {
-  const group = regionOf(node)
-  if (!group) return false
-  const stops = stopsIn(group.box)
-  const at = stops.indexOf(node)
-  if (at < 0) return false
-  return focusRenderable(stops[at + delta])
-}
-
 const enter = (group: Group | undefined): boolean => {
   if (!group) return false
-  // A remembered target, unless what was remembered is the region's own box: that is the last resort
-  // below, taken when the region had nothing in it yet, and remembering it pins the keys to the frame
-  // for the rest of the run. A reader who looked into Browse before choosing a source came back to a
-  // lit border, no caret and dead arrows, because the list that arrived in between was never asked
-  // for.
-  //
-  // The region's own box is the last resort, as it is on the DOM: a region with nothing focusable in
-  // it still has to be reachable, or the cycle has a hole and the layout's own chords — the group
-  // switch, the split — have nothing to be focus-within of.
-  const keyed = group.lastIdentity ? itemsByIdentity.get(group.lastIdentity) : undefined
-  const remembered = group.lastIdentity
-    ? keyed && !keyed.isDestroyed ? keyed : undefined
-    : group.last && !group.last.isDestroyed && group.last !== group.box ? group.last : undefined
-  const target = remembered ?? entryStop(group.box) ?? group.box
-  if (target === group.box) group.box.focusable = true
-  target.focus()
-  setFocusedNode(target)
-  provisional = target === group.box
-  group.last = target
-  group.lastIdentity = itemIdentities.get(target)
-  lastByColumn[group.column] = group
-  focused = { paneId: group.paneId, regionId: group.regionId }
-  revealInViewports(target)
-  if (group.pickOnEnter) itemPicks.get(target)?.()
+  const target = remembered(group) ?? entryStop(group.box) ?? group.box
+  const before = focusedNode()
+  focusRenderable(target)
+  if (group.pickOnEnter && focusedNode() === target) itemPicks.get(target)?.()
+  // Look again where the keys went somewhere new: a walk into a region whose list has not arrived
+  // lands on its frame, and the pass is what takes them off it once the list does. A move that
+  // changed nothing is not worth a second look, and scheduling one would be a loop.
+  if (focusedNode() !== before) scheduleSettle()
   return true
 }
-
-// ── The settle pass ───────────────────────────────────────────────────────────────────────────
-
-let settleQueued = false
-// The overlays holding the keys, innermost last. A stack rather than one box, because a `Menu` inside
-// a `Modal` is a second overlay over the first and closing it must leave the modal still holding them.
-const overlays: Renderable[] = []
-let overlayClosing: { node: Renderable | null; region: RegionRef | null } | null = null
-
-/** The overlay that owns the keys, if one does. */
-const openOverlay = (): Renderable | null => {
-  while (overlays.length && overlays[overlays.length - 1]!.isDestroyed) overlays.pop()
-  return overlays[overlays.length - 1] ?? null
-}
-
-/** Whether a renderable is inside a box, by walking the retained tree up. */
-const within = (box: Renderable, node: Renderable): boolean => {
-  for (let at: Renderable | null = node; at; at = at.parent) if (at === box) return true
-  return false
-}
-
-/**
- * Queue the one deferred focus decision.
- *
- * A microtask rather than a frame event: OpenTUI emits per frame, but a test renderer under `flush()`
- * may render several times before one, and a settle that waits for a frame waits for the wrong thing.
- * Solid commits synchronously, so the renderables of the current render all exist at the end of the
- * current task — which is exactly when a microtask runs. Guarded, so six callers in one turn settle
- * once.
- */
-export function scheduleSettle(): void {
-  if (settleQueued) return
-  settleQueued = true
-  queueMicrotask(() => {
-    settleQueued = false
-    settleFocus()
-  })
-}
-
-/** 1. Focus never sits on a corpse: re-enter the region by its remembered identity. */
-const reviveFocus = (): void => {
-  const node = focusedNode()
-  if (!node || (!node.isDestroyed && node.visible)) return
-  const group = groups.find((candidate) => candidate.last === node) ?? regionOf(node)
-  if (group) enter(group)
-  // A corpse in no region — the last stop inside an overlay that has closed. Holding it would leave
-  // the screen with the keys on a dead node and stop `openScreen` below from opening it at all.
-  else setFocusedNode(null)
-}
-
-/** 2. Something has to have the keys when the screen first has regions, and on this host nothing
- *  else will decide: the desktop lands focus with a click or a Tab and there is neither here. The
- *  shell names the region; with no answer, the first one drawn takes them. */
-const openScreen = (): void => {
-  if (focusedNode()) return
-  const wanted = topology?.opensOn() ?? null
-  enter(groupAt(wanted) ?? ordered()[0])
-}
-
-/** 3. A region holding the keys for want of anything better gives them up as soon as it has
- *  somewhere to put them, which is when its list arrives. */
-const claimProvisional = (): void => {
-  if (!provisional) return
-  const group = groupAt(focused)
-  if (!group) return
-  const target = entryStop(group.box)
-  if (!target || target === group.box) return
-  enter(group)
-}
-
-/** 0. An open overlay holds the keys, and holds them for as long as it is open.
- *
- *  It cannot land on anything before this: its children are mounted by the render that produced its
- *  box, so the settle after it opens is the first moment there is a stop inside it. Its region claim
- *  is untouched, which is what makes giving the keys back a matter of remembering one renderable.
- *
- *  Every settle after that one is the same question again, because everything else the settle pass
- *  does is a region decision and the region tier is exactly what a trap is holding the keys away
- *  from. A list arriving behind an open modal used to take them (`claimProvisional`), and a row
- *  destroyed inside one used to leave them on a corpse (`markItem`) — in both cases the trap then
- *  swallowed every key the reader pressed, so the modal was on screen and could not be answered. */
-const holdInOverlay = (box: Renderable): void => {
-  // The keys never went back to the region behind: an overlay that closed into another one is a
-  // handover rather than a restore.
-  overlayClosing = null
-  const node = focusedNode()
-  if (node && !node.isDestroyed && node.visible && within(box, node)) return
-  const target = entryStop(box) ?? box
-  if (target === box) box.focusable = true
-  target.focus()
-  setFocusedNode(target)
-}
-
-/** 4. And gives them back on the settle after it closes, which is after the reconciliation that
- *  closing caused: the action that dismisses an overlay can replace the surface behind it in the
- *  same update, and at cleanup time the old row still reports itself live. */
-const restoreFromOverlay = (): void => {
-  const closing = overlayClosing
-  if (!closing) return
-  overlayClosing = null
-  // An overlay that was open before anything had the keys — a `Modal` drawn by the first render — has
-  // nothing to give back, and what it leaves behind is a detached box that still reports itself live.
-  // Drop it and open the screen the way boot does, rather than claiming a null region.
-  if (!closing.node && !closing.region) {
-    setFocusedNode(null)
-    openScreen()
-    return
-  }
-  focused = closing.region
-  const identity = closing.node ? itemIdentities.get(closing.node) : undefined
-  const replaced = !!identity && itemsByIdentity.get(identity) !== closing.node
-  if (closing.node && !closing.node.isDestroyed && !replaced) {
-    // A region holding the keys on its own frame for want of anything better may have grown a list
-    // while the overlay was up, and the settle that would have noticed ran with the overlay in front
-    // of it. Re-enter rather than restore, so the keys come back to the list and not to the border.
-    const home = groupAt(closing.region)
-    if (home && home.box === closing.node) enter(home)
-    else focusRenderable(closing.node)
-    return
-  }
-  // A workspace or source switch can replace the row that was focused behind the overlay. Restoring
-  // the dead renderable is impossible, but restoring its region is not: walk the live tree again so
-  // the replacement row receives focus and the region's pick-on-enter rule runs.
-  const group = groupAt(closing.region)
-  if (group) enter(group)
-}
-
-/** 5. Reveal wherever the four steps above left the keys. */
-const revealFocus = (): void => {
-  const node = focusedNode()
-  if (node && !node.isDestroyed) revealInViewports(node)
-}
-
-function settleFocus(): void {
-  const overlay = openOverlay()
-  if (overlay) {
-    holdInOverlay(overlay)
-    revealFocus()
-    return
-  }
-  reviveFocus()
-  openScreen()
-  claimProvisional()
-  restoreFromOverlay()
-  revealFocus()
-}
-
-/**
- * Hand the keys to an overlay that has just opened, keep them there while it is open, and give
- * them back when it closes.
- *
- * The DOM palette keeps a `prevFocus` element for exactly this and restores it on dismissal
- * (client-core/host/palette/overlay.ts). Same rule, no element: what had the keys is remembered and
- * put back, unless it went away while the overlay was open, in which case the region that owned it
- * keeps the claim and its own memory decides.
- */
-export function takeFocus(box: Renderable): void {
-  const previous = focusedNode()
-  const previousRegion = focused
-  overlays.push(box)
-  scheduleSettle()
-  onCleanup(() => {
-    const at = overlays.lastIndexOf(box)
-    if (at >= 0) overlays.splice(at, 1)
-    overlayClosing = { node: previous, region: previousRegion }
-    scheduleSettle()
-  })
-}
-
-// ── Moving ────────────────────────────────────────────────────────────────────────────────────
 
 /**
  * Move to the next or previous region on screen. Wraps.
@@ -647,21 +826,37 @@ export function moveRegion(delta: 1 | -1): boolean {
   return enter(all[(((at < 0 ? 0 : at) + delta) + all.length) % all.length])
 }
 
-/** Move between the rail and main columns without wrapping.
+/**
+ * Move one column left or right, without wrapping.
+ *
+ * The nearest column in the direction asked, which is what makes the number an ordering rather than
+ * a name: the rail is 0, a layout's regions are 1, and a layout that draws two frames side by side
+ * declares its second one 2, so one rule crosses the rail-to-pane edge and the list-to-detail edge
+ * alike. Left in the rail and Right from the rightmost column do nothing, deliberately: a key that
+ * jumps across the whole screen from an edge is a surprise, and Tab already cycles
+ * (docs/tui.md § Focus regions).
  *
  * The destination remembers the group last used in that column. On a first visit it enters the first
- * region the shell does not call chrome, which is how main skips the pane strip. */
+ * region the shell does not call chrome, which is how a first crossing into the pane skips the pane
+ * strip above it (../chrome/topology.ts § skips).
+ */
 export function moveColumn(delta: 1 | -1): boolean {
   const current = groupAt(focused)
   if (!current) return false
-  if ((current.column === 'rail' && delta < 0) || (current.column === 'main' && delta > 0)) return false
+  // `ordered()` rather than `groups`, so both the columns and the memory answer for a region that is
+  // still registered *and* still in scope. Out of scope it is the region behind a dialog (§ Scopes).
+  const reachable = ordered()
+  const beyond = reachable
+    .map((group) => group.x)
+    .filter((x) => (delta > 0 ? x > current.x : x < current.x))
+  if (!beyond.length) return false
+  const destination = delta > 0 ? Math.min(...beyond) : Math.max(...beyond)
 
-  const destination: RegionColumn = current.column === 'rail' ? 'main' : 'rail'
-  const remembered = lastByColumn[destination]
-  if (remembered && groups.includes(remembered)) return enter(remembered)
+  const remembered = lastByColumn.get(destination)
+  if (remembered && reachable.includes(remembered)) return enter(remembered)
 
-  return enter(ordered().find((group) =>
-    group.column === destination && !(topology?.skips(group) ?? false)))
+  return enter(reachable.find((group) =>
+    group.x === destination && !(topology?.skips(group) ?? false)))
 }
 
 /**
@@ -699,14 +894,15 @@ export function activationEntersMain(): boolean {
 export function movePane(delta: 1 | -1): boolean {
   const current = groupAt(focused)
 
-  // The rail is spatially before the one pane this host draws. Honour that edge before asking the
-  // shell to replace the pane on screen: Ctrl+Option+Right advertised "the pane to the right", but
-  // from Menu/Browse/Tasks it used to call the task-pane cycler instead. A browse source has no
-  // active task, so the chord did nothing at all. The reverse edge restores the rail group the
-  // reader last used; once there is no column in the requested direction, the task-pane switcher
-  // remains the next/previous-pane answer.
+  // Every column on screen is spatially before the pane the chord would replace, so a column move
+  // answers first: Ctrl+Option+Right advertised "the pane to the right", but from Menu/Browse/Tasks
+  // it used to call the task-pane cycler instead. A browse source has no active task, so the chord
+  // did nothing at all. The reverse edge restores the column group the reader last used.
   if (current && moveColumn(delta)) return true
-  if (current?.column === 'rail') return false
+  // And the left edge is the rail, where there is nothing further left to reach and no pane to the
+  // left of the one on screen either: a pane cycle from here would replace the pane a reader is not
+  // in. Past the last column in the direction asked, the task-pane switcher is the answer.
+  if (current?.x === RAIL_COLUMN) return false
 
   const panes: string[] = []
   for (const group of ordered()) if (!panes.includes(group.paneId)) panes.push(group.paneId)
@@ -723,6 +919,98 @@ export function movePane(delta: 1 | -1): boolean {
 export const isParentStop = (node: Renderable | null | undefined): boolean =>
   !!node && !!parentEntry(node)?.panels().length
 
+// ── The landing rule ──────────────────────────────────────────────────────────────────────────
+
+let settleQueued = false
+
+/**
+ * Queue the one deferred focus decision.
+ *
+ * A microtask rather than a frame event: OpenTUI emits per frame, but a test renderer under `flush()`
+ * may render several times before one, and a pass that waits for a frame waits for the wrong thing.
+ * Solid commits synchronously, so the renderables of the current render all exist at the end of the
+ * current task — which is exactly when a microtask runs. Guarded, so six callers in one turn settle
+ * once.
+ *
+ * A tree to read is the whole of what it buys. It orders nothing against the reconciler's
+ * `process.nextTick` destruction, which is Suspense's and stays Suspense's: nothing here depends on a
+ * corpse still reporting itself live, `pushScope`'s pop blurs the keys out of a box that is going,
+ * and a blur to nothing asks for a pass of its own (§ The one writer, ../kit/reconciler.ts).
+ */
+export function scheduleSettle(): void {
+  if (settleQueued) return
+  settleQueued = true
+  queueMicrotask(() => {
+    settleQueued = false
+    ensureFocus()
+  })
+}
+
+/**
+ * Whether the keys are on a stand-in that something better has since replaced.
+ *
+ * Two things here are focusable so they can hold the keys when nothing else can, and both stop being
+ * the right answer the moment their contents arrive: a region's frame, which is `enter`'s last resort
+ * while a `lazy()` region or its query is on its way, and a collection's container, which `stopsIn`
+ * draws in place of an active row a virtual window has scrolled off. A reader sees the same thing
+ * either way: a lit border, no caret, dead arrows.
+ *
+ * Asked of the tree rather than remembered, which is what the `provisional` boolean did: a fact about
+ * the tree kept beside the tree is a fact that can disagree with it.
+ */
+const onPlaceholder = (node: Renderable): boolean => {
+  const group = groups.find((candidate) => candidate.box === node)
+  if (group) return !!entryStop(group.box)
+  const container = containers.find((entry) => entry.box === node)
+  return !!container && reachable(container.active())
+}
+
+/**
+ * One question, then one landing.
+ *
+ * The question is about the renderable that has the keys. Can it still hold them, meaning alive,
+ * visible all the way up, focusable and inside the top scope, and is it the real thing rather than a
+ * stand-in? If so, reveal it and stop.
+ *
+ * If not, land. A scope holding the keys takes the stop it last had, then the first stop inside its
+ * box, then the box itself. On the screen a region answers first: the region that still claims the
+ * keys, else the one the shell opens on, else the first one drawn; and inside whichever answers,
+ * `enter` takes the stop it last had, its entry stop, its frame.
+ *
+ * This replaced a pass of seven ordered steps over four module variables. Each step had been a
+ * correct fix for a real bug; together they were a state machine nobody had written down, and the bug
+ * they produced was always the same one: two steps ran in an order the author had not pictured, and
+ * the reader got a lit frame with no caret or a caret on a destroyed row. Every path lands the same
+ * way now, so a bug in landing is one bug (docs/tui.md § Focus regions).
+ */
+function ensureFocus(): void {
+  const node = focusedNode()
+  if (reachable(node) && !onPlaceholder(node)) {
+    revealInViewports(node)
+    return
+  }
+  const scope = top()
+  if (scope.box) {
+    focusRenderable(remembered(scope) ?? entryStop(scope.box) ?? scope.box)
+    return
+  }
+  // Something has to have the keys once the screen has regions, and on this host nothing else will
+  // decide: the desktop lands them with a click or a Tab and there is neither here. The claim first,
+  // because it is the region a destroyed row was in; then the region the shell names; then whatever
+  // drew first.
+  const home = groupAt(focused) ?? groupAt(topology?.opensOn() ?? null) ?? ordered()[0]
+  if (home) {
+    enter(home)
+    return
+  }
+  // A corpse in no region at all, which was not focusable when it went and so was never blurred.
+  // Holding it would leave the screen with the keys on a dead node. Through the renderer, because the
+  // signal is a view of it: `blur` emits the event with nothing current and the listener writes the
+  // null. It refuses a node that is not focusable, which is why a control that goes disabled is
+  // blurred before it loses the flag (./stops.ts § pressable).
+  node?.blur()
+}
+
 /**
  * Every stop on screen, region by region, in the order the regions draw.
  *
@@ -732,24 +1020,52 @@ export const isParentStop = (node: Renderable | null | undefined): boolean =>
  * (../reachability.test.tsx).
  */
 export function _allStops(): Renderable[] {
-  return ordered().flatMap((group) => stopsIn(group.box))
+  const scope = top().box
+  if (!scope) return ordered().flatMap((group) => stopsIn(group.box))
+  // Inside a scope the only stops that exist are the scope's own, which is the same filter every
+  // other question in this module takes (§ Scopes). A scope with none of its own, such as the cheat
+  // sheet, which is lines of text, is itself the last-resort stop the landing rule put the keys on,
+  // so the property has something to be about rather than being vacuously true.
+  const stops = stopsIn(scope)
+  return stops.length ? stops : [scope]
+}
+
+/**
+ * Which columns the keys can reach, and which of them they are in.
+ *
+ * Test-only. The reachability property presses `l` and `h` on every kind of focused thing it met and
+ * asks whether the footer's word came true, and for `column` that means the keys are in a different
+ * one — with an edge as the only reason they are not, because there is no wrap
+ * (../reachability.test.tsx, docs/tui.md § The invariants, invariant 11).
+ */
+export function _columns(): { at: number | null; all: readonly number[] } {
+  return {
+    at: groupAt(focused)?.x ?? null,
+    all: [...new Set(ordered().map((group) => group.x))].sort((a, b) => a - b),
+  }
 }
 
 /** Test seam. The list is module-level, so a suite must not inherit the previous one's regions. */
 export function _resetRegions(): void {
+  // The previous render's renderer among them: a suite builds one per test and a listener left on a
+  // torn-down renderer is a second writer of the signal.
+  stopListening()
+  // And the guard that says a pass is already queued. The reset is synchronous and a microtask is
+  // not, so the previous test can leave this set with its pass still pending: the pass then runs
+  // against an empty store, which is harmless, but the next render's first `scheduleSettle` is
+  // swallowed as a duplicate and the screen opens with the keys nowhere.
+  settleQueued = false
   groups.length = 0
-  delete lastByColumn.rail
-  delete lastByColumn.main
+  setMounted((count) => count + 1)
+  lastByColumn.clear()
   focused = null
-  provisional = false
   cycler = null
   topology = null
   parents = []
-  overlays.length = 0
-  overlayClosing = null
+  setScopes([screenScope()])
   containers = []
   items = new WeakSet<Renderable>()
   itemIdentities = new WeakMap<Renderable, string>()
   itemsByIdentity.clear()
-  setFocusedNode(null)
+  writeFocus(null)
 }

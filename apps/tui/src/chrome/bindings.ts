@@ -16,8 +16,8 @@
 import { InputRenderable, ScrollBoxRenderable, TextareaRenderable, type KeyEvent, type Renderable } from '@opentui/core'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { hostKeysFor } from '../keys/install'
-import { focusedItem, focusedRenderable, isParentStop } from '../keys/regions'
-import { focusedOpens } from '../keys/stops'
+import { focusedExpands, focusedItem, focusedRenderable, isParentStop, regionsInScope } from '../keys/regions'
+import { focusedCrosses, focusedOpens } from '../keys/stops'
 import { openOverlays } from './state'
 
 export type Hint = {
@@ -33,7 +33,12 @@ export type Hint = {
 // for a pair (`j/k`) or for a synonym set (`enter` and space both activate) and the engine answers
 // per key: asking about every one of them would drop "move" the moment `down` was shadowed and `j`
 // was not.
-type Spec = Hint & { probe: string }
+//
+// `when` is for the rest of the question, where the engine's answer is not the whole of it. A layer
+// knows nothing about scopes, so the region layer's Tab is registered and reported live inside a
+// dialog even though a dialog has no regions to cycle. Only the store can say the key has nowhere to
+// go (../keys/regions.ts § Scopes).
+type Spec = Hint & { probe: string; when?: () => boolean }
 
 /**
  * What has the keys, as the only thing the footer's words depend on.
@@ -54,6 +59,8 @@ export const focusedKind = (): FocusedKind => {
   return 'stop'
 }
 
+export type Words = { moveKeys: string; move: string; act: string; cross: string; commit: string }
+
 /**
  * The words, one row per focused kind. `move` is the vertical pair, `act` is Enter, `cross` is the
  * horizontal pair, and `commit` is the chord.
@@ -61,32 +68,69 @@ export const focusedKind = (): FocusedKind => {
  * A table rather than a run of ternaries because the invariant is over the table: every kind says
  * something for every key, and the reachability suite reads the same rows the footer draws
  * (../reachability.test.tsx).
+ *
+ * The kind does not always settle the `cross` column, so read the words through `words()` below
+ * rather than off this table (§ the cross word).
  */
-export const WORDS: Record<FocusedKind, { moveKeys: string; move: string; act: string; cross: string; commit: string }> = {
+export const WORDS: Record<FocusedKind, Words> = {
   // Down enters the panel the strip is showing and Up leaves the strip, so the pair is not a pair.
   parent: { moveKeys: 'j', move: 'enter', act: 'press', cross: 'tab', commit: 'commit' },
   item: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'fold', commit: 'commit' },
-  field: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'fold', commit: 'send' },
-  opens: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'fold', commit: 'commit' },
+  // A field's bare keys are its own: `j`, `l` and Enter type, so their layers are inactive and the
+  // engine never reports them live. The words are here for the table's sake and the footer draws the
+  // chord alone (../keys/install.ts § typing).
+  field: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'type', commit: 'send' },
+  opens: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'column', commit: 'commit' },
   // A viewport is a stop only while it holds none, and then the arrows are the scroll
   // (../keys/regions.ts § stopsIn).
-  viewport: { moveKeys: 'j/k', move: 'scroll', act: 'press', cross: 'fold', commit: 'commit' },
-  stop: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'fold', commit: 'commit' },
+  viewport: { moveKeys: 'j/k', move: 'scroll', act: 'press', cross: 'column', commit: 'commit' },
+  stop: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'column', commit: 'commit' },
+}
+
+/**
+ * The words for what has the keys, with the cross word resolved.
+ *
+ * `h` and `l` are the one pair whose meaning is not settled by the kind alone, and the footer said
+ * `fold` for every kind, which was true of one of them. Two questions settle it, and both are the
+ * store's rather than the kind's:
+ *
+ *   does this collection fold?     a tree's rows expand and collapse; a plain list's decline the
+ *                                  intent, and it bubbles to the region tier, which moves a column
+ *   does this stop cross itself?   `DocumentTabs`, `SegmentedControl` and a chip row are each a
+ *                                  horizontal collection drawn as one stop, so the pair moves inside
+ *                                  them and never reaches the column
+ *
+ * Everything else bubbles, and the region tier has one meaning for a bubbled `h` or `l`: one column
+ * left or right (../keys/regions.ts § moveColumn, docs/tui.md § The five key groups).
+ */
+export const words = (): Words => {
+  const kind = focusedKind()
+  const row = WORDS[kind]
+  if (kind === 'field' || kind === 'parent') return row
+  if (focusedCrosses()) return { ...row, cross: 'move' }
+  if (kind === 'item') return { ...row, cross: focusedExpands() ? 'fold' : 'column' }
+  return row
 }
 
 const specs = (): Spec[] => {
   const keys = hostKeysFor()
-  const words = WORDS[focusedKind()]
+  const says = words()
   const bare = (intent: keyof typeof keys, at = 0): string => keys[intent][at] ?? keys[intent][0] ?? ''
   return [
-    { probe: bare('next', 1), keys: words.moveKeys, label: words.move, detail: 'and the arrows' },
-    { probe: bare('activate'), keys: 'enter', label: words.act, detail: 'or space' },
-    { probe: bare('expand', 1), keys: 'h/l', label: words.cross, detail: 'and the arrows' },
+    { probe: bare('next', 1), keys: says.moveKeys, label: says.move, detail: 'and the arrows' },
+    { probe: bare('activate'), keys: 'enter', label: says.act, detail: 'or space' },
+    { probe: bare('expand', 1), keys: 'h/l', label: says.cross, detail: 'and the arrows' },
     { probe: bare('search', 1), keys: '/', label: 'filter' },
     { probe: bare('menu'), keys: 'menu', label: 'menu' },
     { probe: bare('delete'), keys: 'del', label: 'delete' },
-    { probe: bare('commit'), keys: keys.commit[0] ?? '', label: words.commit, detail: 'send what is in the box' },
-    { probe: bare('nextRegion', 1), keys: 'tab', label: 'region', detail: 'shift+tab goes back; f6 does too' },
+    { probe: bare('commit'), keys: keys.commit[0] ?? '', label: says.commit, detail: 'send what is in the box' },
+    {
+      probe: bare('nextRegion', 1),
+      keys: 'tab',
+      label: 'region',
+      detail: 'shift+tab goes back; f6 does too',
+      when: () => regionsInScope() > 1,
+    },
     { probe: bare('nextPane'), keys: keys.nextPane[0] ?? '', label: 'pane', detail: 'the pane to the right' },
     { probe: bare('dismiss'), keys: 'esc', label: 'back' },
   ]
@@ -104,11 +148,18 @@ export function activeHints(): Hint[] {
   // true at the render that happened to build it.
   focusedRenderable()
   openOverlays()
+  // And how many regions the keys can reach, which changes without focus moving: the rail hides on
+  // Ctrl+B and the pane strip draws only while a task is open. Read here rather than only inside the
+  // Tab hint's own probe, because that probe short-circuits — so on a render where the key is not
+  // live the footer would take no dependency at all and keep whatever it last said
+  // (../keys/regions.ts § regionsInScope).
+  regionsInScope()
   const engine = keymap<Renderable, KeyEvent>()
   if (!engine) return []
   const live = new Set(engine.getActiveKeys().map((key) => engine.formatKey(key.display)))
-  const shown = specs().filter((spec) => spec.probe && live.has(engine.formatKey(spec.probe)))
-  const hint = ({ probe: _probe, ...rest }: Spec): Hint => rest
+  const shown = specs()
+    .filter((spec) => spec.probe && live.has(engine.formatKey(spec.probe)) && (spec.when?.() ?? true))
+  const hint = ({ probe: _probe, when: _when, ...rest }: Spec): Hint => rest
   // Every command with a chord and a description of its own — the palette, the cheat sheet, quitting,
   // and whatever a plugin registered. These the engine does know the words for, because a command
   // layer binding carries them (../keys/commandLayer.ts).

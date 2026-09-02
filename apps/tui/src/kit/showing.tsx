@@ -16,6 +16,7 @@ import { stop } from '../keys/stops'
 import { flatten, hasNode, Line, pad, Run, runStyle, slot } from './cells'
 import { markdownLines, type Line as MarkdownLine } from './markdown'
 import { borderCell, litControl, rule, spaceCells } from './roles'
+import { ScrollViewport } from './scrolling'
 import { GLYPHS } from './glyphs'
 import { spinnerFrame } from './tick'
 import { focusRenderable, focusedRenderable, scheduleSettle } from '../keys/regions'
@@ -242,7 +243,7 @@ export function Rows<T extends CollectionItem>(props: {
   selected?: string | null
   onSelect?: (key: string) => void
   onActivate?: (key: string) => void
-  onExpand?: (key: string, expand: boolean) => void
+  onExpand?: (key: string, expand: boolean) => boolean | void
   onMenu?: (key: string) => void
   children: (item: T, itemProps: ItemProps, selected: () => boolean, place: Record<string, never>) => JSX.Element
 }) {
@@ -316,14 +317,14 @@ export function Rows<T extends CollectionItem>(props: {
   // live in both states.
   createEffect(() => {
     window().from
-    if (!box || focusedRenderable() !== box || !collection.focusActive()) return
-    box.focusable = false
+    if (!box || focusedRenderable() !== box) return
+    collection.focusActive()
   })
 
   // A region's contents are `lazy` and its rows come from a query, so a pane opens before its list
   // exists and the region lands the keys on its own box for want of anything better. Every arrival of
   // rows — the first response and every refetch after it — is a reason for the store to look again
-  // (../keys/regions.ts § The settle pass).
+  // (../keys/regions.ts § The landing rule).
   createEffect(() => {
     items()
     scheduleSettle()
@@ -346,7 +347,17 @@ export function Rows<T extends CollectionItem>(props: {
       // many rows fit — so it always fitted, always drew everything, and overflowed the frame
       // (../panel.tsx). Every other list keeps the kit's rule and takes the room its rows need.
       {...(props.virtual ? { flexGrow: 1, flexBasis: 0, flexShrink: 1 } : { flexShrink: 0 })}
-      ref={(element: BoxRenderable) => { box = element; setRows(element.height); collection.attach(element); scheduleSettle() }}
+      ref={(element: BoxRenderable) => {
+        box = element
+        setRows(element.height)
+        // Focusable for good, at mount, and the walk still counts the list once. `stopsIn` draws a
+        // collection as the row its caret is on and falls back to the container only where there is
+        // no such row, which is a virtual list whose active row is off its drawn window or a list
+        // with no rows at all (../keys/regions.ts § stopsIn).
+        element.focusable = true
+        collection.attach(element)
+        scheduleSettle()
+      }}
       onSizeChange={() => setRows(box?.height ?? 0)}
       onMouseScroll={(event: MouseEvent) => {
         if (!props.virtual) return
@@ -355,12 +366,11 @@ export function Rows<T extends CollectionItem>(props: {
         const amount = Math.max(1, Math.round(event.scroll?.delta ?? 1))
         const next = clampTop(top() + (direction === 'down' ? amount : -amount))
         if (next === top()) return
-        if (box) {
-          // Pointer focus has no browser `focusin` to bridge into the region store. The virtual list
-          // owns that bridge because it owns the wheel offset (docs/tui.md § Collections).
-          box.focusable = true
-          focusRenderable(box)
-        }
+        // The wheel is about to take the focused row out of the drawn slice, so the container has to
+        // hold the keys while it is gone. Asked for here rather than left to the renderer, which
+        // focuses what a left click lands on and hears nothing from a wheel
+        // (docs/tui.md § Collections).
+        if (box) focusRenderable(box)
         setTop(next)
         event.preventDefault()
         event.stopPropagation()
@@ -571,9 +581,13 @@ export function CodeBlock(props: {
 export function Log(props: { lines: readonly string[]; follow?: boolean; find?: JSX.Element; ariaLabel: string }) {
   return (
     <box flexDirection="column" flexGrow={1}>
-      <box flexDirection="column" flexGrow={1} overflow="scroll">
+      {/* A viewport, where this was a yoga clip. A clip owns no offset, so a log longer than its
+          frame drew its first screenful and nothing could reach the tail (./scrolling.tsx,
+          docs/tui.md § Scrolling viewports). The find bar stays outside it, so it is on the bottom
+          line wherever the lines above it have been scrolled to. */}
+      <ScrollViewport>
         <For each={props.lines}>{(line) => <Line role="mono">{line}</Line>}</For>
-      </box>
+      </ScrollViewport>
       {slot(props.find)}
     </box>
   )
@@ -896,7 +910,10 @@ export function DiffPane(props: { source: { files: () => DiffFile[] | undefined;
   })
 
   return (
-    <box flexDirection="column" flexGrow={1} overflow="scroll">
+    // A viewport, where this was a yoga clip. Every row of every file is built here, so a clip drew
+    // the first screenful of the first file and left the rest unreachable
+    // (./scrolling.tsx, docs/tui.md § Scrolling viewports).
+    <ScrollViewport>
       <Show when={props.source.files()} fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}>
         <For each={rows()}>
           {(entry) => (
@@ -916,7 +933,7 @@ export function DiffPane(props: { source: { files: () => DiffFile[] | undefined;
           )}
         </For>
       </Show>
-    </box>
+    </ScrollViewport>
   )
 }
 

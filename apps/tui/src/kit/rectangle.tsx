@@ -1,8 +1,10 @@
 /** @jsxImportSource @opentui/solid */
-import { createSignal, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, onCleanup, Show, type JSX } from 'solid-js'
 import { extend } from '@opentui/solid'
 import { EmbeddedTerminalRenderable, type BoxRenderable, type KeyEvent, type Renderable } from '@opentui/core'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { focusRenderable, focusedRenderable, onScreen } from '../keys/regions'
+import { RECTANGLE } from '../keys/tiers'
 import { Line } from './cells'
 import { boxBorder } from './roles'
 
@@ -40,11 +42,6 @@ export type CellTerminal = {
   size: () => { cols: number; rows: number }
 }
 
-// Above every layer there is: while a rectangle is entered the keys are its, `Ctrl+C` included, and
-// no app layer may fire. An intercept rather than a layer, because a layer answers keys it can name
-// and a rectangle answers all of them (docs/tui.md § The Rectangle contract).
-const RECTANGLE_PRIORITY = 200
-
 // How long after leaving a rectangle a second Escape means "send an Escape to what is inside".
 //
 // The contract is "Escape alone leaves, Escape twice sends one"
@@ -56,15 +53,22 @@ const ESCAPE_PAIR_MS = 400
 
 // Whether any rectangle has the keys, for the footer.
 //
-// A count rather than a boolean, because two rectangles can be mounted at once — a task with a
-// terminal pane and a docker exec — and the second one leaving must not clear a flag the first one
-// still holds. Module state rather than a prop threaded up through the shell: the footer is drawn by
-// the chrome and the rectangle is drawn by a pane, and there is no path between them.
-const [entered, setEntered] = createSignal(0)
+// Every mounted rectangle's own answer, rather than a count of the ones that are entered. Two of them
+// can be mounted at once, a task with a terminal pane beside a docker exec, and each answers about its
+// own box, so the footer asks whether any of them says yes. A count could disagree with the screen and
+// did: the second rectangle leaving decremented a number the first one still held, and a rectangle
+// hidden without being unmounted never decremented at all, so the footer went on telling a reader to
+// press Escape at a box nobody could see. Nothing derived from the box itself can drift that way.
+//
+// A signal over the list rather than a plain array, so the footer re-reads when a rectangle mounts as
+// well as when one is entered. Module state rather than a prop threaded up through the shell: the
+// footer is drawn by the chrome and the rectangle is drawn by a pane, and there is no path between
+// them.
+const [live, setLive] = createSignal<readonly (() => boolean)[]>([])
 
 /** Is a rectangle holding every key right now? Read by the footer, which says so and says how to get
  *  back out (docs/tui.md § The footer). */
-export const enteredRectangle = (): boolean => entered() > 0
+export const enteredRectangle = (): boolean => live().some((held) => held())
 
 /**
  * A `pty` rectangle: an emulator in cells, one tab stop from outside.
@@ -74,7 +78,10 @@ export const enteredRectangle = (): boolean => entered() > 0
  * may fire while a rectangle is entered.
  */
 export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerminal) => void }) {
-  const [inside, setInside] = createSignal(false)
+  // Enter was pressed and nothing has taken the keys off the box since. Half of the answer, and the
+  // only half worth storing: the other half is the box's own focus, which the renderer owns
+  // (§ entered).
+  const [armed, setArmed] = createSignal(false)
   let box: BoxRenderable | undefined
   let term: EmbeddedTerminalRenderable | undefined
   let leftAt = 0
@@ -93,21 +100,47 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
     if (bytes?.length) emit(bytes)
   }
 
-  const enter = () => {
-    if (inside()) return
-    setInside(true)
-    setEntered((open) => open + 1)
-  }
+  // Whether the keys are this rectangle's, as a fact about the screen rather than a flag anybody
+  // maintains: the reader pressed Enter since the box last lost the keys, the box has them, and the
+  // box is on screen. Asking the box is what makes a rectangle hidden without being unmounted stop
+  // eating keys. `visible` is per node in OpenTUI, so hiding an ancestor blurs the ancestor and
+  // leaves a focused descendant reporting itself focused and visible, which is why `onScreen` walks
+  // the parents (../keys/regions.ts § onScreen).
+  //
+  // `armed()` is read first because it is the only reactive term, and this answer is drawn: the title
+  // and the border tone are this box's own, so a render that short-circuited before the signal would
+  // never re-run when Enter set it, and the rectangle would take the keys without saying so.
+  const entered = (): boolean => armed() && !!box && box.focused && onScreen(box)
+
+  const enter = () => setArmed(true)
   const leave = () => {
-    if (!inside()) return
-    setInside(false)
-    setEntered((open) => Math.max(0, open - 1))
+    if (!armed()) return
+    setArmed(false)
     leftAt = Date.now()
-    box?.focus()
+    // Back on the door, through the store's one door, so the region the rectangle is in sees the keys
+    // come back to it (../keys/regions.ts § The one writer).
+    focusRenderable(box)
   }
+  // The keys leaving the box disarms it, and there are two ways for that to happen. One raises an
+  // event: the renderer blurs the box when something else takes the keys, including the landing rule
+  // moving them off a node that has gone off screen.
+  const disarmOnBlur = (element: BoxRenderable) => {
+    element.on('blurred', () => setArmed(false))
+  }
+  // The other raises nothing at all. A box hidden without being unmounted keeps the renderer's focus,
+  // so the flag is also cleared once the box has stopped being on screen. The store's focus signal is
+  // the moment to ask at: hiding a subtree asks for a landing pass, the pass moves the keys off the
+  // node that went off screen, and that write is this effect's turn to run. Read for the dependency
+  // and not for the value: `Renderable.focused` and `visible` are plain fields the renderer writes,
+  // and the signal is the view of them the one writer keeps (../keys/regions.ts § The landing rule).
+  createEffect(() => {
+    focusedRenderable()
+    if (armed() && !onScreen(box)) setArmed(false)
+  })
   // A rectangle unmounted while entered — a pane closed with Ctrl+C still in flight — must not leave
   // the footer telling a reader to press Escape at nothing.
-  onCleanup(() => { if (inside()) setEntered((open) => Math.max(0, open - 1)) })
+  setLive((all) => [...all, entered])
+  onCleanup(() => setLive((all) => all.filter((held) => held !== entered)))
 
   const handed = (renderable: EmbeddedTerminalRenderable) => {
     term = renderable
@@ -145,9 +178,13 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
 
   const engine = keymap<Renderable, KeyEvent>()
   if (engine) {
+    // At the `RECTANGLE` tier, above every layer there is: while a rectangle is entered the keys are
+    // its, `Ctrl+C` included, and no app layer may fire. An intercept rather than a layer, because a
+    // layer answers the keys it can name and a rectangle answers all of them
+    // (docs/tui.md § The Rectangle contract, ../keys/tiers.ts).
     onCleanup(engine.intercept('key', (ctx) => {
       const key = ctx.event
-      if (!inside()) {
+      if (!entered()) {
         // One stop from outside: the box holds the focus, not what is in it. Enter goes in, and a
         // second Escape just after leaving goes back in and sends the Escape through, which is how a
         // reader reaches vim's normal mode from in here.
@@ -163,23 +200,23 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
       if (key.name === 'escape') { leave(); ctx.consume(); return }
       send(key)
       ctx.consume()
-    }, { priority: RECTANGLE_PRIORITY }))
+    }, { priority: RECTANGLE }))
   }
 
   return (
     <box
-      ref={(element: BoxRenderable) => { box = element; element.focusable = true }}
+      ref={(element: BoxRenderable) => { box = element; element.focusable = true; disarmOnBlur(element) }}
       flexDirection="column"
       flexGrow={1}
       // The same border either way, and the title carries the state instead. A `control` border is a
       // different role, not a brighter one, and a style pack may set any role to zero width — so
       // swapping roles to mean "focused" is how a box quietly stops being drawn at all
       // (docs/ui-design.md § Borders).
-      {...boxBorder('surface', { tone: inside() ? 'accent' : 'neutral' })}
+      {...boxBorder('surface', { tone: entered() ? 'accent' : 'neutral' })}
       // Short, because a box title that does not fit its width is not drawn at all. The whole rule —
       // "esc leave · esc esc send escape" — is on the footer, which says it while a rectangle is
       // entered (../chrome/Footer.tsx).
-      title={`${props.label} · ${inside() ? 'esc leave' : 'enter'}`}
+      title={`${props.label} · ${entered() ? 'esc leave' : 'enter'}`}
     >
       <embedded_terminal ref={handed} flexGrow={1} />
     </box>

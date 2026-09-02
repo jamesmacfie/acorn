@@ -7,6 +7,7 @@ import { registerPanel, Tabs as TabStrip } from '../kit/grouping'
 import { bindKeys } from '../keys/install'
 import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
+import { PANE } from '../keys/tiers'
 
 // `tabs`: the bar is one line, the current panel below (docs/panes.md § Layout model).
 //
@@ -32,8 +33,8 @@ export function Tabs(props: LayoutProps) {
       flexDirection="column"
       flexGrow={1}
       ref={(element: BoxRenderable) => {
-        // Layer 30, the pane's own tier, focus-within on the pane box. Priority is what decides,
-        // not how local the layer is (client-core host/keys/install.ts § the four tiers).
+        // The pane's own tier, focus-within on the pane box. Priority is what decides, not how
+        // local the layer is (client-core host/keys/install.ts § the four tiers, ../keys/tiers.ts).
         // Ctrl, not the platform's primary modifier. macOS keeps Cmd for the terminal emulator and
         // never delivers it, so the desktop's Cmd+1 is Ctrl+1 here — the same substitution the
         // command layer makes for every chord in the intent table (../keys/commandLayer.ts § asCtrl).
@@ -45,7 +46,7 @@ export function Tabs(props: LayoutProps) {
             setSelected(tab.id)
             return true
           },
-        })), 30)
+        })), PANE)
       }}
     >
       <TabStrip

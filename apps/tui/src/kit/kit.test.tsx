@@ -27,6 +27,7 @@ import {
 import { Fallback, Only, Rectangle } from './pixels'
 import { Line } from './cells'
 import { _resetCollections } from '../keys/collection'
+import { focusedRenderable } from '../keys/regions'
 
 // One case per kit node, asserting the sentence its row in docs/ui-design.md § Every node at 80 by 24
 // promises, against the cells it actually drew.
@@ -913,6 +914,13 @@ type Behaviour = {
  *  `[Save]` has the same six characters as an unfocused one. Accent is the palette's own sixth slot
  *  and the default foreground is white, so "the red channel is below the green" is "this is the accent
  *  slot" without naming a hex anywhere (../appearance.ts § TERMINAL_PALETTE). */
+/** Where to click to land on some drawn text: one cell inside it, in the frame's own coordinates. */
+const cellOf = (screen: Frame, text: string): [number, number] => {
+  const row = screen.lines.findIndex((line) => line.includes(text))
+  expect(row, `no line containing ${JSON.stringify(text)}`).toBeGreaterThanOrEqual(0)
+  return [screen.lines[row]!.indexOf(text) + 1, row]
+}
+
 const lit = (screen: Cells, text: string) => {
   const run = screen.runs().find((entry) => entry.text.includes(text))
   expect(run, `no run containing ${JSON.stringify(text)}`).toBeDefined()
@@ -1313,6 +1321,120 @@ describe.skipIf(!hasFfi)('every control is a stop', () => {
     )
     try {
       await entry.drive(screen, pressed)
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+
+  it('puts the keys on the control a click lands on, and Enter presses that one', async () => {
+    // The proof that dropping the pointer bridges lost nothing. The renderer focuses the nearest
+    // focusable ancestor of a left mouse-down itself, and the region store reads that off the same
+    // event a Tab raises, so a click is a focus move like any other
+    // (../keys/regions.ts § The one writer).
+    const pressed: string[] = []
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="clicking"
+          label="Clicking"
+          regions={{
+            body: () => (
+              <Stack>
+                <Button label="First" onPress={() => pressed.push('first')} />
+                <Button label="Second" onPress={() => pressed.push('second')} />
+              </Stack>
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 8 },
+    )
+    try {
+      // The pane opens on its first stop, because nothing pressed Tab and this host has no pointer to
+      // land the keys with (../keys/regions.ts § regionFocus).
+      lit(screen, '[First]')
+      const clicked = await screen.click(...cellOf(screen, '[Second]'))
+      lit(clicked, '[Second]')
+      // A click focuses and presses, which is the whole of this host's pointer model
+      // (docs/tui.md § What the TUI never does). Enter then presses the one under the caret, which is
+      // the half that says the click moved the keys and not only the highlight.
+      expect(pressed).toEqual(['second'])
+      await clicked.press('RETURN')
+      expect(pressed).toEqual(['second', 'second'])
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+
+  it('lets go of the keys when the control holding them goes disabled', async () => {
+    // `blur()` refuses a node that is not focusable, so a control that loses the flag while it holds
+    // the keys keeps them for the rest of the run, and every box above it goes on reporting a focused
+    // descendant. The reader sees a dialog whose buttons are lit and dead
+    // (../keys/stops.ts § pressable, docs/tui.md § The invariants).
+    const [off, setOff] = createSignal(false)
+    const pressed: string[] = []
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="disabling"
+          label="Disabling"
+          regions={{
+            body: () => (
+              <Stack>
+                <Button label="Risky" disabled={off()} onPress={() => pressed.push('risky')} />
+                <Button label="Safe" onPress={() => pressed.push('safe')} />
+              </Stack>
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 8 },
+    )
+    try {
+      lit(screen, '[Risky]')
+      const risky = focusedRenderable()
+      setOff(true)
+      const disabled = await screen.frame()
+      expect(focusedRenderable(), 'the disabled control is still holding the keys').not.toBe(risky)
+
+      // And they can still land somewhere, which is the half a wedge makes impossible.
+      const moved = await disabled.click(...cellOf(disabled, '[Safe]'))
+      lit(moved, '[Safe]')
+      await moved.press('RETURN')
+      expect(pressed).toEqual(['safe', 'safe'])
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+
+  it('lands the keys somewhere when the only control on screen goes disabled', async () => {
+    // The other half of the same wedge, and the half a click cannot rescue. Losing the flag blurs the
+    // control, and a blur is not a commit: nothing looked again, so the keys were nowhere and on a
+    // one-region screen Tab could not fetch them back, because `moveRegion` answers false with fewer
+    // than two regions. So `pressable` asks for a pass after the blur and the landing rule does it,
+    // which on this screen is the region's own frame
+    // (../keys/stops.ts § pressable, ../keys/regions.ts § ensureFocus).
+    const [off, setOff] = createSignal(false)
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="wedging"
+          label="Wedging"
+          regions={{ body: () => <Button label="Only" disabled={off()} onPress={() => {}} /> }}
+        />
+      ),
+      { width: 40, height: 8 },
+    )
+    try {
+      lit(screen, '[Only]')
+      setOff(true)
+      await screen.frame()
+      const held = focusedRenderable()
+      expect(held, 'nothing holds the keys').not.toBe(null)
+      expect(held!.isDestroyed).toBe(false)
+      // And what holds them can give them up, which is the whole point of not clearing the flag on a
+      // node that has the keys (@opentui/core § Renderable.blur).
+      expect(held!.focusable, 'the keys are on a node that cannot be blurred').toBe(true)
     } finally {
       screen.done()
     }

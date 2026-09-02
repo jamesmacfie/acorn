@@ -205,8 +205,8 @@ describe.skipIf(!hasFfi)('the shell', () => {
 
     // Enter on the first row quits. The overlay is still drawn afterwards and that is right: the real
     // `onQuit` takes the terminal back and ends the process, so there is no frame after it to close
-    // anything in. A list inside a `Modal` answering Enter at all is the phase-2 trap bug this test
-    // caught (../keys/trap.ts § SWALLOW_PRIORITY).
+    // anything in. A list inside a `Modal` answering Enter at all is what the swallow layer used to
+    // break, and a scope cannot: it names no keys (../keys/trap.ts).
     await started.press('RETURN')
     started.done()
     expect(started.quits()).toBe(1)

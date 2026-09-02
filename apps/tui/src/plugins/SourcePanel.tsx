@@ -15,8 +15,8 @@ import { Alert, Badge, EmptyState, Row, Rows } from '../kit/showing'
 import { Input } from '../kit/asking'
 import { Line } from '../kit/cells'
 import { bindKeys } from '../keys/install'
-import { focusedRenderable, focusRenderable, moveFocusFrom, moveStop, stopsIn } from '../keys/regions'
-import { STOP_PRIORITY } from '../keys/stops'
+import { focusedRenderable, focusRenderable, moveStop, stopsIn, walkStops } from '../keys/regions'
+import { STOP } from '../keys/tiers'
 
 // A descriptor source's rail list, in cells.
 //
@@ -118,9 +118,9 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
         // The focused renderable, not `element`: the kit's `Input` owns its own box and this is the
         // wrapper the layer is bound to, which is not itself a stop in the walk.
         const focused = focusedRenderable()
-        return !!focused && moveFocusFrom(focused, 1)
+        return walkStops(focused, 1)
       } },
-    ], STOP_PRIORITY, { whileTyping: true })
+    ], STOP, { whileTyping: true })
   }
 
   return (

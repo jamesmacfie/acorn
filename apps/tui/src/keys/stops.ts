@@ -17,19 +17,8 @@ import { createEffect, createSignal, onCleanup } from 'solid-js'
 import type { Renderable } from '@opentui/core'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
-import { focusedRenderable, focusRenderable, moveStop, stopsIn } from './regions'
-
-/**
- * Just above the collection tier, and the one number in this file worth an argument.
- *
- * The design said 40 — "a stop and a collection are both the thing that has the keys, and the two
- * never both have focus". They can: a `Button` inside a `Row` is inside the row's `focus-within`
- * layer as well as its own `focus` layer, so both match the same Enter. At equal priority the engine
- * falls back to registration order (`@opentui/keymap` § compareLayers), and which of a container's
- * ref and its children's refs runs first is the reconciler's business, not ours. One above the
- * collection makes the answer the same either way, and still below a `Tabs` strip at 45.
- */
-export const STOP_PRIORITY = 41
+import { focusedRenderable, moveStop, scheduleSettle } from './regions'
+import { STOP } from './tiers'
 
 export type StopOptions = {
   /** What `activate` runs. Absent leaves Enter to bubble, which a chip that can only be removed wants. */
@@ -56,11 +45,39 @@ export const focusedOpens = (): boolean => {
   return !!node && opening.has(node)
 }
 
+// Which stops answer `expand` and `collapse` themselves. `DocumentTabs`, `SegmentedControl` and a
+// chip row are each a horizontal collection drawn as one stop, so Left and Right move inside them
+// rather than crossing a column — and the footer has to say `move` there rather than `column`, or it
+// names a key that does something else (../chrome/bindings.ts § the cross word).
+const crossing = new WeakSet<Renderable>()
+
+/** Whether the stop that has the keys answers the horizontal pair itself. */
+export const focusedCrosses = (): boolean => {
+  const node = focusedRenderable()
+  return !!node && crossing.has(node)
+}
+
 /** Make a renderable a stop: focusable, pressed by `activate`, and pressed by the mouse. */
 export function pressable(box: Renderable, options: StopOptions): void {
   const off = () => options.disabled?.() ?? false
   if (options.opens) opening.add(box)
-  createEffect(() => { box.focusable = !off() })
+  if (options.on?.expand || options.on?.collapse) crossing.add(box)
+  createEffect(() => {
+    if (!off()) { box.focusable = true; return }
+    // Blurred before the flag goes. `blur()` refuses a node that is not focusable, so clearing the
+    // flag first would leave a control that was holding the keys holding them for the rest of the
+    // run, and every box above it reporting a focused descendant with it
+    // (@opentui/core § Renderable.blur).
+    //
+    // And then the keys are nowhere, which nothing else on this turn would notice: a blur is not a
+    // commit and a screen with one region cannot Tab out of it. So the landing rule gets a turn
+    // (./regions.ts § The landing rule).
+    if (box.focused) {
+      box.blur()
+      scheduleSettle()
+    }
+    box.focusable = false
+  })
   const given = options.on ?? {}
   const runs: Partial<Record<Intent, () => boolean>> = {
     ...(options.onPress ? { activate: () => { options.onPress!(); return true } } : {}),
@@ -79,12 +96,13 @@ export function pressable(box: Renderable, options: StopOptions): void {
   onCleanup(registerIntentLayer(box, Object.keys(runs) as Intent[], (intent) => {
     if (off()) return false
     return runs[intent]?.() ?? false
-  }, { priority: STOP_PRIORITY, mode: 'focus' }))
+  }, { priority: STOP, mode: 'focus' }))
   // Click to focus and then press, which is the whole of this host's pointer model
-  // (docs/tui.md § What the TUI never does).
+  // (docs/tui.md § What the TUI never does). Only the press is here: the renderer focuses the
+  // nearest focusable ancestor of a left mouse-down itself and the store reads that off the same
+  // event a key move raises, so a click needs no bridge (../keys/regions.ts § The one writer).
   box.onMouseDown = () => {
     if (off()) return
-    focusRenderable(box)
     options.onPress?.()
   }
 }
@@ -109,21 +127,4 @@ export function stop(options: StopOptions): { ref: (box: Renderable) => void; fo
       return !!element && focusedRenderable() === element
     },
   }
-}
-
-/**
- * Move focus to the next stop inside one box, in reading order. An edge is a wall.
- *
- * Scoped to a box rather than to a region, because the caller is an overlay: a `Menu`'s list is the
- * only thing a reader can drive while the trap is up, and the stops behind it are not reachable.
- * Phase 2 generalises this to every panel and every plain stop; this is the overlay's share of it.
- */
-export function moveStopIn(box: Renderable, delta: 1 | -1): boolean {
-  const stops = stopsIn(box)
-  if (!stops.length) return false
-  const at = stops.indexOf(focusedRenderable() as Renderable)
-  if (at < 0) return focusRenderable(stops[delta > 0 ? 0 : stops.length - 1])
-  // `|| true`: falling off the end of a list inside an overlay does nothing rather than driving
-  // whatever is behind it.
-  return focusRenderable(stops[at + delta]) || true
 }

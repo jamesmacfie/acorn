@@ -40,7 +40,12 @@ export type CollectionIntentOptions = {
   selected?: () => string | null | undefined
   onSelect?: (key: string) => void
   onActivate?: (key: string) => void
-  onExpand?: (key: string, expand: boolean) => void
+  /** Left and right on a row of this collection. Returning `false` says the row did not fold — a
+   *  leaf, or a directory that was already in the state asked for — and lets the key bubble to the
+   *  tier below, which on the terminal moves one column. Returning nothing keeps the old behaviour,
+   *  where the collection claimed the key either way, so no caller changes until it opts in
+   *  (docs/command-palette-and-shortcuts.md § Focus and typing). */
+  onExpand?: (key: string, expand: boolean) => boolean | void
   onMenu?: (key: string) => void
   /** Put the host's focus on this item. The host's whole share of a move. */
   land: (key: string) => void
@@ -99,6 +104,27 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
     return goTo(list[(((at < 0 ? 0 : at) + delta) + list.length) % list.length].key)
   }
 
+  /** A page key: as far as `PAGE` allows without leaving the list, and `false` once it is there.
+   *
+   *  Clamped rather than wrapped, unlike the arrows above. Modulo a list shorter than a page is a
+   *  key that lies: PageDown in a three-row list moved one row, and in a ten-row list it moved
+   *  nowhere at all, which a reader cannot tell from a dead key. Returning `false` at the edge is
+   *  the other half of it. The key then carries on to the tier below, where a scrolling viewport
+   *  moves the page the reader asked for, which is the sentence the footer promises: arrows move,
+   *  page keys scroll (docs/tui.md § Scrolling viewports).
+   *
+   *  This is shared, so the desktop gets it too. PageDown on the last row of a desktop list now
+   *  stops instead of wrapping round to the first, and that is intended: a page key is how a reader
+   *  travels, and travelling past the end back to the start is how a reader loses their place. */
+  const page = (delta: number): boolean => {
+    const list = enabled()
+    if (!list.length) return false
+    const at = list.findIndex((item) => item.key === active())
+    const to = Math.min(Math.max((at < 0 ? 0 : at) + delta, 0), list.length - 1)
+    if (to === at) return false
+    return goTo(list[to].key)
+  }
+
   const handle = (intent: Intent): boolean => {
     const current = active()
     switch (intent) {
@@ -106,18 +132,21 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
       case 'prev': return move(-1)
       case 'first': return move(0, 'first')
       case 'last': return move(0, 'last')
-      case 'pageNext': return move(PAGE)
-      case 'pagePrev': return move(-PAGE)
+      case 'pageNext': return page(PAGE)
+      case 'pagePrev': return page(-PAGE)
+      // `?? true` and not a bare `return true`: a handler that says nothing is a handler that has not
+      // been asked this question yet, and every DOM tree in the app is one of those. A handler that
+      // says `false` gets its key back, which is how Right on a leaf reaches the tier that crosses a
+      // column instead of being swallowed by a fold that did not happen
+      // (docs/tui.md § The five key groups).
       case 'expand':
         if (horizontal()) return move(1)
         if (!current || !options.onExpand) return false
-        options.onExpand(current, true)
-        return true
+        return options.onExpand(current, true) ?? true
       case 'collapse':
         if (horizontal()) return move(-1)
         if (!current || !options.onExpand) return false
-        options.onExpand(current, false)
-        return true
+        return options.onExpand(current, false) ?? true
       case 'activate':
         if (!current || !options.onItem(current)) return false
         pick(current)

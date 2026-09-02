@@ -6,6 +6,7 @@ import type { Task } from '@acorn/protocol/api.ts'
 import { installPlatform } from './platform'
 import { openNode } from './node/open'
 import { installKeymap } from './keys/install'
+import { COMMAND } from './keys/tiers'
 import { installRenderGuard, RENDERER_LISTENER_CAP } from './renderGuard'
 
 // `acorn`.
@@ -172,7 +173,7 @@ async function quit(code = 0): Promise<never> {
 // and it stops now. Inside an entered rectangle it never reaches here at all, which is the whole
 // point of the Rectangle contract.
 engine.registerLayer({
-  priority: 0,
+  priority: COMMAND,
   bindings: [{ key: 'ctrl+c', cmd: () => { void quit(); return true } }],
 })
 // A supervisor's SIGTERM drains the child this process started, which is the whole reason it waits.
