@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  DEFAULT_NOTIFICATION_SETTINGS, HOLD_MS, observeAttention, registerNoticeSink, resetDelivery,
-  type DeliveryContext, type NoticeSink, type NotificationSettings,
+  HOLD_MS, observeAttention, registerNoticeSink, resetDelivery,
+  type DeliveryContext, type NoticeSink,
 } from './deliver'
+import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from './settings'
 import type { AttentionState, Snapshot } from './attention'
 import { _resetNotices, notices, type Notice } from './notifications'
 

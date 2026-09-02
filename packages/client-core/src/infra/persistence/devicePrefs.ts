@@ -26,6 +26,7 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.diskWarningAcked,
   PrefKeys.exclusiveSlots,
   PrefKeys.remoteSlots,
+  PrefKeys.notifications,
 ])
 
 const PREFIX = 'acorn-pref:'

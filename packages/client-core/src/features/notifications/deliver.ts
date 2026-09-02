@@ -12,19 +12,7 @@ import { wsOnNotice } from '../../infra/node/wsClient'
 import { activeTaskId } from '../tasks/tasks'
 import { edgesBetween, snapshotKey, type Edge, type Snapshot } from './attention'
 import { pushNotice, type Notice } from './notifications'
-
-export type NotificationSettings = {
-  sound: boolean
-  system: boolean
-  badge: boolean
-  events: { blocked: boolean; finished: boolean; error: boolean }
-}
-
-// Everything on. Phase 2 replaces this reader with the `notifications` device preference, which
-// defaults every absent field to true for the same reason: a fresh install should behave as designed.
-export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  sound: true, system: true, badge: true, events: { blocked: true, finished: true, error: true },
-}
+import { readNotificationSettings, type NotificationSettings } from './settings'
 
 export type DeliveryContext = {
   focused(): boolean
@@ -38,7 +26,7 @@ export const defaultDeliveryContext: DeliveryContext = {
   // screen should not be waking anybody up. The terminal client swaps in its DEC 1004 state.
   focused: () => (typeof document === 'undefined' ? true : document.hasFocus()),
   activeTaskId: () => activeTaskId(),
-  settings: () => DEFAULT_NOTIFICATION_SETTINGS,
+  settings: () => readNotificationSettings(),
   now: () => Date.now(),
 }
 

@@ -46,7 +46,7 @@ Use the persistence scope that owns the state:
 | State | Scope |
 | --- | --- |
 | Fleet membership and token custody | desktop installation; token in main, membership in fleet store |
-| Appearance, shortcuts, rail order, notices, trust, tokens | device |
+| Appearance, notification settings, shortcuts, rail order, notices, trust, tokens | device |
 | Query cache | Node |
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
 | Dashboard panel definitions and their placements | owning Node's prefs, one app-scoped slice |
