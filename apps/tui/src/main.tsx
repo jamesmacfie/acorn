@@ -2,7 +2,6 @@
 import { parseArgs } from 'node:util'
 import { CliRenderEvents, createCliRenderer } from '@opentui/core'
 import { render } from '@opentui/solid'
-import type { Task } from '@acorn/protocol/api.ts'
 import { installPlatform } from './platform'
 import { openNode } from './node/open'
 import { installKeymap } from './keys/install'
@@ -60,86 +59,80 @@ if (nodeMajor < 26 || (nodeMajor === 26 && nodeMinor < 4)) {
   process.exit(2)
 }
 
-// Before the renderer: pairing asks a question on stdin, and starting a node prints its own boot
-// output. Both want a plain terminal, and neither has anything to draw.
+// Before the renderer: pairing asks a question on stdin, and it is the one thing here that does. What
+// no longer happens before the renderer is waiting for a node this run started — `openNode` returns as
+// soon as the child is spawned, and the shell draws from the persisted cache while it boots
+// (./node/open.ts, docs/future/performance/decisions.md § Every host draws first).
 const opened = await openNode(values.node).catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
 })
-// The node, attached to or started and waited for. When this TUI started it, every `[service:boot]`
-// line the node printed is above this mark and accounts for the whole of it.
+// The node: attached to, or spawned and still booting.
 bootMark('node open')
 
 let leaving = false
+// What this process wants to say and cannot, because stderr is the file the renderer draws on and a
+// line written there garbles the shell until the next full repaint. Printed on the way out, beside the
+// boot account. `opened.held` — a started child's stderr — is held the same way, in `supervise.ts`,
+// and read at print time because it grows for the life of the run.
+const heldLines: string[] = []
 const platform = installPlatform(opened, () => void quit())
 
 // Nothing that reaches the node may be imported before the seam exists: an import is evaluated once,
 // and a module that reads `window.acorn` at its top level would read it before the line above ran.
-const { selectActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
-const { readJson } = await import('@acorn/client-core/infra/node/apiClient.ts')
-const { setCacheStorage } = await import('@acorn/client-core/infra/node/fleet.ts')
+const { selectActiveNode, setActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
+const { clientFor, nodeState, setCacheStorage } = await import('@acorn/client-core/infra/node/fleet.ts')
 const { fileCacheStorage } = await import('./node/cache')
-const { tasksRoute } = await import('@acorn/protocol/api.ts')
-const { activateTaskSignals } = await import('@acorn/client-core/features/tasks/activate.ts')
+const { persistQueryClient } = await import('@tanstack/query-persist-client-core')
+const { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } = await import('@acorn/client-core/infra/persistence/queryPersistence.ts')
+const { setNodeStarting } = await import('./chrome/nodeState')
 const { syncPluginDistribution } = await import('@acorn/client-core/host/plugins/distribution.ts')
 const { syncPluginContributions } = await import('@acorn/client-core/host/plugins/syncContributions.ts')
 const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
+const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
+const { createEffect, createRoot } = await import('solid-js')
+const { setHostFocused } = await import('@acorn/client-core/features/notifications/deliver.ts')
 
 // The query cache persists to files rather than to IndexedDB, which there is none of here. Installed
 // before `selectActiveNode`, because that is what builds the first node's cache.
 setCacheStorage(fileCacheStorage())
 
+// Which node this run addresses, said out loud before the fleet is read. `selectActiveNode` keeps a
+// selection it still recognises and otherwise prefers the home node, which is the LOCAL one — so
+// without this line `acorn --node <remote>` opened a remote node's broker connection and then sent
+// every request to the machine's own node. It also makes `activeCacheId()` and the client below the
+// same partition, which is what the watchers write into.
+setActiveNode(opened.nodeId)
 await selectActiveNode()
 
-// The roster, and not one line earlier. `App` calls `initClientPlugins` at module scope, which runs
-// every plugin's `activate` pass, and agents' primes its session store over HTTP as it goes. A static
-// import here evaluated that before `installPlatform` had run, so `send` found no transport, took its
-// no-broker fallback into global `fetch`, and handed Node a relative path to parse. The suite's
-// harness already imports `App` this way (./harness.tsx).
-const { App } = await import('./App')
-// 110 chunks and 1.06 MB of it, evaluated here — half of everything this bundle contains, before a
-// cell has been drawn. Phase 1 of the performance programme is what shrinks it, and
-// scripts/check-startup-graph.mjs is what stops it growing back.
-bootMark('App imported')
-
-const tasks = await readJson<Task[]>(tasksRoute).catch(async (error: unknown) => {
-  await platform.dispose()
-  console.error(`acorn reached ${opened.nodeId} but could not read its tasks: ${error instanceof Error ? error.message : String(error)}`)
-  process.exit(1)
+// One client and one persister per node, and this host reads the same pair every other host does
+// (docs/caching.md § Renderer query cache). `App` used to mint a second `QueryClient` of its own, so
+// the shell read a cache nothing persisted and nothing invalidated: every start was cold, and a task
+// created anywhere else never appeared. `clientFor` hands back both halves, so there is nothing to
+// build here beyond driving them.
+const { client, persister } = clientFor(opened.nodeId)
+// A tuple, not an object: `[unsubscribe, restorePromise]`. Nothing calls the unsubscribe — the
+// persister's lifetime is this process's.
+const [, restored] = persistQueryClient({
+  queryClient: client,
+  persister,
+  maxAge: PERSISTED_QUERY_MAX_AGE_MS,
+  dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
 })
-bootMark('tasks read')
-// `--task` opens one by id; without it the shell opens the first available Menu source.
-// Refused here rather than drawn as an empty rail, because a name that matches nothing is a typo and
-// a person wants to hear about it before the screen is redrawn.
-if (values.task) {
-  const task = tasks.find((candidate) => candidate.id === values.task)
-  if (!task) {
-    await platform.dispose()
-    console.error(`No task ${values.task} on this node.`)
-    process.exit(1)
-  }
-  activateTaskSignals(task)
-}
+// Awaited, which is this host's `isRestoring`: the snapshot is one synchronous file read, and a shell
+// drawn a tick before it lands would draw an empty rail and then fill it.
+await restored
+bootMark('cache restored')
 
-// Third-party plugins: ask every node in the fleet what it carries, hash whatever is new into this
-// device's own cache, and register the surfaces of every bundle it has already accepted. Anything it
-// has not is queued for the trust prompt, which the shell draws as an overlay.
+// The shell, and not one line earlier: a module that reaches the node must not be evaluated before
+// `installPlatform` has run, or `send` finds no transport and falls back to global `fetch` with a
+// relative path. The suite's harness imports it the same way (./harness.tsx).
 //
-// Not awaited, for the reason the desktop's composition root gives: a fleet with an offline machine in
-// it must not hold up the first frame, and a plugin pane appearing a moment after the shell does is
-// the right trade (docs/plugins.md § Loaded plugins: the client half).
-void syncPluginDistribution().then(syncPluginContributions).catch((error: unknown) => {
-  console.warn('[plugins] could not read the fleet\'s plugins:', error)
-})
-// …and stay reconciled: a node that reloads a plugin in place broadcasts `plugins:changed`.
-watchPluginChanges()
-
-// The sound channel: an unseen agent edge rings the terminal. Imported here rather than at the top,
-// for the reason every client-core import in this file is — the seam has to exist before a module
-// that reaches the node is evaluated.
-const { initBellNotices } = await import('./kit/bell')
-const { setHostFocused } = await import('@acorn/client-core/features/notifications/deliver.ts')
-initBellNotices()
+// What is NOT in here any more is the roster. Those twelve plugin barrels were 224 KB of this graph
+// and every one of their `init` and `activate` passes ran before a cell was drawn; they load after
+// the first frame now (./roster.ts, scripts/check-startup-graph.mjs).
+const { App } = await import('./App')
+bootMark('App imported')
 
 // The renderer is built here rather than left to `render`, because the keymap's terminal adapter
 // binds to it and `render` hands it back to nobody.
@@ -156,18 +149,73 @@ installRenderGuard()
 // the chord does not exist to be bound. `disambiguate` is the one flag that fixes it, and it fixes the
 // same ambiguity for a lone Escape, which the parser otherwise has to wait out
 // (docs/tui.md § The adapter, ./kit/asking.tsx § Composer).
-const renderer = await createCliRenderer({ exitOnCtrlC: false, useKittyKeyboard: { disambiguate: true } })
+//
+// `openConsoleOnError` is off because this host holds its own output. OpenTUI pops its console
+// overlay over the frame on an uncaught error, and the shell now draws in front of a node that may
+// not answer for a second — so one fire-and-forget request rejecting reads as the whole app being
+// replaced by a debug panel. The error is not lost: it is captured below and printed on the way out.
+const renderer = await createCliRenderer({
+  exitOnCtrlC: false,
+  useKittyKeyboard: { disambiguate: true },
+  openConsoleOnError: false,
+})
 bootMark('renderer created')
 // Time to first draw. `@opentui/solid` exports a `TimeToFirstDraw` renderable that holds the same
 // number, but it is an on-screen label: it would have to be mounted in the tree and would paint a debug
 // overlay over the shell. The renderer's own first `frame` event is the same moment with nothing drawn
 // over.
-renderer.once(CliRenderEvents.FRAME, () => bootMark('first draw'))
-// A library warning must not cover the screen. OpenTUI pops its console overlay over the frame on
-// any `console.warn`/`error` once the renderer owns the terminal, so a single stray line from a
-// dependency reads as the whole app going blank. Deactivated the same way the test harness does
-// (./harness.tsx); anything logged still lands in the terminal's scrollback after quit.
-renderer.console.deactivate()
+renderer.once(CliRenderEvents.FRAME, () => {
+  bootMark('first draw')
+  void fillIn()
+})
+
+// Everything the shell does not need in order to draw, run once the first frame is on screen.
+//
+// The roster is the big one and it is safe here because every contribution registry is a Solid signal:
+// the chrome draws, this lands, and the rail, the pane strip and the palette fill from the same
+// reactivity that already handles a loaded plugin arriving from a node seconds later (./roster.ts).
+// The agents plugin's `activate` fires an HTTP request to prime its session store as it goes, which is
+// the one thing in the pass that touches the node at all.
+async function fillIn(): Promise<void> {
+  const { installRoster } = await import('./roster')
+  installRoster()
+  bootMark('roster registered')
+
+  // Every task write on the node broadcasts `tasks:changed`, and this turns that into one invalidation
+  // of the client the shell reads — which it now is (docs/plugins.md § Hearing a core event). The
+  // desktop has had this since the fleet; this host had nothing, so a task created by an agent or in
+  // another window moved nothing on screen until a restart.
+  watchTaskChanges()
+
+  // The node's arrival, which is behind the first frame now. Everything the shell asked for while a
+  // node it had just spawned was booting came back as `ECONNREFUSED`, and the first non-offline state
+  // is when those are worth asking again. The desktop's composition root holds the same effect for the
+  // same reason (apps/desktop/src/client/index.tsx).
+  createRoot(() => {
+    createEffect(() => {
+      if (nodeState(opened.nodeId) === 'offline') return
+      void client.invalidateQueries({ refetchType: 'active' })
+    })
+  })
+
+  // Third-party plugins: ask every node in the fleet what it carries, hash whatever is new into this
+  // device's own cache, and register the surfaces of every bundle it has already accepted. Anything it
+  // has not is queued for the trust prompt, which the shell draws as an overlay.
+  void syncPluginDistribution().then(syncPluginContributions).catch((error: unknown) => {
+    heldLines.push(`[plugins] could not read the fleet's plugins: ${error instanceof Error ? error.message : String(error)}`)
+  })
+  // …and stay reconciled: a node that reloads a plugin in place broadcasts `plugins:changed`.
+  watchPluginChanges()
+
+  // The sound channel: an unseen agent edge rings the terminal.
+  const { initBellNotices } = await import('./kit/bell')
+  initBellNotices()
+}
+// A library's log must not cover the screen, and must not be written to it either. OpenTUI's console
+// stays ACTIVE — it replaces `global.console` with one that captures — and hidden. Active because
+// stderr is the file the renderer draws on, so a line written there garbles the shell until the next
+// full repaint; hidden because a debug panel over the workspace is not what a stray log deserves.
+// Nothing is lost: the capture is printed after `renderer.destroy()` with the rest of the held output.
 renderer.console.hide()
 // Every live `scrollbox` subscribes to the renderer's `selection` event (./renderGuard.ts).
 renderer.setMaxListeners(RENDERER_LISTENER_CAP)
@@ -199,9 +247,14 @@ async function quit(code = 0): Promise<never> {
   if (leaving) return await new Promise<never>(() => {}) // a second Ctrl+C during the drain waits
   leaving = true
   renderer.destroy()
-  // The terminal is ours again, so the held output can go out: the boot account first, then anything
-  // Node wanted to warn about while the screen was busy.
+  // The terminal is ours again, so everything held while the screen was busy can go out: the boot
+  // account, then what this process logged, then a started node's own stderr, then whatever this file
+  // wanted to say, then Node's warnings.
   printBootMarks()
+  const logged = renderer.console.getCachedLogs()
+  if (logged.trim()) console.error(logged)
+  for (const line of opened.held ?? []) console.error(`[node] ${line}`)
+  for (const line of heldLines) console.error(line)
   for (const warning of heldWarnings) console.error(warning)
   await platform.dispose()
   process.exit(code)
@@ -218,4 +271,38 @@ engine.registerLayer({
 // A supervisor's SIGTERM drains the child this process started, which is the whole reason it waits.
 process.once('SIGTERM', () => void quit())
 
-await render(() => <App nodeId={opened.nodeId} supervised={opened.supervised} onQuit={() => void quit()} />, renderer)
+// A node this run started has not answered anything yet, and the footer says so until it does. Set
+// before the first frame, so nothing draws the wrong thing even once — and after `quit`, because a
+// child that fails to spawn rejects on the next tick and quitting needs a renderer to hand back
+// (./chrome/nodeState.ts).
+if (opened.starting) {
+  setNodeStarting(true)
+  void opened.starting.then(
+    () => setNodeStarting(false),
+    (error: unknown) => {
+      setNodeStarting(false)
+      heldLines.push(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
+      void quit(1)
+    },
+  )
+}
+
+await render(
+  () => (
+    <App
+      client={client}
+      nodeId={opened.nodeId}
+      supervised={opened.supervised}
+      {...(values.task ? { task: values.task } : {})}
+      onNoTask={(id) => {
+        heldLines.push(`No task ${id} on this node.`)
+        // Not from here. A warm cache answers the tasks query on the first tick, so this callback can
+        // fire inside `render()` — and `renderer.destroy()` from inside a render pass throws, which
+        // took the exit path with it and printed nothing at all. Let the frame finish, then leave.
+        setTimeout(() => void quit(1))
+      }}
+      onQuit={() => void quit()}
+    />
+  ),
+  renderer,
+)

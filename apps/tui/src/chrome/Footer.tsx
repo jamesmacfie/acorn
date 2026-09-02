@@ -5,7 +5,7 @@ import { nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { Line, ellipsise } from '../kit/cells'
 import { enteredRectangle } from '../kit/rectangle'
 import { activeHints } from './bindings'
-import { nodeSentence } from './nodeState'
+import { nodeSentence, nodeStarting } from './nodeState'
 
 // The last line: what the keyboard will do, and what the node is doing.
 //
@@ -48,7 +48,9 @@ export function Footer(props: { nodeId: string }) {
       <Line role="muted">{hints()}</Line>
       <box flexGrow={1} />
       <Show when={sentence()}>
-        {(text) => <Line tone={state() === 'degraded' ? 'warn' : 'danger'}>{text()}</Line>}
+        {/* A node still booting is not a fault, so it is not drawn as one: the same amber a reconnect
+            gets, because both are "wait a moment" (./nodeState.ts). */}
+        {(text) => <Line tone={nodeStarting() || state() === 'degraded' ? 'warn' : 'danger'}>{text()}</Line>}
       </Show>
     </box>
   )

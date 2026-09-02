@@ -75,7 +75,15 @@ either, and renders the onboarding path instead.
 
 Where a partition is written is the host's, through `setCacheStorage`. IndexedDB is the default,
 because the hosts that had one were browsers; the terminal client has none and installs a directory
-of files instead, one per partition key, before the first cache is built.
+of files instead, one per partition key, before the first cache is built. That host drives the
+persister itself — `persistQueryClient` from `@tanstack/query-persist-client-core`, with the same
+`maxAge` and dehydration predicate the desktop's provider passes — and awaits the restore before it
+renders, which is its `isRestoring`.
+
+One client per node is a contract, not a convention. The terminal client was the host that broke it:
+it minted a second `QueryClient` for its shell beside the per-node one, so the shell read a cache
+nothing persisted and nothing invalidated. Nothing on any host may add another
+([tui.md](./tui.md) § Booting client-core under Node).
 
 The persisted cache is disposable and has a bounded lifetime. It provides fast last-known reads,
 not mutation confirmation. When a Node is reconnecting or offline, cached responses remain visible

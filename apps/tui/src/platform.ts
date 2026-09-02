@@ -51,6 +51,13 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     broker.upsert({ ...toNodeRecord(node), token, ...(node.certPem ? { certPem: node.certPem } : {}) })
   }
   connect(opened.nodeId)
+  // …and again when a node this run started announces itself. The row the line above used is the one
+  // last time's handshake wrote, so its endpoint names a port nothing is listening on yet — the broker
+  // reports `offline` and retries, which is the state the footer already draws. Connecting to the old
+  // row rather than waiting is deliberate: a broker with no record at all answers every request with
+  // "Unknown node", which is a hard error rather than a node that is not there yet, and the queries
+  // the shell fires while the child boots would fail as bugs instead of as reconnects.
+  if (opened.starting) void opened.starting.then((handshake) => connect(handshake.nodeId), () => {})
 
   const subscribe = <T,>(list: T[], handler: T): (() => void) => {
     list.push(handler)
@@ -130,8 +137,11 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       // from the new handshake rather than reused. What is not here is the desktop's `onNodeReplaced`
       // push: nothing in this build is holding a view of the old endpoint to invalidate. Phase 4 draws
       // the chrome that would need telling.
-      const restarted = await startNode(dataRootDir(), fleet.tokenFor(opened.nodeId))
-      const { handshake } = restarted
+      // Awaited here, unlike the start at boot: nothing is waiting on a frame, and the caller asked
+      // for a node it can use. The restarted child's stderr is piped and dropped rather than held —
+      // the hold in `main.tsx` belongs to the child this process spawned at boot.
+      const restarted = startNode(dataRootDir(), fleet.tokenFor(opened.nodeId))
+      const handshake = await restarted.handshake
       stop = restarted.stop
       supervised = true
       fleet.remember(

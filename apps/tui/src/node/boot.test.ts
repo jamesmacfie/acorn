@@ -1,10 +1,16 @@
-import { mkdtempSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { QueryClient } from '@tanstack/solid-query'
+import { persistQueryClient, persistQueryClientRestore } from '@tanstack/query-persist-client-core'
 import { lockedBy } from '@acorn/node-core/server/storage/dataRoot.ts'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
+import { cacheKeyFor, clientFor, setCacheStorage } from '@acorn/client-core/infra/node/fleet.ts'
+import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
+import { tasksKey, type Task } from '@acorn/protocol/api.ts'
 import { custody, openNode, type OpenedNode } from './open'
+import { fileCacheStorage } from './cache'
 import { installPlatform, type Platform } from '../platform'
 
 // The boot test (docs/testing.md § Test layers): does `acorn`'s world come up.
@@ -114,8 +120,75 @@ describe('acorn against a node it started', () => {
     }
   }, 30_000)
 
+  // The caching contract, end to end against a real node id (docs/caching.md § Renderer query cache).
+  // Before this the TUI installed the file store and never drove a persister, so the directory was
+  // empty on every run and every start was cold.
+  it('writes one cache file named by the partition key, and reads the rows back out of it', async () => {
+    const cacheDir = join(root, 'config', 'cache')
+    setCacheStorage(fileCacheStorage(cacheDir))
+    const { client, persister } = clientFor(opened.nodeId)
+    const [, restored] = persistQueryClient({
+      queryClient: client,
+      persister,
+      maxAge: PERSISTED_QUERY_MAX_AGE_MS,
+      dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+    })
+    await restored
+
+    const rows: Task[] = [{
+      id: 'task-persisted', title: 'from the cache', projectId: 'project-1', branch: 'from-the-cache',
+      origin: 'local', icon: null, status: 'active', links: [], parentId: null, sort: 0,
+      github: null, worktreePath: null, pullNumber: null,
+    }]
+    client.setQueryData(tasksKey, rows)
+    // Waited on by content rather than by existence. The persister writes on every cache event and
+    // throttles to one write every five seconds, so the first file on disk may be the empty snapshot
+    // it took while restoring.
+    const written = join(cacheDir, `${encodeURIComponent(cacheKeyFor(opened.nodeId))}.json`)
+    await waitFor(() => existsSync(written) && readFileSync(written, 'utf8').includes('task-persisted'), 'the rows to be persisted')
+
+    // One file, named by the partition key with the colon encoded. Node A's snapshot must never be
+    // able to rehydrate into node B, and the name is what makes that structural.
+    expect(readdirSync(cacheDir)).toEqual([`${encodeURIComponent(cacheKeyFor(opened.nodeId))}.json`])
+
+    // …and a fresh client restores from that file with no node involved, which is what the next
+    // `acorn` does before it has heard from one. Not the same client: this asserts the file, not the
+    // memory it was dehydrated from.
+    const cold = new QueryClient()
+    await persistQueryClientRestore({ queryClient: cold, persister, maxAge: PERSISTED_QUERY_MAX_AGE_MS })
+    expect(cold.getQueryData(tasksKey)).toEqual(rows)
+  }, 30_000)
+
   it('drains the node it started and releases the lock', async () => {
     await platform.dispose()
     expect(lockedBy(dataDir())).toBeNull()
   }, 60_000)
+})
+
+// The start path, once the root has been opened before (docs/tui.md § Attach or start). The first-ever
+// start has no id on disk and nothing cached, so it waits for the handshake; every start after that
+// returns as soon as the child is spawned, which is what lets the renderer draw in front of a booting
+// node.
+describe('acorn starting a node it has started before', () => {
+  it('returns the node id from the data root without waiting for the handshake', async () => {
+    // The root above has been opened and drained, so `node.json` names its node and nothing holds it.
+    expect(lockedBy(dataDir())).toBeNull()
+    const second = await openNode(undefined)
+    try {
+      expect(second.supervised).toBe(true)
+      expect(second.nodeId).toBe(opened.nodeId)
+      // The distinguishing fact: the boot line is still in flight. `openNode` resolved before the
+      // child had bound a port, let alone printed anything.
+      expect(second.starting).toBeDefined()
+      expect(second.held).toBeDefined()
+      expect(lockedBy(dataDir())).toBeNull()
+
+      // …and it does land, with the same id, which is what rewrites the fleet row's endpoint.
+      const handshake = await second.starting!
+      expect(handshake.nodeId).toBe(opened.nodeId)
+      expect(second.fleet.get(opened.nodeId)?.endpoint).toBe(handshake.endpoint)
+    } finally {
+      await second.stop()
+    }
+  }, BUDGET_MS)
 })

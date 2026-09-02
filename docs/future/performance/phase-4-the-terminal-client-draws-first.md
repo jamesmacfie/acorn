@@ -1,7 +1,13 @@
 # Phase 4: the terminal client draws first, from disk
 
-Status: not started. Waits on phase 0 for `TimeToFirstDraw`; phase 1 shrinks what it loads but is not
-a dependency.
+Status: shipped 2026-09-03. The shell renders under `clientFor(nodeId).client` with
+`persistQueryClient` driving the file store, so the cache directory is written and the client the
+watchers invalidate is the one the shell reads; the renderer is created before a started node's
+handshake, whose stderr is piped and held; the tasks round trip and the twelve-plugin roster both left
+the critical path. First draw attached to a running node is **67 ms**, not the 300 ms this file
+proposed, and `acorn` against a stopped data root draws at **62 ms** rather than 722–852 ms. The eager
+closure went 1,026,357 B → 841,142 B, which is phase 1's target still missed and now explained
+(measurements.md § 2026-09-03 — phase 4).
 
 ## Goal
 

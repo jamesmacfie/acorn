@@ -1,18 +1,8 @@
 /** @jsxImportSource @opentui/solid */
-import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import { agentsClientPlugin } from '@acorn/plugin-agents/client/index.ts'
-import { changesClientPlugin } from '@acorn/plugin-changes/client/index.ts'
-import { contextClientPlugin } from '@acorn/plugin-context/client/index.ts'
-import { dockerClientPlugin } from '@acorn/plugin-docker/client/index.ts'
-import { editorClientPlugin } from '@acorn/plugin-editor/client/index.ts'
-import { githubClientPlugin } from '@acorn/plugin-github/client/index.ts'
-import { memoryClientPlugin } from '@acorn/plugin-memory/client/index.ts'
-import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
-import { onboardingClientPlugin } from '@acorn/plugin-onboarding/client/index.ts'
-import { previewClientPlugin } from '@acorn/plugin-preview/client/index.ts'
-import { terminalClientPlugin } from '@acorn/plugin-terminal/client/index.ts'
-import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
-import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints/plugin.ts'
+import { createEffect, type JSX } from 'solid-js'
+import { QueryClientProvider, createQuery, type QueryClient } from '@tanstack/solid-query'
+import { tasksOptions } from '@acorn/client-core/infra/queries.ts'
+import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { setLayouts } from '@acorn/client-core/host/layouts/table.ts'
 import { setSourcePanel } from '@acorn/client-core/host/chrome/sourcePanel.ts'
@@ -25,14 +15,17 @@ import { RemoteTree } from './plugins/RemoteTree'
 import { installPluginWorkers } from './plugins/workerFactory'
 import { Shell } from './chrome/Shell'
 
-// The composition root's client half: the roster, the layout table, and the query client under which
-// the whole shell runs. What is on screen is `chrome/Shell.tsx`; this is what has to be true before
-// it draws.
+// The composition root's client half: the four host seams and the shell under the one query client
+// this node has. What is on screen is `chrome/Shell.tsx`; this is what has to be true before it draws.
 //
-// No persister. `clientFor` in client-core's fleet.ts builds one over the storage seam and the TUI
-// installs a directory of files behind it (./node/cache.ts), but that is per node and this is the
-// client the shell itself runs under.
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: false } } })
+// The roster is not here. It is `./roster.ts`, imported after the first frame, and that file says why.
+//
+// The query client is a prop rather than a `new QueryClient()` here, and that is the caching contract
+// rather than a preference. client-core builds one client and one persister per node
+// (infra/node/fleet.ts § clientFor), and that is the client `watchTaskChanges` and its siblings
+// invalidate. A second one minted here read a cache nobody wrote and nobody invalidated, so every
+// `acorn` start was cold and a task created elsewhere never appeared
+// (docs/caching.md § Renderer query cache).
 
 // This host's layout table, before any pane draws. Phase 0 could not do this: the pane registry named
 // client-core's DOM table directly, so `paneContributions()` handed back a component this host could
@@ -61,35 +54,56 @@ setSourcePanel(sourcePanel)
 // (client-core/host/chrome/extendedPane.ts, ./plugins/ExtendedPane.tsx).
 setExtendedPane(ExtendedPane)
 
-// The roster: one line per plugin, through the registry rather than by importing each contribution,
-// because that is where a pane comes from on the desktop too. It is the same twelve the desktop
-// registers, and eight panes reach the strip (docs/tui.md § What a plugin loses here). A loaded plugin
-// is not on this list and never will be: it arrives from a node as a bundle, and
-// `syncPluginDistribution` in main.tsx is what finds it.
-// …and no core Home source. `selectedSource()` otherwise resolves an unset selection against the raw
+// No core Home source. `selectedSource()` otherwise resolves an unset selection against the raw
 // registry before provider/workspace gates have loaded. Keep it explicitly empty so the rail can
 // choose the first source it actually draws once those gates are ready (chrome/Rail.tsx).
 setSelectedSource(null)
 
-initClientPlugins([
-  agentsClientPlugin,
-  changesClientPlugin,
-  contextClientPlugin,
-  dockerClientPlugin,
-  editorClientPlugin,
-  githubClientPlugin,
-  memoryClientPlugin,
-  notesClientPlugin,
-  onboardingClientPlugin,
-  previewClientPlugin,
-  terminalClientPlugin,
-  workflowsClientPlugin,
-])
+/** `acorn --task <id>`, resolved off the shell's own tasks query rather than off a request of its own.
+ *
+ *  `main.tsx` used to `await readJson(tasksRoute)` before it created a renderer — a round trip on the
+ *  critical path whose answer the query below asks for a moment later anyway. It waits on the first
+ *  answer now, which a warm cache makes immediate.
+ *
+ *  A plain flag rather than `on()`: `on()` re-fires on identity change, and a fresh array from a
+ *  refetch is a new identity, so this would re-activate the task under whatever the reader had since
+ *  opened. The flag is the dedupe. */
+function TaskArg(props: { id?: string; onMissing?: (id: string) => void; children: JSX.Element }) {
+  // Read once, at setup. It comes from `parseArgs` and cannot change, and a wrapper that draws
+  // nothing keeps the tree the same shape whether or not `--task` was given — so every render in the
+  // suite exercises the same arrangement production does.
+  const id = props.id
+  if (id) {
+    const query = createQuery(() => tasksOptions(true))
+    let resolved = false
+    createEffect(() => {
+      const tasks = query.data
+      if (!tasks || resolved) return
+      resolved = true
+      const task = tasks.find((candidate) => candidate.id === id)
+      // Refused rather than drawn as an empty rail, because a name that matches nothing is a typo and
+      // a person wants to hear about it. A tasks query that never answers at all is a different
+      // failure and says so on the footer instead.
+      if (task) activateTaskSignals(task)
+      else props.onMissing?.(id)
+    })
+  }
+  return props.children
+}
 
-export function App(props: { nodeId: string; supervised: boolean; onQuit: () => void }) {
+export function App(props: {
+  client: QueryClient
+  nodeId: string
+  supervised: boolean
+  task?: string
+  onNoTask?: (id: string) => void
+  onQuit: () => void
+}) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Shell nodeId={props.nodeId} supervised={props.supervised} onQuit={props.onQuit} />
+    <QueryClientProvider client={props.client}>
+      <TaskArg id={props.task} onMissing={props.onNoTask}>
+        <Shell nodeId={props.nodeId} supervised={props.supervised} onQuit={props.onQuit} />
+      </TaskArg>
     </QueryClientProvider>
   )
 }

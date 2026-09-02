@@ -48,8 +48,16 @@ export const addSession = (s: TerminalSession): void => {
 // terminal engine is absent (web build), so consumers naturally show nothing.
 export function initSessions(): () => void {
   if (!hasHostCapability({ plugin: 'terminal' })) return () => {}
-  void refreshSessions()
-  return wsOnStatus(() => void refreshSessions())
+  // Caught, because every host now mounts this in front of its node
+  // (docs/future/performance/decisions.md § Every host draws first): the first pull lands while the
+  // node may still be booting, and an uncaught rejection is a crash under Node's default policy. The
+  // terminal client made it visible — OpenTUI answers one by drawing its debug console over the shell.
+  // A list that could not be read is an empty list, which is what the next status broadcast fixes.
+  const pull = (): void => {
+    void refreshSessions().catch(() => {})
+  }
+  pull()
+  return wsOnStatus(pull)
 }
 
 // Which terminal tab was last viewed, per task (session-only, like isTerminalOpen). Lets the drawer
