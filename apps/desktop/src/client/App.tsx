@@ -16,6 +16,7 @@ import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/
 import { planWorkspaceViewTransition } from '@acorn/client-core/features/workspaces/workspaceViewTransition.ts'
 import OverflowMenu from '@acorn/client-core/features/settings/OverflowMenu.tsx'
 import { initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
+import { initSoundNotices } from '@acorn/client-core/features/notifications/chime.ts'
 import { initSessions, sessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
 import TabRail from '@acorn/client-core/features/tabs/TabRail.tsx'
 import Tips from '@acorn/client-core/kit/components/overlays/tips.tsx'
@@ -183,6 +184,9 @@ export default function App() {
   // without a terminal still runs workflows. They were inside the guard above, which meant no gate
   // notice at all on such a node.
   onMount(() => onCleanup(initWorkflowNotices()))
+
+  // The sound channel. Every unseen notice the gate lets through, whatever raised it.
+  onMount(() => onCleanup(initSoundNotices()))
 
   // Which plugins the node this shell is showing runs.
   //

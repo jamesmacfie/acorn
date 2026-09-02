@@ -103,6 +103,12 @@ void syncPluginDistribution().then(syncPluginContributions).catch((error: unknow
 // …and stay reconciled: a node that reloads a plugin in place broadcasts `plugins:changed`.
 watchPluginChanges()
 
+// The sound channel: an unseen agent edge rings the terminal. Imported here rather than at the top,
+// for the reason every client-core import in this file is — the seam has to exist before a module
+// that reaches the node is evaluated.
+const { initBellNotices } = await import('./kit/bell')
+initBellNotices()
+
 // The renderer is built here rather than left to `render`, because the keymap's terminal adapter
 // binds to it and `render` hands it back to nobody.
 //
