@@ -1,39 +1,53 @@
 # Performance
 
-A programme, 2026-08-31. Nothing here is scheduled, and nothing in it has started. The desktop
-renderer build is red on its own startup budget, which makes phase 0 the only urgent line in the
-folder.
+A programme, started 2026-08-31 and widened 2026-09-02 to cover the terminal client and to record
+the architecture decisions the first reads stopped short of. Nothing here is scheduled, and nothing in
+it has shipped. The desktop renderer build is red on its own startup budget and drifted further over
+it between the two dates (1,317,605 bytes, then 1,324,279 against 1,250,000), which makes phase 0 the
+only urgent line in the folder and is the argument for the denylist it adds.
 
-Two reads feed one plan:
+Four reads and one set of decisions feed eleven phases:
 
-- [analysis.md](./analysis.md) reads the surfaces: the startup payload measured from the built
-  renderer, and the per-event costs of the agent transcript, the diff viewer, the node's request
-  paths, and the persister, read from source. Its numbered items carry the detail the phases point
-  at.
-- [architecture.md](./architecture.md) reads the shapes, from tracing four paths end to end: a cold
-  start that gates the window on a complete node boot three processes deep, backpressure that
-  amplifies load instead of shedding it, a terminal pipeline that pays continuously for sessions
-  nobody watches and pays again on every tab switch, an event firehose whose `term:status` ping
-  refetches most of what a client knows, and remount-first switching whose softeners are dead code.
-- [phases.md](./phases.md) is the order of work, six phases, each ending in a measurement.
+- [analysis.md](./analysis.md) reads the desktop's surfaces: the startup payload measured from the
+  built renderer, and the per-event costs of the agent transcript, the diff viewer, the node's request
+  paths, and the persister, read from source. 2026-08-31.
+- [architecture.md](./architecture.md) reads the desktop's shapes, from tracing four paths end to
+  end: a cold start that gates the window on a complete node boot, backpressure that amplifies load,
+  a terminal pipeline that pays for sessions nobody watches, an event firehose whose `term:status`
+  ping refetches most of what a client knows, and remount-first switching whose softeners are dead
+  code. 2026-08-31.
+- [tui-analysis.md](./tui-analysis.md) reads the terminal client: a startup path with the desktop's
+  shape, two query clients and a cache nobody writes, an eager graph that is half the build, a key
+  path that scans arrays inside a subtree walk, and lists that build every row. 2026-09-02.
+- [decisions.md](./decisions.md) is what was decided from all three: seven decisions about which
+  foundations stay and which change, and the corrections to the first two reads. 2026-09-02.
+- [phases.md](./phases.md) is the order of work and the dependency graph. Each phase has its own
+  file, written for a reader with none of this context: why the mechanism is the way it is, with
+  paths and numbers, and then what to change.
 - [refused.md](./refused.md) is what the programme decided not to do, so it stays decided.
 
 ## The phases, in one line each
 
 | Phase | What it is | Status |
 | --- | --- | --- |
-| 0 | Split the icon set out of startup (unblocks the red build) and instrument boot, node requests, and first paint. | Not started. |
-| 1 | Open the window before the node boots: helper ready first, paint from the persisted cache, shed the node boot's serial dead weight, stop denying WebKit's caches. | Not started. |
-| 2 | Stop the event amplifiers: split `term:status`, filter non-active nodes in the helper, PTY pause with honest `seq` accounting, the task-list N+1. | Not started. |
-| 3 | Terminals do work only when watched: gate the headless emulator on attach, chunked ring, hidden-not-unmounted tabs, binary `term:out`. | Not started. |
-| 4 | The live surfaces: transcript append and lookup costs, diff hydration granularity, and a real decision on `keepAlive` versus a fast data path. | Not started. |
-| 5 | Re-measure, then the deferred arguments (base64 bodies, incremental projection, per-key persistence, an interest model). | Parked behind numbers. |
+| [0](./phase-0-instrument-and-unblock.md) | Split the icon set out of startup, add a startup denylist to both hosts' build checks, and instrument boot, requests, and first paint on the node, the desktop, and the terminal client. | Not started. |
+| [1](./phase-1-registries-hold-loaders.md) | Every name-to-component table maps to a loader: the kit tables on both hosts, the iframe copy, the CodeMirror language table; the terminal client stops loading CodeMirror. | Not started. |
+| [2](./phase-2-paint-before-the-node.md) | The desktop window opens before the node boots: helper ready first, no awaits before `render`, paint from the persisted cache, immutable assets. | Not started. |
+| [3](./phase-3-the-node-listens-sooner.md) | The node's boot sheds its serial dead weight: background shell probe, idempotent bundle writes, concurrent plugin init; the listener before plugins, gated on a number. | Not started. |
+| [4](./phase-4-the-terminal-client-draws-first.md) | The terminal client renders under the per-node query client, persists it to the file cache it already installed, and draws while a started node boots. | Not started. |
+| [5](./phase-5-stop-the-event-amplifiers.md) | Split `term:status`, filter non-active nodes in the helper, PTY pause with honest `seq`, the task-list N+1, and node-side caches for git status and device tokens. | Not started. |
+| [6](./phase-6-terminals-work-only-when-watched.md) | The headless emulator runs only while attached, the ring is chunks, hidden tabs stay mounted, `term:out` is binary. | Not started. |
+| [7](./phase-7-streaming-surfaces-render-incrementally.md) | The transcript's append is constant time, usage folds on the node, markdown re-renders its open block and caches closed fences. | Not started. |
+| [8](./phase-8-switching-and-hydration.md) | `keepAlive` decided, one round trip to editor text, hover prefetch, diff hydration per path. | Not started. |
+| [9](./phase-9-the-terminal-clients-keystroke.md) | The terminal client's key path is indexed, hints are a memo, typing is a layer, long lists and the diff pane window their rows. | Not started. |
+| [10](./phase-10-re-measure-and-the-deferred-arguments.md) | Re-measure everything, then take up or refuse the parked arguments against the numbers. | Parked behind numbers. |
 
 ## How this relates
 
-The budget check this programme unblocks lives in `apps/desktop/scripts/check-renderer-budget.mjs`
-and runs inside the desktop build. The event ceiling phase 2 works around is recorded in
-[events.md](../events.md); the terminal display contract phase 3 changes is
-[docs/terminal.md](../../terminal.md)'s; the transcript decisions phase 4 touches are
-[docs/managed-agents.md](../../managed-agents.md)'s. Where a phase ships, its behaviour moves to the
-owning doc and the phase row here shrinks to a pointer, the same way every retired programme ended.
+The budget check phase 0 turns green lives in `apps/desktop/scripts/check-renderer-budget.mjs` and
+runs inside the desktop build; its terminal-client twin is `apps/tui/scripts/check-startup-graph.mjs` (new).
+ The event ceiling phase 5 works around is recorded in [events.md](../events.md); the terminal
+display contract phase 6 changes is [docs/terminal.md](../../terminal.md)'s; the transcript decisions
+phase 7 touches are [docs/managed-agents.md](../../managed-agents.md)'s; the focus rules phase 9 is
+held to are [docs/tui.md](../../tui.md) § Keys and focus. Where a phase ships, its behaviour moves to
+the owning doc and the phase row here shrinks to a pointer, the same way every retired programme ended.

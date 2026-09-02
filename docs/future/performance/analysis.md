@@ -170,6 +170,9 @@ fact, and the node's own projection could send the changed turn or request inste
 
 ### 11. Every byte crosses the bridge as base64 inside JSON, twice
 
+Corrected 2026-09-02: Rust never sees a request body; the renderer speaks to the helper over a loopback
+WebSocket directly. See [decisions.md](./decisions.md) § Corrections to the first reads.
+
 `apps/desktop/src/shell/wire.ts` says so plainly, and names its own ceiling:
 
 > base64 costs a third more bytes and one copy each way on a loopback socket, which is nothing next
