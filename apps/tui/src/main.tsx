@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { parseArgs } from 'node:util'
-import { createCliRenderer } from '@opentui/core'
+import { CliRenderEvents, createCliRenderer } from '@opentui/core'
 import { render } from '@opentui/solid'
 import type { Task } from '@acorn/protocol/api.ts'
 import { installPlatform } from './platform'
@@ -107,6 +107,7 @@ watchPluginChanges()
 // for the reason every client-core import in this file is — the seam has to exist before a module
 // that reaches the node is evaluated.
 const { initBellNotices } = await import('./kit/bell')
+const { setHostFocused } = await import('@acorn/client-core/features/notifications/deliver.ts')
 initBellNotices()
 
 // The renderer is built here rather than left to `render`, because the keymap's terminal adapter
@@ -141,6 +142,18 @@ renderer.setMaxListeners(RENDERER_LISTENER_CAP)
 const heldWarnings = new Set<string>()
 process.removeAllListeners('warning')
 process.on('warning', (warning) => { heldWarnings.add(`${warning.name}: ${warning.message}`) })
+// Whether this terminal is the one the reader is looking at, which is the gate's `focused()` and
+// therefore the difference between a notice that lands read and one that raises a banner. The
+// renderer asks for DEC 1004 focus reports and turns `ESC [ I` and `ESC [ O` into these two events.
+//
+// A plain variable rather than a signal: the gate reads it imperatively a second after an edge, and
+// nothing draws from it. It starts true because unknown counts as focused — a terminal that never
+// answers must not be treated as one nobody is watching (client-core § defaultDeliveryContext).
+let terminalFocused = true
+renderer.on(CliRenderEvents.FOCUS, () => { terminalFocused = true })
+renderer.on(CliRenderEvents.BLUR, () => { terminalFocused = false })
+setHostFocused(() => terminalFocused)
+
 const engine = installKeymap(renderer)
 
 // The terminal comes back first, then the node drains. A node that started here gets its bounded

@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  HOLD_MS, deliverNotice, observeAttention, registerNoticeSink, resetDelivery, systemSink,
-  type DeliveryContext, type NoticeSink,
+  HOLD_MS, defaultDeliveryContext, deliverNotice, observeAttention, registerNoticeSink, resetDelivery,
+  setHostFocused, systemSink, type DeliveryContext, type NoticeSink,
 } from './deliver'
 import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from './settings'
 import type { AttentionState, Snapshot } from './attention'
@@ -87,6 +87,24 @@ describe('the seen rule', () => {
     settle()
     expect(notices()[0].read).toBe(false)
     expect(sunk.map((n) => n.title)).toEqual(['claude needs you'])
+  })
+
+  // The terminal client's half of the rule. It is not a document, so it has no `hasFocus()` to ask;
+  // it hears DEC 1004 focus reports from the renderer and installs the answer here
+  // (apps/tui/src/main.tsx). Unknown still counts as focused, which is what a host that never
+  // installs one falls back to.
+  it('takes a host\'s own answer about whether it is on screen', () => {
+    expect(defaultDeliveryContext.focused()).toBe(true)
+    let onScreen = false
+    setHostFocused(() => onScreen)
+    try {
+      expect(defaultDeliveryContext.focused()).toBe(false)
+      onScreen = true
+      expect(defaultDeliveryContext.focused()).toBe(true)
+    } finally {
+      setHostFocused(null)
+    }
+    expect(defaultDeliveryContext.focused()).toBe(true)
   })
 
   it('another task being open is not watching this one', () => {

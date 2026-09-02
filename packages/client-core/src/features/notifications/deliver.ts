@@ -22,10 +22,16 @@ export type DeliveryContext = {
   now(): number
 }
 
+// A host that knows whether it is on screen and is not a document says so here. The terminal client
+// installs its DEC 1004 state (apps/tui/src/main.tsx); nothing else calls this, and a host that does
+// not falls back to the page's own answer.
+let hostFocused: (() => boolean) | null = null
+export const setHostFocused = (answer: (() => boolean) | null): void => { hostFocused = answer }
+
 export const defaultDeliveryContext: DeliveryContext = {
   // Unknown counts as focused, which is the quiet answer: a host that cannot say whether it is on
-  // screen should not be waking anybody up. The terminal client swaps in its DEC 1004 state.
-  focused: () => (typeof document === 'undefined' ? true : document.hasFocus()),
+  // screen should not be waking anybody up.
+  focused: () => hostFocused?.() ?? (typeof document === 'undefined' ? true : document.hasFocus()),
   activeTaskId: () => activeTaskId(),
   settings: () => readNotificationSettings(),
   now: () => Date.now(),

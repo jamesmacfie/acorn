@@ -1,113 +1,70 @@
 # Phase 5: the terminal client
 
-Design, 2026-09-02. Not started. Depends on phase 1 (edges exist to deliver) and phase 3 (BEL is
-the sound sink). Independent of phase 4.
+Shipped 2026-09-02. `acorn` in a terminal asks the host terminal to raise a notification for an unseen
+edge, knows when the terminal is not focused, carries an unread count in its topbar, and opens the
+bell's two sections as an overlay. Where each part landed:
 
-## Goal
+- `apps/tui/src/kit/notify.ts` (new) holds the whole terminal channel and nothing that reaches the
+  node: `notifyMode` and `BEL`, moved here from `bell.ts`; `detectBackend`, which reads `TERM_PROGRAM`
+  (`iTerm.app`, `ghostty`, `WezTerm`, `WarpTerminal` → `osc9`; `kitty` → `osc99`), then
+  `KITTY_WINDOW_ID` or `TERM=xterm-kitty` → `osc99`, then `TERM` for `xterm-ghostty`, `wezterm` and
+  `rxvt`; `sanitise`; `sequence`; `wrapTmux`; `notification`, which puts the four together and answers
+  the empty string when there is nothing to write; `showInTerminal`; and the badge signal the topbar
+  draws.
+- `apps/tui/src/kit/bell.ts` keeps `initBellNotices` and re-exports `notifyMode` and `BEL` from
+  `notify.ts`, so phase 3's callers and its test are unchanged.
+- `apps/tui/src/platform.ts` installs the seam's `notify` group: `show` writes the sequence,
+  `onActivate` returns a no-op unsubscribe, `setBadge` writes the signal.
+- `packages/client-core/src/features/notifications/deliver.ts` gains `setHostFocused`, and
+  `apps/tui/src/main.tsx` feeds it from `CliRenderEvents.FOCUS` and `BLUR`.
+- `apps/tui/src/chrome/Topbar.tsx` draws `◔ N` in the warn tone at the right edge, and nothing at
+  zero.
+- `apps/tui/src/chrome/Inbox.tsx` (new) is the overlay and `initInbox`, which owns the attention
+  fan-out and the `trackBadge` effect. `apps/tui/src/chrome/Shell.tsx` calls it, registers
+  `core.notifications.open` on `n`, mounts the overlay, and calls `initSessions`,
+  `initWorkflowNotices` and `initSystemNotices` where the desktop's `App.tsx` does.
 
-`acorn` in a terminal asks the host terminal to raise a notification for an unseen edge, knows when
-the terminal is not focused, shows an unread count in its topbar, and opens an inbox overlay with
-the same two sections as the desktop bell. Warp, iTerm2, Ghostty, WezTerm, and Kitty all get a
-native notification; everything else gets BEL.
+## Where the build departed from the requirements
 
-## Why
+**The two sections are one collection, not two** (requirement 6, which asked for two `Rows`). A modal
+takes the keys by swallowing every intent but `dismiss` at priority 35, and `nextRegion` lives at 5 —
+so a second collection inside one is a list nobody can reach, which breaks the first focus invariant
+(`apps/tui/src/keys/trap.ts`, docs/tui.md § Traps). The two sections are one `Rows` with each head
+drawn above its first row instead, so `j` and `k` walk the whole inbox.
 
-[analysis.md](./analysis.md) findings 10 and 15: the terminal client has toasts and nothing else, and
-its renderer already reports focus that nothing listens to. The user runs Warp and named the
-terminal-level notification Claude Code sends there as the behaviour they want. herdr's
-`terminal_notify.rs` is the recipe ([references.md](./references.md)).
+**The command is registered in `Shell.tsx`, not `bindings.ts`** (requirement 6). `chrome/bindings.ts`
+is the footer's words — it turns the engine's live keys into hints and registers nothing. Every
+command this shell owns is registered in one `onMount` in `Shell.tsx`, and this is one more line
+there.
 
-## Requirements
+**`notifyMode` moved rather than being re-exported the other way** (requirement 1, which offered
+either). The platform seam is built before `window.acorn` exists, so `platform.ts` may not import a
+module that reaches client-core — and `bell.ts` does. The pure half is `notify.ts` and `bell.ts`
+re-exports from it, which is the direction that compiles.
 
-1. `apps/tui/src/kit/notify.ts` (new), sibling of `apps/tui/src/kit/copy.ts` and shaped like it.
-   Phase 3 already shipped half of this in `apps/tui/src/kit/bell.ts`: `notifyMode(env)` reads the
-   override and `initBellNotices` writes BEL for every unseen notice, so this phase adds the OSC
-   half, reads `notifyMode` rather than re-parsing the variable, and moves or re-exports it if the
-   two want to be one file. The rest:
-   `detectBackend(env): 'osc9' | 'osc99' | 'osc777' | null` from `TERM_PROGRAM` (`iTerm.app`,
-   `ghostty`, `WezTerm`, `WarpTerminal` → `osc9`), `KITTY_WINDOW_ID` or `TERM=xterm-kitty` →
-   `osc99`, `TERM` containing `rxvt` → `osc777`, else null; `sequence(backend, title, body)` returning
-   the bytes; `wrapTmux(seq)` producing a `DCS tmux;` passthrough with every ESC doubled when `TMUX`
-   is set; `sanitise(text)` stripping ESC, BEL, and ST. `ACORN_TUI_NOTIFY` overrides: `off` disables
-   both, `bell` and `terminal` pick one, `both` (default) sends the OSC when a backend exists and BEL
-   always.
-2. OSC 9 is `ESC ] 9 ; <title>: <body> ESC \`; OSC 99 is two sequences with `i=1:d=0` for the title
-   and `p=body` for the body; OSC 777 is `ESC ] 777 ; notify ; <title> ; <body> ESC \`. Verify each
-   against the emulator's documentation before shipping; herdr's file is the reference
-   implementation and its tests are the fixtures.
-3. `apps/tui/src/platform.ts` installs a `notify` group on the object it assigns: `show` writes the
-   sequence to stdout through the renderer's write path (not a bare `process.stdout.write`, which the
-   renderer would draw over; verify what `apps/tui/src/kit/copy.ts` does and do the same),
-   `onActivate` returns a no-op unsubscribe (a terminal cannot tell us the banner was clicked), and
-   `setBadge` records the number in a signal the topbar reads.
-4. Focus: `apps/tui/src/main.tsx` subscribes to the renderer's `CliRenderEvents.FOCUS` and `BLUR`
-   and feeds a `terminalFocused` signal, default `true`, into the phase 1 `DeliveryContext` as
-   `focused()`. Unknown counts as focused (herdr's rule).
-5. The topbar (`apps/tui/src/chrome/Topbar.tsx`) draws the pill number at its right edge as `◔ N`
-   when N is non-zero, in the warn tone, reading the same `unreadCount() + inbox().rows.length` the
-   desktop bell reads. Zero draws nothing.
-6. An inbox overlay: a command `notifications.open` registered in `apps/tui/src/chrome/bindings.ts`
-   on a key chosen by the keymap's conventions, drawing "Needs you" and "Notifications" as two
-   `Rows` collections in a panel over the shell, rows in the bell's order, Enter opening the row's
-   task and target through the same factored click path phase 4 makes, Escape closing. Reuse the
-   bell's data (`noticesForActiveNode`, `createAttentionInbox`), not its component.
-7. The terminal client calls `initWorkflowNotices()` and `initSessions()` where the desktop's
-   `App.tsx` does, so workflow notices and PTY edges reach it. Verify the terminal plugin capability
-   guard is right for the terminal client's node.
-8. `docs/tui.md` § What must never happen is read before writing any of this, and nothing here draws
-   a DOM node or adds a second keymap.
+**No timestamp on an inbox row, and no `action` dispatch** (requirement 6, "rows in the bell's
+order"). The order is kept; the relative time is not drawn, because a row at 80 columns gives up its
+meta first and `relTime` is the bell's own local helper rather than something shared. A notice
+carrying `review-config` or `review-plugin-request` opens its task, and not the trust modal the
+desktop opens beside it: neither of those surfaces is drawn on this host.
 
-## Design notes
+**The badge is always on here** (requirement 3). The desktop reads the `badge` switch; there is no
+device preference store in a terminal, and `ACORN_TUI_NOTIFY` is about the channels that interrupt
+you rather than a number in your own topbar.
 
-**Why OSC and not `terminal-notifier` or `osascript`.** herdr shells out on macOS to get
-click-to-activate. acorn's terminal client is a Node process inside someone's terminal, and the
-terminal already has a notification path that lands in the right app with the right icon. A shelled
-notifier is one more binary to find and one more platform to special-case.
+**The focus test is in client-core, not in the TUI suite** (the tests section, which asked for a
+synthetic `BLUR` and `FOCUS`). Every test that draws is `describe.skipIf(!hasFfi)`, because OpenTUI's
+renderer is Node 26.4 behind `--experimental-ffi` — so a focus case there would prove nothing on the
+Node most of the repo runs on. What the phase actually adds to the gate is one seam, and it is
+asserted where it runs: `defaultDeliveryContext` takes a host's own answer, in
+`packages/client-core/src/features/notifications/deliver.test.ts`. The two chrome cases —
+`◔ 2` with two unread notices, nothing with none, and `n` opening both sections — are in
+`chrome.test.tsx` with the rest of its file, and run wherever the renderer does. `notify.test.ts` is
+plain and covers the backend table, each sequence byte for byte, the tmux wrapping, sanitising, and
+`ACORN_TUI_NOTIFY=off`.
 
-**Warp.** `TERM_PROGRAM=WarpTerminal`. Warp documents OSC 9 and OSC 777; OSC 9 is first because it
-is what iTerm2, Ghostty, and WezTerm also take. Verify against Warp's current documentation, and if
-Warp turns a plain BEL into a badge on its own tab, say so in the file so `bell` is a sensible
-setting there.
+## Doc moves when it shipped
 
-**Why no settings surface.** Finding 14. The terminal client cannot hold a device preference and has
-no settings page. `ACORN_TUI_NOTIFY` is the `ACORN_TUI_OSC52` pattern, and a file-backed
-preference store is a door in `docs/tui.md`, not this phase.
-
-**Why the overlay and not a fourth panel.** The column has three framed panels and 22 rows to spend
-at 80 by 24 (`docs/tui.md` § The screen). An inbox that is open only when asked costs nothing when
-closed.
-
-## Files
-
-- `apps/tui/src/kit/notify.ts` (new): backends, sequences, tmux, sanitising. The env override and
-  the BEL write are already in `apps/tui/src/kit/bell.ts`.
-- `apps/tui/src/platform.ts`: the `notify` group.
-- `apps/tui/src/main.tsx`: focus events into the context.
-- `apps/tui/src/chrome/Topbar.tsx`: the count.
-- `apps/tui/src/chrome/Notifications.tsx`: grows the overlay, or a sibling `Inbox.tsx` (new) does.
-- `apps/tui/src/chrome/bindings.ts`: the command.
-- `apps/tui/src/chrome/Shell.tsx`: mounts the overlay and the two init calls.
-
-## Tests
-
-- `apps/tui/src/kit/notify.test.ts` (new): backend detection over a table of environments including
-  Warp, iTerm2, Ghostty, WezTerm, Kitty, tmux-inside-Kitty, and a bare `xterm-256color`; each
-  sequence byte for byte; tmux wrapping doubles every ESC; `sanitise` strips a BEL and an ST;
-  `ACORN_TUI_NOTIFY=off` yields no bytes.
-- `apps/tui/src/chrome/chrome.test.tsx`: the topbar shows `◔ 2` with two unread notices and nothing
-  with none; the overlay opens on its key, lists both sections, and Enter on a row activates the task.
-- A focus test: after a synthetic `BLUR`, an edge for the active task lands unread; after `FOCUS`,
-  read.
-
-## Acceptance
-
-- Requirements 1 to 8 hold.
-- In Warp with the terminal unfocused, a managed session asking for permission raises a Warp
-  notification and the topbar reads `◔ 1`; focusing Warp and opening the overlay, Enter lands on the
-  request.
-- Every existing test passes, including the boot test.
-
-## Doc moves when it ships
-
-`docs/tui.md` § Chrome gains the topbar count and the inbox overlay; § Doors left open gains the
-preference store. This file shrinks to a pointer.
+`docs/tui.md` § What is drawn bespoke gained the count, the inbox overlay, the OSC channel and the
+DEC 1004 focus rule; § Doors left open gained the device preference store. This file then goes with
+the folder.

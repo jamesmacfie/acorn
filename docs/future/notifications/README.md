@@ -1,6 +1,6 @@
 # Notifications
 
-A programme, 2026-09-02. Phases 1 to 4 have shipped and nothing else has started. It starts from a
+A programme, 2026-09-02. Phases 1 to 5 have shipped and phase 6 has not started. It starts from a
 complaint: acorn notifies on too many agent steps. It ends with one attention model shared by
 managed and PTY agents, a settings page, and four channels that hang off one gate, on both hosts.
 
@@ -30,7 +30,7 @@ across.
 | [phase-2-settings.md](./phase-2-settings.md) | Shipped. A pointer to where the page, the parser and the key ended up, and the three places the build departed from the plan. |
 | [phase-3-sound.md](./phase-3-sound.md) | Shipped. A pointer to where the chimes, the sink and the BEL write ended up, and the three places the build departed from the plan. |
 | [phase-4-desktop.md](./phase-4-desktop.md) | Shipped. A pointer to where the `notify` seam group, the two Rust commands and the badge effect ended up, and the four places the build departed from the plan. |
-| [phase-5-tui.md](./phase-5-tui.md) | OSC 9, 99, and 777 to the host terminal, terminal focus, a topbar count, an inbox overlay. |
+| [phase-5-tui.md](./phase-5-tui.md) | Shipped. A pointer to where the OSC channel, the focus seam, the topbar count and the inbox overlay ended up, and the five places the build departed from the plan. |
 | [phase-6-tests-and-docs.md](./phase-6-tests-and-docs.md) | The invariants as properties, `docs/notifications.md` (new) as the owner, and deleting this folder. |
 
 ## The phases, in one line each
@@ -41,12 +41,13 @@ across.
 | 2 | A Notifications settings page over one JSON device preference, with a test button. | 1 | Shipped 2026-09-02. |
 | 3 | Two WebAudio chimes; BEL on the terminal client. | 2 | Shipped 2026-09-02. |
 | 4 | Seam group `notify`: `tauri-plugin-notification`, `set_badge_count`, web fallback, click to open. | 2 | Shipped 2026-09-02. |
-| 5 | Terminal client: OSC backends with tmux passthrough, DEC 1004 focus, topbar count, inbox overlay, `ACORN_TUI_NOTIFY`. | 1, 3 | Not started. |
+| 5 | Terminal client: OSC backends with tmux passthrough, DEC 1004 focus, topbar count, inbox overlay, `ACORN_TUI_NOTIFY`. | 1, 3 | Shipped 2026-09-02. |
 | 6 | Invariants as tests, `docs/notifications.md`, pointers, folder deleted. | all | Not started. |
 
-Phase 5 is next. The gate reads the `notifications` device preference through
-`readNotificationSettings` in `features/notifications/settings.ts`, and that phase hangs its channel
-off `registerNoticeSink` and its switch off the page phase 2 built, the way phases 3 and 4 did.
+Phase 6 is next: the invariants as tests, `docs/notifications.md` (new) as the owner, and this folder
+deleted. Every channel is now hung off `registerNoticeSink` and every switch off the page phase 2
+built, except on the terminal client, which has no device preference store and reads
+`ACORN_TUI_NOTIFY` instead.
 
 ## How to use this folder
 

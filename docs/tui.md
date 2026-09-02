@@ -822,6 +822,33 @@ tab. `visible` is yoga's `display: none`, so the row gives up its height and the
 Notifications are the same `toast()` store the desktop's `ToastHost` draws, so `bridge.ui.toast` and
 every plugin that calls it lands on a line above the footer. They never take focus.
 
+**The count and the inbox.** The topbar's right edge carries `◔ N` in the warn tone when something
+is waiting, and nothing when nothing is. It is the number the desktop's bell puts on its pill and on
+the app icon — unread notices plus the rows in the attention inbox — and it gets here the same way it
+gets onto the dock: `trackBadge` calls the platform seam's `setBadge`, and this host's `notify` group
+writes the signal the topbar reads (`apps/tui/src/kit/notify.ts`). One number with one meaning on
+both hosts.
+
+`n` opens what is behind it. `apps/tui/src/chrome/Inbox.tsx` is the bell's two sections — "Needs you"
+and "Notifications" — as an overlay, because there is no popover here and the column has no room for a
+fourth panel. It reuses the bell's data and not its component: the same `createAttentionInbox`
+fan-out and the same notice ring, drawn as one collection rather than two so that `j` and `k` walk the
+whole thing. Two collections inside a modal would leave the second unreachable, because a trap
+swallows `nextRegion`. Enter switches node if the row belongs to another one, opens the task, and
+dispatches the row's target through the same handler table the desktop uses.
+
+**Asking the terminal to notify.** An unseen notice reaches `initSystemNotices`, which is the same
+channel the desktop raises an OS banner from; here the seam writes an escape sequence and the
+emulator decides. OSC 9 for iTerm2, Ghostty, WezTerm and Warp, OSC 99 for kitty, OSC 777 for rxvt,
+wrapped in a tmux DCS passthrough with every ESC doubled when `TMUX` is set, and title and body
+stripped of anything that could end the sequence early. A terminal on none of those lists gets the
+BEL and nothing else. `ACORN_TUI_NOTIFY` is the switch, in the `ACORN_TUI_OSC52` pattern: `off`,
+`bell`, `terminal`, or `both`, which is the default. There is no settings page here to hold it.
+
+Whether the terminal is the window the reader is looking at comes from DEC 1004: the renderer emits
+`CliRenderEvents.FOCUS` and `BLUR`, `apps/tui/src/main.tsx` feeds them to `setHostFocused`, and the
+gate's seen rule reads them. Unknown counts as focused, so a terminal that never reports stays quiet.
+
 ### Navigation
 
 `Tab` and `Shift+Tab` cycle regions, beside `F6`, which is what the DOM host spells the same intent
@@ -1023,6 +1050,10 @@ modules, the runtime pin and the signing gate. What that step still owes is writ
   client-plugins programme's phase 0 on this host.
 - **A read-only text view inside an `editor` rectangle**, with a find bar. The box and `$EDITOR` cover
   the case today.
+- **A device preference store.** There is no `localStorage` here and `writeDevicePref` is a no-op, so
+  every device-scoped setting the desktop holds is either a default or an environment variable on this
+  host — the notification switches among them (`ACORN_TUI_NOTIFY`). A file-backed store under the
+  TUI's config directory would let the Notifications settings page work here as it does there.
 - **A test for the no-shrink rule.** One `flexShrink` left at its default on a pane's path brings the
   interleaving back, and what catches it is a pane suite noticing a string is missing rather than a
   rule saying why.

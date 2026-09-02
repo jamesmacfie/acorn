@@ -6,6 +6,7 @@ import type { OpenedNode } from './node/open'
 import { startNode } from './node/supervise'
 import { dataRootDir } from './node/paths'
 import { createPluginCustody } from './plugins/custody'
+import { setTerminalBadge, showInTerminal } from './kit/notify'
 
 // The platform seam, from a Node process.
 //
@@ -145,6 +146,19 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
         handshake.deviceToken,
       )
       connect(handshake.nodeId)
+    },
+
+    // Telling somebody something happened while they were not looking, which in a terminal is the
+    // terminal's job: an escape sequence goes to the emulator and the emulator raises the banner, in
+    // the right app with the right icon (./kit/notify.ts).
+    //
+    // `onActivate` never fires. A terminal has no way to tell us its banner was clicked, so the
+    // unsubscribe is all this can honestly return, and the inbox overlay is how a reader gets from
+    // the notification to the thing that raised it (./chrome/Inbox.tsx).
+    notify: {
+      show: async (request: { title: string; body?: string }) => showInTerminal(request.title, request.body),
+      onActivate: () => () => {},
+      setBadge: setTerminalBadge,
     },
 
     // Custody of third-party plugin bundles: a content-addressed file cache and an acknowledgement

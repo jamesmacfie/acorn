@@ -31,8 +31,9 @@ which chime a kind picks, and silence when `sound` is off — and that reads bet
 schedules it asserts against.
 
 **`bell.ts`, not `notify.ts`** (the files section, which offered either). Phase 5 owns
-`apps/tui/src/kit/notify.ts` (new) and the OSC sequences; `notifyMode` lives in `bell.ts` for now
-because it is the switch both files read, and phase 5 can move or re-export it.
+`apps/tui/src/kit/notify.ts` and the OSC sequences, and it took `notifyMode` and `BEL` with it —
+the platform seam imports that file and may not import one that reaches the node. `bell.ts` keeps
+`initBellNotices` and re-exports both.
 
 ## Doc moves when it ships
 
