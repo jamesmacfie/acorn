@@ -78,6 +78,7 @@ client: createProject
 client: createTask
 client: createWorkspace
 client: debounce
+client: defaultDeliveryContext
 client: deviceStorage
 client: dispatchActiveLayout
 client: dispatchLayout
@@ -86,6 +87,8 @@ client: focusedPane
 client: formatFileReference
 client: formatRelativeTime
 client: formatSize
+client: fromManagedSession
+client: fromTerminalSession
 client: fuzzyScore
 client: getHighlighter
 client: handlePluginContentLinkClick
@@ -98,8 +101,10 @@ client: isTerminalMax
 client: latestOnly
 client: learnRefPrefixes
 client: linkifyRefs
+client: markAttentionSeen
 client: nodeReady
 client: nodes
+client: observeAttention
 client: onClosePaneWhen
 client: onClosePaneWithin
 client: onScopeEvicted

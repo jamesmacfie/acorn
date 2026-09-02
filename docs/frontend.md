@@ -270,6 +270,21 @@ approval is still pending after a person dismisses it, so it returns on the next
 attention items are fetched per Node rather than pushed, and why they carry no `read` flag. A notice
 is fired once and forgotten.
 
+Both come from one reading of what an agent session is doing.
+`client-core/features/notifications/attention.ts` collapses a managed row and a PTY session onto five
+states, `working`, `blocked`, `finished`, `error`, and `idle`, and three changes between them are
+worth telling someone about: into `blocked`, into `error`, and `working` to `finished` for an
+interactive or PTY session. A workflow's turn finishing is not one of them, because the workflows
+plugin already sends `run-done` for the run.
+
+One gate decides what each change does. It holds the change for a second and drops it if the session
+has moved on, and it asks whether the owner was watching: the window focused, and the change's task
+the active one. A change they watched still lands in the bell, already read, and fires no other
+channel. A change they missed lands unread. The same rule retires a `completed` attention row:
+looking at a finished session in a focused window acknowledges it, keyed by the session's
+`updatedAt` so a second completion is news again. A `permission`, a `question`, a gate, or an error
+is never retired that way, because looking at a block does not lift it.
+
 ## Restore and persistence
 
 Launch restore proceeds in this order: fleet membership and Node records, active Node, selection and

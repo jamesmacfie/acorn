@@ -1,11 +1,14 @@
 import { createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
-import { saveFile, setTerminalOpen, type Task } from '@acorn/plugin-api/client'
+import {
+  activeNodeId, activeTaskId, defaultDeliveryContext, markAttentionSeen, saveFile, setTerminalOpen, type Task,
+} from '@acorn/plugin-api/client'
 import type { AgentProviderDescriptor, AgentSession } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
 import { downloadName } from './downloadName'
 import { managedAgentStore } from './managedStore'
 import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import {
+  agentAttentionItemId,
   clearManagedSession,
   selectManagedSession,
   selectedManagedSession,
@@ -82,6 +85,26 @@ export function createAgentPaneModel(task: Task) {
       setError(caught instanceof Error ? caught.message : 'Unable to load the agent transcript.')
     })
   }))
+
+  // Acknowledge on view. The node keeps `attention: completed` until the owner speaks again, so a
+  // finished session sits in "Needs you" long after they have read it. Looking at it, in a focused
+  // window, is the acknowledgement (client-core attentionInbox.ts). The key carries `updatedAt`, so
+  // a session that completes a second time is news again.
+  const acknowledgeCompleted = (): void => {
+    if (activeTaskId() !== task.id || !defaultDeliveryContext.focused()) return
+    const nodeId = activeNodeId() ?? ''
+    for (const session of taskSessions())
+      if (session.attention === 'completed') markAttentionSeen(nodeId, agentAttentionItemId(session.id), session.updatedAt)
+  }
+  createEffect(acknowledgeCompleted)
+  // The effect alone misses the commonest case: the session completed while you were elsewhere, and
+  // coming back changes nothing it tracks.
+  // Feature-checked rather than `typeof window`: the terminal host and the test harness both supply
+  // a window-shaped object that is not a DOM one.
+  if (typeof window?.addEventListener === 'function') {
+    window.addEventListener('focus', acknowledgeCompleted)
+    onCleanup(() => window.removeEventListener('focus', acknowledgeCompleted))
+  }
 
   let readTimer: ReturnType<typeof setTimeout> | null = null
   createEffect(() => {

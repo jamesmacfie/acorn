@@ -59,6 +59,10 @@ export function openManagedSession(taskId: string, sessionId: string, requestId?
   dispatchLayout(taskId, { type: 'show', pane: 'agents' })
 }
 
+// The attention inbox's id for a session row, built in one place so the row and the acknowledgement
+// that retires it cannot drift apart (client-core attentionInbox.ts).
+export const agentAttentionItemId = (sessionId: string): string => `agents.sessions:${sessionId}`
+
 export function activateManagedAgentNoticeTargets(): () => void {
   return registerNoticeTargetHandler('managed-agent', (taskId, target) => {
     openManagedSession(taskId, target.resourceId, target.subresourceId)

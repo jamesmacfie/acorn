@@ -8,7 +8,7 @@ import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { ATTENTION_COPY, isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { agentSessionsCollection } from './collectionContribution'
 import { managedAgentApi } from './sessions/managedClient'
-import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents } from './sessions/managedSelection'
+import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents, agentAttentionItemId } from './sessions/managedSelection'
 import { activateManagedAgentNotifications } from './sessions/managedStore'
 import { agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
@@ -93,11 +93,14 @@ export const agentsClientPlugin: ClientPlugin = {
           return {
             // Not the bare session id: the row's identity is (this source, this session), and two
             // sources colliding on a session id would make one of them un-renderable.
-            id: `agents.sessions:${session.id}`,
+            id: agentAttentionItemId(session.id),
             taskId: session.taskId,
             title: `${session.title || session.providerId} ${copy.title}`,
             detail: session.runtimeState,
             severity: copy.severity,
+            // The inbox retires a `completed` row once the owner has looked at it; every other
+            // reason names a block only they can lift.
+            attentionReason: session.attention,
             // `updatedAt`, not now(): the row shows how long this has been waiting, which is the number
             // that decides whether the owner should care.
             at: session.updatedAt,

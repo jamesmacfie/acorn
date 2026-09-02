@@ -15,7 +15,7 @@ import { workspaceForProject } from '@acorn/client-core/features/workspaces/acti
 import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/features/workspaces/fleetWorkspaces.ts'
 import { planWorkspaceViewTransition } from '@acorn/client-core/features/workspaces/workspaceViewTransition.ts'
 import OverflowMenu from '@acorn/client-core/features/settings/OverflowMenu.tsx'
-import { initWorkflowNotices } from '@acorn/client-core/features/notifications/notifications.ts'
+import { initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { initSessions, sessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
 import TabRail from '@acorn/client-core/features/tabs/TabRail.tsx'
 import Tips from '@acorn/client-core/kit/components/overlays/tips.tsx'
@@ -177,8 +177,12 @@ export default function App() {
     if (!hasHostCapability({ plugin: 'terminal' })) return
     onCleanup(initSessions())
     onCleanup(startClientSchedules())
-    onCleanup(initWorkflowNotices())
   })
+
+  // Workflow notices are broadcast over `/v2/events` by main, not by the terminal plugin, and a node
+  // without a terminal still runs workflows. They were inside the guard above, which meant no gate
+  // notice at all on such a node.
+  onMount(() => onCleanup(initWorkflowNotices()))
 
   // Which plugins the node this shell is showing runs.
   //

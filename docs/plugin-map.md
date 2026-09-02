@@ -306,12 +306,20 @@ Pick by how long the message should live.
 | --- | --- | --- |
 | `toast(message, { tone, durationMs })` | Seconds | "That worked." No actions, no buttons |
 | `capabilities.get(WORKFLOWS_NOTICES)?.notice(taskId, kind, title)` | Until read | Something happened while the user was elsewhere. `workflows.notices`, from `plugins/workflows/src/contract/notices.ts` |
-| `pushManagedAgentNotice({ taskId, sessionId, kind, title })` | Until read, plus an OS notification | An agent finished, needs input, or failed |
+| `pushManagedAgentNotice({ taskId, sessionId, kind, title })` | Until read | An agent finished, needs input, or failed |
 | `ctx.attentionSources.register(source)` | Until resolved | A state on the node that needs the owner to act |
 | `bridge.ui.toast(title, detail)` | Seconds | The same, from inside a sandboxed frame |
 
 Toast tones are `neutral`, `success`, and `danger`. A failure gets 8 seconds instead of 4, because it is
 the one you might need to read twice.
+
+Agent notices come from a change of state, not from an event. A plugin holding agent sessions calls
+`observeAttention(snapshots)` with what its adapter produced, and the gate in
+`client-core/features/notifications/deliver.ts` decides the rest: it holds each change for a second
+and re-checks it, so a permission that policy auto-approves never reaches anybody, and it marks a
+change you watched happen as read, so the history is complete and the bell's count does not move.
+`pushManagedAgentNotice` goes through the same gate and is the way in for a notice that has no
+session behind it.
 
 A notice that should open something when clicked carries a `target`, and you register what happens with
 `registerNoticeTargetHandler(kind, handler)`. The same dispatch serves the attention inbox, which uses

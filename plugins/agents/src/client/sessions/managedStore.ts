@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { onScopeEvicted, pushManagedAgentNotice } from '@acorn/plugin-api/client'
+import { activeNodeId, fromManagedSession, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
 import { wsOnAgentFrame } from './wsChannel'
 import type { AgentEventRecord, AgentSession, AgentSessionSnapshot, AgentWsFrame } from '@acorn/protocol/managedAgents.ts'
 import { managedAgentApi } from './managedClient'
@@ -9,7 +9,6 @@ const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
 let subscribers = 0
 let disposeSocket: (() => void) | null = null
-const noticedEventIds = new Set<string>()
 const snapshotRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const deletedSessionIds = new Set<string>()
 const PROJECTED_EVENT_TYPES = new Set([
@@ -38,6 +37,10 @@ function upsertSession(session: AgentSession): void {
       ? { ...current, [session.id]: { ...snapshot, session: newestManagedSession(snapshot.session, session) } }
       : current
   })
+  // Notices come from the row, not from the events. The node projects `attention` from the driver's
+  // own events and re-broadcasts the row after every one, so the client reads a state instead of
+  // guessing one per event — which is why a ten-step workflow used to raise ten "completed" rows.
+  observeAttention([fromManagedSession(session, activeNodeId() ?? '')])
 }
 
 function removeSession(sessionId: string): void {
@@ -52,38 +55,6 @@ function removeSession(sessionId: string): void {
     delete next[sessionId]
     return next
   })
-}
-
-function notifyForEvent(event: AgentEventRecord, session: AgentSession): void {
-  if (noticedEventIds.has(event.id)) return
-  noticedEventIds.add(event.id)
-  if (event.event.type === 'request') {
-    pushManagedAgentNotice({
-      taskId: session.taskId,
-      sessionId: session.id,
-      requestId: event.event.requestId,
-      kind: 'agent-needs-input',
-      title: event.event.kind === 'permission'
-        ? 'Managed agent needs approval'
-        : event.event.kind === 'workflow_gate'
-          ? 'Managed workflow needs approval'
-          : 'Managed agent has a question',
-    })
-  } else if (event.event.type === 'turn_completed') {
-    pushManagedAgentNotice({
-      taskId: session.taskId,
-      sessionId: session.id,
-      kind: 'agent-completed',
-      title: 'Managed agent completed a turn',
-    })
-  } else if (event.event.type === 'error') {
-    pushManagedAgentNotice({
-      taskId: session.taskId,
-      sessionId: session.id,
-      kind: 'agent-error',
-      title: 'Managed agent needs attention',
-    })
-  }
 }
 
 function appendEvent(event: AgentEventRecord): void {
@@ -102,11 +73,10 @@ function appendEvent(event: AgentEventRecord): void {
   })
   if (duplicate) return
   if (PROJECTED_EVENT_TYPES.has(event.event.type)) scheduleSnapshotRefresh(event.sessionId)
-  const session = sessions().find((candidate) => candidate.id === event.sessionId)
-  if (session) notifyForEvent(event, session)
-  else void managedAgentStore.loadSnapshot(event.sessionId)
-    .then((snapshot) => notifyForEvent(event, snapshot.session))
-    .catch(() => undefined)
+  // An event for a session we have never seen: fetch the row, which `upsertSession` then puts
+  // through the gate.
+  if (!sessions().some((candidate) => candidate.id === event.sessionId))
+    void managedAgentStore.loadSnapshot(event.sessionId).catch(() => undefined)
 }
 
 function scheduleSnapshotRefresh(sessionId: string): void {
@@ -180,13 +150,12 @@ export const managedAgentStore = {
   // roster under node B and `loadSnapshot` merges B's transcript into A's cached snapshot for a
   // colliding id.
   //
-  // The dedupe sets go too: `noticedEventIds` suppressing a notice and `deletedSessionIds` suppressing an
-  // upsert are both judgements about one node's ids, and keeping them would silently swallow the new
-  // node's first events for any id that collided.
+  // `deletedSessionIds` goes too: suppressing an upsert is a judgement about one node's ids, and
+  // keeping it would silently swallow the new node's first events for any id that collided. The
+  // attention gate clears itself on the same event (client-core deliver.ts).
   clear(): void {
     setSessions([])
     setSnapshots({})
-    noticedEventIds.clear()
     deletedSessionIds.clear()
     for (const timer of snapshotRefreshTimers.values()) clearTimeout(timer)
     snapshotRefreshTimers.clear()
