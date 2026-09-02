@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { NodeStatus } from '@acorn/protocol/broker.ts'
+import { setActiveNode } from '../../infra/node/activeNode'
 
 const readJson = vi.fn()
 vi.mock('../../infra/node/apiClient', () => ({
@@ -6,7 +8,9 @@ vi.mock('../../infra/node/apiClient', () => ({
   writeJson: vi.fn(),
 }))
 
-const { readCollection, sanitizeRailItem, scopedSourceItemsPath } = await import('./chromeData')
+const { chromeDeps, readCollection, sanitizeRailItem, scopedSourceItemsPath, unwatchChrome, watchChrome } = await import('./chromeData')
+const wsClient = await import('../../infra/node/wsClient')
+const { _resetPluginChannels } = await import('../plugins/pluginChannel')
 
 describe('descriptor source scope', () => {
   it('adds an encoded active project while preserving plugin query parameters', () => {
@@ -105,5 +109,72 @@ describe('collection reads', () => {
 
     await expect(readCollection('board', 'cards-mine', '/v2/p/linear/collections/issues-mine', 'node-1', {}, new AbortController().signal))
       .rejects.toThrow('board may not read')
+  })
+})
+
+
+// The whole of phase 5's chrome half, from the frame to the revision a descriptor read watches.
+//
+// The amplifier this pins closed: `term:status` used to be one content-free ping that a terminal
+// emitted on every idle-to-working edge, and the chrome sweep answered it by refetching every plugin's
+// rail rows, badges and collections on every connected client
+// (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+describe('chrome freshness hears only what names it', () => {
+  const emit: ((nodeId: string, frame: unknown) => void)[] = []
+
+  beforeEach(() => {
+    emit.length = 0
+    ;(globalThis as { window?: unknown }).window = {
+      acorn: {
+        desktop: true,
+        nodeFetch: () => Promise.reject(new Error('this suite makes no requests')),
+        nodeSend: () => {},
+        onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => {
+          emit.push(cb)
+          return () => {}
+        },
+        onNodeStatus: (_cb: (status: NodeStatus) => void) => () => {},
+      },
+    }
+    wsClient._resetWsClient()
+    _resetPluginChannels()
+    setActiveNode('n1')
+    watchChrome(undefined)
+  })
+
+  afterEach(() => {
+    unwatchChrome()
+    wsClient._resetWsClient()
+    _resetPluginChannels()
+    setActiveNode(null)
+    delete (globalThis as { window?: unknown }).window
+  })
+
+  const frame = (f: unknown) => emit.forEach((cb) => cb('n1', f))
+
+  it('does not bump any plugin on a terminal session change', () => {
+    const board = chromeDeps('board')
+    const linear = chromeDeps('linear')
+    frame({ channel: 'terminal:sessions-changed' })
+    expect(chromeDeps('board')).toBe(board)
+    expect(chromeDeps('linear')).toBe(linear)
+  })
+
+  it('bumps only the plugin a status ping names', () => {
+    const board = chromeDeps('board')
+    const linear = chromeDeps('linear')
+    frame({ channel: 'term:status', pluginId: 'board' })
+    expect(chromeDeps('board')).toBe(board + 1)
+    expect(chromeDeps('linear')).toBe(linear)
+  })
+
+  // Core's own pings still carry no id, and still mean everyone's: a task created or a worktree
+  // appearing can move anybody's rows.
+  it('bumps everyone on a ping that names nobody', () => {
+    const board = chromeDeps('board')
+    const linear = chromeDeps('linear')
+    frame({ channel: 'term:status' })
+    expect(chromeDeps('board')).toBe(board + 1)
+    expect(chromeDeps('linear')).toBe(linear + 1)
   })
 })

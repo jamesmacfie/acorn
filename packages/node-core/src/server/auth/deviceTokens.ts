@@ -19,6 +19,16 @@ const TOKEN_RE = /^acorn_dt_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 
 const LAST_SEEN_THROTTLE_MS = 5 * 60_000
 
+// How long a resolved bearer is answered from memory instead of from SQLite. Every authenticated
+// request used to run a synchronous `SELECT` on the node's single event loop, which on a client
+// holding a live socket and refetching a few queries is the most-executed statement in the process
+// (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+//
+// Sixty seconds, matched to the hub's revocation sweep (server/transport/wsHub.ts): a revoke made
+// through this service clears the entry immediately, and the only way an entry outlives its device is
+// a revoke this process never saw, which is the same window a live socket already has.
+const AUTH_CACHE_TTL_MS = 60_000
+
 const sha256 = (input: string): Buffer => createHash('sha256').update(input).digest()
 
 // The wire shape lives in @acorn/protocol because the device list is an owner-facing response
@@ -70,6 +80,17 @@ const summarize = (row: typeof schema.devices.$inferSelect): DeviceSummary => ({
 export function deviceService(db: AppDatabase, now: () => number = () => Date.now()): DeviceService {
   const revokeListeners = new Set<(deviceId: string) => void>()
 
+  // Resolved bearers, keyed by sha256 of the whole token so the secret itself is never a map key. The
+  // hash is still computed per request — it is the lookup key, and it is what the comparison below
+  // needs anyway. What the entry saves is the `SELECT` and the constant-time compare.
+  //
+  // A miss is the only path that reads the row, so `revokedAt` is re-checked on every miss. A revoke
+  // through this service drops every entry for that device before it notifies anyone.
+  const warm = new Map<string, { deviceId: string; at: number }>()
+  const forget = (deviceId: string): void => {
+    for (const [key, entry] of warm) if (entry.deviceId === deviceId) warm.delete(key)
+  }
+
   return {
     async issue(name) {
       const id = randomUUID()
@@ -95,6 +116,11 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
       if (!match) return null
       const [, id, secret] = match
 
+      const key = sha256(bearer).toString('base64')
+      const cached = warm.get(key)
+      if (cached && now() - cached.at < AUTH_CACHE_TTL_MS) return { deviceId: cached.deviceId }
+      warm.delete(key)
+
       const [row] = await db.select().from(schema.devices).where(eq(schema.devices.id, id)).limit(1)
       if (!row) return null
       if (row.revokedAt !== null) return null
@@ -118,6 +144,7 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
         })()
       }
 
+      warm.set(key, { deviceId: id, at: now() })
       return { deviceId: id }
     },
 
@@ -135,6 +162,9 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
         // first one has to be closed too), but it is not a second security event to review.
         recordAudit(db, { ...actor, action: 'device.revoked', subject: id })
       }
+      // Before the listeners, and on a repeat revoke too: a warm entry left behind would authenticate
+      // the revoked bearer for up to a minute, which is the one thing this cache must never do.
+      forget(id)
       // Notify even on a repeat revoke: it is cheap, and a socket that survived the first one (a
       // reconnect racing the revoke) must still be closed.
       for (const listener of revokeListeners) listener(id)

@@ -350,10 +350,12 @@ host other than loopback adds nothing to the allowlist, because the client can a
 directly.
 
 A frame's channel is `<owner>:<verb>`, and the token before the first `:` is the registered prefix on
-both ends. Core owns nine, and every other prefix belongs to the plugin that registered it.
+both ends. Core owns twelve, and every other prefix belongs to the plugin that registered it.
 
 `term:` is transport on both ends and `workflow:` carries the notification bell's notices and step
-events. The other seven are the Node saying that something it owns has moved, and each is one frame:
+events. `ws:shed` is the hub saying it dropped frames because a socket was too far behind to take
+them, described under [Backpressure](./terminal.md#backpressure). The other nine are the Node saying
+that something it owns has moved, and each is one frame:
 
 - `plugins:changed`, when a Node reloads a plugin's node half in place. See the dev loop in
   [the plugins doc](./plugins.md).
@@ -369,13 +371,26 @@ events. The other seven are the Node saying that something it owns has moved, an
   same two kinds the agent webhook delivers externally.
 - `project:changed`, on every project write: create, patch, re-detect, delete, and the config and
   run-target writes.
+- `terminal:sessions-changed`, when a terminal session is created, exits, or flips between working
+  and idle. The one channel here that fires at machine speed, which is why only the session roster
+  hears it.
+- `worktree:status-changed`, when something under a task's worktree changes: a stage, a commit, a
+  discard, a push, an editor write, a worktree created, a session's command going quiet. It carries
+  `taskId`, or `null` when the writer did not know which task it was working in. Separate from
+  `head:changed` because a stage or a discard moves the dirty markers without moving HEAD.
 
-The first two are content-free, because the list behind each is a fetchable route and a payload would
-be a second projection to keep in step. `connection:changed` carries `integrationId`, `providerId`,
-and the new `status`, because every integration plugin hears it and most of them are looking at a
-different provider. The three fields let a listener drop the frame without a round trip, and the
-client still re-reads the route. The last four carry a payload for the same reason; the shapes are in
-`@acorn/protocol/nodeEvents.ts`.
+`term:status` rides the `term:` prefix and is a narrower thing than its name suggests. It means
+"re-read this plugin's chrome descriptors", it carries the `pluginId` whose rows moved, and the
+plugin-chrome sweep is the only thing that hears it. A ping with no `pluginId` is core's own, and means
+every plugin's. The terminal's two former meanings are `terminal:sessions-changed` and
+`worktree:status-changed`.
+
+`plugins:changed`, `tasks:changed` and `terminal:sessions-changed` are content-free, because the list
+behind each is a fetchable route and a payload would be a second projection to keep in step.
+`connection:changed` carries `integrationId`, `providerId`, and the new `status`, because every
+integration plugin hears it and most of them are looking at a different provider. The three fields let
+a listener drop the frame without a round trip, and the client still re-reads the route. The other
+five carry a payload for the same reason; the shapes are in `@acorn/protocol/nodeEvents.ts`.
 
 All of them are invalidation, not replay: a client that missed a frame is not owed a delta, which is
 why each field is what the thing now is rather than what changed about it.

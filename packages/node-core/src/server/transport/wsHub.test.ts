@@ -465,3 +465,107 @@ describe('wsHub non-term channels and broadcast, under task scope', () => {
     device.close()
   })
 })
+
+
+// Backpressure, which used to be handled by amplifying load: the hub dropped a frame when a socket
+// buffered past its mark and incremented `seq` anyway, the broker read the gap as loss and closed the
+// socket, and reconnect re-attached every terminal and refetched every active query — at the moment
+// the node was busiest (docs/future/performance/architecture.md § 2).
+//
+// The mark is set to a byte here rather than four megabytes, so the pause and the resume happen over a
+// real socket without pushing real megabytes through it. `paused` on the client end is what makes the
+// server end's buffer grow.
+describe('wsHub backpressure', () => {
+  let paused: [string, boolean][]
+  let tiny: Server
+  let tinyHost: string
+
+  const openTiny = (): Promise<WebSocket> => {
+    const ws = new WebSocket(`ws://${tinyHost}${WS_PATH}`, { headers: { host: tinyHost, authorization: `Bearer ${DEVICE_TOKEN}` } })
+    return new Promise((resolve, reject) => {
+      ws.on('open', () => resolve(ws))
+      ws.on('error', reject)
+    })
+  }
+
+  beforeEach(async () => {
+    paused = []
+    setStreamHandlers({
+      input: () => {},
+      attach: () => {},
+      detach: () => {},
+      streamTaskId: () => 'task-1',
+      flowControl: (id, isPaused) => void paused.push([id, isPaused]),
+    })
+    tiny = createServer()
+    await listen(tiny)
+    tinyHost = `127.0.0.1:${(tiny.address() as AddressInfo).port}`
+    attachWsHub(tiny, { internalToken: INTERNAL, allowedHosts: new Set([tinyHost]), devices, revocationCheckMs: 5_000, maxBufferedBytes: 1 })
+  })
+
+  afterEach(() => {
+    disposeWsHub(tiny)
+    tiny.close()
+  })
+
+  // One megabyte of output with the reader stopped, and the producer is asked to stop too.
+  it('pauses the stream behind a socket over its mark and resumes it on drain', async () => {
+    const ws = await openTiny()
+    const got = frames(ws)
+    ws.pause()
+
+    const big = 'x'.repeat(1_000_000)
+    for (let i = 0; i < 4; i++) wsBroadcast({ channel: 'term:out', id: 's1', msg: { type: 'output', data: big } as never })
+
+    await waitFor(() => paused.some(([, isPaused]) => isPaused), 'the PTY to be paused')
+    expect(paused[0]).toEqual(['s1', true])
+    // Asked once, not once per frame.
+    expect(paused.filter(([, isPaused]) => isPaused)).toHaveLength(1)
+
+    ws.resume()
+    await waitFor(() => paused.some(([, isPaused]) => !isPaused), 'the PTY to be resumed on drain')
+    expect(paused.at(-1)).toEqual(['s1', false])
+
+    // And nothing was thrown away: every frame the hub was handed arrived, in order, with a contiguous
+    // sequence. Dropping bytes out of the middle of a terminal stream corrupts the screen.
+    await waitFor(() => got.length >= 4, 'all four frames')
+    expect(got.map((f) => f.seq)).toEqual([1, 2, 3, 4])
+    ws.close()
+  })
+
+  // A socket that dies while it is behind must not leave the PTY it was holding paused for ever.
+  it('resumes a held stream when the socket that held it closes', async () => {
+    const ws = await openTiny()
+    ws.pause()
+    const big = 'y'.repeat(1_000_000)
+    for (let i = 0; i < 3; i++) wsBroadcast({ channel: 'term:out', id: 's2', msg: { type: 'output', data: big } as never })
+    await waitFor(() => paused.some(([, isPaused]) => isPaused), 'the PTY to be paused')
+
+    ws.terminate()
+    await waitFor(() => paused.some(([, isPaused]) => !isPaused), 'the PTY to be resumed on close')
+    expect(paused.at(-1)).toEqual(['s2', false])
+  })
+
+  // An invalidation ping has no producer to slow down, so it is the one thing still shed. What must not
+  // happen is a gap: the broker closes on one, and the whole point is not to reconnect under load.
+  it('sheds a non-stream frame as a marker, keeping seq contiguous', async () => {
+    const ws = await openTiny()
+    const got = frames(ws)
+    ws.pause()
+
+    wsBroadcast({ channel: 'term:out', id: 's3', msg: { type: 'output', data: 'z'.repeat(1_000_000) } as never })
+    // Now the socket is over its mark, and these have nobody to pause.
+    wsBroadcast({ channel: 'tasks:changed' })
+    wsBroadcast({ channel: 'tasks:changed' })
+    wsBroadcast({ channel: 'plugins:changed' })
+
+    ws.resume()
+    await waitFor(() => got.some((f) => f.channel === 'ws:shed'), 'the shed marker')
+    // One marker for the whole congested window, and it took the sequence number the first shed frame
+    // would have had. Nothing after it skips a number.
+    expect(got.filter((f) => f.channel === 'ws:shed')).toHaveLength(1)
+    expect(got.map((f) => f.seq)).toEqual(got.map((_f, i) => i + 1))
+    expect(got.map((f) => f.channel)).toEqual(['term:out', 'ws:shed'])
+    ws.close()
+  })
+})

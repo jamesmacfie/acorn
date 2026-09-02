@@ -77,6 +77,12 @@ export type { SecretService } from '@acorn/node-core/server/core/secrets.ts'
 export type { PrefService } from '@acorn/node-core/server/core/prefs.ts'
 export { confineExistingFile } from '@acorn/node-core/server/core/fs.ts'
 export { git, gitOrThrow, gitText } from '@acorn/node-core/server/core/git.ts'
+// The coalesced `git status` for a worktree: one process per path per two seconds however many callers
+// ask, so a plugin reading local changes and core reading the rail's dirty markers share one spawn
+// (docs/workspaces-and-tasks.md § Worktree status reads). `invalidateWorktreeStatus` is for a plugin
+// that has just written under a worktree itself; the ordinary announcement is
+// `ctx.events.worktreeStatus(taskId)`.
+export { invalidateWorktreeStatus, worktreeStatusText } from '@acorn/node-core/server/worktrees/worktreeStatus.ts'
 export { brokerEnv } from '@acorn/node-core/server/core/proc.ts'
 
 // ── Task, worktree and run configuration ──────────────────────────────────────────────────────

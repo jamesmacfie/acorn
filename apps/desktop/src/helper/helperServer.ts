@@ -83,7 +83,23 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   const { secret, appOrigin } = options
   const sockets = new Set<WebSocket>()
 
+  // Which node the renderer is actually looking at. The broker opens a socket to every paired node and
+  // pushes every frame here, and the renderer drops whatever is not the active node on arrival
+  // (@acorn/client-core/infra/node/wsClient.ts) — so an N-node fleet used to pay two process
+  // boundaries, a JSON stringify and a JSON parse per frame to deliver frames that were then thrown
+  // away (docs/future/performance/architecture.md § 4).
+  //
+  // Nobody has to tell us: every request the renderer makes names the node it is addressing, so the
+  // last one named is the active one. A node switch changes the fact with the renderer's first request
+  // to the new node. The one frame that might be dropped in the gap between the switch and that request
+  // is a `<noun>:changed` ping, and the switch's own refetch covers it. The renderer-side filter stays
+  // as a belt.
+  let addressed: string | null = null
+
   const push = (message: HelperMessage): void => {
+    // `node-status` from every node, always: the fleet list draws a row per node and a node coming back
+    // online is exactly what the renderer is watching for on the ones it is not looking at.
+    if ('push' in message && message.push === 'node-frame' && addressed !== null && message.nodeId !== addressed) return
     const payload = JSON.stringify(message)
     for (const socket of sockets) if (socket.readyState === socket.OPEN) socket.send(payload)
   }
@@ -105,6 +121,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   const handlers: Record<HelperMethod, (params: unknown) => unknown | Promise<unknown>> = {
     'node-fetch': async (raw) => {
       const { nodeId, request } = z.object({ nodeId: z.string().min(1), request: z.unknown() }).parse(raw)
+      addressed = nodeId
       const parsed = nodeFetchRequestSchema.parse(toFetchRequest(request as WireFetchRequest))
       try {
         const response = await helper.broker.fetch(nodeId, parsed)
@@ -122,6 +139,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     },
     'node-send': (raw) => {
       const { nodeId, frame } = z.object({ nodeId: z.string().min(1), frame: z.unknown() }).parse(raw)
+      addressed = nodeId
       // Structural check only: the frame vocabulary is a
       // TypeScript union rather than a Zod schema, the node validates its own inbound frames, and all
       // the helper needs to know is that this is a channel-tagged object it can forward.

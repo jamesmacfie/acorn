@@ -35,15 +35,18 @@ export const CHANGES_HOOKS = [
 // host around it, and absent means nobody objects, which is also what an empty chain means.
 export function localGitBridge(
   core: Pick<CoreServices, 'tasks'>,
-  broadcastStatus: () => void = () => {},
+  /** `ctx.events.worktreeStatus`: a stage, a commit, a discard or a push moved the dirty markers. */
+  worktreeChanged: (taskId: string) => void = () => {},
   hooks?: Pick<PluginHookRegistry, 'run'>,
 ): LocalGitBridge {
-  // A mutation resolves the root, runs the git action, then pings status so dirty markers move.
+  // A mutation resolves the root, runs the git action, then announces so dirty markers move. Dropping
+  // the coalesced `git status` for the path is `run`'s job in ./localDiff.ts, next to the write itself,
+  // so an action reached from anywhere (the agent tools, a test) gets it too.
   const withRoot = async (taskId: string, fn: (root: string) => Promise<{ ok: boolean; reason?: string }>) => {
     const root = await core.tasks.root(taskId)
     if (!root) return { ok: false, reason: 'No worktree yet.' }
     const res = await fn(root)
-    broadcastStatus()
+    worktreeChanged(taskId)
     return res
   }
   return {

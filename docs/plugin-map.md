@@ -185,7 +185,8 @@ and what never will be are in `docs/plugins.md § Hearing another plugin`; what 
 
 | Call | What it does |
 | --- | --- |
-| `ctx.events.status()` | The content-free ping. Every client re-pulls what it is showing |
+| `ctx.events.status()` | "Re-read my chrome descriptors." Scoped to your plugin by the host |
+| `ctx.events.worktreeStatus(taskId)` | "Something under this task's worktree changed." Moves the dirty markers |
 | `ctx.events.send(frame)` | Push one frame to every connected client. The hub skips task-confined sockets |
 | `ctx.events.repoConfigTrustNotice(taskId)` | The one notice carrying an action: this repo's committed config needs review |
 | `ctx.events.on(event, listener)` | Hear a core event on this node. The event must be one `permissions.events` named |
@@ -414,8 +415,8 @@ export const tunnelsPlugin: NodePlugin = {
       cadence: { every: 600 },
       run: async (signal) => {
         const closed = await reapIdle(db, ctx.core.proc, signal)
-        // Content-free. Every client re-reads /list rather than trusting a payload that has to stay
-        // correct across reconnects.
+        // Content-free, and scoped to this plugin by the host. Every client re-reads /list rather than
+        // trusting a payload that has to stay correct across reconnects.
         if (closed > 0) ctx.events.status()
         return `closed ${closed}`
       },

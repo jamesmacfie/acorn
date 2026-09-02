@@ -12,7 +12,7 @@ import { createSignal } from 'solid-js'
 import { hasHostCapability } from '../../infra/node/hostCapabilities'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { readJson } from '../../infra/node/apiClient'
-import { wsOnStatus } from '../../infra/node/wsClient'
+import { wsOnNodeEvent } from '../../infra/node/wsClient'
 import { fromTerminalSession } from '../notifications/attention'
 import { observeAttention } from '../notifications/deliver'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
@@ -57,7 +57,10 @@ export function initSessions(): () => void {
     void refreshSessions().catch(() => {})
   }
   pull()
-  return wsOnStatus(pull)
+  // `terminal:sessions-changed`, which is the half of the old `term:status` ping this list actually
+  // wanted. The other five subscribers to that ping were paying for this one's edges
+  // (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+  return wsOnNodeEvent('terminal:sessions-changed', pull)
 }
 
 // Which terminal tab was last viewed, per task (session-only, like isTerminalOpen). Lets the drawer

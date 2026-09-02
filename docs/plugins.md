@@ -1601,9 +1601,15 @@ timidity — a descriptor read is one HTTP call *per node*, and one interval ser
 at the lowest value anyone declared, so a plugin that asked for two seconds would be spending every
 other plugin's budget as well as its own. Declare it for data that changes with nothing to trigger on.
 
-**`ctx.events.status()`** is core's content-free ping. It refetches every descriptor of every plugin
-and marks whatever each client is showing stale, which is right for "something happened" and wrong for
-"here is another number". Use it after an action, not on a timer.
+**`ctx.events.status()`** means "re-read my chrome descriptors". The host binds it to the calling
+plugin's id, so it refetches that plugin's rail rows, badges, collections and agent context on every
+connected client, and nobody else's. It is right for "something happened" and wrong for "here is
+another number". Use it after an action, not on a timer.
+
+It used to be a content-free ping that refetched every descriptor of every plugin, and a terminal
+flipping between working and idle fired one per edge. `bumpChrome` in
+`packages/client-core/src/host/chrome/chromeData.ts` has kept a revision per plugin all along; the
+socket subscription was the one caller that told it nothing.
 
 **The plugin's own channel** is the fast path, and the one to reach for when data actually streams.
 
@@ -2787,9 +2793,27 @@ a stranger could learn one existed.
 **Hearing a core event.** `ctx.events.on(event, listener)` is the receive side, and it fires whether or
 not a client is attached, which is the point on a node nobody is sitting at. The event must be one core
 publishes (`NODE_EVENT_CHANNELS` in `packages/protocol/src/nodeEvents.ts`) and, for a loaded plugin,
-one its manifest named in `permissions.events` — the same grant list its frames subscribe against, so
+one its manifest named in `permissions.events`, the same grant list its frames subscribe against, so
 there is one vocabulary and one trust sentence per grant rather than two of each. Disposal follows
 unload, exactly as a route registration does. The catalogue is in `nodeEvents.ts`.
+
+Two of the nine are worth calling out because they are what a coarser ping split into.
+`terminal:sessions-changed` says a session was created, exited, or flipped between working and idle.
+It is the one core channel that fires at machine speed, so hear it only if a session roster is what
+you draw. `worktree:status-changed` says something under a task's worktree changed, and carries the
+`taskId`. Announce that one with `ctx.events.worktreeStatus(taskId)` after your plugin writes under a
+worktree, and drop the node's coalesced `git status` for the path first if you wrote to it directly:
+
+```js
+import { invalidateWorktreeStatus } from '@acorn/plugin-api/node'
+
+await writeFile(join(root, path), text, 'utf8')
+invalidateWorktreeStatus(root)
+ctx.events.worktreeStatus(taskId)
+```
+
+The order matters. The announcement is what makes every client re-read, and they must not be handed
+the answer from before your write. See [Worktree status reads](./workspaces-and-tasks.md#worktree-status-reads).
 
 **Hearing another plugin.** The same `on` takes `plugin:<id>:<verb>` when the producer declared the
 verb: a loaded plugin under a top-level `emits` key in its manifest, a built-in through

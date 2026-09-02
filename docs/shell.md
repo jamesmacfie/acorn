@@ -381,8 +381,21 @@ broker adds the bearer, validates the pinned certificate, and returns serializab
 Node states are `online`, `degraded`, `offline`, `incompatible`, and `revoked`.
 
 Both ends run a ping and pong watchdog. A sequence gap or watchdog failure makes the node stale and
-causes the client to reconnect and refetch. A mutation is never queued automatically while a node is
-offline.
+causes the client to reconnect and refetch, with one exception: a `ws:shed` marker says the node
+dropped invalidation frames because this socket was behind, which is congestion rather than loss, and
+the broker forwards it instead of closing. See [Backpressure](./terminal.md#backpressure).
+A mutation is never queued automatically while a node is offline.
+
+The helper forwards one node's frames, not the fleet's. The broker holds a socket to every paired
+node, and the renderer only ever draws one node's live surfaces, so the helper reads which node is
+active off the requests it is already answering: `node-fetch` and `node-send` both name a node id, and
+the last one named is the active one (`apps/desktop/src/helper/helperServer.ts`). Frames from any
+other node are dropped before they cross the process boundary, which is where a stringify and a parse
+per frame used to be spent on frames the renderer threw away. Every node's `node-status` is forwarded
+regardless, because the fleet list draws a row per node. A node switch changes the fact with the
+renderer's first request to the new node; the one frame that might be dropped in that gap is a
+`<noun>:changed` ping, and the switch's own refetch covers it. The renderer keeps its own filter as a
+belt.
 
 Nothing asks the webview engine to talk to a node, so there is no certificate-override path to get
 wrong. The window loads `app://acorn`, and every byte to or from a node goes through the broker's own

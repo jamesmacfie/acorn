@@ -33,6 +33,8 @@ export const NODE_EVENT_CHANNELS = [
   'run:changed',
   'agent-session:changed',
   'project:changed',
+  'terminal:sessions-changed',
+  'worktree:status-changed',
 ] as const
 
 export type NodeEventChannel = (typeof NODE_EVENT_CHANNELS)[number]
@@ -81,3 +83,12 @@ export type AgentSessionChangedEvent = {
 // A project row was created, patched, re-detected, deleted, or had its config written. The id is the
 // only field: which project moved is worth a round trip saved, what moved is not.
 export type ProjectChangedEvent = { projectId: string }
+
+// Something under a task's worktree changed on this node: a stage, a commit, a discard, a push, an
+// editor write, a worktree created. Carries the task rather than the path, because the path is the
+// node's own filesystem and a client addresses a worktree by the task that owns it. `null` when the
+// writer did not know which task it was working in, which a listener reads as "sweep them all".
+//
+// This is the half of the old `term:status` ping that meant "re-read the dirty markers". It is
+// separate from `head:changed` because a stage or a discard moves the markers without moving HEAD.
+export type WorktreeStatusChangedEvent = { taskId: string | null }

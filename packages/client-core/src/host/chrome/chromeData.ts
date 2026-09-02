@@ -56,8 +56,9 @@ export const ownsRoute = (pluginId: string, path: string): boolean => {
 
 // Two revisions, and a descriptor read watches both.
 //
-// The shared one is bumped by the node's content-free status ping and by the polling fallback. That
-// ping carries no payload, so a global signal is all it can drive.
+// The shared one is bumped by the polling fallback and by a status ping that names no plugin, which is
+// core's own way of saying "anyone's rows may have moved" — a task created, a worktree appearing. A
+// plugin's own ping names itself and lands on the per-plugin revision below.
 //
 // The per-plugin one is for a plugin pushing on its own channel (plugins/pluginChannel.ts). Without
 // it, a plugin sampling every two seconds re-reads every other plugin's badges and rail rows at the
@@ -105,7 +106,10 @@ let interval: ReturnType<typeof setInterval> | null = null
 /** Start (or restart) the freshness wiring for the descriptors currently registered. `refreshSeconds`
  * is the smallest polling fallback any of them declared, or undefined when none did. */
 export function watchChrome(refreshSeconds: number | undefined): void {
-  unsubscribe ??= wsOnStatus(() => bumpChrome())
+  // The plugin id, forwarded. This was the one caller that passed nothing, so every ping refetched
+  // every plugin's descriptor routes (docs/future/performance/decisions.md § Corrections to the first
+  // reads). Core's own pings still carry no id, which still means everyone's.
+  unsubscribe ??= wsOnStatus((pluginId) => bumpChrome(pluginId))
   unsubscribePush ??= onPluginPush(bumpChrome)
   if (interval) clearInterval(interval)
   interval = refreshSeconds === undefined ? null : setInterval(() => bumpChrome(), refreshSeconds * 1_000)

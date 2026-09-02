@@ -7,6 +7,7 @@ import { schema } from '../db'
 import { clearHooks, registerHookHandler } from '../pluginHost/hooks'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { baseRefPref, computeTaskStatuses, loadTask, resolveTaskCwd, setWorktreesRoot } from './taskWorktree'
+import { _resetWorktreeStatus, invalidateWorktreeStatus } from './worktreeStatus'
 
 const broadcasts: Record<string, unknown>[] = []
 vi.mock('../transport/wsHub', async (importOriginal) => ({
@@ -60,6 +61,9 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
   afterAll(() => rmSync(template, { recursive: true, force: true }))
 
   beforeEach(async () => {
+    // The coalesced status read is a module singleton, and these tests recreate a repo at a fresh path
+    // per case (./worktreeStatus.ts).
+    _resetWorktreeStatus()
     t = makeTestDb()
     dir = mkdtempSync(join(tmpdir(), 'acorn-taskwt-'))
     checkout = join(dir, 'checkout')
@@ -154,6 +158,11 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     writeFileSync(join(res.cwd, 'g.txt'), 'new\n')
     git(res.cwd, 'add', 'g.txt')
     git(res.cwd, 'commit', '-m', 'move the tip')
+    // This raw commit stands in for one typed into a terminal, and the terminal engine drops the
+    // coalesced status read for the worktree on the same edge it announces the change on
+    // (plugins/terminal/src/server/terminal.ts § worktreeSettled). Without that, two polls a
+    // millisecond apart are one `git status` by design (./worktreeStatus.ts).
+    invalidateWorktreeStatus(res.cwd)
     const [second] = await computeTaskStatuses(t.db)
     expect(second!.head).not.toBe(first!.head)
     expect(broadcasts.filter((f) => f.channel === 'head:changed')).toEqual([

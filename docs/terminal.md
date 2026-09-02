@@ -58,6 +58,36 @@ question that has already scrolled past does not count.
 `resolveBackend` degrades a profile's `tmux` preference to `node-pty` whenever tmux is not installed,
 so durable mode is simply unavailable rather than a launch failure.
 
+Two frames come out of these edges, and the split is about how often each fires.
+`terminal:sessions-changed` goes out on every edge, including the working one, which a build's output
+crosses repeatedly. Only the session roster hears it. `worktree:status-changed` goes out on the human
+edges alone: a session's command going quiet, a session exiting, a setup script finishing. Those are
+the moments a `git commit` typed into a shell is done, so that is when the dirty markers are worth
+re-reading, and the node drops its coalesced `git status` for the session's directory on the same
+edge. A session going from idle to working changes nothing about the files, so it says nothing about
+them.
+
+## Backpressure
+
+The node's hub holds one WebSocket per client and stamps a per-connection `seq` on every frame. A gap
+in that sequence means loss, and the broker's only remedy is to close the socket and reconnect, which
+re-attaches every live terminal and makes the node serialise a framebuffer per session while the
+client refetches its active queries.
+
+So the hub does not create gaps. When a socket has buffered more than 4 MiB, the hub asks the engine
+to pause the pseudo-terminal behind the frame it is about to send, sends the frame anyway, and resumes
+the producer once the buffer falls below half the mark. `pause()` stops node-pty reading the
+pseudo-terminal, the kernel's pipe fills, and the program writing into it blocks. That is what "slow
+down" means to a build, and it costs nothing: no bytes are dropped, so no screen is corrupted. A
+session attached to two clients is paused while either of them is behind, and a socket that dies while
+holding a pause releases it, so a session cannot be left paused for ever.
+
+An invalidation ping has no producer to slow down. Those are still shed, and the hub replaces the
+first one in a congested window with a `ws:shed` marker that takes the sequence number the shed frame
+would have had. Later sheds in the same window consume no sequence number, because one "you are
+behind" is the whole message. The broker forwards the marker instead of resetting the socket, and the
+renderer answers it the way it answers a reconnect: mark what is on screen stale and let it refetch.
+
 ## Process broker
 
 Terminal, agents, workflows, Docker, database helpers, and command variables use CoreServices' process

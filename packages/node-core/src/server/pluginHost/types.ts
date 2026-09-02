@@ -307,8 +307,15 @@ export type CompiledPluginProviderRegistry = PluginProviderRegistry & {
 export type PluginBroadcast = {
   // Push a frame to every connected client. The hub skips task-confined sockets.
   send(frame: WsServerFrame): void
-  // The content-free ping. The renderer re-pulls what it's showing rather than trusting a payload.
+  // "Re-read my chrome descriptors": this plugin's rail rows, badges, collections and agent context.
+  // Scoped to the calling plugin by the host, so one plugin saying its rows moved no longer costs every
+  // other plugin a descriptor round trip on every connected client
+  // (docs/plugins.md § Hearing a core event).
   status(): void
+  // "Something under this task's worktree changed": a stage, a commit, a discard, a push, a file
+  // written. The dirty markers in the rail and footer come from a `git status` sweep, and this is what
+  // tells a client to take it. `null` when the writer does not know the task.
+  worktreeStatus(taskId: string | null): void
   // "This repo's committed config changed and needs the owner's review". The one notice that carries an
   // action, because ignoring it silently disables a repo's scripts.
   repoConfigTrustNotice(taskId: string): void

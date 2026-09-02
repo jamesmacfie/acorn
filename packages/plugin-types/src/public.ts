@@ -409,8 +409,13 @@ export type PluginDatabase = HostOwned<'node-core/main/pluginStorage.PluginDatab
 export type PluginBroadcast = {
   /** Confined to your own `plugin:<yourId>:<verb>` namespace. Anything else throws. */
   send(frame: { channel: string } & Record<string, unknown>): void
-  /** The content-free ping the renderer re-pulls on. */
+  /** "Re-read my chrome descriptors": your rail rows, badges, collections and agent context. Scoped to
+   *  your plugin, so it costs nobody else a round trip. */
   status(): void
+  /** "Something under this task's worktree changed": a stage, a commit, a discard, a file written. The
+   *  dirty markers in the rail and footer come from a `git status` sweep, and this is what tells a
+   *  client to take it. `null` when you do not know the task. */
+  worktreeStatus(taskId: string | null): void
   /** "This repo's committed config changed and needs the owner's review." */
   repoConfigTrustNotice(taskId: string): void
   /** Hear a core event, or another plugin's declared verb, on this node, whether or not a client is
@@ -429,6 +434,8 @@ export type NodeEventChannel =
   | 'run:changed'
   | 'agent-session:changed'
   | 'project:changed'
+  | 'terminal:sessions-changed'
+  | 'worktree:status-changed'
 
 // ── Core services ─────────────────────────────────────────────────────────────────────────────────
 

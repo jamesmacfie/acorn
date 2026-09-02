@@ -132,6 +132,29 @@ without a setup script. Missing sources warn rather than fail worktree creation,
 are never overwritten, and a repo's list wins over a personal one outright rather than merging with
 it.
 
+### Worktree status reads
+
+The rail and footer show a dirty marker and a changed-file count per task, and both come from
+`git status --porcelain=v2 --branch` in each active worktree. Every connected client asks for that
+sweep independently, and the changes pane asks the same question of the same directory for its own
+list, so two clients over four worktrees used to be 16 `git status` processes per ping.
+
+`packages/node-core/src/server/worktrees/worktreeStatus.ts` answers from one process per worktree per
+two seconds: concurrent callers join the run in flight, and a caller just behind one gets what that
+run produced. The changes pane's local-changes read takes the same output, which is why the command
+carries `--branch` that only the rail needs. The node drops a path's entry when it writes under it,
+which covers a stage, a commit, a discard, a push, an editor save, a worktree created, and a terminal
+session's command going quiet. A change made outside acorn shows up on the next poll past the window.
+There is no filesystem watcher, and `docs/future/performance/refused.md` holds the argument and the
+condition that would change it.
+
+**The cache serves reads, never a refusal.** `removeWorktree` refuses to delete a worktree with
+uncommitted changes unless the caller forces it, and a stale "clean" reaching that guard would destroy
+somebody's work. So `worktreeDirty` passes `fresh: true`, which skips the in-flight promise and the
+window and runs git. A failure is never remembered either: "we could not tell" must not become
+"clean" for the next two seconds. `worktreeStatus.test.ts` holds the test that says so, which writes
+a file, waits 100 milliseconds, and expects the removal to be refused.
+
 Archive runs the configured teardown flow where the desktop runtime is available and reports partial
 failures instead of pretending removal succeeded. Its order is guard, repo teardown script, stop
 sessions, plugin cleanups, remove worktree, mark archived. The two teardown steps sit before removal

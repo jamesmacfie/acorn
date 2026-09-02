@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
-import { buildSessionEnv, childEnv, type CoreServices, getProfile, type InternalEnvFactory, type Launcher, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
+import { buildSessionEnv, childEnv, type CoreServices, getProfile, type InternalEnvFactory, invalidateWorktreeStatus, type Launcher, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
 import { terminalSessions } from '../node/schema'
 import type { TerminalBridge } from './routes/terminal'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/protocol/terminal.ts'
@@ -115,6 +115,16 @@ let seedNotes: ((task: TaskRef) => Promise<void>) | null = null
 let internalEnv: InternalEnvFactory = () => ({})
 let bootReconciled: Promise<void> = Promise.resolve()
 let statusBroadcast: () => void = () => {}
+let worktreeBroadcast: (taskId: string) => void = () => {}
+
+// A session's command went quiet, exited, or finished setting up. Whatever it was doing to the files in
+// its worktree, it has stopped doing it, so drop the coalesced `git status` for that directory and tell
+// every client to re-read the dirty markers. This is what keeps a `git commit` typed into a terminal
+// showing up immediately without a filesystem watcher (docs/future/performance/refused.md).
+function worktreeSettled(s: Session): void {
+  invalidateWorktreeStatus(s.meta.cwd)
+  worktreeBroadcast(s.meta.taskId)
+}
 
 // PTY-tier AgentState (docs/terminal-and-agents.md): shells stay 'unknown'; agents flip between working
 // and idle with the silence detector, and 'blocked' lands with the prompt-pattern scan.
@@ -289,6 +299,7 @@ function wireSession(meta: TerminalSession, pty: IPty): Session {
     agentSender.clear(s.meta.id) // queued sends can never fire now
     emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null })
     if (s.meta.backend === 'tmux') void markExited(s.meta.id, exitCode)
+    worktreeSettled(s)
     // Task-completion trigger (docs/notes-and-memory.md): an agent session ending is the extraction moment.
     if (s.meta.kind === 'agent' && s.meta.title !== 'Teardown') void memoryReviewTrigger?.(s.meta.taskId, s.ring.slice(-10_000))
     statusBroadcast()
@@ -310,6 +321,7 @@ function startIdleWatch() {
         agentSender.onIdle(s.meta.id) // flush 'after-ready' sends on the busy→idle edge (04 §D)
         // The OS toast lives in the client now, focus-gated with cooldown and dedup there.
         statusBroadcast()
+        worktreeSettled(s)
       }
     }
   }, 3000)
@@ -330,6 +342,8 @@ async function maybeRunSetup(t: TaskRef, cwd: string): Promise<void> {
   if (trigger === 'off' || !script?.trim()) return
   await spawnOne({ taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t)
   statusBroadcast() // panel re-lists to show the Setup tab even when no other spawn follows
+  invalidateWorktreeStatus(cwd)
+  worktreeBroadcast(t.id) // a setup script installs dependencies, which is a dirty worktree
 }
 
 async function create(opts: CreateOpts): Promise<TerminalSession> {
@@ -526,7 +540,14 @@ export type TerminalChannelDeps = {
   // Resolves when the composition root's post-window reconcile pass is done, including on failure.
   // Mutating surfaces that read the sessions map await it.
   reconciled: Promise<void>
+  // "The session roster moved": created, exited, or flipped between working and idle. Machine rate on
+  // the working edge, which is why it says only that (@acorn/protocol/nodeEvents.ts).
   status?: () => void
+  // "Something under this task's worktree may have changed." Fired on the human-rate edges only — a
+  // command going quiet, a session exiting, a setup script finishing — because those are the moments a
+  // person's `git commit` in a shell is done. A working edge is not one of them
+  // (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+  worktreeChanged?: (taskId: string) => void
   streams?: (handlers: Parameters<CompiledPluginBroadcast['streams']>[0]) => void
 }
 
@@ -558,6 +579,7 @@ export function disposeTerminal(): void {
   seedNotes = null
   bootReconciled = Promise.resolve()
   statusBroadcast = () => {}
+  worktreeBroadcast = () => {}
 }
 
 export type TerminalChannelRegistrations = {
@@ -576,6 +598,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   seedNotes = deps.seedTaskNotes
   bootReconciled = deps.reconciled
   statusBroadcast = deps.status ?? (() => {})
+  worktreeBroadcast = deps.worktreeChanged ?? (() => {})
 
   // Every worktree creation funnels through core's resolveTaskCwd, so this handler makes the setup
   // script run whichever surface created the worktree.
@@ -705,6 +728,24 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
     },
     detach: (id, sink) => {
       sessions.get(id)?.display.detach(sink)
+    },
+    // Backpressure, at the producer. The hub calls this when a client's socket has buffered past its
+    // mark; `pause()` stops node-pty reading the pseudo-terminal, which lets the kernel's pipe fill and
+    // the program writing into it block, which is what "slow down" means to a build
+    // (docs/terminal.md § Backpressure). The alternative the hub used to take was throwing frames away,
+    // which the client could only recover from by reconnecting and re-attaching every session.
+    //
+    // A pause is not visible to the session's state: the idle watch reads `lastActivityAt`, and a paused
+    // PTY simply stops advancing it, which is indistinguishable from a quiet program and equally true.
+    flowControl: (id, paused) => {
+      const s = sessions.get(id)
+      if (!s || s.meta.status !== 'running') return
+      try {
+        if (paused) s.pty.pause()
+        else s.pty.resume()
+      } catch {
+        // A PTY that exited between the hub's decision and this call. Nothing to slow down.
+      }
     },
   })
 

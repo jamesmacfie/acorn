@@ -558,6 +558,10 @@ describe('architecture boundaries', () => {
       ['packages/node-core/src/server/worktrees/taskWorktree.ts', "the 'terminal' setup-script trigger"],
       ['packages/protocol/src/api.ts', "the 'terminal' setup-script trigger"],
       ['packages/client-core/src/host/registries/commands/commands.ts', "the 'terminal' command category"],
+      // `terminal` the channel prefix of core's own `terminal:sessions-changed` event, which is a noun
+      // and not the roster id. Any plugin that starts a session emits it and the shell hears it
+      // (@acorn/protocol/nodeEvents.ts).
+      ['packages/client-core/src/infra/node/wsClient.ts', "the 'terminal:sessions-changed' channel prefix"],
       ['packages/protocol/src/plugin/contract.ts', "the 'terminal' command category"],
       // `terminal` an agent controller and a driver kind; `context` an agent input part.
       ['packages/protocol/src/managedAgents.ts', "'terminal' the agent controller, 'context' the input part"],

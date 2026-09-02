@@ -9,7 +9,7 @@
 // Dispatch is a prefix registry (wsChannels.ts). This file owns `term:` and `workflow:`, because
 // `term:` is core transport on both ends and `workflow:notice` feeds core's notification pipeline.
 // `docker:` and `agent:` are registered by the plugins that own them.
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
 import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
@@ -17,6 +17,9 @@ import { activeNodeId } from './activeNode'
 import { registerWsChannel, routeWsFrame, wsReattachFrames, _resetWsChannels } from './wsChannels'
 
 type OutputCb = (m: ServerMsg) => void
+// `term:status` carries the id of the plugin whose chrome moved, or nothing when core itself pinged and
+// every plugin's descriptors are suspect (node-core/server/notify.ts).
+type StatusCb = (pluginId?: string) => void
 // Exported so subscribers outside this package import it rather than keeping a hand-written twin that
 // drifts when a kind is added.
 export type WorkflowNotice = {
@@ -29,7 +32,7 @@ type NoticeCb = (n: WorkflowNotice) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
 
 const outputSubs = new Map<string, Set<OutputCb>>() // sessionId → local subscribers
-const statusSubs = new Set<() => void>()
+const statusSubs = new Set<StatusCb>()
 const pluginsSubs = new Set<() => void>()
 const tasksSubs = new Set<() => void>()
 const connectionSubs = new Set<(event: ConnectionChangedEvent) => void>()
@@ -41,6 +44,9 @@ type NodeEventMap = {
   'run:changed': RunTargetChangedEvent
   'agent-session:changed': AgentSessionChangedEvent
   'project:changed': ProjectChangedEvent
+  // Content-free: a session was created, exited, or flipped between working and idle.
+  'terminal:sessions-changed': Record<string, never>
+  'worktree:status-changed': WorktreeStatusChangedEvent
 }
 const nodeEventSubs = new Map<keyof NodeEventMap, Set<(event: never) => void>>()
 const noticeSubs = new Set<NoticeCb>()
@@ -120,7 +126,10 @@ function dispatch(raw: unknown): void {
 registerWsChannel(
   'term',
   (frame) => {
-    if (frame.channel === 'term:status') return statusSubs.forEach((cb) => cb())
+    if (frame.channel === 'term:status') {
+      const { pluginId } = frame as { pluginId?: unknown }
+      return statusSubs.forEach((cb) => cb(typeof pluginId === 'string' ? pluginId : undefined))
+    }
     if (frame.channel !== 'term:out') return
     const { id, msg } = frame as { id?: unknown; msg?: unknown }
     if (typeof id !== 'string') return
@@ -158,18 +167,26 @@ registerWsChannel('connection', (frame) => {
   connectionSubs.forEach((cb) => cb({ integrationId, providerId, status }))
 })
 
-// Core's sixth through ninth: HEAD moved, a run target started or stopped, an agent session reached an
-// edge, a project row or its config moved (docs/plugins.md § Hearing a core event). Each prefix is the
-// noun before the colon, and the frame minus `channel` is the payload. Not narrowed field by field
+// Core's sixth through eleventh: HEAD moved, a run target started or stopped, an agent session reached
+// an edge, a project row or its config moved, a terminal session's roster moved, something under a
+// task's worktree changed (docs/plugins.md § Hearing a core event). Each prefix is the noun before the
+// colon, and the frame minus `channel` is the payload. Not narrowed field by field
 // like `connection` above: the frame came from this node over the authenticated socket, and a
 // subscriber that needs a field checked does it once at the point of use.
-for (const prefix of ['head', 'run', 'agent-session', 'project']) {
+for (const prefix of ['head', 'run', 'agent-session', 'project', 'terminal', 'worktree']) {
   registerWsChannel(prefix, (frame) => {
     const { channel, ...event } = frame
     nodeEventSubs.get(channel as keyof NodeEventMap)?.forEach((cb) => cb(event as never))
   })
 }
 
+
+// Core's twelfth, and the only one that is an apology. The node's hub shed invalidation frames because
+// this socket was too far behind to take them (node-core/server/transport/wsHub.ts). Nothing says which
+// ones, so the remedy is the reconnect remedy: mark what is on screen stale and let it refetch.
+registerWsChannel('ws', (frame) => {
+  if (frame.channel === 'ws:shed') reconnectSubs.forEach((cb) => cb())
+})
 
 // Fires when the node's socket comes back after a drop. The app shell uses it to mark that node's
 // queries stale so whatever is on screen refetches.
@@ -227,7 +244,10 @@ export function wsWrite(id: string, data: string): void {
   rawSend({ channel: 'term:input', id, data })
 }
 
-export function wsOnStatus(cb: () => void): () => void {
+// "Re-read a plugin's chrome descriptors." One subscriber, `host/chrome/chromeData.ts`, and the
+// argument is what keeps it from being a fan-out: a plugin's own ping refreshes that plugin's rows and
+// nobody else's (docs/plugins.md § Hearing a core event).
+export function wsOnStatus(cb: StatusCb): () => void {
   statusSubs.add(cb)
   connect()
   return () => void statusSubs.delete(cb)

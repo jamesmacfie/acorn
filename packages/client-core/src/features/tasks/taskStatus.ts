@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { taskBridge } from './taskBridge'
-import { wsOnStatus } from '../../infra/node/wsClient'
+import { wsOnNodeEvent } from '../../infra/node/wsClient'
 import type { TaskStatus } from '@acorn/protocol/terminal.ts'
 import type { ClientScheduleContribution } from '../../host/registries/shell/schedules'
 import { latestOnly } from '../../kit/lib/latestOnly'
@@ -48,7 +48,16 @@ export const taskStatusScheduleContribution: ClientScheduleContribution = {
   // Each refresh shells out to `git status` for every active worktree. Status broadcasts keep
   // in-app mutations immediate; ten seconds bounds background process churn as task count grows.
   run: refreshTaskStatuses,
-  // PTY status edges arrive on the shared WebSocket, which is core's own transport, no need to go
-  // through a feature accessor for it.
-  subscribe: (refresh) => wsOnStatus(refresh),
+  // Two narrow events rather than the old content-free `term:status` ping, which also fired on every
+  // terminal idle-to-working edge and made a build's output spawn a `git status` per worktree per
+  // client (docs/future/performance/phase-5-stop-the-event-amplifiers.md). What actually moves a dirty
+  // marker is a write under the worktree, or an agent finishing a turn. Core's own transport, so no
+  // feature accessor.
+  subscribe: (refresh) => {
+    const offs = [
+      wsOnNodeEvent('worktree:status-changed', () => refresh()),
+      wsOnNodeEvent('agent-session:changed', () => refresh()),
+    ]
+    return () => offs.forEach((off) => off())
+  },
 }

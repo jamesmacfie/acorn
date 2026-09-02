@@ -8,8 +8,10 @@ moved to the owning docs when they shipped, so nothing here restates them:
   `emits` declaration, the cross-plugin grant, the trust sentence, the admission rule, and the
   refusals.
 - `docs/plugin-map.md § Events`: the orientation version.
-- `packages/protocol/src/nodeEvents.ts`: the core catalogue (`plugins`, `tasks`, `connection`,
-  `head`, `run`, `agent-session`, `project`, each `:changed`), one host-owned sentence per entry.
+- `packages/protocol/src/nodeEvents.ts`: the core catalogue (`plugins:changed`, `tasks:changed`,
+  `connection:changed`, `head:changed`, `run:changed`, `agent-session:changed`, `project:changed`,
+  and, added 2026-09-03, `terminal:sessions-changed` and `worktree:status-changed`), one host-owned
+  sentence per entry.
 - `docs/plugin-authoring.md § Permissions`: what a loaded plugin declares to hear or to be heard.
 
 What shipped, in one line each: every core event in the catalogue is emitted node-side under a
@@ -18,6 +20,23 @@ except preview's is emitted on its plugin's own channel; `emits` exists in the m
 `NodePlugin`; a subscriber names another plugin's verb in `permissions.events` and hears it on the
 node and in a client bundle, frame or tree alike; workflows hears `plugin:github:checks-changed`
 instead of polling.
+
+## Added since
+
+**2026-09-03, two channels out of one ping.** `term:status` was a content-free ping with six
+subscribers, fired on every terminal idle-to-working edge, and answering it cost every connected
+client a sweep of every plugin's descriptors, a `git status` per active worktree, the session roster,
+two pull-request queries, and a workflow-runs refetch. It is now three things. `term:status` keeps the
+chrome sweep and carries the `pluginId` whose rows moved. `terminal:sessions-changed` carries the
+session roster, and is the one core channel that fires at machine speed. `worktree:status-changed`
+carries the dirty markers and a `taskId`, and fires from the writer: a git action, an editor save, a
+worktree created, a session's command going quiet. `docs/api-reference.md § WebSocket` has the
+catalogue and `docs/plugins.md § Hearing a core event` has what a plugin does with them.
+
+Two of the old six now hear an event that already existed rather than a new one. GitHub's pull-request
+tabs hear `head:changed` for their own task, because a commit landing in the worktree is what moves a
+pull. The agents sidebar hears `workflow:notice` and `workflow:step:event`, because those come from
+the plugin that changes the runs it draws.
 
 ## Open
 

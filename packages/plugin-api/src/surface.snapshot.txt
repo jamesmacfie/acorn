@@ -286,6 +286,7 @@ node: getProfile
 node: git
 node: gitOrThrow
 node: gitText
+node: invalidateWorktreeStatus
 node: isDir
 node: isRecord
 node: isRepoConfigTrustError
@@ -326,6 +327,7 @@ node: taskContext
 node: tmuxAvailable
 node: truncateBytes
 node: viaBridge
+node: worktreeStatusText
 testkit: AppDatabase
 testkit: TestDb
 testkit: TestNodeContext
