@@ -105,7 +105,7 @@ Eleven entrypoints:
 | `@acorn/plugin-api/ui` | Frame-safe presentation components: primitives (including the `ListDetail` two-column pane layout), `Icon`, `Picker` and its `PickerRow` for a list that opens from typing rather than from a button, `Menu` and its `RowActions` wrapper for the ellipsis menu on a list row, `Modal`, `Tabs`, `Markdown`, the diff rows, and `DiffPane` for the whole diff viewer. Also `attachPty`, which fills a `pty` rectangle from the channel the caller describes rather than from a box the host hands back ([terminal.md § Client](./terminal.md)) |
 | `@acorn/plugin-api/ui/diff` | The diff model, virtualizer, hydration and find pass, plus the `DiffSource` port `DiffPane` is driven through |
 | `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components and registration seams; never import this from an isolated frame |
-| `@acorn/plugin-api/ui/editor` | The host-owned Monaco surface: the theme and the language map. Compiled panes only, and browser-realm only — it pulls in `monaco-editor`, which reads `window` at module scope |
+| `@acorn/plugin-api/ui/editor` | The host-owned CodeMirror surface: the theme, the view-state pair, and `languageForPath`, which is async because it downloads one grammar. Compiled panes only. The terminal client aliases it to a stub, because cells have no highlighter ([tui.md](./tui.md) § The host switch) |
 | `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims, plus `mountFrame` and `mountTree`, the two render paths' entry points |
 | `@acorn/plugin-api/ui/tree` | The kit as nodes a remote tree writes in JSX, and the Solid adapter behind them. A tree imports this and never the `/ui` barrel |
 | `@acorn/plugin-api/ui/tokens` | The role enums and the node support matrix as data, with no components on them |
@@ -1391,6 +1391,17 @@ its shell — a table of components per node name, a placeholder, and when a bat
 in the sandbox behind it is the realm and nothing else: a Web Worker under a CSP on the desktop, a
 `node:worker_threads` thread under `--permission` in a terminal, the same two ports and the same
 handshake either way (`docs/security.md § Rung 0 — The client sandbox`).
+
+**A host's table maps a name to a component or to a loader.** A tree names types, so each host keeps a
+table from a kit node name to the thing that draws it
+(`packages/client-core/src/host/tree/components.ts`, `apps/tui/src/kit/components.tsx`). Cheap
+primitives are the component; the heavy names — the diff viewer, the diff rows, `Markdown`, `Timeline`,
+`ModelConnectionPicker` — are a loader, because a table that holds every value puts every value in the
+chunk that holds the table, and the DOM host's table is fetched on every cold window whether or not a
+loaded plugin exists (`packages/client-core/src/host/tree/kitEntry.ts` says which and why). Each root
+is drawn under a `Suspense` with a `null` fallback, so **a tree that names a heavy node draws nothing
+for one frame and then draws it**. Nothing else changes: the mutations, the caps and the events below
+are the same either way, and a plugin cannot tell which entry answered.
 
 **A node is `{ id, type, props, children }`.** `type` is a kit node name. `id` is minted by the
 sandbox adapter and is stable for the node's life; it is what events and patches address. `props` is a

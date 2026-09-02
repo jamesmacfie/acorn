@@ -135,3 +135,124 @@ means running `acorn` against a live node on Node 26.4.
 `ACORN_PERF=1` turns on a `git` histogram, a SQLite histogram and a line per request, and none of them
 has been read against real traffic. Phase 5 is the phase that needs them (`git status` fan-out) and
 should be the one to record them here.
+
+## 2026-09-03 — phase 1
+
+Same machine, Node 24.11.0 (Node 26.8.1 for the terminal client). Phase 0 had shipped at `17b03dbe`;
+nothing else in the programme had.
+
+### The renderer's startup budget
+
+`pnpm --filter @acorn/desktop build` → `apps/desktop/scripts/check-renderer-budget.mjs`.
+
+| | Startup scripts | Styles | Startup assets | Preload depth |
+| --- | --- | --- | --- | --- |
+| After phase 0 | 974,732 B | 92,153 B | 151 | 4 |
+| After phase 1 | **654,403 B** | 91,571 B | 133 | 4 |
+
+**320,329 B off the first paint, 33% of what was left**, and 18 fewer requests. Against the pre-phase-0
+figure of 1,329,679 B the two phases together have taken 675,276 B, just over half.
+
+The four denylisted names are gone. The script's `KNOWN` allowance list is empty and a test in
+`apps/desktop/test/scripts/checkRendererBudget.test.ts` asserts that it is:
+
+```
+[renderer-budget] startup scripts=654403B styles=91571B assets=133 depth=4
+[renderer-budget] one interaction away: 109 more chunks, 1509975B (not counted)
+```
+
+No `KNOWN FAILURE:` lines, where the same command printed three before. Proof by name, from the built
+startup list: `shiki` — absent, and two `shiki-*.js` chunks exist in the build, so it is fixed rather
+than renamed. `DiffPane` — absent, two chunks exist. `wasm` — absent. `viewState` — absent, one chunk
+exists (see the editor below). `icon-nodes` — absent, phase 0's.
+
+`prModel` needs its own line, because it is the one that moved rather than shrank. There is **no
+`prModel-*.js` chunk in the build any more**: making the GitHub plugin's PR pane a lazy contribution
+took `prModel.ts` out of the eagerly-reachable set, and rolldown folded its modules into a chunk it
+named `prSections-*.js`, which is not in the startup list. A chunk name is one module's name, so it
+follows the graph. Both names are on the denylist now.
+
+### Where those bytes were, and what the reads got wrong
+
+The `RemoteTree` chunk is in the modulepreload list on every cold window because it is the fallback
+branch of `host/tree/Slot.tsx`, and it held `host/tree/components.ts`, whose one static import of
+`DiffPane` pulled `features/diff/` and, through `infra/highlight/worker.ts`, the highlighter. That part
+of decision 3 was exactly right. Two other parts were not:
+
+- **`host/frames/remoteSolid.ts` is not a second copy of the component table.** It builds
+  `KIT_NODE_COMPONENTS` with `Object.fromEntries(KIT_NODES.map(...))` — one factory per name that mints
+  a node of that name. It imports no component and can import none: it runs inside a stranger's worker
+  and touches no `window`. There was nothing to merge, and merging would have broken the sandbox rule.
+  It was not touched.
+- **`Markdown` was not the shiki edge.** `kit/components/content/Markdown.tsx` already reached the
+  highlighter through `await import('../../../infra/highlight/shiki')` and its grammars through
+  `infra/highlight/langs.ts`, which is loaders already. It is a loader in the table now for the
+  streaming-transcript reason, not for a byte saving.
+- **`prModel` was not a registry-holds-values problem in any of the four tables.**
+  `plugins/github/src/client/index.ts` imported `./pullDetail/PrPane` statically to read
+  `prPaneContribution`, which the same file declared beside the component — so the contribution row
+  held the component, and with it the pull-request model, the overview, the conversation, the file list,
+  the check log and the diff viewer. Every sibling plugin's pane contribution was already a `lazy()` in
+  a module of its own; this was the one exception, and the phase file's Scope said pane contributions
+  "already are" lazy. The fix is `plugins/github/src/client/pullDetail/paneContribution.ts`, the
+  sibling shape.
+
+### The editor's grammars
+
+| | Value |
+| --- | --- |
+| `viewState-*.js` — the chunk holding `features/editor/language.ts` | **60,861 B** (was 954,915 B) |
+| Chunks in the build that hold a CodeMirror grammar | 17 |
+| Of those, statically reachable from `language.ts`'s chunk | **0** |
+| Grammar packages imported statically by `language.ts` | **0** (was 17) |
+| Opening a `.ts` file, once the editor pane is loaded | **2 more chunks, 110,946 B** |
+
+**894,054 B off the editor's lazy chunk, 94% of it.** The count is 17 grammar imports, not the 19
+decisions.md and the phase file both say: 13 `@codemirror/lang-*` packages and 4
+`@codemirror/legacy-modes` modes. `@codemirror/language` and `@codemirror/state` are the engine, not
+grammars, and stay static.
+
+The two chunks a `.ts` file fetches are the `lang-javascript` grammar and one shared Lezer chunk;
+everything else CodeMirror needs came with `basicSetup` when the pane loaded. "One grammar" is the
+honest claim rather than "one chunk". The four JavaScript dialects resolve the same package, so a
+`.tsx` file after a `.ts` one fetches nothing.
+
+### The terminal client's eager graph
+
+`pnpm --filter @acorn/tui build` → `apps/tui/scripts/check-startup-graph.mjs`.
+
+| | Chunks | Bytes | Whole build |
+| --- | --- | --- | --- |
+| Before (phase 0's figure, re-measured) | 110 | 1,114,282 B | 2,100,437 B |
+| After phase 1 | 111 | **1,024,422 B** | 2,109,214 B |
+| Ceiling now held | | **1,060,000 B** | |
+
+**89,860 B, 8%. The phase file's `Done when` asked for under 550 KB and this does not reach it**, and
+the reason is that the phase file was wrong about where the terminal client's eager bytes are. Two
+findings:
+
+- **This host's kit table was never in its eager graph.** `apps/tui/src/plugins/RemoteTree.tsx` is
+  loaded lazily, so `apps/tui/src/kit/components.tsx` and everything under it — the 173 KB `RemoteTree`
+  chunk included — is fetched only when a loaded plugin draws a tree. Decision 3's claim that this
+  table "is why that host's eager graph is half its whole build" is false. The table took the shared
+  `KitTable` type for parity and kept every entry a component: the heavy nodes share
+  `apps/tui/src/kit/showing.tsx` with the cheap ones, so a loader there would cost a frame of blank and
+  save no bytes.
+- **What the eager graph actually is, is the plugin roster.** `apps/tui/src/App.tsx` imports thirteen
+  client plugin barrels statically so their `init` can register. Cutting each of the `App` chunk's 80
+  direct static edges in turn and re-walking gives the exclusive cost of each: the largest after this
+  phase is 28,040 B, then 23,823 B, then 21,274 B, and the rest is a tail of 75 chunks under 5 KB each.
+  There is no registry left in it. Halving this number means not importing thirteen barrels before the
+  first frame, which is **phase 4's** work, not a table's shape.
+
+The 89,860 B this phase did take is the pull-request model and its subtree, measured by the same
+edge-cut walk at 61,151 B across 4 chunks, plus the modules that came with it.
+
+### What the four tables cost, one line each
+
+| Table | What it held eagerly | What it holds now |
+| --- | --- | --- |
+| `client-core/host/tree/components.ts` | 75 components, 5 of them reaching `features/` or the highlighter | 67 components and 8 loaders; nothing under `features/` is reached statically |
+| `client-core/host/frames/remoteSolid.ts` | node factories, no components | unchanged — the claim about it was wrong |
+| `apps/tui/src/kit/components.tsx` | 75 components, none in the eager graph | 75 components, type shared with the DOM host |
+| `client-core/features/editor/language.ts` | 17 grammars, 894 KB | 17 loaders, 0 KB until a file is opened |

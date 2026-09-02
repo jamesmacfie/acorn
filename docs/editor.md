@@ -64,6 +64,16 @@ What changed, and why:
   quietly fixes the last-writer-wins hazard that table below describes, because a compartment is per
   view rather than per process. `language.ts` is the same total map over the same published
   vocabulary, resolving to Lezer grammars instead of Monaco language ids.
+- **`languageForPath` is async, and downloads one grammar.** It was seventeen static imports, so a
+  pane that opened one file downloaded every language the app knows: the editor's lazy chunk was
+  954,915 bytes of which the grammars were nearly all. The map's entries now import their grammar and
+  then build a parser from it, `languageForPath(path)` and `languageFor(id)` return a promise, and both
+  call sites await it beside the read they already await — `EditorPane.tsx` in the `Promise.all` inside
+  `stateFor(path)`, `DocumentSurface.tsx` beside its read route — so no new wait appears on screen. A
+  grammar that will not download is an empty extension rather than a throw: no highlighting beats no
+  file. The four JavaScript dialects share one package, so opening a `.tsx` file after a `.ts` one
+  costs no request. Measured after the split: the chunk is 60,861 bytes and a `.ts` file fetches two
+  more chunks, 110,946 bytes (docs/future/performance/measurements.md § 2026-09-03).
 - **View state stopped being opaque**, which is the one place the design got *better* rather than
   merely equivalent — see § View state below.
 - **The `ui/editor` entrypoint survives, and is no longer node-hostile.** It exists to keep the

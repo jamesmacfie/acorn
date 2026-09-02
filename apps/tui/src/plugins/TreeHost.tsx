@@ -1,7 +1,8 @@
 /** @jsxImportSource @opentui/solid */
-import { createMemo, ErrorBoundary, For, onCleanup, Show, type JSX } from 'solid-js'
+import { createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
 import { Dynamic } from '@opentui/solid'
 import { TEXT_NODE, isKitNode } from '@acorn/protocol/tree/nodes.ts'
+import { kitComponent } from '@acorn/client-core/host/tree/kitEntry.ts'
 import { createTreeState } from '@acorn/client-core/host/tree/treeState.ts'
 import type { TreeHostProps } from '@acorn/client-core/host/tree/TreeHost.tsx'
 import { KIT_COMPONENTS } from '../kit/components'
@@ -49,7 +50,7 @@ export function TreeHost(props: TreeHostProps) {
             shape a cell host refuses and the DOM absorbs; the boundary below names it. */}
         <Show when={type() !== TEXT_NODE} fallback={String(stored()!.props.value ?? '')}>
           <Show when={isKitNode(type())} fallback={<TreePlaceholder pluginId={props.pluginId} detail={type()} />}>
-            <Dynamic component={KIT_COMPONENTS[type() as keyof typeof KIT_COMPONENTS]} {...resolved()}>
+            <Dynamic component={kitComponent(KIT_COMPONENTS[type() as keyof typeof KIT_COMPONENTS])} {...resolved()}>
               <For each={stored()!.children}>{(child) => <NodeView id={child} />}</For>
             </Dynamic>
           </Show>
@@ -63,7 +64,13 @@ export function TreeHost(props: TreeHostProps) {
       {/* One boundary per tree, not per node: a kit component that throws on a stranger's props takes
           its own tree down and nothing else. */}
       <ErrorBoundary fallback={(error: unknown) => <TreePlaceholder pluginId={props.pluginId} detail={error instanceof Error ? error.message : String(error)} />}>
-        <For each={state.roots()}>{(id) => <NodeView id={id} />}</For>
+        {/* One boundary per root, the same shape client-core's TreeHost takes. Every entry in this
+            host's table is a component today, so nothing suspends; the boundary is here because the
+            table's type allows a loader and because the kit is drawn from one set of names on both
+            hosts. Safe under OpenTUI only because ../kit/reconciler.ts ties a node's destruction to
+            its creating owner rather than to being detached — without that, a boundary that suspends
+            after showing content comes back permanently blank. */}
+        <For each={state.roots()}>{(id) => <Suspense fallback={null}><NodeView id={id} /></Suspense>}</For>
       </ErrorBoundary>
     </Show>
   )

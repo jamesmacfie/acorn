@@ -2,13 +2,18 @@
 //
 // One import per node and no wildcard, for the same reason @acorn/protocol's exports are enumerated:
 // adding a line is the decision. A node that is in the kit but not here is a build error, caught by
-// the exhaustive type below and by `components.test.ts`.
+// the exhaustive type below and by `components.test.tsx`.
 //
 // The same components `@acorn/plugin-api/ui` re-exports, reached directly because this file is inside
 // client-core. The direct render path uses the components; this path uses the same ones, which is what
 // makes "one component API, two render paths" true rather than aspirational.
-import type { Component } from 'solid-js'
-import type { KitNodeName } from '@acorn/protocol/tree/nodes.ts'
+//
+// An entry is a component or a loader (./kitEntry.ts). The heavy names are loaders, because this
+// module is preloaded on every cold window — `RemoteTree` is ./Slot.tsx's fallback branch — and one
+// static import of `DiffPane` used to put the diff viewer and the syntax highlighter in the first
+// paint. Nothing under `features/` is reached statically from here any more, which is the property
+// `components.test.ts` holds.
+import type { AnyKitComponent, KitEntry, KitTable } from './kitEntry'
 import {
   Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, ConfirmButton, DescriptionList, EmptyState,
   DetailColumn, Field, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
@@ -21,7 +26,6 @@ import PickerRow from '../../kit/components/inputs/PickerRow'
 import Popover from '../../kit/components/overlays/Popover'
 import CopyButton from '../../kit/components/inputs/CopyButton'
 import MentionTextarea from '../../kit/components/inputs/MentionTextarea'
-import Markdown from '../../kit/components/content/Markdown.tsx'
 import { Menu } from '../../kit/components/overlays/Menu'
 import { RowActions } from '../../kit/components/layout/RowActions'
 import { Fold } from '../../kit/components/layout/Fold'
@@ -39,7 +43,6 @@ import { Link } from '../../kit/components/content/Link'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Heading } from '../../kit/components/content/Heading'
 import { Section } from '../../kit/components/layout/Section'
-import { Timeline } from '../../kit/components/content/Timeline'
 import { Facts } from '../../kit/components/content/Facts'
 import { ChipRow } from '../../kit/components/layout/ChipRow'
 import { Log } from '../../kit/components/content/Log'
@@ -48,28 +51,39 @@ import { Rows } from '../../kit/components/layout/Rows'
 import { Only } from '../../kit/components/layout/Only'
 import { Fallback } from '../../kit/components/content/Fallback'
 import { Rectangle } from '../../kit/components/content/Rectangle'
-import { DiffLine, FileHead, NonCodeRow, SplitCell } from '../../kit/diff/DiffRows'
-import { DiffPane } from '../../features/diff/DiffPane'
-import ModelConnectionPicker from '../../features/settings/models/ModelConnectionPicker'
 
-// `Component<any>` and not a union of every node's props: the renderer has already validated the
-// props against the wire schema, and a union of every node's prop type would make every mount site an
-// unresolvable overload. The typing that matters is the key set, which is exhaustive.
-// oxlint-disable-next-line no-explicit-any
-type AnyKitComponent = Component<any>
+// The eight loaders, and why each one is not a component.
+//
+//   - `DiffPane` reaches ../../features/diff and, through it, the syntax highlighter.
+//   - The four diff rows share `kit/diff/DiffRows.tsx` with it, so leaving one eager keeps the chunk.
+//   - `Markdown` fetches a grammar per fence at render time and is the surface a streaming transcript
+//     re-renders; keeping it out of this table's chunk keeps the parser out of the first paint.
+//   - `Timeline` carries the follow-scroll machinery.
+//   - `ModelConnectionPicker` reaches ../../features/settings.
+//
+// One line each and no internal comma, because `tools/arch/kitTable.test.ts` reads this literal as
+// text: importing it there would pull a renderer into a node-env test.
+const load = (loader: () => Promise<{ default: AnyKitComponent }>): KitEntry => ({ load: loader })
 
-export const KIT_COMPONENTS: Record<KitNodeName, AnyKitComponent> = {
-  Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar,
+export const KIT_COMPONENTS: KitTable = {
+  Stack, Inline, Section, Fold, Card, Tabs, Toolbar,
   Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, Sections, SplitHandle, DocumentTabs, SectionHeader,
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
   // remote tree only under a name of their own.
   ModalBody: Modal.Body, ModalActions: Modal.Actions, TabPanel: Tabs.Panel, ToolbarSpacer: Toolbar.Spacer,
   Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
-  DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
-  FileHead, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
+  DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log,
+  EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
   PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,
-  ModelConnectionPicker,
   Rectangle,
   Only, Fallback,
+  Timeline: load(() => import('../../kit/components/content/Timeline').then((m) => ({ default: m.Timeline }))),
+  Markdown: load(() => import('../../kit/components/content/Markdown.tsx')),
+  DiffPane: load(() => import('../../features/diff/DiffPane').then((m) => ({ default: m.DiffPane }))),
+  DiffLine: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.DiffLine }))),
+  FileHead: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.FileHead }))),
+  NonCodeRow: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.NonCodeRow }))),
+  SplitCell: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.SplitCell }))),
+  ModelConnectionPicker: load(() => import('../../features/settings/models/ModelConnectionPicker')),
 }

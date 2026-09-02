@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { createNode, createRemoteRoot, createText, insertNode, setProperty, type RemoteNode } from './remoteRoot'
 import { KIT_COMPONENTS } from '../tree/components'
+import { kitComponent } from '../tree/kitEntry'
 import { TreeHost, type TreeTransport } from '../tree/TreeHost'
 
 // One description of a card, drawn twice: compiled straight into the shell, and through the remote
@@ -33,8 +34,10 @@ const toolCard = <N,>(sink: Sink<N>, press: () => void): N =>
   ])
 
 const directSink: Sink<JSX.Element> = {
+  // Through `kitComponent`, because a table entry is a component or a loader for one (../tree/kitEntry.ts).
+  // Every node in the card above is a cheap primitive, so what comes back is always the component.
   node: (type, props, children) =>
-    createComponent(KIT_COMPONENTS[type as keyof typeof KIT_COMPONENTS], { ...props, get children() { return children } }),
+    createComponent(kitComponent(KIT_COMPONENTS[type as keyof typeof KIT_COMPONENTS])!, { ...props, get children() { return children } }),
   text: (value) => value,
 }
 

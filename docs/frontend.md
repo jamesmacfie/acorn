@@ -291,24 +291,33 @@ over a byte ceiling, and on a **chunk name**.
 - **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
   That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
   analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything
-  in it is evaluated before the first cell is drawn. The ceiling is 1,150,000 B. The walk is a regex
+  in it is evaluated before the first cell is drawn. The ceiling is 1,060,000 B. The walk is a regex
   over import edges rather than a real module graph, so it is approximate on purpose — it exists to
   catch a 300 KB regression, not to be exact.
 
 **Why a name test as well as a byte total.** Between 2026-08-31 and 2026-09-02 the renderer's total
 drifted from 1,317,605 B to 1,329,679 B across 31 unrelated commits while staying red, so nobody read
 it. And a budget that only counts bytes lets the next heavy chunk in as long as something else shrank.
-The denylist is `shiki`, `wasm`, `DiffPane`, `prModel`, `viewState` and `icon-nodes`: each is a lazy
-surface that leaked into the eager graph, and a chunk with one of those names being fetched at startup
-is wrong whatever it weighs. The shape of the mistake is always the same — a string-keyed table from a
-name to a **value** rather than to a **loader**, which pulls every value into whichever chunk holds the
-table (`kit/tokens/iconNodes.ts` is the one that has been fixed; see
-[ui-design.md](./ui-design.md) § Which names are drawn without waiting).
+The denylist is `shiki`, `wasm`, `DiffPane`, `prModel`, `prSections`, `viewState` and `icon-nodes`:
+each is a lazy surface that leaked into the eager graph, and a chunk with one of those names being
+fetched at startup is wrong whatever it weighs. The shape of the mistake is always the same — a
+string-keyed table from a name to a **value** rather than to a **loader**, which pulls every value into
+whichever chunk holds the table. All five instances have been fixed: `kit/tokens/iconNodes.ts` (see
+[ui-design.md](./ui-design.md) § Which names are drawn without waiting), the DOM host's kit table (see
+[plugins.md](./plugins.md) § The tree contract), the CodeMirror language map (see
+[editor.md](./editor.md)) and the GitHub plugin's PR pane contribution.
+
+A chunk's name is one module's name, so a name here can move when the graph changes: the
+pull-request model was `prModel` until its pane's contribution went lazy, after which the same modules
+landed in a chunk called `prSections`. Both names stay listed. A prefix that names no chunk at all is
+not an error — a module can be renamed or deleted — and neither script fails on one, which is what
+makes the allowance list below keepable.
 
 Each script also carries a short `KNOWN` list: denylisted names that are in the startup list **today**
 and are somebody's open work. Those report loudly and do not fail the build. The list may only shrink —
 once a chunk with that name is built and no longer fetched at startup, the check fails until the entry
-is deleted, so a fix cannot quietly regress a month later.
+is deleted, so a fix cannot quietly regress a month later. **Both lists are empty**, and a test in each
+package asserts that they are: a name added back has to argue for itself.
 
 ## Restore and persistence
 

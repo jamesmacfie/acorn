@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -54,22 +54,21 @@ describe('check-renderer-budget', () => {
     expect(run(dir).output).toContain('icon-nodes-dddd.js')
   })
 
-  it('reports a chunk phase 1 still owes without failing the build', () => {
+  it('fails on the highlighter, which is the chunk this check was written for', () => {
+    // Phase 0 allowed this one and reported it; phase 1 took it out of the startup list and deleted
+    // the allowance, so it fails the build outright now (docs/future/performance/measurements.md).
     client(['index-aaaa.js', 'shiki-eeee.js'])
     const { code, output } = run(dir)
-    expect(code).toBe(0)
-    expect(output).toContain('KNOWN FAILURE: shiki-eeee.js')
+    expect(code).toBe(1)
+    expect(output).toContain('shiki-eeee.js')
   })
 
-  it('fails when a known failure is fixed, so the allowance cannot outlive it', () => {
-    // Built, but no longer fetched at startup: exactly what phase 1 will produce, and the build says
-    // so rather than letting the allowance sit there ready to excuse a regression.
-    client(['index-aaaa.js'])
-    writeFileSync(join(dir, 'assets', 'shiki-eeee.js'), 'x')
-    const { code, output } = run(dir)
-    expect(code).toBe(1)
-    expect(output).toContain('No longer fetched at startup')
-    expect(output).toContain('Delete')
+  it('excuses nothing', () => {
+    // The allowance list is the one thing in the script that can turn a red build green, so it is
+    // asserted rather than trusted. It held `shiki`, `DiffPane` and `prModel` while phase 1 was owed
+    // and has been empty since. Adding a name back is a deliberate act and this is where it argues
+    // for itself.
+    expect(readFileSync(SCRIPT, 'utf8')).toContain('const KNOWN = []')
   })
 
   it('fails over the byte budget', () => {

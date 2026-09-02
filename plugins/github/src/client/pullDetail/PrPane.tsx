@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import type { PaneLayoutContribution, Task } from '@acorn/plugin-api/client'
+import type { Task } from '@acorn/plugin-api/client'
 import {
   Alert, Button, Chip, ChipRow, EmptyState, Icon, Menu, Sections, Stack,
 } from '@acorn/plugin-api/ui'
@@ -27,8 +27,9 @@ import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 //
 // A task can be about more than one pull — the one it was made from, the ones that mention it, the
 // ones stacked on it — so the navigator opens with the strip that switches between them (./prTabs.ts).
-
-const PANE_ID = 'pr'
+//
+// The registration is next door in ./paneContribution.ts, which is what keeps this file — and the
+// pull-request model behind it — out of the renderer's first paint.
 
 /** The strip of pull requests this task is about, and the offer to make a task for one of them. */
 function PullStrip(props: { tabs: PrTabsModel }) {
@@ -197,15 +198,3 @@ export function PrPane(props: { task: Task }) {
   )
 }
 
-export const prPaneContribution: PaneLayoutContribution = {
-  id: PANE_ID,
-  label: 'PR review',
-  glyph: 'git-pull-request',
-  description: 'Overview, files & diff',
-  order: 10,
-  defaultChord: 'meta+shift+r',
-  when: (task) => task.pullNumber != null,
-  minWidth: 520,
-  layout: 'single',
-  regions: { body: PrPane },
-}

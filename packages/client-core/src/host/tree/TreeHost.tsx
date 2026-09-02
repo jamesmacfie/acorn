@@ -1,8 +1,9 @@
-import { createMemo, ErrorBoundary, For, onCleanup, Show, type JSX } from 'solid-js'
+import { createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { TEXT_NODE, isKitNode, type KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { KIT_COMPONENTS } from './components'
+import { kitComponent } from './kitEntry'
 import { TreePlaceholder } from './placeholder'
 import { createTreeState } from './treeState'
 
@@ -50,7 +51,7 @@ export function TreeHost(props: TreeHostProps) {
       <Show when={stored()} keyed={false}>
         <Show when={type() !== TEXT_NODE} fallback={<>{String(stored()!.props.value ?? '')}</>}>
           <Show when={isKitNode(type())} fallback={<TreePlaceholder pluginId={props.pluginId} detail={type()} />}>
-            <Dynamic component={KIT_COMPONENTS[type() as keyof typeof KIT_COMPONENTS]} {...resolved()}>
+            <Dynamic component={kitComponent(KIT_COMPONENTS[type() as keyof typeof KIT_COMPONENTS])} {...resolved()}>
               <For each={stored()!.children}>{(child) => <NodeView id={child} />}</For>
             </Dynamic>
           </Show>
@@ -65,7 +66,12 @@ export function TreeHost(props: TreeHostProps) {
           its own tree down and nothing else. The owner's surface around it is untouched, which is the
           containment promise the design makes. */}
       <ErrorBoundary fallback={(error: unknown) => <TreePlaceholder pluginId={props.pluginId} detail={error instanceof Error ? error.message : String(error)} />}>
-        <For each={state.roots()}>{(id) => <NodeView id={id} />}</For>
+        {/* One boundary per root, not per node and not one for the whole slot. A heavy node is a
+            loader (./kitEntry.ts), and a pending `lazy()` renders as an empty string — invisible on
+            the DOM, refused by a cell host, so `fallback={null}` is the shape the pane registry
+            already settled on (../registries/panes/panes.ts). Per root rather than per tree so a
+            root waiting on a diff viewer does not blank the roots beside it. */}
+        <For each={state.roots()}>{(id) => <Suspense fallback={null}><NodeView id={id} /></Suspense>}</For>
       </ErrorBoundary>
     </Show>
   )

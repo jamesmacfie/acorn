@@ -21,19 +21,29 @@ const args = process.argv.slice(2)
 const distFlag = args.indexOf('--dist')
 const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') : args[distFlag + 1])
 
-// Measured at 1,114,282 B on 2026-09-02, half the whole 2.1 MB build, and rounded up so an unrelated
-// comment does not turn the build red. Phase 1 of the performance programme lowers it: the three
-// registries that pull this much are `apps/tui/src/kit/components.tsx` and client-core's two copies
-// (docs/future/performance/decisions.md § Registries hold loaders).
-const CEILING = 1_150_000
+// Measured at 1,024,422 B on 2026-09-03, and rounded up so an unrelated comment does not turn the
+// build red. It was 1,114,282 B until phase 1 of the performance programme made the GitHub plugin's
+// PR pane a lazy contribution; the kit table this host holds was never in the graph at all, because
+// `../src/plugins/RemoteTree.tsx` is already lazy
+// (docs/future/performance/measurements.md § 2026-09-03).
+//
+// What is left is not a registry. `../src/App.tsx` imports thirteen client plugin barrels statically
+// so their `init` can register, and their registration modules and shared queries are most of this
+// number. Phase 4 is the phase that changes it; a ceiling that assumed phase 1 could halve this
+// number was wrong about where the bytes were.
+const CEILING = 1_060_000
 
 // The same list the desktop's check holds, for the same reason: a chunk with one of these names in a
 // startup graph is a lazy surface that leaked into the eager one. Written twice rather than shared,
 // because each host's build script is the only consumer and the allowances below differ.
-const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'viewState', 'icon-nodes']
-// In the graph today, and phase 1's to remove. Reported loudly rather than failing the build, and it
-// may only shrink: once the chunk is built and out of the graph, this check fails until the prefix goes.
-const KNOWN = ['prModel']
+//
+// `prSections` is the pull-request model under the chunk name it took once phase 1 made the PR pane's
+// contribution lazy — a chunk is named after one module in it, so the name moves when the graph does.
+// Both names stay listed; a prefix that names no chunk is not an error (`inBuild` below).
+const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes']
+// Names allowed in the graph for now, reported loudly rather than failing the build. It may only
+// shrink. Empty since phase 1, which was the phase that owed the one it held.
+const KNOWN = []
 
 const STATIC_EDGE = /(?:^|[\n;}])\s*import\s*(?:[^'";]*?\s*from\s*)?['"](\.[^'"]+)['"]/g
 const DYNAMIC_EDGE = /import\s*\(\s*['"](\.[^'"]+)['"]\s*\)/g
