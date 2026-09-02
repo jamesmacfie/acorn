@@ -63,6 +63,24 @@ exclusive lock the node takes on its data root at boot.
    (`nodeId`, `endpoint`, `fingerprint`, `certPem`, `deviceToken`), and keep the child for the life of
    the TUI.
 
+The renderer does not wait for step 3. `openNode` returns as soon as the child is spawned and hands
+back the handshake as a promise, because a node's boot is the longest thing on this command's critical
+path — 120 seconds of budget, and a full `tsx` boot in a checkout. What lets the shell draw in front of
+it is that the node's id is already on disk: `node.json` names it, it is minted once per root and never
+rewritten, so `acorn` can name the query cache's partition and render it before the child has bound a
+port. The footer says `starting the node…` until the handshake lands, and the first non-offline state
+invalidates whatever the shell asked for while nothing was listening
+([caching.md](./caching.md) § Renderer query cache).
+
+Two cases still wait, and both for the same reason — there is nothing to draw. A first-ever start has
+no `node.json` and no cache under it. And pairing asks a question on stdin, so it stays in front of the
+renderer whatever else moves behind it.
+
+A started child's stdout is read until the handshake and drained after; its stderr is piped and held,
+never inherited. stderr is the file the renderer draws on, so one line of the node's logging arriving
+mid-session reads as the shell going to garbage. The held lines print after `renderer.destroy()`,
+beside the boot account and whatever the process itself logged.
+
 `apps/tui/src/node/open.ts` holds that decision, and `supervise.ts` is the forty lines that own a
 started child: SIGTERM, then SIGKILL after five seconds. It is not the desktop helper's supervisor.
 `ServiceHost` speaks the fd-3 service RPC to `service.js`, and a standalone node prints one line on
@@ -95,6 +113,14 @@ device tokens at mode 0600, and the query cache the client persists (`apps/tui/s
 behind `setCacheStorage`, where the desktop leaves IndexedDB). `ACORN_TUI_CONFIG_DIR` overrides it,
 which is how the boot test never touches the config of the person running it. The data root is the
 node's, and nothing in `apps/tui` writes to it.
+
+`cache/` holds one file per node, named by the partition key with its colon percent-encoded, at 0600
+in a 0700 directory. It is written now: `main.tsx` drives `persistQueryClient` over the same persister
+`clientFor` built, where before it installed the store and never persisted anything, so the directory
+stayed empty and every start was cold. A write goes to `<key>.json.tmp` and is renamed over the target,
+so a reader never sees half a snapshot and a crash mid-write leaves the previous one readable. Reads
+are synchronous because there is one, before the renderer exists; writes are not, because they land
+while the renderer owns the terminal.
 
 The device token is plain bytes at 0600. The desktop encrypts under the platform keychain through a
 `TokenCipher`; there is no keychain here, so the TUI supplies a pass-through, which is what the node
@@ -133,6 +159,20 @@ process's own globals under a browser's name.
 
 `main.tsx` installs the seam and then imports the rest dynamically, because a module that reads
 `window.acorn` at its top level would read it before the install ran.
+
+**One query client per node, and this host keeps that contract.** `App.tsx` takes the client as a prop
+and gets `clientFor(nodeId).client` — the same client `watchTaskChanges` and its siblings invalidate,
+and the same one the persister above writes. It used to mint a second `QueryClient` of its own, so the
+shell read a cache nothing persisted and nothing invalidated: a task created by an agent or in another
+window moved nothing on screen until a restart. Nothing on any host may add a second client
+([caching.md](./caching.md) § Renderer query cache).
+
+**The roster loads after the first frame.** `apps/tui/src/roster.ts` holds the twelve client plugins and
+`main.tsx` imports it on the renderer's first `frame` event. Registering late is safe because every
+contribution registry is a Solid signal, so the chrome draws and the rail, the pane strip and the
+palette fill from the same reactivity that already handles a loaded plugin arriving from a node seconds
+later. What must not move behind the frame is the four host seams in `App.tsx` — the layout table above
+all, which a pane needs before it can draw at all.
 
 | Group | What the TUI installs |
 | --- | --- |

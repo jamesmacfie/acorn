@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import type { CliRenderer } from '@opentui/core'
+import type { QueryClient } from '@tanstack/solid-query'
 import type { PluginTrustRequest } from '@acorn/client-core/host/plugins/distribution.ts'
 import { _resetRequests, stubTransport, TASK } from './fixture'
 import { setTerminalBadge } from './kit/notify'
@@ -87,7 +88,14 @@ export async function renderFixture(size: {
   width?: number
   height?: number
   supervised?: boolean
+  /** Draw as if this run had spawned the node and its handshake had not landed yet: the footer says
+   *  so and the broker has reported nothing (../chrome/nodeState.ts). */
+  starting?: boolean
   pane?: string
+  /** Seed the node's query cache before the shell mounts, which is what a warm start reads. Handed
+   *  the same per-node client the shell renders under, so a query seeded here with a fresh timestamp
+   *  is inside `clientFor`'s 30-second staleTime and no fetch is made for it at all. */
+  cache?: (client: QueryClient) => void
   /** Bundles this device has never decided about, seeded into the distribution queue so the shell
    *  raises its trust overlay. Seeded here rather than by the caller because the reset below would
    *  clear anything seeded before the call (client-core/host/plugins/distribution.ts). */
@@ -105,6 +113,7 @@ export async function renderFixture(size: {
   const { clearAnnotations } = await import('@acorn/client-core/host/annotations/annotations.ts')
   const { setActiveTaskId, setSelectedSource } = await import('@acorn/client-core/features/tasks/tasks.ts')
   const { _resetPluginDistribution, _seedPendingTrust } = await import('@acorn/client-core/host/plugins/distribution.ts')
+  const { setNodeStarting } = await import('./chrome/nodeState')
   // The collection store, the region list, the per-pane layout state, the path and which browse
   // source is showing are all module state, so two renders in one process would share a caret, a
   // focused region, a split position, a project and a rail selection. The real host has one render
@@ -124,6 +133,7 @@ export async function renderFixture(size: {
   clearAnnotations()
   setActiveTaskId(null)
   setSelectedSource(null)
+  setNodeStarting(size.starting ?? false)
   // …and the queue of bundles waiting on a trust decision, which is module state like the rest and
   // would otherwise leave the next test in the file staring at the previous one's dialog.
   _resetPluginDistribution()
@@ -153,6 +163,12 @@ export async function renderFixture(size: {
       .map((entry) => entry?.preload?.()))
   }
   const { App } = await import('./App')
+  // The roster, which production loads after its first frame (./roster.ts). A suite awaits it
+  // before rendering: a test asserts on one frame, so a screen that fills a beat later is a flake
+  // rather than a finding, and every plugin surface under test has to be registered before the
+  // command layer builds its first table.
+  const { installRoster } = await import('./roster')
+  installRoster()
   // Contributions nobody ships, and nothing at all unless a test asked for one
   // (./fixtureExtensions.tsx). After the roster `App.tsx` registers, because a delivery needs the point
   // its owner declared while activating, and before the render, because a chord has to be in the
@@ -182,7 +198,14 @@ export async function renderFixture(size: {
   renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(renderer)
   let quits = 0
-  await render(() => <App nodeId="node-1" supervised={size.supervised ?? false} onQuit={() => { quits += 1 }} />, renderer)
+  // The same client the shell reads in production: one per node, built by client-core's fleet
+  // (client-core/infra/node/fleet.ts § clientFor). Cleared per render, because a suite is one process
+  // with many renders and a cache entry from the last test is a fixture the next one did not write.
+  const { clientFor } = await import('@acorn/client-core/infra/node/fleet.ts')
+  const { client } = clientFor('node-1')
+  client.clear()
+  size.cache?.(client)
+  await render(() => <App client={client} nodeId="node-1" supervised={size.supervised ?? false} onQuit={() => { quits += 1 }} />, renderer)
   // Bounded, and the frame is taken either way. A tree that never settles is itself a finding, and a
   // capture that hangs says nothing about which node did it.
   const settle = (ms: number) => Promise.race([flush(), new Promise((done) => setTimeout(done, ms))])

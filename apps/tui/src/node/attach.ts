@@ -14,6 +14,22 @@ import { nodeIdentitySchema } from '@acorn/protocol/node.ts'
 /** What a running node's data root says about it, or null when nothing live holds the root. */
 export type RunningNode = { pid: number; nodeId: string; endpoint: string; fingerprint: string; certPem: string }
 
+/** Who this data root's node is, whether or not anything is running it, or null before the root has
+ *  ever been opened.
+ *
+ *  A node's id is minted once per root and written to `node.json` (node-core § openDataRoot), so it
+ *  survives every restart. That is what lets `acorn` pick the query cache's partition and draw from
+ *  it while a node it just spawned is still booting: the id is known, the port is not
+ *  (docs/tui.md § Attach or start). */
+export function knownNodeId(dataDir: string): string | null {
+  try {
+    const identity = nodeIdentitySchema.safeParse(JSON.parse(readFileSync(join(dataDir, 'node.json'), 'utf8')))
+    return identity.success ? identity.data.nodeId : null
+  } catch {
+    return null
+  }
+}
+
 export function runningNode(dataDir: string): RunningNode | null {
   const pid = lockedBy(dataDir)
   if (pid === null) return null

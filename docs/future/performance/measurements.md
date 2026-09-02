@@ -567,3 +567,130 @@ they are in front of the window on a machine with a slower disk than this one.
   needs the app running and a person watching it. Phase 10 owns that.
 - **`first paint`.** Still unread, for the reason phase 2 gave: it is a `requestAnimationFrame`
   callback and macOS pauses those while the window is occluded.
+
+## 2026-09-03 — phase 4
+
+Same machine. Phases 0 (`17b03dbe`), 1 (`77ed2ebd`), 2 (`7c826ad6`) and 3 (`facd8288`) had shipped.
+
+The terminal client runs on **Node 26.8.1** with `--experimental-ffi`; nvm's default here is 24.11 and
+OpenTUI cannot draw on it. Every number below is the built bundle (`pnpm --filter @acorn/tui build`,
+then `node --experimental-ffi dist/main.js`) driven through a pty with `script -q`, against a fixture
+data root and a fixture config directory, quit with `Ctrl+C`, reading the `[acorn:boot]` marks phase 0
+added. Before-and-after pairs were taken by stashing `apps/tui` and `packages/client-core`, rebuilding,
+and running the same protocol.
+
+Caveat on the "starting a node" rows: there is no `standalone.js` beside the TUI bundle in a checkout,
+so `supervise.ts` falls back to the source entry under `tsx`. That is what a developer's `acorn` does,
+and it is what the before column was paying for.
+
+### First draw
+
+Medians of three runs, except the start rows (two before, three after).
+
+| | Before | After |
+| --- | --- | --- |
+| Attached to a running node, **warm** cache | 88 ms | **67 ms** |
+| Attached to a running node, **cold** cache | 88 ms | **65 ms** |
+| **Starting a node** (root opened before) | **722–852 ms** | **62 ms** |
+| First-ever start, fresh root and no cache | 886 ms | 886 ms — unchanged, and deliberately |
+
+**The 300 ms target in the phase file is replaced by 67 ms**, which is the measured warm attached
+figure. The proposal was written before phase 0's marks had been read on this host; the attach path was
+never the problem. What was the problem is the row below it: `acorn` against a stopped data root drew
+its first frame **at 62 ms instead of 722–852 ms**, an order of magnitude, because the shell no longer
+waits for a node it just spawned. In a checkout with a cold `tsx` cache that gap is seconds rather than
+hundreds of milliseconds.
+
+Cold and warm attached differ by 2 ms, which is honest and slightly disappointing: the restore is one
+`readFileSync` of a 1.8 KB snapshot on this fixture root. On a real root the snapshot is hundreds of
+kilobytes and the gap will be larger; nobody has measured that.
+
+The first-ever start still waits, and that is the design. There is no `node.json` to name a cache
+partition with and no cache under it, so there is nothing to draw and waiting costs nothing.
+
+The marks after, warm attached, one run:
+
+| Mark | Offset |
+| --- | --- |
+| `node open` | +3 ms |
+| `cache restored` | +21 ms (18 ms) |
+| `App imported` | +35 ms (14 ms) |
+| `renderer created` | +39 ms (5 ms) |
+| **`first draw`** | **+67 ms** (28 ms) |
+| `roster registered` | +81 ms (14 ms) |
+
+…and before, warm attached, one run: `node open` +3 ms, `App imported` +43 ms (**40 ms**),
+`tasks read` +53 ms, `renderer created` +60 ms, `first draw` +90 ms. Two things moved: the `App` import
+is 14 ms rather than 40 ms because the roster left it, and the tasks round trip is gone from the
+critical path entirely.
+
+### The eager closure, and the new ceiling
+
+`pnpm --filter @acorn/tui build` → `apps/tui/scripts/check-startup-graph.mjs`.
+
+| | Chunks | Bytes | Whole build |
+| --- | --- | --- | --- |
+| After phase 1 | 112 | 1,026,357 B | 2,110,161 B |
+| After phase 4 | **91** | **841,142 B** | 2,122,669 B |
+| Ceiling now held | | **870,000 B** | |
+
+**185,215 B, 18%, and 21 fewer chunks.** The whole build grew 12 KB, which is the roster becoming its
+own chunk boundary rather than being folded into `App`.
+
+This is phase 1's missed target, and it is still missed: phase 1's `Done when` asked for under 550 KB.
+Phase 1 was right that the roster was what remained and wrong that removing it would halve the number.
+Its edge-cut walk measured each barrel's *exclusive* cost — the largest 28,040 B, then a tail of 75
+chunks under 5 KB — and cutting all twelve at once takes 185 KB, not 500 KB, because most of what the
+plugins reach is client-core that the chrome reaches too.
+
+What is left is the chrome and the client-core it draws with: `PanelGrid` 228 KB, `asking` 114 KB,
+`App` 108 KB, `fleet` 92 KB. That is what the first frame is made of. There is no registry in it and
+nothing in it is waiting to be made lazy, so **the next honest saving here is a smaller kit, not a
+later import**, and nobody should set a byte target for this host again without saying which components
+they intend to delete.
+
+### The cache directory is written
+
+Proof by file, against the fixture config directory after one run:
+
+```
+$ ls -l "$ACORN_TUI_CONFIG_DIR/cache"
+-rw-------  1  1798  acorn-cache%3A92973bbb-580b-4dff-837d-bd59a52c508c.json
+```
+
+One file, named by the partition key (`acorn-cache:<nodeId>`, colon percent-encoded), 0600 in a 0700
+directory. Before this phase that directory never existed: the store was installed and no persister was
+ever driven. Its four entries, all `success`, are `['workspaces','groups','v2']`, `['tasks','v3']`,
+`['integrations','v3']` and `['prefs']`.
+
+That last fact is also the proof that the node's arrival is honoured. On a start run all four of those
+queries fail with `ECONNREFUSED` while the child boots; they are `success` in the snapshot because the
+first non-offline state invalidates the active queries and they refetch, the same effect
+`apps/desktop/src/client/index.tsx` has held since phase 2.
+
+### Two things the reorder exposed, both fixed here
+
+Neither is in the phase file, and both were only reachable once a frame could be drawn in front of a
+node that is not listening.
+
+- **`Unknown node`, not `ECONNREFUSED`.** Skipping `connect()` until the handshake left the broker with
+  no record, and `NodeBroker.fetch` answers that with a hard `Unknown node` error rather than a
+  reconnect. The fix is to connect to the row last time's handshake wrote — its port is dead, the broker
+  reports `offline` and retries, which is a state the footer already draws.
+- **An unhandled rejection drew OpenTUI's debug console over the shell.** `initSessions` in client-core
+  fires its first pull without a `catch`; OpenTUI answers an uncaught error by showing its console
+  overlay. Fixed at the source, and the renderer is now created with `openConsoleOnError: false`. The
+  host also keeps OpenTUI's console *capture* on and hidden rather than deactivating it, so a stray
+  `console.warn` from a plugin lands in the capture and is printed after `renderer.destroy()` instead of
+  being written to the file the renderer draws on.
+
+### Not measured
+
+- **A real data root.** The fixture root has no tasks, projects or worktrees, so the rail is empty in
+  every frame above and nothing here says what a hundred-task rail costs to draw. The cache snapshot is
+  1.8 KB rather than the hundreds of kilobytes `cache.ts`'s own comment assumes.
+- **A packaged build.** In a checkout the TUI has no `standalone.js` beside it, so the started node runs
+  under `tsx`. Phase 7 of the bundle programme pins that layout.
+- **`tasks:changed` against a real write.** `watchTaskChanges()` is installed and the shell now reads the
+  client it invalidates, which `chrome.test.tsx` covers from the cache side, but nobody has created a
+  task on the node from a second client and watched this rail move.

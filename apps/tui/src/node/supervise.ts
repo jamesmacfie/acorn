@@ -30,7 +30,21 @@ export type Handshake = {
 const KILL_ESCALATION_MS = 5_000
 const HANDSHAKE_BUDGET_MS = 120_000
 
-export type SupervisedNode = { handshake: Handshake; stop(): Promise<void> }
+/** How many of the child's stderr lines are kept. A node that fails to boot says so in its last few
+ *  lines, and a node that boots fine can log for hours: holding all of it would be a leak in the one
+ *  process that is also drawing. */
+const HELD_STDERR_LINES = 200
+
+export type SupervisedNode = {
+  /** The child's boot line, still in flight. Not awaited by `startNode`, so the shell can draw while
+   *  the node boots (docs/tui.md § Attach or start). */
+  handshake: Promise<Handshake>
+  /** Whatever the child wrote to stderr, in order, for printing once the renderer has handed the
+   *  terminal back. Piped rather than inherited: stderr is the file the renderer draws on, so a line
+   *  arriving mid-session reads as the shell going to garbage. */
+  held: readonly string[]
+  stop(): Promise<void>
+}
 
 /** Where the node's entry lives. Beside this bundle in a packaged artifact, which is what
  *  `bin/acorn` and the tarball give us (docs/tui.md); in a checkout there
@@ -49,25 +63,36 @@ function nodeEntry(): { command: string; args: string[]; cwd?: string } {
   return { command: process.execPath, args: ['--import', 'tsx', source], cwd: app }
 }
 
-/** Start a node against `dataDir` and wait for it to announce itself.
+/** Start a node against `dataDir`. Returns as soon as the child is spawned; its boot line arrives on
+ *  `handshake`.
+ *
+ *  Not awaited here, and that is the point: the renderer is created and the shell drawn while the
+ *  child boots, which in a checkout with no build is a full tsx boot of the node
+ *  (docs/future/performance/decisions.md § Every host draws first).
  *
  *  `deviceToken` is whatever this TUI already holds for this data root. The node reuses a token that
  *  still authenticates and mints one otherwise, so passing it is what stops every launch adding a
  *  device row (server/auth/deviceTokens.ts § resolveDeviceToken). */
-export async function startNode(dataDir: string, deviceToken?: string): Promise<SupervisedNode> {
+export function startNode(dataDir: string, deviceToken?: string): SupervisedNode {
   const { command, args, cwd } = nodeEntry()
   const child = spawn(command, args, {
     ...(cwd ? { cwd } : {}),
     env: { ...process.env, ACORN_DATA_DIR: dataDir, ...(deviceToken ? { ACORN_DEVICE_TOKEN: deviceToken } : {}) },
-    // stdin closed, because the node never reads it. stderr inherited so a failure to boot is visible
-    // where the person is standing. stdout is ours until the handshake arrives, and then it is theirs
-    // again: a full-screen renderer is about to own this terminal, so the node's logging is dropped
-    // rather than drawn over the top of the workspace.
-    stdio: ['ignore', 'pipe', 'inherit'],
+    // stdin closed, because the node never reads it. stdout is ours until the handshake arrives, and
+    // then it is drained: a full-screen renderer owns this terminal, so the node's logging is dropped
+    // rather than drawn over the top of the workspace. stderr is piped for the same reason and held,
+    // because a boot failure is the one thing worth reading afterwards.
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
 
-  const handshake = await new Promise<Handshake>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('The node printed no handshake line. Check the output above.')), HANDSHAKE_BUDGET_MS)
+  const held: string[] = []
+  createInterface({ input: child.stderr! }).on('line', (line) => {
+    if (held.length >= HELD_STDERR_LINES) held.shift()
+    held.push(line)
+  })
+
+  const handshake = new Promise<Handshake>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('The node printed no handshake line.')), HANDSHAKE_BUDGET_MS)
     timer.unref?.()
     const lines = createInterface({ input: child.stdout! })
     // The handshake is one line of JSON among free-form logging, so every line is tried rather than
@@ -88,7 +113,7 @@ export async function startNode(dataDir: string, deviceToken?: string): Promise<
     child.once('error', reject)
   })
 
-  return { handshake, stop: () => stop(child) }
+  return { handshake, held, stop: () => stop(child) }
 }
 
 function stop(child: ChildProcess): Promise<void> {

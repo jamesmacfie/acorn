@@ -50,6 +50,7 @@
     "@opentui/core": "^0.5.9",
     "@opentui/keymap": "^0.5.9",
     "@opentui/solid": "^0.5.9",
+    "@tanstack/query-persist-client-core": "^5.101.0",
     "@tanstack/solid-query": "^5.101.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-webgl": "^0.18.0",

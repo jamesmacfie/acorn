@@ -21,17 +21,20 @@ const args = process.argv.slice(2)
 const distFlag = args.indexOf('--dist')
 const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') : args[distFlag + 1])
 
-// Measured at 1,024,422 B on 2026-09-03, and rounded up so an unrelated comment does not turn the
-// build red. It was 1,114,282 B until phase 1 of the performance programme made the GitHub plugin's
-// PR pane a lazy contribution; the kit table this host holds was never in the graph at all, because
-// `../src/plugins/RemoteTree.tsx` is already lazy
-// (docs/future/performance/measurements.md § 2026-09-03).
+// Measured at 841,142 B on 2026-09-03, and rounded up by about 3% so an unrelated comment does not
+// turn the build red. The history, because each step moved it for a different reason
+// (docs/future/performance/measurements.md):
 //
-// What is left is not a registry. `../src/App.tsx` imports thirteen client plugin barrels statically
-// so their `init` can register, and their registration modules and shared queries are most of this
-// number. Phase 4 is the phase that changes it; a ceiling that assumed phase 1 could halve this
-// number was wrong about where the bytes were.
-const CEILING = 1_060_000
+//   1,114,282 B  phase 0's first measurement
+//   1,024,422 B  phase 1 made the GitHub plugin's PR pane a lazy contribution. The kit table this host
+//                holds was never in the graph at all — `../src/plugins/RemoteTree.tsx` is lazy already.
+//     841,142 B  phase 4 moved the twelve-plugin roster out of `../src/App.tsx` into
+//                `../src/roster.ts`, which `../src/main.tsx` imports after the first frame.
+//
+// What is left is the chrome and the client-core it draws with, which is what the first frame is made
+// of. There is no registry in it and nothing here is waiting to be made lazy: the next honest saving
+// is a smaller kit, not a later import.
+const CEILING = 870_000
 
 // The same list the desktop's check holds, for the same reason: a chunk with one of these names in a
 // startup graph is a lazy surface that leaked into the eager one. Written twice rather than shared,

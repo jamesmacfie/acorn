@@ -1,8 +1,8 @@
 import { FleetStore, type FleetNode } from '@acorn/custody/broker/fleetStore.ts'
 import { deviceTokens, LOCAL_TOKEN_SCOPE, type DeviceTokens, type TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { configDir, dataRootDir } from './paths'
-import { runningNode } from './attach'
-import { startNode } from './supervise'
+import { knownNodeId, runningNode } from './attach'
+import { startNode, type Handshake } from './supervise'
 import { pairInteractively } from './pair'
 
 // The `acorn` command's one decision: which node this run talks to, and whether it owns that node's
@@ -36,6 +36,17 @@ export type OpenedNode = {
   /** Whether this TUI started the node. The one that started it owns its lifetime, which is the
    *  desktop's rule too: a second `acorn` in a second terminal attaches and leaves it running. */
   supervised: boolean
+  /** Set only when this run started a node that has not announced itself yet: the child's boot line,
+   *  still in flight, already folded into the fleet store when it lands. The node id above is read
+   *  from the root's `node.json` in that case, which is what lets the shell draw from that node's
+   *  persisted cache while the child boots.
+   *
+   *  Absent on the attach path, and absent on a first-ever start, where there is no id on disk to
+   *  draw with and nothing cached to draw. */
+  starting?: Promise<Handshake>
+  /** The started child's stderr, held for printing after the renderer hands the terminal back
+   *  (./supervise.ts). */
+  held?: readonly string[]
   stop(): Promise<void>
 }
 
@@ -69,20 +80,41 @@ export async function openNode(target: string | undefined, at: Custody = custody
     return done(running.nodeId)
   }
 
-  const node = await startNode(dataDir, tokens.read(LOCAL_TOKEN_SCOPE))
-  const { handshake } = node
-  fleet.remember(
-    {
-      nodeId: handshake.nodeId,
-      label: label(handshake.nodeId),
-      endpoint: handshake.endpoint,
-      local: true,
-      ...(handshake.fingerprint ? { fingerprint: handshake.fingerprint } : {}),
-      ...(handshake.certPem ? { certPem: handshake.certPem } : {}),
-    },
-    handshake.deviceToken,
-  )
-  return done(handshake.nodeId, true, node.stop)
+  // Nothing holds the root, so start one — and do not wait for it. A started node's boot is the
+  // longest thing on this command's critical path (120 seconds of budget, and a full tsx boot in a
+  // checkout), and the shell has a persisted cache it can draw from meanwhile
+  // (docs/future/performance/decisions.md § Every host draws first).
+  const node = startNode(dataDir, tokens.read(LOCAL_TOKEN_SCOPE))
+  const remember = (handshake: Handshake): Handshake => {
+    fleet.remember(
+      {
+        nodeId: handshake.nodeId,
+        label: label(handshake.nodeId),
+        endpoint: handshake.endpoint,
+        local: true,
+        ...(handshake.fingerprint ? { fingerprint: handshake.fingerprint } : {}),
+        ...(handshake.certPem ? { certPem: handshake.certPem } : {}),
+      },
+      handshake.deviceToken,
+    )
+    return handshake
+  }
+  const starting = node.handshake.then(remember)
+  // Who this root's node is, without opening it. Written once per root and never rewritten, so it is
+  // known before the child has bound anything (./attach.ts § knownNodeId).
+  const known = knownNodeId(dataDir)
+  if (!known) {
+    // A first-ever start. There is no id to name a cache partition with and no cache under it either,
+    // so there is nothing to draw and waiting costs nothing. Nothing has drawn yet either, which is why
+    // the child's held stderr goes into the failure here: it is the only account of why a first `acorn`
+    // did not come up, and there is no renderer holding the terminal to print it after.
+    const handshake = await starting.catch((error: unknown) => {
+      const said = error instanceof Error ? error.message : String(error)
+      throw new Error(node.held.length ? `${said}\n${node.held.join('\n')}` : said)
+    })
+    return done(handshake.nodeId, true, node.stop)
+  }
+  return { nodeId: known, fleet, supervised: true, starting, held: node.held, stop: node.stop }
 }
 
 // `--node` names either a node this device has already paired with, by label or by id, or an endpoint

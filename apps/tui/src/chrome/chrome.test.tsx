@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest'
 import { toast } from '@acorn/client-core/features/notifications/toast.ts'
 import { _resetNotices, pushNotice } from '@acorn/client-core/features/notifications/notifications.ts'
+import { tasksKey, type Task } from '@acorn/protocol/api.ts'
+import { recordedRequests } from '../fixture'
 import { hasFfi } from '../ffi'
 import { renderFixture } from '../harness'
 
@@ -187,6 +189,54 @@ describe.skipIf(!hasFfi)('the shell', () => {
     const frame = await screen.frame()
     screen.done()
     expect(frame.split('\n')[0]).not.toContain('\u25d4')
+  }, 30_000)
+
+  // Drawing in front of the node (docs/tui.md § Attach or start,
+  // docs/future/performance/decisions.md § Every host draws first). `acorn` creates its renderer before
+  // a node it spawned has printed its boot line, so the whole shell has to be drawable from the
+  // persisted cache with nothing on the wire.
+  it('draws the whole shell from the persisted cache while the node it started is booting', async () => {
+    const cached: Task[] = [{
+      id: 'task-cached', title: 'from-last-time', projectId: 'project-1', branch: 'from-last-time',
+      origin: 'local', icon: null, status: 'active', links: [], parentId: null, sort: 0,
+      github: null, worktreePath: null, pullNumber: null,
+    }]
+    const screen = await renderFixture({
+      width: 100,
+      height: 28,
+      starting: true,
+      // Seeded into the same per-node client the shell renders under, which is the whole of this
+      // phase: `App` used to mint one of its own, so a restored snapshot was invisible to it and every
+      // start was cold (client-core/infra/node/fleet.ts § clientFor).
+      cache: (client) => client.setQueryData(tasksKey, cached),
+    })
+    const frame = await screen.frame()
+    screen.done()
+
+    const lines = frame.split('\n')
+    // The rail's task, drawn from the cache. Not the fixture's `fix-login`: nothing asked the node
+    // for tasks at all, because a seeded query with a fresh timestamp is inside `clientFor`'s
+    // thirty-second staleTime.
+    expect(frame).toContain('from-last-time')
+    expect(frame).not.toContain('fix-login')
+    expect(recordedRequests().some((request) => request.path === '/v2/core/tasks')).toBe(false)
+    // …and the chrome around it is whole: topbar, rail, pane strip and the keys on the footer.
+    expect(lines[0]).toContain('acorn')
+    expect(lines[lines.length - 2]).toContain('j/k move')
+    // The one thing that says the node is not there yet, and it is not drawn as a fault: a node
+    // this run spawned reads as `offline` to the broker, which would otherwise say "unreachable —
+    // retrying" about a node that is booting fine (./nodeState.ts).
+    expect(frame).toContain('starting the node')
+    expect(frame).not.toContain('unreachable')
+  }, 30_000)
+
+  it('drops the starting sentence once the handshake lands, and fills the rail from the node', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    const frame = await screen.until('fix-login')
+    screen.done()
+
+    expect(frame).not.toContain('starting the node')
+    expect(frame).toContain('fix-login')
   }, 30_000)
 
   it('asks before quitting a node it started, and does not when it only attached', async () => {
