@@ -138,7 +138,7 @@ pub async fn save_file(app: AppHandle, bytes: String, suggested_name: String) ->
 // ── Notifications and the dock badge ──────────────────────────────────────────────────────────
 //
 // Both are the shell's rather than the helper's: a banner and an app icon belong to the window's
-// process. See docs/future/notifications/model.md for the gate upstream of them, which decides what
+// process. See docs/notifications.md for the gate upstream of them, which decides what
 // is worth one.
 
 /// The tag of the last banner shown, and when. `tauri-plugin-notification` v2 gives desktop no

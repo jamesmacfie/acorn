@@ -17,7 +17,7 @@ import { closeOverlay } from './state'
 import type { ShellModel } from './model'
 
 // What is waiting, as the bell's two sections in a terminal
-// (docs/future/notifications/phase-5-tui.md).
+// (docs/tui.md § What is drawn bespoke).
 //
 // The desktop draws this in a popover under the topbar bell. There is no popover here and no bell to
 // hang one under, so it is an overlay opened on `n` — and an overlay rather than a fourth panel

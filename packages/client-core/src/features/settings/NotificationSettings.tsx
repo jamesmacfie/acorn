@@ -10,7 +10,7 @@ import { activeTaskId } from '../tasks/tasks'
 import { Show } from 'solid-js'
 
 // Settings → Notifications: the switches the gate reads
-// (docs/future/notifications/model.md § The gate).
+// (docs/notifications.md § Settings).
 //
 // The three event switches turn an edge off entirely, row included. Off means the owner does not
 // want to hear about it, and a row that lands silently but still counts in the pill is hearing

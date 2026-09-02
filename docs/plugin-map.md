@@ -319,7 +319,8 @@ Agent notices come from a change of state, not from an event. A plugin holding a
 and re-checks it, so a permission that policy auto-approves never reaches anybody, and it marks a
 change you watched happen as read, so the history is complete and the bell's count does not move.
 `pushManagedAgentNotice` goes through the same gate and is the way in for a notice that has no
-session behind it.
+session behind it. For the states, the edges, the gate, and the channels, see
+[notifications.md](./notifications.md).
 
 A notice that should open something when clicked carries a `target`, and you register what happens with
 `registerNoticeTargetHandler(kind, handler)`. The same dispatch serves the attention inbox, which uses

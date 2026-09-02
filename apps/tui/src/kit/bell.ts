@@ -1,5 +1,5 @@
 // The sound channel on this host, which is BEL and nothing else
-// (docs/future/notifications/phase-3-sound.md).
+// (docs/notifications.md § The channels).
 //
 // A Node process has no audio device it can reach portably. BEL is the one sound every terminal
 // understands, and Warp, iTerm2 and Kitty already turn it into a badge or an OS notification of

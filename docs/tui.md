@@ -827,7 +827,7 @@ is waiting, and nothing when nothing is. It is the number the desktop's bell put
 the app icon — unread notices plus the rows in the attention inbox — and it gets here the same way it
 gets onto the dock: `trackBadge` calls the platform seam's `setBadge`, and this host's `notify` group
 writes the signal the topbar reads (`apps/tui/src/kit/notify.ts`). One number with one meaning on
-both hosts.
+both hosts, and [notifications.md](./notifications.md) owns what goes into it.
 
 `n` opens what is behind it. `apps/tui/src/chrome/Inbox.tsx` is the bell's two sections — "Needs you"
 and "Notifications" — as an overlay, because there is no popover here and the column has no room for a

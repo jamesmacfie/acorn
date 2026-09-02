@@ -249,7 +249,8 @@ talks to is not always on this machine, so a path would name a file the node can
 owns the dialog and the read or write, and the renderer never learns where the file went.
 
 The `notify` group is a system notification, a click on one, and the number on the dock icon
-(`apps/desktop/src-tauri/src/commands.rs`). All three are the shell's rather than the helper's,
+(`apps/desktop/src-tauri/src/commands.rs`). What decides that a banner is worth raising is
+[notifications.md](./notifications.md) § The gate. All three are the shell's rather than the helper's,
 because a banner and an app icon belong to the window's process. `tauri-plugin-notification` is
 initialised in `src-tauri/src/lib.rs` for `app.notification()` alone: the renderer never invokes the
 plugin's own commands, so `capabilities/default.json` still grants `core:default` and nothing else,
