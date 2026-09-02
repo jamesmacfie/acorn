@@ -83,7 +83,10 @@ The keyboard is one engine, `@opentui/keymap`, installed on the shell root by
 `client-core/host/keys/install.ts`. Its HTML adapter turns DOM keydowns into keymap events and tracks
 targets with a `MutationObserver`. The same package carries a terminal adapter, and the terminal
 client uses it: `apps/tui/src/keys/install.ts` builds `createDefaultOpenTuiKeymap(renderer)` and gets
-the same four tiers, the same `intentKeys` table and the same bubbling. What differs is the pair of
+the same layer model, the same `intentKeys` table and the same bubbling. It needs more priorities
+than this host does, because it draws the whole workspace in one window and an entered terminal has
+to sit above every one of them, and all ten of them are written in one file with a sentence each
+(`apps/tui/src/keys/tiers.ts`). What differs is the pair of
 type parameters — a target is an OpenTUI `Renderable` there and an `HTMLElement` here — so
 `client-core/kit/keys/keymapHost.ts` names neither: the host supplies its pair at `setKeymap`, along
 with its own answer to "is somebody typing right now", which is the only question a binding asks
@@ -111,6 +114,14 @@ An unhandled intent bubbles. A binding whose handler returns `false` is not hand
 carries on to the next layer: the focused collection answers, or an ancestor does, or the region
 layer does, or nothing does.
 
+**Which is why a handler that changed nothing says so.** `onExpand` on a `Rows` may return a boolean:
+`false` means the row did not fold — a leaf, or a list with nothing to open — and hands the key back,
+so the tier below answers it. On the terminal that tier moves one column, which is how Right on a
+file in the editor's tree reaches the document beside the tree. Returning nothing claims the key, the
+way the collection always did, so no caller changes until it opts in; the editor's file tree is the
+one that has (`plugins/editor/src/client/FileTree.tsx`). The terminal's tab strip keeps the same rule
+at its last tab.
+
 **Focus is a property of the tree.** Each kit node has a fixed focus role
 (`client-core/kit/tokens/focusRoles.ts`), and a plugin sets none of it: stops, collections with roving
 focus, items inside a collection, and the two traps. Every layout region is a focus group. F6 and
@@ -121,11 +132,13 @@ with the task, pane and region.
 
 The terminal keeps the contract and replaces the mechanism, and
 [tui.md](./tui.md) § Keys and focus owns the whole of how: five levels, five key groups, a
-shell-installed topology, one settle pass, and eight invariants with the file that checks each. Two things there belong to this table rather than to that one. Tab is `nextRegion`
-on that host, beside F6, because the browser owns Tab and a terminal does not, and a reader in one
-presses it first; the intent is the shared one and `intentKeys` is still the table, and a host adding
-a key to an intent it already has is what a per-host key table is for. And overlays and entered PTYs
-retain first refusal there as everywhere.
+shell-installed topology, a dialog as a scope, one landing rule, and eleven invariants with the file
+that checks each. Where the keys are is the renderer's answer there and nothing else writes it, which
+is what a host with no pointer has instead of `document.activeElement`. Two things there belong to
+this table rather than to that one. Tab is `nextRegion` on that host, beside F6, because the browser
+owns Tab and a terminal does not, and a reader in one presses it first; the intent is the shared one
+and `intentKeys` is still the table, and a host adding a key to an intent it already has is what a
+per-host key table is for. And overlays and entered PTYs retain first refusal there as everywhere.
 
 **Collection state is the host's.** A run of `Row`s inside a `Rows`, a tab strip, a menu, a chip row,
 a segmented control, a timeline and a grid are all one collection with roving focus inside, and the
@@ -181,14 +194,17 @@ DOM event too, and the overlay would never see it.
 
 **In a terminal, an overlay and a rectangle each own the keys outright**, and these are the two places
 the terminal's keyboard is not the desktop's. There is no scrim to click through and no window to
-click outside of, so a `Modal` or an open `Menu` takes two layers: `dismiss` above everything, and a
-swallow of every other intent above a pane's own layer and below a collection's. The swallow sits
-below the collection tier on purpose — priority decides, not locality, so a swallow at the trap's own
-tier would eat Enter before a list drawn inside the modal could answer it, and a collection behind the
-overlay cannot fire anyway, because the overlay took the focus. An entered `pty` rectangle takes every
+click outside of, so a `Modal` or an open `Menu` is a scope: the box goes on the region store's scope
+stack while it is drawn, and every question that store answers is answered inside it, so there is
+nothing behind the dialog for a key to reach. One layer goes with it, `dismiss` above everything. It
+was two, and the second named the intents it swallowed, which is a table that leaks a key the moment
+it differs from another one ([tui.md](./tui.md) § Traps). An entered `pty` rectangle takes every
 key before dispatch, `Ctrl+C` included, which is the point of entering one. Escape alone leaves a
 rectangle; pressing it twice goes back in and sends one through, which is how a reader reaches vim's
-normal mode from in there.
+normal mode from in there. Being entered is derived rather than remembered: it means the box has the
+keys, is on screen, and had an Enter pressed on it since it last lost them, so a rectangle hidden by
+a tab switch stops taking keys the moment it goes off screen
+([tui.md](./tui.md) § The Rectangle contract).
 
 **The cheat sheet** (`client-core/host/keys/CheatSheet.tsx`, Cmd+/) lists what the keyboard will do right
 here, read from the engine's own catalog rather than from the keybinding registry. `getActiveKeys`

@@ -12,7 +12,9 @@ import { Alert } from '../kit/showing'
 //
 // It never takes focus, which on this host is not a claim but a fact: nothing here is focusable, so
 // the renderer cannot put the keys in it. Dismissing is a key rather than a close button, and the key
-// is `dismiss` — Escape — answered by the shell, because a toast has nowhere to hold a layer from.
+// is `dismiss` — Escape — answered by the region tier's own handler, because a toast has nowhere to
+// hold a layer from. This file only draws: clearing the queue is the first step of that one handler,
+// which reads the same store (../keys/install.ts § clearNotifications).
 
 function ToastLine(props: { entry: Toast }) {
   const timer = setTimeout(() => dismissToast(props.entry.id), props.entry.durationMs)
@@ -30,12 +32,4 @@ export function Notifications() {
       <For each={activeToasts()}>{(entry) => <ToastLine entry={entry} />}</For>
     </box>
   )
-}
-
-/** Clear whatever is on screen. The shell's `dismiss` runs this before anything else, so Escape means
- *  "get this out of my way" before it means anything to a pane. */
-export const dismissNotifications = (): boolean => {
-  const open = activeToasts()
-  for (const entry of open) dismissToast(entry.id)
-  return open.length > 0
 }

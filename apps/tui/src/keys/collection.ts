@@ -24,7 +24,7 @@ import {
 } from '@acorn/client-core/kit/keys/collectionIntents.ts'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import {
-  activationEntersMain, focusedRenderable, markCollection, markItem, moveColumn, noteFocus,
+  activationEntersMain, focusedRenderable, focusRenderable, markCollection, markItem, moveColumn,
   scheduleSettle,
 } from './regions'
 
@@ -64,10 +64,9 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
     land: (key) => {
       const box = boxes.get(key)
       if (!box) return
-      box.focus()
-      // The region the row is in now has the keys, which is what `focusin` says on the DOM. The
-      // retained renderable tree is the bubble here.
-      noteFocus(box)
+      // Through the store's one door, so the region the row is in learns it has the keys from the
+      // renderer's own event rather than from this call (./regions.ts § The one writer).
+      focusRenderable(box)
     },
     onItem: () => true,
     onActivate: (key) => {
@@ -100,7 +99,7 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
         markItem(box, () => keys.goTo(key), `${options.id()}\u0000${key}`)
         // Solid keys rows by their data-object reference, while collection state keys them by this
         // logical key. A refresh may therefore redraw the same row as a new renderable, and the
-        // renderer's focus goes with the one it destroyed. The settle pass re-lands on the same
+        // renderer's focus goes with the one it destroyed. The landing rule re-lands on the same
         // logical row, because the identity registry now points at this box.
         if (previous && previous !== box) scheduleSettle()
         onCleanup(() => { if (boxes.get(key) === box) boxes.delete(key) })
@@ -114,17 +113,24 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       const key = keys.active()
       const box = key ? boxes.get(key) : undefined
       if (!box) return false
-      box.focus()
-      noteFocus(box)
-      return true
+      return focusRenderable(box)
     },
     attach: (box) => {
-      // Layer 40, focus-within on the collection, exactly as on the desktop (client-core
-      // host/keys/install.ts § the four tiers). Priority decides, not locality.
+      // The collection tier, focus-within on the collection, exactly as on the desktop (client-core
+      // host/keys/install.ts § the four tiers). Priority decides, not locality. The number comes from
+      // `registerIntentLayer`'s own default, which both hosts read, so it is the one tier this
+      // package states without setting (./tiers.ts § COLLECTION).
       onCleanup(registerIntentLayer(box, COLLECTION_INTENTS, keys.handle))
       // And one stop from outside: a reader walking a panel with `↓` passes the list once, on the row
       // the caret is already on, rather than through every row of it (./regions.ts § stopsIn).
-      markCollection(box, () => { const key = keys.active(); return key ? boxes.get(key) : undefined })
+      // And whether this list folds, which the footer needs to know before a reader presses `h` or
+      // `l`: a tree's fold and a plain list's bubble to a column move are the same key
+      // (./regions.ts § focusedExpands, ../chrome/bindings.ts).
+      markCollection(
+        box,
+        () => { const key = keys.active(); return key ? boxes.get(key) : undefined },
+        () => !!options.onExpand,
+      )
     },
   }
 }

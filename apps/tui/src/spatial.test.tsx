@@ -68,4 +68,37 @@ describe.skipIf(!hasFfi)('spatial focus', () => {
     expect(focusedRegion()?.regionId).toBe('tasks')
     screen.done()
   }, 120_000)
+
+  it('crosses between the two halves of a list-detail pane', async () => {
+    // The rail-to-pane edge and the list-to-detail edge are one rule, and for a while they were not.
+    // A region's column was a pair, `rail | main`, and no `regionFocus` call in `layouts/` passed
+    // one, so every region a layout registered was `main`. In a `list-detail` pane, two frames
+    // literally side by side, Right had nothing to cross to: it returned false and did nothing, while
+    // Left jumped past both frames to the rail. A column is an integer counted left to right now and
+    // the layout declares both of its own (./keys/regions.ts § moveColumn).
+    //
+    // The changes pane rather than the pull request pane the report named. `github`'s PR surface is a
+    // `single` layout holding one kit node, because "the halves are one surface", as `PrPane.tsx`
+    // says, so it has one region and no two frames for a key to cross between. The panes that really
+    // are `list-detail` are changes, notes and agents.
+    const screen = await renderFixture({ width: 120, height: 40, pane: 'changes' })
+    try {
+      await screen.until('STAGED')
+      // Tab in, and Tab only. Walking with `↓` reaches the Menu, and landing in the Menu selects the
+      // source under the caret, which replaces the whole task pane with that source's surface and
+      // takes the two halves this case is about off the screen (./chrome/Rail.tsx § pickOnEnter).
+      for (let press = 0; press < 6 && focusedRegion()?.regionId !== 'list'; press += 1) {
+        await screen.press('TAB')
+      }
+      expect(focusedRegion()?.regionId).toBe('list')
+
+      await screen.press('l')
+      expect(focusedRegion()?.regionId).toBe('detail')
+
+      await screen.press('h')
+      expect(focusedRegion()?.regionId).toBe('list')
+    } finally {
+      screen.done()
+    }
+  }, 90_000)
 })

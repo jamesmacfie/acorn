@@ -2,6 +2,7 @@ import type { Accessor } from 'solid-js'
 import type { Renderable } from '@opentui/core'
 import { layoutState } from '@acorn/client-core/host/layouts/state.ts'
 import { bindKeys } from '../keys/install'
+import { PANE } from '../keys/tiers'
 
 // A split that moves by a key, because a terminal has no grip to drag.
 //
@@ -11,8 +12,8 @@ import { bindKeys } from '../keys/install'
 // it left it on either host. `SplitHandle` and `SplitCell` are `absent` in the support matrix for
 // exactly this reason: the handle is a key, not a node (docs/tui.md).
 //
-// The chord is Ctrl with shift and an arrow, on layer 30, focus-within on the layout's own box. Layer
-// 30 is a pane's own tier and shift keeps it clear of the pane-cycling chords at layer 5. Ctrl rather
+// The chord is Ctrl with shift and an arrow, on the pane's own tier, focus-within on the layout's own
+// box. Shift keeps it clear of the pane-cycling chords at the region tier. Ctrl rather
 // than the platform's primary modifier, which on macOS is Cmd — a chord a terminal emulator keeps for
 // itself and never delivers (../keys/commandLayer.ts § asCtrl).
 
@@ -49,6 +50,6 @@ export function createKeySplit(options: {
     attach: (box) => bindKeys(box, [
       { key: `ctrl+shift+${less}`, cmd: () => nudge(-STEP) },
       { key: `ctrl+shift+${more}`, cmd: () => nudge(STEP) },
-    ], 30),
+    ], PANE),
   }
 }

@@ -1,5 +1,9 @@
 /** @jsxImportSource @opentui/solid */
+import type { CliRenderer } from '@opentui/core'
+import type { PluginTrustRequest } from '@acorn/client-core/host/plugins/distribution.ts'
 import { _resetRequests, stubTransport, TASK } from './fixture'
+import { setTerminalBadge } from './kit/notify'
+import { RAW_KEYS } from './kit/render'
 import { focusedRegion, focusedRenderable, type RegionRef } from './keys/regions'
 
 // Booting client-core under Node against no node at all: the same seam, the same boot, a transport
@@ -26,6 +30,17 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
         nodes: [{ nodeId: 'node-1', label: 'fixture', endpoint: 'https://127.0.0.1:1', local: true }],
         statuses: [{ nodeId: 'node-1', state: 'online' }],
       }),
+      // The notify group, because the topbar's count is written through it. `trackBadge` returns
+      // early wherever `window.acorn.notify` is absent (client-core/features/notifications/badge.ts),
+      // so a harness without one draws no count and the test asserting one could never pass.
+      // `show` answers false rather than writing an escape sequence: a suite must not send OSC to
+      // the terminal running it. The badge writes the same signal the real seam does
+      // (./platform.ts, ./kit/notify.ts).
+      notify: {
+        show: async () => false,
+        onActivate: () => () => {},
+        setBadge: setTerminalBadge,
+      },
     },
   }
   const { selectActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
@@ -57,10 +72,27 @@ export type Screen = {
   reach: (text: string, steps?: number) => Promise<boolean>
   resize: (width: number, height: number) => void
   quits: () => number
+  /** The renderer, so a test can ask the one question the store cannot answer about itself: what
+   *  OpenTUI thinks has the keys. Every agreement assertion reads `currentFocusedRenderable`
+   *  (./reachability.test.tsx, docs/tui.md § The invariants). */
+  renderer: CliRenderer
   done: () => void
 }
 
-export async function renderFixture(size: { width?: number; height?: number; supervised?: boolean; pane?: string } = {}): Promise<Screen> {
+// The renderer the last `renderFixture` built, so the next one can tear it down. Module state
+// because a suite is one worker with many renders and the harness is what they have in common.
+let previous: CliRenderer | null = null
+
+export async function renderFixture(size: {
+  width?: number
+  height?: number
+  supervised?: boolean
+  pane?: string
+  /** Bundles this device has never decided about, seeded into the distribution queue so the shell
+   *  raises its trust overlay. Seeded here rather than by the caller because the reset below would
+   *  clear anything seeded before the call (client-core/host/plugins/distribution.ts). */
+  trust?: readonly PluginTrustRequest[]
+} = {}): Promise<Screen> {
   const { createTestRenderer } = await import('@opentui/core/testing')
   const { render } = await import('@opentui/solid')
   const { installKeymap } = await import('./keys/install')
@@ -72,6 +104,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   const { _resetRouter } = await import('./kit/router')
   const { clearAnnotations } = await import('@acorn/client-core/host/annotations/annotations.ts')
   const { setActiveTaskId, setSelectedSource } = await import('@acorn/client-core/features/tasks/tasks.ts')
+  const { _resetPluginDistribution, _seedPendingTrust } = await import('@acorn/client-core/host/plugins/distribution.ts')
   // The collection store, the region list, the per-pane layout state, the path and which browse
   // source is showing are all module state, so two renders in one process would share a caret, a
   // focused region, a split position, a project and a rail selection. The real host has one render
@@ -91,6 +124,10 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   clearAnnotations()
   setActiveTaskId(null)
   setSelectedSource(null)
+  // …and the queue of bundles waiting on a trust decision, which is module state like the rest and
+  // would otherwise leave the next test in the file staring at the previous one's dialog.
+  _resetPluginDistribution()
+  if (size.trust?.length) _seedPendingTrust(size.trust)
   await bootFixture()
   // Which pane the fixture task opens on. The roster has eight of them now, so "the pane" is a choice
   // rather than the only one there is, and a test that does not make it gets whatever the task's saved
@@ -127,6 +164,12 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   // keymap has to be installed before anything mounts: a layout, a collection and a trap all register
   // their layer as they draw, and a layer registered against no engine is silently dropped.
   installRenderGuard()
+  // Whatever the last render left behind. A test that fails an assertion before its `done()` never
+  // tears its renderer down, so the Solid root stays mounted, its `onCleanup` never runs, and the
+  // next render in the same worker throws "command contribution already registered" from the shell's
+  // `onMount` — one red test turning into three, none of which names the first. Tearing down here
+  // costs nothing when the previous test was tidy (@opentui/solid disposes the root on `destroy`).
+  previous?.destroy()
   const { renderer, mockInput, flush, captureCharFrame, captureSpans, resize } = await createTestRenderer({
     width: size.width ?? 80,
     height: size.height ?? 24,
@@ -135,6 +178,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
     // suite driving a different protocol from production is testing a different keyboard.
     kittyKeyboard: true,
   })
+  previous = renderer
   renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(renderer)
   let quits = 0
@@ -161,7 +205,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   }
 
   const press = async (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }): Promise<void> => {
-    mockInput.pressKey(key, modifiers)
+    mockInput.pressKey(RAW_KEYS[key] ?? key, modifiers)
     // A real wait before the render loop, not just a flush. A lone Escape is the start of every
     // escape sequence there is, and the terminal's parser holds it until it is sure nothing
     // follows; flushing the render loop does not make that timer run.
@@ -170,16 +214,24 @@ export async function renderFixture(size: { width?: number; height?: number; sup
   }
 
   /**
-   * Where the keys are, and the one line a reader would look at to see it.
+   * Where the keys are, and the cells a reader would look at to see it.
    *
-   * The focused renderable's own line first, because that is the line it drew itself on — a `Row`
-   * draws the caret there and a `Button` draws itself lit there. The line holding a `\u203a` is the
-   * fallback, for the moment focus is on a region's own box and nothing is lit at all.
+   * The focused renderable's own row and its own columns. The row is where it drew itself, since a
+   * `Row` puts the caret there and a `Button` draws itself lit there. The columns matter because a
+   * terminal row is the width of the screen and the screen is the rail beside a pane: at 120 cells a
+   * rail row's line carries the pane's text as well, so a match against the whole row answers for
+   * something the keys are nowhere near. That is what made a `reach` on a wide screen stop on the
+   * wrong thing and pass a precondition it had not met.
+   *
+   * The row holding a `\u203a` is the fallback, for the moment focus is on a region's own box and
+   * nothing is lit at all. That one keeps its full width, because there is no node to take columns
+   * from.
    */
   const caret = async (): Promise<Caret> => {
     const lines = (await frame()).split('\n')
     const node = focusedRenderable()
-    const own = node && !node.isDestroyed ? lines[node.y] : undefined
+    const row = node && !node.isDestroyed ? lines[node.y] : undefined
+    const own = row === undefined || !node ? undefined : row.slice(node.x, node.x + node.width)
     return { region: focusedRegion(), text: own ?? lines.find((line) => line.includes('\u203a')) ?? '' }
   }
 
@@ -268,9 +320,13 @@ export async function renderFixture(size: { width?: number; height?: number; sup
       })))
     },
     resize,
+    renderer,
     /** How many times the shell asked to quit. Counted rather than performed: a suite that really
      *  exited would take the runner with it. */
     quits: () => quits,
-    done: () => renderer.destroy(),
+    done: () => {
+      if (previous === renderer) previous = null
+      renderer.destroy()
+    },
   }
 }

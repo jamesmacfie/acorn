@@ -120,7 +120,7 @@ export function createShellModel(): ShellModel {
     setActiveTaskId(null)
     setSelectedSource(null)
     setChosenWorkspace(workspaceId)
-    // The focused Menu row is about to be destroyed with the old roster. The settle pass re-enters the
+    // The focused Menu row is about to be destroyed with the old roster. The landing rule re-enters the
     // region by its entry rule once reconciliation has produced the new rows.
     scheduleSettle()
   }

@@ -442,10 +442,19 @@ does, and a handler returning `false` passes it on.
 | Group | Keys | In a collection | On a parent stop | On a plain stop | On a viewport with no stops | Bubbled to the region tier |
 | --- | --- | --- | --- | --- | --- | --- |
 | Move | `↓` `j` / `↑` `k` | next/previous row, wrapping as `collectionIntents.ts` says | Down enters the panel the strip is showing; Up leaves for the previous stop | next/previous stop in reading order within the panel, revealed in every viewport around it; an edge is a wall | scroll a fifth of a page | nothing |
-| Cross | `→` `l` / `←` `h` | `expand`/`collapse`, which a tree answers and a horizontal collection moves | the next/previous tab; an edge is a wall | nothing | nothing | rail → main and main → rail, landing on the destination column's last region, no wrap |
+| Cross | `→` `l` / `←` `h` | `expand`/`collapse`, which a tree answers and a horizontal collection moves; a plain list and a leaf bubble | the next/previous tab; an edge bubbles | bubbles | bubbles | one column left or right, landing on that column's last-used region, no wrap |
 | Act | `⏎` `space` | activate the row, then enter main where the region says so | nothing | press: `onPress`, a toggle, a `Select`'s list, an `Input`'s submit, an entered rectangle | nothing | nothing |
-| Back | `esc` | the parent stop if a panel holds the collection, else the region's home | the region's home | the parent stop, else the region's home | the region's home | an overlay closes, a rectangle is left, a notification clears |
+| Back | `esc` | the parent stop if a panel holds the collection, else the region's home | the region's home | the parent stop, else the region's home | the region's home | a notification clears, else the climb the shell's topology names |
 | Page | `pgup` `pgdn` `home` `end` | `pagePrev`, `pageNext`, `first`, `last` on the collection | scroll the viewport around it | scroll the viewport around it | scroll | nothing |
+
+**A cross key has one meaning per level and one at the bottom.** A handler that changed nothing
+returns `false`, so the key carries on down: a tab strip at its last tab, a tree row that is a file,
+a plain list with no fold. What waits at the region tier is the column move, and it is the only thing
+`h` and `l` mean there — so Left with nothing to the left goes one column left in every control on
+the screen. That is a reversal: a tab-strip edge used to be a wall, on the grounds that a failed Left
+threw the reader back into the rail unexpectedly. The surprise was smaller than the inconsistency,
+which was one key with five meanings and two of them silent. The footer says `column` where that is
+what the key will do, so the reader is told before they press it.
 
 Two keys sit at the screen level and never bubble. Tab and Shift+Tab cycle every region on screen in
 declared order and wrap, and the pane chords cross the column edge before they switch the pane. Both
@@ -467,7 +476,7 @@ describes five levels and nothing else:
 
 ```text
 Screen
-└─ Column           rail | main                                    right/left cross, no wrap
+└─ Column           0 the rail, 1 the pane, 2 a second frame        right/left cross, no wrap
    └─ Region        Menu, Browse, Tasks, the pane strip, a layout's own regions   Tab cycles them
       └─ Parent stop   a strip that owns panels                    Down enters, Escape returns
          └─ Stop    a row, a control, a viewport holding no other stop
@@ -475,8 +484,12 @@ Screen
 
 A region is registered by its layout with its id and its order, from the layout's own knowledge of
 its regions rather than from `compareDocumentPosition`. Focus is OpenTUI's focus and the renderer owns
-it. OpenTUI focuses mouse targets itself, and the viewport receiving the click mirrors that result
-into the region bookkeeping, because there is no DOM `focusin` event to do it.
+it, so the store is a view of the renderer's `focused_renderable` event and one listener is the only
+thing that writes it: which renderable has the keys, which region that puts them in, and what the
+region should remember. Nothing else moves focus without asking, either, because everything goes
+through `focusRenderable`, which asks the renderer and reports what the renderer did. The mouse needs
+no bridge of its own: OpenTUI focuses the nearest focusable ancestor of a left click itself, and the
+store hears about that through the same event a Tab arrives by.
 
 Entering a region lands on its first parent stop, else its first collection row, else its first stop,
 else the region's own frame, walking OpenTUI's retained tree depth first. The middle step is this
@@ -488,8 +501,9 @@ source came back to a lit border, no caret, and arrows that did nothing, for the
 
 **A strip with panels is a parent stop.** `markParent(node, panels)` marks one, where `panels()`
 returns the boxes whose subtrees it owns. From outside it is one stop: `left`/`h` and `right`/`l` walk
-it without wrapping and an edge is a wall rather than an implicit trip to the rail, `down`/`j` enters
-the panel it is showing, and Escape from anything inside that panel returns to it. A strip that owns
+it without wrapping and an edge bubbles to the column move, `down`/`j` enters the panel it is
+showing, `up`/`k` is the previous stop beside the strip rather than one of the strip's own tabs, and
+Escape from anything inside that panel returns to it. A strip that owns
 none, such as GitHub's Open/Closed pull filter, is an ordinary control, so Browse still opens on its
 rows and Up/Down reaches the collection. The strip is a sibling of its panels rather than an ancestor,
 so walking up from a control never reaches it: the panel box is what the walk reaches, and the panels
@@ -518,34 +532,52 @@ once. `moveStop` answers false for whatever the walk does not own, which is how 
 back to its collection and a document with no controls keeps them for scrolling.
 
 **One deferred decision.** A focus decision that needs a renderable the current render has not
-produced yet waits in `settleFocus`, queued at most once per turn by `scheduleSettle`. A microtask
+produced yet waits in `ensureFocus`, queued at most once per turn by `scheduleSettle`. A microtask
 rather than a frame event, because a test renderer under `flush()` may render several times before a
 frame, while Solid commits synchronously and every renderable of the current render exists at the end
-of the current task.
+of the current task. `apps/tui/src/invariants.test.ts` holds the folder to one `queueMicrotask` and
+the kit to none.
 
-It asks one question first: is an overlay holding the keys? If one is, the pass has a single step —
-put them on a live stop inside it, and reveal that stop. Everything else it could do is a region
-decision, and the region tier is what a trap is holding the keys away from. Without that question it
-did those things anyway, and both went wrong in the same visible way: a list arriving behind an open
-modal took the keys off it, and a row destroyed inside one left them on the corpse. Either way the
-trap then swallowed every key the reader pressed, so the dialog was on screen and could not be
-answered — which is how the plugin trust prompt came to be unanswerable from the second bundle in
-its queue onwards.
+A tree to read is the whole of what the microtask buys. It orders nothing against the reconciler's
+`process.nextTick` destruction, which exists for `Suspense` (§ Destroy on disposal) and is no longer
+load-bearing for focus: a scope popping blurs the keys out of the box that is going rather than
+waiting to be told, and nothing in the pass depends on a node that has been disposed still reporting
+itself live.
 
-With no overlay it runs four steps in order: re-enter a region whose focused row was destroyed, by
-the row's logical identity; open the screen if nothing holds the keys; take the keys off a region
-that was only holding them for want of anything better; then give them back to whatever the overlay
-that just closed took them from, or open the screen where there was nothing to give back. Then it
-reveals the focused stop in every viewport around it.
+**One question.** Can the renderable that has the keys still hold them, and is it the real thing
+rather than a stand-in? Holding them means alive, visible, visible all the way up to the root, still
+`focusable`, and inside the top scope. The walk up the parents is the half that matters, because
+OpenTUI's `visible` is per node: the shell hides the main row behind an overlay and a `TabPanel`
+hides the tab that is not showing, and a focused descendant of either goes on saying it is visible. A
+stand-in is a region's own frame while that region has an entry stop, or a collection's container
+while that collection has a live active row. Both are `focusable` so that they can hold the keys when
+nothing else can, and both stop being the right answer the moment their contents arrive. If the
+answer to the question is yes, the pass reveals the stop in the viewports around it and stops.
 
-The overlays are a stack rather than one box, because a `Menu` inside a `Modal` is a second overlay
-over the first and closing it must leave the modal still holding the keys.
+**Four steps if the answer is no.** A scope holding the keys takes the stop it last had, then the
+first stop inside its box, then the box itself, which is `focusable` from the push. On the screen the
+same four steps run with a region in front of them: the region that still claims the keys, else the
+region the shell opens on, else the first one drawn; and inside whichever of those answers, the stop
+it last had, its entry stop, its frame, which is `focusable` from registration. A remembered stop
+resolves by collection identity first, because a query refresh redraws the same logical row as a new
+renderable, and a stand-in is never restored.
 
-There were six of these and each was a correct fix for a real bug. Together they were a state machine
-nobody had written down, and the class of bug they produced was always the same: two of them ran in an
-order the author had not pictured, and the reader got a lit frame with no caret or a caret on a
-destroyed row. `apps/tui/src/invariants.test.ts` holds the folder to one `queueMicrotask` and the kit
-to none.
+**Hiding a subtree asks for a pass.** Two boxes here hide what is inside them rather than unmounting
+it, so that the rail and the pane behind an overlay keep their queries and their models and a tab
+that is not showing keeps its state: the shell's main row, and the `ScrollViewport` that a `TabPanel`
+is. Neither of them blurs what is inside it, because `visible` is per node, so each schedules a
+landing pass when its flag goes false and the pass does the rest, since it already walks the parents
+before it decides who can still hold the keys. Without that the keys stayed on a node behind the
+overlay: invariant 6 was false of a hidden subtree, and an entered rectangle on a tab that had been
+switched went on eating every key in the app.
+
+**A region and a scope each remember their own stops, and one focus move writes one memory.** A
+`Modal` or an open `Menu` is drawn inside whichever region held the keys. A region that also
+remembered the dialog's rows would hand the keys back to a destroyed row when the dialog closed
+instead of to the trigger that opened it, and its claim would say the reader had changed region while
+they were answering a dialog. So handing the keys back needs nothing recorded when a scope opens: the
+scope remembers where they were inside it, the region behind it still remembers its own last stop,
+and closing a `Select` drawn inside a `Modal` comes back to that `Select`.
 
 **The shell installs what the keys cannot know.** `setTopology` takes three answers and
 `setPaneCycler` takes a fourth, both from `chrome/Shell.tsx`: where Escape goes from the top of a
@@ -564,16 +596,23 @@ around the pane by declaring orders outside the range a layout uses. `nextPane` 
 rail/main edge in its direction; once focus is already in main and there is no further column, it
 switches which task pane is drawn.
 
-Regions also declare one of two columns. Menu, Browse and Tasks are `rail`; the pane strip and every
-layout or source region default to `main`. A bubbled `expand` (`right`/`l`) moves rail to main, and a
-bubbled `collapse` (`left`/`h`) moves main to rail, restoring the last group used in the destination
-column and never wrapping. A first crossing into main passes over the pane strip and enters the pane
-itself, because the strip is a line above the pane rather than a place to work. Collections and
-layouts keep first refusal: a tree that can expand, or a narrow `list-detail` that can switch groups,
-consumes the intent before the region tier. Escape from a source detail returns specifically to
-Browse, and from a task pane to the pane strip, because the shell says so rather than because
-something remembers the last rail panel visited. Spatial movement is disabled while an input owns the
-keys.
+Regions also declare a column, as an integer counted left to right. Menu, Browse and Tasks pass 0;
+the pane strip and every layout or source region default to 1; a layout that draws two frames side by
+side declares the second one 2, which `list-detail` does for its detail and
+`frame-beside-document` for its frame. A bubbled `expand` (`right`/`l`) moves to the nearest column
+to the right and a bubbled `collapse` (`left`/`h`) to the nearest on the left, restoring the last
+group used there and never wrapping. Left in the rail and Right from the rightmost column do nothing,
+deliberately: a key that jumps across the whole screen from an edge is a surprise, and Tab already
+cycles. One rule therefore crosses the rail-to-pane edge and the list-to-detail edge alike. It was a
+pair, `rail | main`, and a pair could not say that two frames inside one pane are two columns: every
+region a layout registered was `main`, so Right in a `list-detail` pane had nothing to cross to and
+did nothing at all. A first crossing into the pane's
+column passes over the pane strip and enters the pane itself, because the strip is a line above the
+pane rather than a place to work. Collections and layouts keep first refusal: a tree that can expand,
+or a narrow `list-detail` that can switch groups, consumes the intent before the region tier. Escape
+from a source detail returns specifically to Browse, and from a task pane to the pane strip, because
+the shell says so rather than because something remembers the last rail panel visited. Spatial
+movement is disabled while an input owns the keys.
 
 ### Collections
 
@@ -607,12 +646,39 @@ remembered row is idempotent.
 
 ### Scrolling viewports
 
+Anything that can outgrow its box is a viewport. `overflow="scroll"` is not one: it is a yoga
+clipping instruction, so it hides what will not fit and owns no offset for anything to move. It looks
+like a scroll right up to the moment the caret walks below the fold and nothing follows it, which is
+what eight of the nine plugin lists used to do. A region body that can grow past its frame is a
+`ScrollViewport` or a `Rows virtual`, and `apps/tui/src/kit/scrolling.tsx` is the one file under
+`apps/tui/src` allowed to spell the clip. `apps/tui/src/invariants.test.ts` greps for that, because a
+clip reviews well.
+
 `apps/tui/src/kit/scrolling.tsx` is the non-virtual viewport seam. It draws a constrained OpenTUI
 `scrollbox`, which owns the vertical offset, visible scrollbar, wheel/trackpad acceleration and
 clamping. Panels opt into it for document/detail bodies; hidden tab panels keep their own offsets.
 The viewport itself is the fallback focus stop for a document with no controls. When it contains a
 row, textarea, rectangle or other real stop, it is transparent to focus and a focused child is
 revealed through every scrollbox ancestor with `scrollChildIntoView`.
+
+A viewport whose `visible` flag goes false asks for a landing pass, because a `TabPanel` is this node
+and hiding a panel does not blur what is inside it (§ Focus regions).
+
+A page key clamps rather than wrapping. `pageNext` goes to the last row and `pagePrev` to the first,
+and each hands the key back once the caret is already there, so the viewport below the collection
+scrolls instead. This is in the shared `collectionIntents.ts`, so the desktop keeps the same rule:
+PageDown on the last row of a list stops. The arrows still wrap, because a list you cannot fall off
+the end of is a list you never have to look at.
+
+The reveal runs twice. Once synchronously on every focus move, and once more on the renderer's next
+`frame` event, from the single listener `apps/tui/src/keys/regions.ts` installs beside its focus
+listener. The second one exists because `scrollChildIntoView` compares a child's laid-out `y` against
+its viewport's, and `Renderable.y` is whatever the last completed layout pass left there: for a row
+that did not exist in the previous frame the first reveal reads stale or zero geometry, scrolls by
+the wrong delta, and nothing corrects it. A reader meets that three ways, and all three are common:
+a region entered on a freshly mounted list, a refetch replacing a row by identity, and a virtual
+window shift. It is not a landing rule and decides nothing about where the keys go; it only makes the
+viewport show where they already are.
 
 Arrows move and page keys scroll, which is the one sentence the footer has to be able to say
 everywhere. Arrow keys and `j`/`k` scroll a viewport only while the viewport itself has the keys, and
@@ -632,18 +698,42 @@ large-list virtualizer or putting a free-sized scrollbox around an entire pane.
 
 ### Traps
 
-`apps/tui/src/keys/trap.ts` contains keys by owning a layer rather than by walking focusable elements.
-A `Modal` or `Menu` pushes a layer that answers `next`, `prev` and `dismiss` and swallows the rest.
-That layer sits below the collection tier, not at the trap's own. Putting it at the trap's tier is the
-mistake the quit confirmation found: priority decides, not locality, so the swallow reached Enter
-first and a list inside a `Modal` was dead. Putting it lower costs nothing, because a collection
-behind the overlay does not fire anyway once the overlay has taken the focus.
+A trap is a scope, not a swallow. `apps/tui/src/keys/regions.ts` keeps a stack of them. The bottom
+is the screen, which contains everything, and a `Modal` or an open `MenuList` pushes its own box
+while it is drawn. Every question the store answers is answered inside the top scope and nowhere
+else: which regions are on screen, which stops a walk can see, where Tab goes, where Left goes.
+Nothing behind the top scope exists as far as the keys are concerned, so a key that has nothing to
+reach does nothing. A stack rather than one box, because a `Menu` inside a `Modal` is a second scope
+over the first and closing it must leave the modal still holding the keys.
 
-**Taking the keys is the other half, and the node does it.** `Modal` calls `takeFocus` on its own box,
-so a dialog lands the keys on its first stop by being drawn. That used to be the caller's job, and the
-six callers in `apps/tui` all remembered — but `takeFocus` is this app's and a plugin only has the kit,
-so every modal a plugin draws trapped the keys and left them where they were. A dialog that swallows
-what the reader presses and never receives it is worse than one that does not open.
+That leaves `keys/trap.ts` with one layer, for `dismiss` at tier 60. It is global rather than bound
+to the overlay's box, because a layer with a target only fires when focus is inside it and Escape has
+to close the dialog from anywhere. The palette's own arrows sit one number above it, since a palette
+is a text box steered with the arrows and the bare keys are inert while somebody is typing.
+
+**A swallow cannot work.** The layer this replaced bound every intent but `dismiss` to a handler that
+returned true, and that means naming every key it swallows. The moment its table differs from the
+table something else binds, the difference is a key that leaks. That is exactly what happened:
+`trap.ts` read the shared `keysFor()`, where `nextRegion` is `f6` alone, while `keys/install.ts`
+binds `hostKeysFor()`, which adds `tab` for this host. So Tab was swallowed nowhere, walked the keys
+onto a rail row behind the plugin trust prompt, and the swallow then ate everything but Escape. The
+one key the footer advertised was the one that broke the dialog. A scope names nothing and has
+nothing to leak.
+
+Two more things follow from the rule. The command layer's bare keys, `w`, `p`, `n`, `q` and `?`,
+fire only at the screen's own depth, so a reader who presses one inside a dialog does not get a
+picker over the top of it. Chords stay live at every depth. And the footer has to ask the store
+rather than the engine, because the region layer's Tab is still registered inside a dialog and the
+engine still reports it live, so `activeHints()` shows the `tab region` hint only while more than one
+region is in scope.
+
+**Taking the keys is the other half, and pushing the scope is both.** `Modal` calls `pushScope`
+from its own box's `ref` and pops it in `onCleanup`, so a dialog contains the keys, lands them on its
+first stop by being drawn, and gives them back to the renderable that had them when it closes.
+Landing them used to be the caller's job, and the six callers in `apps/tui` all remembered. The
+helper was this app's, though, and a plugin only has the kit, so every modal a plugin drew trapped
+the keys and left them where they were. A dialog that swallows what the reader presses and never
+receives it is worse than one that does not open.
 
 ### The Rectangle contract
 
@@ -654,9 +744,31 @@ above every layer and consumes what it takes. Keys reach the emulator through `e
 the emulator's own handler, because the emulator only takes keys when the renderer has focused it and
 here the box holds the focus so Enter and Escape belong to the rectangle.
 
+**Being entered is a fact about the screen, not a flag anybody keeps.** A rectangle is entered while
+the reader has pressed Enter since the box last lost the keys, the box has the keys now, and the box
+is on screen all the way up to the root. The intercept asks all three of those at the moment a key
+arrives, so there is nothing to go stale. The one thing stored is the Enter, and it is cleared two
+ways: when the renderer blurs the box, and once the box has stopped being on screen. Those are two
+different ways to lose the keys and only the first raises an event.
+
+It used to be a flag set by Enter and cleared by Escape or by unmounting, and neither of those
+happens when a subtree is hidden without being unmounted. `visible` is per node in OpenTUI, so hiding
+an ancestor blurs the ancestor and leaves the rectangle's box reporting itself focused and visible.
+Both of this app's ways of hiding a subtree do exactly that, the shell's main row behind an overlay
+and a `TabPanel` that is not showing, so a rectangle nobody could see went on consuming every key in
+the app, `Ctrl+C` included, because the intercept sits above every layer there is. It kept them until
+the reader found the tab it was on and pressed Escape at it.
+
+The footer asks that same question of every rectangle that is mounted rather than counting the ones
+that are entered. Two can be mounted at once, a task with a terminal pane beside a docker exec, and
+a count was the thing that could disagree with the screen: the second one leaving decremented a
+number the first one still held, and a hidden one never decremented at all.
+
 Escape alone leaves. A second Escape within 400 milliseconds goes back in and sends one. There is no
 pending window on the first press, because holding it to see whether a second arrives would put a
-delay on every exit, and this is already the one key rule the desktop does not have.
+delay on every exit, and this is already the one key rule the desktop does not have. Leaving moves
+the keys through `focusRenderable` like every other move, so the region the rectangle sits in sees
+them come back to its door.
 
 ### The footer
 
@@ -671,26 +783,60 @@ Enter opens something. `focusedKind()` asks the region store which kind has the 
 
 | What has the keys | `j`/`k` | `enter` | `h`/`l` | `ctrl+enter` |
 | --- | --- | --- | --- | --- |
-| A field, meaning an `Input` or a `Textarea` | move | press | fold | send |
-| A row of a collection | move | open | fold | commit |
+| A field, meaning an `Input` or a `Textarea` | move | press | type | send |
+| A row of a collection | move | open | fold, or column | commit |
 | A parent stop, meaning a strip showing a panel | `j` enter | press | tab | commit |
-| A stop that opens a list, meaning a `Menu` trigger and so every `Select` | move | open | fold | commit |
-| A viewport holding no other stop | scroll | press | fold | commit |
-| Any other stop | move | press | fold | commit |
+| A stop that opens a list, meaning a `Menu` trigger and so every `Select` | move | open | column | commit |
+| A viewport holding no other stop | scroll | press | column | commit |
+| Any other stop | move | press | column, or move | commit |
 
 A `Menu` says which it is by passing `opens` to `pressable`, and nothing else in the kit does yet. The
 order is a priority: a field is a stop too, and a viewport is only ever a stop while it holds none.
+
+The `h`/`l` column is the one the kind alone does not settle, so `words()` resolves it from two
+questions the store answers. A collection that was given an `onExpand` folds and says `fold`; one
+that was not declines the intent, which bubbles, and says `column`. A stop that answers `expand` and
+`collapse` itself is a horizontal collection drawn as one stop — `DocumentTabs`, `SegmentedControl`,
+a chip row — and says `move`, because the pair moves inside it and never reaches the column. The
+footer said `fold` for every kind before that, which was true of one of them. A field's bare keys
+type, so their layers are inactive and the engine never reports them live; the words in that row are
+there for the table's sake and the footer draws the chord alone.
 
 While a PTY is entered the footer says `esc leave · esc esc send escape`. `?` opens the cheat sheet as
 a modal with the same hints and a sentence each, and the footer itself is not a focus stop: it is a
 label with nothing to drive, and a stop that does nothing is a hole a reader falls into.
 
+### Seeing what the keys did
+
+`ACORN_TUI_KEYS_TRACE=1` writes one line per key to `keys.log` under the XDG state directory
+(`$XDG_STATE_HOME/acorn/keys.log`, else `~/.local/state/acorn/keys.log`):
+
+```text
+17:08:29.001 key=f6      reason=binding-handled    focused=BoxRenderable#box-72 region=pane/body scope=overlay:2 agree=yes
+17:08:29.492 key=enter   reason=intercept-consumed focused=BoxRenderable#box-91 region=pane/body scope=screen    agree=yes
+```
+
+The parsed key, what answered it and why, the renderable that had the keys, its region, how many
+overlays deep the keys are, and whether the renderer and the store agree about where they are. It is
+a `key:after` intercept in `keys/install.ts`, which runs once per key after dispatch and claims
+nothing; the hyphenated `key-after` is not a hook name and registers nothing at all. Registered
+without `release`, or every keystroke would log twice.
+
+Three lines are a bug wherever they appear. `agree=no` is the renderer and the store disagreeing,
+which draws a highlight on one thing while another answers. `reason=no-match` on a key the footer
+offers is the footer lying. `region=none` while the screen has regions means nothing owns the keys.
+The line quoted first above is a fourth: the region layer answered Tab while an overlay held the
+keys, which is how a dialog comes to be on screen and unanswerable.
+
+This is the first thing to turn on when somebody says the keys stopped working.
+
 ### The invariants
 
-Eight sentences about the keyboard, each one a test rather than a scenario. A scenario pins one path,
-and every bug the fourteen focus fixes chased was a path nobody had written a scenario for.
-`apps/tui/src/reachability.test.tsx` walks every stop on seven surfaces and asks four of these after
-every press, so a new pane or a new control joins the property the day it lands.
+Eleven sentences about the keyboard, each one a test rather than a scenario. A scenario pins one
+path, and every bug the fourteen focus fixes chased was a path nobody had written a scenario for.
+`apps/tui/src/reachability.test.tsx` walks every stop on eight surfaces, which are the browse rail,
+the six panes the pane sweep opens, and the cheat sheet as an open dialog. It asks five of these
+after every press, so a new pane or a new control joins the property the day it lands.
 
 | # | The invariant | Where it is checked |
 | --- | --- | --- |
@@ -702,6 +848,9 @@ every press, so a new pane or a new control joins the property the day it lands.
 | 6 | Focus never sits on a corpse. | `reachability.test.tsx`, after every press |
 | 7 | No chord this host cannot press: `super+` is spelled only where it is rewritten. | `invariants.test.ts` |
 | 8 | The footer tells the truth: the word beside a key is what that key does there. | `reachability.test.tsx`, against the word table |
+| 9 | The renderer and the store agree about what has the keys, and what has them can give them up. | `reachability.test.tsx`, after every press. Made structural by the one writer: `setFocusedNode` appears once, `.focus()` once, and `focusable =` only where `invariants.test.ts` allows it. |
+| 10 | Focus is inside the top scope: with a dialog open, no key moves the keys out of it. | `reachability.test.tsx`, after every press on the overlay surface |
+| 11 | A claimed key changed something. A handler that changed nothing returns `false` and the key bubbles. | `reachability.test.tsx` § crossKeys, which presses `h` and `l` on every kind of focused thing the walk met and asks whether the footer's word came true |
 
 Two of them changed on contact with the build. Invariant 3 also promised one lit control, and it is
 not checked: focus draws `strong` and `accent`, and so does an active tab label, so a span count
@@ -838,7 +987,7 @@ still beside it, which read as one more panel rather than the thing being asked.
 must not tear down the rail and the pane behind it and throw away their queries and their models, so
 the row is `visible={false}` while an overlay is on top, the same thing `TabPanel` does for a hidden
 tab. `visible` is yoga's `display: none`, so the row gives up its height and the overlay takes it.
-`takeFocus` in the region store is this host's answer to the DOM palette's `prevFocus`.
+`pushScope` in the region store is this host's answer to the DOM palette's `prevFocus`.
 
 Notifications are the same `toast()` store the desktop's `ToastHost` draws, so `bridge.ui.toast` and
 every plugin that calls it lands on a line above the footer. They never take focus.
@@ -854,8 +1003,8 @@ both hosts, and [notifications.md](./notifications.md) owns what goes into it.
 and "Notifications" — as an overlay, because there is no popover here and the column has no room for a
 fourth panel. It reuses the bell's data and not its component: the same `createAttentionInbox`
 fan-out and the same notice ring, drawn as one collection rather than two so that `j` and `k` walk the
-whole thing. Two collections inside a modal would leave the second unreachable, because a trap
-swallows `nextRegion`. Enter switches node if the row belongs to another one, opens the task, and
+whole thing. Two collections inside a modal would leave the second unreachable, because a dialog is
+a scope with no regions in it and `nextRegion` has nowhere to go. Enter switches node if the row belongs to another one, opens the task, and
 dispatches the row's target through the same handler table the desktop uses.
 
 **Asking the terminal to notify.** An unseen notice reaches `initSystemNotices`, which is the same

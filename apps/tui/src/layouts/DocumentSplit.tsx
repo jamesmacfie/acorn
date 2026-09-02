@@ -23,6 +23,15 @@ const DEFAULT_DOCUMENT = 10
 const MIN_DOCUMENT = 3
 const MAX_DOCUMENT_FRACTION = 0.7
 
+/** The frame's column when the two halves are side by side, so Right crosses from the document to
+ *  the frame rather than bubbling past both to the rail (../keys/regions.ts § moveColumn).
+ *
+ *  Read once per mount, and that is enough: the axis is fixed when the component is built, at the
+ *  bottom of this file, so `document-over-frame` and `frame-beside-document` are two components and
+ *  neither can flip. If one ever took its axis from a prop, the `ref` below re-runs on remount and
+ *  reads the value then. */
+const SECOND_COLUMN = 2
+
 const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
   let box: BoxRenderable | undefined
   const [extent, setExtent] = createSignal(0)
@@ -66,7 +75,16 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
           {props.regions.document?.()}
         </Panel>
       </box>
-      <Panel grow scroll title="Frame" onBox={regionFocus({ paneId: props.stateKey, regionId: 'frame' }, 1)}>
+      <Panel
+        grow
+        scroll
+        title="Frame"
+        onBox={regionFocus(
+          { paneId: props.stateKey, regionId: 'frame' },
+          1,
+          axis === 'x' ? { x: SECOND_COLUMN } : {},
+        )}
+      >
         {props.regions.frame?.()}
       </Panel>
     </box>

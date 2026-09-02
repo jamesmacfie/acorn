@@ -9,8 +9,9 @@ import { flatten, Line, slot } from './cells'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from './roles'
 import { trapKeys } from '../keys/trap'
 import { bindKeys } from '../keys/install'
-import { enterParent, markParent, moveFocusFrom, moveRegion, takeFocus } from '../keys/regions'
-import { moveStopIn, stop } from '../keys/stops'
+import { enterParent, focusedRenderable, markParent, moveRegion, pushScope, walkStops } from '../keys/regions'
+import { stop } from '../keys/stops'
+import { LIST, PARENT } from '../keys/tiers'
 import { ScrollViewport } from './scrolling'
 import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 
@@ -21,9 +22,9 @@ import type { KitSection } from '@acorn/client-core/kit/components/layout/Sectio
 // bordered box drawn in flow, a `Menu` is a list in a box under its trigger, and a `Popover` is a
 // full-width block. Where a `Modal` lands is the caller's: the shell gives its overlays the whole
 // screen under the topbar (../chrome/Shell.tsx), and a pane's own `Modal` draws inside the pane.
-// The keys that make them modal are the keymap's, not theirs: a `Modal` and an open `Menu` push a
-// layer above the pane's that answers `dismiss` and swallows the rest (../keys/trap.ts,
-// docs/tui.md § Traps).
+// The keys that make them modal are the store's and the keymap's, not theirs: a `Modal` and an open
+// `Menu` push a scope, which is the box the keys are contained in, and a layer above the pane's that
+// answers `dismiss` (../keys/regions.ts § Scopes, ../keys/trap.ts, docs/tui.md § Traps).
 
 // `flexShrink={0}` on every block node in this file, and on the rows in ./showing.tsx. A terminal's
 // answer to "there is not enough room" is to clip, never to squeeze: yoga's default is to take a
@@ -205,9 +206,12 @@ export function Tabs(props: {
   const step = (delta: 1 | -1): boolean => {
     const at = props.tabs.findIndex((tab) => tab.id === props.active)
     const next = props.tabs[at + delta]
-    // A tab edge is a wall. Escape owns the upward/back edge; letting a failed Left bubble to the
-    // region layer made the first tab unexpectedly throw the reader back into the rail.
-    if (!next) return true
+    // An edge is a bubble, not a wall: with nothing to the left there is nothing for this strip to
+    // do, so the key goes down the tiers and the region tier moves one column. Left in every control
+    // now means the same thing, and the footer says `column` where that is what the key will do
+    // (docs/tui.md § The five key groups). The retired rule claimed the key and moved nothing, which
+    // made one key mean five things across one screen.
+    if (!next) return false
     props.onChange(next.id)
     return true
   }
@@ -225,6 +229,10 @@ export function Tabs(props: {
       flexShrink={0}
       overflow="hidden"
       ref={(element: BoxRenderable) => {
+        // Which nodes are reachable is declared where the node is built, and this is where a strip is
+        // built. `markParent` used to set the flag, which put the one declaration a `Tabs` makes
+        // about itself in the region store (../keys/regions.ts § markParent).
+        element.focusable = true
         // A strip with panels is a parent stop: Down enters the one it is showing and Escape from
         // anything inside that panel comes back here. A strip with none — GitHub's Open/Closed
         // filter — owns an empty set and stays an ordinary control, which is what `markParent`'s
@@ -238,9 +246,16 @@ export function Tabs(props: {
           // edge continues into the following pane region instead.
           ...['down', 'j'].map((key) => ({
             key,
-            cmd: () => enterParent(element) || moveFocusFrom(element, 1) || moveRegion(1),
+            cmd: () => enterParent(element) || walkStops(element, 1) || moveRegion(1),
           })),
-        ], 45, { mode: 'focus' })
+          // And back out the way it came. Up is the previous stop beside the strip and nothing else:
+          // a strip is one stop from outside, so its own tabs are not what Up walks. `walkStops`
+          // answers false where the strip is the first stop in the box around it, which is the
+          // bubble the contract asks for (docs/tui.md § The five key groups). Without this a strip
+          // was the one stop on the screen with no Up at all: a reader who reached a `Sections` strip
+          // by walking down to it had no arrow that took them back off it.
+          ...['up', 'k'].map((key) => ({ key, cmd: () => walkStops(element, -1) })),
+        ], PARENT, { mode: 'focus' })
       }}
     >
       <For each={props.tabs}>
@@ -292,11 +307,12 @@ Toolbar.Group = (props: { children: JSX.Element }) => <box flexDirection="row">{
 /** A centred box over the content. Nothing dims behind it, because dimming a whole screen of cells
  *  costs a repaint of every one of them and buys a reader who can already see the border nothing.
  *
- *  What makes it modal is the key layer it owns. `keys/trap.ts` on the DOM contains Tab by walking
- *  focusable elements; there is nothing to walk here, so a modal traps by pushing a layer above the
- *  pane's that answers `dismiss` and swallows the rest until it closes
- *  (docs/tui.md § Traps). That is what a terminal modal is, and it is
- *  the same thing the shell's overlay stack does (../chrome/state.ts). */
+ *  What makes it modal is the scope it pushes. `keys/trap.ts` on the DOM contains Tab by walking
+ *  focusable elements; there is nothing to walk here, so the box itself goes on the region store's
+ *  scope stack while it is drawn and the store stops answering for anything behind it. Tab then has
+ *  nowhere to go rather than walking behind the dialog. The one key layer left is the one that
+ *  closes it (docs/tui.md § Traps). The shell's overlay stack answers a different question, which is
+ *  which overlay to draw (../chrome/state.ts). */
 export function Modal(props: {
   onDismiss: () => void
   title?: string
@@ -318,12 +334,12 @@ export function Modal(props: {
       title={props.title}
       paddingLeft={1}
       paddingRight={1}
-      // Trapping the keys and landing them are two halves of one thing, and only the first was here:
-      // a modal swallowed every intent but `dismiss` and left focus wherever it was, so unless the
-      // caller also reached for `takeFocus` the reader got a dialog they could not answer. Every
-      // modal a plugin draws was in that state, because `takeFocus` is this app's and a plugin only
-      // has the kit (../keys/regions.ts § takeFocus).
-      ref={(element: BoxRenderable) => takeFocus(element)}
+      // Containing the keys and landing them are two halves of one thing, and pushing the scope is
+      // both: the store lands them on the first stop inside the box and answers nothing behind it.
+      // Only the first half used to be here, so unless the caller also reached for a focus helper of
+      // this app's the reader got a dialog they could not answer. Every modal a plugin draws was in
+      // that state, because a plugin only has the kit (../keys/regions.ts § pushScope).
+      ref={(element: BoxRenderable) => onCleanup(pushScope(element))}
     >
       {props.children}
     </box>
@@ -390,17 +406,9 @@ export function Menu(props: {
   )
 }
 
-/**
- * Where an open menu's own `↓` and `↑` sit: above the trap's swallow at 35, below a collection at 40.
- *
- * Below 40 on purpose. A menu whose caller drew a real `Rows` inside it has a collection with the
- * arrows already, and that collection should answer them; the walk here is for the ordinary case,
- * where the list is a run of stops and nothing owns the arrows at all.
- */
-const LIST_PRIORITY = 36
-
-/** The open half of a `Menu`, so the trap's life is the list's rather than the trigger's: a component
- *  that only exists while the list is open takes the keys on mount and gives them back on unmount. */
+/** The open half of a `Menu`, so the scope's life is the list's rather than the trigger's: a
+ *  component that only exists while the list is open contains the keys on mount and gives them back
+ *  on unmount. */
 function MenuList(props: { close: () => void; children: JSX.Element }) {
   trapKeys(() => props.close())
   return (
@@ -410,9 +418,9 @@ function MenuList(props: { close: () => void; children: JSX.Element }) {
       paddingLeft={1}
       paddingRight={1}
       ref={(element: BoxRenderable) => {
-        // The keys go into the list and come back to the trigger when it closes, which is what an
-        // overlay is (../keys/regions.ts § takeFocus).
-        takeFocus(element)
+        // The keys go into the list and come back to the trigger when it closes, and nothing outside
+        // the list answers while it is open (../keys/regions.ts § pushScope).
+        onCleanup(pushScope(element))
         // `↓` and `↑` walk the list's own stops. Not a collection, because a menu's children are
         // whatever opened it — a run of options, a filter field and a list of rows, a plugin's own
         // nodes — and there is no item list to key one by. The design asked for a `Rows` here; a
@@ -421,16 +429,21 @@ function MenuList(props: { close: () => void; children: JSX.Element }) {
         // Twice, because the two answers differ inside a filter field. The bare letters are gated on
         // "is somebody typing", which is right — `j` in a picker's filter is a `j`. The arrows are
         // not, because a list under a field is the only thing an arrow there could mean, and that is
-        // the same exception the palette takes above the trap (../keys/trap.ts § overlayKeys).
-        const walk = (delta: 1 | -1) => () => moveStopIn(element, delta)
+        // the same exception the palette takes above the dismiss layer (../keys/trap.ts
+        // § overlayKeys).
+        //
+        // `within` is the list rather than the neighbours of whatever has the keys, because the stops
+        // behind an open list are not reachable while its scope holds them
+        // (../keys/regions.ts § walkStops).
+        const walk = (delta: 1 | -1) => () => walkStops(focusedRenderable(), delta, { within: element })
         bindKeys(element, [
           { key: 'j', cmd: walk(1) },
           { key: 'k', cmd: walk(-1) },
-        ], LIST_PRIORITY)
+        ], LIST)
         bindKeys(element, [
           { key: 'down', cmd: walk(1) },
           { key: 'up', cmd: walk(-1) },
-        ], LIST_PRIORITY, { whileTyping: true })
+        ], LIST, { whileTyping: true })
       }}
     >
       {props.children}
@@ -561,21 +574,24 @@ export function ListDetail(props: {
  *  parent's; this node draws the label and the scroll. */
 export function ListColumn(props: { label?: string; scroll?: boolean; children: JSX.Element }) {
   return (
-    <box flexDirection="column" flexGrow={1} overflow={props.scroll ? 'scroll' : 'visible'}>
+    <box flexDirection="column" flexGrow={1}>
       {/* In a box of its own so the deficit a taller-than-the-screen column creates cannot be taken out
           of the label: a one-line run given half a line lands on the line above it, which drew this
           column's own name over the heading under it
           (docs/tui.md). */}
       <Show when={props.label}><box flexShrink={0}><Line role="eyebrow">{props.label!}</Line></box></Show>
-      {props.children}
+      {/* The label sits above the viewport and not inside it. It is the column's own name, so it
+          stays put while the rows under it move; scrolling a heading off its own list leaves a
+          reader looking at rows that belong to nothing. */}
+      {props.scroll ? <ScrollViewport>{props.children}</ScrollViewport> : props.children}
     </box>
   )
 }
 
 export function DetailColumn(props: { scroll?: boolean; children: JSX.Element }) {
   return (
-    <box flexDirection="column" flexGrow={1} overflow={props.scroll ? 'scroll' : 'visible'}>
-      {props.children}
+    <box flexDirection="column" flexGrow={1}>
+      {props.scroll ? <ScrollViewport>{props.children}</ScrollViewport> : props.children}
     </box>
   )
 }

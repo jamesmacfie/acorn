@@ -18,7 +18,9 @@ import type { ButtonProps, InputProps, SelectProps } from '@acorn/client-core/ki
 import type { PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import type { MentionTextareaProps } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 import type { ItemProps } from '../keys/collection'
-import { moveStopIn, stop, STOP_PRIORITY } from '../keys/stops'
+import { focusRenderable, stopsIn } from '../keys/regions'
+import { stop } from '../keys/stops'
+import { STOP } from '../keys/tiers'
 import { bindKeys } from '../keys/install'
 import { flatten, hasNode, Line, slot } from './cells'
 import { boxBorder, litControl } from './roles'
@@ -182,7 +184,7 @@ export function Textarea(props: {
           if (props.disabled || !props.onSubmit) return false
           props.onSubmit(element.plainText)
           return true
-        }, { priority: STOP_PRIORITY, mode: 'focus' }))
+        }, { priority: STOP, mode: 'focus' }))
       }}
       // The change event carries no payload — OpenTUI's own comment on it says to ask the renderable
       // for the text — so this is the one node in the kit that needs a handle on what it drew.
@@ -401,7 +403,7 @@ export function PickerRow(props: {
 }) {
   // `focusRoles.ts` calls this an item, and inside a `Rows` it is one. Inside an open `Menu` there is
   // no collection to be an item of — the list is drawn by whoever opened it — so here it is a stop and
-  // the menu's own `↓`/`↑` walk its stops (../keys/stops.ts § moveStopIn).
+  // the menu's own `↓`/`↑` walk its stops (../keys/regions.ts § walkStops).
   const control = stop({ onPress: () => props.onSelect(), disabled: () => !!props.disabled })
   return (
     <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
@@ -516,9 +518,11 @@ export function MentionTextarea(props: MentionTextareaProps) {
             key: 'down',
             cmd: () => {
               if (!list || !suggestions().length) return false
-              return moveStopIn(list, 1)
+              // Entering the list, not walking it: the field is not one of its stops, so there is
+              // nothing to step from (../keys/regions.ts § walkStops).
+              return focusRenderable(stopsIn(list)[0])
             },
-          }], STOP_PRIORITY, { mode: 'focus', whileTyping: true })
+          }], STOP, { mode: 'focus', whileTyping: true })
         }}
         onInput={props.onInput}
       />

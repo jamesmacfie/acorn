@@ -23,7 +23,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [performance/](./performance/README.md) | Two performance reads, surfaces and shapes, merged into six phases: unblock the red renderer budget and instrument, paint before the node boots, stop the event amplifiers, terminals work only when watched, the live surfaces, then re-measure. | Plan, 2026-08-31. Not started. The renderer build is over budget. |
-| [terminal-keyboard/](./terminal-keyboard/README.md) | The terminal client's focus and keys, re-founded: one source of truth for focus, traps as scopes, one landing rule, named tiers with honest claims, viewports everywhere. Seven phases. | Plan, 2026-09-02. Not started. The five reported symptoms are traced in its `symptoms.md`. |
 
 ## The single files
 
@@ -85,6 +84,32 @@ focused thing: § The invariants and § The footer, with the suites in
 [testing.md](../testing.md) § Test layers. The focus model that every phase pointed at is § The five
 key groups and § The invariants; the two invariants that changed on contact with the build say so
 there.
+
+`terminal-keyboard/` was seven phases that re-founded the terminal client's focus and keys after the
+model under them had been rewritten ten times in three days, each time correctly, for a bug somebody
+saw. Shipped 2026-09-02. [tui.md](../tui.md) § Keys and focus owns all of
+it, and the review's finding was that five reports came from four structural faults and one scrolling
+fault, so
+each of its five rules went to the subsection that owns the mechanism. Rule 1, the renderer is the
+only truth about focus, is § Focus regions: one listener on the renderer's focus event writes the
+store, one function moves focus and reports what the renderer did, and the mouse arrives through the
+same door as a key. Rule 2, a trap is a scope rather than a swallow, is § Traps, with the leak it
+removed named there: a swallow has to list the keys it eats, and the list it read was not the list
+`install.ts` binds, so Tab walked out of every dialog. Rule 3, one landing rule in place of a
+seven-step pass over four global flags, is § Focus regions again: one question about the renderable
+that has the keys, then four steps, and the one deferred decision the invariants hold the folder to.
+Rule 4, named tiers and honest claims, is § The five key groups and the tier table in
+`apps/tui/src/keys/tiers.ts`, which is the only file under `apps/tui/src` that spells a priority; it
+is also where the reversal lives that made a tab-strip edge bubble instead of walling, so Left means
+one thing everywhere. Rule 5, anything that can exceed its box is a viewport, is § Scrolling
+viewports, with the page-key clamp in the shared
+`packages/client-core/src/kit/keys/collectionIntents.ts` so the desktop keeps the same rule. The
+rectangle that closed the programme is § The Rectangle contract: being entered is derived from the
+box rather than remembered in a flag. The three invariants the programme added are rows 9 to 11 of
+§ The invariants, and the trace flag a developer turns on first is § Seeing what the keys did. What
+it refused is recorded where the refusal binds: no column wrap and an arrow edge as a wall in
+§ Focus regions, no second keymap in § What must never happen, and the four manual checks it still
+owed are items 27 to 30 of [testing.md](../testing.md) § The smoke checklist.
 
 `structure/` was eight phases that made the folder names say what the architecture doc says: `main/`
 retired everywhere, client-core regrouped into `kit/`, `host/`, `infra/`, and `features/`, one shape

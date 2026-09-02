@@ -2,21 +2,21 @@
 //
 // `client-core/host/keys/install.ts` names this file's seam in its own header: "its terminal adapter,
 // which we do not use yet, is in the same package". This is the day it is used. Same engine, same
-// `intentKeys` table, same four tiers ordered by priority, a different pair of type parameters:
+// `intentKeys` table, the same tiers ordered by priority, a different pair of type parameters:
 // `Keymap<Renderable, KeyEvent>` where the DOM's is `Keymap<HTMLElement, HtmlKeymapEvent>`.
 //
-//   0   the command layer: acorn's resolved keybindings over the command registry, the same tier the
-//       desktop puts them on (./commandLayer.ts)
-//   5   region, pane and column movement, global, because moving between them starts anywhere
-//   30  a pane's own layer: the `tabs` layout's chords, and the group switch a narrow `list-detail`
-//       registers
-//   40  a collection's intents, focus-within on the collection (./collection.ts)
-//   45  a `Sections` strip, which yields left/right at its edges (../kit/grouping.tsx)
+// The tiers and the sentence for each are in ./tiers.ts, which is the one file in this package that
+// spells a priority. This one registers the `REGION` tier: region, pane and column movement, global,
+// because moving between them starts anywhere.
 //
 // A binding whose handler returns false is not handled, so dispatch carries on to the next layer.
 // That is how an intent bubbles: the focused collection answers it, or the region layer does, or
-// nothing does.
+// nothing does. Which is also why a handler that changed nothing must say so
+// (docs/tui.md § The five key groups).
 
+import { appendFileSync, mkdirSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { onCleanup } from 'solid-js'
 import { createDefaultOpenTuiKeymap } from '@opentui/keymap/opentui'
 import { InputRenderable, TextareaRenderable, type CliRenderer, type KeyEvent, type Renderable } from '@opentui/core'
@@ -24,7 +24,12 @@ import type { Keymap, TargetMode } from '@opentui/keymap'
 import { isTyping, keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
-import { moveBack, moveColumn, moveRegion, movePane } from './regions'
+import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications/toast.ts'
+import {
+  focusedRegion, focusedRenderable, installRegions, moveBack, moveColumn, moveRegion, movePane,
+  scopeDepth,
+} from './regions'
+import { REGION } from './tiers'
 
 export type TuiKeymap = Keymap<Renderable, KeyEvent>
 
@@ -55,6 +60,81 @@ export function hostKeysFor(): Record<Intent, readonly string[]> {
   return merged
 }
 
+// ── The trace ─────────────────────────────────────────────────────────────────────────────────
+//
+// One line per key, behind `ACORN_TUI_KEYS_TRACE`, because "the keys stopped working" is a report
+// nobody can act on and this turns it into a log (docs/tui.md § Keys and focus).
+//
+// A `key:after` intercept rather than a layer: it runs once per key after dispatch has finished, so
+// it can say what answered and why without claiming the key. The hyphenated `key-after` is not a
+// hook name and registers nothing, silently. Registered without `release`, which is how the engine
+// spells "presses only" — with it, every keystroke would log twice.
+
+/**
+ * Clear whatever transient feedback is on screen, and say whether there was any.
+ *
+ * The first step of `dismiss`, so Escape means "get this out of my way" before it means anything to a
+ * pane. It reads the toast store rather than asking the shell, because `keys/` may not import
+ * `chrome/` (tools/arch/boundaries.test.ts § the terminal focus store knows the keyboard and not the
+ * screen) and because the store is where the answer is: a toast is not focusable and has nowhere to
+ * hold a layer of its own, so the shell only ever drew it (../chrome/Notifications.tsx).
+ *
+ * It was a second layer at this tier, registered by the shell's root box. Two layers at one priority
+ * fall back to the order they registered in, which is the reconciler's business and not a rule
+ * anybody wrote down, so which Escape a reader got was luck
+ * (./tiers.ts).
+ */
+const clearNotifications = (): boolean => {
+  const open = activeToasts()
+  for (const entry of open) dismissToast(entry.id)
+  return open.length > 0
+}
+
+/** Where the log goes. The XDG state directory, which is for data a program keeps across runs and
+ *  can regenerate — exactly what a key log is. Not `configDir()`, which is `../node/paths.ts` and is
+ *  node-side; this folder may not reach it. */
+const logPath = (): string => {
+  const state = process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state')
+  return join(state, 'acorn', 'keys.log')
+}
+
+/** `HH:MM:SS.mmm`, local, because the reader comparing this to what they just pressed is here. */
+const stamp = (at: Date): string =>
+  `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+  + `:${String(at.getSeconds()).padStart(2, '0')}.${String(at.getMilliseconds()).padStart(3, '0')}`
+
+function installTrace(engine: TuiKeymap, renderer: CliRenderer): void {
+  const file = logPath()
+  try {
+    mkdirSync(join(file, '..'), { recursive: true })
+  } catch {
+    // A log nobody can write is not worth taking the app down for.
+    return
+  }
+  onCleanup(engine.intercept('key:after', (ctx) => {
+    const node = renderer.currentFocusedRenderable
+    const region = focusedRegion()
+    // The one line that is a bug every time it says no: the renderer routes the keys and the store
+    // draws the highlights, so a disagreement is a lit thing that does not answer
+    // (docs/tui.md § The invariants, invariant 9).
+    const agree = node === focusedRenderable() ? 'yes' : 'no'
+    const depth = scopeDepth()
+    const fields = [
+      `key=${engine.formatKey(ctx.event.name ?? '?').padEnd(13)}`,
+      `reason=${ctx.reason.padEnd(17)}`,
+      `focused=${node ? `${node.constructor.name}#${node.id}` : 'none'}`,
+      `region=${region ? `${region.paneId}/${region.regionId}` : 'none'}`,
+      `scope=${depth === 1 ? 'screen' : `overlay:${depth}`}`,
+      `agree=${agree}`,
+    ]
+    try {
+      appendFileSync(file, `${stamp(new Date())} ${fields.join(' ')}\n`)
+    } catch {
+      // Same reason as above. A full disk is not a keyboard bug.
+    }
+  }))
+}
+
 /**
  * Install the keymap on the renderer and register the region chords.
  *
@@ -63,6 +143,11 @@ export function hostKeysFor(): Record<Intent, readonly string[]> {
  * the caller's, which on this host is the process ending.
  */
 export function installKeymap(renderer: CliRenderer): TuiKeymap {
+  // Which renderable has the keys is half of installing a keyboard, so the region store's
+  // subscription to the renderer's focus event goes on here rather than at each of the three call
+  // sites: the app, the shell harness and the kit's own renderer (./regions.ts § The one writer).
+  installRegions(renderer)
+
   const engine = createDefaultOpenTuiKeymap(renderer)
 
   // `j`, `k`, `l`, `h`, space and `/` are letters somebody may be typing. The DOM half asks
@@ -101,16 +186,17 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
     ['nextPane', () => movePane(1)],
     ['prevPane', () => movePane(-1)],
     // An overlay's dismiss layer and an entered PTY sit above this one. With neither active, Escape
-    // from main is the terse spelling of the same spatial edge as Ctrl+Option+Left; from the rail it
-    // returns false so the shell can still dismiss a notification.
-    ['dismiss', moveBack],
+    // clears what is on screen first and then climbs: from main it is the terse spelling of the same
+    // spatial edge as Ctrl+Option+Left, and from the rail there is nothing above it, so with no
+    // notification to clear it returns false and nothing happens.
+    ['dismiss', () => clearNotifications() || moveBack()],
   ]
   const columnMoves: [Intent, () => boolean][] = [
     ['expand', () => moveColumn(1)],
     ['collapse', () => moveColumn(-1)],
   ]
   engine.registerLayer({
-    priority: 5,
+    priority: REGION,
     bindings: [
       ...moves.flatMap(([intent, run]) => map[intent].map((key) => ({ key, cmd: run }))),
       ...columnMoves.flatMap(([intent, run]) => map[intent].map((key) => ({
@@ -122,6 +208,9 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
       }))),
     ],
   })
+
+  // Last, so the intercept sees a fully built engine, and only when asked for.
+  if (process.env.ACORN_TUI_KEYS_TRACE) installTrace(engine, renderer)
 
   return engine
 }

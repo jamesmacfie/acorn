@@ -45,7 +45,7 @@ export type CollectionOptions = {
   selected?: () => string | null | undefined
   onSelect?: (key: string) => void
   onActivate?: (key: string) => void
-  onExpand?: (key: string, expand: boolean) => void
+  onExpand?: (key: string, expand: boolean) => boolean | void
   onMenu?: (key: string) => void
   /** Put an off-screen item on screen. A virtualised collection draws only the rows in view, so most
    *  of its items have no element to focus until the scroller has been asked to reach them. */

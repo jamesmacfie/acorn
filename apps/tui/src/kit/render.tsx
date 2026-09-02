@@ -34,8 +34,22 @@ export type Cells = Frame & {
   press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<Cells>
   /** Send one terminal wheel/trackpad step at a cell. */
   scroll: (x: number, y: number, direction: 'up' | 'down') => Promise<Cells>
+  /** Press and release the left button at a cell, which is what a reader's click is. */
+  click: (x: number, y: number) => Promise<Cells>
   resize: (width: number, height: number) => Promise<Cells>
   done: () => void
+}
+
+/** The keys OpenTUI's own `KeyCodes` table has no name for, spelled as the bytes a terminal sends.
+ *
+ *  `pressKey` treats a name it does not recognise as text and types it one character at a time, in
+ *  silence. So `pressKey('PAGEDOWN')` typed eight letters, and the `G` among them is `last`: a case
+ *  meaning to press Page Down pressed End instead, landed on the last row, and passed. Anything this
+ *  host binds and `KeyCodes` does not name belongs here. The shell harness presses through this same
+ *  table, so a case cannot press one spelling in one file and another in the other (../harness.tsx). */
+export const RAW_KEYS: Record<string, string> = {
+  PAGEUP: '\x1b[5~',
+  PAGEDOWN: '\x1b[6~',
 }
 
 // How long to wait after a keystroke before reading the screen.
@@ -94,6 +108,7 @@ export async function renderCells(
       frame,
       press,
       scroll,
+      click,
       resize,
       done: () => setup.renderer.destroy(),
     }
@@ -106,12 +121,16 @@ export async function renderCells(
     key: string,
     modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean },
   ): Promise<Cells> => {
-    setup.mockInput.pressKey(key, modifiers)
+    setup.mockInput.pressKey(RAW_KEYS[key] ?? key, modifiers)
     await new Promise((done) => setTimeout(done, KEY_SETTLE_MS))
     return frame()
   }
   const scroll = async (x: number, y: number, direction: 'up' | 'down'): Promise<Cells> => {
     await setup.mockMouse.scroll(x, y, direction)
+    return frame()
+  }
+  const click = async (x: number, y: number): Promise<Cells> => {
+    await setup.mockMouse.click(x, y)
     return frame()
   }
   const resize = async (width: number, height: number): Promise<Cells> => {

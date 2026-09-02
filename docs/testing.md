@@ -75,8 +75,13 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   terminal projection in [panes.md](./panes.md) § Layout model and checked against the protocol's own
   region table, at the same two sizes. And a twin of client-core's `keys.test.tsx` against the terminal
   adapter, so the two adapters cannot drift: where the keys land when a pane opens, the moves and their
-  wrapping, activate reaching a row, the region cycle remembering its place, a modal swallowing what is
-  behind it, and a `pty` rectangle taking every key on Enter and giving them back on Escape. A pane file
+  wrapping, activate reaching a row, the region cycle remembering its place, a modal holding the keys
+  against both of this host's keys for `nextRegion`, and a `pty` rectangle taking every key on Enter
+  and giving them back on Escape. Five cases beside those are the reported keyboard faults, kept as
+  regression tests where the rule they broke lives: the plugin trust prompt and the quit
+  confirmation each hold the keys through a Tab, the footer offers `tab` only where Tab goes
+  somewhere, and an entered rectangle stops taking keys the moment it goes off screen, both when
+  a bare `visible` hides it and when the tab it sits on is switched. A pane file
   (`src/panes.test.tsx`) opens each first-party pane in the roster at exactly 80 by 24 with the chrome
   around it and asks the three questions the pane sweep asks: is the thing the pane is for on the first
   screen, is no line wider than the 80 cells the kit promises, and did the pane draw itself rather than
@@ -92,10 +97,14 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   back at 100, the palette opening on its chord and giving the keys back where it found them, a
   notification appearing above the footer without taking focus, and `q` asking before it stops a node
   this `acorn` started. A reachability file (`src/reachability.test.tsx`) is the keyboard's property
-  rather than a scenario: it walks every stop on seven surfaces — the browse rail and the six panes
-  the pane sweep opens — and after every press asks that at most one caret is drawn, that focus is on
-  a node still on screen, and that the word the footer puts beside each bare key is what that key does
-  there. At the end it asks that the walk landed on every stop `_allStops()` declared, and a second
+  rather than a scenario: it walks every stop on eight surfaces, which are the browse rail, the six
+  panes the pane sweep opens, and the browse rail again with the cheat sheet open over it. After
+  every press it asks that at most one caret is drawn, that focus is on a node still on screen, that
+  the word the footer puts beside each bare key is what that key does there, that the renderer and
+  the store agree about which renderable has them, and that the keys have not reached out of the
+  open dialog.
+  At the end it asks that the walk landed on every stop `_allStops()` declared, that pressing `h` and
+  `l` on every kind of focused thing it met did what the footer said it would, and a second
   block presses Escape out of each surface and asks that the climb ends in the rail. It runs at 80 by
   24, and at 120 by 40 as well when `ACORN_TUI_WIDE` is set, which CI sets and a save does not: the
   wide pass doubles a three-minute file to buy the layouts that split at 100 cells. Five files
@@ -331,6 +340,30 @@ checklist, by [shell.md](./shell.md) § Signing gates and the updater, or by
     context pane and the Notes pane still support, and make one context section answer slowly. Both
     panes keep their layout, and the slow section reports itself without stalling the others
     ([notes-and-memory.md](./notes-and-memory.md) § Context integration).
+
+The next four are the terminal keyboard's, from the programme that ended on 2026-09-02 by rewriting
+[tui.md](./tui.md) § Keys and focus. Every one of them needs a real terminal and none can be
+automated: both harnesses ask for the kitty keyboard protocol, the trust queue is stubbed, and a
+suite drives one task at a time.
+
+27. Answer the plugin trust prompt at boot, against a real node offering a bundle this device has
+    never decided about. The caret starts inside the dialog, Tab does not move it out, Enter on "Run
+    it" records the decision, and Escape drops the queue entry. The harness stubs `pendingTrust`; the
+    real flow comes through custody, which is the half no test sees
+    ([tui.md](./tui.md) § The trust prompt).
+28. Press Shift+Tab in a terminal that does not negotiate the kitty keyboard protocol. Both harnesses
+    ask for it and get it, so a legacy terminal's spelling of that chord is untested; check that the
+    region cycle still goes backwards, and that a lone Escape still leaves a rectangle without
+    waiting out the parser.
+29. Enter a PTY, then let a notification activate another task while the keys are inside it. Open the
+    palette with its chord from inside the PTY, close it, and type again. Run it with
+    `ACORN_TUI_KEYS_TRACE=1` and read `keys.log`: no line may say `agree=no`, and none may say
+    `region=none` while the screen has regions ([tui.md](./tui.md) § Seeing what the keys did).
+30. Walk the cross and page keys where five different rules used to live. In a `list-detail` pane,
+    Right crosses from the list to the detail, Left comes back, and PageDown lands on the last row
+    and then scrolls the panel instead of wrapping. On the first tab of a `Sections` strip, Left goes one
+    column left rather than doing nothing. In the editor's file tree, Right on a leaf reaches the
+    document beside the tree.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

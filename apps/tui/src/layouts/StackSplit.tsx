@@ -12,6 +12,12 @@ import { regionFocus } from '../keys/regions'
 //
 // `bottom` carries the height and `top` takes what is left, which is the shape the terminal drawer
 // was drawn from — the region you resize is the one you are looking at.
+//
+// Both regions stay in the pane's one column. A column is a left-to-right position, and this layout
+// stacks: `top` is above `bottom` and neither is beside the other, so Left and Right here cross to
+// the rail as they do from any single-column pane, and Escape is what climbs (../keys/regions.ts
+// § moveColumn). The axis is `'y'` at every call below and there is no prop that changes it, which is
+// why this is a sentence rather than a condition.
 
 const DEFAULT_BOTTOM_LINES = 10
 const MIN_BOTTOM_LINES = 3

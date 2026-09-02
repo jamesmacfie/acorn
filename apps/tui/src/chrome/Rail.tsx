@@ -54,6 +54,11 @@ export const railCells = (shellCells: number): number =>
 const MENU_ROWS = 7
 const TASKS_ROWS = 7
 
+/** The leftmost column. Every region in this file is in it and every region anywhere else defaults
+ *  to the one to its right, which is what makes Right from a rail panel enter the pane and Left from
+ *  the pane come back (../keys/regions.ts § moveColumn). */
+const RAIL = 0
+
 /** Before every region a layout registers, so the cycle reads down the screen (./Shell.tsx). */
 const MENU_ORDER = -130
 const BROWSE_ORDER = -120
@@ -121,7 +126,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
         onBox={regionFocus(
           MENU,
           MENU_ORDER,
-          { column: 'rail', enterMainOnActivate: true, pickOnEnter: true },
+          { x: RAIL, enterMainOnActivate: true, pickOnEnter: true },
         )}
       >
         {/* Empty while the provider and workspace-link gates are still loading, which is a rendering
@@ -149,7 +154,11 @@ export function Rail(props: { model: ShellModel; cells: number }) {
       {/* The chosen source's own list, drawn here rather than in the surface it belongs to. A source
           that has not declared regions keeps its whole surface in the main panel and this panel says
           so, which is the honest answer and not an error. */}
-      <Panel title="Browse" grow>
+      {/* `scroll`, because a source's list is as long as the source says and the rail is one column
+          of a fixed screen: without a viewport the rows past the fold were drawn nowhere and the
+          caret walked off the bottom of the panel (../kit/scrolling.tsx,
+          docs/tui.md § Scrolling viewports). */}
+      <Panel title="Browse" grow scroll>
         <Show
           when={source()?.regions?.list}
           fallback={
@@ -167,7 +176,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
               ref={regionFocus(
                 BROWSE,
                 BROWSE_ORDER,
-                { column: 'rail', enterMainOnActivate: true, pickOnEnter: true },
+                { x: RAIL, enterMainOnActivate: true, pickOnEnter: true },
               )}
             >
               {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this
@@ -186,7 +195,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
         onBox={regionFocus(
           TASKS,
           TASKS_ORDER,
-          { column: 'rail', enterMainOnActivate: true },
+          { x: RAIL, enterMainOnActivate: true },
         )}
       >
         <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} />} />

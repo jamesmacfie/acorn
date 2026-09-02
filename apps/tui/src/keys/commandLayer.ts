@@ -22,6 +22,8 @@ import {
   keybindingRegistry, resolveKeybindings, type KeybindingPrefs, type ResolvedKeybinding,
 } from '@acorn/client-core/host/registries/commands/keybindings.ts'
 import type { TuiKeymap } from './install'
+import { scopeDepth } from './regions'
+import { COMMAND } from './tiers'
 
 export type CommandScope = {
   prefs: () => KeybindingPrefs
@@ -87,9 +89,16 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
         return [{
           key,
           cmd: binding.command,
-          active: () => mayFire(binding, scope) && !(isBareKey(key) && isTyping()),
+          // A bare key belongs to the screen. `w`, `p`, `n`, `q` and `?` open a picker, and a reader
+          // who presses one inside a dialog meant the dialog. Before this, `w` over the trust prompt
+          // raised the workspace picker on top of it. Chords stay live at every depth, because
+          // Ctrl+K is not a key anything inside a dialog could want, and the collection layers
+          // behind the dialog need no gate of their own: they are focus-within and the focus is
+          // inside the dialog, so they never fire (./regions.ts § Scopes).
+          active: () => mayFire(binding, scope)
+            && !(isBareKey(key) && (isTyping() || scopeDepth() > 1)),
         }]
       })
-    onCleanup(engine.registerLayer({ priority: 0, commands, bindings }))
+    onCleanup(engine.registerLayer({ priority: COMMAND, commands, bindings }))
   })
 }
