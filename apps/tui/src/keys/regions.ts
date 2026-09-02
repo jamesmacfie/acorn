@@ -667,6 +667,25 @@ export function movePane(delta: 1 | -1): boolean {
   return enter(ordered().find((group) => group.paneId === paneId))
 }
 
+/** Whether this renderable is itself a parent stop showing at least one panel.
+ *
+ *  `parentOf` answers the other direction — the parent above a stop — and the footer needs this one:
+ *  on a strip, `j` enters rather than moves and `h/l` change the tab (../chrome/bindings.ts). */
+export const isParentStop = (node: Renderable | null | undefined): boolean =>
+  !!node && !!parentEntry(node)?.panels().length
+
+/**
+ * Every stop on screen, region by region, in the order the regions draw.
+ *
+ * Test-only, and the walk is `stopsIn` applied to each region's box rather than a second one — so a
+ * panel's contents are not here, because a panel is the level below a region's own list and is
+ * reached by entering the parent stop that owns it. The reachability property reads this
+ * (../reachability.test.tsx).
+ */
+export function _allStops(): Renderable[] {
+  return ordered().flatMap((group) => stopsIn(group.box))
+}
+
 /** Test seam. The list is module-level, so a suite must not inherit the previous one's regions. */
 export function _resetRegions(): void {
   groups.length = 0

@@ -91,8 +91,18 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   at 120 by 40, Tab walking rail to pane strip to pane, the rail collapsing at 99 cells and coming
   back at 100, the palette opening on its chord and giving the keys back where it found them, a
   notification appearing above the footer without taking focus, and `q` asking before it stops a node
-  this `acorn` started. Four files alongside need no renderer and never skip: the palette's collapse from a theme to the
-  terminal's slots, the clipboard sequence, the plugin suite below, and the boot test after it.
+  this `acorn` started. A reachability file (`src/reachability.test.tsx`) is the keyboard's property
+  rather than a scenario: it walks every stop on seven surfaces — the browse rail and the six panes
+  the pane sweep opens — and after every press asks that at most one caret is drawn, that focus is on
+  a node still on screen, and that the word the footer puts beside each bare key is what that key does
+  there. At the end it asks that the walk landed on every stop `_allStops()` declared, and a second
+  block presses Escape out of each surface and asks that the climb ends in the rail. It runs at 80 by
+  24, and at 120 by 40 as well when `ACORN_TUI_WIDE` is set, which CI sets and a save does not: the
+  wide pass doubles a three-minute file to buy the layouts that split at 100 cells. Five files
+  alongside need no renderer and never skip: the focus invariants that are facts about the source
+  rather than about a render (`src/invariants.test.ts`, one deferred decision and no `super+` chord),
+  the palette's collapse from a theme to the terminal's slots, the clipboard sequence, the plugin
+  suite below, and the boot test after it.
 
   The plugin suite (`src/plugins/plugins.test.tsx`) is the sandbox, tested for real. It starts a
   `node:worker_threads` worker under `--permission`, hands it a bundle out of a real

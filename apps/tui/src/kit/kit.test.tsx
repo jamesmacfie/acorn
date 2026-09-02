@@ -397,7 +397,7 @@ const CASES: Case[] = [
   },
   {
     node: 'Table',
-    draws: 'reduced: box-drawn, and the header names the columns it had to drop',
+    draws: 'reduced: box-drawn, and a line under it names the columns it had to drop',
     render: () => (
       <Table>
         <TableRow head>
@@ -409,9 +409,9 @@ const CASES: Case[] = [
     ),
     size: { width: 10, height: 6 },
     check: (frame) => {
-      // Ten cells is one column's worth, so the low-priority one goes — and the header names it,
-      // because a reader who can only see that something is missing has to widen the pane to find
-      // out whether it was the column they wanted.
+      // Ten cells is one column's worth, so the low-priority one goes — and a muted line under the
+      // table names it, because a reader who can only see that something is missing has to widen the
+      // pane to find out whether it was the column they wanted.
       expect(lineWith(frame, 'name')).not.toContain('when')
       has(frame, '+ when')
     },
@@ -889,7 +889,7 @@ describe.skipIf(!hasFfi)('the kit in cells', () => {
 //
 // The cases above assert the characters a node draws. These assert that it does something: the keys
 // land on it, it says so, and the handler its props have always carried is called
-// (docs/future/terminal-updates/phase-0-controls.md).
+// (docs/tui.md § Keys and focus).
 //
 // Each case is drawn as the whole body of a pane, and nothing presses Tab first: a region takes the
 // keys when the pane opens, because this host has no pointer to click with
@@ -1340,7 +1340,7 @@ describe.skipIf(!hasFfi)('every control is a stop', () => {
 // Two surfaces that looked the same behaved differently, because `Sections` handed its strip a list
 // of panels and a plugin drawing `Tabs` and `TabPanel` as siblings had no way to. The pairing is
 // `idPrefix` now, which both halves already carry, so the relation is drawn rather than passed
-// (./grouping.tsx § Which panels a strip owns, docs/future/terminal-updates/phase-3-tabs.md).
+// (./grouping.tsx § Which panels a strip owns, docs/tui.md § Focus regions).
 
 /** `Tabs` and its `TabPanel`s as siblings, the way a plugin writes them. */
 function TwoPanels() {

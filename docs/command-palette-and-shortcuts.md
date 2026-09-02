@@ -120,8 +120,8 @@ panes, and each group remembers the node focus was last on, so coming back lands
 with the task, pane and region.
 
 The terminal keeps the contract and replaces the mechanism, and
-[tui.md](./tui.md) § Focus regions owns the whole of how: five levels, a shell-installed topology, and
-one settle pass. Two things there belong to this table rather than to that one. Tab is `nextRegion`
+[tui.md](./tui.md) § Keys and focus owns the whole of how: five levels, five key groups, a
+shell-installed topology, one settle pass, and eight invariants with the file that checks each. Two things there belong to this table rather than to that one. Tab is `nextRegion`
 on that host, beside F6, because the browser owns Tab and a terminal does not, and a reader in one
 presses it first; the intent is the shared one and `intentKeys` is still the table, and a host adding
 a key to an intent it already has is what a per-host key table is for. And overlays and entered PTYs
@@ -197,11 +197,8 @@ shows the pane's meaning and a chord whose command is unavailable does not appea
 
 **The terminal's footer is the same list, one line long.** `apps/tui/src/chrome/bindings.ts` reads
 `getActiveKeys` too, gives each live intent a word, and the footer prints as many as fit while the
-cheat sheet on `?` prints all of them. Nothing is declared twice. `getActiveKeys` is a snapshot with
-no signal behind it, so the list also reads the two signals that move the active layers — where the
-keys are, and whether an overlay has taken them — or the footer would be whatever was true at the
-render that happened to build it. While a rectangle is entered the footer says `esc leave · esc esc
-send escape` instead, because every other hint is false in there.
+cheat sheet on `?` prints all of them. Nothing is declared twice. Which word a key gets depends on
+what has the keys, and [tui.md](./tui.md) § The footer owns that table.
 
 A sandboxed plugin frame has its own document, so its SDK normalizes and forwards unclaimed keydowns
 over the existing rate-limited bridge. The host resolves them against the same binding table,

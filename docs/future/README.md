@@ -21,9 +21,9 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
+| [notifications/](./notifications/README.md) | Agent notifications rebuilt as an edge layer over the node's attention projection: five states, three edges, one gate with a seen rule, a Notifications settings page, and sound, system notification, dock badge, and terminal OSC channels on both hosts. Six phases. | Plan, 2026-09-02. Not started. Phase 1 is the one to do first. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [performance/](./performance/README.md) | Two performance reads, surfaces and shapes, merged into six phases: unblock the red renderer budget and instrument, paint before the node boots, stop the event amplifiers, terminals work only when watched, the live surfaces, then re-measure. | Plan, 2026-08-31. Not started. The renderer build is over budget. |
-| [terminal-updates/](./terminal-updates/README.md) | The terminal client's keyboard, finished: an analysis of what is sound and what was hacked, a five-level focus model with one settle pass and eight invariants, and seven phases from wiring every control to properties over the whole pane roster. Also which plugin extension kinds cross into cells and which are named as lost. | Plan, 2026-09-02. Not started. Phase 0 is the one to do first. |
 
 ## The single files
 
@@ -48,7 +48,8 @@ compiled-tier's component couplings dissolved into slots, rail-tab's slice 3 bec
 annotation point, and the marketing plugin docs should be written against the tree rather than the
 frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
 beside them; nothing in it waits any more. Events and sandbox are independent of all of that and of
-each other. Ecosystem's rung-2 containment is the one design restated in more than one place (its
+each other, and so is notifications: it reads the session row the agents plugin already broadcasts,
+installs one more platform-seam group, and needs nothing from the event catalogue. Ecosystem's rung-2 containment is the one design restated in more than one place (its
 `blockers.md`, sandbox's `phases.md`, `docs/security.md § The containment ladder`); the security
 doc owns it and the others point.
 
@@ -56,8 +57,23 @@ doc owns it and the others point.
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` (replaced by
 the single `events.md` above on 2026-08-28 when all but three items shipped), `layout/`, `structure/`,
-`structure-followup/`, `before-terminal-ui/`, `terminal/`, and the single files `live-qa.md` and
-`dx.md` are in git history. Each ended by saying where its behaviour moved.
+`structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, and the single files
+`live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
+
+`terminal-updates/` was seven phases that finished the terminal's keyboard, shipped and deleted
+2026-09-02. [tui.md](../tui.md) § Keys and focus owns all of it. Phase 0 wired every asking node so it
+focuses, shows focus and acts, which is § The adapter and the pressable contract under it. Phase 1
+rewrote the region store into five levels with one settle pass and a shell-installed topology, and
+phase 4 moved the shell's own arrangement into `chrome/topology.ts`; both are § Focus regions and
+§ Navigation. Phase 2 gave the arrows the stops of a panel and Escape the climb to its parent, and
+phase 3 made a `Tabs` strip with `TabPanel`s a parent stop without a prop, paired by `idPrefix`; both
+are § Focus regions. Phase 5 took the `ExtendedPane` seam, `rows` as a collection and the diff
+annotation marks into cells, and § What a plugin loses here is the table it produced. Phase 6 turned
+the eight invariants into properties over the pane roster and gave the footer a word per kind of
+focused thing: § The invariants and § The footer, with the suites in
+[testing.md](../testing.md) § Test layers. The focus model that every phase pointed at is § The five
+key groups and § The invariants; the two invariants that changed on contact with the build say so
+there.
 
 `structure/` was eight phases that made the folder names say what the architecture doc says: `main/`
 retired everywhere, client-core regrouped into `kit/`, `host/`, `infra/`, and `features/`, one shape

@@ -7,24 +7,13 @@ import { focusedRegion } from './keys/regions'
 const caretLine = (frame: string): string =>
   frame.split('\n').find((line) => line.includes('\u203a')) ?? ''
 
-const caretOn = async (
-  screen: { frame: () => Promise<string>; press: (key: string) => Promise<void> },
-  text: string,
-): Promise<boolean> => {
-  for (let step = 0; step < 10; step += 1) {
-    if (caretLine(await screen.frame()).includes(text)) return true
-    await screen.press('TAB')
-  }
-  return false
-}
-
 describe.skipIf(!hasFfi)('spatial focus', () => {
   it('enters main from rail shortcuts, restores rail, and lets h/l walk detail tabs', async () => {
     const screen = await renderFixture({ width: 100, height: 32 })
 
     // The ordinary startup path opens on Menu. Enter performs its normal source activation and then
     // crosses to the content that activation opened; Escape returns to the source's Browse list.
-    expect(await caretOn(screen, 'GitHub')).toBe(true)
+    expect(await screen.reach('GitHub')).toBe(true)
     await screen.press('RETURN')
     expect(focusedRegion()?.regionId).toBe('source')
     await screen.press('ESCAPE')
@@ -33,7 +22,7 @@ describe.skipIf(!hasFfi)('spatial focus', () => {
     // Menu selected GitHub when it took focus; once its list exists, entering Browse selects its
     // first row.
     await screen.until('Invalidate')
-    expect(await caretOn(screen, 'Invalidate')).toBe(true)
+    expect(await screen.reach('Invalidate')).toBe(true)
     await screen.until('(fix-login) → (main)', 45)
 
     const browseCaret = caretLine(await screen.frame())

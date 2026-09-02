@@ -18,10 +18,12 @@ import type { KitSection } from '@acorn/client-core/kit/components/layout/Sectio
 // docs/ui-design.md § Every node at 80 by 24 and no further.
 //
 // A terminal has no floating layer and no scrim, so the three overlay nodes flatten: a `Modal` is a
-// bordered box where the pane would go, a `Menu` is a list in a box under its trigger, and a
-// `Popover` is a full-width block. The keys that make them modal are the keymap's, not theirs: a
-// `Modal` and an open `Menu` push a layer above the pane's that answers `dismiss` and swallows the
-// rest (../keys/trap.ts, docs/tui.md § Traps).
+// bordered box drawn in flow, a `Menu` is a list in a box under its trigger, and a `Popover` is a
+// full-width block. Where a `Modal` lands is the caller's: the shell gives its overlays the whole
+// screen under the topbar (../chrome/Shell.tsx), and a pane's own `Modal` draws inside the pane.
+// The keys that make them modal are the keymap's, not theirs: a `Modal` and an open `Menu` push a
+// layer above the pane's that answers `dismiss` and swallows the rest (../keys/trap.ts,
+// docs/tui.md § Traps).
 
 // `flexShrink={0}` on every block node in this file, and on the rows in ./showing.tsx. A terminal's
 // answer to "there is not enough room" is to clip, never to squeeze: yoga's default is to take a
@@ -364,6 +366,8 @@ export function Menu(props: {
   const control = stop({
     onPress: () => set(!open()),
     disabled: () => props.disabled?.() ?? false,
+    // Enter here opens the list rather than doing something, and the footer says so.
+    opens: true,
   })
   return (
     <box flexDirection="column">
