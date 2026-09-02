@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import { nodeState, nodeStatus } from '../../infra/node/fleet'
+import { nodes, nodeState, nodeStatus } from '../../infra/node/fleet'
 import { formatLastSeen, freshnessOf, FRESHNESS_LABELS, type FreshnessQuery } from '../../infra/node/freshness'
 import { StatusDot } from '../../kit/components/primitives'
 import './nodes.css'
@@ -35,6 +35,10 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
     const code = status()?.error?.code
     return code === 'identity_mismatch' || code === 'protocol_mismatch' ? HARD_ERRORS[code] : undefined
   }
+  // The fleet record's label, so a caller that only knows the id (the pane strip) still tips a name.
+  // The id is the fallback for a node the fleet has not listed, which is also the case where "Offline"
+  // is the state.
+  const label = () => props.label ?? nodes().find((node) => node.nodeId === props.nodeId)?.label ?? props.nodeId
   const detail = () =>
     hard()?.detail ??
     (freshness() === 'stale' || freshness() === 'offline' ? formatLastSeen(status()?.lastSeenAt) : '')
@@ -44,7 +48,7 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
       class="node-chip"
       classList={{ compact: props.compact }}
       data-freshness={hard() ? 'error' : freshness()}
-      data-tip={`${props.label ?? props.nodeId}: ${nodeState(props.nodeId)}`}
+      data-tip={`${label()}: ${nodeState(props.nodeId)}`}
       data-tip-sub={detail() || undefined}
     >
       <StatusDot tone={FRESHNESS_TONE[hard() ? 'error' : freshness()]} />
