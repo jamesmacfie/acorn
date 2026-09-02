@@ -51,9 +51,10 @@ export function Topbar(props: { model: ShellModel; nodeId: string }) {
           {(branch) => <Line role="muted">{branch()}</Line>}
         </Show>
         {/* What is waiting: the same number the desktop's bell puts on its pill and on the app icon,
-            written here through the platform seam's `setBadge` (../kit/notify.ts). The same glyph the
-            bell uses, so the two hosts read as one product. Zero draws nothing — a count that is
-            always there says nothing when it moves. `n` opens what is behind it (./Inbox.tsx). */}
+            written here through the platform seam's `setBadge` (../kit/notify.ts). Its own glyph,
+            where the desktop draws a bell: the glyph table has no bell that every terminal font can
+            be trusted with. Zero draws nothing, because a count that is always there says nothing
+            when it moves. `n` opens what is behind it (./Inbox.tsx). */}
         <Show when={terminalBadge()}>
           {(count) => <Line tone="warn">{`◔ ${count()}`}</Line>}
         </Show>

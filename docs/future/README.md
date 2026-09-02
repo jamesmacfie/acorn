@@ -23,6 +23,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [performance/](./performance/README.md) | Two performance reads, surfaces and shapes, merged into six phases: unblock the red renderer budget and instrument, paint before the node boots, stop the event amplifiers, terminals work only when watched, the live surfaces, then re-measure. | Plan, 2026-08-31. Not started. The renderer build is over budget. |
+| [terminal-keyboard/](./terminal-keyboard/README.md) | The terminal client's focus and keys, re-founded: one source of truth for focus, traps as scopes, one landing rule, named tiers with honest claims, viewports everywhere. Seven phases. | Plan, 2026-09-02. Not started. The five reported symptoms are traced in its `symptoms.md`. |
 
 ## The single files
 
@@ -68,8 +69,8 @@ belongs to somebody else's contract, that owner took it: [shell.md](../shell.md)
 bridge has the desktop's two Tauri commands and the focus approximation that stands in for a click
 callback, [tui.md](../tui.md) § What is drawn bespoke has the topbar count, the inbox overlay and the
 DEC 1004 focus rule, [plugin-map.md](../plugin-map.md) § Notifications still answers which call a
-plugin makes, and [contribution-kinds.md](../contribution-kinds.md) has `attentionReason` on the
-attention row.
+plugin makes, and [contribution-kinds.md](../contribution-kinds.md) has what an attention
+row's severity decides.
 `terminal-updates/` was seven phases that finished the terminal's keyboard, shipped and deleted
 2026-09-02. [tui.md](../tui.md) § Keys and focus owns all of it. Phase 0 wired every asking node so it
 focuses, shows focus and acts, which is § The adapter and the pressable contract under it. Phase 1

@@ -122,20 +122,26 @@ an unseen notice, so no channel repeats the seen rule.
 notice with no session behind it. `pushManagedAgentNotice` and `initWorkflowNotices` both go through
 it, so a run that finishes on the task you are watching is quiet for the same reason an agent turn is.
 
-## Acknowledge on view
+## Acknowledging an attention row
 
-`completed` is a state the node keeps until the owner speaks again, so a finished session sits in
-"Needs you" long after they have read it. Looking at it, in a focused window, retires it.
+A finished turn is a state the node keeps until the owner speaks again, so it sits in "Needs you"
+long after they have read it. So does a memory proposal nobody has reviewed. Looking at the session,
+in a focused window, retires it, and so does "Mark all read" in the bell.
 
 `packages/client-core/src/features/notifications/attentionInbox.ts` holds a session-only set keyed by
-node id, the row's own id, and the row's `at`, which is the session's `updatedAt`. A row whose key is
-in the set is hidden from the inbox and from the pill. Because the key carries `updatedAt`, a session
-that completes a second time is news again.
+node id, the row's own id, and the row's `at`, which for a session is its `updatedAt`. A row whose key
+is in the set is hidden from the inbox and from the pill. Because the key carries that timestamp, a
+session that completes a second time is news again.
 
-Only a row whose `attentionReason` is `completed` can be retired this way. A permission, a question,
-a workflow gate, or an error describes a block that looking at it does not lift. The set clears on a
-node switch, like every other node-scoped signal ([state-ownership.md](./state-ownership.md) § Scope
-rules).
+Only a nudge can be retired this way, and `severity` is the word for it: `info` means nothing is
+blocked. A permission, a question, a workflow gate, or an error is `warn` or `danger`, and describes a
+block that reading about it does not lift — those stay in "Needs you", and in the pill, until the
+owner lifts them. The set clears on a node switch, like every other node-scoped signal
+([state-ownership.md](./state-ownership.md) § Scope rules).
+
+"Mark all read" is therefore about the whole number the bell shows, not just its lower section: it
+marks every notice read and acknowledges every nudge on show. It cannot empty a bell that is holding
+a real block, which is the point of the block.
 
 ## The channels
 

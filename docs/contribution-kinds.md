@@ -47,7 +47,7 @@ component: a tree names one, and the host mounts its own.
 | Commands | Both | `ctx.commands` / `contributions.commands` | The command palette and chords |
 | Keybindings | Both | `ctx.keybindings` / `contributions.keybindings` | The chord dispatcher |
 | Palette rows | Both | `ctx.paletteRows` / `contributions.palette` | The command palette's row sources |
-| Attention sources | Both | `ctx.attentionSources` / `contributions.attention` | The notification inbox. An item's `attentionReason` of `completed` lets the owner retire the row by looking at it ([notifications.md](./notifications.md) § Acknowledge on view) |
+| Attention sources | Both | `ctx.attentionSources` / `contributions.attention` | The notification inbox. An item of `info` severity is a nudge the owner can retire by acknowledging it; `warn` and `danger` stay until the block is lifted ([notifications.md](./notifications.md) § Acknowledging an attention row) |
 | Node stats | Both | `ctx.nodeStats` / `contributions.nodeStats` | A node card on Fleet home |
 | Content links | Both | `ctx.contentLinks` / `contributions.contentLinks` | The in-app link router |
 | Agent contexts | Both | `ctx.agentContexts` / `contributions.agentContexts` | The context tray on an agent launch |
