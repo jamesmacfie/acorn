@@ -13,10 +13,11 @@
 // together are "move", because the intent layers bind anonymous handlers rather than named commands.
 // The keys come from the host's own intent table, so a hint can never name a key nothing is bound to.
 
-import type { KeyEvent, Renderable } from '@opentui/core'
+import { InputRenderable, ScrollBoxRenderable, TextareaRenderable, type KeyEvent, type Renderable } from '@opentui/core'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { hostKeysFor } from '../keys/install'
-import { focusedItem, focusedRenderable } from '../keys/regions'
+import { focusedItem, focusedRenderable, isParentStop } from '../keys/regions'
+import { focusedOpens } from '../keys/stops'
 import { openOverlays } from './state'
 
 export type Hint = {
@@ -34,21 +35,57 @@ export type Hint = {
 // was not.
 type Spec = Hint & { probe: string }
 
+/**
+ * What has the keys, as the only thing the footer's words depend on.
+ *
+ * Six kinds and no seventh: the same key means a different thing on each, and a reader on a Merge
+ * button should not be told Enter opens something. The order is a priority — a field that is also a
+ * stop is a field, and a viewport is only ever a stop when it holds none (docs/tui.md § The footer).
+ */
+export type FocusedKind = 'item' | 'parent' | 'field' | 'opens' | 'viewport' | 'stop'
+
+export const focusedKind = (): FocusedKind => {
+  const node = focusedRenderable()
+  if (node instanceof InputRenderable || node instanceof TextareaRenderable) return 'field'
+  if (focusedItem()) return 'item'
+  if (isParentStop(node)) return 'parent'
+  if (focusedOpens()) return 'opens'
+  if (node instanceof ScrollBoxRenderable) return 'viewport'
+  return 'stop'
+}
+
+/**
+ * The words, one row per focused kind. `move` is the vertical pair, `act` is Enter, `cross` is the
+ * horizontal pair, and `commit` is the chord.
+ *
+ * A table rather than a run of ternaries because the invariant is over the table: every kind says
+ * something for every key, and the reachability suite reads the same rows the footer draws
+ * (../reachability.test.tsx).
+ */
+export const WORDS: Record<FocusedKind, { moveKeys: string; move: string; act: string; cross: string; commit: string }> = {
+  // Down enters the panel the strip is showing and Up leaves the strip, so the pair is not a pair.
+  parent: { moveKeys: 'j', move: 'enter', act: 'press', cross: 'tab', commit: 'commit' },
+  item: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'fold', commit: 'commit' },
+  field: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'fold', commit: 'send' },
+  opens: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'fold', commit: 'commit' },
+  // A viewport is a stop only while it holds none, and then the arrows are the scroll
+  // (../keys/regions.ts § stopsIn).
+  viewport: { moveKeys: 'j/k', move: 'scroll', act: 'press', cross: 'fold', commit: 'commit' },
+  stop: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'fold', commit: 'commit' },
+}
+
 const specs = (): Spec[] => {
   const keys = hostKeysFor()
-  const onItem = () => focusedItem()
+  const words = WORDS[focusedKind()]
   const bare = (intent: keyof typeof keys, at = 0): string => keys[intent][at] ?? keys[intent][0] ?? ''
   return [
-    { probe: bare('next', 1), keys: 'j/k', label: 'move', detail: 'and the arrows' },
-    // `open` on a row, `press` on a control. The same key, two different promises, and a reader who
-    // is on a Merge button should not be told it opens something. Phase 6 owns the rest of the
-    // footer's words (docs/future/terminal-updates/phase-6-tests-and-docs.md).
-    { probe: bare('activate'), keys: 'enter', label: onItem() ? 'open' : 'press', detail: 'or space' },
-    { probe: bare('expand', 1), keys: 'h/l', label: 'fold', detail: 'and the arrows' },
+    { probe: bare('next', 1), keys: words.moveKeys, label: words.move, detail: 'and the arrows' },
+    { probe: bare('activate'), keys: 'enter', label: words.act, detail: 'or space' },
+    { probe: bare('expand', 1), keys: 'h/l', label: words.cross, detail: 'and the arrows' },
     { probe: bare('search', 1), keys: '/', label: 'filter' },
     { probe: bare('menu'), keys: 'menu', label: 'menu' },
     { probe: bare('delete'), keys: 'del', label: 'delete' },
-    { probe: bare('commit'), keys: keys.commit[0] ?? '', label: 'commit', detail: 'send what is in the box' },
+    { probe: bare('commit'), keys: keys.commit[0] ?? '', label: words.commit, detail: 'send what is in the box' },
     { probe: bare('nextRegion', 1), keys: 'tab', label: 'region', detail: 'shift+tab goes back; f6 does too' },
     { probe: bare('nextPane'), keys: keys.nextPane[0] ?? '', label: 'pane', detail: 'the pane to the right' },
     { probe: bare('dismiss'), keys: 'esc', label: 'back' },

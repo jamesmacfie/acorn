@@ -964,6 +964,12 @@ second copy would be wrong within a release and nothing would catch it. The focu
 `kit/tokens/focusRoles.ts`, and `tools/arch/kitTable.test.ts` fails if this table and those two files
 disagree about which nodes exist or what each one does with focus.
 
+Every row here has a case in `apps/tui/src/kit/kit.test.tsx` that draws the node and reads the cells
+back, and every node the focus column calls a stop, a collection or a conditional stop also has a
+case that presses it or a written reason why the press is driven in a suite of its own. The reason
+sentences are in `NOT_DRIVEN_HERE` in that file, and the list cannot grow quietly: a node cannot join
+the kit as a stop without somebody deciding whether this host presses it.
+
 ### Grouping
 
 | Node | Focus | At 80×24 |
@@ -976,7 +982,7 @@ disagree about which nodes exist or what each one does with focus.
 | `Timeline` | collection | cards in sequence, a grey rule between turns; `follow` is a no-op, because a column of cells pins to its last child by construction. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets |
 | `Toolbar` | none | children on one line; a `Heading` in a bar is cut short rather than wrapped, as it is on the DOM, so the bar stays one line tall and the controls at the far end stay on screen |
-| `Modal` | trap | a centred box over dimmed content; Escape dismisses. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
+| `Modal` | trap | a centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
 | `ModalBody` | none | the lines between the title rule and the actions line |
 | `ModalActions` | none | the buttons on one line, right-aligned inside the box |
 | `Menu` | trap | a vertical list in a box |
@@ -1005,7 +1011,7 @@ disagree about which nodes exist or what each one does with focus.
 | `Badge` | none | `[text]` in the tone's colour |
 | `Chip` | conditional | `(text)`, with a trailing `×` when removable |
 | `ChipRow` | collection | chips on one line, wrapping |
-| `StatusDot` | none | `●` in colour, `○` for neutral |
+| `StatusDot` | none | `●` in colour, `○` for muted |
 | `Facts` | none | two columns, labels grey; `grouping="rows"` is one pair per line; `wide` on an item is a desktop-only full-row tile |
 | `DescriptionList` | none | as `Facts`, one pair per line |
 | `Table` | none | reduced: box-drawn, truncating columns by the priority its heads declare |
@@ -1035,7 +1041,7 @@ disagree about which nodes exist or what each one does with focus.
 | --- | --- | --- |
 | `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic. An icon-only button draws its `label`, because a glyph child has no text to read off it |
 | `ConfirmButton` | stop | `[ Delete? ]` after the first press; the armed button is the prompt |
-| `Input` | stop | an underlined field; owns keys while focused |
+| `Input` | stop | a field taking the room its row has left; owns keys while focused |
 | `Textarea` | stop | a boxed multi-line field; owns keys |
 | `Select` | stop | `[ value ▾ ]`, opening a `Menu` |
 | `Checkbox` | stop | `[x] label`; Space toggles |

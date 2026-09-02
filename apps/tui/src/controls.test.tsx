@@ -9,7 +9,7 @@ import { recordedRequests } from './fixture'
 // `kit/kit.test.tsx` § every control is a stop asserts that each node presses when the keys are on it.
 // This asserts the other half, which no unit case can: that a reader arriving at a pane can get the
 // keys onto a control at all, and that pressing it reaches the node
-// (docs/future/terminal-updates/phase-0-controls.md).
+// (docs/tui.md § Keys and focus).
 //
 // The worked example in that folder's focus-model.md is the sequence below. Phase 0 reached the first
 // stop of a panel; phase 2 reaches the rest of them, so `[Merge]` — the second stop in Details — is
@@ -43,9 +43,11 @@ describe.skipIf(!hasFfi)('the pull request from the keyboard', () => {
       await screen.press('ARROW_DOWN')
       expect(await litRuns(screen)).toContain('[ squash ▾ ]')
 
-      // The footer says `press`, not `open`: the keys are on a control rather than on a row.
+      // The footer says `open`, because this control opens a list. A plain button beside it would
+      // say `press`, and a row in the rail would say `open` for the other reason
+      // (../chrome/bindings.ts § WORDS).
       const onControl = await screen.frame()
-      expect(onControl).toContain('enter press')
+      expect(onControl).toContain('enter open')
 
       // And pressing it opens the method list, which is what a `Select` does.
       await screen.press('RETURN')
@@ -96,7 +98,7 @@ describe.skipIf(!hasFfi)('the pull request from the keyboard', () => {
       const typed = await screen.frame()
       expect(typed).toContain('> hi')
       // The footer names the key that sends, at the field that takes it.
-      expect(typed).toContain('ctrl+return commit')
+      expect(typed).toContain('ctrl+return send')
 
       // Escape leaves the field for the strip that owns the panel and sends nothing, which is how a
       // reader gets out of a composer without posting.

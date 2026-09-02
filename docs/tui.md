@@ -433,6 +433,33 @@ does not know the request ignores it, and the mode is popped on exit either way.
 ask for the same protocol, because a suite driving a different keyboard from the app is testing a
 different keyboard.
 
+### The five key groups
+
+Every key is an intent before it is a key (`client-core/kit/keys/intents.ts`). Where an intent lands
+depends on the thing that has the keys, and an intent bubbles: the innermost thing that can answer
+does, and a handler returning `false` passes it on.
+
+| Group | Keys | In a collection | On a parent stop | On a plain stop | On a viewport with no stops | Bubbled to the region tier |
+| --- | --- | --- | --- | --- | --- | --- |
+| Move | `↓` `j` / `↑` `k` | next/previous row, wrapping as `collectionIntents.ts` says | Down enters the panel the strip is showing; Up leaves for the previous stop | next/previous stop in reading order within the panel, revealed in every viewport around it; an edge is a wall | scroll a fifth of a page | nothing |
+| Cross | `→` `l` / `←` `h` | `expand`/`collapse`, which a tree answers and a horizontal collection moves | the next/previous tab; an edge is a wall | nothing | nothing | rail → main and main → rail, landing on the destination column's last region, no wrap |
+| Act | `⏎` `space` | activate the row, then enter main where the region says so | nothing | press: `onPress`, a toggle, a `Select`'s list, an `Input`'s submit, an entered rectangle | nothing | nothing |
+| Back | `esc` | the parent stop if a panel holds the collection, else the region's home | the region's home | the parent stop, else the region's home | the region's home | an overlay closes, a rectangle is left, a notification clears |
+| Page | `pgup` `pgdn` `home` `end` | `pagePrev`, `pageNext`, `first`, `last` on the collection | scroll the viewport around it | scroll the viewport around it | scroll | nothing |
+
+Two keys sit at the screen level and never bubble. Tab and Shift+Tab cycle every region on screen in
+declared order and wrap, and the pane chords cross the column edge before they switch the pane. Both
+are in § Navigation.
+
+`ctrl+⏎` is `commit` and submits the `Composer` or `Input` that has the keys. It is typing-exempt, so
+it fires from inside the text, and a `Composer`'s submit button is also a plain stop that Down
+reaches, for a reader who does not know the chord.
+
+While an `Input` or `Textarea` has the keys, bare keys type. The move, cross and page groups go inert
+except `↑` and `↓` inside a multi-line `Textarea`, which move the cursor. Escape leaves the field for
+its parent stop or the region's home, which is how a reader gets out of a composer without sending.
+Tab, Shift+Tab, `ctrl+⏎` and the pane chords all work from inside a field.
+
 ### Focus regions
 
 `apps/tui/src/keys/regions.ts` keeps the DOM host's contract and replaces every mechanism in it. It
@@ -617,9 +644,56 @@ active layers. Nothing is declared twice. The engine has no signal for "the acti
 `activeHints()` reads the two signals that move them: where the keys are, and whether an overlay has
 taken them. Without that the footer is whatever was true at the render that happened to build it.
 
+The words come from a table in `bindings.ts` with one row per kind of focused thing, because the same
+key promises different things in different places and a reader on a Merge button should not be told
+Enter opens something. `focusedKind()` asks the region store which kind has the keys, in this order:
+
+| What has the keys | `j`/`k` | `enter` | `h`/`l` | `ctrl+enter` |
+| --- | --- | --- | --- | --- |
+| A field, meaning an `Input` or a `Textarea` | move | press | fold | send |
+| A row of a collection | move | open | fold | commit |
+| A parent stop, meaning a strip showing a panel | `j` enter | press | tab | commit |
+| A stop that opens a list, meaning a `Menu` trigger and so every `Select` | move | open | fold | commit |
+| A viewport holding no other stop | scroll | press | fold | commit |
+| Any other stop | move | press | fold | commit |
+
+A `Menu` says which it is by passing `opens` to `pressable`, and nothing else in the kit does yet. The
+order is a priority: a field is a stop too, and a viewport is only ever a stop while it holds none.
+
 While a PTY is entered the footer says `esc leave · esc esc send escape`. `?` opens the cheat sheet as
-a modal, and the footer itself is not a focus stop: it is a label with nothing to drive, and a stop
-that does nothing is a hole a reader falls into.
+a modal with the same hints and a sentence each, and the footer itself is not a focus stop: it is a
+label with nothing to drive, and a stop that does nothing is a hole a reader falls into.
+
+### The invariants
+
+Eight sentences about the keyboard, each one a test rather than a scenario. A scenario pins one path,
+and every bug the fourteen focus fixes chased was a path nobody had written a scenario for.
+`apps/tui/src/reachability.test.tsx` walks every stop on seven surfaces and asks four of these after
+every press, so a new pane or a new control joins the property the day it lands.
+
+| # | The invariant | Where it is checked |
+| --- | --- | --- |
+| 1 | Every stop a region declares is reachable from the keyboard. | `reachability.test.tsx`, against `_allStops()` |
+| 2 | Every stop acts: focusing it and pressing Enter calls the handler. | `kit/kit.test.tsx` § every control is a stop |
+| 3 | One caret. At most one `›` is on screen and it marks what has the keys. | `reachability.test.tsx`, after every press |
+| 4 | Escape is bounded and ends in the rail. | `reachability.test.tsx` § escape is bounded |
+| 5 | One deferred decision: `queueMicrotask` appears once in `keys/` and never in `kit/`. | `invariants.test.ts` |
+| 6 | Focus never sits on a corpse. | `reachability.test.tsx`, after every press |
+| 7 | No chord this host cannot press: `super+` is spelled only where it is rewritten. | `invariants.test.ts` |
+| 8 | The footer tells the truth: the word beside a key is what that key does there. | `reachability.test.tsx`, against the word table |
+
+Two of them changed on contact with the build. Invariant 3 also promised one lit control, and it is
+not checked: focus draws `strong` and `accent`, and so does an active tab label, so a span count
+cannot tell the two apart and a test that cannot tell fails on a passing screen. Invariant 4 promised
+`depth + 1` Escapes, counting the parent stops above the caret; that is short by the region chain,
+which on a task pane is two more hops — the pane's region climbs to the strip and the strip climbs to
+Tasks. The bound the test uses is the parent stops plus the chain `chrome/topology.ts` names.
+
+The walk itself is Tab major and `↓` minor: inside whichever region has the keys, Down until the caret
+stops moving, then Tab to the next region. A failure names the surface, the size and the line it could
+not reach, and pressing the same keys in the same order puts the same thing under the caret. Right
+and Enter are not in the walk, because what the property is over is `stopsIn` per region and a panel's
+contents are the level below.
 
 ### What must never happen
 
@@ -736,10 +810,14 @@ use the kit's collection: a collection's keys are bare keys, a bare key does not
 is being typed into, and in a palette something always is. So it keeps one cursor signal and binds the
 arrows above the trap.
 
-An overlay hides the pane rather than replacing it. Opening the palette must not tear down the pane
-behind it and throw away its queries and its model, so the pane box is `visible={false}` while an
-overlay is on top, the same thing `TabPanel` does for a hidden tab. `takeFocus` in the region store is
-this host's answer to the DOM palette's `prevFocus`.
+An overlay takes the whole screen under the topbar, and hides what is there rather than replacing it.
+It is a sibling of the rail-and-pane row in `chrome/Shell.tsx`, not a child of the pane column: an
+overlay belongs to the screen, and mounted inside the column it drew in the pane's width with the rail
+still beside it, which read as one more panel rather than the thing being asked. Opening the palette
+must not tear down the rail and the pane behind it and throw away their queries and their models, so
+the row is `visible={false}` while an overlay is on top, the same thing `TabPanel` does for a hidden
+tab. `visible` is yoga's `display: none`, so the row gives up its height and the overlay takes it.
+`takeFocus` in the region store is this host's answer to the DOM palette's `prevFocus`.
 
 Notifications are the same `toast()` store the desktop's `ToastHost` draws, so `bridge.ui.toast` and
 every plugin that calls it lands on a line above the footer. They never take focus.
@@ -909,8 +987,10 @@ profiles.
 [testing.md](./testing.md) § Test layers owns the tiers. In short: one case per kit node against a cell
 buffer, one per layout drawn from its projection, a twin of client-core's `keys.test.tsx` against the
 terminal adapter, a pane file that opens every first-party pane at exactly 80 by 24 and asks whether
-the thing the pane is for is on the first screen, a chrome file that drives the whole shell, and four
-files that need no renderer and never skip: the palette's collapse to 16 slots, the clipboard
+the thing the pane is for is on the first screen, a chrome file that drives the whole shell, a
+reachability file that walks every stop on seven surfaces and checks four invariants after every
+press, and five files that need no renderer and never skip: the focus invariants that are facts about
+the source, the palette's collapse to 16 slots, the clipboard
 sequence, the plugin sandbox, and the boot test.
 
 The boot test (`apps/tui/src/node/boot.test.ts`) is what `apps/desktop/test/boot.test.ts` is for the

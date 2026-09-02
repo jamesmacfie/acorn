@@ -40,11 +40,26 @@ export type StopOptions = {
   /** The other intents this stop answers, each saying whether it took the intent. `Chip`'s `delete`
    *  and `SegmentedControl`'s whole collection come through here. */
   on?: Partial<Record<Intent, () => boolean>>
+  /** This stop opens a list rather than doing something. The footer says `enter open` instead of
+   *  `enter press`, which is the only difference it makes (../chrome/bindings.ts). */
+  opens?: boolean
+}
+
+// Which stops open a list. A `Menu` trigger and therefore every `Select`, and nothing else so far.
+// A WeakSet rather than a prop on the node, for the same reason `items` is one: the footer asks
+// about whatever has the keys and must not need to know which kit node drew it.
+const opening = new WeakSet<Renderable>()
+
+/** Whether the stop that has the keys opens a list. */
+export const focusedOpens = (): boolean => {
+  const node = focusedRenderable()
+  return !!node && opening.has(node)
 }
 
 /** Make a renderable a stop: focusable, pressed by `activate`, and pressed by the mouse. */
 export function pressable(box: Renderable, options: StopOptions): void {
   const off = () => options.disabled?.() ?? false
+  if (options.opens) opening.add(box)
   createEffect(() => { box.focusable = !off() })
   const given = options.on ?? {}
   const runs: Partial<Record<Intent, () => boolean>> = {

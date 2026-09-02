@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 // The focus model's invariants, where the invariant is a fact about the source rather than about a
-// render (docs/tui.md § Focus regions). Phase 6 of docs/future/terminal-updates/ turns the rest of
-// them into properties over the pane roster; this one cannot be one, because what it forbids is a
-// second place to put a decision.
+// render (docs/tui.md § The invariants). ../reachability.test.tsx turns the rest of them into
+// properties over the pane roster; these two cannot be, because what they forbid is a second place
+// to put a decision and a chord nobody can press.
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url))
 

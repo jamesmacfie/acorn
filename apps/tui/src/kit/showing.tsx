@@ -690,8 +690,8 @@ export function Table(props: { size?: 'sm' | 'md'; stickyHead?: boolean; minWidt
   )
 }
 
-/** reduced: the column's label in the bold header line; the lowest priority is dropped first, and the
- *  header names what was lost. */
+/** reduced: the column's label in the bold header line; the lowest priority is dropped first, and a
+ *  muted line under the table names what was lost. */
 export function TableHead(props: { align?: 'start' | 'center' | 'end'; priority?: 'high' | 'normal' | 'low'; children?: JSX.Element }) {
   const table = building
   const index = table?.register({ priority: props.priority ?? 'normal', label: flatten(props.children) }) ?? 0

@@ -321,7 +321,7 @@ const FILE_TEXT = 'export async function signIn(email: string, password: string)
 // Every request the fixture was asked for, in order, so a test can assert that a control acted rather
 // than only that it drew. A control's whole job is to make one of these; the answer it gets back is
 // the route's business and mostly a 404 here, which is the right shape for "the press left the
-// building" (docs/future/terminal-updates/phase-0-controls.md).
+// building" (docs/tui.md § Keys and focus).
 const recorded: { path: string; method: string }[] = []
 
 /** What the fixture has been asked for since the last reset. */

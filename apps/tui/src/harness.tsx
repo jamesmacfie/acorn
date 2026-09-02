@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { _resetRequests, stubTransport, TASK } from './fixture'
+import { focusedRegion, focusedRenderable, type RegionRef } from './keys/regions'
 
 // Booting client-core under Node against no node at all: the same seam, the same boot, a transport
 // that answers from a fixture. Shared by the smoke test and the capture script so both draw the same
@@ -43,7 +44,23 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
 /** One run of cells in a captured frame: what it says and what colour it says it in. */
 export type Span = { text: string; fg: { r: number; g: number; b: number }; attributes: number }
 
-export async function renderFixture(size: { width?: number; height?: number; supervised?: boolean; pane?: string } = {}): Promise<{ frame: () => Promise<string>; until: (text: string, seconds?: number) => Promise<string>; press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<void>; spans: () => Promise<Span[][]>; resize: (width: number, height: number) => void; quits: () => number; done: () => void }> {
+/** Where the keys are and what the line under them says (./keys/regions.ts). */
+export type Caret = { region: RegionRef | null; text: string }
+
+export type Screen = {
+  frame: () => Promise<string>
+  until: (text: string, seconds?: number) => Promise<string>
+  press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<void>
+  spans: () => Promise<Span[][]>
+  caret: () => Promise<Caret>
+  walk: (steps: number, each?: (caret: Caret) => unknown) => Promise<void>
+  reach: (text: string, steps?: number) => Promise<boolean>
+  resize: (width: number, height: number) => void
+  quits: () => number
+  done: () => void
+}
+
+export async function renderFixture(size: { width?: number; height?: number; supervised?: boolean; pane?: string } = {}): Promise<Screen> {
   const { createTestRenderer } = await import('@opentui/core/testing')
   const { render } = await import('@opentui/solid')
   const { installKeymap } = await import('./keys/install')
@@ -143,8 +160,74 @@ export async function renderFixture(size: { width?: number; height?: number; sup
     return captureCharFrame()
   }
 
+  const press = async (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }): Promise<void> => {
+    mockInput.pressKey(key, modifiers)
+    // A real wait before the render loop, not just a flush. A lone Escape is the start of every
+    // escape sequence there is, and the terminal's parser holds it until it is sure nothing
+    // follows; flushing the render loop does not make that timer run.
+    await new Promise((done) => setTimeout(done, 80))
+    await settle(500)
+  }
+
+  /**
+   * Where the keys are, and the one line a reader would look at to see it.
+   *
+   * The focused renderable's own line first, because that is the line it drew itself on — a `Row`
+   * draws the caret there and a `Button` draws itself lit there. The line holding a `\u203a` is the
+   * fallback, for the moment focus is on a region's own box and nothing is lit at all.
+   */
+  const caret = async (): Promise<Caret> => {
+    const lines = (await frame()).split('\n')
+    const node = focusedRenderable()
+    const own = node && !node.isDestroyed ? lines[node.y] : undefined
+    return { region: focusedRegion(), text: own ?? lines.find((line) => line.includes('\u203a')) ?? '' }
+  }
+
+  /**
+   * Press the screen's own stops, in one fixed order, calling back after each press.
+   *
+   * Tab major and `\u2193` minor: inside whichever region has the keys, Down until the caret stops
+   * moving, then Tab to the next region and start again. A failure is therefore reproducible by
+   * hand — press the same keys in the same order and the same thing is under the caret.
+   *
+   * Down rather than a breadth-first fan of Down, Right and Enter, which the design asked for.
+   * What the property is over is `_allStops()`, and that is `stopsIn` per region: a panel's contents
+   * are the level below and are not in it. Right and Enter only reach that level, so they would cost
+   * presses and prove nothing (docs/tui.md § The invariants).
+   *
+   * `each` returning `true` ends the walk where it stands, which is how `reach` stops on what it
+   * came for rather than spending the whole budget behind it.
+   */
+  const walk = async (steps: number, each?: (caret: Caret) => unknown): Promise<void> => {
+    const seen = new Set<unknown>()
+    let previous: unknown = null
+    let repeats = 0
+    for (let step = 0; step < steps; step += 1) {
+      if (await each?.(await caret())) return
+      const node = focusedRenderable()
+      // Two kinds of "this region is done", and both need saying. A wall answers Down with the same
+      // renderable; a collection answers it with the row it wrapped around to, which is a different
+      // renderable the walk has already stood on. Without the second, a list of five rows is where
+      // the walk spends its whole budget.
+      repeats = node === previous || seen.has(node) ? repeats + 1 : 0
+      seen.add(node)
+      previous = node
+      const done = repeats >= 2
+      await press(done ? 'TAB' : 'ARROW_DOWN')
+      if (done) { repeats = 0; previous = null }
+    }
+  }
+
   return {
     frame,
+    caret,
+    walk,
+    /** Walk until the caret's line says this, or the budget is spent. Stops where it lands. */
+    reach: async (text: string, steps = 40): Promise<boolean> => {
+      let found = false
+      await walk(steps, (here) => (found = here.text.includes(text)))
+      return found
+    },
     /**
      * The frame, once it holds this text, or the last one taken if it never does.
      *
@@ -168,14 +251,7 @@ export async function renderFixture(size: { width?: number; height?: number; sup
     // case (`KeyCodes.RETURN`). Anything else is typed one letter at a time, silently, which is a
     // good hour to save the next person — and a chord is the key plus a modifiers object, never the
     // string `'ctrl+k'`, which types five letters and a `k`.
-    press: async (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => {
-      mockInput.pressKey(key, modifiers)
-      // A real wait before the render loop, not just a flush. A lone Escape is the start of every
-      // escape sequence there is, and the terminal's parser holds it until it is sure nothing
-      // follows; flushing the render loop does not make that timer run.
-      await new Promise((done) => setTimeout(done, 80))
-      await settle(500)
-    },
+    press,
     /** The frame as coloured runs rather than characters.
      *
      *  `frame()` answers what is on the screen and nothing about what colour it is, so every rule in
