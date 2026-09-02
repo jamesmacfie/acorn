@@ -51,7 +51,12 @@ export default defineConfig({
       // lucide's icon geometry, removed rather than replaced: 706 KB of SVG paths, and this host has
       // no SVG. Left alone it is externalised, and Node's loader refuses a JSON module with no import
       // attribute on it (src/kit/iconNodes.ts).
+      //
+      // Both halves of it, because client-core splits the set: the census's eager map is a relative
+      // JSON import and would be inlined into this bundle rather than externalised, which is the same
+      // 16 KB of paths nobody here can draw (client-core kit/tokens/iconNodes.ts).
       { find: /^lucide-static\/icon-nodes\.json$/, replacement: resolve(import.meta.dirname, 'src/kit/iconNodes.ts') },
+      { find: /^\.\/iconNodes\.eager\.json$/, replacement: resolve(import.meta.dirname, 'src/kit/iconNodes.ts') },
       // The router, removed rather than replaced. `@solidjs/router` reads `window.history.state` at
       // module scope, so a pane that imports it cannot even be loaded here, and there is no URL behind
       // it to answer with (src/kit/router.ts).

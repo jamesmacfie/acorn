@@ -93,6 +93,39 @@ internal token stay. The device row goes with the core database, so the desktop 
 next launch. That is the intended fresh-install path, since there is no upgrade path from an older
 database.
 
+## Timing a cold start
+
+Four processes, four accounts of their own boot, all of them lines on a stream with a running offset.
+Every line carries `+Nms` from that process's start and `(Nms)` for the step alone, so the one step
+that cost the boot is the one wide number.
+
+**The node prints its marks unconditionally.** A node that took eleven seconds to bind should say so
+without anyone having asked, so `[service:boot]` needs no switch: `login-shell`,
+`bundled-packages`, `migrate`, `graph` (the plugin loader importing whatever is installed in the data
+root), then one line per plugin per pass (`plugin github init`, `plugin x ready`), then `install`,
+`cert`, `bind`, `listener-up`, `scheduler`, the four `reconcile.*` steps, and `teardown`. The per-plugin
+lines are there because nineteen inits run in series and a single total cannot say which one is slow.
+
+**Everything else is behind `ACORN_PERF=1`**, because those streams are the ones a developer watches
+while using the app:
+
+| Process | Set | Prints |
+| --- | --- | --- |
+| Helper | `ACORN_PERF=1` in the environment the shell was started from | `[helper:boot]` on **stderr** for handshake, plugin-cache sweep, bundled plugins trusted, `service.start`, node adopted, WebSocket bound, ready line. stderr and not stdout: stdout is the line protocol Rust parses |
+| Node | same variable | `[perf:request]` per request (method, matched route pattern, status, ms, request id), plus `git` and SQLite histograms |
+| Renderer | `localStorage.setItem('acorn.perf', '1')` and reload | `[renderer:boot]` in the devtools console for script start, node selected, plugins applied, first paint, `nodeReady`. A `localStorage` switch rather than the variable because a webview has no environment — Rust loads the renderer from a custom scheme rather than spawning it. The `performance.mark`s are made either way, so the devtools performance panel has the same labels with the switch off |
+| `acorn` | nothing | `[acorn:boot]` on exit for node open, App imported, tasks read, renderer created, first draw. Held rather than printed live, because stderr is the file the renderer draws on while it owns the terminal — a line written mid-session reads as the shell going to garbage. Printed after `renderer.destroy()`, beside the held Node warnings |
+
+The node's histograms count what it does over and over with nothing else counting it: `git status` and
+`git diff` spawns, and SQLite statements grouped by their first two words. They print at drain, and
+`kill -USR2 <pid>` dumps and clears them mid-session, so a second dump describes the interval rather
+than all time. `packages/node-core/src/server/perf.ts` owns both.
+
+Reading a desktop cold start end to end means putting three of these together: Rust spawns the helper,
+the helper's `[helper:boot] ready line` is the whole of what Rust waited for, the node's
+`[service:boot] listener-up` sits inside that, and the renderer's clock starts at its own document's
+navigation, after Rust created the window.
+
 ## Build artifacts
 
 `apps/node` emits `service.js`, `mcp.js`, `standalone.js`, and chunks. `apps/desktop/scripts/stage.mjs`

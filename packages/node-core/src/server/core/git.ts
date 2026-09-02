@@ -10,6 +10,7 @@
 //   SSH_AUTH_SOCK in the passthrough. It isn't in the base allowlist (childEnv), so a push over ssh
 //   would fail with "agent refused operation" once git went through the broker. It grants use of the
 //   agent, not a readable secret.
+import { timed } from '../perf'
 import { runProcess, runProcessOrThrow, type ProcResult } from './proc'
 
 // Most git reads are small; `git diff` on a large change is the exception, so the cap is generous while
@@ -54,11 +55,19 @@ const spec = (args: readonly string[], opts: GitOptions) => ({
   stdin: opts.stdin,
 })
 
+// Timed behind `ACORN_PERF=1`, keyed by the subcommand rather than by the whole argument list: a
+// status ping spawns `git status` and two `git diff` per active worktree per connected client and
+// nothing counts them, which is the measurement phase 5 of the performance programme argues from
+// (../perf.ts). `timed` is a straight passthrough when the switch is off.
+const seam = (args: readonly string[]) => `git ${args[0] ?? '?'}`
+
 // Exit code is data: `git diff --quiet` and `git merge-tree` both use it to answer a question.
-export const git = (args: readonly string[], opts: GitOptions): Promise<ProcResult> => runProcess(spec(args, opts))
+export const git = (args: readonly string[], opts: GitOptions): Promise<ProcResult> =>
+  timed(seam(args), () => runProcess(spec(args, opts)))
 
 // For the callers that treat a non-zero exit as an error.
-export const gitOrThrow = (args: readonly string[], opts: GitOptions): Promise<ProcResult> => runProcessOrThrow(spec(args, opts))
+export const gitOrThrow = (args: readonly string[], opts: GitOptions): Promise<ProcResult> =>
+  timed(seam(args), () => runProcessOrThrow(spec(args, opts)))
 
 // stdout of a successful command, trimmed, which is the shape most call sites wanted.
 export const gitText = async (args: readonly string[], opts: GitOptions): Promise<string> => (await gitOrThrow(args, opts)).stdout.trim()

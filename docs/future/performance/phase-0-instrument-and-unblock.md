@@ -1,7 +1,20 @@
 # Phase 0: instrument, and unblock the build
 
-Status: not started. Waits on nothing. Every other phase waits on this one, because every other phase
-ends in a number this one makes possible.
+Status: **shipped 2026-09-02.** The icon set is split (77 eager names, generated and lint-checked), both
+hosts' build checks carry a byte ceiling and a name denylist, and the node, the helper, the renderer and
+the terminal client each print their own boot account. The renderer's startup budget is green at
+974,732 B, down from 1,329,679 B. Numbers in [measurements.md](./measurements.md); behaviour in
+[frontend.md](../../frontend.md) § Startup budget, [ui-design.md](../../ui-design.md) § Icons and
+[local-development.md](../../local-development.md) § Timing a cold start.
+
+Two things this phase could not do, both because they need the app running rather than built: nobody
+has read the desktop's four boot accounts side by side, and nobody has read the git or SQLite histograms
+against real traffic. Phase 2 and phase 5 own those readings; measurements.md says so in its own words
+rather than carrying a made-up figure.
+
+One deliberate change of shape: the `TimeToFirstDraw` renderable is still exported by `@opentui/solid`
+0.5.9, but it is an on-screen label rather than a headless timer — using it would paint a debug overlay
+over the shell. The renderer's own first `frame` event is the same moment with nothing drawn.
 
 ## Goal
 

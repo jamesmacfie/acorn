@@ -1,12 +1,13 @@
 # Performance
 
 A programme, started 2026-08-31 and widened 2026-09-02 to cover the terminal client and to record
-the architecture decisions the first reads stopped short of. Nothing here is scheduled, and nothing in
-it has shipped. The desktop renderer build is red on its own startup budget and drifted further over
-it between the two dates (1,317,605 bytes, then 1,324,279 against 1,250,000), which makes phase 0 the
-only urgent line in the folder and is the argument for the denylist it adds.
+the architecture decisions the first reads stopped short of. Phase 0 has shipped; nothing else has.
 
-Four reads and one set of decisions feed eleven phases:
+The renderer build was red on its own startup budget for two days and drifted further over it while it
+sat there (1,317,605 bytes, then 1,324,279, then 1,329,679 against 1,250,000), which was the argument
+for the denylist phase 0 added alongside the byte total. It is green now, at 974,732 bytes.
+
+Four reads, one set of decisions and one set of numbers feed eleven phases:
 
 - [analysis.md](./analysis.md) reads the desktop's surfaces: the startup payload measured from the
   built renderer, and the per-event costs of the agent transcript, the diff viewer, the node's request
@@ -25,12 +26,14 @@ Four reads and one set of decisions feed eleven phases:
   file, written for a reader with none of this context: why the mechanism is the way it is, with
   paths and numbers, and then what to change.
 - [refused.md](./refused.md) is what the programme decided not to do, so it stays decided.
+- [measurements.md](./measurements.md) is what each phase measured, dated, with the command. Phase 0
+  filled it first, and phase 3's decision about a wire contract turns on a figure in it.
 
 ## The phases, in one line each
 
 | Phase | What it is | Status |
 | --- | --- | --- |
-| [0](./phase-0-instrument-and-unblock.md) | Split the icon set out of startup, add a startup denylist to both hosts' build checks, and instrument boot, requests, and first paint on the node, the desktop, and the terminal client. | Not started. |
+| [0](./phase-0-instrument-and-unblock.md) | Split the icon set out of startup, add a startup denylist to both hosts' build checks, and instrument boot, requests, and first paint on the node, the desktop, and the terminal client. | **Shipped 2026-09-02.** Budget green at 974,732 B. Behaviour lives in [frontend.md](../../frontend.md) § Startup budget, [ui-design.md](../../ui-design.md) § Icons, [local-development.md](../../local-development.md) § Timing a cold start. Numbers in [measurements.md](./measurements.md). |
 | [1](./phase-1-registries-hold-loaders.md) | Every name-to-component table maps to a loader: the kit tables on both hosts, the iframe copy, the CodeMirror language table; the terminal client stops loading CodeMirror. | Not started. |
 | [2](./phase-2-paint-before-the-node.md) | The desktop window opens before the node boots: helper ready first, no awaits before `render`, paint from the persisted cache, immutable assets. | Not started. |
 | [3](./phase-3-the-node-listens-sooner.md) | The node's boot sheds its serial dead weight: background shell probe, idempotent bundle writes, concurrent plugin init; the listener before plugins, gated on a number. | Not started. |

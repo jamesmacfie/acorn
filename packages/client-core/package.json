@@ -8,7 +8,8 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "lint": "tsc --noEmit",
+    "icons": "node scripts/icon-census.mjs",
+    "lint": "node scripts/icon-census.mjs --check && tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

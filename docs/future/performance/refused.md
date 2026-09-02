@@ -107,9 +107,20 @@ so a stranger's bundle cannot leave a half-applied tree. The simulation is quadr
 security decision stays; phase 10 makes the algorithm linear when a loaded plugin's tree is measured
 slow.
 
-### A 503-until-ready node contract, unless phase 0 demands it
+### A 503-until-ready node contract
 
 Phase 3's gated half binds the listener before plugin init and answers plugin routes with
 `plugin_starting` until their plugin is ready. It is a wire contract every client and the MCP child
-would honour forever. It ships only if the phase 0 breakdown shows plugin init dominating the boot
-after concurrency; otherwise the listener stays where it is and this entry records why.
+would honour forever. It shipped only if the phase 0 breakdown showed plugin init dominating the boot
+after concurrency, taken as over 300 ms.
+
+**Refused on the numbers, 2026-09-02.** Phase 0 measured it: every plugin's `init` together is 46 ms on
+a first boot against a realistic data root and 24 ms warm, and no plugin declares a `ready` at all, so
+that pass is free (measurements.md § The node's boot breakdown). Binding the listener before plugin init
+would buy at most 46 ms of a 412 ms boot and cost a permanent wire contract.
+
+What the same measurement found instead is that **82% of the node's cold boot is `graph`** — 338 ms in
+`loadExternalPlugins`, scanning the data root's install directory, verifying each manifest, importing
+each bundle and running its migrations chain — and it runs in front of plugin init, so no amount of
+concurrency in the init pass touches it. Phase 3's target is the loader. Exit condition for revisiting
+this entry: a node whose plugin passes measure over 300 ms after the loader has been dealt with.

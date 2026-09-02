@@ -1,4 +1,5 @@
-// lucide's icon geometry, as this host's answer: nothing.
+// lucide's icon geometry, as this host's answer: nothing. Both halves of it — the census's eager map
+// and the full set behind the dynamic import — resolve here (../vite.config.ts § lucide-static).
 //
 // The fifth alias in the host switch (../vite.config.ts), and the second that removes a package rather
 // than swapping a component for one. `lucide-static/icon-nodes.json` is 706 KB of SVG path data, and

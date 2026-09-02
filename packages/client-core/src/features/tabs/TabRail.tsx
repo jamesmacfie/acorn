@@ -32,6 +32,7 @@ import ExclusiveSlotHost from '../../host/plugins/ExclusiveSlotHost'
 import { registerContextMenuItems, type TaskRowTarget } from '../../host/registries/panes/contextMenus'
 import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
 import IconPicker, { randomIconName } from '../../kit/components/inputs/IconPicker'
+import { loadIconNodes } from '../../kit/tokens/iconNodes'
 import './tabrail.css'
 import { RailTab } from './RailTab'
 import { taskOriginAppearance } from '../tasks/origin'
@@ -170,6 +171,11 @@ export default function TabRail() {
   const taskById = (id: string) => (query.data ?? []).find((task) => task.id === id)
 
   onMount(() => {
+    // Every row here can draw an icon the owner picked, which is any of Lucide's 1,756 rather than the
+    // 87 the chrome spells for itself, and only the eager 87 are in the startup chunk. Asked for as
+    // soon as the rail exists, so a picked icon is drawn rather than briefly spelled
+    // (kit/tokens/iconNodes.ts). Not awaited: the rail draws its rows either way.
+    void loadIconNodes()
     // Core's own row actions, registered rather than written inline (docs/plugins.md § Context
     // menus).
     const rowActions = registerContextMenuItems([

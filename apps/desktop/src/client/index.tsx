@@ -1,13 +1,13 @@
 /* @refresh reload */
 import { render } from 'solid-js/web'
 import { applyNodePlugins } from './activate'
-import { Show } from 'solid-js'
+import { createEffect, createRoot, Show } from 'solid-js'
 import { PersistQueryClientProvider } from '@tanstack/solid-query-persist-client'
 import { Route, Router } from '@solidjs/router'
 import App from './App'
 import '@acorn/client-core/infra/styles/styles.css'
 import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
-import { activeCacheId, activeNodeId, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
+import { activeCacheId, activeNodeId, nodeReady, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientFor } from '@acorn/client-core/infra/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/infra/node/wsClient.ts'
 import { sourceRouteContributions } from '@acorn/client-core/host/registries/sources/sources.ts'
@@ -22,6 +22,31 @@ import { watchNodeEvents } from '@acorn/client-core/infra/node/watchNodeEvents.t
 
 const noop = () => null
 
+// The renderer's half of a cold-start timeline. `performance.mark` always, because it costs nothing and
+// puts the same labels in the devtools performance panel; the console line only when asked, because this
+// console is the one a developer has open while using the app.
+//
+// The switch is localStorage rather than `ACORN_PERF`, which is the environment variable the node and
+// the helper read: there is no environment in a webview, and the renderer is loaded by Rust's custom
+// scheme rather than spawned. `localStorage.setItem('acorn.perf', '1')` and reload
+// (docs/local-development.md § Timing a cold start).
+//
+// `performance.now()` counts from this document's navigation, so these offsets are the renderer's own
+// and start where the helper's ready line left off.
+const bootPerf = (() => {
+  try {
+    return localStorage.getItem('acorn.perf') === '1'
+  } catch {
+    // A webview with site data blocked. Not a reason to fail a boot over.
+    return false
+  }
+})()
+const bootMark = (label: string): void => {
+  performance.mark(`acorn:${label}`)
+  if (bootPerf) console.log(`[renderer:boot] ${label} +${performance.now().toFixed(0)}ms`)
+}
+bootMark('script start')
+
 // A WS drop means the client missed events, and there is no cursor into history to replay from, so
 // the remedy is to mark everything stale and let whatever is on screen refetch
 // (docs/api-reference.md § Events). `refetchType: 'active'` is what keeps that from fanning out
@@ -33,12 +58,14 @@ wsOnReconnect(() => void clientFor(activeCacheId()).client.invalidateQueries({ r
 // shell's onMount side effects (session tracking, pollers) do not sit behind NodeGate's <Show>, so
 // rendering first would fire requests with no node selected.
 await selectActiveNode()
+bootMark('node selected')
 
 // …and then which of that node's plugins are on, before anything renders a pane switcher. A node switch
 // re-applies it (App.tsx), which is safe because the plugin host replaces a plugin's contributions rather
 // than appending them. Not awaited-and-fatal: `applyNodePlugins` swallows a read failure and leaves the
 // full contribution set active, because a node that cannot answer must not cost the owner their UI.
 await applyNodePlugins(activeNodeId() ?? undefined)
+bootMark('plugins applied')
 
 // Third-party plugin bundles, across the whole fleet rather than just the active node
 // (docs/plugins.md). Not awaited: it talks to every remembered node, and a fleet with an offline
@@ -108,3 +135,18 @@ render(
   ),
   document.getElementById('root')!,
 )
+
+// After the frame the tree above produced, which is the first thing the owner sees, and separately the
+// moment the node answered — the two are far apart today and phase 2 of the performance programme is
+// what pulls them apart further on purpose (docs/future/performance/decisions.md § Every host draws
+// first).
+requestAnimationFrame(() => bootMark('first paint'))
+createRoot((dispose) => {
+  createEffect(() => {
+    if (!nodeReady()) return
+    bootMark('nodeReady')
+    // One mark, not a subscription: the interesting event is the first time it goes ready, and a
+    // reconnect later is not a cold start. Deferred so the effect is not disposed from inside itself.
+    queueMicrotask(dispose)
+  })
+})

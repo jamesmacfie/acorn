@@ -526,9 +526,37 @@ unlike `.spin`: on a state icon the turn is the whole signal that something is r
 rotation is not the motion that setting exists to stop.
 
 The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
-names before and will again) and so brand marks stay out of `ICON_NAMES`, which `kit/components/inputs/IconPicker.tsx`
-enumerates for user-chosen task icons. Putting them in that picker is then a
-deliberate one-line decision rather than something that happens by accident.
+names before and will again) and so brand marks stay out of the Lucide name list
+`kit/components/inputs/IconPicker.tsx` enumerates for user-chosen task icons. Putting them in that
+picker is then a deliberate one-line decision rather than something that happens by accident.
+
+### Which names are drawn without waiting
+
+Lucide ships 1,756 icons and 706 KB of geometry, and step 2 above resolves a name at render time, so a
+bundler cannot see which names are reachable and used to put all of it in a chunk the window loads
+before it draws. The set is split in `kit/tokens/iconNodes.ts`:
+
+- **The eager half** is every Lucide name spelled as a literal in this repository's product code —
+  77 of them, about 14 KB — written to `iconNodes.eager.json` and carried by the chunk that holds
+  `Icon`. Those draw on the first pass with nothing awaited.
+- **The lazy half** is the rest, behind `() => import('lucide-static/icon-nodes.json')`. A name only
+  that half has takes the text fallback for one frame, then becomes an SVG when the map lands.
+
+The eager half is **generated, never hand-kept**. `packages/client-core/scripts/icon-census.mjs`
+scans `packages/`, `plugins/` and `apps/` for `name="…"`, `icon: '…'` and `glyph: '…'` literals that
+are Lucide names, and client-core's `lint` re-runs it in `--check` mode. Spell a new icon in the tree
+without regenerating the file and lint fails, naming the icon, because the alternative is that the
+icon ships in the lazy half and flashes as its own text. Run
+`pnpm --filter @acorn/client-core icons` and commit the result.
+
+Nothing is dropped. A person can assign any of the 1,756 to a task and a plugin manifest can name any
+one, and both choices are persisted, so a build-time census of what is reachable would break stored
+data. The split moves the bytes; it does not lose the names.
+
+Two consumers must never show that one frame, so they ask for the full map up front: `IconPicker`,
+whose whole purpose is the other 1,679, and `features/tabs/TabRail.tsx`, whose rows draw whatever
+icon the owner picked. The rest of the chrome only ever names an eager icon, so it never sees the
+miss. A new surface that draws a **stored** icon name should call `loadIconNodes()` when it mounts.
 
 **A mark belongs in core if and only if a core surface renders it.** Otherwise it belongs to the
 plugin that draws it. The reason is the text fallback: if core names `brand:x` and no plugin has
