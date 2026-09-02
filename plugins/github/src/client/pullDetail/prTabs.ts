@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
 import {
   activateTaskSignals, clientEvents, consumePaneIntent, onScopeEvicted, openTarget, pathForTask,
-  projectsOptions, tasksOptions, type Task, wsOnStatus,
+  projectsOptions, tasksOptions, type Task,
 } from '@acorn/plugin-api/client'
 import { pullDetailOptions, pullsOptions, taskPullsOptions } from '../queries'
 import { parsePullRef, type PullRef } from '../../shared/pullRef'
@@ -100,7 +100,12 @@ function build(task: Task) {
     consumePaneIntent(event.taskId, event.paneId)
     selectItem(event.intent.item)
   })
-  const offStatus = wsOnStatus(() => {
+  // `head:changed` for this task, not the old content-free `term:status` ping. Two pull-request keys
+  // were being invalidated on every terminal idle-to-working edge, on every connected client
+  // (docs/future/performance/phase-5-stop-the-event-amplifiers.md). What actually moves a pull is a
+  // commit landing in the task's worktree, which is what this event names.
+  const offStatus = clientEvents.on('head:changed', (event) => {
+    if (event.taskId !== task.id) return
     void queryClient.invalidateQueries({ queryKey: taskPullsKey(task.id) })
     const pull = primary()
     if (pull) void queryClient.invalidateQueries({ queryKey: pullsKey(pull.owner, pull.repo, 'open') })

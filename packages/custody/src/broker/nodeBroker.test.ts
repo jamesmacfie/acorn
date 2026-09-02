@@ -373,6 +373,36 @@ describe('broker WebSocket', () => {
     expect(frames).toEqual([{ channel: 'term:status', seq: 1 }])
   })
 
+  // A `ws:shed` marker is the node saying "you were behind, so I dropped some invalidation frames".
+  // Shed load, not lost data. Closing the socket here would re-attach every terminal and refetch every
+  // active query at the moment the node is busiest, which is the amplification phase 5 removed
+  // (node-core/server/transport/wsHub.ts, docs/terminal.md § Backpressure).
+  it('does not reset the socket on a shed marker, even one that skipped a number', async () => {
+    const { origin, server } = await listen(false)
+    let connections = 0
+    const wss = new WebSocketServer({ server, path: WS_PATH })
+    wss.on('connection', (socket) => {
+      connections += 1
+      socket.send(JSON.stringify({ channel: 'term:status', seq: 1 }))
+      socket.send(JSON.stringify({ channel: 'ws:shed', seq: 4 }))
+      socket.send(JSON.stringify({ channel: 'tasks:changed', seq: 5 }))
+    })
+
+    const frames: unknown[] = []
+    const broker = new NodeBroker({ frame: (_n, f) => frames.push(f), status: () => {} })
+    brokers.push(broker)
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+
+    await waitFor(() => frames.length >= 3, 'all three frames')
+    expect(frames).toEqual([
+      { channel: 'term:status', seq: 1 },
+      { channel: 'ws:shed', seq: 4 },
+      { channel: 'tasks:changed', seq: 5 },
+    ])
+    // The counter resynchronised on the marker, so the frame after it is not a second gap either.
+    expect(connections).toBe(1)
+  })
+
   it('tears down and reconnects a socket whose peer stops answering pings', async () => {
     const { origin, server } = await listen(false)
     let connections = 0

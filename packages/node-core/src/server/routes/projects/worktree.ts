@@ -8,7 +8,7 @@ import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSumma
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/terminal.ts'
 import { archiveTask, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
 import { runProcess } from '../../core/proc'
-import { broadcastStatus } from '../../notify'
+import { broadcastWorktreeStatusChanged } from '../../notify'
 import { buildSessionEnv } from '../../taskEnv'
 import { computeTaskStatuses, isDir, loadTask, projectForTask, projectSetup, resolveTaskCwd, taskRoot, toTaskRef } from '../../worktrees/taskWorktree'
 import { applyTaskChecks, collectTaskConcerns } from '../../pluginHost/taskChecks'
@@ -158,7 +158,7 @@ export const worktree = new Hono<AppEnv>()
     // Eager pre-create is best-effort: a stale/unavailable worktree throws now, and this route's job
     // is only to get the setup script in early. The surface that actually needs the cwd will say so.
     await resolveTaskCwd(db, task, project.path, null).catch((e) => console.warn('[worktree] pre-create skipped:', e instanceof Error ? e.message : e))
-    broadcastStatus() // rail/footer pick up the new worktree
+    broadcastWorktreeStatusChanged({ taskId }) // rail/footer pick up the new worktree
     return c.json({ ok: true })
   })
   // What every plugin has to say about archiving this task, asked once when the dialog opens. Each

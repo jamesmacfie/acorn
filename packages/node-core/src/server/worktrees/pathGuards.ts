@@ -30,5 +30,3 @@ export const isContainedPath = (root: string, candidate: string): boolean => {
   return c === r || c.startsWith(r + sep)
 }
 
-// A checkout is dirty when `git status --porcelain` prints anything.
-export const isDirty = (porcelain: string): boolean => porcelain.trim().length > 0

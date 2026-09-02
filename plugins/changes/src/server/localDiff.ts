@@ -6,7 +6,7 @@
 
 import { lstat, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { git, gitOrThrow, gitText } from '@acorn/plugin-api/node'
+import { git, gitOrThrow, gitText, invalidateWorktreeStatus, worktreeStatusText } from '@acorn/plugin-api/node'
 import type { LocalChange } from '@acorn/protocol/terminal.ts'
 
 
@@ -81,7 +81,11 @@ export function mergeNumstat(changes: LocalChange[], numstat: string, staged: bo
 }
 
 export async function localChanges(worktree: string): Promise<LocalChange[]> {
-  const stdout = await gitText(['status', '--porcelain=v2'], { cwd: worktree, timeoutMs: 15_000 })
+  // The shared status read, not a fourth `git status` for the same directory. Core's rail markers ask
+  // the same question of the same path, so both take whichever process ran in the last two seconds
+  // (@acorn/plugin-api/node § worktreeStatusText). `--branch` header lines are skipped by the parser
+  // below, which is why the two callers can share one command.
+  const stdout = (await worktreeStatusText(worktree)) ?? ''
   let changes = parsePorcelainV2(stdout)
   try {
     const [unstaged, staged] = await Promise.all([
@@ -129,7 +133,13 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
 export type GitActionResult = { ok: true } | { ok: false; reason: string }
 
 const run = async (worktree: string, args: string[]): Promise<GitActionResult> => {
+  // Every mutation this file makes goes through here, which makes it the one place that has to drop the
+  // coalesced `git status` for the path. Before the command, not after: a status read that starts while
+  // `git add` is running must not be able to store its pre-stage answer under the new timestamp
+  // (@acorn/plugin-api/node § worktreeStatusText).
+  invalidateWorktreeStatus(worktree)
   const result = await git(args, { cwd: worktree, timeoutMs: 30_000 })
+  invalidateWorktreeStatus(worktree)
   if (result.spawnError) return { ok: false, reason: result.spawnError }
   if (result.timedOut) return { ok: false, reason: 'git timed out' }
   if (result.code !== 0) return { ok: false, reason: (result.stderr || 'git failed').trim().slice(0, 400) }

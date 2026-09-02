@@ -12,7 +12,7 @@ import { externalRefForConnection, getConnection } from '../../integrations/conn
 import { ProviderOperationError } from '../../integrations/types'
 import { isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { integrationProviderRegistry } from '../../integrations/registry'
-import { getProject } from '../../projects'
+import { getProject, type ProjectRow } from '../../projects'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
 // and terminal_sessions, no user_id, but still auth-gated (it's a logged-in app). CRUD: create /
@@ -133,9 +133,16 @@ export const tasks = new Hono<AppEnv>()
       list.push(rowLink(l))
       byTask.set(l.taskId, list)
     }
-    const projects = new Map<string, Awaited<ReturnType<typeof getProject>>>()
-    for (const row of rows) {
-      if (row.projectId) projects.set(row.projectId, await getProject(db, row.projectId))
+    // One query for every project the list mentions, not one per task. This was `await getProject` in
+    // a loop over rows, so a hundred tasks in one project was a hundred identical `SELECT`s per list
+    // read, and the list is read on every `tasks:changed`
+    // (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+    const projectIds = [...new Set(rows.flatMap((row) => (row.projectId ? [row.projectId] : [])))]
+    const projects = new Map<string, ProjectRow>()
+    if (projectIds.length) {
+      for (const project of await db.select().from(schema.projects).where(inArray(schema.projects.id, projectIds))) {
+        projects.set(project.id, project)
+      }
     }
     return c.json(rows.map((r) => rowToTask(r, byTask.get(r.id) ?? [], r.projectId ? projects.get(r.projectId) ?? null : null)).filter((task): task is Task => task !== null))
   })

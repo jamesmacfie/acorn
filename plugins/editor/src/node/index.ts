@@ -22,7 +22,7 @@ export const editorPlugin = (): NodePlugin => {
         timeoutMs: 2_000,
       })
       routeDisposables = [
-        ctx.capabilities.provide(EDITOR, editorBridge(ctx.core, ctx.events.status, ctx.hooks)),
+        ctx.capabilities.provide(EDITOR, editorBridge(ctx.core, ctx.events.worktreeStatus, ctx.hooks)),
         ctx.capabilities.provide(SEARCH, searchBridge(ctx.core)),
       ]
       // `$EDITOR` in a throwaway PTY, for a reader who edits in terminal mode. It rides the one

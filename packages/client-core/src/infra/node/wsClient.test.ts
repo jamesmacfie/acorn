@@ -107,6 +107,44 @@ describe('wsClient', () => {
     expect(notices).toEqual(['repo-config-trust'])
   })
 
+  // Phase 5 split the old content-free `term:status` ping in two and gave what is left of it a plugin
+  // id (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+  it('hands a status subscriber the plugin id the frame named, and nothing when it named none', () => {
+    const named: (string | undefined)[] = []
+    client.wsOnStatus((pluginId) => named.push(pluginId))
+
+    bridge.emitFrame({ channel: 'term:status', pluginId: 'board' })
+    bridge.emitFrame({ channel: 'term:status' })
+    bridge.emitFrame({ channel: 'term:status', pluginId: 7 })
+
+    expect(named).toEqual(['board', undefined, undefined])
+  })
+
+  it('routes the two events the status ping was split into', () => {
+    const sessions: number[] = []
+    const worktrees: (string | null)[] = []
+    client.wsOnNodeEvent('terminal:sessions-changed', () => sessions.push(1))
+    client.wsOnNodeEvent('worktree:status-changed', (event) => worktrees.push(event.taskId))
+
+    bridge.emitFrame({ channel: 'terminal:sessions-changed' })
+    bridge.emitFrame({ channel: 'worktree:status-changed', taskId: 't1' })
+
+    expect(sessions).toEqual([1])
+    expect(worktrees).toEqual(['t1'])
+  })
+
+  // The node's hub shed invalidation frames because this socket was too far behind to take them. The
+  // remedy is the reconnect remedy, because nothing says which ones were dropped
+  // (node-core/server/transport/wsHub.ts).
+  it('treats a shed marker as a reason to refetch what is on screen', () => {
+    const reconnects: number[] = []
+    client.wsOnReconnect(() => reconnects.push(1))
+
+    bridge.emitFrame({ channel: 'ws:shed' })
+
+    expect(reconnects).toEqual([1])
+  })
+
   it('ignores a frame that is not channel-tagged', () => {
     const statuses: number[] = []
     client.wsOnStatus(() => statuses.push(1))

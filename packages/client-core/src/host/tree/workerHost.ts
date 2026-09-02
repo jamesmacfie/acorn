@@ -190,7 +190,10 @@ function start(input: AcquireInput): Live {
         return input.onRefused(`could not draw '${message.slot}': ${message.message}`)
       }
       case 'tree:batch': {
-        const bytes = batchBytes(message)
+        // The sandbox's own measurement, taken before it posted. Falls back to measuring here only for
+        // a bundle built before `bytes` existed (@acorn/protocol/tree/messages.ts says why trusting it
+        // gives a hostile bundle nothing).
+        const bytes = message.bytes ?? batchBytes(message)
         if (bytes > TREE_LIMITS.batchBytes) return input.onRefused(`dropped a ${bytes}-byte batch, over the ${TREE_LIMITS.batchBytes}-byte cap`)
         const slot = live.slots.get(message.slot)
         // A batch for a tree nobody is showing any more. Dropped silently: unmount and a batch in

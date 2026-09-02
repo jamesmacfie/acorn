@@ -43,6 +43,14 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - Revoking a device (`DELETE /v2/core/devices/:id`) closes that device's live sockets immediately and
   fails its in-flight requests. A device can revoke its own row; that is the same effect as unpairing
   itself.
+- A bearer that authenticated is remembered for 60 seconds, keyed by the SHA-256 of the whole token,
+  so a client holding a live socket does not run a `SELECT` and a constant-time compare per request
+  (`packages/node-core/src/server/auth/deviceTokens.ts`). Only a token that resolved is remembered: a
+  wrong secret and an unknown id read the row every time, so neither can become a warm entry.
+  **Revoking a device drops its entries before it notifies anyone.** Without that, a revoked bearer
+  would keep working for the rest of the window, which is a credential the owner believes they took
+  away. The 60-second window matches the socket sweep's, so the only way an entry can outlive its
+  device is a revoke this process never saw. `isActive`, which that sweep reads, is never cached.
 - There is no cookie or ambient browser credential, so CSRF middleware is not part of the protocol.
 
 `requireUser` is the single gate mounted over `/v2/*`. It accepts either credential kind, device or

@@ -343,13 +343,23 @@ export class NodeBroker {
     }
     connection.lastSeenAt = Date.now()
     const seq = (frame as { seq?: unknown }).seq
+    // `ws:shed` is the node saying "you were behind, so I dropped some invalidation frames". Shed
+    // load, not lost data: the node's hub takes a sequence number for the marker so there is normally
+    // no gap at all, and where there is one, closing would be the wrong answer twice over — a reconnect
+    // re-attaches every terminal and refetches every active query at the moment the node is busiest
+    // (docs/terminal.md § Backpressure). The frame is forwarded either way, and the renderer answers it
+    // by marking what it is showing stale.
+    const shed = (frame as { channel?: unknown }).channel === 'ws:shed'
     if (typeof seq === 'number') {
       // A gap means loss. There is no cursor into history to replay from, so the protocol's remedy is
       // to treat it as a reconnect and refetch.
       if (connection.seq !== 0 && seq !== connection.seq + 1) {
-        console.warn(`[broker] frame gap on ${connection.node.nodeId}: expected ${connection.seq + 1}, got ${seq}`)
-        connection.ws?.close()
-        return
+        if (!shed) {
+          console.warn(`[broker] frame gap on ${connection.node.nodeId}: expected ${connection.seq + 1}, got ${seq}`)
+          connection.ws?.close()
+          return
+        }
+        console.warn(`[broker] ${connection.node.nodeId} shed frames under load: expected ${connection.seq + 1}, got ${seq}`)
       }
       connection.seq = seq
     }

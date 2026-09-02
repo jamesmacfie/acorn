@@ -572,7 +572,24 @@ function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Recor
       return
     }
     const slot: MountedSlot = {
-      root: createRemoteRoot((ops) => port.postMessage({ kind: 'tree:batch', slot: id, ops })),
+      // Measured here, on the sandbox's own thread, and declared on the message. The host used to
+      // stringify every batch again to check it against the cap, on the thread that also has to draw
+      // (docs/plugins.md § The tree contract).
+      //
+      // Spelled out rather than imported from @acorn/protocol/tree/messages.ts, which is the same three
+      // lines: that module pulls zod in, and nothing this file imports may reach a stranger's bundle
+      // (tools/arch/boundaries.test.ts).
+      root: createRemoteRoot((ops) => {
+        const message = { kind: 'tree:batch', slot: id, ops }
+        let bytes: number | null = null
+        try {
+          bytes = new TextEncoder().encode(JSON.stringify(message)).byteLength
+        } catch {
+          // A cycle or a BigInt somewhere in the props. Post it without a measurement and let the host
+          // fail the same way it did before this field existed.
+        }
+        port.postMessage(bytes === null ? message : { ...message, bytes })
+      }),
       props,
       onProps: [],
       dispose: [],

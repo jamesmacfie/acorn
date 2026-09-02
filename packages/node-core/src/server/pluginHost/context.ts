@@ -34,7 +34,7 @@ import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { onWsBroadcast, registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../transport/wsHub'
 import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import { assertSubscribableVerb } from './emits'
-import { broadcastRepoConfigTrustNotice, broadcastStatus } from '../notify'
+import { broadcastRepoConfigTrustNotice, broadcastStatus, broadcastWorktreeStatusChanged } from '../notify'
 import { buildPluginRequestContext } from './requestContext'
 
 // What the loader learned about a plugin it took off disk, and the one flag that separates a loaded
@@ -352,7 +352,11 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
           wsBroadcast(frame)
         }
         : wsBroadcast,
-      status: broadcastStatus,
+      // Bound to the caller's own id, which is the whole fix for the chrome sweep: `bumpChrome` has
+      // held a per-plugin revision map all along and this was the one caller that told it nothing
+      // (docs/future/performance/decisions.md § Corrections to the first reads).
+      status: () => broadcastStatus(plugin),
+      worktreeStatus: (taskId) => broadcastWorktreeStatusChanged({ taskId }),
       repoConfigTrustNotice: broadcastRepoConfigTrustNotice,
       // The receive side (docs/plugins.md § Hearing another plugin). Scoped by the same
       // `permissions.events` grant the plugin's frames are scoped by, so there is one vocabulary and

@@ -25,6 +25,11 @@ export type StreamHandlers = {
   // task-scope check in onConnect: a task-scoped internal credential may only drive its own task's
   // streams, and only the engine that owns the sessions can answer that question.
   streamTaskId(id: string): string | null | undefined
+  // Stop and start the thing producing this stream's bytes. The hub calls this when a socket buffers
+  // past its mark, so a build spewing output slows down instead of having its frames thrown away
+  // (docs/terminal.md § Backpressure). Optional because not every stream has a producer that can be
+  // paused; a stream owner that offers none is shed instead, and told so.
+  flowControl?(id: string, paused: boolean): void
 }
 
 let handlers: StreamHandlers | null = null
@@ -58,6 +63,15 @@ type Conn = {
   // (docs/security.md § Transport and auth).
   internal?: InternalClaims
   missedPongs: number
+  // Streams this connection has asked the engine to pause, and whether it has already told the client
+  // that non-stream frames are being shed. Both are cleared when the socket drains or closes.
+  held: Set<string>
+  shedding: boolean
+  drainTimer: ReturnType<typeof setInterval> | null
+  // Where this socket's buffer is considered too far behind. Per connection rather than a module
+  // constant only so a test can drive the behaviour with a real socket instead of four megabytes of
+  // real traffic (see `maxBufferedBytes` on WsAuthDeps).
+  mark: number
 }
 const conns = new Set<Conn>()
 const hubDisposers = new WeakMap<Server, () => void>()
@@ -69,12 +83,91 @@ const hubDisposers = new WeakMap<Server, () => void>()
 const MISSED_PONGS_BEFORE_DEAD = 2
 
 const MAX_BUFFERED_BYTES = 4 * 1024 * 1024
+// Where a paused producer is let go again: half the mark rather than the mark itself, so a socket
+// hovering at the line does not pause and resume once per frame.
+const resumeBelow = (mark: number) => mark / 2
+// `ws` has no drain event, so the mark is polled. 50 ms is a frame or three of terminal output at the
+// engine's 16 ms coalescing tick, which is short enough that a resumed build does not stutter.
+const DRAIN_POLL_MS = 50
 
+// How many connections are holding each stream paused. A session attached to two clients is paused
+// while either of them is behind, and resumed only when both have caught up: `pause()` is a property
+// of the producer, not of one socket.
+const holds = new Map<string, number>()
+
+function holdStream(conn: Conn, id: string): void {
+  if (conn.held.has(id)) return
+  conn.held.add(id)
+  const next = (holds.get(id) ?? 0) + 1
+  holds.set(id, next)
+  if (next === 1) handlers?.flowControl?.(id, true)
+}
+
+function releaseStream(conn: Conn, id: string): void {
+  if (!conn.held.delete(id)) return
+  const next = (holds.get(id) ?? 1) - 1
+  if (next <= 0) {
+    holds.delete(id)
+    handlers?.flowControl?.(id, false)
+  } else {
+    holds.set(id, next)
+  }
+}
+
+function releaseAll(conn: Conn): void {
+  for (const id of [...conn.held]) releaseStream(conn, id)
+  conn.shedding = false
+  if (conn.drainTimer) clearInterval(conn.drainTimer)
+  conn.drainTimer = null
+}
+
+function watchDrain(conn: Conn): void {
+  if (conn.drainTimer) return
+  conn.drainTimer = setInterval(() => {
+    if (conn.ws.readyState !== conn.ws.OPEN || conn.ws.bufferedAmount <= resumeBelow(conn.mark)) releaseAll(conn)
+  }, DRAIN_POLL_MS)
+  conn.drainTimer.unref?.()
+}
+
+// One frame out, and the whole of this node's backpressure policy.
+//
+// It used to drop a frame when the socket buffered past the mark and increment `seq` anyway, so the
+// client saw a gap; the broker reads a gap as loss and closes the socket
+// (@acorn/custody/broker/nodeBroker.ts), reconnect re-attaches every terminal, and each re-attach
+// makes the node serialise a framebuffer while the client refetches its active queries. A build
+// spewing output was answered with more load, at the moment the node was busiest
+// (docs/future/performance/architecture.md § 2).
+//
+// Now: a stream frame over the mark is still sent, and its producer is paused until the socket drains.
+// Nothing is dropped, so nothing is lost. A frame with no producer to pause — an invalidation ping —
+// is shed, and a `ws:shed` marker takes its sequence number so the client is told it missed something
+// and the broker sees no gap. Later sheds in the same congested window consume no sequence number at
+// all, because one "you are behind" is the whole message.
 function sendFrame(conn: Conn, frame: WsServerFrame): void {
-  // Increment even when the frame is dropped, so the omission is visible to the client as a gap.
+  if (conn.ws.readyState !== conn.ws.OPEN) {
+    // Nobody will read this socket's sequence again. Kept incrementing so the counter still describes
+    // what was offered to a connection that is on its way out.
+    conn.seq += 1
+    return
+  }
+  if (conn.ws.bufferedAmount > conn.mark) {
+    const { id } = frame as { id?: unknown }
+    const streamId = frame.channel === 'term:out' && typeof id === 'string' ? id : null
+    if (streamId) {
+      holdStream(conn, streamId)
+      watchDrain(conn)
+      // and fall through: the frame goes out. Dropping bytes out of the middle of a terminal stream
+      // corrupts the screen, and there is no cursor to replay from.
+    } else {
+      watchDrain(conn)
+      if (conn.shedding) return
+      conn.shedding = true
+      conn.seq += 1
+      conn.ws.send(JSON.stringify({ channel: 'ws:shed', seq: conn.seq } satisfies WsServerWireFrame))
+      return
+    }
+  }
   conn.seq += 1
-  if (conn.ws.readyState !== conn.ws.OPEN) return
-  if (conn.ws.bufferedAmount > MAX_BUFFERED_BYTES) return
   conn.ws.send(JSON.stringify({ ...frame, seq: conn.seq } satisfies WsServerWireFrame))
 }
 
@@ -127,6 +220,10 @@ export type WsAuthDeps = {
   // How often the backstop sweep re-checks each connection's device. docs/api-reference.md § Pairing pins the
   // production value at 60s; tests inject a short one instead of faking timers.
   revocationCheckMs?: number
+  // Where a socket's buffer counts as too far behind, in bytes. Production is the 4 MiB constant above;
+  // a test sets it low so the pause and the resume can be driven over a real socket rather than by
+  // pushing megabytes through one.
+  maxBufferedBytes?: number
 }
 
 // What a successful upgrade resolved to. `deviceId` is what makes revocation actionable later: a
@@ -169,8 +266,8 @@ function mayDriveStream(conn: Conn, id: string | null): boolean {
   return handlers?.streamTaskId(id) === conn.internal.taskId
 }
 
-function onConnect(ws: WebSocket, authorized: Authorized): void {
-  const conn: Conn = { ws, sinks: new Map(), deviceId: authorized.deviceId, seq: 0, internal: authorized.internal, missedPongs: 0 }
+function onConnect(ws: WebSocket, authorized: Authorized, mark: number): void {
+  const conn: Conn = { ws, sinks: new Map(), deviceId: authorized.deviceId, seq: 0, internal: authorized.internal, missedPongs: 0, held: new Set(), shedding: false, drainTimer: null, mark }
   conns.add(conn)
   ws.on('pong', () => {
     conn.missedPongs = 0
@@ -223,6 +320,9 @@ function onConnect(ws: WebSocket, authorized: Authorized): void {
   })
   const cleanup = () => {
     if (!conns.delete(conn)) return // 'error' and 'close' can both fire, run once
+    // Before the detaches: a socket that died while it was behind must not leave the PTY it was
+    // holding paused forever. That would be a session that never produces output again.
+    releaseAll(conn)
     for (const [id, sink] of conn.sinks) handlers?.detach(id, sink)
     conn.sinks.clear()
     for (const handler of channelHandlers.values()) handler.onDisconnect(conn)
@@ -295,7 +395,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
         socket.destroy()
         return
       }
-      wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws, authorized))
+      wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws, authorized, deps.maxBufferedBytes ?? MAX_BUFFERED_BYTES))
     })
   }
   server.on('upgrade', onUpgrade)
@@ -315,8 +415,12 @@ export function disposeWsHub(server: Server): void {
 
 // Test-only reset so the module singleton doesn't leak connections between cases.
 export function _resetWsHub(): void {
-  for (const c of conns) c.ws.close()
+  for (const c of conns) {
+    if (c.drainTimer) clearInterval(c.drainTimer)
+    c.ws.close()
+  }
   conns.clear()
+  holds.clear()
   handlers = null
   channelHandlers.clear()
 }

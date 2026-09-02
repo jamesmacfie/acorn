@@ -5,7 +5,7 @@
 // platform concerns and live in client-core/features/tasks/taskBridge.ts.
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/protocol/terminal.ts'
 import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../shared/api'
-import { readJson, writeJson, wsAttach, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsWrite, type WorkflowNotice } from '@acorn/plugin-api/client'
+import { readJson, writeJson, wsAttach, wsOnNotice, wsOnWorkflowStepEvent, wsWrite, type WorkflowNotice } from '@acorn/plugin-api/client'
 
 export type TerminalApi = {
   list(): Promise<TerminalSession[]>
@@ -16,7 +16,6 @@ export type TerminalApi = {
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
   write(id: string, data: string): void
-  onStatus(cb: () => void): () => void
   attach(id: string, on: (m: ServerMsg) => void): () => void
   // Workflow commands use workflowClient's HTTP routes; notices and live step events use WebSocket.
   workflow: {
@@ -42,7 +41,6 @@ export const terminalApi = (): TerminalApi => {
     remove: (id) => post<boolean>(terminalSessionActionRoute(id, 'remove')),
     resize: (id, cols, rows) => post<boolean>(terminalSessionActionRoute(id, 'resize'), { cols, rows }),
     write: wsWrite,
-    onStatus: wsOnStatus,
     attach: wsAttach,
     workflow: { onNotice: wsOnNotice, onStepEvent: wsOnWorkflowStepEvent },
   }

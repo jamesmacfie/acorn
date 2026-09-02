@@ -32,7 +32,13 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       const registrations = registerTerminalChannel(db, ctx.core, {
         ...deps,
         seedTaskNotes: (task) => ctx.capabilities.get(NOTES_SEED_TASK)?.(task) ?? Promise.resolve(),
-        status: ctx.events.status,
+        // `terminal:sessions-changed`, not `ctx.events.status`. This fires on every idle-to-working
+        // edge, which is machine speed, and the old ping had six subscribers
+        // (docs/future/performance/phase-5-stop-the-event-amplifiers.md). Written as a frame here for
+        // the same reason `run:changed` is: `ctx.events` is the seam and a plugin does not
+        // deep-import server/notify.ts.
+        status: () => ctx.events.send({ channel: 'terminal:sessions-changed' }),
+        worktreeChanged: ctx.events.worktreeStatus,
         streams: ctx.events.streams,
       })
       routeDisposables = [

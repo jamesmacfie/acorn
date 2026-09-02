@@ -1,12 +1,40 @@
 // Renderer broadcasts shared by the main-process surfaces. They go over the authenticated WebSocket
 // hub and do nothing when no socket is connected.
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import { wsBroadcast } from './transport/wsHub'
 
-// Per-tab status is shown for sessions the renderer is not attached to, so a change broadcasts as a
-// content-free ping and the panel re-pulls the session list.
-export function broadcastStatus(): void {
-  wsBroadcast({ channel: 'term:status' })
+// "Re-read this plugin's chrome descriptors": rail rows, badges, collections, agent context. One
+// client-side consumer, `client-core/host/chrome/chromeData.ts`, and nothing else hears it.
+//
+// The plugin id is the whole point of the argument. Without it every ping refetched every plugin's
+// descriptor routes on every connected client, and a terminal flipping between busy and idle fired
+// one per edge (docs/future/performance/phase-5-stop-the-event-amplifiers.md). With it, a plugin
+// saying "my rows moved" costs one plugin's rows. Core's own pings still pass nothing, because a task
+// create or a worktree appearing can move anyone's, and they happen at human speed.
+//
+// The channel keeps its terminal name for wire compatibility; the terminal's own two meanings left it
+// for `terminal:sessions-changed` and `worktree:status-changed` below.
+export function broadcastStatus(pluginId?: string): void {
+  wsBroadcast(pluginId ? { channel: 'term:status', pluginId } : { channel: 'term:status' })
+}
+
+// A terminal session was created, exited, or flipped between working and idle. Content-free, like
+// `tasks:changed`: the session roster is a fetchable route and a payload would be a second projection
+// to keep in step.
+//
+// Split out of `term:status` because it is the one event on this node that fires at machine speed. A
+// build spewing output crosses the idle threshold repeatedly, and every subscriber to the old ping —
+// every plugin's chrome, a `git status` sweep over every worktree, two pull-request queries — answered
+// each edge. Only the session list needs to.
+export function broadcastTerminalSessionsChanged(): void {
+  wsBroadcast({ channel: 'terminal:sessions-changed' })
+}
+
+// Something under a task's worktree changed (@acorn/protocol/nodeEvents.ts). The dirty-marker half of
+// the old `term:status` ping, fired where the write happens rather than wherever a terminal happened
+// to go quiet.
+export function broadcastWorktreeStatusChanged(event: WorktreeStatusChangedEvent): void {
+  wsBroadcast({ channel: 'worktree:status-changed', ...event })
 }
 
 // Workflow gate / run-done notices for the renderer bell (docs/workflows.md); the memory-proposal

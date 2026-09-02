@@ -694,3 +694,129 @@ node that is not listening.
 - **`tasks:changed` against a real write.** `watchTaskChanges()` is installed and the shell now reads the
   client it invalidates, which `chrome.test.tsx` covers from the cache side, but nobody has created a
   task on the node from a second client and watched this rail move.
+
+## 2026-09-03 — phase 5
+
+Same machine, Node 24.11.0. Phases 0 (`17b03dbe`), 1 (`77ed2ebd`), 2 (`7c826ad6`), 3 (`facd8288`) and
+4 (`92983971`) had shipped.
+
+Every number here comes from a throwaway `*.test.ts` under the package it measures, driving the real
+modules with the real subprocesses and the real SQLite file, and counting at the seam. The two
+measurement files were deleted after they were read; the assertions that hold each number are in the
+permanent tests named below. What is **not** here is a reading of phase 0's request log, because that
+needs the packaged shell running with a person driving a terminal, and port 4317 is this machine's live
+instance. The section at the end says what that leaves unmeasured.
+
+### git processes per status ping
+
+One status ping, as the trace defines it: every connected client asks for the rail's dirty markers
+(one `git status --porcelain=v2 --branch` per active worktree) and, with a changes pane open, the
+local-changes list (`git status --porcelain=v2` plus two `git diff --numstat` per worktree). Two
+clients, four worktrees, one dirty file in each, real git.
+
+| | `git status` | git processes in total |
+| --- | --- | --- |
+| Before | 16 | 32 |
+| After | **4** | **20** |
+
+Four is one per worktree per two-second window, which is the phase's done-when line, and it does not
+move with the number of clients: the second client's eight reads all join or hit the first client's
+four runs. The `git diff --numstat` pair is untouched at 16, because this phase shares the status half
+of the local-changes read and nothing else. That is the residue worth knowing about: a changes pane on
+two clients is still 16 processes a ping, and coalescing them means caching a per-file stat list, not
+a status line.
+
+Held by `packages/node-core/src/server/worktrees/worktreeStatus.test.ts`: two concurrent callers run
+git once, a caller inside the window runs it zero times, an invalidated path runs it again, and a
+failure is never remembered.
+
+### The worktree-removal guard
+
+**It passes.** A file written 100 ms ago still blocks `removeWorktree` without `force`, with the cache
+warmed to "clean" immediately before the write. `worktreeDirty` passes `fresh: true`, which skips both
+the in-flight promise and the window, and the same test proves the bypass is real by counting two
+`git status` spawns for one read and one refusal issued together, where two reads would have been one.
+
+### SQLite reads in auth
+
+A hundred authenticated requests with the same device token, counting calls into `db.select` on the
+`devices` table.
+
+| | Reads |
+| --- | --- |
+| Before | 100 |
+| Inside one 60-second window | **1** |
+| Spread over 10 minutes | 10 |
+
+Zero on a warm token, which is the done-when line, and one per minute of continuous traffic. A revoke
+drops the entry before it notifies anyone, and a token that failed is never remembered, both held by
+`packages/node-core/src/server/auth/deviceTokens.test.ts`.
+
+### The task-list route
+
+`GET /v2/core/tasks`, counting calls into `db.select`. The route reads the tasks, their links, and
+every project they mention.
+
+| Rows | Before | After |
+| --- | --- | --- |
+| 1 project, 2 tasks | 4 | **3** |
+| 3 projects, 24 tasks | 26 | **3** |
+
+It was one project query per task, in a loop, including a repeat for every task sharing a project. The
+list is what every client refetches on `tasks:changed`, so on a hundred-task node that was a hundred
+identical statements per write per client. Held by
+`packages/node-core/src/server/routes/projects/tasks.test.ts`.
+
+### Query traffic on an idle client while a terminal streams — counted at the client, not the node
+
+A terminal producing output crosses the idle-to-working threshold repeatedly, and each crossing used to
+be one `term:status` frame with six subscribers. Counted as reads provoked per crossing, on a client
+with a task open, a changes pane, a PR pane and the agents sidebar:
+
+| Subscriber | Before, per edge | After, per edge |
+| --- | --- | --- |
+| Plugin chrome sweep (`chromeData.ts`) | one descriptor read per plugin per contribution | 0 |
+| Worktree status sweep (`taskStatus.ts`) | 1 read, 3 git processes per worktree behind it | 0 |
+| Session roster (`agentSessions.ts`) | 1 read | 1 read |
+| Pull-request keys (`prTabs.ts`) | 2 invalidations | 0 |
+| Workflow runs and steps (`AgentTaskSidebar.tsx`) | 1 read plus one per run | 0 |
+| Terminal client re-export | unused | removed |
+
+The session roster is the one thing that genuinely wanted this edge, and it is the only thing that
+still hears it, on `terminal:sessions-changed`. The dirty markers moved to `worktree:status-changed`,
+which the terminal engine fires on the human edges only: a command going quiet, a session exiting, a
+setup script finishing. So a `git commit` typed into a shell still moves the markers immediately, and a
+build spewing output does not.
+
+`chromeData.test.ts` holds the first row (a `terminal:sessions-changed` frame bumps no plugin's chrome
+revision, and a `term:status` naming one bumps only that one), and `wsClient.test.ts` holds the
+routing.
+
+### Backpressure
+
+Driven over a real socket with the client end paused and the hub's mark set to one byte, so the pause
+and the resume happen for real without pushing four megabytes through a loopback socket
+(`maxBufferedBytes` on `WsAuthDeps` exists for that and nothing else).
+
+Four one-megabyte `term:out` frames into a paused socket: the engine is asked to pause the
+pseudo-terminal once, not once per frame; all four frames arrive with `seq` 1, 2, 3, 4; the engine is
+asked to resume once the buffer drains. A socket terminated while holding a pause releases it. Three
+invalidation frames shed in the same congested window produce exactly one `ws:shed` marker and no gap
+at all, and `nodeBroker.test.ts` shows the broker forwarding a marker rather than closing the socket,
+including one that did skip a number.
+
+Before this, a frame over the mark was dropped and `seq` incremented anyway, so the broker read the gap
+as loss and closed the socket, and reconnect re-attached every terminal.
+
+### Not measured
+
+- **Phase 0's request log.** Every done-when line in the phase file is written in terms of
+  `ACORN_PERF=1`'s per-request lines and its git and SQLite histograms. Reading them means launching
+  the packaged shell with a person driving a terminal at full rate, and this machine's live instance
+  holds port 4317 and the data root's lock. The numbers above are the same quantities counted at the
+  seam instead, in-process, with real subprocesses and a real database. Nobody has read the histograms
+  against real traffic, which is still what phase 0 asked for and still owed. Phase 10 should take it.
+- **A deliberately saturated socket recovering without a reconnect, in the app.** Held as a unit over a
+  real socket, not observed on a real build's output.
+- **The `git diff --numstat` pair.** Two processes per worktree per client per ping, untouched, for the
+  reason in the first section.

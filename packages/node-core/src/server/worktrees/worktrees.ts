@@ -2,7 +2,8 @@ import { gitOrThrow } from '../core/git'
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import type { WorktreeResult } from '@acorn/protocol/terminal.ts'
-import { isContainedPath, isDirty, worktreeBranchDirName } from './pathGuards'
+import { isContainedPath, worktreeBranchDirName } from './pathGuards'
+import { invalidateWorktreeStatus, worktreeStatus, type WorktreeStatus } from './worktreeStatus'
 
 
 // Workspace worktrees. docs/workspaces-and-tasks.md § Worktrees and setup owns why they exist and
@@ -124,6 +125,7 @@ export async function ensureWorktree(
     } catch {
       return { ok: false, reason: 'Could not create the worktree.' }
     }
+    invalidateWorktreeStatus(path)
     return { ok: true, path, created: true }
   }
 
@@ -140,6 +142,7 @@ export async function ensureWorktree(
   } catch {
     return { ok: false, reason: `Could not create a worktree for ${branch}.` }
   }
+  invalidateWorktreeStatus(path)
   return { ok: true, path, created: true }
 }
 
@@ -179,32 +182,21 @@ export function copyWorktreeFiles(checkout: string, worktree: string, entries: s
   return { copied, warnings }
 }
 
+// Does this worktree have uncommitted changes?
+//
+// `fresh: true`, always. This is what `removeWorktree` below decides on, and a cached "clean" would
+// let a destructive deletion past the guard and lose somebody's uncommitted work. The cache in
+// ./worktreeStatus.ts serves reads and never a refusal, and this is the refusal
+// (docs/workspaces-and-tasks.md § Worktrees and setup).
 export async function worktreeDirty(path: string): Promise<boolean> {
-  try {
-    const { stdout } = await gitOrThrow(['status', '--porcelain'], { cwd: path, timeoutMs: 10_000 })
-    return isDirty(stdout)
-  } catch {
-    return false
-  }
+  return (await worktreeStatus(path, { fresh: true })).dirty
 }
 
 // Dirty flag and changed-file count for the rail and footer markers (docs/workspaces-and-tasks.md).
-// `--porcelain=v2 --branch` adds `# branch.oid` and `# branch.head` header lines ahead of the entries,
-// so one process answers both "is it dirty" and "where is HEAD" (docs/plugins.md § Hearing a core event
-// § HEAD moved). `branch` is null on a detached HEAD, `head` null when git failed or the tree is
-// unborn.
-export async function worktreePorcelain(path: string): Promise<{ dirty: boolean; count: number; branch: string | null; head: string | null }> {
-  try {
-    const { stdout } = await gitOrThrow(['status', '--porcelain=v2', '--branch'], { cwd: path, timeoutMs: 10_000 })
-    const lines = stdout.split('\n').filter((l) => l.trim().length > 0)
-    const header = (key: string) => lines.find((l) => l.startsWith(`# ${key} `))?.slice(key.length + 3).trim() ?? null
-    const count = lines.filter((l) => !l.startsWith('#')).length
-    const branch = header('branch.head')
-    const head = header('branch.oid')
-    return { dirty: count > 0, count, branch: branch === '(detached)' ? null : branch, head: head === '(initial)' ? null : head }
-  } catch {
-    return { dirty: false, count: 0, branch: null, head: null }
-  }
+// A read, so it takes the coalesced answer: one `git status` per worktree per two seconds however many
+// clients are asking (./worktreeStatus.ts).
+export async function worktreePorcelain(path: string): Promise<WorktreeStatus> {
+  return worktreeStatus(path)
 }
 
 // Remove a worktree through the main checkout. Refuses a dirty worktree unless force is set, which
@@ -219,5 +211,8 @@ export async function removeWorktree(checkout: string, path: string, force = fal
   } catch {
     return { ok: false, reason: 'Could not remove the worktree.' }
   }
+  // The directory is gone, so whatever we remembered about it is a lie about a path that may be
+  // recreated on the same name by the next `ensureWorktree`.
+  invalidateWorktreeStatus(path)
   return { ok: true, path }
 }

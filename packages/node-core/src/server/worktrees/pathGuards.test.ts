@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { branchSlug, isContainedPath, isDirty, isValidRepoIdent, worktreeBranchDirName, worktreeDirName } from './pathGuards'
+import { branchSlug, isContainedPath, isValidRepoIdent, worktreeBranchDirName, worktreeDirName } from './pathGuards'
 
 describe('worktrees', () => {
   it('builds the per-PR dir name', () => {
@@ -12,11 +12,6 @@ describe('worktrees', () => {
     expect(branchSlug('feat/login')).toBe('feat-login')
     expect(branchSlug('fix:@bug!')).toBe('fix--bug-')
     expect(branchSlug('keep.this_one-2')).toBe('keep.this_one-2')
-  })
-  it('treats any porcelain output as dirty', () => {
-    expect(isDirty('')).toBe(false)
-    expect(isDirty('\n  \n')).toBe(false)
-    expect(isDirty(' M src/a.ts\n?? b.ts')).toBe(true)
   })
 })
 

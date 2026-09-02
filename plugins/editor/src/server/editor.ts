@@ -3,7 +3,7 @@
 // re-derives the worktree root from the DB. Path confinement is `resolveInRoot` (docs/security.md §
 // Process, path, and configuration controls). Pure Node, so it works in dev:node too. Wired in
 // node/index.ts.
-import { BridgeError, type CoreServices, gitOrThrow, type PluginHookRegistry } from '@acorn/plugin-api/node'
+import { BridgeError, type CoreServices, gitOrThrow, invalidateWorktreeStatus, type PluginHookRegistry } from '@acorn/plugin-api/node'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 
@@ -20,9 +20,9 @@ async function confine(core: EditorCoreServices, taskId: string, relPath: string
   return abs
 }
 
-/** `ctx.events.status`, the content-free "go re-read" ping. Passed in rather than reached for, so this
- *  module stays plain Node and testable without a host. */
-export type EditorChanged = () => void
+/** `ctx.events.worktreeStatus`: "something under this task's worktree changed". Passed in rather than
+ *  reached for, so this module stays plain Node and testable without a host. */
+export type EditorChanged = (taskId: string) => void
 
 export const editorBridge = (
   core: EditorCoreServices,
@@ -80,11 +80,14 @@ export const editorBridge = (
     if (verdict && !verdict.ok) return { ok: false, reason: `${verdict.by}: ${verdict.reason}` }
     try {
       await writeFile(abs, verdict?.payload.text ?? content, 'utf8')
+      // The coalesced `git status` for this worktree is now a lie, and `changed` below is what makes
+      // every client re-read it (@acorn/plugin-api/node § worktreeStatusText).
+      invalidateWorktreeStatus(root)
       // Deliberately the ordinary invalidation ping and NOT an event: "file saved" stays refused
       // (docs/plugins.md § What is not an event). A save from another client used to move nothing on this one —
       // its tree, its dirty markers and its git status all went stale until something else pinged
       // (docs/plugins.md § Hearing a core event).
-      changed()
+      changed(taskId)
       return { ok: true }
     } catch (e) {
       return { ok: false, reason: e instanceof Error ? e.message : String(e) }

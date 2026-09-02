@@ -1,6 +1,12 @@
 # Phase 5: stop the event amplifiers
 
-Status: not started. Waits on phase 0 for the request log that shows the amplification.
+Status: shipped 2026-09-03, all six pieces plus both small ones. `term:status` is split three ways and
+carries a plugin id, the helper forwards the active node only, the hub pauses the producer instead of
+dropping a frame, the task-list N+1 is one `inArray`, worktree status is one `git status` per path per
+two seconds with the removal guard reading fresh, and a warm device token costs no `SELECT`.
+Numbers in [measurements.md](./measurements.md) § 2026-09-03 — phase 5. Two deviations from this file
+are recorded under "What changed shape" below, and phase 0's request log is still unread: every number
+was counted at the seam in-process instead, because reading it needs the packaged shell running.
 
 ## Goal
 
@@ -155,13 +161,49 @@ guard.
 - `ACORN_PERF` shows zero SQLite reads in auth on a warm token.
 - A worktree with a fresh uncommitted change is still refused removal.
 
+## What changed shape
+
+Two things in this file turned out to be the wrong way round, and one claim was already true.
+
+**`term:status` kept the chrome sweep, not the terminal.** This file said `term:status` stays "for the
+terminal client's own use and nothing else hears it". It went the other way, because of what the six
+subscribers turned out to be. The terminal client's own re-export
+(`plugins/terminal/src/client/terminalClient.ts`) had no callers at all, so it is deleted; the
+plugin-chrome sweep is the subscriber that remains, and the correction in
+[decisions.md](./decisions.md) settles that it should be fixed by passing a plugin id rather than by
+being moved. So `term:status` now means "re-read this plugin's chrome descriptors", carries an optional
+`pluginId`, and the terminal's two former meanings are `terminal:sessions-changed` and
+`worktree:status-changed`. Renaming the channel would be a wire change for a comment's worth of
+clarity; the name is documented in `docs/api-reference.md § WebSocket` instead.
+
+**The two plugin sidebars hear events that already existed.** This file said "the plugin channels for
+the two plugin sidebars". Neither needed a new channel. GitHub's pull-request tabs hear `head:changed`
+scoped to their own task, because a commit landing in the worktree is what moves a pull; the agents
+sidebar hears `workflow:notice` for its task and `workflow:step:event`, because those come from the
+plugin that changes the runs it draws. Both were already on the wire and already exported through
+`@acorn/plugin-api/client`.
+
+**The idempotency middleware already stops early.** It returns before `c.req.text()` for a missing
+key, a `GET`, a `HEAD`, a principal with no device id, a malformed key, and an unbound store. Nothing
+to do.
+
+**The worktree emitters needed a plugin seam.** `ctx.events.worktreeStatus(taskId)` is new on
+`PluginBroadcast`, because the changes and editor plugins were the two callers of `ctx.events.status`
+that meant "the files moved" rather than "my rows moved", and they hold the task id at the call site.
+`invalidateWorktreeStatus` is exported from `@acorn/plugin-api/node` beside it, for a plugin that wrote
+under a worktree itself.
+
 ## Verify before building
 
-- Re-derive the `term:status` consumer list with a grep for `wsOnStatus` and `onStatus`; it was six at
-  `17a9acdf`.
-- Confirm `bumpChrome(pluginId?)` still has the per-plugin map and the `wsOnStatus` caller still
-  passes nothing.
-- Confirm `worktreeDirty` still guards removal in `worktrees.ts` before writing the cache.
-- Confirm `node-pty`'s `pause`/`resume` at the pinned version.
-- Confirm `wsHub.ts` still increments `seq` on a dropped frame and `nodeBroker.ts` still closes on a
-  gap.
+All five checked at `92983971`, and all five held.
+
+- The `term:status` consumer list is six, exactly as `decisions.md` corrected it: the chrome sweep, the
+  worktree status sweep, the session roster, GitHub's pull-request tabs, the agents sidebar, and the
+  terminal client's re-export. The sixth has no callers.
+- `bumpChrome(pluginId?: string)` still keeps a per-plugin revision map, and `watchChrome` was still
+  the one caller passing nothing.
+- `worktreeDirty` still guards `removeWorktree`, on the `!force` branch, with the reason string the
+  dialog shows.
+- `node-pty` is 1.1.0 and `IPty` declares `pause(): void` and `resume(): void`.
+- `wsHub.ts` still incremented `seq` before the drop, with a comment saying the omission is meant to be
+  visible to the client as a gap, and `nodeBroker.receive` still closed the socket on one.
