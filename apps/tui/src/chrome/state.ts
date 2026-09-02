@@ -12,8 +12,10 @@ import { createSignal } from 'solid-js'
 
 /** The overlays the shell itself draws. A pane's own `Modal` is not one of these: it is a kit node
  *  and owns its own trap (../kit/grouping.tsx). `trust` is the one nobody opens by hand: the plugin
- *  distribution pass queues a bundle and the shell raises it (../plugins/TrustPrompt.tsx). */
-export type OverlayName = 'palette' | 'help' | 'quit' | 'trust' | 'workspace' | 'project'
+ *  distribution pass queues a bundle and the shell raises it (../plugins/TrustPrompt.tsx).
+ *  `notifications` is the bell's two sections, which on this host have no popover to live in
+ *  (./Inbox.tsx). */
+export type OverlayName = 'palette' | 'help' | 'quit' | 'trust' | 'workspace' | 'project' | 'notifications'
 
 // A stack rather than one slot, because the topmost is the one that owns the keys and closing it has
 // to reveal the one under it. In practice two are rarely open at once — `?` inside the palette types

@@ -3,6 +3,7 @@ import { Show } from 'solid-js'
 import { nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { StatusDot } from '../kit/showing'
 import { Line } from '../kit/cells'
+import { terminalBadge } from '../kit/notify'
 import { nodeTone } from './nodeState'
 import { routedProjectId } from './routing'
 import type { ShellModel } from './model'
@@ -48,6 +49,13 @@ export function Topbar(props: { model: ShellModel; nodeId: string }) {
         <box flexGrow={1} />
         <Show when={props.model.task()?.branch}>
           {(branch) => <Line role="muted">{branch()}</Line>}
+        </Show>
+        {/* What is waiting: the same number the desktop's bell puts on its pill and on the app icon,
+            written here through the platform seam's `setBadge` (../kit/notify.ts). The same glyph the
+            bell uses, so the two hosts read as one product. Zero draws nothing — a count that is
+            always there says nothing when it moves. `n` opens what is behind it (./Inbox.tsx). */}
+        <Show when={terminalBadge()}>
+          {(count) => <Line tone="warn">{`◔ ${count()}`}</Line>}
         </Show>
         <StatusDot tone={nodeTone(state())} label={state()} />
       </box>

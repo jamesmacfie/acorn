@@ -12,6 +12,8 @@ import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sourc
 import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { pendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
+import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
+import { initSessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
 import { Dynamic } from '@opentui/solid'
 import { Line } from '../kit/cells'
 import { EmptyState, Row, Rows } from '../kit/showing'
@@ -31,6 +33,7 @@ import { Topbar } from './Topbar'
 import { PaneBody, PaneStrip } from './PaneRow'
 import { Footer } from './Footer'
 import { Notifications, dismissNotifications } from './Notifications'
+import { Inbox, initInbox } from './Inbox'
 import { TrustPrompt } from '../plugins/TrustPrompt'
 import { Palette } from './Palette'
 import { CheatSheet } from './CheatSheet'
@@ -95,6 +98,21 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // One tick for every spinner on screen (../kit/tick.ts).
   onMount(() => onCleanup(startSpinner()))
 
+  // What is waiting, and the three things that feed it. The desktop's `App.tsx` mounts the same three
+  // and this is the same place in the same order.
+  //
+  // `initSessions` asks its own capability question — a node without the terminal plugin has no PTY
+  // sessions to watch and it returns a no-op — so there is no guard to repeat here. `initWorkflowNotices`
+  // is outside that question on purpose: main broadcasts gate and run-done events over `/v2/events`,
+  // and a node with no terminal still runs workflows. `initSystemNotices` is the channel this host
+  // answers with an escape sequence rather than an OS banner (../platform.ts, ../kit/notify.ts).
+  onMount(() => {
+    onCleanup(initSessions())
+    onCleanup(initWorkflowNotices())
+    onCleanup(initSystemNotices())
+  })
+  initInbox()
+
   // The command layer, tier 0: every keybinding the app and its plugins registered, over the command
   // registry, with the reader's own overrides applied. The scope questions are the shell's signals.
   onMount(() => {
@@ -132,6 +150,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.workspace.switch', title: 'Switch workspace', category: 'workspace', palette: true, run: () => openOverlay('workspace') },
       { id: 'core.project.switch', title: 'Switch project', category: 'workspace', palette: true, run: () => openOverlay('project') },
       { id: 'core.rail.toggle', title: 'Rail', category: 'navigation', palette: true, run: () => { setHidden((value) => !value) } },
+      { id: 'core.notifications.open', title: 'Notifications', hint: 'what needs you, and what happened', category: 'navigation', palette: true, run: () => openOverlay('notifications') },
       { id: 'core.quit', title: 'Quit', category: 'action', palette: true, run: quit },
     ])
     // Ctrl and not `meta`, which is acorn's spelling for the platform command key: a terminal
@@ -143,6 +162,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.workspace.switch', command: 'core.workspace.switch', description: 'Workspace', category: 'Global', defaultChord: 'w', when: 'global' },
       { id: 'core.project.switch', command: 'core.project.switch', description: 'Project', category: 'Global', defaultChord: 'p', when: 'global' },
       { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
+      { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
       { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
     ])
     onCleanup(() => { bindings.dispose(); commands.dispose() })
@@ -177,63 +197,71 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       onSizeChange={() => setCells(root?.width ?? 80)}
     >
       <Topbar model={model} nodeId={props.nodeId} />
-      <box flexDirection="row" flexGrow={1}>
+      {/* Hidden, not unmounted: opening an overlay must not tear down the rail and the pane
+          behind it and throw away their queries and their models. `visible` is yoga's
+          `display: none`, so the row gives up its height and the overlay below takes it.
+          That is what a cell host has instead of a floating layer, and it is the same thing
+          `TabPanel` does for a hidden tab. */}
+      <box flexDirection="row" flexGrow={1} visible={!topOverlay()}>
         {/* No rule between the column and the pane: each panel draws its own frame, and a rule beside
             a border is two lines saying one thing (../panel.tsx). */}
         <Show when={!hidden()}><Rail model={model} cells={railCells(cells())} /></Show>
         <box flexDirection="column" flexGrow={1}>
-          {/* Hidden, not unmounted: opening the palette must not tear down the pane behind it and
-              throw away its queries and its model. `visible` is what a cell host has instead of a
-              floating layer, and it is the same thing `TabPanel` does for a hidden tab. */}
-          <box flexDirection="column" flexGrow={1} visible={!topOverlay()}>
-            {/* The strip is a region only while a task gives it something to draw. Keeping the ref
-                outside this Show left an empty, focusable box in the source-view Tab cycle. */}
-            <Show when={model.task()}>
-              {(task) => (
-                <box
-                  flexShrink={0}
-                  flexDirection="column"
-                  ref={(element: BoxRenderable) => {
-                    setStrip(element)
-                    regionFocus(PANES, STRIP_ORDER)(element)
-                  }}
-                >
-                  <PaneStrip task={task()} focused={focusWithin(strip())} />
-                </box>
-              )}
-            </Show>
-            {/* Under `PanelBody`, because a browse source's component is a `lazy()` and a pending one
-                resolves to an empty string — which a cell host refuses outright, where the DOM would
-                have shrugged and drawn a text node nobody sees. The same guard the pane mount path
-                already has for the same reason (../layouts/index.ts, findings.md § A pending `lazy()`
-                region is an empty string). It carries the error boundary too, so a surface that
-                throws says what it threw rather than leaving the main panel blank (../panel.tsx). */}
-            <PanelBody>
-              <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>
-                {/* A source that declared regions has its list in the Browse panel already, so the
-                    main panel is its detail alone. One that did not keeps its whole surface here,
-                    which is every source that has not been migrated
-                    (client-core/host/registries/sources/sources.ts § regions). */}
-                <Match when={source()?.regions?.detail}>{(detail) => <SourceRegion><Dynamic component={detail()} /></SourceRegion>}</Match>
-                <Match when={source()?.component}>{(component) => <SourceRegion><Dynamic component={component()} /></SourceRegion>}</Match>
-                <Match when={model.task()}>{(task) => <PaneBody task={task()} />}</Match>
-              </Switch>
-            </PanelBody>
-          </box>
-          <Show when={topOverlay()}>
-            {(name) => (
-              <Switch>
-                <Match when={name() === 'palette'}><Palette model={model} /></Match>
-                <Match when={name() === 'help'}><CheatSheet /></Match>
-                <Match when={name() === 'workspace'}><WorkspacePicker model={model} /></Match>
-                <Match when={name() === 'project'}><ProjectPicker model={model} /></Match>
-                <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
-                <Match when={name() === 'trust'}><TrustPrompt /></Match>
-              </Switch>
+          {/* The strip is a region only while a task gives it something to draw. Keeping the ref
+              outside this Show left an empty, focusable box in the source-view Tab cycle. */}
+          <Show when={model.task()}>
+            {(task) => (
+              <box
+                flexShrink={0}
+                flexDirection="column"
+                ref={(element: BoxRenderable) => {
+                  setStrip(element)
+                  regionFocus(PANES, STRIP_ORDER)(element)
+                }}
+              >
+                <PaneStrip task={task()} focused={focusWithin(strip())} />
+              </box>
             )}
           </Show>
+          {/* Under `PanelBody`, because a browse source's component is a `lazy()` and a pending one
+              resolves to an empty string — which a cell host refuses outright, where the DOM would
+              have shrugged and drawn a text node nobody sees. The same guard the pane mount path
+              already has for the same reason (../layouts/index.ts, findings.md § A pending `lazy()`
+              region is an empty string). It carries the error boundary too, so a surface that
+              throws says what it threw rather than leaving the main panel blank (../panel.tsx). */}
+          <PanelBody>
+            <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>
+              {/* A source that declared regions has its list in the Browse panel already, so the
+                  main panel is its detail alone. One that did not keeps its whole surface here,
+                  which is every source that has not been migrated
+                  (client-core/host/registries/sources/sources.ts § regions). */}
+              <Match when={source()?.regions?.detail}>{(detail) => <SourceRegion><Dynamic component={detail()} /></SourceRegion>}</Match>
+              <Match when={source()?.component}>{(component) => <SourceRegion><Dynamic component={component()} /></SourceRegion>}</Match>
+              <Match when={model.task()}>{(task) => <PaneBody task={task()} />}</Match>
+            </Switch>
+          </PanelBody>
         </box>
       </box>
+      {/* The overlay layer is a sibling of the row, not a child of the pane column. An overlay
+          belongs to the screen: mounted in the column it drew in the pane's width with the rail
+          still beside it, so the trust prompt read as one more panel rather than the thing being
+          asked. `flexGrow` here keeps the footer at the bottom; the `Modal` inside stays at its
+          own content height (../kit/grouping.tsx). */}
+      <Show when={topOverlay()}>
+        {(name) => (
+          <box flexDirection="column" flexGrow={1}>
+            <Switch>
+              <Match when={name() === 'palette'}><Palette model={model} /></Match>
+              <Match when={name() === 'help'}><CheatSheet /></Match>
+              <Match when={name() === 'workspace'}><WorkspacePicker model={model} /></Match>
+              <Match when={name() === 'project'}><ProjectPicker model={model} /></Match>
+              <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
+              <Match when={name() === 'trust'}><TrustPrompt /></Match>
+              <Match when={name() === 'notifications'}><Inbox model={model} /></Match>
+            </Switch>
+          </box>
+        )}
+      </Show>
       <Notifications />
       <Footer nodeId={props.nodeId} />
     </box>

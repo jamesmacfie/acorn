@@ -1,6 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
 import { toast } from '@acorn/client-core/features/notifications/toast.ts'
+import { _resetNotices, pushNotice } from '@acorn/client-core/features/notifications/notifications.ts'
 import { hasFfi } from '../ffi'
 import { renderFixture } from '../harness'
 
@@ -158,6 +159,34 @@ describe.skipIf(!hasFfi)('the shell', () => {
     const cleared = await screen.frame()
     screen.done()
     expect(cleared).not.toContain('Saved.')
+  }, 30_000)
+
+  // The count and what is behind it (docs/tui.md § What is drawn bespoke). The number is the desktop
+  // bell's, written here through the platform seam's `setBadge`, and `n` opens the same two sections
+  // the bell's popover holds.
+  it('counts what is waiting in the topbar, and opens the inbox on n', async () => {
+    _resetNotices()
+    pushNotice({ taskId: 'task-1', kind: 'agent-needs-input', title: 'claude needs you', at: Date.now() })
+    pushNotice({ taskId: 'task-1', kind: 'agent-completed', title: 'claude finished', at: Date.now() })
+    const screen = await renderFixture({ width: 100, height: 28 })
+    const counted = await screen.until('\u25d4 2')
+    expect(counted.split('\n')[0]).toContain('\u25d4 2')
+
+    await screen.press('n')
+    const inbox = await screen.until('claude needs you')
+    screen.done()
+    _resetNotices()
+
+    expect(inbox).toContain('Notifications')
+    expect(inbox).toContain('claude finished')
+  }, 30_000)
+
+  it('draws no count when nothing is waiting', async () => {
+    _resetNotices()
+    const screen = await renderFixture({ width: 100, height: 28 })
+    const frame = await screen.frame()
+    screen.done()
+    expect(frame.split('\n')[0]).not.toContain('\u25d4')
   }, 30_000)
 
   it('asks before quitting a node it started, and does not when it only attached', async () => {
