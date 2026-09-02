@@ -47,7 +47,7 @@ const GROUPS = {
   },
   transport: {
     resolve: nodeTransport,
-    members: members<NodeTransport>()(['fetch', 'abort', 'send', 'onFrame', 'onStatus']),
+    members: members<NodeTransport>()(['fetch', 'abort', 'send', 'onFrame', 'onBytes', 'onStatus']),
   },
   fleet: {
     resolve: fleetBridge,

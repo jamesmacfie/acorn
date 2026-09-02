@@ -36,7 +36,9 @@ export type HelperOptions = {
   tokenCipher: TokenCipher
   // Where broker pushes go. The shell owns the target, because only it knows whether a renderer is
   // currently attached.
-  push: { frame(nodeId: string, frame: unknown): void; status(status: unknown): void }
+  // `bytes` is the one binary channel: terminal output, id-tagged (@acorn/protocol/ws.ts § The one
+  // binary frame).
+  push: { frame(nodeId: string, frame: unknown): void; bytes(nodeId: string, frame: Uint8Array): void; status(status: unknown): void }
   // A preview tunnel opened or closed. Only a shell that cannot inject a request header needs these.
   // The Tauri shell seeds the listener's secret into the preview webview's cookie store instead. See
   // previewTunnel.ts.
@@ -106,7 +108,7 @@ export function createHelper(options: HelperOptions): Helper {
     },
   })
 
-  const broker = new NodeBroker({ frame: options.push.frame, status: options.push.status })
+  const broker = new NodeBroker({ frame: options.push.frame, bytes: options.push.bytes, status: options.push.status })
   const fleet = new FleetStore(userDataDir, tokens)
   // Preview tunnels re-resolve their node from the fleet store on every connection, so a new
   // endpoint, token, or certificate applies to new connections. Restart, adoption, and forget tear

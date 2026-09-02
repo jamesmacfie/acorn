@@ -118,6 +118,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
     // renderer attached when a frame arrives.
     push: {
       frame: (nodeId, frame) => server?.push({ push: 'node-frame', nodeId, frame }),
+      bytes: (nodeId, frame) => server?.pushBytes(nodeId, frame),
       status: (status) => server?.push({ push: 'node-status', status }),
     },
     // The renderer is told and reloads itself. The node it was talking to has a new endpoint,

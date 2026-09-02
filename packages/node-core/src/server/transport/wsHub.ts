@@ -8,7 +8,7 @@ import type { Duplex } from 'node:stream'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { DeviceService } from '../auth/deviceTokens'
 import type { ServerMsg } from '@acorn/protocol/terminal.ts'
-import { WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame, wsFrameSchema } from '@acorn/protocol/ws.ts'
+import { encodeIdFrame, WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame, wsFrameSchema } from '@acorn/protocol/ws.ts'
 import { claimUpgrade } from './upgradeClaim'
 
 // A sink is one connection's outlet for a session's ServerMsg frames. terminal.ts adds and removes it
@@ -171,6 +171,49 @@ function sendFrame(conn: Conn, frame: WsServerFrame): void {
   conn.ws.send(JSON.stringify({ ...frame, seq: conn.seq } satisfies WsServerWireFrame))
 }
 
+// Terminal output, as one binary frame instead of an escaped JSON string.
+//
+// The bytes were bytes when the pseudo-terminal produced them, and this used to be the one channel that
+// re-escaped them once per attached socket and again on the helper hop, at 60 frames a second while a
+// build talks (docs/future/performance/architecture.md § 3). The frame is the session id and then the
+// payload (@acorn/protocol/ws.ts § The one binary frame); the desktop broker forwards it without
+// looking inside, and the renderer's bridge tags it with the node id.
+//
+// Everything the JSON path does is still done here: the same backpressure decision, and the same
+// refusal to drop bytes out of the middle of a stream. What it does not do is take a sequence number,
+// because output has never been part of the invalidation channel's gap detection.
+const encoder = new TextEncoder()
+// One encode per broadcast rather than one per socket: the engine hands the same ServerMsg to every
+// sink attached to a session, so the frame is built by whichever sink asks first. Weak, so a message
+// nobody holds any more takes its frame with it.
+const encodedOutput = new WeakMap<ServerMsg, Uint8Array | null>()
+
+function outputFrame(id: string, msg: ServerMsg & { type: 'output' }): Uint8Array | null {
+  let frame = encodedOutput.get(msg)
+  if (frame === undefined) {
+    frame = encodeIdFrame(id, encoder.encode(msg.data))
+    encodedOutput.set(msg, frame)
+  }
+  return frame
+}
+
+function sendStreamFrame(conn: Conn, id: string, msg: ServerMsg): void {
+  // `ready`, `exit` and `error` are one frame per attach or per lifetime, and they carry a session
+  // object rather than bytes. They stay JSON.
+  if (msg.type !== 'output') return sendFrame(conn, { channel: 'term:out', id, msg })
+  const frame = outputFrame(id, msg)
+  // An id this frame cannot spell (@acorn/protocol/ws.ts). The JSON path still works, so say it that
+  // way rather than dropping a terminal's output.
+  if (!frame) return sendFrame(conn, { channel: 'term:out', id, msg })
+  if (conn.ws.readyState !== conn.ws.OPEN) return
+  if (conn.ws.bufferedAmount > conn.mark) {
+    holdStream(conn, id)
+    watchDrain(conn)
+    // and fall through, for the reason sendFrame gives: there is no cursor to replay a hole from.
+  }
+  conn.ws.send(frame, { binary: true })
+}
+
 // Is this connection confined to a single task? The socket-level twin of requireUser.ts's
 // `isTaskConfined`, kept here rather than imported because that one reads a Hono context and this one
 // reads a Conn: same rule, two different carriers of the same claims.
@@ -295,7 +338,7 @@ function onConnect(ws: WebSocket, authorized: Authorized, mark: number): void {
         if (typeof data === 'string') handlers.input(streamId, data)
       } else if (frame.channel === 'term:attach') {
         if (conn.sinks.has(streamId)) return
-        const sink: StreamSink = (msg) => sendFrame(conn, { channel: 'term:out', id: streamId, msg })
+        const sink: StreamSink = (msg) => sendStreamFrame(conn, streamId, msg)
         conn.sinks.set(streamId, sink)
         handlers.attach(streamId, sink) // engine restores the canonical screen before queued live frames
       } else if (frame.channel === 'term:detach') {

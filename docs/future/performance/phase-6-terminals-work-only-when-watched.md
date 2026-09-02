@@ -1,7 +1,13 @@
 # Phase 6: terminals do work only when watched
 
-Status: not started. Waits on phase 5's `seq` accounting, because the reconnect this phase makes rare
-is the one phase 5 stops triggering.
+Status: **shipped 2026-09-03**, whole. The emulator is built by the first attach and disposed by the
+last detach, the ring is a chunk list with a byte budget, every open terminal tab keeps its surface with
+the inactive ones hidden, and `term:out` is a binary frame on the node-to-helper and helper-to-renderer
+hops. Phase 5's `seq` accounting had shipped, so the reconnect this phase relies on being rare is rare.
+The `Done when` line about the phase 0 histogram was answered the other way the phase file allows: the
+parser is counted at the seam in a test rather than sampled through `ACORN_PERF=1`, because phase 0's
+histograms are on the git and SQLite seams in node-core and `terminal.write` is inside a plugin. Numbers
+in [measurements.md](./measurements.md) § 2026-09-03 — phase 6.
 
 ## Goal
 
@@ -114,3 +120,40 @@ The renderer's bridge decodes the id and hands the bytes to the subscriber for t
 - Confirm `TerminalPanel.tsx` still mounts one tab with `keyed`.
 - Confirm phase 5's `seq` accounting shipped; without it, the reconnect this phase relies on being
   rare is still common.
+
+## What the checks turned up
+
+All three held, with one thing worth writing down.
+
+- **`attach()` is still the emulator's only consumer.** `TerminalDisplay` is named by `terminal.ts` and
+  by its own test and nowhere else, and `screen.snapshot()` is reached from `attach` alone.
+- **`plugins/agents` has not grown a screen reader**, but it does run `@xterm/headless` of its own.
+  `plugins/agents/src/server/usage/processRunner.ts` builds one over a throwaway pseudo-terminal to read
+  a provider's usage screen. That is its own emulator over its own process, not a reader of a terminal
+  session's display, so this phase does not touch it and the claim stands as written.
+- **`TerminalPanel.tsx` still mounted one tab with `keyed`**, on `activeId()`.
+
+Two decisions the phase file left open:
+
+- **`<For>` over the session ids, not over the session rows and not `<Index>`.** The Design section says
+  "`<For>` with a `hidden` attribute", and `<For>` is right — but only over the ids. The roster is
+  replaced wholesale by every `refreshSessions`, so `<For>` over the rows compares new objects and
+  rebuilds every surface, which is the opposite of the phase's point; `<Index>` keys by position, so
+  closing the first tab would hand the second session to the first tab's live xterm. An id is a string,
+  which `<For>` compares by value, so a refresh that changed nothing keeps every element.
+  `TerminalPanel.test.tsx` fails under either alternative.
+- **A surface builds its xterm on the first frame it is shown on, rather than when it mounts.** xterm
+  measures its cell size from a laid-out box and a `display: none` box has none, so mounting every tab's
+  xterm at once would have measured them all at zero. Deferring also means a tab nobody opens costs
+  nothing. After the first showing the xterm is kept, which is the whole phase.
+
+Out of scope and left alone as the file says: the agents plugin's ring reads and the terminal client's
+third parse into `EmbeddedTerminalRenderable`.
+
+One line in the Scope is wrong and is worth correcting rather than quietly satisfying. **The `$EDITOR`
+and Docker exec rectangles do not "inherit the change".** They are not sessions in the terminal engine:
+each is a throwaway pseudo-terminal on its own plugin-owned channel (`editor:pty`, `docker:exec`), with
+no `TerminalDisplay`, no ring, and no `term:out` frame. So they never paid the cost this phase removes
+and they do not get the binary frame either — their output is still JSON on their own channel. Nothing
+regresses for them, and a later phase that wants their bytes on the binary frame has the format to
+reuse. What they do inherit is `hidden` on the kit's rectangle, which neither passes.

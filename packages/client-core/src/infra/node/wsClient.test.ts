@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { setActiveNode } from './activeNode'
+import { encodeIdFrame } from '@acorn/protocol/ws.ts'
 import { registerWsChannel } from './wsChannels'
 
 // The renderer no longer owns a socket, so this fakes the broker rather than a WebSocket: the
@@ -9,12 +10,17 @@ import { registerWsChannel } from './wsChannels'
 type Bridge = {
   sent: { nodeId: string; frame: unknown }[]
   emitFrame(frame: unknown, nodeId?: string): void
+  // Terminal output, which is bytes rather than a frame (@acorn/protocol/ws.ts § The one binary
+  // frame). The host has already peeled its own node id off; what arrives here still names the
+  // session.
+  emitBytes(frame: Uint8Array, nodeId?: string): void
   emitStatus(state: NodeStatus['state'], nodeId?: string): void
 }
 
 function installBridge(): Bridge {
   const sent: { nodeId: string; frame: unknown }[] = []
   const frameHandlers: ((nodeId: string, frame: unknown) => void)[] = []
+  const byteHandlers: ((nodeId: string, frame: Uint8Array) => void)[] = []
   const statusHandlers: ((status: NodeStatus) => void)[] = []
   // `nodeFetch` is what makes the host's transport exist as far as platform/index.ts is concerned:
   // it is the "there is a broker" discriminator, so a fake that pushes frames has to answer
@@ -25,6 +31,10 @@ function installBridge(): Bridge {
     nodeSend: (nodeId: string, frame: unknown) => sent.push({ nodeId, frame }),
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => {
       frameHandlers.push(cb)
+      return () => {}
+    },
+    onNodeBytes: (cb: (nodeId: string, frame: Uint8Array) => void) => {
+      byteHandlers.push(cb)
       return () => {}
     },
     onNodeStatus: (cb: (status: NodeStatus) => void) => {
@@ -38,6 +48,7 @@ function installBridge(): Bridge {
     // The nodeId defaults to the active node, so every existing case reads as before; the fleet cases
     // below pass a second node explicitly.
     emitFrame: (frame, nodeId = 'n1') => frameHandlers.forEach((cb) => cb(nodeId, frame)),
+    emitBytes: (frame, nodeId = 'n1') => byteHandlers.forEach((cb) => cb(nodeId, frame)),
     emitStatus: (state, nodeId = 'n1') => statusHandlers.forEach((cb) => cb({ nodeId, state })),
   }
 }
@@ -68,6 +79,34 @@ describe('wsClient', () => {
 
     bridge.emitFrame({ channel: 'term:out', id: 's1', msg: { type: 'output', data: 'ring' } })
     expect(output).toEqual([{ type: 'output', data: 'ring' }])
+    off()
+  })
+
+  // Phase 6 of the performance programme: output arrives as bytes and reaches the same subscriber
+  // (docs/future/performance/phase-6-terminals-work-only-when-watched.md).
+  it('routes a binary frame to the session it names, decoded', () => {
+    const session = '11111111-2222-3333-4444-555555555555'
+    const output: unknown[] = []
+    const off = client.wsAttach(session, (m) => output.push(m))
+
+    bridge.emitBytes(encodeIdFrame(session, new TextEncoder().encode('ünïcøde 🌰\r\n'))!)
+    // …and one for a session nothing is subscribed to, which is dropped rather than thrown.
+    bridge.emitBytes(encodeIdFrame('99999999-8888-7777-6666-555555555555', new TextEncoder().encode('elsewhere'))!)
+    // …and a frame too short to hold an id at all.
+    bridge.emitBytes(new Uint8Array([1, 2, 3]))
+
+    expect(output).toEqual([{ type: 'output', data: 'ünïcøde 🌰\r\n' }])
+    off()
+  })
+
+  it('drops a binary frame from a node this client is not looking at', () => {
+    const session = '11111111-2222-3333-4444-555555555555'
+    const output: unknown[] = []
+    const off = client.wsAttach(session, (m) => output.push(m))
+
+    bridge.emitBytes(encodeIdFrame(session, new TextEncoder().encode('from n2'))!, 'n2')
+
+    expect(output).toEqual([])
     off()
   })
 

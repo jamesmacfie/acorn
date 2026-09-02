@@ -820,3 +820,99 @@ as loss and closed the socket, and reconnect re-attached every terminal.
   real socket, not observed on a real build's output.
 - **The `git diff --numstat` pair.** Two processes per worktree per client per ping, untouched, for the
   reason in the first section.
+
+## 2026-09-03 — phase 6
+
+Same machine, Node 24.11.0. Phases 0 (`17b03dbe`), 1 (`77ed2ebd`), 2 (`7c826ad6`), 3 (`facd8288`),
+4 (`92983971`) and 5 (`28781ae6`) had shipped.
+
+Every number here comes from a throwaway `*.test.ts` or `*.test.tsx` under the package it measures,
+driving the real modules — the real `@xterm/headless`, the real panel in jsdom — and counting at the
+seam. Both measurement files were deleted after they were read; the assertions that hold each
+behaviour are in the permanent tests named below. The "before" figures for the tab switch were taken
+by checking the two client files out at `92fef8e0` and running the same measurement against them, not
+by reading the old code.
+
+The corpus for the node-side numbers is one megabyte of real terminal output: 4,272 bytes of
+`git log --color --graph --oneline` repeated, with a full-screen redraw frame every third chunk
+(cursor hide, clear, box-drawing borders, a quoted string and a backslash — the shape an agent TUI
+emits). 339 chunks, 1,004,005 bytes.
+
+### Parser work for an unwatched session
+
+The whole point of the phase. Same bytes, nobody attached.
+
+| | Time |
+| --- | --- |
+| Before: an emulator per session, running from the moment it was spawned | **492 ms** |
+| After: the ring alone, no emulator built | **2.8 ms** |
+
+Emulators built for an unwatched session: **0**, which is the assertion rather than the timing.
+`plugins/terminal/src/server/terminalDisplay.test.ts` holds it, along with the last detach disposing
+and a cold attach rebuilding byte for byte the same visible screen a session that emulated throughout
+would have shown.
+
+Phase 0 put its `ACORN_PERF=1` histograms on the git and SQLite seams, and `terminal.write` is inside a
+plugin rather than in node-core, so this is the phase file's other option taken: the parser is counted
+at the seam in a test rather than sampled through a histogram. What a histogram would add is a reading
+against a person's real session, which is the same thing phase 5 left owed and phase 10 should take.
+
+### What an attach costs the node
+
+| | Time |
+| --- | --- |
+| Before, per tab switch: serialize a warm framebuffer | 17.8 ms |
+| After, per first visit to a tab: replay the ring and serialize | 20.0 ms |
+
+The same work, and the point is how often it happens: it used to be once per switch, for ever, and it
+is now once per tab per drawer session.
+
+### Network per tab switch
+
+Counted in jsdom with the real panel and the real surface, xterm stubbed, four switches between two
+sessions.
+
+| | Before | After |
+| --- | --- | --- |
+| First visit to a tab | 1 `POST …/resize`, 1 `term:attach`, 1 xterm built | same |
+| Every switch after that | 1 `POST …/resize`, 1 `term:detach`, 1 `term:attach`, 1 xterm disposed, 1 built | **nothing** |
+
+Over four switches: **4 HTTP requests and 8 WebSocket frames before, 1 and 1 after** — and the one is
+the second tab's own first visit, not a switch. Held by
+`plugins/terminal/src/client/TerminalPanel.test.tsx`, which also fails if the list goes back to
+iterating the session rows or moves to `<Index>`.
+
+### `term:out` wire volume
+
+Bytes on the wire for the same corpus, per flush, one flush per coalescing tick. The node hop is the
+node's socket to the desktop broker; the helper hop is the broker's forward to the renderer, which used
+to re-wrap the JSON frame in a push and stringify it again.
+
+| Corpus | Node hop | Helper hop | Encodes, 3 sockets |
+| --- | --- | --- | --- |
+| Mixed, as above | 1,196,783 → **1,016,209 B** (15.1%) | 1,223,225 → **1,028,413 B** (15.9%) | 1,017 → **339** |
+| The full-screen redraw frames alone | 57,743 → **42,601 B** (26.2%) | 66,557 → **46,669 B** (29.9%) | |
+| The plain-text chunks alone | 1,139,040 → **973,608 B** (14.5%) | 1,156,668 → **981,744 B** (15.1%) | |
+
+So the saving is a sixth of the bytes on ordinary output and nearly a third on the escape-heavy frames
+a full-screen agent draws, which is the traffic that actually arrives at 60 frames a second. The
+`payload` itself is 1,004,005 B, so the after figures are the payload plus 36 bytes of id per frame and
+nothing else.
+
+The **encodes** column is the part that does not show up in bytes: the node used to `JSON.stringify` the
+frame once per attached socket, and now builds one frame per broadcast whatever the socket count.
+`packages/node-core/src/server/transport/wsHub.test.ts` holds that two attached sockets receive
+byte-identical frames, that a binary frame takes no sequence number, and that an id the fixed-width
+field cannot spell falls back to the JSON frame rather than going missing.
+
+### Not measured
+
+- **The app.** Every number above is in-process. Nobody has watched a real build spew output through
+  the packaged shell with these changes in, because this machine's live instance holds port 4317 and
+  the data root's lock. The smoke checklist in docs/testing.md is what covers that, by hand.
+- **Memory per open tab.** Keeping an xterm per tab is the trade the phase accepts, and nobody has
+  measured what one costs. jsdom's stub is not an xterm, and a real figure needs the app.
+- **Scrollback loss in practice.** A cold attach rebuilds from 256 KB, so a program whose screen
+  depends on older bytes redraws from its next output
+  ([refused.md](./refused.md) § Scrollback beyond the ring). What that looks like for a real agent TUI
+  after a long build has not been watched.

@@ -29,6 +29,45 @@ The Node batches PTY output before it goes over the wire: buffered bytes flush a
 roughly every 16 milliseconds (about one frame at 60 frames per second) instead of one frame per PTY
 chunk, so a busy TUI does not send a frame for every keystroke echo.
 
+## The screen, and who pays for it
+
+**There is an emulator only while somebody is watching.** The canonical screen is a real terminal
+framebuffer on the node — `@xterm/headless` with a thousand lines of scrollback — because a
+pseudo-terminal's output is a sequence of cursor operations rather than a screen that can be replayed
+from an arbitrary offset. The first client to attach builds one and replays the session's raw ring into
+it; the last client to detach disposes it. A session nobody is looking at fills its ring and nothing
+else.
+
+It used to run from the moment the session was spawned, for every session, and the only thing that ever
+read it was an attach. So a background build paid continuous ANSI parsing to produce a screen that
+might never be asked for: a megabyte of a build's output is about 470 ms of parsing, against 3 ms to
+keep the ring alone.
+
+**The price is scrollback, and it is deliberate.** A cold attach can only rebuild from what the ring
+still holds, so history older than 256 KB is gone and an alternate-screen program whose state depends
+on older bytes redraws from its next output. If a class of session turns up where the full history
+matters, the answer is a bigger ring for that class, not a parser running for ever
+(`docs/future/performance/refused.md` § Scrollback beyond the ring).
+
+**The ring is a list of chunks, not a string.** 256 KB of recent raw output, kept as the buffers it
+arrived in with a running byte count, dropping from the head once the budget is spent. It used to be
+one string rebuilt as `ring = trim(ring + chunk)` on every chunk the pseudo-terminal produced, which
+copies the whole buffer per chunk to serve readers that want the last four or ten kilobytes of it. A
+reader concatenates only the tail it asks for, and `tail` joins the buffers before decoding, so a
+character split by a chunk boundary still reads back whole. Two things read it besides the attach
+rebuild: the blocked-prompt scan over the last 4,000 bytes and the transcript tail over the last
+10,000. Both are heuristics over recent output, and both now count in bytes where they used to count
+in UTF-16 code units.
+
+**Output crosses the wire as bytes.** `term:out` is the one channel on the authenticated socket that is
+not JSON. A frame is a fixed-width session id and then the pseudo-terminal's bytes verbatim
+(`packages/protocol/src/ws.ts` § The one binary frame), built once per broadcast rather than once per
+attached socket, and forwarded through the desktop broker without being read. The ids are UUIDs; an id
+that does not fit the field falls back to the JSON frame, so a stream owner with a different naming
+scheme still works. A binary frame carries no `seq` and consumes none, because sequence numbers belong
+to the invalidation channel and output has never been part of it. `ready`, `exit` and `error` carry a
+session object rather than bytes and stay JSON.
+
 Every session, terminal or managed, reports its state from one shared vocabulary, `AgentState`
 (`packages/protocol/src/terminal.ts`): `starting`, `working`, `waiting`, `idle`, and `blocked`. Every
 agent surface reuses it verbatim, so no other module redeclares it. A transport reports only the
@@ -147,6 +186,23 @@ The terminal drawer is a bottom task surface with tabs, task-local last-active s
 launchers, status badges, and xterm rendering. It is available when the desktop terminal capability
 is present. The Agent pane shows managed sessions; the drawer is the home for shells and raw
 provider TUIs.
+
+**Every open session keeps its surface, and all but one is hidden.** Switching tabs is a repaint: the
+xterm stays alive, stays attached, and stays current, because a hidden xterm still receives its
+session's output. What it costs is one xterm per open tab, which is what a terminal application spends.
+
+The drawer used to mount the active tab alone, keyed on its id, so the most common thing anyone does in
+it was also the most expensive: every switch destroyed an xterm and its WebGL context, sent a `term:detach`
+and a `term:attach`, posted a resize, and made the node serialize a thousand-line framebuffer — about
+18 ms of the node's loop per switch. Now the first visit to a tab costs that once and every switch after
+it touches nothing.
+
+Two details hold it up. A surface builds its xterm on the first frame it is actually shown on, not when
+it mounts: a tab nobody has opened costs nothing, and xterm measures its cell size from a laid-out box,
+which a hidden one is not. And the list iterates the session ids rather than the session rows — the
+roster is replaced wholesale on every refresh, so `<For>` over the rows would rebuild every surface and
+take the xterms with it, while `<Index>` would key by position and hand a closed tab's live xterm to
+whichever session moved up into its place.
 
 Inside the drawer, everything is a kit node. `DocumentTabs` draws the session strip and carries the
 profile `Menu`, the "+" and the close control in its actions slot. `SplitHandle` is the resize grip.

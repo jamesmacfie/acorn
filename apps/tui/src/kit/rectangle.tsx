@@ -77,7 +77,7 @@ export const enteredRectangle = (): boolean => live().some((held) => held())
  * every key belongs to it — `Ctrl+C` included, which is the whole point and the reason no app layer
  * may fire while a rectangle is entered.
  */
-export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerminal) => void }) {
+export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (terminal: CellTerminal) => void }) {
   // Enter was pressed and nothing has taken the keys off the box since. Half of the answer, and the
   // only half worth storing: the other half is the box's own focus, which the renderer owns
   // (§ entered).
@@ -208,6 +208,11 @@ export function PtyRectangle(props: { label: string; mount?: (terminal: CellTerm
       ref={(element: BoxRenderable) => { box = element; element.focusable = true; disarmOnBlur(element) }}
       flexDirection="column"
       flexGrow={1}
+      // Kept mounted and taken off the screen, which is what a tab strip over several of these asks
+      // for: the emulator and its channel survive the switch (docs/terminal.md § Client). `entered`
+      // above already asks the screen rather than a flag, so a box hidden this way stops taking the
+      // keys without anything else being told.
+      visible={!props.hidden}
       // The same border either way, and the title carries the state instead. A `control` border is a
       // different role, not a brighter one, and a style pack may set any role to zero width — so
       // swapping roles to mean "focused" is how a box quietly stops being drawn at all

@@ -50,6 +50,12 @@ reply), and nothing but terminal output is likely to reach it. Phase 3 moves `te
 frames because that path is measured in frames per second; request and response bodies stay JSON
 until a body shows up in the phase 0 numbers.
 
+**Half taken, 2026-09-03.** The binary frame shipped as phase 6, not phase 3, and it carries terminal
+output on both hops and nothing else. Bodies are still base64 in the JSON messages, and this entry is
+still the reason: no body has shown up in a measurement. The frame format is in
+`packages/protocol/src/ws.ts` § The one binary frame, so a later body upgrade has something to reuse
+rather than something to invent.
+
 ## Scrollback beyond the ring after phase 3
 
 Gating the headless emulator on attached sinks means a cold attach rebuilds the screen from the
@@ -57,6 +63,13 @@ Gating the headless emulator on attached sinks means a cold attach rebuilds the 
 depends on older bytes redraws from its next output. That is the accepted price for not running a
 parser per session forever. If a session class appears where full history matters, the answer is a
 bigger ring for that class, not a return to always-on emulation.
+
+**Taken, 2026-09-03.** The gating shipped as phase 6, not phase 3, and the price is paid as written.
+What the numbers say about the trade: a megabyte of a build's output through an unwatched session is
+2.8 ms instead of 492 ms, and the rebuild a cold attach pays instead is 20 ms, once per tab
+(measurements.md § 2026-09-03 — phase 6). The behaviour is now stated for a reader in
+[docs/terminal.md](../../terminal.md) § The screen, and who pays for it, and nobody has yet watched what
+losing older bytes looks like for a real agent TUI after a long build.
 
 ## Added 2026-09-02
 

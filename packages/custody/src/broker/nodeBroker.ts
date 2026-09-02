@@ -41,6 +41,10 @@ export type BrokerNode = NodeRecord & { token: string; certPem?: string }
 export type BrokerEvents = {
   // A server→client frame arrived. Forwarded verbatim; the broker does not interpret channels.
   frame(nodeId: string, frame: unknown): void
+  // The one binary frame: terminal output, as an id-tagged payload (@acorn/protocol/ws.ts § The one
+  // binary frame). Forwarded byte for byte — this broker does not read the id inside and does not
+  // count the frame against `seq`, because a binary frame takes no sequence number.
+  bytes(nodeId: string, frame: Uint8Array): void
   status(status: NodeStatus): void
 }
 
@@ -280,7 +284,10 @@ export class NodeBroker {
       connection.missedPongs = 0
       connection.lastSeenAt = Date.now()
     })
-    ws.on('message', (data) => this.receive(connection, data.toString()))
+    ws.on('message', (data, isBinary) => {
+      if (isBinary) return this.receiveBytes(connection, data)
+      this.receive(connection, data.toString())
+    })
     ws.on('unexpected-response', (_req, res) => {
       // 401 or 403 at the upgrade means the device was revoked or the token is wrong. Stop
       // reconnecting, because retrying a revoked credential forever is noise.
@@ -332,6 +339,15 @@ export class NodeBroker {
     if (connection.pingTimer) clearInterval(connection.pingTimer)
     connection.pingTimer = null
     connection.missedPongs = 0
+  }
+
+  // `ws` hands a binary message over as a Buffer, or as an array of them when the frame was
+  // fragmented. Concatenated rather than forwarded piecemeal, because the id and the payload have to
+  // reach the other end as one frame.
+  private receiveBytes(connection: Connection, data: unknown): void {
+    connection.lastSeenAt = Date.now()
+    const frame = Array.isArray(data) ? Buffer.concat(data as Buffer[]) : (data as Buffer)
+    this.events.bytes(connection.node.nodeId, frame)
   }
 
   private receive(connection: Connection, raw: string): void {

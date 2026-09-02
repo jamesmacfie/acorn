@@ -321,6 +321,12 @@ the cap is raised rather than removed so a real runaway still trips it.
   the editor's `$EDITOR` window cross at about fifteen lines each. The terminal plugin's own drawer
   surface keeps its xterm, because its options are a theme, a font size, a WebGL renderer and a
   Shift+Enter rule, none of which means anything in cells ([terminal.md](./terminal.md) § Client).
+  The bytes reach the rectangle as bytes: `term:out` is the one channel on the node's socket that is a
+  binary frame rather than JSON, and the broker in this process hands it straight to the client
+  ([terminal.md](./terminal.md) § The screen, and who pays for it). A `pty` rectangle also takes
+  `hidden`, which draws the box and takes it off the screen so a tab strip over several of them keeps
+  every emulator and every channel alive; `entered` asks the screen rather than a flag, so a hidden
+  rectangle stops taking the keys with nothing else being told.
 - **`editor` draws its box and says the file opens there.** The `$EDITOR` handoff needed nothing
   built: the editor pane already has a terminal mode where one device preference swaps CodeMirror for
   a throwaway PTY running the reader's own editor on the worktree, and that PTY lives on the node, so

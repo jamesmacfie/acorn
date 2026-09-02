@@ -31,11 +31,16 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
   let stop = opened.stop
 
   const frameHandlers: ((nodeId: string, frame: unknown) => void)[] = []
+  const byteHandlers: ((nodeId: string, frame: Uint8Array) => void)[] = []
   const statusHandlers: ((status: NodeStatus) => void)[] = []
   const statuses = new Map<string, NodeStatus>()
 
   const broker = new NodeBroker({
     frame: (nodeId, frame) => { for (const handler of frameHandlers) handler(nodeId, frame) },
+    // Terminal output, as the one binary frame (@acorn/protocol/ws.ts § The one binary frame). The
+    // desktop tags the node id around this because it has a process boundary to cross; here the
+    // broker is in this process, so the frame the node sent is handed over as it stands.
+    bytes: (nodeId, frame) => { for (const handler of byteHandlers) handler(nodeId, frame) },
     status: (status) => {
       statuses.set(status.nodeId, status)
       for (const handler of statusHandlers) handler(status)
@@ -79,6 +84,7 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     nodeAbort: (requestId: string) => broker.abort(requestId),
     nodeSend: (nodeId: string, frame: Parameters<NodeBroker['send']>[1]) => broker.send(nodeId, frame),
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => subscribe(frameHandlers, cb),
+    onNodeBytes: (cb: (nodeId: string, frame: Uint8Array) => void) => subscribe(byteHandlers, cb),
     onNodeStatus: (cb: (status: NodeStatus) => void) => {
       // Replay what the broker already reported: the socket opens during `connect` above, well before
       // anything renders, and a status the renderer never hears reads as `offline` forever.

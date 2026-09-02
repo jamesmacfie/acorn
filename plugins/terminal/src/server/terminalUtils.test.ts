@@ -10,7 +10,7 @@ import {
   tmuxAttachArgs,
   tmuxName,
   tmuxNewSessionArgs,
-  trimRing,
+  OutputRing,
 } from './terminalUtils'
 
 describe('clampDim', () => {
@@ -24,13 +24,81 @@ describe('clampDim', () => {
   })
 })
 
-describe('trimRing', () => {
-  it('caps the buffer at RING_CAP, keeping the most recent bytes', () => {
-    const big = 'a'.repeat(RING_CAP) + 'TAIL'
-    const out = trimRing(big)
-    expect(out.length).toBe(RING_CAP)
-    expect(out.endsWith('TAIL')).toBe(true)
-    expect(trimRing('short')).toBe('short')
+// The chunk-list ring (phase 6 of the performance programme). What it replaced was one string rebuilt
+// as `ring = trimRing(ring + data)` on every chunk, so that expression is the reference implementation
+// the ASCII cases below are measured against, spelled out here because it no longer exists in src.
+const oldRing = (chunks: readonly string[]): string => {
+  let ring = ''
+  for (const chunk of chunks) {
+    ring += chunk
+    if (ring.length > RING_CAP) ring = ring.slice(ring.length - RING_CAP)
+  }
+  return ring
+}
+
+const fill = (chunks: readonly string[]): OutputRing => {
+  const ring = new OutputRing()
+  for (const chunk of chunks) ring.push(chunk)
+  return ring
+}
+
+describe('OutputRing', () => {
+  it('caps at RING_CAP, keeping the most recent bytes', () => {
+    const chunks = ['a'.repeat(RING_CAP), 'TAIL']
+    const ring = fill(chunks)
+
+    expect(ring.bytes).toBe(RING_CAP)
+    expect(ring.tail()).toBe(oldRing(chunks))
+    expect(ring.tail().endsWith('TAIL')).toBe(true)
+    expect(new OutputRing().tail()).toBe('')
+    expect(fill(['short']).tail()).toBe('short')
+  })
+
+  it('reads the same tail the string implementation did, at and across every chunk boundary', () => {
+    // Deliberately ragged, including an empty chunk: the tails asked for below land exactly on a
+    // boundary, inside a chunk, and past everything kept.
+    const chunks = ['alpha', 'bravo-', 'charlie', 'd', '', 'echo\r\nfoxtrot']
+    const ring = fill(chunks)
+    const whole = oldRing(chunks)
+
+    expect(ring.tail()).toBe(whole)
+    for (let want = 0; want <= whole.length + 8; want += 1) {
+      expect(ring.tail(want)).toBe(want <= 0 ? '' : whole.slice(Math.max(0, whole.length - want)))
+    }
+  })
+
+  it('keeps exactly its budget when the head has to be cut inside a chunk', () => {
+    const chunks = ['x'.repeat(RING_CAP - 10), 'y'.repeat(40)]
+    const ring = fill(chunks)
+
+    expect(ring.bytes).toBe(RING_CAP)
+    expect(ring.tail()).toBe(oldRing(chunks))
+    expect(ring.tail(40)).toBe('y'.repeat(40))
+  })
+
+  it('decodes a multi-byte character whose bytes straddle a chunk boundary', () => {
+    // The naive rewrite of this class decodes each chunk and joins the strings, which turns a
+    // character cut by the walk into two replacement characters. `tail` concatenates the buffers and
+    // decodes once, so it does not.
+    //
+    // A 🌰 is four bytes. Asking for a tail that starts one byte into it makes the walk cut the chunk
+    // holding it, and asking for one that starts before it makes the walk span two chunks.
+    const ring = fill(['before 🌰', ' after'])
+
+    expect(ring.tail()).toBe('before 🌰 after')
+    expect(ring.tail(10)).toBe('🌰 after') // 4 bytes of nut plus 6 of ' after'
+    expect(ring.bytes).toBe(Buffer.byteLength('before 🌰 after', 'utf8'))
+  })
+
+  it('counts the tail in bytes, which is what changed for its two readers', () => {
+    // `slice(-n)` counted UTF-16 code units; this counts bytes, so a tail full of non-ASCII is a
+    // slightly shorter window. Both readers are heuristics over recent output — the blocked-prompt
+    // scan over the last 4,000 and the transcript tail over the last 10,000 (./terminal.ts) — so a
+    // shorter window is a smaller sample of the same thing, and worth knowing rather than fixing.
+    const ring = fill(['x'.repeat(100), '中'.repeat(100)])
+
+    expect(ring.bytes).toBe(100 + 300)
+    expect(ring.tail(300)).toBe('中'.repeat(100))
   })
 })
 

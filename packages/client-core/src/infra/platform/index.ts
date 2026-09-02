@@ -26,6 +26,10 @@ export type NodeTransport = {
   abort(requestId: string): void
   send(nodeId: string, frame: WsClientFrame): void
   onFrame(cb: (nodeId: string, frame: unknown) => void): () => void
+  // The one binary channel: terminal output, as an id-tagged frame the host forwards without reading
+  // (@acorn/protocol/ws.ts § The one binary frame). The host peels its own node id; what arrives here
+  // still names the session, and wsClient.ts is the one module that reads it.
+  onBytes(cb: (nodeId: string, frame: Uint8Array) => void): () => void
   onStatus(cb: (status: NodeStatus) => void): () => void
 }
 
@@ -199,6 +203,7 @@ type AcornPreload = {
   nodeAbort?: NodeTransport['abort']
   nodeSend?: NodeTransport['send']
   onNodeFrame?: NodeTransport['onFrame']
+  onNodeBytes?: NodeTransport['onBytes']
   onNodeStatus?: NodeTransport['onStatus']
   fleetList?: FleetBridge['list']
   nodeProbe?: FleetBridge['probe']
@@ -256,6 +261,7 @@ export const nodeTransport = (): NodeTransport | null => {
     abort: (requestId) => acorn.nodeAbort?.(requestId),
     send: (nodeId, frame) => acorn.nodeSend?.(nodeId, frame),
     onFrame: (cb) => acorn.onNodeFrame?.(cb) ?? (() => {}),
+    onBytes: (cb) => acorn.onNodeBytes?.(cb) ?? (() => {}),
     onStatus: (cb) => acorn.onNodeStatus?.(cb) ?? (() => {}),
   }
 }

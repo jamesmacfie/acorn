@@ -106,25 +106,50 @@ type PendingAttachment = { frames: ServerMsg[] }
 // Owns client attachment ordering around the framebuffer above. While a snapshot is being
 // serialized, live frames are retained per attaching sink. The sink receives:
 //   ready → reset + canonical snapshot → every frame published after the snapshot barrier.
+//
+// **Emulation is a consequence of attachment.** There is an emulator here only while somebody is
+// watching. It used to run at full rate for every session from the moment it was spawned, and its
+// only reader is the snapshot `attach` takes — so a background build paid continuous ANSI parsing to
+// produce a screen nobody would ever ask for (docs/future/performance/architecture.md § 3). The first
+// attach builds one and replays the raw ring into it; the last detach disposes it. Nothing else about
+// the ordering below changed.
+//
+// The price is scrollback: a cold attach can only rebuild from what the ring still holds, so history
+// older than the ring is gone and an alternate-screen program whose state depends on older bytes
+// redraws from its next output. That is recorded, with the reason it is the right trade, in
+// docs/future/performance/refused.md § Scrollback beyond the ring.
 export class TerminalDisplay {
   private readonly live = new Set<TerminalDisplaySink>()
   private readonly attaching = new Map<TerminalDisplaySink, PendingAttachment>()
   private hasOutput = false
+  private screen: TerminalScreen | null = null
 
   constructor(
-    cols: number,
-    rows: number,
-    private readonly screen: TerminalScreen = new HeadlessTerminalScreen(cols, rows),
+    private cols: number,
+    private rows: number,
+    // Injected so a test can drive the ordering without a real emulator, and called per emulator
+    // rather than once per session, since there is now one per watched period rather than one for
+    // life.
+    private readonly makeScreen: (cols: number, rows: number) => TerminalScreen = (cols, rows) => new HeadlessTerminalScreen(cols, rows),
   ) {}
 
   write(data: string): void {
     if (!data) return
+    // Remembered even with no emulator, because it is what tells a later attach whether there is a
+    // screen worth rebuilding at all.
     this.hasOutput = true
-    this.screen.write(data)
+    this.screen?.write(data)
   }
 
   resize(cols: number, rows: number): void {
-    this.screen.resize(cols, rows)
+    this.cols = cols
+    this.rows = rows
+    this.screen?.resize(cols, rows)
+  }
+
+  /** Whether an emulator is running. The property the phase 6 tests assert on. */
+  get emulating(): boolean {
+    return this.screen !== null
   }
 
   publish(message: ServerMsg): void {
@@ -132,9 +157,17 @@ export class TerminalDisplay {
     for (const pending of this.attaching.values()) pending.frames.push(message)
   }
 
-  attach(sink: TerminalDisplaySink, session: TerminalSession): void {
+  /**
+   * Subscribe a client and restore its screen. `replay` hands over the session's raw ring, read only
+   * when an emulator has to be built, so an attach onto a session that already has one costs nothing
+   * extra.
+   */
+  attach(sink: TerminalDisplaySink, session: TerminalSession, replay: () => string): void {
     const replayed = this.hasOutput
     sink({ type: 'ready', session, replayed })
+    // Before the snapshot below and before any further live write, so the replay and the live bytes
+    // meet exactly once.
+    const screen = this.ensure(replay)
     if (!replayed) {
       this.live.add(sink)
       return
@@ -142,7 +175,7 @@ export class TerminalDisplay {
 
     // snapshot() installs its barrier synchronously. Any later publish belongs after the snapshot
     // and is captured in this attachment's frame queue until activate() transfers it to live.
-    const snapshot = this.screen.snapshot()
+    const snapshot = screen.snapshot()
     const pending: PendingAttachment = { frames: [] }
     this.attaching.set(sink, pending)
     void snapshot
@@ -161,12 +194,32 @@ export class TerminalDisplay {
   detach(sink: TerminalDisplaySink): void {
     this.attaching.delete(sink)
     this.live.delete(sink)
+    this.release()
   }
 
   dispose(): void {
     this.attaching.clear()
     this.live.clear()
-    this.screen.dispose()
+    this.release()
+  }
+
+  private ensure(replay: () => string): TerminalScreen {
+    if (this.screen) return this.screen
+    const screen = this.makeScreen(this.cols, this.rows)
+    this.screen = screen
+    // One string rather than chunk by chunk: the ring is bytes, and a character split across two of
+    // its chunks has to be decoded whole before the parser sees it (./terminalUtils.ts, OutputRing).
+    const history = replay()
+    if (history) screen.write(history)
+    return screen
+  }
+
+  // The last watcher leaving is what stops the parser. A session with no emulator still fills its
+  // ring, which is what the next attach rebuilds from.
+  private release(): void {
+    if (this.live.size > 0 || this.attaching.size > 0) return
+    this.screen?.dispose()
+    this.screen = null
   }
 
   private activate(sink: TerminalDisplaySink, pending: PendingAttachment): void {
