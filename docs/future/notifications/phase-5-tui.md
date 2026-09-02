@@ -19,7 +19,11 @@ terminal-level notification Claude Code sends there as the behaviour they want. 
 
 ## Requirements
 
-1. `apps/tui/src/kit/notify.ts` (new), sibling of `apps/tui/src/kit/copy.ts` and shaped like it:
+1. `apps/tui/src/kit/notify.ts` (new), sibling of `apps/tui/src/kit/copy.ts` and shaped like it.
+   Phase 3 already shipped half of this in `apps/tui/src/kit/bell.ts`: `notifyMode(env)` reads the
+   override and `initBellNotices` writes BEL for every unseen notice, so this phase adds the OSC
+   half, reads `notifyMode` rather than re-parsing the variable, and moves or re-exports it if the
+   two want to be one file. The rest:
    `detectBackend(env): 'osc9' | 'osc99' | 'osc777' | null` from `TERM_PROGRAM` (`iTerm.app`,
    `ghostty`, `WezTerm`, `WarpTerminal` → `osc9`), `KITTY_WINDOW_ID` or `TERM=xterm-kitty` →
    `osc99`, `TERM` containing `rxvt` → `osc777`, else null; `sequence(backend, title, body)` returning
@@ -75,7 +79,8 @@ closed.
 
 ## Files
 
-- `apps/tui/src/kit/notify.ts` (new): backends, sequences, tmux, sanitising, env override.
+- `apps/tui/src/kit/notify.ts` (new): backends, sequences, tmux, sanitising. The env override and
+  the BEL write are already in `apps/tui/src/kit/bell.ts`.
 - `apps/tui/src/platform.ts`: the `notify` group.
 - `apps/tui/src/main.tsx`: focus events into the context.
 - `apps/tui/src/chrome/Topbar.tsx`: the count.
