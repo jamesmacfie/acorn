@@ -1,6 +1,6 @@
 # Notifications
 
-A programme, 2026-09-02. Phases 1, 2 and 3 have shipped and nothing else has started. It starts from a
+A programme, 2026-09-02. Phases 1 to 4 have shipped and nothing else has started. It starts from a
 complaint: acorn notifies on too many agent steps. It ends with one attention model shared by
 managed and PTY agents, a settings page, and four channels that hang off one gate, on both hosts.
 
@@ -29,7 +29,7 @@ across.
 | [phase-1-edges.md](./phase-1-edges.md) | Shipped. A pointer to where the reducer, the gate, and their documentation ended up, and the four places the build departed from the plan. |
 | [phase-2-settings.md](./phase-2-settings.md) | Shipped. A pointer to where the page, the parser and the key ended up, and the three places the build departed from the plan. |
 | [phase-3-sound.md](./phase-3-sound.md) | Shipped. A pointer to where the chimes, the sink and the BEL write ended up, and the three places the build departed from the plan. |
-| [phase-4-desktop.md](./phase-4-desktop.md) | The `notify` seam group: Tauri notifications with a web fallback, click to open, the dock badge as the pill. |
+| [phase-4-desktop.md](./phase-4-desktop.md) | Shipped. A pointer to where the `notify` seam group, the two Rust commands and the badge effect ended up, and the four places the build departed from the plan. |
 | [phase-5-tui.md](./phase-5-tui.md) | OSC 9, 99, and 777 to the host terminal, terminal focus, a topbar count, an inbox overlay. |
 | [phase-6-tests-and-docs.md](./phase-6-tests-and-docs.md) | The invariants as properties, `docs/notifications.md` (new) as the owner, and deleting this folder. |
 
@@ -40,14 +40,13 @@ across.
 | 1 | Five states, three edges, one gate with a one-second hold and a seen rule. Two detectors become one. Completed rows acknowledge on view. | nothing | Shipped 2026-09-02. |
 | 2 | A Notifications settings page over one JSON device preference, with a test button. | 1 | Shipped 2026-09-02. |
 | 3 | Two WebAudio chimes; BEL on the terminal client. | 2 | Shipped 2026-09-02. |
-| 4 | Seam group `notify`: `tauri-plugin-notification`, `set_badge_count`, web fallback, click to open. | 2 | Not started. |
+| 4 | Seam group `notify`: `tauri-plugin-notification`, `set_badge_count`, web fallback, click to open. | 2 | Shipped 2026-09-02. |
 | 5 | Terminal client: OSC backends with tmux passthrough, DEC 1004 focus, topbar count, inbox overlay, `ACORN_TUI_NOTIFY`. | 1, 3 | Not started. |
 | 6 | Invariants as tests, `docs/notifications.md`, pointers, folder deleted. | all | Not started. |
 
-Phases 4 and 5 are next, and they are independent of each other; 5 now has its BEL and needs
-nothing else from 3. The gate now reads the `notifications` device preference through `readNotificationSettings`
-in `features/notifications/settings.ts`, and each of those phases hangs its channel off
-`registerNoticeSink` and its switch off the page phase 2 built.
+Phase 5 is next. The gate reads the `notifications` device preference through
+`readNotificationSettings` in `features/notifications/settings.ts`, and that phase hangs its channel
+off `registerNoticeSink` and its switch off the page phase 2 built, the way phases 3 and 4 did.
 
 ## How to use this folder
 
@@ -85,12 +84,11 @@ worked example. When those seven steps happen as written on the desktop, and the
 - Phase 1 shipped, so the gate is real: `observeAttention` and `deliver` in
   `packages/client-core/src/features/notifications/deliver.ts` are what a later phase hangs a
   channel off, through `registerNoticeSink`.
-- `apps/desktop/src-tauri/Cargo.toml` has no notification plugin and the capability file grants
-  `core:default` only. Phase 4 adds both; if either has appeared, phase 4 shrinks.
 - OpenTUI emits `CliRenderEvents.FOCUS` and `BLUR` from DEC 1004 reports
   (`references/opentui/packages/core/src/renderer.ts`). Phase 5 needs the installed version to do
   the same.
 - The terminal client has no `localStorage` and `writeDevicePref` is a no-op there. If a
   file-backed store has landed, phase 5 reads the preference instead of `ACORN_TUI_NOTIFY`.
-- `tauri` v2's `set_badge_count` and `tauri-plugin-notification`'s desktop click handling are named
-  as things to check, not facts, in [phase-4-desktop.md](./phase-4-desktop.md).
+- Phase 4 shipped, so a channel that needs the desktop has a seam to use: `showNotification`,
+  `onNoticeActivated`, `canSetBadge` and `setBadge` in `packages/client-core/src/infra/platform/index.ts`,
+  and the terminal client installs its own `notify` group behind them.

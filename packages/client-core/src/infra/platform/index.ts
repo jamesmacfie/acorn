@@ -94,6 +94,22 @@ export type FileDialogs = {
   save(request: SaveRequest): Promise<boolean>
 }
 
+// Telling somebody something happened while they were not looking, and how many of those are
+// waiting. Like the file dialogs and unlike the folder picker, this is not desktop-only: a page has
+// `Notification`, so the seam carries that fallback itself (`showNotification` below) and every
+// caller gets a working verb. A host that installs this group takes over with the OS's own
+// notification centre and can draw a number on the app icon, which a page cannot.
+//
+// `tag` is the notice id, so an activation can find the notice it came from. `show` answers false
+// when nothing was shown — no permission, no notifier — so a caller can tell "the OS said no" from
+// "the OS is showing it".
+export type NotifyRequest = { title: string; body?: string; tag: string }
+export type Notify = {
+  show(request: NotifyRequest): Promise<boolean>
+  onActivate(cb: (tag: string) => void): () => void
+  setBadge(count: number | null): void
+}
+
 // The two actions the node recovery screen offers. Neither is expressible in the renderer: one reveals
 // a path in the file manager, the other bypasses the will-quit prompt, whose handler lives in a shell
 // that is not mounted behind the gate.
@@ -198,6 +214,7 @@ type AcornPreload = {
   recovery?: RecoveryActions
   folderPath?: FolderPicker
   files?: FileDialogs
+  notify?: Notify
   preview?: PreviewViews
   webview?: PluginWebviews
 }
@@ -346,6 +363,54 @@ export const saveFile = async (request: SaveRequest): Promise<boolean> => {
   URL.revokeObjectURL(url)
   return true
 }
+
+// The host's notification group, or null where the page does its own (below). Consumers call
+// `showNotification`, `onNoticeActivated` and `setBadge`; this accessor exists for the seam contract,
+// which checks the group the host installed rather than the fallback.
+export const notifyHost = (): Notify | null => acornGlobal()?.notify ?? null
+
+// The page's own notifications, held until they close. A `Notification` whose only reference is the
+// browser's can be collected with its click handler still unfired, which is the bug orca hit.
+const shownNotifications = new Map<string, Notification>()
+// Subscribers to the fallback's clicks. A host that installs the group answers `onNoticeActivated`
+// itself, so this set stays empty there.
+const activationListeners = new Set<(tag: string) => void>()
+
+/** Raise one, through the host if it installed the group and through the page otherwise. False means
+ *  nothing was shown: permission refused, or no notifier at all. Silent in both, always: the chime is
+ *  the client's (features/notifications/chime.ts) and it plays whether or not a banner appeared. */
+export const showNotification = async (request: NotifyRequest): Promise<boolean> => {
+  const host = acornGlobal()?.notify
+  if (host) return host.show(request)
+  const Ctor = (globalThis as { Notification?: typeof Notification }).Notification
+  if (!Ctor) return false
+  const permission = Ctor.permission === 'default' ? await Ctor.requestPermission() : Ctor.permission
+  if (permission !== 'granted') return false
+  const notification = new Ctor(request.title, { body: request.body, tag: request.tag, silent: true })
+  shownNotifications.set(request.tag, notification)
+  notification.onclose = () => shownNotifications.delete(request.tag)
+  notification.onclick = () => {
+    window.focus()
+    for (const cb of activationListeners) cb(request.tag)
+    notification.close()
+  }
+  return true
+}
+
+/** Somebody clicked one. The tag is the notice id it was raised for. */
+export const onNoticeActivated = (cb: (tag: string) => void): (() => void) => {
+  const host = acornGlobal()?.notify
+  if (host) return host.onActivate(cb)
+  activationListeners.add(cb)
+  return () => activationListeners.delete(cb)
+}
+
+// Whether this host can draw a number on the app icon. A page cannot, and the settings row hides
+// rather than offering a switch that does nothing.
+export const canSetBadge = (): boolean => !!acornGlobal()?.notify
+
+/** The number on the app icon, or null for none. A no-op where there is no icon to draw on. */
+export const setBadge = (count: number | null): void => acornGlobal()?.notify?.setBadge(count)
 
 // Whether this host can change fleet membership rather than only read it (`fleetBridge`). Settings →
 // Nodes hides itself rather than offering buttons that cannot work.

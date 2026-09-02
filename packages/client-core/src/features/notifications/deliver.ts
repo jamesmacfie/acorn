@@ -8,6 +8,7 @@
 // Channels beyond the bell row are sinks. Phase 1 registers none; sound, the system notification and
 // the terminal's OSC sequences each add one.
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
+import { showNotification } from '../../infra/platform'
 import { wsOnNotice } from '../../infra/node/wsClient'
 import { activeTaskId } from '../tasks/tasks'
 import { edgesBetween, snapshotKey, type Edge, type Snapshot } from './attention'
@@ -119,6 +120,24 @@ export function initWorkflowNotices(): () => void {
     const detail = n.action === 'review-config' ? 'Review & trust' : n.action === 'review-plugin-request' ? 'Review the request' : undefined
     deliverNotice({ taskId: n.taskId, kind: n.kind, title: n.title, detail, action: n.action, at: Date.now() })
   })
+}
+
+/** The system channel: an OS banner for every unseen notice the settings allow, through the
+ *  platform seam's `notify` group where a shell installed one and the page's own `Notification`
+ *  otherwise (infra/platform/index.ts).
+ *
+ *  The body is the notice's `detail` and nothing else. A title is already free of prompt text,
+ *  responses, filenames and paths (`pushManagedAgentNotice`), and the notification centre keeps what
+ *  it is shown: an OS banner is the one surface where "what happened" must not become "what it
+ *  said". */
+export function initSystemNotices(): () => void {
+  return registerNoticeSink(systemSink)
+}
+
+/** Exported for the test. Sinks only ever see an unseen notice, so the seen rule is already kept. */
+export function systemSink(notice: Notice): void {
+  if (!readNotificationSettings().system) return
+  void showNotification({ title: notice.title, body: notice.detail, tag: notice.id })
 }
 
 /** Node switch, or a test starting clean. Snapshots and held edges are judgements about one node's

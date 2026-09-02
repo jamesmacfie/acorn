@@ -1,6 +1,12 @@
-import { For, Show } from 'solid-js'
-import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount } from './notifications'
+import { For, onCleanup, onMount, Show } from 'solid-js'
+import { createQuery } from '@tanstack/solid-query'
+import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount, type Notice } from './notifications'
 import { createAttentionInbox } from './attentionInbox'
+import { parseNotificationSettings } from './settings'
+import { onNoticeActivated } from '../../infra/platform'
+import { trackBadge } from './badge'
+import { prefsOptions } from '../../infra/queries'
+import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { activeNodeId, setActiveNode } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { noticeKindContribution } from '../../host/registries/rail/notices'
@@ -33,6 +39,33 @@ const relTime = (at: number): string => {
 export default function NotificationBell(props: { onSelectTask: (taskId: string) => void }) {
   const inbox = createAttentionInbox()
   const multiNode = () => nodes().length > 1
+  // One pill for both sections. An attention item always counts — it is unresolved by definition — so
+  // it is added rather than max()'d with the unread notices.
+  const pill = () => unreadCount() + inbox().rows.length
+
+  // Opening a notice, from the row below and from a click on the system banner it raised. One
+  // function because the two are the same act: the banner is the row, drawn by the OS.
+  const openNotice = (notice: Notice) => {
+    markRead(notice.id)
+    props.onSelectTask(notice.taskId)
+    if (notice.action === 'review-config') openRepoConfigTrust(notice.taskId)
+    if (notice.action === 'review-plugin-request') openPluginApproval(notice.taskId)
+    openNoticeTarget(notice)
+  }
+
+  // The banner carries the notice id as its tag, so an activation finds the notice it came from. The
+  // active node's, matching what this popover shows: a notice raised before a node switch names a task
+  // this client can no longer resolve.
+  onMount(() => onCleanup(onNoticeActivated((tag) => {
+    const notice = noticesForActiveNode().find((n) => n.id === tag)
+    if (notice) openNotice(notice)
+  })))
+
+  // The app icon carries the pill's number (badge.ts). The switch is read through the prefs query
+  // rather than the device store, because turning the badge off has to clear it now rather than at
+  // the next unread.
+  const prefs = createQuery(() => prefsOptions(true))
+  trackBadge(pill, () => parseNotificationSettings(prefs.data?.[PrefKeys.notifications]).badge)
 
   // Popover for the chrome only: the portal, the anchoring, outside-click and the Escape this
   // never had. The content stays as it is: an inbox with two sections and dismissable rows is not
@@ -45,9 +78,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
       trigger={({ open, toggle }) => (
         <Button variant="bare" title="Notifications" expanded={open()} onPress={toggle}>
           ◔
-          {/* One pill for both sections. An attention item always counts — it is unresolved by definition —
-              so it is added rather than max()'d with the unread notices. */}
-          <Show when={unreadCount() + inbox().rows.length}>
+          <Show when={pill()}>
             {(count) => <span class="notify-count">{count()}</span>}
           </Show>
         </Button>
@@ -110,12 +141,8 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                     class="notify-row"
                     classList={{ unread: !n.read }}
                     onClick={() => {
-                      markRead(n.id)
                       close()
-                      props.onSelectTask(n.taskId)
-                      if (n.action === 'review-config') openRepoConfigTrust(n.taskId)
-                      if (n.action === 'review-plugin-request') openPluginApproval(n.taskId)
-                      openNoticeTarget(n)
+                      openNotice(n)
                     }}
                   >
                     <span class="notify-glyph" classList={{ 'notify-warn': noticeKindContribution(n.kind)?.severity !== 'info' }}>

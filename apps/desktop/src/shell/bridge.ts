@@ -212,6 +212,20 @@ const acorn = {
       invoke<boolean>('save_file', { bytes: encodeBytes(request.bytes), suggestedName: request.suggestedName }),
   },
 
+  // Telling somebody something happened while they were not looking, and the number on the dock
+  // icon. The shell's and not the helper's: a banner and a badge belong to the window's process, and
+  // the helper has no window and no icon.
+  //
+  // No sound and no `silent` flag to ask for: the Rust command never sets one, because the chime is
+  // the client's and plays whether or not the OS agreed to show a banner.
+  notify: {
+    show: (request: { title: string; body?: string; tag: string }) => invoke<boolean>('show_notification', request),
+    // `tauri-plugin-notification` gives desktop no activation callback, so Rust approximates one from
+    // a window focus soon after a banner (src-tauri/src/commands.rs).
+    onActivate: (cb: (tag: string) => void) => onEvent<string>('acorn:notification-activated', cb),
+    setBadge: (count: number | null) => void invoke('set_badge', { count }),
+  },
+
   // The browser preview pane. `show` is exclusive because one task's preview is on screen at a time,
   // and `hide` names no task because what the caller means is "no preview right now".
   preview: {

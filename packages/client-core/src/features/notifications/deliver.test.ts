@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  HOLD_MS, observeAttention, registerNoticeSink, resetDelivery,
+  HOLD_MS, deliverNotice, observeAttention, registerNoticeSink, resetDelivery, systemSink,
   type DeliveryContext, type NoticeSink,
 } from './deliver'
 import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from './settings'
@@ -123,4 +123,58 @@ it('points a PTY row at the terminal session and a managed row at the agent pane
   observeAttention([snap('blocked'), snap('blocked', { sessionId: 's2', kind: 'pty' })], context)
   settle()
   expect(notices().map((n) => n.target?.kind).sort()).toEqual(['managed-agent', 'terminal-session'])
+})
+
+// The sinks read the device store directly rather than the gate's context, because they run after
+// the gate has already decided. `system` on is what a device with no preference reads, so only "off"
+// needs saying.
+const device = vi.hoisted(() => ({ system: true }))
+vi.mock('./settings', async (original) => ({
+  ...(await original<object>()),
+  readNotificationSettings: () => ({ sound: true, system: device.system, badge: true, events: { blocked: true, finished: true, error: true } }),
+}))
+
+describe('the system channel', () => {
+  const shown: { title: string; body?: string; tag: string }[] = []
+  beforeEach(() => {
+    device.system = true
+    shown.length = 0
+    vi.stubGlobal('window', {
+      acorn: { notify: { show: async (r: { title: string; body?: string; tag: string }) => { shown.push(r); return true }, onActivate: () => () => {}, setBadge: () => {} } },
+    })
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('raises a banner for an edge you missed and none for one you watched', () => {
+    const drop = registerNoticeSink(systemSink)
+    observeAttention([snap('working')], context)
+    observeAttention([snap('blocked')], context)
+    settle()
+    focused = true
+    observeAttention([snap('working')], context)
+    observeAttention([snap('blocked')], context)
+    settle()
+    drop()
+    expect(shown.map((r) => r.title)).toEqual(['claude needs you'])
+  })
+
+  it('is silent when the switch is off', () => {
+    device.system = false
+    const drop = registerNoticeSink(systemSink)
+    observeAttention([snap('working')], context)
+    observeAttention([snap('blocked')], context)
+    settle()
+    drop()
+    expect(shown).toEqual([])
+  })
+
+  // The OS keeps what it is shown. A detail is written for the notification centre; a title can name
+  // a file the agent is asking about, and it is the row's, not the banner's body.
+  it('sends the detail as the body and never the title', () => {
+    const drop = registerNoticeSink(systemSink)
+    deliverNotice({ taskId: 't1', kind: 'agent-needs-input', title: 'edit /etc/hosts?', at: 1, detail: 'Review & trust' }, context)
+    deliverNotice({ taskId: 't1', kind: 'agent-needs-input', title: 'edit /etc/hosts?', at: 2 }, context)
+    drop()
+    expect(shown.map((r) => r.body)).toEqual(['Review & trust', undefined])
+  })
 })

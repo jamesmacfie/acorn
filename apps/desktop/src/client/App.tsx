@@ -15,7 +15,7 @@ import { workspaceForProject } from '@acorn/client-core/features/workspaces/acti
 import { createFleetWorkspaces, selectFleetWorkspace } from '@acorn/client-core/features/workspaces/fleetWorkspaces.ts'
 import { planWorkspaceViewTransition } from '@acorn/client-core/features/workspaces/workspaceViewTransition.ts'
 import OverflowMenu from '@acorn/client-core/features/settings/OverflowMenu.tsx'
-import { initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
+import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { initSoundNotices } from '@acorn/client-core/features/notifications/chime.ts'
 import { initSessions, sessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
 import TabRail from '@acorn/client-core/features/tabs/TabRail.tsx'
@@ -187,6 +187,10 @@ export default function App() {
 
   // The sound channel. Every unseen notice the gate lets through, whatever raised it.
   onMount(() => onCleanup(initSoundNotices()))
+
+  // The system channel, on the same terms. The dock badge is the bell's, because it is the bell's
+  // number (features/notifications/NotificationBell.tsx).
+  onMount(() => onCleanup(initSystemNotices()))
 
   // Which plugins the node this shell is showing runs.
   //
