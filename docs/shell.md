@@ -239,14 +239,27 @@ labelled placeholder.
 `apps/desktop/src/shell/bridge.ts` is built as one IIFE and injected as the window's initialization
 script, which runs before any page script. It assembles the narrow, validated `window.acorn` surface
 the platform seam reads: broker request and response bytes, stream frames and status, fleet
-operations, lifecycle actions, the three file dialogs, and the webview commands. It never exposes a
-node token, a certificate, a database handle, or a process object.
+operations, lifecycle actions, the three file dialogs, the notification group, and the webview
+commands. It never exposes a node token, a certificate, a database handle, or a process object.
 
 The file dialogs are the folder picker, `pick_files`, and `save_file`. The last two carry bytes, not
 paths: the renderer sends a byte array to save and receives one per file it picked, base64 in both
 directions because the Tauri channel is JSON. Bytes rather than paths because the node this renderer
 talks to is not always on this machine, so a path would name a file the node cannot open. The shell
 owns the dialog and the read or write, and the renderer never learns where the file went.
+
+The `notify` group is a system notification, a click on one, and the number on the dock icon
+(`apps/desktop/src-tauri/src/commands.rs`). All three are the shell's rather than the helper's,
+because a banner and an app icon belong to the window's process. `tauri-plugin-notification` is
+initialised in `src-tauri/src/lib.rs` for `app.notification()` alone: the renderer never invokes the
+plugin's own commands, so `capabilities/default.json` still grants `core:default` and nothing else,
+and a page in the preview pane or a plugin webview cannot raise a banner wearing acorn's icon.
+
+The plugin gives desktop no activation callback, so `show_notification` records the notice id it
+raised a banner for and `window_focused` emits `acorn:notification-activated` when the main window
+comes back within 30 seconds. That is a guess, and a wrong one costs a task selection the owner did
+not ask for. Both halves of the alternative are worse: no click handling at all, or a second
+notifier process to shell out to.
 
 The same bridge serves both render paths. `packages/client-core/src/host/frames/broker.ts` takes a `MessagePort` and knows
 nothing about where the other end is: an iframe gets one over `window.postMessage`, a plugin worker

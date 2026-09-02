@@ -71,6 +71,9 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        // The renderer never invokes this plugin's own commands — capabilities/default.json grants it
+        // nothing — so it is here only to give src/commands.rs `app.notification()`.
+        .plugin(tauri_plugin_notification::init())
         .register_uri_scheme_protocol(APP_SCHEME, move |ctx, request| {
             let source = match &scheme_dev {
                 Some(origin) => Source::DevServer(origin.clone()),
@@ -92,6 +95,8 @@ pub fn run() {
             commands::reveal_data_folder,
             commands::force_quit,
             commands::quit_approved,
+            commands::show_notification,
+            commands::set_badge,
             webviews::webview_ensure,
             webviews::webview_bounds,
             webviews::webview_show,
@@ -144,6 +149,11 @@ pub fn run() {
                     api.prevent_exit();
                     menu::request_quit(app);
                 }
+            }
+            // The click on a system notification, as near as desktop Tauri gets to one
+            // (src/commands.rs, `window_focused`).
+            RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(true), .. } if label == "main" => {
+                commands::window_focused(app)
             }
             RunEvent::Exit => {
                 // Before the helper, so no child webview is left composited over a window whose

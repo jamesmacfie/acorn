@@ -2,10 +2,12 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '../../infra/queries'
 import { saveJsonPref } from './savePref'
 import { Button, Checkbox, Field } from '../../kit/components/primitives'
+import { canSetBadge } from '../../infra/platform'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { parseNotificationSettings, type NotificationSettings as Settings } from '../notifications/settings'
 import { defaultDeliveryContext, deliverNotice } from '../notifications/deliver'
 import { activeTaskId } from '../tasks/tasks'
+import { Show } from 'solid-js'
 
 // Settings → Notifications: the switches the gate reads
 // (docs/future/notifications/model.md § The gate).
@@ -14,9 +16,9 @@ import { activeTaskId } from '../tasks/tasks'
 // want to hear about it, and a row that lands silently but still counts in the pill is hearing
 // about it.
 //
-// There is no badge switch yet. The number on the app icon needs a host that can draw one, and no
-// build installs that seam, so the row is absent rather than greyed out: docs/frontend.md refuses a
-// disabled control with a tooltip where hiding says the true thing.
+// The badge row appears only where the host can draw a number on the app icon — a desktop shell, not
+// a page. Absent rather than greyed out: docs/frontend.md refuses a disabled control with a tooltip
+// where hiding says the true thing.
 export default function NotificationSettings() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
@@ -37,6 +39,9 @@ export default function NotificationSettings() {
     <>
       <Checkbox label="Play a sound" checked={settings().sound} onChange={(sound) => save({ sound })} />
       <Checkbox label="Show a system notification" checked={settings().system} onChange={(system) => save({ system })} />
+      <Show when={canSetBadge()}>
+        <Checkbox label="Show a count on the app icon" checked={settings().badge} onChange={(badge) => save({ badge })} />
+      </Show>
 
       <Field label="Notify me when" group>
         <Checkbox label="An agent needs me" checked={settings().events.blocked} onChange={(blocked) => saveEvent({ blocked })} />

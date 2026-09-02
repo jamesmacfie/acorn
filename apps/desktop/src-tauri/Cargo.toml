@@ -38,6 +38,7 @@ hex = "0.4"
 # Dev only in practice: the app scheme proxies to the Vite dev server so the renderer keeps its own
 # origin while it keeps HMR (src/app_scheme.rs).
 ureq = "2"
+tauri-plugin-notification = "2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

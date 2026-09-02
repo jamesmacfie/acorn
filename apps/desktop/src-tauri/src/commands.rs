@@ -1,12 +1,14 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_notification::{NotificationExt, PermissionState};
 
 use crate::helper::Helper;
 
@@ -133,6 +135,74 @@ pub async fn save_file(app: AppHandle, bytes: String, suggested_name: String) ->
     std::fs::write(path, decoded).is_ok()
 }
 
+// ── Notifications and the dock badge ──────────────────────────────────────────────────────────
+//
+// Both are the shell's rather than the helper's: a banner and an app icon belong to the window's
+// process. See docs/future/notifications/model.md for the gate upstream of them, which decides what
+// is worth one.
+
+/// The tag of the last banner shown, and when. `tauri-plugin-notification` v2 gives desktop no
+/// activation callback — its `show()` returns nothing to hang one off — so this approximates the
+/// click: the window coming back within half a minute of a banner is nearly always somebody having
+/// clicked it. herdr does the same thing with `terminal-notifier -activate`.
+///
+/// A static rather than a `Shell` field, because the notification path never needs the rest of the
+/// shell's state and a focus event has no `State` to hand.
+static LAST_BANNER: Mutex<Option<(String, Instant)>> = Mutex::new(None);
+const ACTIVATION_WINDOW: Duration = Duration::from_secs(30);
+
+/// Raise one. False when nothing was shown, so the renderer can tell "the OS said no" from "the OS
+/// is showing it". `tag` is the notice id, handed back on activation so the renderer can find it.
+///
+/// No sound is ever asked for. The chime is the client's, and it plays whether or not the OS agreed
+/// to draw a banner, so asking for both is how you get two sounds for one event.
+#[tauri::command]
+pub fn show_notification(app: AppHandle, title: String, body: Option<String>, tag: String) -> bool {
+    let notification = app.notification();
+    let granted = matches!(notification.permission_state(), Ok(PermissionState::Granted))
+        || matches!(notification.request_permission(), Ok(PermissionState::Granted));
+    if !granted {
+        return false;
+    }
+    let mut builder = notification.builder().title(title);
+    if let Some(body) = body {
+        builder = builder.body(body);
+    }
+    if builder.show().is_err() {
+        return false;
+    }
+    if let Ok(mut last) = LAST_BANNER.lock() {
+        *last = Some((tag, Instant::now()));
+    }
+    true
+}
+
+/// The number on the app icon, or none. Safe everywhere: Windows draws no badge from this call and
+/// the seam does not promise one, only that asking is harmless.
+#[tauri::command]
+pub fn set_badge(app: AppHandle, count: Option<i64>) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_badge_count(count);
+    }
+}
+
+/// The tag to hand the renderer when the window comes back, given what was last shown and how long
+/// ago. None when nothing was shown, and none when it was long enough ago that the focus is more
+/// likely the owner coming back to work than a click on a banner.
+fn activation_tag(last: Option<(String, Instant)>, now: Instant) -> Option<String> {
+    let (tag, at) = last?;
+    (now.duration_since(at) <= ACTIVATION_WINDOW).then_some(tag)
+}
+
+/// The main window has been focused. Takes the tag either way: a banner old enough to be stale must
+/// not fire on some later focus instead.
+pub fn window_focused(app: &AppHandle) {
+    let taken = LAST_BANNER.lock().ok().and_then(|mut last| last.take());
+    if let Some(tag) = activation_tag(taken, Instant::now()) {
+        let _ = app.emit("acorn:notification-activated", tag);
+    }
+}
+
 /// The recovery screen's "Open data folder". Reveals rather than opens, so the owner can look at a
 /// wedged node without the shell deciding what to do about it.
 #[tauri::command]
@@ -175,8 +245,9 @@ pub fn shutdown(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::mime_for;
+    use super::{activation_tag, mime_for, ACTIVATION_WINDOW};
     use std::path::Path;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn a_picked_file_gets_a_media_type_from_its_extension() {
@@ -187,5 +258,15 @@ mod tests {
         // and a file with no extension at all.
         assert_eq!(mime_for(Path::new("/tmp/main.rs")), "text/plain");
         assert_eq!(mime_for(Path::new("/tmp/Makefile")), "text/plain");
+    }
+
+    #[test]
+    fn a_focus_soon_after_a_banner_counts_as_a_click_and_a_late_one_does_not() {
+        let now = Instant::now();
+        let shown = now - ACTIVATION_WINDOW + Duration::from_secs(1);
+        assert_eq!(activation_tag(Some(("n1".into(), shown)), now), Some("n1".into()));
+        let stale = now - ACTIVATION_WINDOW - Duration::from_secs(1);
+        assert_eq!(activation_tag(Some(("n1".into(), stale)), now), None);
+        assert_eq!(activation_tag(None, now), None);
     }
 }

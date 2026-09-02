@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SEAM_GROUPS, seamProblems, type SeamGroup } from './contract'
-import { canPickFolder, fleetBridge, nodeTransport, pickFiles, pickFolder, saveFile } from './index'
+import { canPickFolder, canSetBadge, fleetBridge, nodeTransport, pickFiles, pickFolder, saveFile, setBadge, showNotification } from './index'
 
 // The seam contract against a mock host. Each shell runs the same checker against its real host
 // object (apps/desktop/src/shell/bridge.test.ts). That half catches a renamed preload key, this half
@@ -31,6 +31,7 @@ const fullHost = () => ({
   recovery: { openDataFolder: vi.fn(), quit: vi.fn() },
   folderPath: { pick: vi.fn(async () => '/tmp/picked') },
   files: { pick: vi.fn(async () => []), save: vi.fn(async () => true) },
+  notify: { show: vi.fn(async () => true), onActivate: vi.fn(() => () => {}), setBadge: vi.fn() },
   preview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), onEvent: vi.fn() },
   webview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), onEvent: vi.fn(), onBlocked: vi.fn() },
 })
@@ -65,6 +66,13 @@ describe('the platform seam contract', () => {
     const { plugins: _plugins, ...host } = fullHost()
     install(host)
     expect(seamProblems(SEAM_GROUPS)).toEqual(['plugins: implemented by the host but the seam resolved null'])
+  })
+
+  it('fails a notify group missing the badge', () => {
+    const host = fullHost()
+    const { setBadge: _setBadge, ...notify } = host.notify
+    install({ ...host, notify })
+    expect(seamProblems(SEAM_GROUPS)).toEqual(['notify.setBadge: not a function'])
   })
 
   it('fails a group the host half-builds', () => {
@@ -117,6 +125,25 @@ describe('the platform seam contract', () => {
       await expect(saveFile({ bytes: new Uint8Array([1]), suggestedName: 'x.md', mimeType: 'text/markdown' })).resolves.toBe(true)
     })
 
+    it('leaves the badge to a host that can draw one', async () => {
+      install({})
+      expect(canSetBadge()).toBe(false)
+      // A page has no app icon, so asking is a no-op rather than a throw.
+      expect(() => setBadge(3)).not.toThrow()
+      const notify = { show: vi.fn(async () => true), onActivate: vi.fn(() => () => {}), setBadge: vi.fn() }
+      install({ notify })
+      expect(canSetBadge()).toBe(true)
+      setBadge(null)
+      expect(notify.setBadge).toHaveBeenCalledWith(null)
+      await expect(showNotification({ title: 'x', tag: 'n1' })).resolves.toBe(true)
+      expect(notify.show).toHaveBeenCalledWith({ title: 'x', tag: 'n1' })
+    })
+
+    it('shows nothing when there is no host and no page notifier', async () => {
+      install({})
+      await expect(showNotification({ title: 'x', tag: 'n1' })).resolves.toBe(false)
+    })
+
     it('answers the folder picker the same way whether it is missing or dismissed', async () => {
       install({})
       expect(canPickFolder()).toBe(false)
@@ -137,6 +164,7 @@ describe('the platform seam contract', () => {
       'desktopExtras',
       'folderPicker',
       'files',
+      'notify',
       'recovery',
       'preview',
       'webviews',

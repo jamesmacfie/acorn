@@ -168,7 +168,15 @@ open its own file input and click its own download link, so the seam carries tha
 caller gets a working verb. A host that installs the `files` group takes over with native dialogs,
 and its save writes where the owner chose instead of into the downloads folder. Both verbs move
 bytes, never paths, which is what lets an agent attachment on this machine reach a node on another
-one. See [the renderer bridge](./shell.md#the-renderer-bridge) for the desktop half.
+one.
+
+`notify` is the same arrangement for telling somebody something happened while they were not
+looking. A page has `Notification`, so `showNotification` falls back to it, holds the object until it
+closes so the click handler survives collection, and asks for permission the first time. A host that
+installs the group takes the banner over and gains the one thing a page cannot do: `canSetBadge`
+answers true, Settings shows the app-icon row, and `trackBadge` puts the bell's pill number on the
+icon. The tag on every banner is the notice id, so a click resolves back to the row it came from.
+See [the renderer bridge](./shell.md#the-renderer-bridge) for the desktop half of both.
 
 The router is registry-driven. A source contributes path shapes with an explicit `order`, and the desktop
 shell composes them before rendering, so a static route stays ahead of a parameter route without embedding a

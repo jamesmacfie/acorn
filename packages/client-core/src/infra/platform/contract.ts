@@ -7,6 +7,7 @@ import {
   hostPlatform,
   isDesktopHost,
   nodeTransport,
+  notifyHost,
   pluginCustody,
   pluginWebviews,
   previewViews,
@@ -15,6 +16,7 @@ import {
   type FileDialogs,
   type FleetBridge,
   type NodeTransport,
+  type Notify,
   type PluginCustody,
   type PluginWebviews,
   type PreviewViews,
@@ -68,6 +70,13 @@ const GROUPS = {
   files: {
     resolve: fileDialogs,
     members: members<FileDialogs>()(['pick', 'save']),
+  },
+  // Telling somebody something happened while they were not looking. Absent is not "the verbs are
+  // missing": the seam falls back to the page's own `Notification`, so this says whether the shell
+  // took that over and, with it, whether there is an app icon to put a number on.
+  notify: {
+    resolve: notifyHost,
+    members: members<Notify>()(['show', 'onActivate', 'setBadge']),
   },
   recovery: {
     resolve: recoveryActions,
