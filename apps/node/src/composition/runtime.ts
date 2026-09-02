@@ -1,5 +1,4 @@
 import type { ServerType } from '@hono/node-server'
-import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth/deviceTokens.ts'
@@ -7,6 +6,7 @@ import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/ser
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
+import { beginLoginShellPath } from '@acorn/node-core/server/core/loginShellPath.ts'
 import { disabledPluginsStore } from '@acorn/node-core/server/plugins/disabled.ts'
 import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost/state.ts'
 import { buildPluginDeps } from './pluginDeps'
@@ -42,8 +42,9 @@ type RuntimeOptions = {
 //
 // Two numbers per line, because both questions get asked. `+Nms` is the offset from the first line, so
 // a person can read the shape of a boot down the column; `(Nms)` is this step alone, so the one step
-// that cost the boot is the one wide number. The plugin passes are named per plugin for that reason —
-// nineteen inits and readys run in series here and a single total cannot say which one is slow
+// that cost the boot is the one wide number. The plugin passes are named per plugin because `install`
+// alone cannot say which plugin was the slow one. Those lines are wall-clock slices rather than
+// per-plugin costs, because the passes overlap: a plugin's line says when it finished
 // (docs/local-development.md § Timing a cold start).
 function bootTimer(): (label: string) => void {
   const started = process.hrtime.bigint()
@@ -56,29 +57,15 @@ function bootTimer(): (label: string) => void {
   }
 }
 
-async function inheritLoginShellPath(isPackaged: boolean): Promise<void> {
-  if (process.platform !== 'darwin' || !isPackaged) return
-  const shell = process.env.SHELL || '/bin/zsh'
-  try {
-    const path = await new Promise<string>((resolve, reject) => {
-      execFile(shell, ['-lic', 'printf %s "$PATH"'], { encoding: 'utf8', timeout: 5_000 }, (error, stdout) => {
-        if (error) reject(error)
-        else resolve(stdout.trim())
-      })
-    })
-    if (path) process.env.PATH = path
-  } catch (error) {
-    console.warn('[service:boot] login-shell PATH probe failed; keeping inherited PATH:', error)
-  }
-}
-
 // Shell-free composition root (docs/architecture-overview.md § Process ownership). The runtime takes
 // no native surface, so importing this module in a plain Node test loads no shell.
 export async function startServiceRuntime({ config, stateChanged }: RuntimeOptions): Promise<ServiceRuntime> {
   const mark = bootTimer()
-  // First, and marked first: on a packaged macOS build this spawns a login shell and waits up to five
-  // seconds for it, before anything else in the boot has run.
-  await inheritLoginShellPath(config.isPackaged)
+  // Started, not awaited. On a packaged macOS build this spawns a login shell to recover the owner's
+  // PATH, which takes half a second to two seconds on a profile with a version manager in it. The
+  // PATH is for spawning agents and build commands later, so the first spawn waits on it instead of
+  // the whole boot (node-core server/core/loginShellPath.ts, docs/node-distribution.md § Boot order).
+  beginLoginShellPath(config.isPackaged)
   mark('login-shell')
   configureTerminalMcp(
     serverName(config.isPackaged),

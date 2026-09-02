@@ -258,8 +258,8 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/server/mcpRegister.ts', // registers the MCP server with a CLI
       'packages/node-core/src/server/profiles.ts', // probes whether an agent CLI is installed
       'packages/node-core/src/server/transport/tls.ts', // openssl, at first boot only
-      // Composition roots: a login-shell PATH probe, and the supervised node's own child.
-      'apps/node/src/composition/runtime.ts',
+      'packages/node-core/src/server/core/loginShellPath.ts', // the login-shell PATH probe, once at boot
+      // The supervised node's own child.
       'packages/custody/src/supervision/serviceHost.ts',
       'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.

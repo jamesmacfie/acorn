@@ -81,6 +81,25 @@ describe('acknowledging a bundle', () => {
     expect(first.list()).toHaveLength(1)
     expect(first.decisionFor('sparkline', HASH_A)?.decision).toBe('accepted')
   })
+
+  // Every launch re-records the bundled plugins (bundledPluginTrust.ts), and each write fsyncs the
+  // whole file. Re-deciding the same bundle the same way is not a decision.
+  it('does not rewrite the file when the stored decision is the same', () => {
+    store().record(ack())
+    const path = join(dir, 'plugin-trust.json')
+    const before = statSync(path, { bigint: true }).mtimeNs
+
+    // A fresh store, because a launch is a fresh process. The later `decidedAt` is deliberate: the
+    // stored answer to "when did the owner decide this" is the first time, not the last.
+    store().record(ack({ decidedAt: 1_700_000_009_000 }))
+    expect(statSync(path, { bigint: true }).mtimeNs).toBe(before)
+    expect(store().decisionFor('sparkline', HASH_A)?.decidedAt).toBe(1_700_000_000_000)
+
+    // And it does write when anything else about the disclosure moved.
+    store().record(ack({ permissions: { ...NONE, api: ['core.tasks:read'] } }))
+    expect(statSync(path, { bigint: true }).mtimeNs).not.toBe(before)
+    expect(store().decisionFor('sparkline', HASH_A)?.permissions.api).toEqual(['core.tasks:read'])
+  })
 })
 
 describe('custody', () => {

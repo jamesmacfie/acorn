@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -71,6 +71,13 @@ export class PluginCache {
   putBundled(pluginId: string, version: string, bytes: Uint8Array): string {
     if (bytes.byteLength > MAX_BUNDLE_BYTES) throw new Error(`Bundled plugin '${pluginId}' exceeds the client bundle limit.`)
     const hash = createHash('sha256').update(bytes).digest('hex')
+    // Nothing to do when these exact bytes are already here, which is every launch between app
+    // updates. Writing anyway cost a bundle write plus an fsynced index rewrite per bundled plugin,
+    // in front of the window (docs/security.md § Third-party plugin bundles).
+    //
+    // The file is checked as well as the index row, because the two can disagree after a crash
+    // mid-write and `sweep` only repairs the other direction. A stat is not a write.
+    if (this.has(hash) && existsSync(join(this.dir, `${hash}.js`))) return hash
     this.writeBundle(hash, bytes)
     const now = Date.now()
     const existing = this.entries()[hash]
@@ -166,11 +173,16 @@ export class PluginCache {
   sweep(): void {
     const entries = { ...this.entries() }
     const cutoff = Date.now() - EVICT_AFTER_MS
+    let dropped = 0
     for (const [hash, entry] of Object.entries(entries)) {
       if (entry.nodeIds.length > 0 || entry.lastSeen >= cutoff) continue
       delete entries[hash]
+      dropped++
     }
-    this.writeIndex(entries)
+    // Only when the sweep actually dropped something. The steady state is a launch that evicts
+    // nothing, and rewriting an unchanged index there is an fsync in front of the window for bytes
+    // that did not change.
+    if (dropped) this.writeIndex(entries)
 
     let files: string[]
     try {

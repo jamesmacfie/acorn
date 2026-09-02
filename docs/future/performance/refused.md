@@ -132,3 +132,45 @@ are larger: 449 ms spawning the node and evaluating its one-chunk bundle before 
 and 220 ms of `migrate` on a first-ever boot. Phase 3 should pick its target from
 measurements.md § 2026-09-03 — phase 2 rather than from the `tsx` figure. The plugin passes are still
 46 ms cold, so the wire contract is still refused for the reason above.
+
+**Phase 3 shipped without it, 2026-09-03.** The plugin passes measure 24 ms warm and 38 to 41 ms on a
+first boot against a realistic root, before and after making them concurrent, out of a 132 ms boot to
+`listener-up`. Binding the listener in front of them cannot buy more than that, and it would cost a
+`plugin_starting` code every client and the Model Context Protocol child honours forever.
+
+One claim in phase 3's own scope turned out to be false and is worth recording, because it was part of
+the case for the gated half being cheap: **the client does not retry on `retryable`.**
+`packages/protocol/src/errors.ts` does carry the field, and `apiClient.ts` reads it onto `ApiError`,
+but nothing in `packages/client-core/src/infra/node/` retries on it — there is no retry loop and no
+TanStack Query `retry` predicate reading it. So the gated half would have needed client code after all,
+which makes it more expensive than the phase file assumed, not less.
+
+## Added 2026-09-03
+
+### Splitting the node service bundle into per-plugin chunks
+
+Phase 3's scope and phase 10's deferred list both said to split the one 1,099,400 B service chunk into
+per-plugin dynamic imports if its evaluation time came in over 100 ms. It is 293 ms, and the split is
+refused anyway, because the measurement says the bytes are not where the time is: 51 ms of the 293 ms
+is the bundle's own modules and 242 ms is external libraries the chunk does not contain
+(measurements.md § 2026-09-03 — phase 3). Every plugin in `nodePlugins()` has its `init` called on
+every boot, so per-plugin chunks would evaluate all 51 ms of it anyway, in 16 pieces instead of one.
+
+`drizzle-orm` is 161 ms of the 242 ms and cannot be narrowed: the root barrel is 92 ms, `sqlite-core`
+alone is 155 ms, and both together are 161 ms, so moving 99 files off the root barrel would save about
+6 ms. Exit condition: a real change to what the node needs before it binds, such as the node no longer
+building its schema at boot. Two smaller candidates are recorded with their sizes in measurements.md
+rather than refused: `@agentclientprotocol/sdk` at 25 ms and `jose` at 10 ms, both statically imported
+for work that happens long after the listener is up.
+
+### A journal check in front of drizzle's `migrate`
+
+Phase 3's scope said to write this down if the ten SQLite opens turned out to cost more than
+milliseconds each. They do not. `core.sqlite` opens and migrates in 7 ms and the nine plugin files cost
+23 ms together, warm, including the 159 MB `agents.sqlite`. `migrate` against an up-to-date journal is
+one `SELECT` against `__drizzle_migrations`, which is what it measures. Nobody should add a check that
+guards a `SELECT` with a file read.
+
+The 111 ms the `migrate` boot label used to report was `diskBlobCache` sweeping 2,975 files with a
+`chmod` each, inside the same step. That is fixed in `packages/node-core/src/server/bindings.ts` and
+the step is 29 ms.

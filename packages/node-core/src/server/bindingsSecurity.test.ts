@@ -40,6 +40,12 @@ describe('local data permissions', () => {
     const old = join(dir, 'patch_old')
     writeFileSync(old, 'old')
     chmodSync(old, 0o644)
+    // Already right, and it has to stay untouched: `chmod` on a correct file is a syscall that changes
+    // nothing, and there are thousands of these on a real cache
+    // (docs/future/performance/measurements.md § 2026-09-03 — phase 3).
+    const settled = join(dir, 'patch_settled')
+    writeFileSync(settled, 'settled', { mode: 0o600 })
+    const before = statSync(settled, { bigint: true }).ctimeNs
 
     const cache = diskBlobCache(dir)
     await cache.put('patch:new', 'new')
@@ -47,5 +53,8 @@ describe('local data permissions', () => {
     expect(statSync(dir).mode & 0o777).toBe(0o700)
     expect(statSync(old).mode & 0o777).toBe(0o600)
     expect(statSync(join(dir, 'patch_new')).mode & 0o777).toBe(0o600)
+    // chmod bumps ctime, so an unchanged ctime says the sweep skipped it.
+    expect(statSync(settled, { bigint: true }).ctimeNs).toBe(before)
+    expect(statSync(settled).mode & 0o777).toBe(0o600)
   })
 })

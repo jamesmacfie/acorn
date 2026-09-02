@@ -1,6 +1,16 @@
 # Phase 3: the node listens sooner
 
-Status: not started. Waits on phase 0 for the boot breakdown that decides its gated half.
+Status: shipped 2026-09-03, definite half only. The login-shell `PATH` probe left the critical path and
+the first spawn waits on it instead, custody's bundled-plugin writes became idempotent, and both plugin
+passes run concurrently. **The gated half is refused**: the plugin passes measure 24 ms warm and 38 to
+41 ms on a first boot out of a 132 ms boot, an order of magnitude under the 300 ms bar, so no
+`plugin_starting` wire contract was built ([refused.md](./refused.md) § A 503-until-ready node
+contract). Two things this file asked for changed shape on the numbers, both recorded in
+[measurements.md](./measurements.md) § 2026-09-03 — phase 3: the concurrent passes save nothing
+measurable, because plugin inits are synchronous, and the per-plugin bundle split is refused because
+only 51 ms of the bundle's 293 ms evaluation is acorn's own code. The boot's real costs turned out to
+be the shell probe, worth 548 ms on a packaged macOS build, and a `chmod` sweep over 2,975 blob cache
+files, worth 78 ms on every boot.
 
 ## Goal
 

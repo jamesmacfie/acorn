@@ -1,8 +1,10 @@
-// The plugin host: builds each plugin's context and runs its init, in declaration order.
-// See docs/plugins.md § Activation and § Loaded plugins.
+// The plugin host: builds every plugin's context in declaration order, then runs all of their inits at
+// once. See docs/plugins.md § Activation and § Loaded plugins.
 //
 // Declaration order must not be load-bearing, because a disabled plugin removes a step from the
-// sequence. Cross-plugin needs resolve through the capability registry at call time.
+// sequence and because the inits now overlap. Cross-plugin needs resolve through the capability
+// registry at call time, and a plugin that has to read another plugin's contributions does it in
+// `ready`, which runs after every init.
 import type { Env } from '../bindings'
 import type { CoreServices } from '../core'
 import { builtinPluginStorage, type PluginDatabase } from '../plugins/storage'
@@ -60,12 +62,16 @@ export type PluginHostOptions = {
   // (server/pluginHost/scheduleRun.ts). Optional because a suite that declares no schedule has nothing to
   // run. A binding that declares one without this is a wiring bug and throws.
   env?: Env
-  // The composition root's boot timer, if it kept one. Every init and every ready runs in series before
-  // the listener binds, so this pass is most of a cold boot and a single `install` label says only how
-  // long all of it took. One line per plugin per pass is what makes "which plugin" answerable, which is
-  // the question the performance programme's phase 3 decides a wire contract on
-  // (apps/node/src/composition/runtime.ts § bootTimer, docs/future/performance/refused.md § A
-  // 503-until-ready node contract).
+  // The composition root's boot timer, if it kept one. Both passes run before the listener binds, and a
+  // single `install` label cannot say which plugin was the slow one, so there is a line per plugin per
+  // pass. Read them as wall-clock slices rather than per-plugin costs once the passes overlap: a
+  // plugin's line says when it finished.
+  //
+  // These are the marks that refused the 503-until-ready wire contract. Both passes together measure
+  // 24 ms warm and 38 to 41 ms on a first boot against a realistic data root, out of a 132 ms boot,
+  // which is not worth a code every client and the MCP child would honour forever
+  // (apps/node/src/composition/runtime.ts § bootTimer,
+  // docs/future/performance/refused.md § A 503-until-ready node contract).
   mark?: (label: string) => void
 }
 
@@ -364,6 +370,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     failed.push({ name: plugin.name, error: error instanceof Error ? error.message : String(error), at: Date.now(), stage: phase })
   }
 
+  // Every plugin that is going to run, prepared in declaration order, before any of them starts. The
+  // registrations here are synchronous and independent, so doing them all first is what lets the init
+  // pass below be concurrent without a plugin racing a neighbour's manifest declarations.
+  const running: { plugin: NodePlugin; ctx: ReturnType<typeof buildPluginContext>; loaded: LoadedPluginBinding | undefined }[] = []
   for (const plugin of plugins) {
     // Clearing happens before the disabled check. These registries are module singletons, so a plugin
     // disabled on the second boot of one process would otherwise keep the first boot's routes, tools
@@ -376,7 +386,6 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // Undefined for a built-in, the manifest's `permissions.node` block for a plugin loaded from disk.
     // Its presence is what shapes the context (server/pluginHost/context.ts).
     const loaded = options.loaded?.get(plugin.name)
-    const permissions = loaded?.permissions
     const storage = storageFor(plugin, loaded)
     const ctx = buildPluginContext({
       plugin: plugin.name,
@@ -391,53 +400,98 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     registerManifestSchedules(ctx, plugin.name, loaded)
     registerManifestTaskChecks(ctx, plugin.name, loaded)
     registerManifestHooks(ctx, plugin.name, loaded)
-    registerManifestHarnesses(ctx, plugin.name, loaded)
     registerManifestCollections(ctx, loaded)
     registerManifestNodeActions(ctx, loaded)
     registerManifestAuditActions(ctx, loaded)
-    // A failing init fails the boot, because every plugin here is first-party code in the same binary.
-    // The plugins that already initialized are torn down first: each holds a WAL-mode SQLite handle and
-    // the composition root's catch releases the data-root lock. The caller cannot do it, because it
-    // only receives the dispose closure from a resolved result.
-    //
-    // A loaded plugin is contained instead. See docs/plugins.md § Loaded plugins.
-    try {
+    running.push({ plugin, ctx, loaded })
+  }
+
+  // The init pass, all at once. Nothing here consumes another plugin's contributions, which is what
+  // `ready` below is for, so the serial loop was serial because loops are.
+  //
+  // Do not expect this to be faster. Most of these inits are synchronous: `ctx.storage.open()` opens a
+  // node:sqlite handle and runs drizzle's migration chain without awaiting anything, so one thread runs
+  // them one after another either way, and the measured pass is 24 ms warm before and after
+  // (docs/future/performance/measurements.md § 2026-09-03 — phase 3). What this buys is that a plugin
+  // that does await something no longer holds up its neighbours.
+  //
+  // `allSettled` rather than `all`, because the failure handling per plugin is the same as the serial
+  // loop's `catch` and one plugin throwing must not hide what its neighbours did.
+  const inits = await Promise.allSettled(
+    running.map(async ({ plugin, ctx }) => {
       await plugin.init(ctx)
       mark(`plugin ${plugin.name} init`)
-    } catch (error) {
-      if (permissions) {
-        await contain(plugin, 'init', error)
-        continue
-      }
-      await disposeStarted(started, closeStorage)
-      throw error
+    }),
+  )
+
+  // Sorted in declaration order, not completion order, so `started` and `enabled` read the same on
+  // every boot. `started` reversed is the dispose order, and a later plugin may depend on an earlier
+  // one's resources, which is the reason that order is declaration and not "whoever finished last".
+  //
+  // A built-in failing still fails the boot, because every built-in is first-party code in the same
+  // binary. The difference from the serial loop is that its neighbours have already run, so all of
+  // them are torn down rather than the prefix: each holds a WAL-mode SQLite handle and the composition
+  // root's catch releases the data-root lock. A loaded plugin is contained instead
+  // (docs/plugins.md § Loaded plugins).
+  let fatal: { error: unknown } | null = null
+  for (const [index, outcome] of inits.entries()) {
+    const { plugin, ctx, loaded } = running[index]
+    if (outcome.status === 'fulfilled') {
+      contexts.set(plugin.name, ctx)
+      started.push(plugin)
+      enabled.push(plugin.name)
+      continue
     }
-    contexts.set(plugin.name, ctx)
-    started.push(plugin)
-    enabled.push(plugin.name)
+    if (loaded?.permissions) {
+      await contain(plugin, 'init', outcome.reason)
+      continue
+    }
+    fatal ??= { error: outcome.reason }
+  }
+  if (fatal) {
+    await disposeStarted(started, closeStorage)
+    throw fatal.error
+  }
+
+  // The one manifest contribution that lands in another plugin's registry, so the one that cannot be
+  // declared before the init pass: `ctx.harnesses.register` resolves AGENTS_HARNESS_REGISTRY at
+  // registration time, and the agents plugin provides it in its own init
+  // (server/pluginHost/context.ts § harnesses). Declared here it no longer matters which order the
+  // roster puts the two in; declared before init it silently registered nothing whenever agents had
+  // not run yet.
+  for (const { plugin, ctx, loaded } of running) {
+    if (!started.includes(plugin)) continue
+    registerManifestHarnesses(ctx, plugin.name, loaded)
   }
 
   // The second pass, after every init: a plugin that must read another plugin's contributions runs here
-  // rather than depending on its position in the list. Still before the listener binds, and a failure
-  // tears down as an init failure does. Iterated over a copy, because containing a failure removes the
+  // rather than depending on its position in the list. Concurrent for the same reason the init pass is,
+  // and still before the listener binds. Snapshotted, because containing a failure below removes the
   // plugin from `started`.
-  for (const plugin of [...started]) {
-    if (!plugin.ready) continue
-    try {
+  const readying = [...started]
+  const readies = await Promise.allSettled(
+    readying.map(async (plugin) => {
+      if (!plugin.ready) return
       await plugin.ready(contexts.get(plugin.name)!)
       mark(`plugin ${plugin.name} ready`)
-    } catch (error) {
-      if (options.loaded?.has(plugin.name)) {
-        await contain(plugin, 'ready', error)
-        // Out of both lists: `contain` already disposed it, and leaving it in `started` would dispose it
-        // again at shutdown.
-        started.splice(started.indexOf(plugin), 1)
-        enabled.splice(enabled.indexOf(plugin.name), 1)
-        continue
-      }
-      await disposeStarted(started, closeStorage)
-      throw error
+    }),
+  )
+  for (const [index, outcome] of readies.entries()) {
+    if (outcome.status === 'fulfilled') continue
+    const plugin = readying[index]
+    if (options.loaded?.has(plugin.name)) {
+      await contain(plugin, 'ready', outcome.reason)
+      // Out of both lists: `contain` already disposed it, and leaving it in `started` would dispose it
+      // again at shutdown.
+      started.splice(started.indexOf(plugin), 1)
+      enabled.splice(enabled.indexOf(plugin.name), 1)
+      continue
     }
+    fatal ??= { error: outcome.reason }
+  }
+  if (fatal) {
+    await disposeStarted(started, closeStorage)
+    throw fatal.error
   }
 
   // Built from the offered list, in declaration order, so a skipped plugin still has a row. `disabled`

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -48,6 +48,46 @@ describe('bundled plugin client trust', () => {
     expect(trust.decisionFor('rollbar', hash)).toMatchObject({
       pluginId: 'rollbar', version: '1.2.3', decision: 'accepted', nodeId: 'bundled:acorn-0.1.0',
     })
+  })
+
+  // The whole second launch, which is the shape the performance programme cared about: sweep the cache,
+  // trust the bundled roster, and write nothing at all because nothing changed
+  // (docs/future/performance/phase-3-the-node-listens-sooner.md).
+  it('writes nothing under the plugin cache on a second launch with unchanged bundles', () => {
+    const resources = temporary('acorn-bundled-trust-idempotent-')
+    const userData = temporary('acorn-bundled-trust-user-')
+    for (const id of ['rollbar', 'linear']) {
+      const dir = join(resources, id)
+      mkdirSync(join(dir, 'dist'), { recursive: true })
+      writeFileSync(join(dir, 'dist/client.js'), `export default function activate() { return '${id}' }\n`)
+      writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
+        id, name: id, version: '1.2.3', apiVersion: PLUGIN_API_MAJOR,
+        client: './dist/client.js',
+        permissions: { api: [], events: [], node: {} },
+      }))
+    }
+    const launch = (): string[] => {
+      const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
+      cache.sweep()
+      const trust = new PluginTrustStore(userData)
+      return trustBundledClientPlugins(resources, '0.1.0', cache, trust)
+    }
+    expect(launch()).toEqual(['linear', 'rollbar'])
+
+    // Nanoseconds, so two writes inside one millisecond cannot compare equal.
+    const stamps = (): Record<string, bigint> => {
+      const out: Record<string, bigint> = {}
+      for (const file of readdirSync(join(userData, 'plugin-cache'))) {
+        out[file] = statSync(join(userData, 'plugin-cache', file), { bigint: true }).mtimeNs
+      }
+      out['plugin-trust.json'] = statSync(join(userData, 'plugin-trust.json'), { bigint: true }).mtimeNs
+      return out
+    }
+    const before = stamps()
+    expect(Object.keys(before).sort()).toHaveLength(4) // two bundles, the index, the trust file
+
+    expect(launch()).toEqual(['linear', 'rollbar'])
+    expect(stamps()).toEqual(before)
   })
 
   it('does not trust a malformed package or a directory with a mismatched id', () => {

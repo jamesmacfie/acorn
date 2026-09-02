@@ -39,10 +39,17 @@ that touches its surface, moves it out.
 - **The reconciler's per-element cost in the terminal client.** `apps/tui/src/kit/reconciler.ts`
   patches every element and wraps every dynamic child. Both fix real bugs. Phase 9's counter says
   whether they cost anything a person can see.
-- **The node service bundle as one chunk.** Phase 3 measures its evaluation time. Split per plugin
-  only if it is over 100 ms.
-- **The ten SQLite opens per boot.** Phase 3 measures them. A journal check before `migrate` is the
-  fix if they show.
+- ~~**The node service bundle as one chunk.**~~ **Settled 2026-09-03, and not by the split.** Its
+  evaluation is 293 ms, over the bar, and phase 3 refused the per-plugin split anyway: only 51 ms of
+  that is the bundle's own modules and every plugin's `init` runs on every boot, so 16 chunks would
+  evaluate the same 51 ms. The other 242 ms is external libraries, `drizzle-orm` alone being 161 ms and
+  not narrowable (refused.md § Splitting the node service bundle into per-plugin chunks). Two sized
+  candidates are left if anyone wants 35 ms: `@agentclientprotocol/sdk` at 25 ms and `jose` at 10 ms,
+  both imported statically for work that happens long after the listener is up.
+- ~~**The ten SQLite opens per boot.**~~ **Settled 2026-09-03: a non-issue.** `core.sqlite` opens and
+  migrates in 7 ms, the nine plugin files cost 23 ms together, and no journal check should be added.
+  The 111 ms the `migrate` label used to report was `diskBlobCache` chmodding 2,975 files inside the
+  same step, which phase 3 fixed.
 
 ## Done when
 

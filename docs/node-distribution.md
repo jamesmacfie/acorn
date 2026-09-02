@@ -19,6 +19,45 @@ while no device is paired. `kill -USR1 <pid>` opens another without restarting t
 its live agent and terminal sessions. `SIGUSR1` does not exist on Windows, so pairing a second device
 there means a restart.
 
+## Boot order
+
+The node binds its listener at the end of one chain: open the data root and take its lock, reconcile
+bundled packages, open and migrate `core.sqlite`, load the packages installed in the data root, run
+every plugin's `init` and then every plugin's `ready`, mint or read the TLS certificate, listen.
+Three things that used to be in that chain for history rather than dependency are not any more.
+
+The login-shell `PATH` probe starts at the first mark and nothing waits on it. On a packaged macOS
+build a window-launched process inherits a minimal `PATH`, so the node asks the owner's login shell
+what theirs is with `$SHELL -lic 'printf %s "$PATH"'`. That costs 520 ms on this developer's machine
+and up to 2 seconds on a profile with a version manager in it, and the answer is needed to spawn
+agents and build commands, not to migrate a database or bind a listener. The probe keeps its
+five-second ceiling, and the first process the node spawns waits for it: `runProcess` and
+`runHeadless` both await the gate in `packages/node-core/src/server/core/loginShellPath.ts` before
+they call `spawn`. A spawn that arrives after the probe has settled waits for nothing.
+
+Two spawn paths do not go through that gate, and both are deliberate. A terminal session runs
+`$SHELL -lc`, which reads the profile itself, so the probe would tell it nothing it does not already
+know. The managed-agent drivers under `plugins/agents/src/server/` call `spawn` directly, so an agent
+started in the first two seconds of a packaged launch can see the inherited `PATH`. Move them onto
+`spawnsReady()` if that ever shows up as a missing-binary report.
+
+Plugin `init` runs for every plugin at once, and so does `ready`. See
+[docs/plugins.md](./plugins.md) § Activation for what that means for a plugin author.
+
+Opening the blob cache no longer chmods every file in it. The sweep is a permission migration for
+files an older build wrote, it is synchronous, and it sat inside the `migrate` step
+([caching.md](./caching.md) § Immutable blob cache).
+
+Reconciliation runs behind the listener, not in front of it. `startServiceRuntime` returns as soon as
+the node is listening, and the tmux, worktree, workflow, and agent reconcile steps continue after
+that.
+
+`[service:boot] <label> +<offset>ms (<step>ms)` prints one line per step, unconditionally, so a node
+that took 11 seconds to bind says so without anyone having asked. Per-request timing is the opposite
+and sits behind `ACORN_PERF=1`. Read the labels as wall-clock slices rather than per-plugin costs
+once the passes overlap: with 16 plugins initialising together, a plugin's line says when it
+finished, not how long it worked.
+
 ## Reaching a node with `acorn`
 
 `acorn` is the terminal client (`apps/tui/`, [docs/tui.md](./tui.md)). Run it and it opens the

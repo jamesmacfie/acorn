@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process'
 import { lineDelimitedJsonAdapter, parseStreamJson } from './agentProfiles/streamJson'
 import type { HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent, StreamJsonAdapter } from './agentProfiles'
 import { requireProfile } from './profiles'
+import { spawnsReady } from './core/loginShellPath'
 
 export type HeadlessMode = 'interactive' | 'headless'
 
@@ -43,10 +44,13 @@ export type HeadlessResult = {
 
 export const HEADLESS_TIMEOUT_MS = 10 * 60 * 1000
 
-export function runHeadless(
+export async function runHeadless(
   argv: HeadlessArgv,
   opts: { cwd: string; env: Record<string, string>; timeoutMs?: number; signal?: AbortSignal; onEvent?: (event: StreamEvent) => void; adapter?: StreamJsonAdapter },
 ): Promise<HeadlessResult> {
+  // Same gate as core/proc.ts, and for the same reason: an agent CLI is exactly the kind of command
+  // the login-shell PATH probe exists to find (core/loginShellPath.ts).
+  await spawnsReady()
   return new Promise((resolve) => {
     const adapter = opts.adapter ?? lineDelimitedJsonAdapter
     // detached gives it its own process group, so the timeout kill reaps grandchildren too. A hung

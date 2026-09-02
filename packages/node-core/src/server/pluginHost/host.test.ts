@@ -15,7 +15,7 @@ import { agentToolContributions } from '../agentTools/registry'
 import type { AppEnv } from '../middleware/auth'
 import { pluginRouteContributions } from '../routeRegistry'
 import { AGENTS_HARNESS_REGISTRY, type ManifestHarness } from './harnesses'
-import { clearRegistrations, initPlugins } from './host'
+import { clearRegistrations, initPlugins, type LoadedPluginBinding } from './host'
 import type { NodePermissions } from '../plugins/manifest'
 import type { CompiledNodePluginContext, NodePlugin } from './types'
 import { defaultBudgets, externalIdsFor, publicProvider } from '../integrations/providerShared'
@@ -103,7 +103,10 @@ describe('plugin host', () => {
       disabled,
     })
 
-  it('initializes plugins in declaration order and binds each context to its own name', async () => {
+  // Starts, not finishes: the pass is kicked off in declaration order, and a plugin that awaits inside
+  // its init finishes whenever it finishes. The order-independence block at the bottom of this file is
+  // the property that matters.
+  it('starts plugins in declaration order and binds each context to its own name', async () => {
     const order: string[] = []
     const names: string[] = []
     const result = await host([
@@ -125,7 +128,7 @@ describe('plugin host', () => {
     expect(resolved).toBe('from provider')
   })
 
-  it('awaits async init, so a plugin can finish a migration before the listener binds', async () => {
+  it('awaits every async init before it resolves, without one plugin waiting for another', async () => {
     const done: string[] = []
     await host([
       plugin('slow', {
@@ -136,7 +139,10 @@ describe('plugin host', () => {
       }),
       plugin('fast', { init: () => void done.push('fast') }),
     ])
-    expect(done).toEqual(['slow', 'fast'])
+    // The whole pass is still awaited, so a plugin's migration is finished before the listener binds.
+    // What is gone is the queueing: 'fast' does not sit behind 'slow', which is why completion order is
+    // not declaration order and must not be depended on.
+    expect(done).toEqual(['fast', 'slow'])
   })
 
   it('skips a disabled plugin but ignores the flag for a required one', async () => {
@@ -182,17 +188,20 @@ describe('plugin host', () => {
 
   it('propagates an init failure instead of booting a half-wired node', async () => {
     const started: string[] = []
-    await expect(
-      host([
-        plugin('bad', {
-          init: () => {
-            throw new Error('nope')
-          },
-        }),
-        plugin('after', { init: () => void started.push('after') }),
-      ]),
-    ).rejects.toThrow('nope')
-    expect(started).toEqual([])
+    const result = host([
+      plugin('bad', {
+        init: () => {
+          throw new Error('nope')
+        },
+      }),
+      plugin('after', { init: () => void started.push('after') }),
+    ])
+    await expect(result).rejects.toThrow('nope')
+    // 'after' ran, where the serial loop never reached it: the whole pass is in flight before any
+    // failure is read. What matters is unchanged — the boot fails rather than serving a node one of
+    // whose plugins never initialized — and the test below is the one that proves the neighbours are
+    // torn down again.
+    expect(started).toEqual(['after'])
   })
 
   it('disposes the plugins that DID initialize when a later init throws', async () => {
@@ -209,11 +218,13 @@ describe('plugin host', () => {
             throw new Error('nope')
           },
         }),
-        plugin('never', { dispose: () => void disposed.push('never') }),
+        plugin('last', { dispose: () => void disposed.push('last') }),
       ]),
     ).rejects.toThrow('nope')
-    // Reverse order, and the plugin that never initialized is not disposed.
-    expect(disposed).toEqual(['second', 'first'])
+    // Reverse declaration order, and every plugin whose init resolved is in the list — which is all of
+    // them now, because they all ran. Declaration order is what the dispose sequence reverses, not
+    // completion order: a later plugin may depend on an earlier one's resources.
+    expect(disposed).toEqual(['last', 'second', 'first'])
   })
 
   // The compiled tier's half of ctx.storage. See docs/data-layer.md § Migrations. All the host needs is
@@ -633,8 +644,9 @@ describe('delivering a manifest-declared harness', () => {
 
   const plugin = (name: string, opts: Partial<NodePlugin> = {}): NodePlugin => ({ name, init: () => {}, ...opts })
 
-  // Two plugins per boot, in the order the composition root uses them: the consumer publishes the
-  // capability from its own init, and the contributor's harnesses arrive when its turn comes.
+  // Two plugins per boot: the consumer publishes the capability from its own init, and the
+  // contributor's manifest harnesses are registered after every init has run, so neither plugin's
+  // position in the roster decides whether the harness arrives.
   const boot = async (
     harnesses: readonly unknown[],
     dir: string,
@@ -752,5 +764,135 @@ describe('delivering a manifest-declared harness', () => {
     })
     expect(result.enabled).toEqual(['opencode'])
     await result.dispose()
+  })
+})
+
+// The property the concurrent init pass rests on, and the reason the file's header says declaration
+// order is not a contract: nothing a plugin does in its init may depend on where the roster put it.
+// Proved by booting one roster three ways and comparing everything it registered.
+describe('order independence', () => {
+  let shared: ReturnType<typeof makeTestDb> | null = null
+  const coreDb = () => (shared ??= makeTestDb()).db
+  afterAll(() => shared?.cleanup())
+
+  const greet = capabilityId<() => string>('probe.orderGreet')
+  const harnessDescriptor = {
+    id: 'opencode',
+    label: 'OpenCode',
+    spawn: { command: 'opencode', args: [] },
+    envPassthrough: [],
+    quirks: { manualCompaction: false, sessionPersistence: false },
+  }
+
+  type Registered = {
+    enabled: string[]
+    harnesses: string[]
+    routes: string[]
+    tools: string[]
+    greeting: string | undefined
+  }
+
+  const bootIn = async (order: readonly number[]): Promise<Registered> => {
+    const harnesses: ManifestHarness[] = []
+    let greeting: string | undefined
+    const roster: NodePlugin[] = [
+      // Stands in for the agents plugin: the harness registry appears inside an init, and a loaded
+      // plugin's manifest harnesses have to find it there.
+      {
+        name: 'agents',
+        init: (ctx) => void ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, {
+          register: (harness) => {
+            harnesses.push(harness)
+            return { dispose: () => void harnesses.splice(harnesses.indexOf(harness), 1) }
+          },
+        }),
+      },
+      {
+        name: 'github',
+        init: (ctx) => {
+          ctx.routes.register(new Hono<AppEnv>())
+          ctx.tools.register({ name: 'probe_order', title: 'Probe', risk: 'read', input: z.object({}), handler: async () => null } as never)
+        },
+      },
+      { name: 'terminal', init: (ctx) => void ctx.capabilities.provide(greet, () => 'from terminal') },
+      // The cross-plugin read, in `ready` because that is the pass that exists for it.
+      { name: 'memory', init: () => {}, ready: (ctx) => void (greeting = ctx.capabilities.get(greet)?.()) },
+      { name: 'opencode', init: () => {} },
+    ]
+    const result = await initPlugins(
+      order.map((index) => roster[index]),
+      {
+        capabilities: new CapabilityRegistry(),
+        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+        dataDir: '',
+        loaded: new Map([['opencode', {
+          permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+          storage: { open: () => { throw new Error('test storage is not configured') } },
+          harnesses: [harnessDescriptor] as never,
+          dir: '',
+        }]]),
+      },
+    )
+    const registered: Registered = {
+      // Sorted, because `enabled` follows whatever order it was handed and the question here is which
+      // plugins ran, not in what sequence.
+      enabled: [...result.enabled].sort(),
+      harnesses: harnesses.map((harness) => harness.id).sort(),
+      routes: pluginRouteContributions().map((entry) => entry.plugin).sort(),
+      tools: agentToolContributions().map((entry) => entry.name).sort(),
+      greeting,
+    }
+    await result.dispose()
+    return registered
+  }
+
+  it('registers the same things whichever order the roster is in', async () => {
+    const declared = await bootIn([0, 1, 2, 3, 4])
+    const reversed = await bootIn([4, 3, 2, 1, 0])
+    const shuffled = await bootIn([3, 0, 4, 2, 1])
+    expect(reversed).toEqual(declared)
+    expect(shuffled).toEqual(declared)
+    // And not vacuously equal. The harness is the strict case: it is the one manifest contribution that
+    // lands in another plugin's registry, so it is present only because agents' registry was found.
+    expect(declared.harnesses).toEqual(['opencode:opencode'])
+    expect(declared.greeting).toBe('from terminal')
+    expect(declared.tools).toEqual(['probe_order'])
+  })
+
+  it('records a rejecting plugin as failed while its neighbours reach ready', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(noop)
+    const ready: string[] = []
+    const loaded = (name: string): [string, LoadedPluginBinding] => [name, {
+      permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [] },
+      storage: { open: () => { throw new Error('test storage is not configured') } },
+    }]
+    const result = await initPlugins(
+      [
+        { name: 'before', init: () => {}, ready: () => void ready.push('before') },
+        {
+          name: 'broken',
+          init: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 2))
+            throw new Error('init went wrong')
+          },
+          ready: () => void ready.push('broken'),
+        },
+        { name: 'after', init: () => {}, ready: () => void ready.push('after') },
+      ],
+      {
+        capabilities: new CapabilityRegistry(),
+        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+        dataDir: '',
+        loaded: new Map([loaded('before'), loaded('broken'), loaded('after')]),
+      },
+    )
+    expect(result.failed).toEqual([expect.objectContaining({ name: 'broken', stage: 'init', error: 'init went wrong' })])
+    expect([...result.enabled].sort()).toEqual(['after', 'before'])
+    // The ready pass runs only for the plugins whose init resolved, so the broken one is not in it and
+    // both of its neighbours are.
+    expect(ready.sort()).toEqual(['after', 'before'])
+    expect(result.roster.find((entry) => entry.name === 'broken')?.state).toBe('failed')
+    await result.dispose()
+    error.mockRestore()
   })
 })

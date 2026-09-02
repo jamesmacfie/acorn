@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterAll, describe, expect, it } from 'vitest'
+import { holdSpawnsUntil } from './loginShellPath'
 import { brokerEnv, runProcess, runProcessOrThrow } from './proc'
 
 const exec = promisify(execFile)
@@ -198,5 +199,38 @@ describe('failure taxonomy', () => {
   it('feeds stdin without wedging on a process that never reads it', async () => {
     await expect(sh('cat', { stdin: 'hello' })).resolves.toMatchObject({ code: 0, stdout: 'hello' })
     await expect(sh('exit 0', { stdin: 'x'.repeat(100_000) })).resolves.toMatchObject({ code: 0 })
+  })
+})
+
+// The login-shell PATH probe runs behind the boot now, so the first spawn is what pays for it. See
+// ./loginShellPath.ts and docs/node-distribution.md § Boot order.
+describe('the login-shell PATH gate', () => {
+  it('holds a spawn that arrives while the probe is running, and costs nothing after', async () => {
+    let release!: () => void
+    holdSpawnsUntil(new Promise<void>((resolve) => (release = resolve)))
+
+    let finished = false
+    const during = sh('exit 0').then((result) => {
+      finished = true
+      return result
+    })
+    // Long enough for the spawn to have happened if nothing were holding it: two macrotasks plus a
+    // real timer is far more than `spawn` needs to reach 'close' for `exit 0`.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(finished).toBe(false)
+
+    release()
+    expect((await during).code).toBe(0)
+
+    // And once the probe is done the gate is gone: this one resolves without another hold.
+    const after = await sh('exit 0')
+    expect(after.code).toBe(0)
+  })
+
+  it('lets a spawn through when the probe failed, keeping the inherited PATH', async () => {
+    // A failed probe already warned and kept the PATH it inherited. A spawn must not inherit its
+    // rejection on top of that.
+    holdSpawnsUntil(Promise.reject(new Error('no login shell here')))
+    expect((await sh('exit 0')).code).toBe(0)
   })
 })

@@ -44,8 +44,10 @@ paints from the persisted cache. Done when the timeline shows the window open be
 
 **[Phase 3: the node listens sooner.](./phase-3-the-node-listens-sooner.md)** The shell probe leaves
 the critical path, bundle writes become idempotent, plugin init runs concurrently. The listener before
-plugin init is gated on phase 0's breakdown and refused if the number does not justify a wire
-contract. Done when `install` drops by the measured serial cost.
+plugin init was gated on phase 0's breakdown and is refused: 24 ms of plugin passes does not justify a
+wire contract. Shipped 2026-09-03. `install` did not drop, because plugin inits are synchronous and
+concurrency cannot overlap them; what dropped was the boot, by 548 ms on a packaged macOS build (the
+shell probe) and 78 ms on a warm one (a `chmod` sweep over the blob cache).
 
 **[Phase 4: the terminal client draws first, from disk.](./phase-4-the-terminal-client-draws-first.md)**
 One query client per node in `acorn` too, persisted through the file storage it already installs;
