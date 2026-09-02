@@ -350,7 +350,9 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 }
 .ui-empty[data-align='start'] { align-items: flex-start; justify-content: flex-start; text-align: left; }
 .ui-empty[data-size='md'] { min-height: var(--space-11); flex: 1; }
-.ui-empty[data-size='sm'] { padding: var(--space-4); gap: var(--space-2); }
+/* Tighter than the base only down the block. The inline padding stays `--pane-pad`, because a small
+   empty state stands in for the rows that would have been there and has to start where they do. */
+.ui-empty[data-size='sm'] { padding: var(--space-4) var(--pane-pad); gap: var(--space-2); }
 .ui-empty-icon { color: var(--text-faint); display: inline-flex; }
 .ui-empty-title { margin: 0; color: var(--text); font-weight: var(--fw-medium); }
 .ui-empty-text { margin: 0; max-width: 42ch; }
