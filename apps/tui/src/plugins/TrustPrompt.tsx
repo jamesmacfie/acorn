@@ -1,13 +1,11 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { pendingTrust, resolvePendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { recordTrustDecision, TIER_LABEL, trustTiers } from '@acorn/client-core/host/trust/trustModel.ts'
 import { Modal, ModalBody, SectionHeader } from '../kit/grouping'
 import { Alert, Row, Rows } from '../kit/showing'
 import { Line } from '../kit/cells'
-import { takeFocus } from '../keys/regions'
 
 // "Do you want to run this?", in a terminal.
 //
@@ -81,7 +79,7 @@ export function TrustPrompt() {
               )}
             </For>
             <Show when={error()}><Alert>{error()}</Alert></Show>
-            <box flexDirection="column" ref={(element: BoxRenderable) => takeFocus(element)}>
+            <box flexDirection="column">
               <Rows id="plugins.trust" ariaLabel="Run this plugin?" items={[...CHOICES]} onActivate={decide}>
                 {(row, item) => <Row item={item}>{row.label}</Row>}
               </Rows>
