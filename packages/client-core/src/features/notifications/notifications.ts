@@ -1,13 +1,12 @@
 // Notification centre: a bounded in-memory ring of agent-event notices, mirrored to a prefs blob so
 // the last 50 survive a reload. Ephemeral app state, not a table. The durable truth is the session or
-// task. Edge detection is pure (detectEdges), fed by the sessions store on every refresh. OS toasts
-// are focus-gated and deduped here.
+// task.
+//
+// This file is the ring and nothing else. What is worth a notice is attention.ts, and when it lands
+// and which channels it wakes is deliver.ts.
 import { createSignal } from 'solid-js'
-import type { TerminalSession } from '@acorn/protocol/terminal.ts'
-import { wsOnNotice } from '../../infra/node/wsClient'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { homeNodeId } from '../../infra/node/fleet'
-import { noticeKindContribution } from '../../host/registries/rail/notices'
 
 export type NoticeKind = string
 export type NoticeTarget = {
@@ -66,8 +65,10 @@ export function openTarget(taskId: string, target: NoticeTarget): void {
   targetHandlers.get(target.kind)?.(taskId, target)
 }
 
-export function pushNotice(n: Omit<Notice, 'id' | 'read'>): Notice {
-  const notice: Notice = { ...n, nodeId: n.nodeId ?? activeNodeId() ?? undefined, id: noticeId(n.at), read: false }
+// `read` is how an edge you watched happen still gets a row without moving the pill
+// (deliver.ts § the seen rule). Everything else pushes unread.
+export function pushNotice(n: Omit<Notice, 'id' | 'read'> & { read?: boolean }): Notice {
+  const notice: Notice = { ...n, nodeId: n.nodeId ?? activeNodeId() ?? undefined, id: noticeId(n.at), read: n.read ?? false }
   setNotices((prev) => capNotices([notice, ...prev]))
   return notice
 }
@@ -133,121 +134,6 @@ export function _resetNotices(): void {
   setNotices([])
 }
 
-// Pure edge detection: compare consecutive session snapshots. Edges are tracked unconditionally
-// (suppression only affects the OS toast) so the next transition is right.
-type SessionEdgeState = Pick<TerminalSession, 'id' | 'taskId' | 'title' | 'kind' | 'status' | 'idle' | 'agentState' | 'exitCode'>
-
-export function detectEdges(prev: SessionEdgeState[], next: SessionEdgeState[], at: number): Omit<Notice, 'id' | 'read'>[] {
-  const before = new Map(prev.map((s) => [s.id, s]))
-  const out: Omit<Notice, 'id' | 'read'>[] = []
-  for (const s of next) {
-    const p = before.get(s.id)
-    if (!p) continue // brand-new session — no edge yet
-    if (s.kind === 'agent' && p.status === 'running' && !p.idle && s.status === 'running' && s.idle && s.agentState !== 'blocked') {
-      out.push({ taskId: s.taskId, kind: 'finished', title: `${s.title} finished`, detail: 'agent went idle', at })
-    }
-    if (s.agentState === 'blocked' && p.agentState !== 'blocked') {
-      out.push({ taskId: s.taskId, kind: 'needs-input', title: `${s.title} needs input`, at })
-    }
-    if (p.status === 'running' && s.status === 'exited') {
-      const failed = s.exitCode != null && s.exitCode !== 0
-      out.push({
-        taskId: s.taskId,
-        kind: failed ? 'error' : 'exited',
-        title: `${s.title} exited${failed ? ` (code ${s.exitCode})` : ''}`,
-        at,
-      })
-    }
-  }
-  return out
-}
-
-// OS-toast gating. A focused window means bell only, plus a per-task-and-kind cooldown so a chatty
-// agent cannot spam. Pure, with state passed in.
-export const TOAST_COOLDOWN_MS = 30_000
-
-export function shouldToast(
-  notice: Pick<Notice, 'taskId' | 'kind' | 'at'>,
-  opts: { focused: boolean; lastToastAt: Map<string, number>; cooldownMs?: number },
-): boolean {
-  if (noticeKindContribution(notice.kind)?.toast === false) return false
-  if (opts.focused) return false
-  const key = `${notice.taskId}:${notice.kind}`
-  const last = opts.lastToastAt.get(key)
-  const cooldown = opts.cooldownMs ?? TOAST_COOLDOWN_MS
-  if (last != null && notice.at - last < cooldown) return false
-  opts.lastToastAt.set(key, notice.at)
-  return true
-}
-
 export function pushBackgroundError(taskId: string, title: string, detail?: string): Notice {
   return pushNotice({ taskId, kind: 'background-error', title, detail, at: Date.now() })
-}
-
-// Workflow notices (docs/workflows.md § Routes and UI). Main broadcasts gate and run-done events over
-// `/v2/events`, and they land in the same bell and toast gate here.
-export function initWorkflowNotices(): () => void {
-  return wsOnNotice((n) => {
-    const at = Date.now()
-    const detail = n.action === 'review-config' ? 'Review & trust' : n.action === 'review-plugin-request' ? 'Review the request' : undefined
-    pushNotice({ taskId: n.taskId, kind: n.kind, title: n.title, detail, action: n.action, at })
-    if (typeof Notification !== 'undefined' && shouldToast({ taskId: n.taskId, kind: n.kind, at }, { focused: document.hasFocus(), lastToastAt })) {
-      try {
-        new Notification(n.title)
-      } catch {
-        // never break the bell
-      }
-    }
-  })
-}
-
-// --- Wiring: called by sessions.ts on every refresh with the previous + new snapshot.
-const lastToastAt = new Map<string, number>()
-
-// Managed-agent notices carry no prompt-derived title, response, filename, or path. The durable
-// notice target provides exact navigation without leaking sensitive content to the OS.
-export function pushManagedAgentNotice(input: {
-  taskId: string
-  sessionId: string
-  requestId?: string
-  kind: 'agent-completed' | 'agent-needs-input' | 'agent-error'
-  title: string
-}): Notice {
-  const at = Date.now()
-  const notice = pushNotice({
-    taskId: input.taskId,
-    kind: input.kind,
-    title: input.title,
-    at,
-    target: {
-      kind: 'managed-agent',
-      resourceId: input.sessionId,
-      subresourceId: input.requestId,
-    },
-  })
-  if (
-    typeof Notification !== 'undefined'
-    && shouldToast(notice, { focused: document.hasFocus(), lastToastAt })
-  ) {
-    try {
-      new Notification(input.title)
-    } catch {
-      // Notification permission/support issues never break durable in-app attention.
-    }
-  }
-  return notice
-}
-
-export function trackSessionEdges(prev: TerminalSession[], next: TerminalSession[]): void {
-  const at = Date.now()
-  for (const edge of detectEdges(prev, next, at)) {
-    pushNotice(edge)
-    if (typeof Notification !== 'undefined' && shouldToast(edge, { focused: document.hasFocus(), lastToastAt })) {
-      try {
-        new Notification(edge.title, { body: edge.detail })
-      } catch {
-        // Notification permission/support issues never break the bell
-      }
-    }
-  }
 }

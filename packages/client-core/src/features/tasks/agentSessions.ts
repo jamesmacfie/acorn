@@ -10,9 +10,11 @@
 // ./taskBridge.test.ts), so off-desktop this is an empty list and no subscription.
 import { createSignal } from 'solid-js'
 import { hasHostCapability } from '../../infra/node/hostCapabilities'
+import { activeNodeId } from '../../infra/node/activeNode'
 import { readJson } from '../../infra/node/apiClient'
 import { wsOnStatus } from '../../infra/node/wsClient'
-import { trackSessionEdges } from '../notifications/notifications'
+import { fromTerminalSession } from '../notifications/attention'
+import { observeAttention } from '../notifications/deliver'
 import type { TerminalSession } from '@acorn/protocol/terminal.ts'
 
 // plugins/terminal owns these paths (plugins/terminal/src/contract/routes.ts). They are duplicated
@@ -29,8 +31,9 @@ export { sessions }
 export const refreshSessions = latestOnly(
   async () => (hasHostCapability({ plugin: 'terminal' }) ? await readJson<TerminalSession[]>(terminalSessionsRoute) : []),
   (next) => {
-    // Notification centre: compare against the last committed snapshot, never a stale request.
-    trackSessionEdges(sessions(), next)
+    // Notification centre: the gate keeps its own view of where each session was, so a stale request
+    // that lost the race never contributes an edge (notifications/deliver.ts).
+    observeAttention(next.flatMap((s) => fromTerminalSession(s, activeNodeId() ?? '') ?? []))
     setSessions(next)
   },
 )

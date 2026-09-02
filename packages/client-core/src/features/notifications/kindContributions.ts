@@ -1,9 +1,8 @@
 import type { NoticeKindContribution } from '../../host/registries/rail/notices'
 
 export const noticeKindContributions: NoticeKindContribution[] = [
-  { id: 'finished', glyph: 'circle-dot', severity: 'info', toast: true },
-  { id: 'needs-input', glyph: 'circle-alert', severity: 'warn', toast: true },
-  { id: 'exited', glyph: 'circle', severity: 'info', toast: true },
+  // No PTY-only kinds. A terminal agent and a managed agent reach the same three `agent-*` kinds
+  // through the same adapter (features/notifications/attention.ts), so they read the same way here.
   { id: 'error', glyph: 'x', severity: 'danger', toast: true },
   { id: 'gate', glyph: 'ban', severity: 'warn', toast: true },
   { id: 'run-done', glyph: 'play', severity: 'info', toast: true },
