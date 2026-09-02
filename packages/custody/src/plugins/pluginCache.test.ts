@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -142,5 +142,48 @@ describe('eviction', () => {
     writeFileSync(join(cacheDir(), `${'b'.repeat(64)}.js`), 'orphan')
     cache().sweep()
     expect(existsSync(join(cacheDir(), `${'b'.repeat(64)}.js`))).toBe(false)
+  })
+})
+
+// Five bundled plugins used to mean five bundle writes and five fsynced index rewrites per launch, for
+// bytes that last changed at an app update. See docs/security.md § Third-party plugin bundles.
+describe('caching the application own bundles', () => {
+  // Nanoseconds, not milliseconds: two writes inside one millisecond would compare equal and the test
+  // would pass for the wrong reason.
+  const mtime = (path: string): bigint => statSync(path, { bigint: true }).mtimeNs
+
+  it('writes once, and touches neither the bundle nor the index the second time', () => {
+    const store = cache()
+    const bytes = new TextEncoder().encode(BUNDLE)
+    const hash = store.putBundled('sparkline', '1.2.0', bytes)
+    const bundlePath = join(cacheDir(), `${hash}.js`)
+    const indexPath = join(cacheDir(), 'index.json')
+    const before = { bundle: mtime(bundlePath), index: mtime(indexPath) }
+
+    // A fresh store, because a launch is a fresh process: the early return has to come off the index on
+    // disk rather than off an in-memory flag.
+    expect(cache().putBundled('sparkline', '1.2.0', bytes)).toBe(hash)
+    expect(mtime(bundlePath)).toBe(before.bundle)
+    expect(mtime(indexPath)).toBe(before.index)
+  })
+
+  it('writes the bundle again when the file is gone but the index still promises it', () => {
+    const store = cache()
+    const bytes = new TextEncoder().encode(BUNDLE)
+    const hash = store.putBundled('sparkline', '1.2.0', bytes)
+    // The crash-mid-write case in the direction `sweep` does not repair: a row with no file. Returning
+    // early on the row alone would leave the plugin unloadable until the next app update.
+    rmSync(join(cacheDir(), `${hash}.js`), { force: true })
+    expect(cache().putBundled('sparkline', '1.2.0', bytes)).toBe(hash)
+    expect(readFileSync(join(cacheDir(), `${hash}.js`), 'utf8')).toBe(BUNDLE)
+  })
+
+  it('leaves the index alone when a sweep evicts nothing', () => {
+    const store = cache()
+    store.putBundled('sparkline', '1.2.0', new TextEncoder().encode(BUNDLE))
+    const indexPath = join(cacheDir(), 'index.json')
+    const before = mtime(indexPath)
+    cache().sweep()
+    expect(mtime(indexPath)).toBe(before)
   })
 })

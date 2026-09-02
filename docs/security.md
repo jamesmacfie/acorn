@@ -347,6 +347,22 @@ mismatch, same file discipline of a `0700` directory and `0600` files. A second 
 have been a second set of security decisions, so there is one — and `apps/tui/src/plugins/custody.ts`
 is the only file in that package permitted to name either class.
 
+**Storing a bundle is idempotent, and the application's own bundles go through the same door.** The
+shell caches and acknowledges the bundles in its own resource directory at every launch, because that
+grant covers bytes the build produced and nothing else writes there. Doing it at every launch does not
+mean writing at every launch. `putBundled` hashes the bytes, and when the cache already holds that
+hash and the file is on disk it returns and touches nothing. The index is rewritten only when a row is
+added, the boot sweep rewrites it only when it evicted something, and the trust store compares the
+stored acknowledgement field by field, ignoring `decidedAt`, and writes only on a difference. So five
+bundled plugins cost five bundle writes and ten fsynced rewrites on the launch after an app update, and
+zero on every launch after that. The two disagreement cases still self-heal: a row whose file is gone
+is rewritten because the file is checked as well as the row, and a file with no row is deleted by the
+sweep.
+
+Skipping a write is not skipping a decision. The hash is still computed from the bytes on every
+launch, so a bundle whose contents changed produces a hash the cache does not hold and takes the full
+path, and an acknowledgement whose permissions moved is written and re-prompted the same as before.
+
 **Consent is per device and per bundle.** First sight of a `(plugin, hash)` pair prompts, naming the
 Node it came from and the permissions the manifest declared. An update arrives as a new hash and
 prompts again, showing what the permissions gained. A rejection is remembered. Pairing a new machine

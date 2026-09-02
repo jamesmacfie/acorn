@@ -104,7 +104,21 @@ without anyone having asked, so `[service:boot]` needs no switch: `login-shell`,
 `bundled-packages`, `migrate`, `graph` (the plugin loader importing whatever is installed in the data
 root), then one line per plugin per pass (`plugin github init`, `plugin x ready`), then `install`,
 `cert`, `bind`, `listener-up`, `scheduler`, the four `reconcile.*` steps, and `teardown`. The per-plugin
-lines are there because nineteen inits run in series and a single total cannot say which one is slow.
+lines are there because `install` on its own cannot say which plugin was the slow one.
+
+Two labels need reading with care. `login-shell` is when the `PATH` probe started, not when it
+finished: the probe runs behind the boot and the first process the node spawns is what waits for it
+([node-distribution.md](./node-distribution.md) § Boot order), so this step is a fraction of a
+millisecond even on a packaged macOS build where the probe itself takes half a second. And the
+per-plugin lines are wall-clock slices rather than per-plugin costs, because the whole `init` pass runs
+at once. A plugin's line says when it finished. Where the two coincide, in the common case of a plugin
+whose `init` never awaits anything, the delta is that plugin's own work; where a plugin does await, the
+plugin that finished next takes the credit for the gap.
+
+`migrate` is also wider than its name. The step covers `makeRuntime`, which opens and migrates
+`core.sqlite` and then builds the rest of the runtime bindings, so a slow `migrate` is not necessarily
+a slow migration. Drizzle's `migrate` against an up-to-date journal is one `SELECT`, and on this
+machine's data root the whole `openDb` call is 7 ms.
 
 **Everything else is behind `ACORN_PERF=1`**, because those streams are the ones a developer watches
 while using the app:
@@ -130,10 +144,12 @@ two accounts meet at `[helper:boot] service.start`, which is the node reporting 
 so `ready line` to `service.start` is how long the shell was on screen without a node behind it.
 
 Two things about the node's own account are worth knowing before quoting it. Its clock starts inside
-`startServiceRuntime`, so spawning the process and evaluating the service bundle — measured at 449 ms —
-are in front of `+0ms` and appear in no step. And measuring the node by calling `startServiceRuntime`
-under `tsx` rather than launching the app inflates `graph` roughly sevenfold, because the loader then
-transpiles as it imports.
+`startServiceRuntime`, so spawning the process and evaluating the service bundle are in front of `+0ms`
+and appear in no step. That gap is 316 ms of which 293 ms is evaluating the bundle's module graph, and
+242 ms of that 293 ms is external libraries rather than acorn's own code, `drizzle-orm` alone being
+161 ms (measurements.md § 2026-09-03 — phase 3). And measuring the node by calling
+`startServiceRuntime` under `tsx` rather than launching the app inflates `graph` roughly sevenfold,
+because the loader then transpiles as it imports.
 
 **`[renderer:boot] first paint` does not print from a background window.** It is a
 `requestAnimationFrame` callback, and macOS pauses those while the window is occluded, so a launch

@@ -3,6 +3,7 @@
 import { spawn } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import { childEnv } from '../taskEnv'
+import { spawnsReady } from './loginShellPath'
 
 // Per stream, not combined: matches the cap plugins/http already enforces on command variables.
 export const DEFAULT_MAX_OUTPUT_BYTES = 1 << 20
@@ -70,7 +71,12 @@ export function brokerEnv(spec: Pick<ProcSpec, 'env' | 'passthrough'>, parent: N
 
 // Never rejects on a non-zero exit: the exit code is data, and every current call site branches on it
 // anyway. Only a programming error (bad spec) can throw.
-export function runProcess(spec: ProcSpec): Promise<ProcResult> {
+export async function runProcess(spec: ProcSpec): Promise<ProcResult> {
+  // The login-shell PATH probe, if this build started one. It runs behind the boot rather than in
+  // front of it, so this is where a spawn pays for it: once, and only if it arrives first
+  // (core/loginShellPath.ts). `spec.timeoutMs` covers the command, not the wait, which is why the
+  // probe carries its own five-second ceiling.
+  await spawnsReady()
   const maxOutputBytes = spec.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES
   return new Promise((resolve) => {
     // Detached, so its own process group, so the kill below reaps grandchildren too. A `sh -c` wrapper

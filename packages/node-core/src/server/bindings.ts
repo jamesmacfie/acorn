@@ -88,10 +88,17 @@ export function diskBlobCache(dir: string): BlobCache {
   chmodSync(dir, 0o700)
   // Migrate existing cache entries created under a permissive umask. Never follow symlinks: blob
   // keys create flat regular files, so anything else is outside this cache's contract.
+  //
+  // Only a file whose mode is actually wrong is chmodded, and the mode comes off the `lstat` this loop
+  // already does. `put` below has written 0600 for a long time, so on a real cache every entry is
+  // already right and every chmod was a syscall that changed nothing: 2,975 blobs cost 102 ms of the
+  // node's boot, in front of the listener, for zero files fixed. The stat pass is 13 ms
+  // (docs/future/performance/measurements.md § 2026-09-03 — phase 3).
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry)
     try {
-      if (lstatSync(path).isFile()) chmodSync(path, 0o600)
+      const stat = lstatSync(path)
+      if (stat.isFile() && (stat.mode & 0o777) !== 0o600) chmodSync(path, 0o600)
     } catch {
       // A cache file can disappear concurrently; a later miss simply refetches it.
     }

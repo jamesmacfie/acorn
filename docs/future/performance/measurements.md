@@ -368,3 +368,202 @@ change the mark to something a background window still fires.
   webview reuse its cache. Nothing in this file says what those hashed reads cost today.
 - **A warm-cache first paint in a packaged build.** Same reason as the mark above, plus the same
   packaged build.
+
+## 2026-09-03 — phase 3
+
+Same machine, Node 24.11.0. Phases 0 (`17b03dbe`), 1 (`77ed2ebd`) and 2 (`7c826ad6`) had shipped.
+
+Everything here is measured against the **staged `service.js`**, not under `tsx`, and under the pinned
+runtime the desktop ships (`apps/desktop/src-tauri/binaries/node-aarch64-apple-darwin`, Node 24.11.0).
+The harness forks the bundle with an IPC channel the way the helper does, sends one `service.start`,
+and reads the `[service:boot]` lines against the parent's clock. The data root is a copy of this
+machine's `apps/node/.acorn`: 16 plugins, five of them loaded from disk, a 1.6 MB `core.sqlite`,
+166 MB of plugin databases, and 2,975 files in `blobs/`. Before-and-after pairs were taken by
+reverting the changed files, rebuilding, re-staging, and running the same protocol.
+
+### The 449 ms phase 2 could not see, split
+
+Phase 2 found that the node's own boot account starts 449 ms after the helper's, and asked phase 3 to
+split spawning the process from evaluating the bundle. Median of seven forks:
+
+| | Value |
+| --- | --- |
+| `fork()` → the child's first line of user code | **23 ms** |
+| of which the child's own clock says was Node's bootstrap | 10 ms |
+| **evaluating the service bundle's module graph** | **293 ms** (344 ms on the first, cold fork) |
+| `fork()` → the bundle fully evaluated | **316 ms** |
+
+So 316 ms of phase 2's 449 ms is spawn plus evaluation, and the remaining ~133 ms is the helper's own
+work between its clock and the fork plus the `service.start` round trip. **Spawning the process is
+23 ms and is not worth touching.** Bundle evaluation is 293 ms, which is over the 100 ms bar phase 3's
+scope and phase 10's deferred list both set.
+
+### What the 293 ms is, and why per-plugin chunks are refused
+
+Timing each external import in a fresh process, in this order, then importing the bundle with those
+already warm:
+
+| Import | Cost |
+| --- | --- |
+| `drizzle-orm` | 91 ms |
+| `drizzle-orm/sqlite-core` | 76 ms |
+| `@agentclientprotocol/sdk` | 25 ms |
+| `zod` | 17 ms |
+| `@hono/node-server` | 11 ms |
+| `jose` | 10 ms |
+| `ws` | 6 ms |
+| `hono` | 5 ms |
+| `node-pty` | 3 ms |
+| `drizzle-orm/better-sqlite3/migrator`, `smol-toml`, `@vscode/ripgrep`, `node:sqlite` | 4 ms together |
+| **the service bundle's own 1,099,400 B chunk, externals warm** | **51 ms** |
+
+**The per-plugin dynamic-import split is refused, and the reason is that the premise was wrong.**
+Phase 3's scope said "if it is over 100 ms, the fix is per-plugin chunks through dynamic imports in
+`apps/node/src/composition/plugins.ts`". It is over 100 ms, and that fix buys nothing. Only 51 ms of
+the 293 ms is acorn's own bundled code, and every plugin in `nodePlugins()` has its `init` called on
+every boot, so making each one a dynamic import moves those 51 ms into 16 chunks and evaluates all of
+them anyway. The other 242 ms is external libraries, which are already outside the chunk.
+
+`drizzle-orm` and `drizzle-orm/sqlite-core` are 161 ms together and cannot be separated: the root
+barrel alone is 92 ms, `sqlite-core` alone is 155 ms, and both together are 161 ms, so the 99 files
+importing query operators from the root barrel are paying about 6 ms for the privilege. Narrowing them
+would be 99 files for 6 ms. `sqlite-core` is the schema builder, and the node cannot migrate anything
+without it.
+
+Two candidates are left, sized, for whoever wants them: `@agentclientprotocol/sdk` at 25 ms, imported
+statically by the managed-agent driver and needed only when an Agent Client Protocol session starts,
+and `jose` at 10 ms for internal tokens. Both live in files phase 3 does not own.
+
+### The boot, before and after
+
+Five warm boots of the same root under each build, medians. Warm because that is what a person's second
+launch of the day is.
+
+| `[service:boot]` step | Before | After |
+| --- | --- | --- |
+| `login-shell` | 0 ms | 0 ms |
+| `bundled-packages` | 11 ms | 11 ms |
+| `migrate` | **111 ms** | **29 ms** |
+| `graph` | 52 ms | 59 ms |
+| the whole `init` pass (`install` minus `graph`) | 24 ms | 24 ms |
+| `cert` | 1 ms | 1 ms |
+| `bind` | 8 ms | 8 ms |
+| **total to `listener-up`** | **210 ms** | **132 ms** |
+
+**78 ms off a warm boot, and none of it is the concurrency.** The `graph` step reads 7 ms slower after,
+which is the loaded-plugin imports landing on a slightly colder page cache now that less runs in front
+of them; it is noise, not a regression.
+
+### The login-shell probe, which is the phase's real number
+
+The table above is a development build, where the probe does not run at all. With `isPackaged: true`,
+which is what a packaged macOS build does:
+
+| | Before | After |
+| --- | --- | --- |
+| `login-shell` step | **569 ms** | **5 ms** |
+| total to `listener-up` | **757 ms** | **209 ms** |
+
+**548 ms off a packaged macOS boot.** This machine's `$SHELL` is `/bin/bash`, and
+`/usr/bin/time -p $SHELL -lic 'printf %s "$PATH"'` reports 0.52 to 0.55 seconds over three runs, which
+matches the 569 ms step. A profile with a version manager in it costs more. The probe still runs, still
+keeps its five-second ceiling, and the first process the node spawns waits for it; nothing on the path
+to the listener does.
+
+### What the concurrent init pass actually saved: nothing measurable
+
+The `init` pass is 24 ms warm and 38 to 41 ms on a first boot against this root, both before and after.
+The task brief predicted "at most about 22 ms" on the reasoning that concurrency turns a sum into a
+maximum. That reasoning does not apply here, and the reason is worth writing down: **these inits are
+synchronous.** `ctx.storage.open()` opens a `node:sqlite` handle and runs drizzle's `migrate`, both
+synchronous calls, and `agents.init` — the most expensive one — has no `await` in it at all. One thread
+cannot overlap synchronous work, so `Promise.allSettled` starts 16 inits that then run to completion one
+after another exactly as the `for` loop did.
+
+The change is still right and it stays: the loop was serial because loops are, the file's own header
+says declaration order is not load-bearing, and a plugin that does await something no longer blocks its
+neighbours. But it is a correctness change with a rounding-error payoff, not a performance one, and
+anyone quoting it should say so.
+
+What the marks do show is that the pass is genuinely concurrent. Completion order is no longer
+declaration order: on a first boot `github` and `memory` finish after `rollbar`, which is declared
+eleventh places later.
+
+### The ten SQLite opens and migrations: confirmed a non-issue
+
+Phase 3's scope asked for a measurement, not a change, and said to write down a journal check before
+`migrate` only if the marks demanded it. They do not.
+
+| | Value |
+| --- | --- |
+| `core.sqlite` open plus drizzle `migrate` (`openDb`) | **7 ms** |
+| the nine plugin files, opened and migrated inside their inits | **23 ms** together, warm |
+| the widest single one (`agents`, 159 MB) | 11 to 14 ms |
+
+Thirty milliseconds for ten opens and ten migration chains. Drizzle's `migrate` on an up-to-date
+journal is one `SELECT` against `__drizzle_migrations`, and that is what it costs. **No journal check
+is needed, and nobody should add one.**
+
+### The 102 ms nobody was looking for
+
+Splitting the `migrate` step to find out whether its 111 ms was really migration found that it is not.
+`makeRuntime` is what the step covers, and inside it:
+
+| Call | Cost |
+| --- | --- |
+| `openDb` — open plus migrate `core.sqlite` | 7 ms |
+| `ensureSessionKey` | 0.2 ms |
+| `activeIdentityStore` | 0.2 ms |
+| `ensureBoundIdentity` | 0.6 ms |
+| `ensureCert` | 1.2 ms |
+| **`diskBlobCache`** | **102 ms** |
+| `loadOrCreateInternalToken` | 0.1 ms |
+
+`diskBlobCache` sweeps the blob directory at every boot, calling `chmod(0600)` on every file to migrate
+entries written under a permissive umask. On this root that is 2,975 `lstat` calls and 2,975 `chmod`
+calls, in front of the listener, and **not one file had the wrong mode.** `put` has written 0600 for a
+long time, so the sweep exists for files an old build left behind.
+
+Reading the mode off the `lstat` the loop already does, and chmodding only a file that is actually
+wrong:
+
+| | Value |
+| --- | --- |
+| `readdir` of 2,975 entries | 2 ms |
+| `lstat` over all of them, checking the mode | 10.5 ms |
+| `lstat` plus unconditional `chmod`, warm | 60 ms |
+| the same during a real boot | 102 ms |
+| files whose mode was wrong | **0** |
+
+That is the whole 78 ms of the development-build table above. It was not in phase 3's scope list, and
+I took it anyway: it is one line, it is the largest single item in the node's own boot account, it sits
+on the serial boot chain this phase exists to shorten, and no other phase file names it.
+`bindingsSecurity.test.ts` still proves the migration works on a 0644 file and now also asserts that an
+already-0600 file's `ctime` does not move.
+
+### The second launch writes nothing under the plugin cache
+
+`packages/custody/src/plugins/bundledPluginTrust.test.ts` asserts it with nanosecond mtimes: two
+bundled packages, a full launch (sweep, then trust the roster), then a second launch through fresh
+`PluginCache` and `PluginTrustStore` instances so the decision comes off disk rather than off an
+in-memory flag. Four files exist afterwards — two bundles, `index.json`, and `plugin-trust.json` — and
+all four `mtimeNs` values are unchanged by the second launch. Before this phase the same second launch
+wrote all four.
+
+Not measured as a wall-clock saving, and it would be dishonest to claim one: on this machine's APFS
+volume five bundle writes and ten fsynced rewrites of two small JSON files do not show above the noise
+in the helper's marks, which is why phase 2 measured `plugin-cache sweep` and `bundled plugins trusted`
+at 28 ms together. The argument for the change is that the writes are unconditional, they fsync, and
+they are in front of the window on a machine with a slower disk than this one.
+
+### Not measured
+
+- **A packaged build.** Every number here is the staged bundle under the pinned runtime, driven by a
+  test harness rather than by the Rust shell. The 548 ms login-shell figure is `isPackaged: true`
+  through that harness, not a `pnpm dist` bundle launched from Finder.
+- **The desktop's window-to-node gap after this phase.** Phase 2 measured it at 601 to 747 ms with the
+  node listening at the end of it. The node now gets there 78 ms sooner on a warm development boot and
+  548 ms sooner on a packaged macOS one, but nobody has re-read the four accounts side by side, which
+  needs the app running and a person watching it. Phase 10 owns that.
+- **`first paint`.** Still unread, for the reason phase 2 gave: it is a `requestAnimationFrame`
+  callback and macOS pauses those while the window is occluded.

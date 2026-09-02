@@ -50,6 +50,14 @@ content because it is not shared storage.
 Blob pruning must respect references retained by plugin records. Worktrees are not part of the blob
 cache.
 
+Opening the cache sweeps the directory once, and the sweep is a permission migration: `put` writes
+mode 0600, so a file with any other mode was written by an older build under a permissive umask. The
+mode comes off the `lstat` the sweep already does, and only a file that is actually wrong is
+chmodded. That matters because the sweep is synchronous and sits in front of the node's listener:
+2,975 blobs and an unconditional `chmod` each cost 102 ms of every boot and fixed nothing
+(`packages/node-core/src/server/bindings.ts`, docs/future/performance/measurements.md § 2026-09-03 —
+phase 3).
+
 ## Renderer query cache
 
 The renderer uses TanStack Query with one `QueryClient` and one persister per Node. The persister key

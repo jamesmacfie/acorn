@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
 import type { PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
@@ -183,6 +184,12 @@ export class PluginTrustStore {
   // so the file cannot grow a history of one plugin being toggled.
   record(ack: PluginAck): void {
     const parsed = ackSchema.parse(ack)
+    const stored = this.decisionFor(parsed.pluginId, parsed.hash)
+    // Re-deciding the same bundle the same way writes nothing. Every launch re-records the five
+    // bundled plugins (bundledPluginTrust.ts), and each write is an fsync of the whole file in front
+    // of the window. `decidedAt` is excluded because it moves on every call by definition, and the
+    // stored answer to "when did the owner decide this" is the first time, not the last.
+    if (stored && isDeepStrictEqual({ ...stored, decidedAt: 0 }, { ...parsed, decidedAt: 0 })) return
     this.write([...this.list().filter((existing) => !(existing.pluginId === parsed.pluginId && existing.hash === parsed.hash)), parsed], this.listDevGrants())
   }
 

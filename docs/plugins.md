@@ -411,7 +411,27 @@ visible with a restart banner rather than collapsing them into one state that wo
 the checkbox or hide the pending restart. Install and update carry the same banner, for the same
 reason: a package that installed onto the Node's disk has not necessarily started running yet.
 
-Node initialization happens before the listener accepts requests. A plugin can register:
+Node initialization happens before the listener accepts requests. Every plugin's `init` runs at once,
+and so does every plugin's `ready`, so **declaration order is not a contract**. A plugin whose `init`
+reads what another plugin's `init` registered is a bug, and it was a bug before the passes overlapped:
+disabling one plugin removes a step from the sequence, and the composition list is grouped by domain
+rather than by dependency. Cross-plugin needs have two answers. Resolve a capability at call time,
+inside the closure that needs it, which is what `ctx.capabilities.get` is for. Or read the other
+plugin's contributions in `ready`, which is the pass that exists for exactly this and runs only after
+every `init` has finished.
+
+`initPlugins` proves the property with a test rather than a promise: it initialises one roster in
+declaration order, reversed, and shuffled, and asserts the same registrations each time
+(`packages/node-core/src/server/pluginHost/host.test.ts` § order independence).
+
+Failure is per plugin. A built-in that throws in either pass fails the boot and every plugin that did
+initialise is disposed first, because each holds a write-ahead-log SQLite handle and the composition
+root releases the data-root lock on the way out. A plugin loaded from disk is contained instead: its
+registrations roll back, its row reads `failed`, and its neighbours reach `ready`. The one thing that
+changed when the passes started overlapping is which plugins have run by the time a failure is read.
+All of them have, so all of them are torn down rather than the ones declared before the failure.
+
+A plugin can register:
 
 - routes under `/v2/p/<plugin>/...`;
 - typed capabilities;
@@ -455,8 +475,8 @@ manifest's shape is declared once, in `packages/protocol/src/plugin/contract.ts`
 registers contributions from the same shape and neither side may import the other;
 `packages/node-core/src/server/plugins/manifest.ts` adds the cross-field rules that need `id` — route
 confinement, surface reachability — and reads the file. Loaded plugins join the same
-array and the same host pass as the compiled-in ones, so ordering, `ready`, capability late-binding
-and disposal are identical.
+array and the same host passes as the compiled-in ones, so `ready`, capability late-binding and
+disposal are identical, and order is no more load-bearing for them than for a built-in.
 
 Three things differ, and all three follow from the code not being ours:
 
