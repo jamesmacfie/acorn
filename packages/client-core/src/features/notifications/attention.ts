@@ -1,5 +1,5 @@
 // What an agent session is doing, in five words, and which changes between them are worth telling
-// someone about (docs/future/notifications/model.md).
+// someone about (docs/notifications.md).
 //
 // Pure: no Solid, no plugin import, no clock. The node already decides what a managed session's
 // attention is; this collapses that decision and the PTY tier's own vocabulary onto one scale so a

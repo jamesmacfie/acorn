@@ -1,5 +1,5 @@
 // Asking the host terminal to raise a notification, which is an escape sequence and nothing else
-// (docs/future/notifications/phase-5-tui.md).
+// (docs/notifications.md § The channels).
 //
 // Shaped like ./copy.ts, and for the same reason: a terminal takes a sequence and never answers, so
 // what this host can honestly say is "sent", not "shown". The emulators that take one are a list

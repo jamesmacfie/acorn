@@ -71,7 +71,7 @@ const session = (over: Partial<AgentSession>): AgentSession => ({
   lastEventSeq: 0, lastReadSeq: 0, archivedAt: null, createdAt: 0, updatedAt: 0, ...over,
 })
 
-describe('the managed adapter (docs/future/notifications/model.md)', () => {
+describe('the managed adapter (docs/notifications.md)', () => {
   const state = (attention: AgentAttentionReason, runtimeState: AgentRuntimeState) =>
     fromManagedSession(session({ attention, runtimeState }), 'n1').state
 

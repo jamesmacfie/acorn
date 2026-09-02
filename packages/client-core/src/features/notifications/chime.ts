@@ -1,5 +1,5 @@
 // The sound channel: two short chimes, synthesised
-// (docs/future/notifications/model.md § Channels, phase-3-sound.md).
+// (docs/notifications.md § The channels).
 //
 // No audio file ships. Two sine notes and a gain envelope are twenty lines and have no format,
 // player, or bundling question, and a chime that is data can be asserted without an `AudioContext`.

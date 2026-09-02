@@ -1,4 +1,4 @@
-// The badge channel: the number on the app icon (docs/future/notifications/model.md § Channels).
+// The badge channel: the number on the app icon (docs/notifications.md § The channels).
 //
 // Not a sink, because it is not an event. The other channels fire once per notice; this one mirrors
 // a running count, so it is an effect over the same accessor the bell's pill reads. One number with

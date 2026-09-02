@@ -172,7 +172,7 @@ export { createDeviceFlow } from '@acorn/client-core/features/integrations/devic
 export { renderMarkdown } from '@acorn/client-core/kit/lib/markdown.ts'
 export { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications/notifications.ts'
 // The attention model: an adapter turns a session row into a state, and the gate decides whether
-// that state changing is news (docs/future/notifications/model.md).
+// that state changing is news (docs/notifications.md).
 export { fromManagedSession, fromTerminalSession } from '@acorn/client-core/features/notifications/attention.ts'
 export { defaultDeliveryContext, observeAttention, pushManagedAgentNotice } from '@acorn/client-core/features/notifications/deliver.ts'
 export { markAttentionSeen } from '@acorn/client-core/features/notifications/attentionInbox.ts'

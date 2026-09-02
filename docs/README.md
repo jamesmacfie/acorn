@@ -41,6 +41,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) | The palette, the keymap, focus, and typing. |
 | [diff-rendering.md](./diff-rendering.md) | The diff model, the virtualizer, hydration, and the find pass. |
 | [editor.md](./editor.md) | The host-owned document surface: why the host draws the editor and what it lends. |
+| [notifications.md](./notifications.md) | What an agent is doing, which changes are worth interrupting for, and the gate every channel hangs off. |
 
 ## Features
 

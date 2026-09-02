@@ -1,4 +1,4 @@
-// The one gate every agent notice goes through (docs/future/notifications/model.md § The gate).
+// The one gate every agent notice goes through (docs/notifications.md § The gate).
 //
 // Two rules, and everything else hangs off them. An edge is held for a second and re-checked, so a
 // permission that policy auto-answers and a turn that a queued message immediately follows never
