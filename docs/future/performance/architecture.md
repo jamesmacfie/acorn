@@ -83,6 +83,9 @@ frames, the upgrade `apps/desktop/src/shell/wire.ts` already names.
 
 ## 4. Every client hears everything, and one ping refetches the world
 
+Corrected 2026-09-02: `bumpChrome` already takes a plugin id, and the `term:status` consumer list is
+six. See [decisions.md](./decisions.md) § Corrections to the first reads.
+
 The node's `/v2/events` socket is a firehose. The only subscription primitive is `term:attach`;
 everything else broadcasts to every connected client (`wsHub.ts`), and a plugin's frames reach every
 socket whether any surface for them is mounted (`packages/node-core/src/server/pluginHost/context.ts`).

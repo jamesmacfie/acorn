@@ -22,7 +22,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [performance/](./performance/README.md) | Two performance reads, surfaces and shapes, merged into six phases: unblock the red renderer budget and instrument, paint before the node boots, stop the event amplifiers, terminals work only when watched, the live surfaces, then re-measure. | Plan, 2026-08-31. Not started. The renderer build is over budget. |
+| [performance/](./performance/README.md) | Four reads (desktop surfaces, desktop shapes, the terminal client, and the decisions drawn from them) and eleven phases across both hosts and the node: instrument and unblock the red renderer budget, registries hold loaders, paint before the node, the node listens sooner, the terminal client draws first, stop the event amplifiers, terminals work only when watched, streaming surfaces render incrementally, switching and hydration, the terminal client's keystroke, then re-measure. | Plan, 2026-08-31, widened 2026-09-02. Not started. The renderer build is over budget and drifted further. |
 
 ## The single files
 

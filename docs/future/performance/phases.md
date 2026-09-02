@@ -1,105 +1,81 @@
 # Performance: the order of work
 
-Plan, 2026-08-31. Nothing here is scheduled. Each phase is independently shippable and each ends
-with a measurement, because the standing rule of this programme is that nothing past phase 0 gets
-argued from source alone. Items marked (analysis) come from [analysis.md](./analysis.md) and carry
-their detail there; items marked (architecture) come from [architecture.md](./architecture.md).
-What this plan decided not to do is in [refused.md](./refused.md).
+Plan, 2026-08-31, reordered 2026-09-02 when the programme widened to the terminal client. Nothing
+here is scheduled. Each phase is independently shippable, has its own file, and ends with a
+measurement, because the standing rule of this programme is that nothing past phase 0 gets argued from
+source alone. [decisions.md](./decisions.md) says which decision each phase serves;
+[refused.md](./refused.md) says what none of them will do.
 
-## Phase 0: unblock the build and get numbers
+## The graph
 
-The desktop build is red on its own startup budget, and the repo has no timing anywhere. Everything
-later is a guess until both are fixed.
+```text
+0 instrument and unblock
+└─ 1 registries hold loaders
+   ├─ 2 paint before the node (desktop)
+   ├─ 3 the node listens sooner
+   ├─ 4 the terminal client draws first
+   └─ 5 stop the event amplifiers
+      ├─ 6 terminals work only when watched   (needs 5's seq accounting)
+      ├─ 7 streaming surfaces render incrementally
+      ├─ 8 switching and hydration           (reads better after 7)
+      └─ 9 the terminal client's keystroke
+         └─ 10 re-measure, then the deferred arguments
+```
 
-- Split the icon set: a 12 KB eager map of the 68 code-referenced names, the full Lucide map lazy
-  behind it, picker and `tasks.icon` awaiting the lazy map. Recovers about 350 KB and turns the
-  budget check green. (analysis § 1)
-- Instrument: boot marks in all three processes stitched into one cold-start breakdown, one
-  request-duration line on the node behind an environment variable, `process.hrtime` histograms on
-  the git seam and the SQLite shim, a `performance.mark` around first paint, and a count of the
-  module-preload chain's depth. (analysis §§ 3, 14)
+Phases 2, 3, 4, and 5 are independent of each other and can run in parallel once 0 and 1 are in.
+Phases 7, 8, and 9 are independent of each other; 6 needs 5. Phase 10 is last by definition.
 
-Done when: `pnpm --filter @acorn/desktop build` passes its budget, and a cold start produces a
-timeline a person can read.
+## The phases
 
-## Phase 1: paint before the node
+**[Phase 0: instrument, and unblock the build.](./phase-0-instrument-and-unblock.md)** The icon split
+that turns the desktop budget green, a startup denylist on both hosts so a named heavy chunk fails the
+build even under budget, boot marks in every process stitched into one timeline, and a request-duration
+line on the node. Done when the budget passes and a cold start prints a timeline a person can read.
 
-The largest single change in the programme: the window stops waiting for the node.
-(architecture § 1)
+**[Phase 1: registries hold loaders.](./phase-1-registries-hold-loaders.md)** The kit component
+tables on both hosts, the iframe path's copy, and the CodeMirror language table map names to loaders.
+Removes `shiki`, `DiffPane`, and `prModel` from the desktop's first paint and CodeMirror from the
+terminal client entirely. Done when the denylist passes and the terminal client's eager graph is
+under half its measured size.
 
-- The helper binds its WebSocket server and prints ready before spawning the node; the Rust shell
-  opens the window on that earlier ready. The node's arrival becomes the `node-status` push the
-  renderer already handles.
-- The renderer drops its two top-level awaits. `applyNodePlugins` already argues for this in its own
-  comments; `selectActiveNode` needs the last-known node id readable synchronously so the cache
-  partition key no longer waits on the fleet answer. First paint comes from the persisted query
-  cache behind the existing `isRestoring` gate, with a skeleton where the cache is cold.
-- The node's own boot sheds its serial dead weight: the login-shell PATH probe starts in the
-  background and is awaited at first spawn (analysis § 4), plugin init runs concurrently where the
-  inits are independent, and the bundled-plugin hash-and-rewrite becomes a no-op when the hashes
-  match.
-- Module delivery stops fighting WebKit: the scheme handler goes asynchronous off the callback
-  thread, hashed `/assets/*` responses get `immutable` caching instead of `no-store`, and the eager
-  imports that pull `shiki`, `DiffPane`, and `prModel` into the startup graph get traced and cut.
-  (analysis §§ 2, 3)
+**[Phase 2: paint before the node.](./phase-2-paint-before-the-node.md)** The helper prints ready
+before the node boots, the window opens on that, the renderer drops its two awaits, and the shell
+paints from the persisted cache. Done when the timeline shows the window open before `listener-up`.
 
-Done when: the window opens before the node finishes booting, the shell draws from cache with the
-node still absent, and the phase 0 timeline shows it.
+**[Phase 3: the node listens sooner.](./phase-3-the-node-listens-sooner.md)** The shell probe leaves
+the critical path, bundle writes become idempotent, plugin init runs concurrently. The listener before
+plugin init is gated on phase 0's breakdown and refused if the number does not justify a wire
+contract. Done when `install` drops by the measured serial cost.
 
-## Phase 2: stop the event amplifiers
+**[Phase 4: the terminal client draws first, from disk.](./phase-4-the-terminal-client-draws-first.md)**
+One query client per node in `acorn` too, persisted through the file storage it already installs;
+the tasks request and the plugin activation off the critical path; the shell visible while a started
+node boots. Done when first draw on a warm cache is under the stated target.
 
-Small diffs, outsized blast radius. (architecture §§ 2, 4; analysis §§ 12, 13)
+**[Phase 5: stop the event amplifiers.](./phase-5-stop-the-event-amplifiers.md)** `term:status`
+splits into events that name what changed, the helper filters non-active nodes, the PTY pauses under
+backpressure with honest `seq`, the task-list N+1 goes, and the node caches git status and device
+tokens with short time-to-live windows, reads only. Done when a busy terminal moves no query traffic
+on an idle client and one ping spawns one git per worktree.
 
-- Split `term:status`: the consumers that refetch chrome, git status, the session list, and two
-  plugin sidebars each get an event scoped to what actually changed, and `bumpChrome` takes a
-  plugin id.
-- The helper drops frames for non-active nodes instead of forwarding them to the renderer to be
-  dropped there.
-- The PTY pauses while a sink is over its buffer mark, and a shed frame no longer burns a `seq`, so
-  transient congestion stops escalating into a socket reset, a framebuffer replay, and a whole-cache
-  refetch.
-- The task-list N+1 becomes one `inArray` over the distinct project ids.
+**[Phase 6: terminals do work only when watched.](./phase-6-terminals-work-only-when-watched.md)**
+The headless emulator runs only while attached, the ring is chunks, inactive tabs stay mounted,
+terminal output is binary on the wire. Done when an unwatched session costs no parser time and a tab
+switch touches no network.
 
-Done when: a terminal producing output at full rate moves no query traffic on an idle client, and a
-deliberately saturated socket recovers without a reconnect.
+**[Phase 7: streaming surfaces render incrementally.](./phase-7-streaming-surfaces-render-incrementally.md)**
+Constant-time append, usage folded once on the node, markdown that re-renders its open block and
+caches closed fences, one memoized turn map. Done when a 2,700-event session streams under the
+per-event budget.
 
-## Phase 3: terminals do work only when watched
+**[Phase 8: switching and hydration.](./phase-8-switching-and-hydration.md)** `keepAlive` deleted or
+implemented, one round trip to editor text, hover prefetch on the rail, per-path diff hydration.
+Done when switching back to a recent task issues no request.
 
-The node-side half of the terminal shape. (architecture § 3)
+**[Phase 9: the terminal client's keystroke.](./phase-9-the-terminal-clients-keystroke.md)** Indexed
+focus regions, hints as a memo, typing as a layer so the keymap's cache stays on, stable rows in the
+rail, windowed long lists and diff pane. Done when a key press visits a bounded number of nodes and
+the reachability suite is green unchanged.
 
-- The headless emulator runs only while a sink is attached. Attach on a cold session replays the raw
-  ring through a fresh emulator instead of reading state kept warm for nobody; the trade, scrollback
-  bounded by the ring, is recorded in refused.md.
-- The ring becomes a chunk list with a byte budget instead of a string re-concatenated per PTY chunk.
-- Inactive terminal tabs stay mounted and hidden, the trade `TabsLayout` already names for trees, so
-  a tab switch is a visibility toggle rather than a serialize, a retransmit, and a fresh WebGL
-  context.
-- `term:out` moves to binary WebSocket frames with one encode per broadcast, the upgrade `wire.ts`
-  names for the renderer hop too.
-
-Done when: an unwatched session costs no parser time on the node loop, and a tab switch touches no
-network.
-
-## Phase 4: the live surfaces
-
-The per-event and per-switch costs on the surfaces a person actually stares at.
-(analysis §§ 6-10, 16, 17; architecture § 5)
-
-- `appendEvent` keeps a `Set` of seen ids and appends in place of the copy-and-sort; `turns.find`
-  becomes one memoized `Map` above the `Index`; the projected-event snapshot refetch sends the
-  changed turn or request instead of re-reading 2,000 rows.
-- Diff hydration publishes per path instead of one version counter over every file, and the
-  parsed-file map becomes a keyed store write.
-- The switch cost gets a decision, not a workaround: either `keepAlive: 'dom'` is implemented for
-  the terminal and editor panes, or the field is deleted and the data path carries it, meaning the
-  editor's three serial mount round trips collapse to one, and the task rail prefetches on hover the
-  way the PR list already does.
-
-Done when: a profiled long agent session and a 200-file pull request stay responsive under the
-phase 0 instrumentation, and `keepAlive` either works or does not exist.
-
-## Phase 5: re-measure, then the deferred arguments
-
-Everything parked behind a number: base64 versus binary frames for `node-fetch` bodies, an
-incremental transcript projection, per-key query persistence, and any general per-connection
-interest model on `/v2/events`. Each stays in refused.md until a phase 0 measurement moves it out.
+**[Phase 10: re-measure, then the deferred arguments.](./phase-10-re-measure-and-the-deferred-arguments.md)**
+Everything parked behind a number, taken up or refused against the re-measured tree.
