@@ -1,10 +1,11 @@
+import { onMount } from 'solid-js'
 import Picker from './Picker'
-import Icon, { ICON_NAMES } from '../content/Icon'
+import Icon from '../content/Icon'
+import { iconNames, loadIconNodes } from '../../tokens/iconNodes'
 import { fuzzyScore } from '../../lib/paletteModel'
 
 const MAX_RESULTS = 200
 
-// An unfiltered popover of 1756 names alphabetically would open on a-arrow-down, a-arrow-up,
 // An unfiltered popover of 1756 names alphabetically would open on a-arrow-down, a-arrow-up,
 // a-large-small, and so on: technically complete, useless in practice. These are what an empty
 // query shows.
@@ -15,7 +16,13 @@ const LEAD = [
   'hammer', 'settings', 'gauge', 'trending-up', 'clock', 'calendar', 'flag', 'target',
 ]
 
-export const randomIconName = (): string => ICON_NAMES[Math.floor(Math.random() * ICON_NAMES.length)]
+// Whatever is drawable at the moment it is asked: the eager 87 before the full set has arrived, all
+// 1,756 after. The rail loads the set when it mounts, so by the time anyone reaches the dice this is
+// the whole list.
+export const randomIconName = (): string => {
+  const names = iconNames()
+  return names[Math.floor(Math.random() * names.length)]
+}
 
 export default function IconPicker(props: {
   value: string | null
@@ -24,10 +31,16 @@ export default function IconPicker(props: {
   onSelect: (icon: string | null) => void
   disabled?: boolean
 }) {
+  // The picker is the one surface that has to see every name, and the one where a row drawing its own
+  // text instead of its icon would be the point of the screen missed. Awaited here rather than at the
+  // call site: opening this popover is the moment the full set is worth its 371 KB
+  // (tokens/iconNodes.ts).
+  onMount(() => void loadIconNodes())
+
   const results = (query: string) => {
     const q = query.trim()
     if (!q) return LEAD
-    return ICON_NAMES.map((name) => ({ name, score: fuzzyScore(q, name) }))
+    return iconNames().map((name) => ({ name, score: fuzzyScore(q, name) }))
       .filter((x): x is { name: string; score: number } => x.score !== null)
       // Tie-break on brevity: for "bug", `bug` should beat `bug-play` and `bug-off`.
       .sort((a, b) => b.score - a.score || a.name.length - b.name.length)

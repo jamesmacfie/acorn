@@ -33,7 +33,15 @@ export type Listener = { server: ServerType; endpoint: ServiceEndpoint; fingerpr
 // It takes the DataRoot as well as the runtime because the transport identity lives on disk beside the
 // database: the certificate is minted into <root>/tls, and the last bound port is remembered in node.json
 // so a restart usually lands back on the same one.
-export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise<Listener> {
+//
+// `mark` is the composition root's boot timer, threaded in rather than duplicated, because minting a
+// certificate on a first launch and binding a port are two very different costs and a caller timing
+// this from outside sees only their sum (apps/node/src/composition/runtime.ts § bootTimer).
+export function startListener(
+  runtime: RuntimeBindings,
+  root: DataRoot,
+  mark: (label: string) => void = () => {},
+): Promise<Listener> {
   // Every bridge, pure-Node domain bridges and the stateful harness and context bridges, is installed by
   // the composition root (apps/node's service/runtime.ts under the desktop shell, server/standalone.ts otherwise)
   // before this is called. Core no longer imports plugin bridge wiring (docs/plugins.md).
@@ -44,6 +52,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
   // be inviting a browser to treat it as an origin. Unmatched paths get Hono's plain 404.
 
   const { keyPem, certPem, fingerprint } = ensureCert(root.dir)
+  mark('cert')
 
   // Host guard (docs/node-distribution.md § Reaching a node from another machine): binding an
   // interface is not the same as answering to any name on it, so a Host we did not expect is refused.
@@ -151,6 +160,7 @@ export function startListener(runtime: RuntimeBindings, root: DataRoot): Promise
       // Loopback, even when advertising: this origin is handed to child processes, which validate the
       // certificate fully against its IP:127.0.0.1 SAN. The address a remote client uses is the one the
       // operator was shown, not this.
+      mark('bind')
       resolveServer({ server, endpoint: { origin: `https://127.0.0.1:${address.port}`, port: address.port }, fingerprint, certPem })
     }
     server.on('error', onError)

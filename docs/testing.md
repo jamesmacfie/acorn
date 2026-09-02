@@ -237,6 +237,20 @@ Nothing is cached between runs, so CI runs the suites a local `pnpm test` usuall
 Turborepo's cache. A green local run with 30 of 31 tasks cached is not evidence about the one task you
 changed.
 
+Two checks live in a `build` script rather than in a suite, because what they assert is a property of
+built output that no test process has. `@acorn/desktop`'s `build` runs
+`apps/desktop/scripts/check-renderer-budget.mjs` over the built `index.html`, and `@acorn/tui`'s
+`build` runs `apps/tui/scripts/check-startup-graph.mjs` over its built chunks. Both fail the build over
+a byte ceiling or a denylisted chunk name; [frontend.md](./frontend.md) § Startup budget owns what they
+enforce.
+
+Neither runs in this workflow, which only runs `lint` and `test`: the renderer's runs in
+`build-desktop.yml`, which builds the bundle, and the terminal client's runs whenever somebody builds
+that package. So each has a fixture suite beside it that drives the same script against a directory it
+writes itself — `apps/desktop/test/scripts/` and `apps/tui/src/startupGraph.test.ts`. Those are what
+gate a pull request: they prove the rule, and the `build` invocation is what applies it to the real
+bytes.
+
 ## The smoke checklist
 
 Deliberately manual — it replaced the Playwright specs, whose harness left the repo with the Electron

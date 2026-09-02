@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { z } from 'zod'
 import { createHelper, type Helper } from '@acorn/custody/index.ts'
+import { helperMark } from '@acorn/custody/bootMarks.ts'
 import type { TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { adoptLegacyCustody } from '@acorn/custody/custody/legacyCustody.ts'
 import { startHelperServer, type HelperServer } from './helperServer'
@@ -127,6 +128,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
 
   await helper.start()
   server = await startHelperServer(helper, { secret: randomBytes(32).toString('hex'), appOrigin: handshake.appOrigin })
+  helperMark('ws bound')
   helper.bootComplete()
   return { helper, server }
 }
@@ -157,11 +159,15 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   queue = queue.then(async () => {
     if (!booted) {
       const handshake = handshakeSchema.parse(JSON.parse(trimmed))
+      helperMark('handshake')
       booted = boot(handshake)
       const { server } = await booted
       // The ready line. `nodeVersion` lets Rust check that the runtime pin it shipped is the runtime
       // that booted.
       console.log(JSON.stringify({ [TAG]: 'ready', protocol: HELPER_PROTOCOL, port: server.port, secret: server.secret, nodeVersion: process.version }))
+      // The line Rust has been blocked on since it spawned this process, so this offset is the whole of
+      // the shell's wait before it creates the window (docs/shell.md, "The shell process").
+      helperMark('ready line')
       return
     }
     const { command } = commandSchema.parse(JSON.parse(trimmed))

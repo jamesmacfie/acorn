@@ -19,6 +19,28 @@ import { installRenderGuard, RENDERER_LISTENER_CAP } from './renderGuard'
 // The shell is whole (docs/tui.md § The screen): a rail of tasks, a pane strip, a palette, a footer
 // that says what the keyboard will do, and the same twelve client plugins the desktop registers.
 
+// This host's cold-start account, held rather than printed. stderr is the file the renderer draws on,
+// so a timing line written while it owns the terminal reads as the shell going to garbage — the same
+// reason Node's own warnings are held below. Every mark is kept and printed on the way out, after
+// `renderer.destroy()` has handed the terminal back.
+//
+// Unconditional, unlike the desktop helper's: these lines only appear once the shell has already
+// exited, where there is nothing left to interrupt, and a person who ran `acorn` and waited two seconds
+// for a rail has earned the account of where they went
+// (docs/local-development.md § Timing a cold start).
+const bootStarted = process.hrtime.bigint()
+const bootMarks: { label: string; at: number }[] = []
+const bootMark = (label: string): void => {
+  bootMarks.push({ label, at: Number(process.hrtime.bigint() - bootStarted) / 1e6 })
+}
+const printBootMarks = (): void => {
+  let previous = 0
+  for (const { label, at } of bootMarks) {
+    console.error(`[acorn:boot] ${label} +${at.toFixed(0)}ms (${(at - previous).toFixed(0)}ms)`)
+    previous = at
+  }
+}
+
 const { values } = parseArgs({
   options: {
     node: { type: 'string' },
@@ -44,6 +66,9 @@ const opened = await openNode(values.node).catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
 })
+// The node, attached to or started and waited for. When this TUI started it, every `[service:boot]`
+// line the node printed is above this mark and accounts for the whole of it.
+bootMark('node open')
 
 let leaving = false
 const platform = installPlatform(opened, () => void quit())
@@ -72,12 +97,17 @@ await selectActiveNode()
 // no-broker fallback into global `fetch`, and handed Node a relative path to parse. The suite's
 // harness already imports `App` this way (./harness.tsx).
 const { App } = await import('./App')
+// 110 chunks and 1.06 MB of it, evaluated here — half of everything this bundle contains, before a
+// cell has been drawn. Phase 1 of the performance programme is what shrinks it, and
+// scripts/check-startup-graph.mjs is what stops it growing back.
+bootMark('App imported')
 
 const tasks = await readJson<Task[]>(tasksRoute).catch(async (error: unknown) => {
   await platform.dispose()
   console.error(`acorn reached ${opened.nodeId} but could not read its tasks: ${error instanceof Error ? error.message : String(error)}`)
   process.exit(1)
 })
+bootMark('tasks read')
 // `--task` opens one by id; without it the shell opens the first available Menu source.
 // Refused here rather than drawn as an empty rail, because a name that matches nothing is a typo and
 // a person wants to hear about it before the screen is redrawn.
@@ -127,6 +157,12 @@ installRenderGuard()
 // same ambiguity for a lone Escape, which the parser otherwise has to wait out
 // (docs/tui.md § The adapter, ./kit/asking.tsx § Composer).
 const renderer = await createCliRenderer({ exitOnCtrlC: false, useKittyKeyboard: { disambiguate: true } })
+bootMark('renderer created')
+// Time to first draw. `@opentui/solid` exports a `TimeToFirstDraw` renderable that holds the same
+// number, but it is an on-screen label: it would have to be mounted in the tree and would paint a debug
+// overlay over the shell. The renderer's own first `frame` event is the same moment with nothing drawn
+// over.
+renderer.once(CliRenderEvents.FRAME, () => bootMark('first draw'))
 // A library warning must not cover the screen. OpenTUI pops its console overlay over the frame on
 // any `console.warn`/`error` once the renderer owns the terminal, so a single stray line from a
 // dependency reads as the whole app going blank. Deactivated the same way the test harness does
@@ -163,6 +199,9 @@ async function quit(code = 0): Promise<never> {
   if (leaving) return await new Promise<never>(() => {}) // a second Ctrl+C during the drain waits
   leaving = true
   renderer.destroy()
+  // The terminal is ours again, so the held output can go out: the boot account first, then anything
+  // Node wanted to warn about while the screen was busy.
+  printBootMarks()
   for (const warning of heldWarnings) console.error(warning)
   await platform.dispose()
   process.exit(code)

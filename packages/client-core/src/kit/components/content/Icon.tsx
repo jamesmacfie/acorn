@@ -1,10 +1,8 @@
 import { For, Match, Show, Switch } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { BRAND, brandMarkRegistry } from '../../tokens/brandMarks'
-import { iconNodes as nodes } from '../../tokens/iconNodes'
+import { iconNode } from '../../tokens/iconNodes'
 import type { Tone } from '../../tokens/tokens'
-
-export const ICON_NAMES = Object.keys(nodes)
 
 // Two families behind one name. See docs/ui-design.md § Icons for the resolution order and the
 // `brand:` prefix, which brandMarks.ts owns because brandStyle resolves the same names.
@@ -64,7 +62,11 @@ export default function Icon(props: {
           </svg>
         )}
       </Match>
-      <Match when={nodes[props.name]}>
+      {/* A name only the lazy half of the set has returns nothing on this pass and takes the glyph
+          fallback below; `iconNode` starts the fetch and this re-runs when the map lands. Consumers
+          that must not show that one frame — IconPicker, the task rail — await `loadIconNodes()`
+          first (tokens/iconNodes.ts). */}
+      <Match when={iconNode(props.name)}>
         {(icon) => (
           <svg
             {...shared()}

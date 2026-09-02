@@ -20,6 +20,7 @@ import { wireAgentTools } from '@acorn/node-core/server/agentTools/coreTools.ts'
 import { configureTerminalMcp, refreshAcornMcpRegistrations } from '@acorn/plugin-terminal/node/index.ts'
 import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
 import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
+import { dumpPerf } from '@acorn/node-core/server/perf.ts'
 import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from './composition'
 
 export type ServiceRuntime = {
@@ -35,9 +36,24 @@ type RuntimeOptions = {
   stateChanged(state: ServiceState, detail?: string): void
 }
 
+// The node's cold-start account, one line per step, and unconditional: a node that took eleven seconds
+// to bind should say so without anyone having asked for it. Per-request timing is the opposite and sits
+// behind ACORN_PERF=1 (node-core server/perf.ts).
+//
+// Two numbers per line, because both questions get asked. `+Nms` is the offset from the first line, so
+// a person can read the shape of a boot down the column; `(Nms)` is this step alone, so the one step
+// that cost the boot is the one wide number. The plugin passes are named per plugin for that reason —
+// nineteen inits and readys run in series here and a single total cannot say which one is slow
+// (docs/local-development.md § Timing a cold start).
 function bootTimer(): (label: string) => void {
   const started = process.hrtime.bigint()
-  return (label) => console.log(`[service:boot] ${label} +${(Number(process.hrtime.bigint() - started) / 1e6).toFixed(0)}ms`)
+  let previous = started
+  return (label) => {
+    const now = process.hrtime.bigint()
+    const ms = (from: bigint) => (Number(now - from) / 1e6).toFixed(0)
+    console.log(`[service:boot] ${label} +${ms(started)}ms (${ms(previous)}ms)`)
+    previous = now
+  }
 }
 
 async function inheritLoginShellPath(isPackaged: boolean): Promise<void> {
@@ -60,7 +76,10 @@ async function inheritLoginShellPath(isPackaged: boolean): Promise<void> {
 // no native surface, so importing this module in a plain Node test loads no shell.
 export async function startServiceRuntime({ config, stateChanged }: RuntimeOptions): Promise<ServiceRuntime> {
   const mark = bootTimer()
+  // First, and marked first: on a packaged macOS build this spawns a login shell and waits up to five
+  // seconds for it, before anything else in the boot has run.
   await inheritLoginShellPath(config.isPackaged)
+  mark('login-shell')
   configureTerminalMcp(
     serverName(config.isPackaged),
     launcherSpec(config.hostRuntimePath, config.mcpEntry, serverName(config.isPackaged)),
@@ -97,6 +116,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     bundledRoot: config.bundledPluginsDir,
     development: !config.isPackaged,
   })
+  mark('bundled-packages')
   const capabilities = new CapabilityRegistry()
   try {
     runtime = makeRuntime(dataRoot, config.version, capabilities)
@@ -148,6 +168,9 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     if (outcome === 'timeout') console.warn('[service:stop] drain exceeded its deadline; exiting anyway')
     stateChanged('stopped')
     mark('teardown')
+    // Whatever ACORN_PERF=1 collected, on the way out. A drain is the last chance to print it, and a
+    // node that was killed rather than drained still has `kill -USR2` (node-core server/perf.ts).
+    dumpPerf('drain')
   }
 
   try {
@@ -188,12 +211,13 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     // listener binds because a catch-up run may call this node's own routes.
     scheduler = createScheduler(db, { env: runtime })
     schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
+    mark('graph')
     const plugins = await initPlugins(
       graph.plugins,
       // The persisted list unioned with the start config's (docs/node-distribution.md § Plugins): the
       // file is the only form a remote node has, and the start config stays a test/`dev:node`
       // override.
-      { capabilities, core, env: runtime, dataDir: config.dataDir, disabled: disabled(), loaded: graph.loaded },
+      { capabilities, core, env: runtime, dataDir: config.dataDir, disabled: disabled(), loaded: graph.loaded, mark },
     )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) console.log(`[service:boot] plugins disabled for this node: ${plugins.skipped.join(', ')}`)
@@ -214,14 +238,15 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     wireAgentTools({ db })
     mark('install')
 
-    const listener = await startListener(runtime, dataRoot)
+    const listener = await startListener(runtime, dataRoot, mark)
     server = listener.server
     endpoint = listener.endpoint
     identity = { fingerprint: listener.fingerprint, certPem: listener.certPem }
     apiUrl = endpoint.origin
     stateChanged('listening')
-    await scheduler.start()
     mark('listener-up')
+    await scheduler.start()
+    mark('scheduler')
 
     stateChanged('reconciling')
     if (process.env.NODE_ENV !== 'test') {

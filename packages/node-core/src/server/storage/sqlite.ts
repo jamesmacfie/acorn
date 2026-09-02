@@ -6,6 +6,7 @@ import { entityKind } from 'drizzle-orm/entity'
 import { createTableRelationsHelpers, extractTablesRelationalConfig } from 'drizzle-orm/relations'
 import { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core/db'
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core/dialect'
+import { PERF, recordDuration } from '../perf'
 
 // SQLite through the runtime's own `node:sqlite`, shaped like the slice of better-sqlite3 that
 // Drizzle's driver and this package call.
@@ -78,6 +79,42 @@ const wrapStatement = (stmt: StatementSync): SqliteStatement => {
   return wrapped
 }
 
+// Every statement, timed by its first two words, behind `ACORN_PERF=1`. This loop is synchronous and
+// shared with terminal emulation and git spawns, and the performance programme refused to split it into
+// threads without numbers (docs/future/performance/refused.md § Splitting the node), so this is where
+// the numbers come from.
+//
+// The whole statement text is not the key: bound parameters are out of it already, but a hundred
+// distinct `SELECT`s would be a hundred histograms nobody reads. The verb and the word after it is a
+// coarse grouping and a deliberate one — it answers "is this node's time going into reads, writes or
+// transactions", which is the question worth asking before anyone tunes a statement. Finding the
+// statement itself is what the request duration and a debugger are for.
+const sqlSeam = (sql: string): string => `sqlite ${sql.trim().split(/\s+/, 2).join(' ').toLowerCase()}`
+
+const timeStatement = (stmt: SqliteStatement, sql: string): SqliteStatement => {
+  const seam = sqlSeam(sql)
+  const time = <T>(run: () => T): T => {
+    const started = process.hrtime.bigint()
+    try {
+      return run()
+    } finally {
+      recordDuration(seam, Number(process.hrtime.bigint() - started) / 1e6)
+    }
+  }
+  const timedStatement: SqliteStatement = {
+    run: (...params) => time(() => stmt.run(...params)),
+    all: (...params) => time(() => stmt.all(...params)),
+    get: (...params) => time(() => stmt.get(...params)),
+    // Drizzle calls `stmt.raw().all(...)` and expects the same statement back, so this has to return
+    // the timed one rather than the handle underneath it.
+    raw(toggle = true) {
+      stmt.raw(toggle)
+      return timedStatement
+    },
+  }
+  return timedStatement
+}
+
 export function openSqlite(path: string, options: { readonly?: boolean } = {}): SqliteDatabase {
   const db = new DatabaseSync(path, { ...OPEN_OPTIONS, readOnly: options.readonly ?? false })
 
@@ -113,7 +150,9 @@ export function openSqlite(path: string, options: { readonly?: boolean } = {}): 
   }
 
   return {
-    prepare: (sql) => wrapStatement(db.prepare(sql)),
+    // `prepare` is where the timing wrapper goes on, not `openSqlite`, so a node with the switch off
+    // hands out exactly the statement it always did.
+    prepare: (sql) => (PERF ? timeStatement(wrapStatement(db.prepare(sql)), sql) : wrapStatement(db.prepare(sql))),
     exec: (sql) => db.exec(sql),
     // better-sqlite3 had a `.pragma()` helper and `node:sqlite` does not. Every caller sets a value
     // and ignores the result, so this covers it.

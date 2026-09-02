@@ -60,6 +60,13 @@ export type PluginHostOptions = {
   // (server/pluginHost/scheduleRun.ts). Optional because a suite that declares no schedule has nothing to
   // run. A binding that declares one without this is a wiring bug and throws.
   env?: Env
+  // The composition root's boot timer, if it kept one. Every init and every ready runs in series before
+  // the listener binds, so this pass is most of a cold boot and a single `install` label says only how
+  // long all of it took. One line per plugin per pass is what makes "which plugin" answerable, which is
+  // the question the performance programme's phase 3 decides a wire contract on
+  // (apps/node/src/composition/runtime.ts § bootTimer, docs/future/performance/refused.md § A
+  // 503-until-ready node contract).
+  mark?: (label: string) => void
 }
 
 // One row per plugin the composition root offered, whether or not it ran. Settings → Plugins needs the
@@ -115,6 +122,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     if (seen.has(plugin.name)) throw new Error(`Duplicate node plugin: ${plugin.name}`)
     seen.add(plugin.name)
   }
+  const mark = options.mark ?? (() => {})
   const disabled = new Set(options.disabled ?? [])
   const enabled: string[] = []
   const skipped: string[] = []
@@ -395,6 +403,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // A loaded plugin is contained instead. See docs/plugins.md § Loaded plugins.
     try {
       await plugin.init(ctx)
+      mark(`plugin ${plugin.name} init`)
     } catch (error) {
       if (permissions) {
         await contain(plugin, 'init', error)
@@ -416,6 +425,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     if (!plugin.ready) continue
     try {
       await plugin.ready(contexts.get(plugin.name)!)
+      mark(`plugin ${plugin.name} ready`)
     } catch (error) {
       if (options.loaded?.has(plugin.name)) {
         await contain(plugin, 'ready', error)

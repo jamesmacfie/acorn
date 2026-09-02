@@ -4,18 +4,31 @@ import { createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { codeForStatus, requestIdSchema, statusIsRetryable, type ApiError, type ErrorCodeOrDomain } from '@acorn/protocol/errors.ts'
+import { PERF } from './perf'
 import type { AppEnv } from './middleware/auth'
 
 // Assign or echo the request id, before anything else in createApp(). A caller-supplied
 // X-Request-Id is honoured only when it matches the grammar (so a hostile header cannot inject into
 // logs or response headers); otherwise we mint one. Echoed in the header and every error envelope,
 // which is what makes a user-reported failure findable in the server log.
+//
+// It is also where a request's duration is measured, behind `ACORN_PERF=1`. Here rather than in a
+// middleware of its own because this is the outermost one and the id is minted here: a duration
+// nobody can tie back to a request correlates with nothing. The path is the matched route pattern, not
+// the URL, so a hundred task ids read as one line's worth of routes (./perf.ts).
 export const requestIdMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const provided = c.req.header('x-request-id')
   const requestId = provided && requestIdSchema.safeParse(provided).success ? provided : randomUUID()
   c.set('requestId', requestId)
   c.header('x-request-id', requestId)
-  await next()
+  if (!PERF) return await next()
+  const started = process.hrtime.bigint()
+  try {
+    await next()
+  } finally {
+    const ms = Number(process.hrtime.bigint() - started) / 1e6
+    console.error(`[perf:request] ${c.req.method} ${c.req.routePath || c.req.path} ${c.res.status} ${ms.toFixed(1)}ms ${requestId}`)
+  }
 })
 
 // Absent only when a test builds a bare Context without the middleware; real requests always carry

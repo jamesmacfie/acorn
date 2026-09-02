@@ -279,6 +279,37 @@ from one reading of what an agent session is doing, and one gate decides which c
 interrupting somebody for and which channels each wakes.
 [notifications.md](./notifications.md) owns that model.
 
+## Startup budget
+
+Both clients have a build check over what they load before they draw, and both fail the build two ways:
+over a byte ceiling, and on a **chunk name**.
+
+- **The renderer.** `apps/desktop/scripts/check-renderer-budget.mjs`, run from `@acorn/desktop`'s
+  `build`, sums every script and `modulepreload` the built `index.html` names: 1,250,000 B for scripts,
+  200,000 B for styles. It also prints how deep the static import chain from the entry goes, and how
+  many more chunks one dynamic import away would fetch, neither of which is counted.
+- **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
+  That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
+  analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything
+  in it is evaluated before the first cell is drawn. The ceiling is 1,150,000 B. The walk is a regex
+  over import edges rather than a real module graph, so it is approximate on purpose — it exists to
+  catch a 300 KB regression, not to be exact.
+
+**Why a name test as well as a byte total.** Between 2026-08-31 and 2026-09-02 the renderer's total
+drifted from 1,317,605 B to 1,329,679 B across 31 unrelated commits while staying red, so nobody read
+it. And a budget that only counts bytes lets the next heavy chunk in as long as something else shrank.
+The denylist is `shiki`, `wasm`, `DiffPane`, `prModel`, `viewState` and `icon-nodes`: each is a lazy
+surface that leaked into the eager graph, and a chunk with one of those names being fetched at startup
+is wrong whatever it weighs. The shape of the mistake is always the same — a string-keyed table from a
+name to a **value** rather than to a **loader**, which pulls every value into whichever chunk holds the
+table (`kit/tokens/iconNodes.ts` is the one that has been fixed; see
+[ui-design.md](./ui-design.md) § Which names are drawn without waiting).
+
+Each script also carries a short `KNOWN` list: denylisted names that are in the startup list **today**
+and are somebody's open work. Those report loudly and do not fail the build. The list may only shrink —
+once a chunk with that name is built and no longer fetched at startup, the check fails until the entry
+is deleted, so a fix cannot quietly regress a month later.
+
 ## Restore and persistence
 
 Launch restore proceeds in this order: fleet membership and Node records, active Node, selection and

@@ -1,4 +1,5 @@
 import type { PreviewBrowserRule, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
+import { helperMark } from './bootMarks'
 import { trustBundledClientPlugins, trustsBundledClientPlugins } from './plugins/bundledPluginTrust'
 import { recordCrash } from './supervision/crashBudget'
 import { deviceTokens, LOCAL_TOKEN_SCOPE, type TokenCipher } from './custody/deviceTokenStore'
@@ -125,12 +126,14 @@ export function createHelper(options: HelperOptions): Helper {
   // is gone rather than briefly listed and then dropped.
   const pluginCache = new PluginCache(userDataDir, broker)
   pluginCache.sweep()
+  helperMark('plugin-cache sweep')
   const pluginTrust = new PluginTrustStore(userDataDir)
   // These bytes ship with this process. Cache and acknowledge them locally before the renderer asks
   // for plugin state, so a node cannot turn the "bundled" label into auto-trust for arbitrary remote
   // bytes. `trustsBundledClientPlugins` owns the one condition.
   const { bundledPluginsDir } = options.service
   if (bundledPluginsDir && trustsBundledClientPlugins()) trustBundledClientPlugins(bundledPluginsDir, version, pluginCache, pluginTrust)
+  helperMark('bundled plugins trusted')
 
   // Record, or re-record after a crash restart, the local node and bring its connection up. The port
   // is ephemeral, so the endpoint, the certificate, and the token can all change between starts. Each
@@ -162,7 +165,11 @@ export function createHelper(options: HelperOptions): Helper {
   const start = async (): Promise<ServiceStartResult> => {
     lastFailure = undefined
     const started = await service.start(tokens.read(LOCAL_TOKEN_SCOPE))
+    // The node's own `[service:boot]` lines land in front of this one, so the two accounts read as one
+    // timeline: everything the node printed, then how long the helper waited for all of it.
+    helperMark('service.start')
     adoptLocalNode(started)
+    helperMark('node adopted')
     return started
   }
 
