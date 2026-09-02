@@ -318,6 +318,12 @@ export function Modal(props: {
       title={props.title}
       paddingLeft={1}
       paddingRight={1}
+      // Trapping the keys and landing them are two halves of one thing, and only the first was here:
+      // a modal swallowed every intent but `dismiss` and left focus wherever it was, so unless the
+      // caller also reached for `takeFocus` the reader got a dialog they could not answer. Every
+      // modal a plugin draws was in that state, because `takeFocus` is this app's and a plugin only
+      // has the kit (../keys/regions.ts § takeFocus).
+      ref={(element: BoxRenderable) => takeFocus(element)}
     >
       {props.children}
     </box>

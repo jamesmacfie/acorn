@@ -518,13 +518,28 @@ once. `moveStop` answers false for whatever the walk does not own, which is how 
 back to its collection and a document with no controls keeps them for scrolling.
 
 **One deferred decision.** A focus decision that needs a renderable the current render has not
-produced yet waits in `settleFocus`, queued at most once per turn by `scheduleSettle`. It runs five
-steps in order: re-enter a region whose focused row was destroyed, by the row's logical identity;
-open the screen if nothing holds the keys; take the keys off a region that was only holding them for
-want of anything better; land in an overlay that opened or restore what one gave back; then reveal
-the focused stop in every viewport around it. A microtask rather than a frame event, because a test
-renderer under `flush()` may render several times before a frame, while Solid commits synchronously
-and every renderable of the current render exists at the end of the current task.
+produced yet waits in `settleFocus`, queued at most once per turn by `scheduleSettle`. A microtask
+rather than a frame event, because a test renderer under `flush()` may render several times before a
+frame, while Solid commits synchronously and every renderable of the current render exists at the end
+of the current task.
+
+It asks one question first: is an overlay holding the keys? If one is, the pass has a single step —
+put them on a live stop inside it, and reveal that stop. Everything else it could do is a region
+decision, and the region tier is what a trap is holding the keys away from. Without that question it
+did those things anyway, and both went wrong in the same visible way: a list arriving behind an open
+modal took the keys off it, and a row destroyed inside one left them on the corpse. Either way the
+trap then swallowed every key the reader pressed, so the dialog was on screen and could not be
+answered — which is how the plugin trust prompt came to be unanswerable from the second bundle in
+its queue onwards.
+
+With no overlay it runs four steps in order: re-enter a region whose focused row was destroyed, by
+the row's logical identity; open the screen if nothing holds the keys; take the keys off a region
+that was only holding them for want of anything better; then give them back to whatever the overlay
+that just closed took them from, or open the screen where there was nothing to give back. Then it
+reveals the focused stop in every viewport around it.
+
+The overlays are a stack rather than one box, because a `Menu` inside a `Modal` is a second overlay
+over the first and closing it must leave the modal still holding the keys.
 
 There were six of these and each was a correct fix for a real bug. Together they were a state machine
 nobody had written down, and the class of bug they produced was always the same: two of them ran in an
@@ -623,6 +638,12 @@ That layer sits below the collection tier, not at the trap's own. Putting it at 
 mistake the quit confirmation found: priority decides, not locality, so the swallow reached Enter
 first and a list inside a `Modal` was dead. Putting it lower costs nothing, because a collection
 behind the overlay does not fire anyway once the overlay has taken the focus.
+
+**Taking the keys is the other half, and the node does it.** `Modal` calls `takeFocus` on its own box,
+so a dialog lands the keys on its first stop by being drawn. That used to be the caller's job, and the
+six callers in `apps/tui` all remembered — but `takeFocus` is this app's and a plugin only has the kit,
+so every modal a plugin draws trapped the keys and left them where they were. A dialog that swallows
+what the reader presses and never receives it is worse than one that does not open.
 
 ### The Rectangle contract
 

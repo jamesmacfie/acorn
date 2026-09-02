@@ -1,6 +1,5 @@
 /** @jsxImportSource @opentui/solid */
 import { For, onCleanup, Show } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { createAttentionInbox, type AttentionInbox } from '@acorn/client-core/features/notifications/attentionInbox.ts'
 import { trackBadge } from '@acorn/client-core/features/notifications/badge.ts'
@@ -12,7 +11,6 @@ import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { Line } from '../kit/cells'
 import { Modal, ModalBody } from '../kit/grouping'
 import { EmptyState, Row, Rows } from '../kit/showing'
-import { takeFocus } from '../keys/regions'
 import { closeOverlay } from './state'
 import type { ShellModel } from './model'
 
@@ -116,7 +114,7 @@ export function Inbox(props: { model: ShellModel }) {
   return (
     <Modal onDismiss={close} title="Notifications" size="md">
       <ModalBody>
-        <box flexDirection="column" ref={(element: BoxRenderable) => takeFocus(element)}>
+        <box flexDirection="column">
           {/* Partial results are a banner, never a failed list (docs/architecture-overview.md § Fleet). */}
           <For each={inbox?.().unavailable ?? []}>
             {(entry) => <Line tone="warn">{`${entry.label} unavailable`}</Line>}

@@ -102,7 +102,7 @@ describe.skipIf(!hasFfi)('keys and focus in cells', () => {
   }, 30_000)
 
   it('a modal swallows next from the pane below, and dismiss closes it', async () => {
-    const [open, setOpen] = createSignal(true)
+    const [open, setOpen] = createSignal(false)
     const frame = await renderCells(() => (
       <>
         <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />
@@ -113,15 +113,26 @@ describe.skipIf(!hasFfi)('keys and focus in cells', () => {
     ), { width: 40, height: 12 })
     try {
       const before = caretRow(frame.lines)
-      // The trap sits above the collection tier, so the list behind it does not move
+      expect(before).toBeGreaterThanOrEqual(0)
+
+      // A modal takes the keys as well as trapping them, so the caret leaves the list behind it
+      // (./regions.ts § takeFocus). One that only trapped them left the reader looking at a dialog
+      // whose every key the trap then swallowed.
+      setOpen(true)
+      const up = await frame.frame()
+      expect(up.text).toContain('a question')
+      expect(caretRow(up.lines)).toBe(-1)
+
+      // The trap sits above the collection tier, so nothing behind it answers `nextRegion` either
       // (./trap.ts). That is the whole meaning of modal on a host with no scrim.
       const held = await frame.press('F6')
-      expect(caretRow(held.lines)).toBe(before)
       expect(held.text).toContain('a question')
+      expect(caretRow(held.lines)).toBe(-1)
 
       const closed = await frame.press('ESCAPE')
       expect(closed.text).not.toContain('a question')
-      // And the pane has the keys back.
+      // And the pane has the keys back, on the row it had them on.
+      expect(caretRow(closed.lines)).toBe(before)
       expect(caretRow((await frame.press('j')).lines)).toBe(before + 1)
     } finally {
       frame.done()

@@ -21,7 +21,7 @@ import { Modal, ModalBody } from '../kit/grouping'
 import { PanelBody } from '../panel'
 import { installCommandLayer } from '../keys/commandLayer'
 import { bindKeys } from '../keys/install'
-import { focusWithin, regionFocus, setPaneCycler, setTopology, takeFocus } from '../keys/regions'
+import { focusWithin, regionFocus, setPaneCycler, setTopology } from '../keys/regions'
 import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
 import { chooseProject, installRouting, routedProjectId } from './routing'
@@ -296,7 +296,7 @@ function QuitConfirm(props: { onQuit: () => void }) {
   return (
     <Modal onDismiss={close} title="Quit" size="sm">
       <ModalBody>
-        <box flexDirection="column" ref={(element: BoxRenderable) => takeFocus(element)}>
+        <box flexDirection="column">
           <Line role="muted">acorn started this node, so quitting stops it.</Line>
           <Rows
             id="chrome.quit"
@@ -325,7 +325,7 @@ function ProjectPicker(props: { model: ShellModel }) {
   return (
     <Modal onDismiss={close} title="Project" size="sm">
       <ModalBody>
-        <box flexDirection="column" ref={(element: BoxRenderable) => takeFocus(element)}>
+        <box flexDirection="column">
           <Show when={projects().length} fallback={<Line role="muted">This workspace has no projects.</Line>}>
             <Rows
               id="chrome.projects"
@@ -353,7 +353,7 @@ function WorkspacePicker(props: { model: ShellModel }) {
   return (
     <Modal onDismiss={close} title="Workspace" size="sm">
       <ModalBody>
-        <box flexDirection="column" ref={(element: BoxRenderable) => takeFocus(element)}>
+        <box flexDirection="column">
           <Rows
             id="chrome.workspaces"
             ariaLabel="Workspaces"

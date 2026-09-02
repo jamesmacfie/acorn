@@ -1,6 +1,5 @@
 /** @jsxImportSource @opentui/solid */
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
 import {
   composeItems, fuzzyFilter, type PaletteItem,
 } from '@acorn/client-core/kit/lib/paletteModel.ts'
@@ -18,7 +17,6 @@ import { Alert, Row } from '../kit/showing'
 import { Input } from '../kit/asking'
 import { Line } from '../kit/cells'
 import { overlayKeys } from '../keys/trap'
-import { takeFocus } from '../keys/regions'
 import { closeOverlay } from './state'
 import type { ShellModel } from './model'
 
@@ -155,7 +153,7 @@ export function Palette(props: { model: ShellModel }) {
   return (
     <Modal onDismiss={close} title="Commands" size="wide">
       <ModalBody>
-        <box flexDirection="column" ref={(element: BoxRenderable) => takeFocus(element)}>
+        <box flexDirection="column">
           <Input
             kind="filter"
             placeholder="Run a command, switch a pane, task or workspace…"

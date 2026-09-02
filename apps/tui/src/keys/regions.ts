@@ -257,9 +257,11 @@ export const markItem = (box: Renderable, pick?: () => void, identity?: string):
     // The row that had the keys is going. Mark the region as holding them for want of anything
     // better and let the settle pass re-enter it once reconciliation has produced the replacement:
     // at cleanup time the old row still reports itself live even though its disposal has begun.
+    if (focusedNode() !== box) return
+    // Only a region can hold the keys for want of anything better; a row inside an overlay has no
+    // region behind it, and the settle still has to run so the overlay lands on a live stop.
     const group = groups.find((candidate) => candidate.last === box) ?? regionOf(box)
-    if (focusedNode() !== box || !group) return
-    provisional = true
+    if (group) provisional = true
     scheduleSettle()
   })
 }
@@ -458,8 +460,22 @@ const enter = (group: Group | undefined): boolean => {
 // ── The settle pass ───────────────────────────────────────────────────────────────────────────
 
 let settleQueued = false
-let overlayOpening: Renderable | null = null
+// The overlays holding the keys, innermost last. A stack rather than one box, because a `Menu` inside
+// a `Modal` is a second overlay over the first and closing it must leave the modal still holding them.
+const overlays: Renderable[] = []
 let overlayClosing: { node: Renderable | null; region: RegionRef | null } | null = null
+
+/** The overlay that owns the keys, if one does. */
+const openOverlay = (): Renderable | null => {
+  while (overlays.length && overlays[overlays.length - 1]!.isDestroyed) overlays.pop()
+  return overlays[overlays.length - 1] ?? null
+}
+
+/** Whether a renderable is inside a box, by walking the retained tree up. */
+const within = (box: Renderable, node: Renderable): boolean => {
+  for (let at: Renderable | null = node; at; at = at.parent) if (at === box) return true
+  return false
+}
 
 /**
  * Queue the one deferred focus decision.
@@ -485,6 +501,9 @@ const reviveFocus = (): void => {
   if (!node || (!node.isDestroyed && node.visible)) return
   const group = groups.find((candidate) => candidate.last === node) ?? regionOf(node)
   if (group) enter(group)
+  // A corpse in no region — the last stop inside an overlay that has closed. Holding it would leave
+  // the screen with the keys on a dead node and stop `openScreen` below from opening it at all.
+  else setFocusedNode(null)
 }
 
 /** 2. Something has to have the keys when the screen first has regions, and on this host nothing
@@ -507,32 +526,54 @@ const claimProvisional = (): void => {
   enter(group)
 }
 
-/** 4a. An overlay takes the keys on the settle after it opens: its children are mounted by the render
- *  that produced its box, so there is nothing to land on any earlier. Its region claim is untouched,
- *  which is what makes giving the keys back a matter of remembering one renderable. */
-const landInOverlay = (): boolean => {
-  const opening = overlayOpening
-  overlayOpening = null
-  if (!opening || opening.isDestroyed) return false
-  const target = entryStop(opening) ?? opening
-  if (target === opening) opening.focusable = true
+/** 0. An open overlay holds the keys, and holds them for as long as it is open.
+ *
+ *  It cannot land on anything before this: its children are mounted by the render that produced its
+ *  box, so the settle after it opens is the first moment there is a stop inside it. Its region claim
+ *  is untouched, which is what makes giving the keys back a matter of remembering one renderable.
+ *
+ *  Every settle after that one is the same question again, because everything else the settle pass
+ *  does is a region decision and the region tier is exactly what a trap is holding the keys away
+ *  from. A list arriving behind an open modal used to take them (`claimProvisional`), and a row
+ *  destroyed inside one used to leave them on a corpse (`markItem`) — in both cases the trap then
+ *  swallowed every key the reader pressed, so the modal was on screen and could not be answered. */
+const holdInOverlay = (box: Renderable): void => {
+  // The keys never went back to the region behind: an overlay that closed into another one is a
+  // handover rather than a restore.
+  overlayClosing = null
+  const node = focusedNode()
+  if (node && !node.isDestroyed && node.visible && within(box, node)) return
+  const target = entryStop(box) ?? box
+  if (target === box) box.focusable = true
   target.focus()
   setFocusedNode(target)
-  return true
 }
 
-/** 4b. And gives them back on the settle after it closes, which is after the reconciliation that
+/** 4. And gives them back on the settle after it closes, which is after the reconciliation that
  *  closing caused: the action that dismisses an overlay can replace the surface behind it in the
  *  same update, and at cleanup time the old row still reports itself live. */
 const restoreFromOverlay = (): void => {
   const closing = overlayClosing
   if (!closing) return
   overlayClosing = null
+  // An overlay that was open before anything had the keys — a `Modal` drawn by the first render — has
+  // nothing to give back, and what it leaves behind is a detached box that still reports itself live.
+  // Drop it and open the screen the way boot does, rather than claiming a null region.
+  if (!closing.node && !closing.region) {
+    setFocusedNode(null)
+    openScreen()
+    return
+  }
   focused = closing.region
   const identity = closing.node ? itemIdentities.get(closing.node) : undefined
   const replaced = !!identity && itemsByIdentity.get(identity) !== closing.node
   if (closing.node && !closing.node.isDestroyed && !replaced) {
-    focusRenderable(closing.node)
+    // A region holding the keys on its own frame for want of anything better may have grown a list
+    // while the overlay was up, and the settle that would have noticed ran with the overlay in front
+    // of it. Re-enter rather than restore, so the keys come back to the list and not to the border.
+    const home = groupAt(closing.region)
+    if (home && home.box === closing.node) enter(home)
+    else focusRenderable(closing.node)
     return
   }
   // A workspace or source switch can replace the row that was focused behind the overlay. Restoring
@@ -549,15 +590,22 @@ const revealFocus = (): void => {
 }
 
 function settleFocus(): void {
+  const overlay = openOverlay()
+  if (overlay) {
+    holdInOverlay(overlay)
+    revealFocus()
+    return
+  }
   reviveFocus()
   openScreen()
   claimProvisional()
-  if (!landInOverlay()) restoreFromOverlay()
+  restoreFromOverlay()
   revealFocus()
 }
 
 /**
- * Hand the keys to an overlay that has just opened, and give them back when it closes.
+ * Hand the keys to an overlay that has just opened, keep them there while it is open, and give
+ * them back when it closes.
  *
  * The DOM palette keeps a `prevFocus` element for exactly this and restores it on dismissal
  * (client-core/host/palette/overlay.ts). Same rule, no element: what had the keys is remembered and
@@ -567,10 +615,11 @@ function settleFocus(): void {
 export function takeFocus(box: Renderable): void {
   const previous = focusedNode()
   const previousRegion = focused
-  overlayOpening = box
+  overlays.push(box)
   scheduleSettle()
   onCleanup(() => {
-    if (overlayOpening === box) overlayOpening = null
+    const at = overlays.lastIndexOf(box)
+    if (at >= 0) overlays.splice(at, 1)
     overlayClosing = { node: previous, region: previousRegion }
     scheduleSettle()
   })
@@ -696,7 +745,7 @@ export function _resetRegions(): void {
   cycler = null
   topology = null
   parents = []
-  overlayOpening = null
+  overlays.length = 0
   overlayClosing = null
   containers = []
   items = new WeakSet<Renderable>()
