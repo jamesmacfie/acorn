@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderMarkdown } from './markdown'
+import { renderBlocks, renderMarkdown } from './markdown'
 
 describe('renderMarkdown', () => {
   it('renders common markdown', () => {
@@ -88,5 +88,52 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown(`${S}7${S}`)).toBe('<p>7</p>')
     // The sentinel next to real tokens: the source's copies are gone, inline()'s own survive.
     expect(renderMarkdown(`${S}0${S} \`code\``)).toBe('<p>0 <code>code</code></p>')
+  })
+})
+
+// The block split is what makes a streaming message cheap to redraw: the component holds an element per
+// key and only replaces the keys that moved (kit/components/content/Markdown.tsx).
+describe('renderBlocks', () => {
+  const keys = (src: string, opts = {}) => renderBlocks(src, opts).map((block) => block.key)
+
+  it('joins back to exactly what renderMarkdown returns', () => {
+    const src = '# Title\n\nA para.\n\n- one\n- two\n\n```ts\nconst a = 1\n```\n\n> quoted\n\n---\n\n| a | b |\n|---|---|\n| 1 | 2 |'
+    expect(renderBlocks(src).map((block) => block.html).join('\n')).toBe(renderMarkdown(src))
+  })
+
+  it('changes exactly one key when a character is appended', () => {
+    const src = '# Title\n\nFirst para.\n\nSecond par'
+    const before = keys(src)
+    const after = keys(`${src}a`)
+    expect(after).toHaveLength(before.length)
+    expect(after.slice(0, -1)).toEqual(before.slice(0, -1))
+    expect(after.at(-1)).not.toBe(before.at(-1))
+  })
+
+  it('keeps the earlier keys when a new block starts', () => {
+    const before = keys('One.\n\nTwo.')
+    const after = keys('One.\n\nTwo.\n\nThree.')
+    expect(after.slice(0, 2)).toEqual(before)
+    expect(after).toHaveLength(3)
+  })
+
+  it('gives a fence one key that stops moving once it closes', () => {
+    const closed = keys('```ts\nconst a = 1\n```\n\nProse')
+    const grown = keys('```ts\nconst a = 1\n```\n\nProse and more')
+    expect(grown[0]).toBe(closed[0])
+    // While the fence is still open the parser reads to the end of the source, so its key does move.
+    expect(keys('```ts\nconst a = 1')[0]).not.toBe(closed[0])
+  })
+
+  it('keys the image policy, because it decides the html', () => {
+    const src = '![shot](https://example.com/x.png)'
+    expect(keys(src, { images: 'placeholder' })).not.toEqual(keys(src))
+  })
+
+  it('tells two identical blocks apart from a changed one, not from each other', () => {
+    // Content-keyed, so two identical paragraphs share a key. The component queues its spare elements
+    // per key for exactly this reason.
+    const [first, second] = keys('Same.\n\nSame.')
+    expect(first).toBe(second)
   })
 })

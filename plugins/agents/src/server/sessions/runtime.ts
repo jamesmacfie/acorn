@@ -652,6 +652,8 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         if (
           (frame.channel === 'agent:event' && frame.event.sessionId !== sessionId)
           || (frame.channel === 'agent:session' && frame.session.id !== sessionId)
+          || (frame.channel === 'agent:turn' && frame.turn.sessionId !== sessionId)
+          || (frame.channel === 'agent:request' && frame.request.sessionId !== sessionId)
           || frame.channel === 'agent:deleted'
         ) return
         void this.store.snapshot(sessionId, afterSeq).then((snapshot) => {

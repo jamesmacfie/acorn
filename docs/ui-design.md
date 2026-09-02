@@ -473,6 +473,27 @@ root the host does not know about sits outside every focus group and no intent r
 The CSS clash and Checkbox checks stay, for the host's own code. Core still writes elements and
 stylesheets and can still lose a rule to a primitive's own attribute selector.
 
+**`Markdown` renders block by block, and that is a contract rather than an optimisation.**
+`kit/lib/markdown.ts` exposes `renderBlocks(text)`, which returns one `{ key, html }` per block with
+the key hashed over that block's own source, and `renderMarkdown` is now that list joined. The
+component keeps the element it rendered for each key, so an update replaces only the blocks whose
+source moved: appending to a message changes exactly one key, its last. Three things follow, and every
+caller depends on at least one of them.
+
+- **A reader's text selection survives an update.** Rewriting `innerHTML` replaces every text node
+  underneath it, and the agent transcript updates a streaming message about 25 times a second. Only
+  the growing block's node is now replaced.
+- **A copy button lives on its block**, so it is mounted once rather than disposed and re-created on
+  every tick.
+- **A closed code fence is highlighted once.** Its block keeps its element, so nothing asks the
+  highlighter again. Behind that, `infra/highlight/shiki.ts`'s `highlightToHtml` keeps a small
+  first-in-first-out cache of fence html keyed by the exact text and language, which catches the same
+  fence coming back after a scroll or a remount.
+
+The one rule a caller has to keep is the one the component already had: `text` is read in an effect,
+and a prop is a getter rather than a memo, so the effect re-runs whenever anything upstream ticks. The
+guard on the last rendered string is what stops an identical value from touching the DOM at all.
+
 ### What the kit refuses
 
 Each of these will be asked for again and the request will sound reasonable, so the argument is

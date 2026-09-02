@@ -222,7 +222,16 @@ somebody is reading.
   policy, in a status-and-text grid that keeps wrapped lines inside the card.
 - Usage folds the same way, one line per turn. A turn's last usage update can arrive after the turn is
   marked complete and so carries no turn id; it updates the line it belongs to rather than starting
-  another. That is how a cost joins a line that started with only a context count.
+  another. That is how a cost joins a line that started with only a context count. **The fold happens
+  on the Node now, not per client.** A harness reports usage as a running snapshot, so a turn draws
+  about 58 rows, a quarter of everything this ledger holds, and every one of them used to cross the
+  wire and sit in every client's event list for the life of the session. The HTTP snapshot route folds
+  them before it serialises and the transcript store folds an arriving one onto the line it belongs to,
+  both by the rule in `plugins/agents/src/shared/usageFold.ts`, which is the transcript's own rule
+  moved somewhere two callers can share it. The surviving row keeps the first update's id and sequence,
+  so the line lands where it always landed. The client's own fold in `conversationItems.ts` stays and
+  is now defensive: a replayed page, an imported transcript or an older node still folds the way it
+  always did.
 - A subagent shows up twice: as one card in its parent's transcript, holding everything that subagent
   did, and as one indented row under its session in the task Agent sidebar. The card is seeded expanded
   while the subagent is working and collapsed if it had already settled when the card was first drawn,
@@ -307,6 +316,34 @@ Archiving is the only way the UI retires a session. Both the pane header's menu 
 menu on each row in the task's session list offer rename, archive, and, while the agent is running,
 stop; archive asks first. The delete route still exists for a caller that means it, but it is no
 longer a menu item one click away from a transcript that cannot be recovered.
+
+### The transcript store
+
+Because nothing is virtualised, the DOM holds every card in a session, and what a streamed event costs
+is the only lever there is. `plugins/agents/src/client/sessions/managedStore.ts` holds one snapshot per
+session — the session row, its turns, its events and its requests — and every client sees about 25
+events a second per streaming session, because the Node coalesces text deltas at 40 ms or 16 KB
+(`durableEventBuffer.ts`). Four rules keep that frame cheap, and all four are load-bearing.
+
+- **The event list is kept in sequence order and appended to in place.** Events arrive in order, so an
+  arrival is a `push`; a reconnect replay can still deliver one out of order and that walks back from
+  the tail to its seat. A set of seen ids per session answers "have I got this one" without a scan.
+  Nothing may hold the array across a change and compare it by identity: what makes the transcript
+  re-render is the store's signal, not the array's identity.
+- **A usage update folds onto the open line** rather than being appended, by the rule above.
+- **A projected event asks for a row, not a session.** `user_message`, `request`, `request_resolved`
+  and `turn_completed` used to trigger a debounced refetch of the whole snapshot — up to 2,000 event
+  rows, with a JSON body parsed per row — to learn one fact. The Node knows the fact already, so it
+  sends it: `agent:turn` carries the turn a `user_message` opened or a `turn_completed` closed, and
+  `agent:request` carries the request a `request` raised or a `request_resolved` answered. `error` is
+  the one type that still refetches, because it also expires this session's pending requests and no
+  frame names that set.
+- **The turns are a map above the list, not a scan inside it.** A row used to find its turn with
+  `turns.find`, once per row per render.
+
+A snapshot read and the socket can disagree about a usage line, because both sides fold it and both
+keep the first update's id: a frame can land while the request is in flight. `managedSnapshot.ts`
+unions the two payloads, socket first, so no reported field is lost either way.
 
 ## New-session defaults
 

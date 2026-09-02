@@ -916,3 +916,133 @@ field cannot spell falls back to the JSON frame rather than going missing.
   depends on older bytes redraws from its next output
   ([refused.md](./refused.md) § Scrollback beyond the ring). What that looks like for a real agent TUI
   after a long build has not been watched.
+
+## 2026-09-03 — phase 7
+
+Same machine, Node 24.11.0. Phases 0 (`17b03dbe`), 1 (`77ed2ebd`), 2 (`7c826ad6`), 3 (`facd8288`),
+4 (`92983971`), 5 (`28781ae6`) and 6 (`449807fb`) had shipped.
+
+Every number here comes from a throwaway `*.test.ts` under `plugins/agents`, replaying a **real
+session out of this machine's own agents database** — a read-only copy of
+`apps/node/.acorn/plugins/agents.sqlite`, 151 MB, 66,264 events, through the real
+`buildConversationItems` and the real `renderBlocks`. The "before" column is the old algorithm written
+out beside the new one in the same file and fed the same events, so both see the same data in the same
+process. The measurement file was deleted after it was read; the assertions that hold each behaviour
+are in `managedStore.test.ts`, `usageFold.test.ts`, `managedBridge.test.ts`, `AgentTranscript.test.tsx`
+and `Markdown.test.tsx`.
+
+The session is **`72f744c0-abff-49b6-a84f-4077989ce7bf`, "Implement phase 4 of
+docs/future/phased-review-steps/", 2,727 events**, the largest in the database and the one
+decisions.md's "2,700 events" refers to. 881 of its events are `usage`, which is 32%.
+
+### The event mix, database-wide
+
+| Type | Rows | Share |
+| --- | --- | --- |
+| `tool` | 35,472 | 54% |
+| `usage` | **16,359** | **24.7%** |
+| `assistant_message` | 11,155 | 17% |
+| everything else together | 3,278 | 5% |
+
+Confirms decisions.md's "usage rows are 25% of all events" exactly. It also says something that read
+did not: **`tool` is more than twice as many rows as `usage`**, and nothing in this phase folds those.
+The transcript already collapses a call's updates into one card at render time, the way it used to do
+for usage; folding them at the source is the same shape of change and is not in this phase.
+
+### What one streamed event costs
+
+Median of three replays of the whole session, after a warm-up pass.
+
+| | Before | After |
+| --- | --- | --- |
+| Store bookkeeping, whole session | 59.0 ms | **0.4 ms** |
+| Store bookkeeping, per event | 21.6 µs | **0.1 µs** |
+| One projection rebuild at full size | 1.00 ms | **0.85 ms** |
+| Bookkeeping plus one rebuild, whole session | 901 ms | **771 ms** |
+| **Per arriving event** | **0.33 ms** | **0.28 ms** |
+
+**The store's own per-event work is 200 times cheaper**, and that is the whole of what `appendEvent`
+was: two linear scans, a copy of the array and a sort of an already-sorted array, on a list that grows
+to 2,727. It is now a `Set` lookup and a `push`.
+
+Two honest caveats on the rest of that table.
+
+- **The 2 ms budget in the phase file was already met before the phase.** At 2,727 events the whole
+  per-event cost outside the DOM was 0.33 ms, not something over 2 ms. The proposal was written from
+  source rather than from a profile, which is what its own `Verify before building` line said to check.
+  What the phase actually buys at this size is the 21.6 µs and the highlighter, not a budget rescue.
+- **The projection rebuild is now the cost**, at 0.85 ms of the 0.28 ms average and rising with the
+  session. Folding usage takes the array from 2,727 rows to 1,850, which is where the 1.00 → 0.85 ms
+  comes from. Making that rebuild incremental is refused for now and parked in phase 10, and this is
+  the number phase 10 should argue from.
+
+`buildConversationItems` still copies and sorts its input on every call, and that was measured rather
+than assumed: on the 1,850-row array the copy plus sort and an in-order check that would skip it both
+land around 0.02 to 0.06 ms, run to run, because V8's sort walks an already-ordered array in one pass.
+Guarding it buys nothing, so it was left alone.
+
+### The Markdown work, on the longest fenced message in the database
+
+Found by concatenating every `assistant_message` delta per message id across all 114 sessions: session
+`6c8cff0a-6b8a-4016-84cf-c781cf7406f6` ("Microlighter"), **15,083 characters, 34 blocks, 3 closed code
+fences** — which is exactly the "message with three fences" the phase file describes.
+
+| Over eleven renders (the message plus ten streamed updates) | Before | After |
+| --- | --- | --- |
+| Blocks whose element is replaced | 374 (all 34, every render) | **10** (one per update) |
+| **Highlighter calls** | **33** | **3** |
+| Copy buttons disposed and re-mounted | 33 | **3** |
+| Parse of the whole message | 0.31 ms | 0.31 ms |
+
+**No fence re-highlights while its text is unchanged**, which is this phase's `Done when`, and
+`Markdown.test.tsx` holds it with a spy across ten updates.
+
+The parse is deliberately unchanged: `renderBlocks` still reads the whole source every tick, because
+the parser is line-based and cheap (0.31 ms for 15 KB) and a resumable parser would be real machinery
+for less than the DOM write it feeds. What the split buys is everything after the parse.
+
+The longest message in the profiled session itself is 3,758 characters over 13 blocks with no fences;
+growing it moves 1 key of 14.
+
+### The snapshot a client reads
+
+`GET /v2/…/snapshot` caps a page at 2,000 event rows. Session `72f744c0`, first page:
+
+| | Before | After |
+| --- | --- | --- |
+| Rows in the page | 2,000 | **1,345** |
+| Serialized bytes | 2,351,578 B | **2,158,126 B** |
+
+**33% of the rows and 8.2% of the bytes.** The gap between those two numbers is the finding: usage
+rows are small, so folding them is a saving in rows walked and objects held rather than in bytes on the
+wire. The rows are what `buildConversationItems` pays for on every event afterwards, which is why it is
+worth doing, but nobody should quote this as a transfer saving.
+
+The ledger is untouched, and `managedBridge.test.ts` asserts it against a real migrated database: 58
+usage rows in one turn project as one through the HTTP bridge, while `exportSnapshot`, `store.snapshot`
+and `eventPage` all still return 58.
+
+### What a projected event reads
+
+| | Before | After |
+| --- | --- | --- |
+| Row reads per `user_message`, `request`, `request_resolved`, `turn_completed` | up to 2,000 event rows, plus every turn and request | **0** — one turn row or one request row arrives with the event |
+| Row reads per `error` | up to 2,000 | up to 2,000 — unchanged, on purpose |
+| Projected events in the whole database | 679 of 66,264 | of which **645 no longer refetch** and 34 (`error`) still do |
+| In session `72f744c0` | 7 refetches | **1** |
+
+`error` keeps its refetch because it also expires the session's pending requests, and no frame names
+that set.
+
+### Not measured
+
+- **The app.** Every number above is in-process, against the real database but not through the shell.
+  This machine's live instance holds port 4317 and the data root's lock, so nobody has watched a real
+  agent stream through the packaged build with these changes in. The smoke checklist in
+  docs/testing.md is what covers that, by hand.
+- **Text selection surviving an update.** No test covers selection anywhere in this repo — it needs a
+  real selection in a real window. `Markdown.test.tsx` asserts the thing selection depends on, which is
+  that an unchanged block keeps the same element, but that is a proxy and it should be confirmed by
+  hand: select across two paragraphs of a streaming agent message and watch the selection hold.
+- **Memory.** Folding usage keeps roughly a third fewer event objects per session in the client, and
+  the highlight cache holds up to 200 fences under 16 KB each. Neither was weighed.

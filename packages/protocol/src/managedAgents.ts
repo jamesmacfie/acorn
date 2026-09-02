@@ -342,9 +342,15 @@ export type AgentDeleteResult = {
   detail?: string
 }
 
+// `agent:turn` and `agent:request` are the node telling a client what a projected event changed.
+// Without them a client had to refetch the whole snapshot — up to 2,000 event rows, a JSON body parsed
+// per row — to learn that one turn had closed or one permission request had been answered
+// (docs/managed-agents.md § The transcript store).
 export type AgentWsFrame =
   | { channel: 'agent:event'; event: AgentEventRecord }
   | { channel: 'agent:session'; session: AgentSession }
+  | { channel: 'agent:turn'; turn: AgentTurn }
+  | { channel: 'agent:request'; request: AgentRequest }
   | { channel: 'agent:deleted'; sessionId: string }
 
 export const agentEventSearchText = (event: AgentNormalizedEvent): string | null => {

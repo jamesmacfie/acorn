@@ -6,6 +6,7 @@
 import { BridgeError } from '@acorn/plugin-api/node'
 import type { AgentRuntimeState } from '@acorn/protocol/managedAgents.ts'
 import type { RunStatus } from '@acorn/protocol/runs.ts'
+import { foldUsageEvents } from '../../shared/usageFold'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
 import type { ManagedAgentsBridge } from './managed'
 
@@ -97,7 +98,13 @@ export function managedAgentsBridge(runtime: ManagedAgentRuntime): ManagedAgents
     importTranscript: (input) => guarded(() => runtime.importTranscript(input)),
     verifyImportedResume: (sessionId) => guarded(() => runtime.verifyImportedResume(sessionId)),
     listSessions: (filter) => guarded(() => runtime.store.listSessions(filter)),
-    snapshot: (sessionId, afterSeq, eventLimit) => guarded(() => runtime.store.snapshot(sessionId, afterSeq, eventLimit)),
+    // Folded here rather than in the store, because this is the one caller whose reader folds anyway.
+    // `store.snapshot` still answers workflow execution and the wait route with every row
+    // (../../shared/usageFold.ts says why, ../sessions/sessionExecute.ts is the caller that needs them).
+    snapshot: (sessionId, afterSeq, eventLimit) => guarded(async () => {
+      const snapshot = await runtime.store.snapshot(sessionId, afterSeq, eventLimit)
+      return { ...snapshot, events: foldUsageEvents(snapshot.events) }
+    }),
     events: (sessionId, afterSeq, limit) => guarded(() => runtime.store.eventPage(sessionId, afterSeq, limit)),
     enqueueTurn: (sessionId, input) => guarded(() => runtime.enqueueTurn(sessionId, input)),
     patchQueuedTurn: (sessionId, turnId, patch) =>

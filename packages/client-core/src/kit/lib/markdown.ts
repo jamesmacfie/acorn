@@ -79,13 +79,42 @@ const isTableSeparator = (l: string | undefined): boolean =>
 const startsTable = (lines: string[], i: number): boolean =>
   lines[i].includes('|') && isTableSeparator(lines[i + 1])
 
-export function renderMarkdown(src: string, opts: MarkdownOptions = {}): string {
+/** One rendered block, with a key that changes only when the block's own source does. */
+export type MarkdownBlock = { key: string; html: string }
+
+// FNV-1a, 32 bits, carried in the key beside the block's length. A block only has to be told apart
+// from its own previous version and from its neighbours, and this is cheap enough to run over a whole
+// message on every streamed frame — which is the point: a streaming message re-parses its last block
+// and reuses the elements of every block before it (ui Markdown.tsx).
+const digest = (text: string): string => {
+  let h = 0x811c9dc5
+  for (let at = 0; at < text.length; at++) {
+    h ^= text.charCodeAt(at)
+    h = Math.imul(h, 0x01000193)
+  }
+  return (h >>> 0).toString(36)
+}
+
+/**
+ * The same render as `renderMarkdown`, block by block, so a caller that re-renders often can keep the
+ * elements whose source has not moved. Appending a character to a message changes exactly one key: the
+ * trailing block's.
+ */
+export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownBlock[] {
   // Strip the sentinel before anything reads the source. See `S` above; this is the whole defence,
   // and it belongs at the one entry point rather than at each of the six `inline()` call sites.
   const lines = src.replaceAll(S, '').replace(/\r\n?/g, '\n').split('\n')
-  const out: string[] = []
+  const out: MarkdownBlock[] = []
+  // The image policy is in the key because it decides the html: two Markdown surfaces sharing a
+  // highlight cache must not share a block.
+  const flavour = opts.images ?? 'inline'
   let i = 0
+  const emit = (html: string, from: number): void => {
+    const source = lines.slice(from, i).join('\n')
+    out.push({ key: `${flavour}:${source.length}:${digest(source)}`, html })
+  }
   while (i < lines.length) {
+    const start = i
     const line = lines[i]
     const fence = /^```\s*([a-zA-Z0-9_+#-]*)/.exec(line.trim())
     if (fence) {
@@ -96,19 +125,19 @@ export function renderMarkdown(src: string, opts: MarkdownOptions = {}): string 
       // The language hint travels as an attribute rather than a class because nothing styles it: the
       // Markdown component reads it to pick a Shiki grammar, and a fence with no hint stays plain.
       const lang = fence[1] || 'text'
-      out.push(`<div class="ui-code-wrap"><pre><code data-language="${esc(lang)}">${esc(buf.join('\n'))}</code></pre></div>`)
+      emit(`<div class="ui-code-wrap"><pre><code data-language="${esc(lang)}">${esc(buf.join('\n'))}</code></pre></div>`, start)
       continue
     }
     const h = /^(#{1,6})\s+(.*)$/.exec(line)
     if (h) {
       const n = h[1].length
-      out.push(`<h${n}>${inline(h[2], opts)}</h${n}>`)
       i++
+      emit(`<h${n}>${inline(h[2], opts)}</h${n}>`, start)
       continue
     }
     if (/^(---+|\*\*\*+)$/.test(line.trim())) {
-      out.push('<hr>')
       i++
+      emit('<hr>', start)
       continue
     }
     if (startsTable(lines, i)) {
@@ -123,18 +152,19 @@ export function renderMarkdown(src: string, opts: MarkdownOptions = {}): string 
       // The `:---:` alignment markers are parsed off and dropped. Applying one means an inline style
       // attribute, which the plugin frames' CSP refuses, so it needs a data attribute and a rule per
       // alignment. Nothing has asked yet.
-      out.push(
+      emit(
         '<div class="ui-table-scroll" data-scroll><table class="ui-table">'
         + `<thead>${row('th', head)}</thead>`
         + `<tbody>${body.map((r) => row('td', r)).join('')}</tbody>`
         + '</table></div>',
+        start,
       )
       continue
     }
     if (/^>\s?/.test(line)) {
       const buf: string[] = []
       while (i < lines.length && /^>\s?/.test(lines[i])) buf.push(lines[i++].replace(/^>\s?/, ''))
-      out.push(`<blockquote>${inline(buf.join('\n'), opts).replace(/\n/g, '<br>')}</blockquote>`)
+      emit(`<blockquote>${inline(buf.join('\n'), opts).replace(/\n/g, '<br>')}</blockquote>`, start)
       continue
     }
     if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
@@ -142,7 +172,7 @@ export function renderMarkdown(src: string, opts: MarkdownOptions = {}): string 
       const items: string[] = []
       while (i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*+]|\d+\.)\s+/, ''))
       const tag = ordered ? 'ol' : 'ul'
-      out.push(`<${tag}>${items.map((it) => `<li>${inline(it, opts)}</li>`).join('')}</${tag}>`)
+      emit(`<${tag}>${items.map((it) => `<li>${inline(it, opts)}</li>`).join('')}</${tag}>`, start)
       continue
     }
     if (line.trim() === '') {
@@ -151,7 +181,11 @@ export function renderMarkdown(src: string, opts: MarkdownOptions = {}): string 
     }
     const buf: string[] = []
     while (i < lines.length && lines[i].trim() !== '' && !isBlockStart(lines[i]) && !startsTable(lines, i)) buf.push(lines[i++])
-    out.push(`<p>${inline(buf.join('\n'), opts).replace(/\n/g, '<br>')}</p>`)
+    emit(`<p>${inline(buf.join('\n'), opts).replace(/\n/g, '<br>')}</p>`, start)
   }
-  return out.join('\n')
+  return out
 }
+
+/** Markdown source to sanitized HTML, as one string. */
+export const renderMarkdown = (src: string, opts: MarkdownOptions = {}): string =>
+  renderBlocks(src, opts).map((block) => block.html).join('\n')
