@@ -122,9 +122,23 @@ The node's histograms count what it does over and over with nothing else countin
 than all time. `packages/node-core/src/server/perf.ts` owns both.
 
 Reading a desktop cold start end to end means putting three of these together: Rust spawns the helper,
-the helper's `[helper:boot] ready line` is the whole of what Rust waited for, the node's
-`[service:boot] listener-up` sits inside that, and the renderer's clock starts at its own document's
-navigation, after Rust created the window.
+the helper's `[helper:boot] ready line` is the whole of what Rust waited for, and the renderer's clock
+starts at its own document's navigation, after Rust created the window. The node's
+`[service:boot] listener-up` no longer sits inside the wait — the window opens on the helper being
+listening, so the node's whole boot happens after it ([shell.md](./shell.md) § The shell process). The
+two accounts meet at `[helper:boot] service.start`, which is the node reporting that it is listening,
+so `ready line` to `service.start` is how long the shell was on screen without a node behind it.
+
+Two things about the node's own account are worth knowing before quoting it. Its clock starts inside
+`startServiceRuntime`, so spawning the process and evaluating the service bundle — measured at 449 ms —
+are in front of `+0ms` and appear in no step. And measuring the node by calling `startServiceRuntime`
+under `tsx` rather than launching the app inflates `graph` roughly sevenfold, because the loader then
+transpiles as it imports.
+
+**`[renderer:boot] first paint` does not print from a background window.** It is a
+`requestAnimationFrame` callback, and macOS pauses those while the window is occluded, so a launch
+watched from a terminal never records it. Bring the window to the front before reloading, or read the
+other four marks and leave that one out.
 
 ## Build artifacts
 

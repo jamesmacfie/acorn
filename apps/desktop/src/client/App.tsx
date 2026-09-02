@@ -28,8 +28,8 @@ import { hasHostCapability } from '@acorn/client-core/infra/node/hostCapabilitie
 import { desktopExtras } from '@acorn/client-core/infra/platform/index.ts'
 import NodeGate from '@acorn/client-core/features/fleet/NodeGate.tsx'
 import NodeChip from '@acorn/client-core/features/fleet/NodeChip.tsx'
-import { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
-import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
+import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
+import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node/nodeSecurity.ts'
 import { applyNodePlugins } from './activate'
 import TaskView from './TaskView'
@@ -205,9 +205,14 @@ export default function App() {
   // A plain effect reading the signal is right because of that remount: it runs once on mount, which
   // is once per node. The duplicate for the first node is a no-op: `applyNodePlugins` skips a node
   // whose list it has already applied.
+  // Re-reads on the node's connection state as well as its identity, which is what makes it a retry.
+  // The shell mounts before the node is up now, so the boot attempt in index.tsx usually fails
+  // against nothing listening; `applyNodePlugins` leaves itself unapplied when the node did not
+  // answer, so this runs again the moment the broker reports the node reachable. `offline` is skipped
+  // because a request then cannot succeed.
   createEffect(() => {
     const nodeId = activeNodeId()
-    if (nodeId) void applyNodePlugins(nodeId)
+    if (nodeId && nodeState(nodeId) !== 'offline') void applyNodePlugins(nodeId)
   })
 
   // The one-time disk-encryption warning (docs/data-layer.md § Backup: "the app surfaces a one-time
@@ -224,8 +229,11 @@ export default function App() {
     void warnOnceAboutDisk(queryClient, nodeId, label)
   })
 
-  // Gated on having a node to ask, not on an identity: there is no login. NodeGate below holds the
-  // screen until `nodeReady()`, so these only ever fire against a selected node.
+  // Gated on having a node to ask, not on an identity: there is no login. `nodeReady()` means the
+  // fleet has answered and a node is selected, which is what makes a request addressable — not that
+  // the node is up. So these can fire at a node that is still booting and come back as errors, and
+  // that is the design: whatever the persisted cache holds is already on screen behind them, and
+  // index.tsx refetches the mounted ones when the node reports itself reachable.
   const prefs = createQuery(() => prefsOptions(nodeReady()))
   const integrations = createQuery(() => integrationsOptions(nodeReady()))
   const projects = createQuery(() => projectsOptions(nodeReady()))
@@ -373,8 +381,15 @@ export default function App() {
     window.location.reload()
   }
 
+  // The gate below is a state, not a wall (docs/frontend.md § Painting before the node).
+  // `nodeGateHolds()` is false the moment there is a node id to address, which on a warm launch is the
+  // first tick, so the rail, the topbar and the pane host draw from the persisted cache with the node
+  // still absent — empty lists where the cache is cold, and a chip that says the node is starting.
+  // What still holds the screen is a broker that could not answer and a launch with no node to talk
+  // to. The `isRestoring` gate stays: it is an IndexedDB read, and painting in front of it would show
+  // the empty shell and then fill it.
   return (
-    <Show when={nodeReady() && !isRestoring()} fallback={<NodeGate />}>
+    <Show when={!nodeGateHolds() && !isRestoring()} fallback={<NodeGate />}>
     <div class="shell">
     <TabRail />
     <div class="app" classList={{ 'left-collapsed': collapsed() }}>

@@ -72,6 +72,15 @@ async function send(path: string, options: SendOptions = {}): Promise<ApiRespons
   const nodeId = options.nodeId ?? activeNodeId()
 
   if (!transport || !nodeId) {
+    // A host that HAS a broker but no node picked yet. That used to be unreachable, because the window
+    // opened after the fleet had answered; it now happens for the first moments of a launch with
+    // nothing remembered (docs/frontend.md § Painting before the node), and a module-level prime can
+    // land here. Falling through to the same-origin branch below would fetch a node route off the
+    // shell's own scheme handler, which refuses those on purpose and answers with a message about the
+    // API being the helper — true, and misleading about what actually went wrong. Retryable, because
+    // it is about to stop being true.
+    if (transport) throw new ApiError('acorn has not picked a node to talk to yet.', 0, 'no_active_node', { retryable: true })
+
     // No broker, so the renderer is in a plain browser served by a node (`dev:node`) or in a unit test
     // that stubs global fetch. Same-origin, so whatever auth that origin accepts applies. There is no
     // device token on this path.

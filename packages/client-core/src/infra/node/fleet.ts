@@ -51,13 +51,27 @@ export const homeNode = (): NodeRecord | undefined => nodes().find((node) => nod
 export const homeNodeId = (): string | null => homeNode()?.nodeId ?? null
 
 let subscribed = false
+// Node ids whose absence from the list has already sent us back to the helper. Once each, so a node
+// the helper genuinely does not list cannot turn every ping into a fleet read.
+const chased = new Set<string>()
+
 // Idempotent, never torn down: the push stream's lifetime is the renderer's.
 function subscribeStatuses(): void {
   if (subscribed) return
   const transport = nodeTransport()
   if (!transport) return
   subscribed = true
-  transport.onStatus((status) => setStatuses((current) => ({ ...current, [status.nodeId]: status })))
+  transport.onStatus((status) => {
+    setStatuses((current) => ({ ...current, [status.nodeId]: status }))
+    // A status for a node this list has never heard of. It used to be impossible: membership was read
+    // after the local node had been adopted. The window now opens first, so on a first-ever launch the
+    // list is empty and the local node's first status is the only news that it exists
+    // (docs/future/performance/decisions.md § Every host draws first). Re-reading costs the helper one
+    // file read.
+    if (chased.has(status.nodeId) || nodes().some((node) => node.nodeId === status.nodeId)) return
+    chased.add(status.nodeId)
+    void refreshFleet().catch((error: unknown) => console.warn('[fleet] could not re-read membership:', error))
+  })
 }
 
 // Re-read membership from main. Called at boot (activeNode.ts) and after every owner-initiated
@@ -162,6 +176,7 @@ export function dropNode(nodeId: string): void {
 // Test seam: the maps and signals above outlive a single test file otherwise.
 export function _resetFleet(): void {
   subscribed = false
+  chased.clear()
   caches.clear()
   setNodes([])
   setStatuses({})

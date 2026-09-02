@@ -1,6 +1,15 @@
 # Phase 2: paint before the node
 
-Status: not started. Waits on phase 0 for the timeline that proves it.
+Status: shipped 2026-09-03. The helper prints its ready line when it is listening, so a measured launch
+opens the window 601-747 ms before the node's listener is up. The renderer awaits nothing before
+`render()`, the cache partition comes from a remembered node id, and `NodeGate` is a state rather than
+a wall. The app scheme serves off the callback thread and a packaged build caches hashed assets. Two
+things nobody predicted: dropping the two top-level awaits took 28,226 B and **91 of the 134 startup
+requests** off the first paint, and re-measuring the node's boot against the staged bundle rather than
+under `tsx` puts `graph` at 47 ms rather than 338 ms, which undercuts phase 3's stated target. NOT
+measured: `first paint` (macOS pauses `requestAnimationFrame` while the window is occluded, so phase
+0's mark cannot be read from a background window) and the immutable-asset saving, which needs a
+packaged build. See measurements.md § 2026-09-03 — phase 2.
 
 ## Goal
 

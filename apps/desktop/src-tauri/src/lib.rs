@@ -23,9 +23,13 @@ use webviews::Webviews;
 // and helper supervision. The helper process, the renderer bridge, and the node are TypeScript. See
 // docs/shell.md.
 //
-// Boot order is the reverse of what a Tauri app usually does. The helper starts and is waited for
-// before the window exists, so the broker is warm by the time the renderer asks for the fleet list. A
-// renderer that booted first would have nothing to show but the recovery screen.
+// Boot waits for the helper and no further. `setup` blocks until the helper prints its ready line,
+// which it does once it is listening, and the window opens on that. The node's own boot runs behind
+// the window and arrives as a `node-status` push, so the shell draws its persisted cache instead of
+// waiting a few hundred milliseconds for a node it will then re-read anyway
+// (docs/future/performance/decisions.md § Every host draws first). What the window still cannot open
+// without is the helper: the renderer's first question is which nodes there are, and the fleet is the
+// helper's file.
 
 /// The wire version both ends of the stdin handshake agree on.
 const HELPER_PROTOCOL: u32 = 1;
@@ -74,12 +78,23 @@ pub fn run() {
         // The renderer never invokes this plugin's own commands — capabilities/default.json grants it
         // nothing — so it is here only to give src/commands.rs `app.notification()`.
         .plugin(tauri_plugin_notification::init())
-        .register_uri_scheme_protocol(APP_SCHEME, move |ctx, request| {
+        // Asynchronous, because the synchronous form runs the whole response on the thread that
+        // delivered the request — the same thread the webview draws on — and a cold window asks for
+        // more than a hundred module scripts. Each one was a blocking `fs::read` in front of the next
+        // request, and under `pnpm dev` a blocking HTTP call to Vite. One thread per request answers
+        // them in parallel instead. The ceiling is that it is a thread rather than a pool: fine for
+        // the tens of reads a launch makes, and the upgrade if that ever changes is a small pool
+        // behind the same responder.
+        .register_asynchronous_uri_scheme_protocol(APP_SCHEME, move |ctx, request, responder| {
             let source = match &scheme_dev {
                 Some(origin) => Source::DevServer(origin.clone()),
                 None => Source::Files(client_root(ctx.app_handle())),
             };
-            app_scheme::serve(&source, worker_frames.read().unwrap().as_ref(), *scheme_port.read().unwrap(), &request)
+            let frames = worker_frames.clone();
+            let port = scheme_port.clone();
+            std::thread::spawn(move || {
+                responder.respond(app_scheme::serve(&source, frames.read().unwrap().as_ref(), *port.read().unwrap(), &request))
+            });
         })
         // The origin every loaded plugin's UI runs on. Registered here rather than lazily, because a
         // privileged scheme has to exist before the webview that will ask for it does.
@@ -111,9 +126,10 @@ pub fn run() {
         .setup(move |app| {
             let handle = app.handle().clone();
             app.manage(Webviews::<tauri::Wry>::default());
-            // Deliberately blocking. There is nothing for the event loop to do until the node is up,
-            // and the alternative is a window that renders the recovery screen for a second every
-            // launch.
+            // Deliberately blocking, and short: the helper reports itself ready as soon as it is
+            // listening, which is a cache sweep and a socket bind rather than a node boot. There is
+            // nothing for the event loop to do in the meantime, and a window opened before the
+            // helper existed could not ask which nodes there are.
             match boot(&handle) {
                 Ok((helper, plugin_frames)) => {
                     *helper_port.write().unwrap() = helper.ready.port;
@@ -125,8 +141,10 @@ pub fn run() {
                     open_window(&handle)?;
                 }
                 Err(error) => {
-                    // Boot is all-or-nothing. A failure means there is no node to talk to, so say why
-                    // and quit rather than sit headless in the dock.
+                    // A helper that never became ready. Nothing can reach a node without it, so say
+                    // why and quit rather than sit headless in the dock. A node that fails to start
+                    // after this point is a different case: the window is already open, and the
+                    // helper's crash budget puts the recovery dialog over the shell.
                     handle
                         .dialog()
                         .message(&error)

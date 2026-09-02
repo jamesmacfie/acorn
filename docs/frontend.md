@@ -242,11 +242,50 @@ TanStack Query is the server-data cache. There is one QueryClient/persister scop
 keys do not need an ad hoc Node prefix because the cache itself is partitioned. Fleet queries fan out
 per Node and must not write aggregate shapes into ordinary per-Node keys.
 
+## Painting before the node
+
+The shell draws before the node it talks to is up, and corrects itself as the node arrives. Nothing
+between the renderer's first script and its first frame waits on a round trip
+([future/performance/decisions.md](./future/performance/decisions.md) § Every host draws first).
+
+`apps/desktop/src/client/index.tsx` starts `selectActiveNode()` and `applyNodePlugins()` and awaits
+neither. Both still run, and their effects arrive through the signals they already set:
+`activate.ts` registers every compiled plugin before any node has answered, and `applyNodePlugins`
+re-runs that registration with the node's disabled list when it arrives. Registering everything and
+correcting a moment later is the deliberate trade — the worst case is a contribution that disappears,
+against a shell that will not paint because a node is slow.
+
+The cache partition cannot wait for the fleet, because it decides which cache the shell mounts on. So
+the device remembers the last node it talked to and `activeNodeId()` answers from that on the first
+tick (`packages/client-core/src/infra/node/activeNode.ts`). The fleet answer corrects it, and a node
+that has gone reaches the existing `node-replaced` reload.
+
+`nodeGateHolds()` decides whether the gate holds the screen, and it is false the moment there is a node
+to address. `NodeGate` is therefore a state rather than a wall: the rail, the topbar and the pane host
+draw with `tasks` and `projects` empty, and the node chip says the node is starting. On a warm launch
+the persisted cache fills those lists before the node is reachable, which is the whole point. Two
+states still hold the screen — a broker that could not answer, because nothing in the window will
+work, and a launch with no node to address, which is the onboarding path and has no cache to draw
+either.
+
+Two consequences follow, and both are behaviour rather than accident. Queries gated on `nodeReady()`
+can fire at a node that is still booting and come back as errors, with whatever the cache holds
+already on screen behind them; `index.tsx` refetches the mounted ones when the broker first reports
+the node reachable, because `wsOnReconnect` deliberately ignores a node's first connect. And fleet
+membership can arrive after the first frame, so `fleet.ts` re-reads it when a status names a node its
+list does not have — on a first-ever launch that push is the only news that the local node exists.
+
 ## Connection and freshness UI
 
 The broker exposes `online`, `degraded`, `offline`, `incompatible`, and `revoked`. Client-core maps
 these plus query state to `live`, `refreshing`, `stale`, `offline`, `disabled`, and `error` displays.
 Offline reads use cached values with a Node badge; mutations fail fast and retain drafts.
+
+The chip has one wording that is not one of those six. A supervised local node the broker has not
+reported on at all reads "Starting" instead of "Offline", because the window opens before that node
+does and "Offline" is the wrong word for a process coming up. It is wording only: the freshness value
+stays `offline`, since nothing on screen is live yet. A *remote* node with no status is genuinely
+offline — nothing has tried to reach it, and only Reconnect will.
 
 The event client tracks per-connection sequence numbers and reconnects with backoff. A gap, heartbeat
 failure, or Node restart marks the scope stale and refetches active queries. Feature streams render

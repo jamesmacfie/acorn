@@ -35,25 +35,35 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
     const code = status()?.error?.code
     return code === 'identity_mismatch' || code === 'protocol_mismatch' ? HARD_ERRORS[code] : undefined
   }
+  // The supervised local node before the broker has reported on it at all. The window opens before
+  // that node is up now (docs/frontend.md § Painting before the node), so the first moments of a
+  // launch are exactly this, and "Offline" is the wrong word for a process that is coming up. Only the
+  // wording changes: the freshness value stays `offline`, because nothing on screen is live yet, and
+  // the six-value vocabulary in node/freshness.ts is not the place to say "not yet".
+  //
+  // A REMOTE node with no status is genuinely offline — nothing has tried to reach it, and only the
+  // Reconnect button will.
+  const starting = () => !status() && !!nodes().find((node) => node.nodeId === props.nodeId)?.local
   // The fleet record's label, so a caller that only knows the id (the pane strip) still tips a name.
   // The id is the fallback for a node the fleet has not listed, which is also the case where "Offline"
   // is the state.
   const label = () => props.label ?? nodes().find((node) => node.nodeId === props.nodeId)?.label ?? props.nodeId
   const detail = () =>
     hard()?.detail ??
-    (freshness() === 'stale' || freshness() === 'offline' ? formatLastSeen(status()?.lastSeenAt) : '')
+    // "never" is true of a node that is still starting and reads as an accusation. Nothing to add.
+    (starting() ? '' : freshness() === 'stale' || freshness() === 'offline' ? formatLastSeen(status()?.lastSeenAt) : '')
 
   return (
     <span
       class="node-chip"
       classList={{ compact: props.compact }}
       data-freshness={hard() ? 'error' : freshness()}
-      data-tip={`${label()}: ${nodeState(props.nodeId)}`}
+      data-tip={`${label()}: ${starting() ? 'starting' : nodeState(props.nodeId)}`}
       data-tip-sub={detail() || undefined}
     >
       <StatusDot tone={FRESHNESS_TONE[hard() ? 'error' : freshness()]} />
       <Show when={props.label}>{(label) => <span class="node-chip-label">{label()}</span>}</Show>
-      <span class="node-chip-state">{hard()?.label ?? FRESHNESS_LABELS[freshness()]}</span>
+      <span class="node-chip-state">{hard()?.label ?? (starting() ? 'Starting' : FRESHNESS_LABELS[freshness()])}</span>
       <Show when={detail() && !hard()}>
         <span class="node-chip-age">{detail()}</span>
       </Show>
