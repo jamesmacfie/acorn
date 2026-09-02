@@ -4,7 +4,8 @@ import {
   setTerminalOpen, type Task, wsOnStatus,
 } from '@acorn/plugin-api/client'
 import {
-  Badge, Button, Icon, Inline, Menu, Row, RowActions, Rows, Section, SectionHeader, Stack, Text,
+  Badge, Button, EmptyState, Icon, Inline, Menu, Row, RowActions, Rows, Section, SectionHeader,
+  Stack, Text,
 } from '@acorn/plugin-api/ui'
 import type { WorkflowStepRow } from '@acorn/protocol/workflow.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
@@ -214,7 +215,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
       <Section label="Managed sessions">
         <Show
           when={sessionRows().length}
-          fallback={<Text emphasis="muted" wrap>No managed sessions in this task.</Text>}
+          fallback={<EmptyState size="sm" align="start">No managed sessions</EmptyState>}
         >
           <Rows
             id={`agents:sessions:${props.task.id}`}
