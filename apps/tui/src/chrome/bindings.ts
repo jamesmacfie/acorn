@@ -18,11 +18,13 @@
 // The keys come from the host's own intent table, so a hint can never name a key nothing is bound to.
 
 import { createSignal } from 'solid-js'
-import { InputRenderable, TextareaRenderable, type KeyEvent, type Renderable } from '@opentui/core'
+import type { KeyEvent, Renderable } from '@opentui/core'
 import { isTyping, keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { hostKeysFor } from '../keys/install'
-import { focusedExpands, focusedItem, focusedRenderable, isParentStop, isViewport, regionsInScope } from '../keys/regions'
+import {
+  focusedExpands, focusedItem, focusedRenderable, isField, isParentStop, isViewport, regionsInScope,
+} from '../keys/regions'
 import { focusedCrosses, focusedOpens } from '../keys/stops'
 import { openOverlays } from './state'
 
@@ -57,7 +59,11 @@ export type FocusedKind = 'item' | 'parent' | 'field' | 'opens' | 'viewport' | '
 
 export const focusedKind = (): FocusedKind => {
   const node = focusedRenderable()
-  if (node instanceof InputRenderable || node instanceof TextareaRenderable) return 'field'
+  // Through the store's own question rather than an `instanceof`, the same treatment `isViewport`
+  // needed one slice earlier: under our painter a field is a plain object with a `kind`, and a footer
+  // that read it as a stop told a reader Enter would press what they were typing into
+  // (../keys/regions.ts § isField).
+  if (node && isField(node)) return 'field'
   if (focusedItem()) return 'item'
   if (isParentStop(node)) return 'parent'
   if (focusedOpens()) return 'opens'

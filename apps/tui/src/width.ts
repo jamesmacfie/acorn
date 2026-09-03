@@ -77,7 +77,7 @@ const WIDE: readonly (readonly [number, number])[] = [
 
 /** Built once. Constructing a segmenter costs far more than asking one a question, and this module
  *  is asked a few hundred times a frame. */
-const clusters = new Intl.Segmenter('en', { granularity: 'grapheme' })
+const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' })
 
 const isWide = (code: number): boolean => {
   let low = 0
@@ -110,14 +110,14 @@ export function clusterWidth(cluster: string): number {
  *  should have to know the segmenter is here. */
 export function graphemes(value: string): string[] {
   if (PLAIN.test(value)) return value.split('')
-  return Array.from(clusters.segment(value), (segment) => segment.segment)
+  return Array.from(segmenter.segment(value), (segment) => segment.segment)
 }
 
 /** The width of a string in cells. */
 export function stringWidth(value: string): number {
   if (PLAIN.test(value)) return value.length
   let cells = 0
-  for (const { segment } of clusters.segment(value)) cells += clusterWidth(segment)
+  for (const { segment } of segmenter.segment(value)) cells += clusterWidth(segment)
   return cells
 }
 
@@ -134,11 +134,39 @@ export function sliceToWidth(value: string, cells: number): { text: string; widt
   }
   let width = 0
   let text = ''
-  for (const { segment } of clusters.segment(value)) {
+  for (const { segment } of segmenter.segment(value)) {
     const cost = clusterWidth(segment)
     if (width + cost > cells) break
     width += cost
     text += segment
   }
   return { text, width }
+}
+
+/** One grapheme cluster: what it says, where in the string it starts, and how many cells it takes. */
+export type Cluster = { text: string; from: number; width: number }
+
+/**
+ * Every cluster of a string, in order, with its offset.
+ *
+ * `graphemes` above answers the same question without the offsets, which is all paint needs to place
+ * a run. A cursor needs the offsets: "one cluster left" and "which cluster is at column 12" are both
+ * questions about where a cluster starts, and a field that stepped by code unit would put the caret
+ * inside an astral character or between a base and its accent.
+ *
+ * The ASCII branch matters more here than it does in `stringWidth`, because the wrap in `./wrap.ts`
+ * runs this walk over every line it touches. With the branch a wrap of a 400-line note is 163
+ * microseconds; without it, 1,946
+ * (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 4).
+ */
+export function clusters(value: string): Cluster[] {
+  const out: Cluster[] = []
+  if (PLAIN.test(value)) {
+    for (let at = 0; at < value.length; at += 1) out.push({ text: value[at]!, from: at, width: 1 })
+    return out
+  }
+  for (const { segment, index } of segmenter.segment(value)) {
+    out.push({ text: segment, from: index, width: clusterWidth(segment) })
+  }
+  return out
 }

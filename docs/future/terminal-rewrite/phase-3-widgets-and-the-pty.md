@@ -1,9 +1,9 @@
 # Phase 3: widgets and the pty
 
-Status: the scroll viewport is built, 2026-09-04, against `cf374cbd`. `Input`, `Textarea`, the `pty`
-rectangle, the parser's wiring and the click hit test are not started. What building the viewport
-found is at the bottom, and the last two sections there are the ones to read first. Waits on phase 0's
-spike 4 for the textarea.
+Status: two slices built, both 2026-09-04. The scroll viewport is built against `cf374cbd` and
+`Input` and `Textarea` against `a6a9e330`. The `pty` rectangle, the parser's wiring and the click hit
+test are not started. What building each slice found is at the bottom, newest section last, and the
+last two sections of each are the ones to read first.
 
 ## Goal
 
@@ -405,3 +405,270 @@ before this programme.
   `flexBasis: 0` child's contribution to an auto-height parent, and how negative free space rounds
   across the children of an overflowing row. Both are recorded above with what was tried. If a widget
   frame comes out one cell or one row off, look there before looking at paint.
+
+## What building the fields found (2026-09-04)
+
+The second slice is built: `Input` and `Textarea` under our painter, the model under both, and the
+typing hand-off that reaches them. `apps/tui/src/kit/asking.tsx` is rewritten in place with both
+implementations behind `drawsOwn()`: the shared half, `ownField`, is 83 lines of code in 131, and the
+two JSX bodies over it are 16 and 18. Two new files beside it, `apps/tui/src/wrap.ts` (71 lines of
+code in 154: the wrap, the two offset-to-cell functions, and the cache paint and Yoga share) and
+`apps/tui/src/kit/field.ts` (150 in 265, of which the key table is 33). Paint's share is 28 lines of
+code in 68. Against a budget of about 135 for the model plus the wrap and about 150 for the input:
+221 for the model and the wrap together, 117 for the components, so over on the first and under on
+the second, and the overrun is the wrap turning out to be a file with two other owners rather than
+the textarea's own.
+
+Spike 4's design held without a change: a plain string, two offsets beside it, one 44-line wrap, no
+`@codemirror/state`. Selection and undo stayed out and nothing missed them. Fourteen things this file,
+[architecture.md](./architecture.md) or the spike said turned out otherwise.
+
+**The two key tables are one table, and the whole of the difference is a flag.** § Scope budgets a key
+table for the `Input` and another for the `Textarea`. `InputRenderable` is `TextareaRenderable` with
+`height: 1` and one binding changed — Return submits instead of inserting a newline — so `edit` takes
+a `newline` boolean and the tables collapse. Two would have been the same twenty lines written twice
+and would have drifted the first time somebody added a chord. The flag does a second job for free:
+"does Return insert one" and "does this field wrap" are the same question, so the same parameter
+decides whether `scroll` counts cells or rows.
+
+**Up and Down come out inert on a one-row field by returning `false`, not by being left out.** The
+spike's model clamps a vertical move to the ends of the document when there is no row to move to;
+[tui.md](../../tui.md) § The five key groups says the move group goes inert in a field except inside a
+multi-line one. Answering "there is no such row" with `false` satisfies both and is what lets one
+table serve both fields: a handler that changed nothing says so, and the key bubbles the way every
+other declined intent does.
+
+**Nothing typed under our painter for a second reason, and it is upstream of the one the last slice
+named.** `isTypingTarget` being two `instanceof`s was real and is fixed — `apps/tui/src/keys/regions.ts
+§ isField` now answers it, and the footer's `focusedKind` reads the same function. But even with the
+predicate right, the store would never have given a field the keys: `focusable` on a node is
+`props.focusable ?? kind === 'scrollbox'` (`apps/tui/src/tree/compat.ts`), no component asks a field to
+be focusable, and `EditBufferRenderable` sets the flag on itself. So the accessor's default is a set of
+three kinds now. Worth knowing because the two faults look identical from the reader's seat and fixing
+either alone changes nothing.
+
+**A field's height is a prop, and it has to be, because the height decides a second thing.**
+`InputRenderable`'s constructor hands `height: 1` to the textarea it extends, and Yoga's shrink
+default is derived from a *numeric* height (`apps/tui/src/layout/props.ts § flexShrinkFor`), so a
+height written straight to the Yoga node would have left every field shrinking in an overflowing row —
+which is `KeyValueEditor`'s row of two of them. It cannot be a JSX attribute either:
+`InputRenderableOptions` omits `height` outright. So `apps/tui/src/tree/node.ts § INTRINSIC` is what a
+kind arrives with, applied through `setProperty` in `createElement` so the prop, Yoga and the derived
+shrink all see it. One entry, and the mechanism is worth more than the entry: it is where the `pty`
+rectangle's own defaults go.
+
+**A `textarea` is a Yoga leaf with a measure function, and that was measured rather than read.**
+Nothing in `@opentui/core` calls `setMeasureFunc` for an edit buffer, so the honest expectation was a
+zero-height box. A textarea stacked between two lines of text moves the line below it down one row per
+line of content, so the renderable is as tall as its wrapped rows whatever the source says, and that
+is why a `Textarea` without `grow` is exactly as tall as what is in it. Ours says it with a measure
+function (`apps/tui/src/layout/measure.ts § measureField`) and matches row for row, wide characters
+included.
+
+**The wrap cache cannot live in the layout module, and the check that would have caught it does not
+look at bare imports.** `apps/tui/src/layout/measure.ts` imports `MeasureMode` from `yoga-layout`,
+which is a runtime value, so a static import of that module from `apps/tui/src/kit/asking.tsx` — which
+`main.tsx` reaches eagerly — put the whole own-painter layout module and Yoga's wasm binary into the
+startup closure of the **OpenTUI** build: 41 KB of chunk and an `await loadYoga()` before a frame the
+loaded Yoga will never lay out. `apps/tui/scripts/check-startup-graph.mjs` walks relative chunk edges
+and `yoga-layout` is left external, so the byte count moved by 41 KB and never named the cause. The
+cache is in `apps/tui/src/wrap.ts` instead, which imports `./width` and a type. Exactly the trap
+`apps/tui/src/ownKeys.ts` was split out to avoid, one module over.
+
+**The component wraps with the pure function rather than reading the cache paint reads, and that is
+the safer of the two.** The cache is keyed by the `value` prop the component itself writes from an
+effect, so a read of it inside a keystroke would depend on Solid having already flushed that effect —
+true today, and a trap for the next person. `wrapRows(text, width)` is pure, so the component's answer
+and paint's are the same answer by construction rather than by ordering, and the cost is the one wrap
+spike 4 budgeted per keystroke. The cache still earns its keep: it is what makes a frame that moved
+nothing wrap nothing.
+
+**A field needs no invalidator, and the reason is where its text comes from.** A run's characters are
+its `#text` children, which the reconciler patches, so `invalidateRun` has to be called. A field's are
+one prop the cache reads on the way in, so a value that changed is a key that does not match. What the
+component still owes is `markDirty` on the Yoga node, because Yoga will not call a measure function it
+does not believe is stale — and only for a `textarea`, because marking a node that has no measure
+function aborts the wasm module.
+
+**The caret is the terminal's own and it belongs on the buffer, so that the diff can leave it
+unsaid.** § Design says paint writes `CSI row;col H` after the frame. Putting the position on the
+`Buffer` as one nullable pair instead means the flush compares it like everything else: a frame that
+moved nothing writes nothing, caret included, and a frame where the caret alone moved writes six
+bytes. `DECTCEM` — `CSI ?25h` and `CSI ?25l` — is the other half, and hiding it on every frame with no
+focused field is what stops a caret parking in the corner of a list.
+`apps/tui/src/input/terminal.ts`'s enter sequence already hides the caret, so the buffer's initial
+`null` matches the terminal's real state and the first frame says nothing it need not.
+
+**Two colours had to be said out loud, not one.** Phase 2 corrected 352 runs of `#00AAFF`, OpenTUI's
+default `focusedBorderColor`. A field has a second: `TextareaRenderable`'s `placeholderColor` defaults
+to `#666666`, which is no more one of the sixteen slots than the blue was and comes from no theme
+either. The fix is the same shape as the one the components already carry for `textColor` — the kit
+names the slot, so both painters read it — and it is a prop rather than a decision in paint, which is
+what keeps the role vocabulary in `apps/tui/src/kit/roles.ts` and out of the painter.
+
+**`Composer` and `MentionTextarea` needed no change at all**, which is one better than § Scope
+expected: it says their `plainText` reads become a `value()` read. The last slice's own advice was
+right instead — a widget's imperative API goes on the node from the component's `ref` — so
+`plainText`, `setText`, `insertText`, `handleKeyPress` and `handlePaste` are installed as property
+descriptors and every caller above the field is one piece of code. The dispatcher's hand-off gets the
+same benefit: `typeInto` still calls `node.handleKeyPress?.(event)` and does not know which painter
+answered.
+
+**A harness key had nowhere to put the character it types.** `ownKeyEvent` set `sequence` to the key's
+*name*, so Space typed the word "space" and a capital typed a lower-case letter — the case having
+moved into the modifier, which is right for a binding and useless for a field. `sequence` now carries
+what the key types and is empty for a key that types nothing, which is what
+`apps/tui/src/input/events.ts § KeyEvent` already says about `text`: what a Return does inside a field
+is the model's decision from the name, not a character the terminal invents. Nothing else in the
+package read `sequence`.
+
+**A paste is a second hand-off and it is ours alone.** OpenTUI's renderer delivers a paste to the
+renderable *it* has focused, and the caret mirror has focused the same field, so that route works
+today and a second listener would paste twice. `apps/tui/src/keys/install.ts § pasteInto` is therefore
+registered only under our painter. It is the one place in this slice branching on the switch for a
+reason other than "there are two implementations", and phase 4 leaves it.
+
+**`apps/tui/src/layout/measure.ts` was committed with two NUL bytes in it and git had stopped
+diffing the file.** They are the separators in `measuredRun`'s cache key, where two spaces were
+plainly meant, and they arrived in the previous slice — almost certainly out of the same
+heredoc-through-python tooling this slice used. The file reads as binary to git, so its diff has been
+`Bin 5003 -> 8222 bytes` rather than lines. Replaced with spaces; the key is internal and nothing
+holds it. Worth checking a new file for once per slice, because nothing else in the suite notices.
+
+### The eight the fields unblocked, and the five that are left
+
+Seven of the eight match cell for cell and the eighth does not, and none of the five surfaces still
+held is held by a widget:
+
+- **`browse`, `palette` and `pr` at both sizes, and `notes` at 80 by 24** match, run for run, after
+  their `#00AAFF` and `#666666` runs were corrected. `pr` was the surface phase 2 read as a viewport
+  and the last slice re-read as a `Textarea`'s `setText`; with `setText` on the node it draws the pane
+  rather than the message.
+- **`agents` at 80 by 24 differs by six rows of content, and the painters agree about every one of
+  them.** Measured rather than argued: the old painter driven through this same harness, with
+  `ACORN_FIXTURE_DELAY_MS` set, draws exactly the cells ours does on all 24 rows, and both differ from
+  the golden — our `flush` turns the loop until the tree stops asking for frames, which drains the
+  fixture's delayed answers, so a "NEEDS YOU" section the capture never saw is on screen. That is the
+  same hazard as `changes` at 80 and it is now the stronger statement: the capture is the shallower
+  screen, not the painter a different one. The seven rows of that surface that *do* line up carry its
+  blue, so they were corrected and only the six content rows are held.
+- **`agents` and `notes` at 120 by 40 differ by one cell on rows that overflow their column**, which
+  is the second of the two recorded Yoga-build differences and not the painter's: the last child of a
+  squeezed row keeps a cell under OpenTUI that it loses here. On `agents` it knocks on, because the
+  cell it loses is enough for the composer's hint to stop wrapping, which moves four rows up by one.
+  The old painter through this harness matches the golden on both, which is what says it is the
+  layout and not the settling.
+
+**137 runs were corrected in this slice**, in ten files, by phase 2's rule: read the colour off the
+live frame at the same column, and refuse it unless it is one of the sixteen slots or the terminal's
+own foreground. 132 were `#00AAFF` and all 132 took the accent slot; five were `#666666` and all five
+took the palette's grey. Per file: `browse` 12 blue and 1 grey at each size, `palette` 22 and 1 at
+each size, `notes` 12 and 1 at 80 and 12 blue at 120, `pr` 12 blue at each size, `agents` 12 blue at 80
+and 4 at 120. The correction runs row by row rather than per file, which is what made `agents` at 80
+correctable at all. What is left uncorrected is 32 blue and 4 grey: `changes` at both sizes, which is
+not this slice's, and the rows of `agents` at 120 and `notes` at 120 whose characters do not line up.
+
+The rule needs a live frame, and the recipe is five lines: write `live` to
+`apps/tui/golden/live-<name>.json` from `apps/tui/src/golden.test.ts` beside the `compare` call, run
+the suite under `own`, then walk the two files together taking the live colour wherever the golden
+holds a hex and the row's characters match. Left out of the tree deliberately — a test that writes
+files is a test with a side effect — but phase 4 will want it once more.
+
+**`notes-80x24`'s one non-deterministic span is accepted rather than compared.** Phase 0 asked for
+this: the file flips a single `inverse` bit on the word `Scratchpad` across runs, because at 80 the
+notes pane sometimes opens with no row marked as current, and both states are where the screen comes
+to rest. `apps/tui/src/golden.test.ts § RACES` drops that one bit from that one run on both sides, so
+everything else about the span is still compared. A golden that cannot be trusted about one bit should
+not become a golden nobody checks.
+
+**The held list is keyed by name and size now, because the reasons stopped agreeing across the two.**
+At 80 the harness settles deeper than the capture did and at 120 the Yoga builds round a squeezed row
+differently, and one entry per surface could only say one of them.
+
+### Test results (2026-09-04)
+
+`pnpm --filter @acorn/tui test` on Node 26.8.1 with the switch at its default: **475 passing, 2
+failing, 28 skipped**, against 451, 2 and 28 before the slice. The 24 extra passes are this slice's new
+cases, all of which run under both painters. The two failures are `walks into a command group on
+return and back out of it on escape` and `draws a search and an input in the same rectangle as the
+list`, both in `apps/tui/src/chrome/chrome.test.tsx`, both another session's in-flight palette work
+and both failing before this slice.
+
+On Node 24.11.0 with `ACORN_TUI_PAINTER=own`, no FFI and no flag: **488 passing, 8 failing, 9 skipped**,
+against 419 passing, 34 failing and 28 skipped before the slice. Everything this slice owns is green.
+`apps/tui/src/kit/kit.test.tsx` is 110 passing and 4 skipped, up from 95 and 16: the eleven field cases
+run, three new ones join them, and the four still held are the two Yoga-build cases and the two mouse
+ones. `apps/tui/src/golden.test.ts` is 23 passing and 5 skipped, up from 16 and 12.
+`apps/tui/src/kit/field.test.ts` is new and 17 for 17. `apps/tui/src/paint/paint.test.ts` gains four
+field cases and is 23 for 23. `apps/tui/src/browse.test.tsx`, `apps/tui/src/controls.test.tsx`,
+`apps/tui/src/extensions.test.tsx`, `apps/tui/src/spatial.test.tsx`, `apps/tui/src/panes.test.tsx` and
+`apps/tui/src/smoke.test.tsx` are green where they were red.
+
+The eight that remain under `own`, each checked on its own:
+
+- **Five in `apps/tui/src/reachability.test.tsx`, all at 80 by 24, and all of them pre-existing.**
+  Measured against the tree at `a6a9e330`: seven failed there and five fail now, so this slice took
+  `pr` and `editor` green and introduced none. Each of the five reports whole rail regions the walk
+  never landed on — `changes` names a `Menu` row, `context` names two `BoxRenderable`s that are a
+  region's frame of last resort — so it is region reachability at that width rather than anything a
+  field does. Three of the five gained one owed stop, and it is the filter field inside a region the
+  walk already could not reach. Not chased; the next slice or phase 4 owns it, and the cheap first
+  question is why a rail region at 80 by 24 is not in the Tab cycle under this painter.
+- **Two in `apps/tui/src/keys/keys.test.tsx`**, both the `pty` rectangle — `renderable.write is not a
+  function` and a size the emulator was never told. The next slice.
+- **One in `apps/tui/src/chrome/chrome.test.tsx`**, `walks into a command group on return and back
+  out of it on escape`, which is one of the two failing under the default switch and is not this
+  slice's. Its pair, `draws a search and an input in the same rectangle as the list`, fails under the
+  default switch and came out red in one run under `own` and green in the next, so treat it as flaky
+  under this painter rather than as a difference between them.
+
+An earlier full run under `own` also red-ed `apps/tui/src/diffLong.test.tsx`, timing out at 120 seconds
+against its own 83-second case, and `apps/tui/src/golden.test.ts § draws palette-80x24 cell for cell`,
+timing out at 200 seconds while a golden comparison had the other cores. Both pass on their own and
+neither appeared in the run above. That is the timeout cascade this suite has had all along: check
+alone before blaming a diff.
+
+`pnpm --filter @acorn/tui lint` is clean under both switch values. `tools/arch` fails only its
+pre-existing `docPaths` case over dotfile paths in three other docs, and `@acorn/client-core` its
+pre-existing icon census.
+
+`apps/tui/scripts/check-startup-graph.mjs` measures the eager closure at 957,638 B under `opentui` and
+954,069 B under `own`, against 935,065 B and 929,039 B before the slice: both grew by about 23 KB, and
+it is this slice's own source — the build does not minify, `apps/tui/src/kit/asking.tsx` went from 646
+lines to 909 in a file already in the graph, and `wrap.ts` and `field.ts` are reached from it. Both
+numbers are over the 870,000 B ceiling the check has been failing since before this programme. The
+41 KB and the eager `await loadYoga()` that the first cut of this slice added to the *OpenTUI* build
+are gone, and the finding above says how they got there.
+
+### What the last slice must know
+
+- **`isTypingTarget` is answered and `apps/tui/src/keys/regions.ts § isField` is where.** An entered
+  `pty` is the other typing target and a stricter one — every key is its input, chords included, until
+  Escape — and it deliberately does not go through that predicate: the rectangle takes the keys before
+  dispatch instead ([tui.md](../../tui.md) § The Rectangle contract). So the rectangle adds a route
+  rather than a case to `isField`.
+- **The hand-off is two listeners now, and the paste half is ours alone.**
+  `apps/tui/src/keys/install.ts § typeInto` and `§ pasteInto` are the shapes the parser's key and paste
+  events should arrive at when they are wired: `typeInto` already filters nothing by `eventType`, so
+  the `press`-and-`repeat` filter § Scope warns about belongs on the subscription rather than here, and
+  a key arriving twice would type twice.
+- **A widget's imperative API on the node is the pattern, twice proved.** `scrollBy` and friends for
+  the viewport, `handleKeyPress`, `handlePaste`, `plainText`, `setText`, `insertText` and `value` for a
+  field, all as property descriptors from the component's `ref`. A `pty` owes `write`, `onData`,
+  `onResize` and `size`, which is the `CellTerminal` interface `apps/tui/src/kit/pty.ts` already
+  speaks, and `apps/tui/src/keys/keys.test.tsx` fails today with `renderable.write is not a function`
+  for exactly that reason.
+- **The caret is on the buffer and the pty's is a second writer of it.** `apps/tui/src/paint/paint.ts
+  § drawField` sets `buffer.cursor` for the focused field; an entered rectangle sets it from the
+  emulator's own cursor translated into the rect. At most one of the two can be true at a time,
+  because at most one thing has the keys, but nothing enforces that — the last writer in the paint
+  walk wins, and the walk order is the tree's.
+- **`scroll` is the prop a widget slides its own content with**, cells or rows depending on the kind,
+  clamped by the component so the caret is inside the box. A `pty` does not want it: the emulator owns
+  its own scrollback and its viewport is the rect.
+- **`INTRINSIC` in `apps/tui/src/tree/node.ts` is where a kind's own defaults go**, applied through
+  `setProperty` so Yoga and the derived `flexShrink` see them. One entry today.
+- **The five held goldens are two measured differences and no work**, and `apps/tui/src/golden.test.ts
+  § PHASE_3` says which is which per size. Neither is above the layout pass. If phase 4 wants all 28,
+  the honest routes are to re-capture the two that the harness out-settles and to spend an afternoon
+  on `pointScaleFactor` for the three that round a squeezed row differently.

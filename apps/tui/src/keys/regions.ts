@@ -31,7 +31,10 @@
 // The pane and region chords live on the same layer 5 the desktop uses, so priority decides here too.
 
 import { createSignal, onCleanup } from 'solid-js'
-import { MouseButton, ScrollBoxRenderable, type CliRenderer, type MouseEvent, type Renderable } from '@opentui/core'
+import {
+  InputRenderable, MouseButton, ScrollBoxRenderable, TextareaRenderable,
+  type CliRenderer, type MouseEvent, type Renderable,
+} from '@opentui/core'
 import { drawsOwn } from '../painter'
 
 export type RegionRef = { paneId: string; regionId: string }
@@ -47,6 +50,22 @@ export type RegionRef = { paneId: string; regionId: string }
  *  (../chrome/bindings.ts § focusedKind). */
 export const isViewport = (node: Renderable): node is ScrollBoxRenderable =>
   node instanceof ScrollBoxRenderable || (node as unknown as { kind?: string }).kind === 'scrollbox'
+
+/** Is this a field somebody types into?
+ *
+ *  The same shape as `isViewport` above and for the same reason, and this one is the reason nothing
+ *  typed under our painter at all: `../keys/install.ts § isTypingTarget` was two `instanceof`s, so the
+ *  typing shadow never went up, the bare keys stayed bound to the collection around the field, and the
+ *  hand-off had nothing it recognised to hand a key to.
+ *
+ *  Exported for its two askers, which are the dispatcher's hand-off and the footer's row of words —
+ *  both of which had their own copy of the pair (`../chrome/bindings.ts § focusedKind`). Phase 4
+ *  leaves the second half. */
+export const isField = (node: Renderable): node is InputRenderable | TextareaRenderable => {
+  if (node instanceof InputRenderable || node instanceof TextareaRenderable) return true
+  const kind = (node as unknown as { kind?: string }).kind
+  return kind === 'input' || kind === 'textarea'
+}
 
 /** The leftmost column. Two facts about the screen are two too many for this module to know, so this
  *  is the one: the column at the far left is the chrome's and has no pane behind it, which is what

@@ -3,7 +3,7 @@ import { createRenderer } from 'solid-js/universal'
 import { invalidateRun } from '../layout/measure'
 import { applyProp, flexShrinkFor, SHRINK_DEPENDS } from '../layout/props'
 import { createYogaNode, freeYogaNode } from '../layout/yoga'
-import { KINDS, measuresText, textOwner, type Node } from './node'
+import { INTRINSIC, KINDS, measuresText, textOwner, type Node } from './node'
 import { makeNode } from './compat'
 import { requestFrame } from './frames'
 
@@ -62,6 +62,9 @@ export function createElement(tag: string): Node {
   if (!kind) throw new Error(`Unknown component type: <${tag}>`)
   const node = make(kind)
   node.yoga = createYogaNode(node)
+  // What the kind arrives with, through `setProperty` rather than written on the side, so the prop
+  // and Yoga and the derived shrink all see it (./node.ts § INTRINSIC).
+  for (const [name, value] of Object.entries(INTRINSIC[kind] ?? {})) setProperty(node, name, value)
   if (node.yoga) {
     if (getOwner()) onCleanup(() => freeYogaNode(node))
     else freeOnRemove.add(node)

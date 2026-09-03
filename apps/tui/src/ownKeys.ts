@@ -57,7 +57,9 @@ const NAMED: Readonly<Record<string, string>> = {
  *
  *  A letter's case moves into the modifier rather than into the name, because `intentKeys` binds
  *  `last` as `shift+g` and a parser reporting `G` would produce a chord string no binding matches
- *  (./input/parser.ts § A key name is lower case). */
+ *  (./input/parser.ts § A key name is lower case). The character itself goes in `sequence`, which is
+ *  what a field types: with the case in the modifier there is nowhere else for a capital to live, and
+ *  `space` as a name is a word rather than a character (./kit/field.ts § typedBy). */
 export function pressedKey(key: string, modifiers: {
   shift?: boolean
   ctrl?: boolean
@@ -65,10 +67,13 @@ export function pressedKey(key: string, modifiers: {
   super?: boolean
 } = {}): OwnKeyEvent {
   const named = NAMED[key]
-  if (named) return ownKeyEvent(named, modifiers)
-  if (key === ' ') return ownKeyEvent('space', modifiers)
+  // A named key types nothing at all, which is the same thing our parser says by leaving `text`
+  // empty: what a Return does inside a field is the edit model's decision from the name, not a
+  // character the terminal handed over (./input/events.ts § KeyEvent).
+  if (named) return ownKeyEvent(named, modifiers, '')
+  if (key === ' ') return ownKeyEvent('space', modifiers, ' ')
   const upper = key.length === 1 && key !== key.toLowerCase()
-  return ownKeyEvent(key.toLowerCase(), upper ? { ...modifiers, shift: true } : modifiers)
+  return ownKeyEvent(key.toLowerCase(), upper ? { ...modifiers, shift: true } : modifiers, key)
 }
 
 export const ownKeyEvent = (name: string, modifiers: {
@@ -76,7 +81,7 @@ export const ownKeyEvent = (name: string, modifiers: {
   ctrl?: boolean
   meta?: boolean
   super?: boolean
-} = {}): OwnKeyEvent => {
+} = {}, typed?: string): OwnKeyEvent => {
   const event: OwnKeyEvent = {
     name,
     ctrl: modifiers.ctrl ?? false,
@@ -87,8 +92,8 @@ export const ownKeyEvent = (name: string, modifiers: {
     option: modifiers.meta ?? false,
     shift: modifiers.shift ?? false,
     ...(modifiers.super === undefined ? {} : { super: modifiers.super }),
-    sequence: name,
-    raw: name,
+    sequence: typed ?? name,
+    raw: typed ?? name,
     number: false,
     eventType: 'press',
     source: 'raw',

@@ -40,6 +40,10 @@ export type Cells = Frame & {
   press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<Cells>
   /** Send one terminal wheel/trackpad step at a cell. */
   scroll: (x: number, y: number, direction: 'up' | 'down') => Promise<Cells>
+  /** A bracketed paste, which a terminal delivers whole. Not a run of key presses: the difference
+   *  between pasting a hundred lines into a composer and sending it a hundred times
+   *  (../input/events.ts § PasteEvent). */
+  paste: (text: string) => Promise<Cells>
   /** Press and release the left button at a cell, which is what a reader's click is. */
   click: (x: number, y: number) => Promise<Cells>
   resize: (width: number, height: number) => Promise<Cells>
@@ -82,6 +86,7 @@ type Surface = {
   runs: () => Run[]
   resize: (width: number, height: number) => void
   pressKey: (key: string, modifiers?: Modifiers) => void
+  pasteText: (text: string) => void
   scroll: (x: number, y: number, direction: 'up' | 'down') => Promise<void>
   click: (x: number, y: number) => Promise<void>
   destroy: () => void
@@ -114,6 +119,10 @@ const openSurface = async (size: { width: number; height: number }): Promise<Sur
         renderer.frame()
       },
       pressKey: (key, modifiers) => { renderer.keyInput.emit('keypress', pressedKey(key, modifiers)) },
+      // Onto the same queue the keys arrive on, because that is where the dispatcher's paste hand-off
+      // listens. Wiring the parser's own paste events into it is the next slice
+      // (../keys/install.ts § pasteInto).
+      pasteText: (text) => { renderer.keyInput.emit('paste', { text }) },
       // A wheel hit-tests to the innermost viewport under the cell and moves its offset. A click is
       // the other half of the pointer and is a later slice: focusing what was clicked is the store's
       // question, and a case that clicks skips until it is answered
@@ -141,6 +150,7 @@ const openSurface = async (size: { width: number; height: number }): Promise<Sur
     }))),
     resize: setup.resize,
     pressKey: (key, modifiers) => { setup.mockInput.pressKey(RAW_KEYS[key] ?? key, modifiers) },
+    pasteText: (text) => { void setup.mockInput.pasteBracketedText(text) },
     scroll: (x, y, direction) => setup.mockMouse.scroll(x, y, direction),
     click: (x, y) => setup.mockMouse.click(x, y),
     destroy: () => setup.renderer.destroy(),
@@ -203,6 +213,7 @@ export async function renderCells(
       press,
       scroll,
       click,
+      paste,
       resize,
       renderer: setup.renderer,
       done: tearDown,
@@ -222,6 +233,11 @@ export async function renderCells(
   }
   const scroll = async (x: number, y: number, direction: 'up' | 'down'): Promise<Cells> => {
     await setup.scroll(x, y, direction)
+    return frame()
+  }
+  const paste = async (text: string): Promise<Cells> => {
+    setup.pasteText(text)
+    await new Promise((done) => setTimeout(done, KEY_SETTLE_MS))
     return frame()
   }
   const click = async (x: number, y: number): Promise<Cells> => {

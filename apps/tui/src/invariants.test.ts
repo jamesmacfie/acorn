@@ -124,8 +124,9 @@ describe('the store is the only owner of focus', () => {
     // is reachable", and it belongs in the region store or nowhere.
     //
     // `tree/compat.ts` is the sixth and it is a node being built rather than a sixth opinion: the
-    // accessor there gives a `scrollbox` the default OpenTUI's own renderable had, and phase 4 deletes
-    // the file (docs/future/terminal-rewrite/phase-2-the-painter.md).
+    // accessor there gives a `scrollbox`, an `input` and a `textarea` the defaults OpenTUI's own
+    // renderables had, and phase 4 deletes the file
+    // (docs/future/terminal-rewrite/phase-2-the-painter.md).
     expect(said(/focusable = /g)).toEqual({
       'keys/regions.ts': 2,
       'keys/stops.ts': 2,

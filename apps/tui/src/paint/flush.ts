@@ -1,5 +1,5 @@
 import { sameColor, type Color } from '../colour'
-import { ATTRS, cellAt, sameCell, type Buffer, type Cell } from './buffer'
+import { ATTRS, cellAt, sameCell, sameCursor, type Buffer, type Cell, type Cursor } from './buffer'
 
 // The difference between two frames, as the bytes that turn one into the other.
 //
@@ -24,6 +24,15 @@ const CSI = '\x1b['
 /** Synchronized output, DEC private mode 2026. */
 const BEGIN = `${CSI}?2026h`
 const END = `${CSI}?2026l`
+
+/** Show and hide the terminal's own caret, DEC private mode 25.
+ *
+ *  The caret is the reader's, not a character of ours: one field at most is focused and typing, and a
+ *  terminal draws its caret at whatever position it was last moved to. So paint says where and this
+ *  says whether — hidden on every frame where nothing is being typed into, because a caret parked in
+ *  the corner of a list is a caret that means nothing (./paint.ts § drawField). */
+const SHOW = `${CSI}?25h`
+const HIDE = `${CSI}?25l`
 
 /** Erase the whole display. Only after a resize: the terminal is still holding a frame of a different
  *  shape, and the cells we are about to write are the ones that changed against a blank buffer, so
@@ -96,6 +105,13 @@ const sameStyle = (one: Written, two: Written): boolean =>
  *  matters. */
 const moveTo = (x: number, y: number): string => `${CSI}${y + 1};${x + 1}H`
 
+/** Where the caret goes at the end of a frame, or hiding it. Nothing at all where it has not moved,
+ *  which is what keeps a frame that changed nothing free. */
+function cursorMove(from: Cursor, to: Cursor): string {
+  if (sameCursor(from, to)) return ''
+  return to ? moveTo(to.x, to.y) + SHOW : HIDE
+}
+
 export type Flush = {
   /** Everything to write, or empty where the frame changed nothing. */
   text: string
@@ -115,6 +131,10 @@ const EMPTY: Flush = { text: '', runs: 0 }
  */
 export function flush(front: Buffer, back: Buffer, erase = false): Flush {
   if (back.cols <= 0 || back.rows <= 0) return erase ? { text: BEGIN + ERASE + END, runs: 0 } : EMPTY
+  // Worked out here and written last, after the cells, because moving the caret is the point of it
+  // and a run written afterwards would move it again. `2J` neither moves nor hides the caret, so an
+  // erasing frame compares against the same previous state as any other.
+  const caret = cursorMove(front.cursor, back.cursor)
 
   let out = ''
   let runs = 0
@@ -156,7 +176,7 @@ export function flush(front: Buffer, back: Buffer, erase = false): Flush {
     }
   }
 
-  if (out === '') return erase ? { text: BEGIN + ERASE + END, runs: 0 } : EMPTY
+  if (out === '' && caret === '') return erase ? { text: BEGIN + ERASE + END, runs: 0 } : EMPTY
   const reset = sameStyle(written, START) ? '' : RESET
-  return { text: BEGIN + (erase ? ERASE : '') + out + reset + END, runs }
+  return { text: BEGIN + (erase ? ERASE : '') + out + reset + caret + END, runs }
 }

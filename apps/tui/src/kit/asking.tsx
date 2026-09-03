@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { createEffect, createSignal, For, Index, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, Index, onCleanup, Show, untrack, type JSX } from 'solid-js'
 import type { BoxRenderable, InputRenderable, Renderable, TextareaRenderable } from '@opentui/core'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm.ts'
 import {
@@ -18,7 +18,7 @@ import type { ButtonProps, InputProps, SelectProps } from '@acorn/client-core/ki
 import type { PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import type { MentionTextareaProps } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 import type { ItemProps } from '../keys/collection'
-import { focusRenderable, stopsIn } from '../keys/regions'
+import { focusedRenderable, focusRenderable, stopsIn } from '../keys/regions'
 import { stop } from '../keys/stops'
 import { STOP } from '../keys/tiers'
 import { bindKeys } from '../keys/install'
@@ -26,6 +26,11 @@ import { flatten, hasNode, Line, slot } from './cells'
 import { boxBorder, litControl } from './roles'
 import { slotColor } from '../appearance'
 import { paintColor } from '../colourCompat'
+import { create, edit, paste, setValue, type Field, type Press } from './field'
+import { toVisual, wrapRows, type Row } from '../wrap'
+import { drawsOwn } from '../painter'
+import { requestFrame } from '../tree/frames'
+import type { Node } from '../tree/node'
 import { Menu } from './grouping'
 import { copyToTerminal } from './copy'
 
@@ -41,6 +46,15 @@ import { copyToTerminal } from './copy'
 // width in a terminal — `Input` draws three characters wide and scrolls its own content unless it is
 // told to take the room its row has left — and an edit buffer owns its own text, so a `value` that
 // changes from outside has to be written into the renderable rather than passed as a prop.
+//
+// **Both fields have two implementations, one contract**, the shape `./scrolling.tsx` set for the
+// scroll viewport. OpenTUI's `InputRenderable` and `TextareaRenderable` own an edit buffer, a wrap
+// and a caret; under our painter `ownField` below owns all three and the node carries the value, the
+// caret's offset and the scroll as props paint reads. What the rest of the app reaches a field
+// through is the same either way — `value`, `plainText`, `setText`, `insertText`, `handleKeyPress`
+// and `handlePaste` — which is what keeps `Composer`, `MentionTextarea` and the dispatcher's typing
+// hand-off one piece of code rather than two. Phase 4 deletes the OpenTUI half
+// (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md).
 
 /** `[ label ]`. `bare` drops the brackets, for a control that is a word inside a sentence. */
 export function Button(props: ButtonProps) {
@@ -101,7 +115,193 @@ export function ConfirmButton(props: ButtonProps & {
   )
 }
 
-export function Input(props: InputProps) {
+/** What the rest of this app asks of a field, whichever painter drew it.
+ *
+ *  OpenTUI's two renderables answer all six already; ours are installed on the node by `ownField`
+ *  below, so `Composer`, `MentionTextarea`, the `commit` layer and the dispatcher's typing hand-off
+ *  never learn which one they are talking to (../keys/install.ts § typeInto). */
+type FieldApi = {
+  value: string
+  plainText: string
+  setText: (text: string) => void
+  insertText: (text: string) => void
+  handleKeyPress: (key: Press) => boolean
+  handlePaste: (event: { text: string }) => void
+}
+
+/**
+ * Our painter's field: the model is a signal here and four props there.
+ *
+ * The whole of both fields under this painter, because the two differ by one thing. `newline` says
+ * whether Return inserts one, which is exactly `InputRenderable`'s single overridden binding, and it
+ * doubles as "does this field wrap" — a one-row field slides sideways where a wrapped one slides up
+ * and down, and one `scroll` number says both (../paint/paint.ts § drawField).
+ *
+ * Nothing on the node knows how to edit. The model is a signal here and a set of props there, so a
+ * node cannot be in an edit state the component disagrees with, and paint reads four numbers
+ * (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § Design).
+ *
+ * Returns the `ref` its two call sites install, because a `ref` callback cannot return a signal —
+ * the same reason `../keys/stops.ts § stop` is shaped that way.
+ */
+function ownField(spec: {
+  value: () => string
+  newline: boolean
+  onInput?: (value: string) => void
+  onSubmit?: (value: string) => void
+}): (element: unknown) => void {
+  const [model, setModel] = createSignal<Field>(create(spec.value()))
+  const [box, setBox] = createSignal<Node>()
+  const [scroll, setScroll] = createSignal(0)
+
+  // Whether this field has the keys, asked of the store rather than held here, which is the same
+  // one-way mirror every other stop in this file uses (../keys/stops.ts § stop).
+  const focused = (): boolean => {
+    const node = box()
+    return !!node && focusedRenderable() === (node as unknown as Renderable)
+  }
+
+  /** The visual rows of a value at the width the last layout gave the field.
+   *
+   *  The same pure function paint and Yoga wrap with, rather than a read of the cache they share, and
+   *  that is deliberate twice over: the cache is keyed by the `value` prop this component writes, so
+   *  reading it here would depend on the effect below having already run, and a wrap of a 400-line
+   *  note is 163 microseconds — affordable per keystroke, which is the only place this is called
+   *  (../wrap.ts, docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 4). */
+  const rows = (text: string): readonly Row[] => {
+    const node = box()
+    return wrapRows(text, spec.newline && node ? Math.max(node.rect.w, 1) : Infinity)
+  }
+
+  /** Slide the field so the caret is inside its box: sideways for a one-row field, up and down for a
+   *  wrapped one. Clamped here rather than in paint, so `scroll` is a fact about where the field is
+   *  looking rather than a hint paint has to second-guess. */
+  const follow = (field: Field, lines: readonly Row[]): void => {
+    const node = box()
+    if (!node) return
+    const here = toVisual(field.text, lines, field.cursor, field.assoc)
+    const room = Math.max(spec.newline ? node.rect.h : node.rect.w, 1)
+    const at = spec.newline ? here.row : here.col
+    setScroll((was) => {
+      if (at < was) return at
+      // A cell of room for the caret itself at the far edge, which is where it sits after the last
+      // character somebody typed.
+      if (at > was + room - 1) return at - room + 1
+      return was
+    })
+  }
+
+  const apply = (next: Field): void => {
+    const changed = next.text !== untrack(model).text
+    setModel(next)
+    if (changed) spec.onInput?.(next.text)
+    follow(next, rows(next.text))
+  }
+
+  const handleKeyPress = (key: Press): boolean => {
+    const field = untrack(model)
+    const next = edit(field, key, rows(field.text), spec.newline)
+    if (next !== false) {
+      apply(next)
+      return true
+    }
+    // Return in a one-row field submits, which is the one binding `InputRenderable` overrides on the
+    // textarea it extends. Here rather than in the table, because a submit is not an edit and the
+    // model has nothing to say about it (./field.ts § edit).
+    if (!spec.newline && (key.name === 'return' || key.name === 'linefeed') && !key.ctrl && !key.meta) {
+      spec.onSubmit?.(field.text)
+      return true
+    }
+    return false
+  }
+
+  /** A whole value written in from outside. The caret keeps its place where it can and the field looks
+   *  at its start again, which is what `setText` means by resetting the buffer it replaces: a scroll
+   *  left over from a longer value would otherwise be looking past the end of a shorter one. */
+  const write = (text: string): void => {
+    setModel((was) => setValue(was, text))
+    setScroll(0)
+  }
+
+  // A value set from outside, written in only when it differs, and read untracked so the effect
+  // depends on the prop and not on the model it is about to write. Without the guard every keystroke
+  // in an uncontrolled field would be undone by the empty prop behind it, which is the same guard the
+  // OpenTUI half spells as `field.value !== value`.
+  createEffect(() => {
+    const incoming = spec.value()
+    if (untrack(model).text !== incoming) write(incoming)
+  })
+
+  // The model into the node's props, where paint reads it, and a frame to draw the move. Written from
+  // an effect rather than spelled as JSX attributes for the reason the viewport's `offset` is: while
+  // the switch exists tsc types every intrinsic in this package against OpenTUI's closed prop shapes
+  // whichever painter the build picked, and none of these four is one of them
+  // (./scrolling.tsx § ownViewport, docs/future/terminal-rewrite/phase-2-the-painter.md).
+  createEffect(() => {
+    const node = box()
+    if (!node) return
+    const field = model()
+    node.props.value = field.text
+    node.props.cursor = field.cursor
+    node.props.assoc = field.assoc
+    node.props.scroll = scroll()
+    node.props.focused = focused()
+    // A `textarea`'s height is its wrapped rows, and Yoga will not call a measure function it does
+    // not think is stale. An `input` has no measure function to mark — it is a cell tall by
+    // `../tree/node.ts § INTRINSIC` — and marking one that has none aborts the wasm module. Through
+    // the handle on the node rather than through `../layout/`, which this file may not import: that
+    // module reaches `yoga-layout` and this one is in `App`'s eager graph
+    // (../wrap.ts § The cache is here rather than in ./layout/measure.ts).
+    if (spec.newline) node.yoga?.markDirty()
+    requestFrame()
+  })
+
+  const api: FieldApi = {
+    get value() { return model().text },
+    get plainText() { return model().text },
+    set value(text: string) { write(text) },
+    setText: write,
+    insertText: (text: string) => { apply(paste(untrack(model), text, spec.newline)) },
+    handleKeyPress,
+    handlePaste: (event: { text: string }) => { apply(paste(untrack(model), event.text, spec.newline)) },
+  }
+
+  return (element: unknown) => {
+    const node = element as Node
+    setBox(node)
+    // Descriptors rather than a spread, or the two getters would be copied as whatever string they
+    // answered at mount (./scrolling.tsx § api).
+    Object.defineProperties(node, Object.getOwnPropertyDescriptors(api))
+  }
+}
+
+/** The two colours a field would otherwise invent. Its own text colour is opaque white to OpenTUI,
+ *  the same trap every other renderable has, and its placeholder is a hardcoded `#666666` — neither
+ *  is one of the sixteen a terminal has or comes from any theme, so both say a slot out loud
+ *  (../appearance.ts, docs/ui-design.md § Roles, and what each host makes of them). */
+const fieldColors = () => ({
+  textColor: paintColor(slotColor('default')),
+  placeholderColor: paintColor(slotColor('muted')),
+})
+
+function ownInput(props: InputProps) {
+  const install = ownField({
+    value: () => (props.value === undefined ? '' : String(props.value)),
+    newline: false,
+    onInput: (value) => props.onInput?.(value),
+    onSubmit: (value) => props.onSubmit?.(value),
+  })
+  return (
+    <input
+      flexGrow={props.width === 'narrow' ? 0 : 1}
+      {...fieldColors()}
+      placeholder={props.placeholder ?? ''}
+      ref={install as (element: InputRenderable) => void}
+    />
+  )
+}
+
+function nativeInput(props: InputProps) {
   let field: InputRenderable | undefined
   const text = () => (props.value === undefined ? '' : String(props.value))
   // An edit buffer owns its text once it has it, so a value set from outside is written in and only
@@ -118,9 +318,7 @@ export function Input(props: InputProps) {
       // A `width` role is not a number and should not become one, so the host decides: a field takes
       // the room its row has left, which is what the stylesheet decides on the DOM.
       flexGrow={props.width === 'narrow' ? 0 : 1}
-      // An edit buffer's own text colour is opaque white, same as every other renderable's
-      // (../appearance.ts), so both fields say the default slot out loud.
-      textColor={paintColor(slotColor('default'))}
+      {...fieldColors()}
       value={text()}
       placeholder={props.placeholder ?? ''}
       ref={(element: InputRenderable) => { field = element }}
@@ -132,7 +330,11 @@ export function Input(props: InputProps) {
   )
 }
 
-export function Textarea(props: {
+export function Input(props: InputProps) {
+  return drawsOwn() ? ownInput(props) : nativeInput(props)
+}
+
+type TextareaProps = {
   size?: Extract<Size, 'sm' | 'md'>
   invalid?: boolean
   width?: 'full' | 'auto' | 'narrow'
@@ -160,7 +362,45 @@ export function Textarea(props: {
   onBlur?: () => void
   onFocus?: () => void
   ref?: unknown
-}) {
+}
+
+/** Everything a `Textarea` does that is not the edit buffer: the caller's `ref`, and the one chord
+ *  that reaches a field while somebody is typing. Shared, because both implementations owe it and
+ *  neither owes it differently. */
+function textareaRef(props: TextareaProps, element: TextareaRenderable): void {
+  // The `ref` prop was decorative until something needed the renderable: a `Composer` reads the
+  // buffer's text when its submit button is pressed, and there is no other way to ask.
+  if (typeof props.ref === 'function') (props.ref as (node: TextareaRenderable) => void)(element)
+  // `commit` is a chord — Ctrl+Return on this host — so it reaches a focused field: it is one of
+  // the typing-exempt intents by design (client-core kit/keys/intents.ts § TYPING_EXEMPT). Bound
+  // in `focus` mode, so a composer inside a list does not answer for the list.
+  onCleanup(registerIntentLayer(element, ['commit'], () => {
+    if (props.disabled || !props.onSubmit) return false
+    props.onSubmit(element.plainText)
+    return true
+  }, { priority: STOP, mode: 'focus' }))
+}
+
+function ownTextarea(props: TextareaProps) {
+  const install = ownField({
+    value: () => props.value ?? '',
+    newline: true,
+    onInput: (value) => props.onInput?.(value),
+  })
+  return (
+    <textarea
+      flexGrow={props.grow ? 1 : 0}
+      {...fieldColors()}
+      placeholder={props.placeholder ?? ''}
+      ref={(element: TextareaRenderable) => {
+        install(element)
+        textareaRef(props, element)
+      }}
+    />
+  )
+}
+
+function nativeTextarea(props: TextareaProps) {
   let area: TextareaRenderable | undefined
   createEffect(() => {
     const value = props.value ?? ''
@@ -169,29 +409,23 @@ export function Textarea(props: {
   return (
     <textarea
       flexGrow={props.grow ? 1 : 0}
-      textColor={paintColor(slotColor('default'))}
+      {...fieldColors()}
       // `initialValue`, not a child: a string child of an edit buffer is an orphan text node.
       initialValue={props.value ?? ''}
       placeholder={props.placeholder ?? ''}
       ref={(element: TextareaRenderable) => {
         area = element
-        // The `ref` prop was decorative until something needed the renderable: a `Composer` reads the
-        // buffer's text when its submit button is pressed, and there is no other way to ask.
-        if (typeof props.ref === 'function') (props.ref as (node: TextareaRenderable) => void)(element)
-        // `commit` is a chord — Ctrl+Return on this host — so it reaches a focused field: it is one of
-        // the typing-exempt intents by design (client-core kit/keys/intents.ts § TYPING_EXEMPT). Bound
-        // in `focus` mode, so a composer inside a list does not answer for the list.
-        onCleanup(registerIntentLayer(element, ['commit'], () => {
-          if (props.disabled || !props.onSubmit) return false
-          props.onSubmit(element.plainText)
-          return true
-        }, { priority: STOP, mode: 'focus' }))
+        textareaRef(props, element)
       }}
       // The change event carries no payload — OpenTUI's own comment on it says to ask the renderable
       // for the text — so this is the one node in the kit that needs a handle on what it drew.
       onContentChange={() => props.onInput?.(area ? area.plainText : '')}
     />
   )
+}
+
+export function Textarea(props: TextareaProps) {
+  return drawsOwn() ? ownTextarea(props) : nativeTextarea(props)
 }
 
 /** `[ value ▾ ]`, opening a `Menu`. The list is the menu's; this is the trigger and the value. */
