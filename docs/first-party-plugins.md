@@ -141,7 +141,7 @@ Two things that are **not** on this list, deliberately:
   loaded plugins do not get — but that is a seam gap, not a privilege. See "The honest asterisk"
   below.
 - **Owning a SQLite file, agent tools, integration providers, panes, ref panels, sources, settings
-  pages, palette rows, slots, attention items, node stats, content links, and a host-owned
+  pages, slots, attention items, node stats, content links, and a host-owned
   webview.** All available to loaded plugins today, through the manifest, the frame bridge, or
   `ctx`. The webview is the newest and the one most likely to be assumed unavailable: a plugin
   declares a surface with a host allowlist and drives it with four verbs, while the

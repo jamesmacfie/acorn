@@ -163,7 +163,7 @@ describe('navigate', () => {
 
 // The answer, added on 2026-09-03 so a command can be awaited: every click site still discards the
 // promise and still gets its toast, and the palette gets a result it can keep its frame open with
-// (docs/future/command-palette/phase-2-search-and-input.md § Migration steps).
+// (docs/plugins.md § Command kinds).
 describe('the answer a verb gives back', () => {
   it('waits for the node before saying an action worked', async () => {
     const answered = runChromeAction({ verb: 'runNodeAction', path: '/v2/p/database/run' }, {

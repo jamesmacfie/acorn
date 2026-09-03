@@ -5,7 +5,7 @@ import { defaultDockerPrefs, readDockerPrefs, saveDockerPref } from './dockerPre
 
 // One key holding two switches, so the only interesting question is what happens to the switch you did
 // not touch. Settings → Docker and the palette's setting command both write through `saveDockerPref`
-// for exactly this reason (docs/future/command-palette/architecture.md § Settings integration).
+// for exactly this reason (docs/command-palette-and-shortcuts.md).
 
 const stored = (): Record<string, string> => ({
   [PrefKeys.dockerPrefs]: localStorage.getItem(`acorn-pref:${PrefKeys.dockerPrefs}`) ?? '',

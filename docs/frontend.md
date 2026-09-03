@@ -30,7 +30,7 @@ tabs, agent. A file whose folder you cannot guess belongs in `features/`.
 ## Registries and plugins
 
 The client plugin host activates `apps/desktop/src/client/plugins.ts`. Plugins register panes,
-rail sources, commands and keybindings, settings pages, slots, rail markers, palette rows, ref panels,
+rail sources, commands and keybindings, settings pages, slots, rail markers, ref panels,
 agent contexts, extension points and their own contributions to somebody else's, schedules,
 persisted-state slices, Node stats, attention sources, brand marks, and content links. The host owns
 the returned disposables so a plugin can be disabled and reactivated without duplicate entries.
@@ -86,7 +86,7 @@ was reviewed on 2026-08-28. **None survives outside a test.**
 | --- | --- |
 | `plugins/preview` task pane | → `{ seam: 'preview' }` on 2026-08-31. Kept as `'desktop'` until then, and that was the wrong question: a desktop shell may ship without preview views, and on one that does the rail listed the pane and the pane said "needs the desktop app". A seam gate cannot disagree with the surface behind it, because the same probe answers both. |
 | `plugins/agents` pane and three settings pages | → `{ plugin: 'agents' }`. Managed sessions are `/v2` plus the shared WebSocket. |
-| `plugins/editor` pane, file palette, find-in-files command | → `{ plugin: 'editor' }`. File reads and ripgrep are routes. |
+| `plugins/editor` pane, quick-open and find-in-files commands | → `{ plugin: 'editor' }`. File reads and ripgrep are routes. |
 | `plugins/terminal` settings page, and the four terminal commands in `TaskView` | → `{ plugin: 'terminal' }`. The drawer is a WebSocket stream, not a shell feature. |
 | `plugins/changes` pane | → `{ plugin: 'changes' }`. |
 | `plugins/notes` task pane | → `{ plugin: 'notes' }`. |
@@ -109,8 +109,8 @@ page. Sources, ref panels and extension points gained `requires` on 2026-08-27 t
 
 Every registry's `order` is a required field, not inferred from where its plugin activates. Plugin
 activation order is invisible in the code, so leaving order optional and falling back to activation
-order let a reorder land with nothing to catch it. Panes, rail sources, settings pages, shell slots,
-and palette rows all sort on this explicit field.
+order let a reorder land with nothing to catch it. Panes, rail sources, settings pages, shell slots
+and commands all sort on this explicit field.
 
 A rail source may also gate itself with a `when` predicate, for relevance that is not an integration
 question. Core's own Fleet home is the one user of it: the predicate is true only once more than one

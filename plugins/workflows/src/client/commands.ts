@@ -9,7 +9,7 @@ import {
 import { workflowApi, type WorkflowDefSummary } from './workflowsClient'
 
 // "Run a workflow", as one search over the definitions committed to this task's repo
-// (docs/future/command-palette/command-catalog.md § Workflows).
+// (docs/workflows.md § From the command palette).
 //
 // A `paletteRows` source until 2026-09-03, which put one row per definition into the palette root and
 // fetched them on every ⌘K. It is a `search` command now: one named row at the root, one fetch when the
@@ -21,7 +21,7 @@ import { workflowApi, type WorkflowDefSummary } from './workflowsClient'
 // the only client reader of `workflowApi.runs` is plugins/agents' task sidebar, which draws a run's
 // *steps* into its roster and keys selection on a managed-session id that a workflow step does not
 // have. A search whose row cannot name where it goes is worse than no search
-// (docs/future/command-palette/phase-4-compiled-plugin-adoption.md § STOP conditions), so the row is
+// (docs/command-palette-and-shortcuts.md), so the row is
 // deferred in the catalogue with that evidence rather than pointed at a pane it cannot address.
 // Approving, cancelling and killing a run stay in the run surface for the reason they always did.
 

@@ -11,7 +11,7 @@ import {
 
 // The two agent defaults the catalogue admits as palette settings: whether a session carries the last
 // one's model forward, and how a tool card starts out
-// (docs/future/command-palette/command-catalog.md § Agents).
+// (docs/managed-agents.md § From the command palette).
 //
 // **Why a mounted component rather than `ctx.commands` at boot.** Both write through the accessors
 // their Settings pages already use, and both of those accessors take a `QueryClient` — the cache is

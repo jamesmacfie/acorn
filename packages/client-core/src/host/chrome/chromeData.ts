@@ -226,7 +226,7 @@ export async function readRailItems(pluginId: string, path: string, nodeId: stri
   })
 }
 
-// ── Command search and input (docs/future/command-palette/architecture.md § Loaded-plugin descriptor) ──
+// ── Command search and input (docs/plugins.md § Command kinds) ──
 
 /** The identifiers a scoped command may send. Derived by the host from the session it captured, never
  *  read off the descriptor or off a previous answer. */

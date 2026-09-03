@@ -10,7 +10,7 @@ import { presentCommand } from './presenter'
 // A command was a flat runnable row until 2026-09-03. It is now a discriminated union, because the
 // next contributors are not leaves: a group has children, a search takes a query, an input is
 // submitted, and a setting shows its current value
-// (docs/future/command-palette/architecture.md § Command graph). The compatibility member carries no
+// (docs/command-palette-and-shortcuts.md). The compatibility member carries no
 // `kind` at all, so every registration written against the old shape is still exactly the same
 // object, and a zero-argument `run` is still assignable to one that is handed a context.
 //
@@ -31,13 +31,12 @@ export type CommandHostKind = 'desktop' | 'tui'
  *
  * Captured rather than ambient because a result fetched for one task must not be invoked against
  * another: the session closes when any of these moves under it, and an executor holding this object
- * knows which world it was picked in (docs/future/command-palette/architecture.md § Execution
- * context).
+ * knows which world it was picked in (docs/command-palette-and-shortcuts.md).
  *
  * Identity, and one adapter. The seven identity fields are data and are what `sameIdentity` compares;
  * `navigate` is the shell's own navigator, handed over by the host that built the context because
  * `useNavigate` is only callable while a component is being set up and a command registry is not one
- * (docs/future/command-palette/architecture.md § Execution context). It is absent on
+ * (docs/command-palette-and-shortcuts.md). It is absent on
  * `DETACHED_COMMAND_CONTEXT`, which is the honest answer for a shortcut: nothing captured a world, so
  * there is nowhere for it to take anybody.
  */
@@ -94,7 +93,7 @@ type CommandCommon = {
   /** Sibling order, before relevance. `DEFAULT_COMMAND_ORDER` when absent. */
   order?: number
   /** A `group` registered by the same owner. Cross-owner parenting is refused, so a plugin cannot
-   *  hang rows inside core's tree or another plugin's (docs/future/command-palette/refused.md). */
+   *  hang rows inside core's tree or another plugin's (docs/command-palette-and-shortcuts.md § What the palette refuses). */
   parentId?: string
   /** Discoverable in the palette. A shortcut may still target a command that is not. */
   palette?: boolean
@@ -176,7 +175,7 @@ export const commandScope = (command: CommandContribution): CommandScope => comm
  *
  * Three of the six scopes are a gate: a command about the open task, the routed project or the current
  * workspace has nothing to address when there is none, so the palette hides it rather than offering a
- * row that can only fail (docs/future/command-palette/architecture.md § Execution context).
+ * row that can only fail (docs/command-palette-and-shortcuts.md).
  *
  * The other three are not. `none` needs nothing. `node` is the default every command written before
  * scopes existed already carries, and it says where a request goes rather than whether the command

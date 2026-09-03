@@ -50,7 +50,7 @@ beforeEach(() => {
 })
 
 describe('the github plugin catalogue', () => {
-  it('registers the five commands the chords name, and puts three of them in the palette', () => {
+  it('registers the six commands the router needs, and puts three of them in the palette', () => {
     expect(commands.map((command) => command.id)).toEqual([
       'help.shortcuts.open', 'github.files.find', 'github.files.next', 'github.files.previous',
       'github.pull.find', 'github.pull.create',

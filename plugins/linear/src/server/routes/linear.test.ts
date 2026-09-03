@@ -6,7 +6,7 @@ import { createLinearFetch } from './linear'
 // The palette's Linear search, driven the way the host drives it: a request context whose connections
 // are canned, and Linear itself replaced by a stubbed `fetch`, because these routes spend the owner's
 // key against a live GraphQL endpoint and a test has none
-// (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Linear).
+// (docs/integrations.md § From the command palette).
 //
 // The two things worth pinning are the two the route decides on its own: which connections it is
 // allowed to ask, and what it asks them. Everything else about a row — where picking it lands — is the

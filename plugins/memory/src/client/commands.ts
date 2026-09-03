@@ -8,7 +8,7 @@ import {
 import { memoryApi } from './memoryClient'
 
 // Memory in the palette: search what this project can see, and open the proposals waiting for a
-// decision (docs/future/command-palette/command-catalog.md § Memory).
+// decision (docs/notes-and-memory.md § From the command palette).
 //
 // **Both land in the Context pane.** This plugin ships no pane of its own; what it draws is a section
 // inside the context pane's section point (./index.ts), and that pane already takes an intent naming a
@@ -22,7 +22,7 @@ import { memoryApi } from './memoryClient'
 //
 // Accepting and rejecting a proposal stay in that section: each needs the proposal's body and its
 // verification flags in front of the reader. Adding a memory needs a name, a type, a scope and a body,
-// which is four fields rather than one line (docs/future/command-palette/refused.md).
+// which is four fields rather than one line (docs/command-palette-and-shortcuts.md § What the palette refuses).
 
 const CONTEXT_PANE = 'context'
 const MEMORY_SECTION = 'memory'

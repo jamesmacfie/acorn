@@ -71,7 +71,6 @@
     "refPanels": [
       "github-pull"
     ],
-    "paletteRows": [],
     "agentContexts": [
       "acorn-task-context",
       "acorn-docker",

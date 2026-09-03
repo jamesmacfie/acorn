@@ -59,7 +59,6 @@ export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } 
 // `ctx.railMarkers`, which binds the contribution to the plugin's own name.
 export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'
 export type { RailMarker, RailMarkerDot, RailMarkerPosition, RailTone } from '@acorn/client-core/features/tabs/railMarkers.ts'
-export type { PaletteRowSource } from '@acorn/client-core/host/registries/palette/paletteRows.ts'
 export type { ClientScheduleContribution } from '@acorn/client-core/host/registries/shell/schedules.ts'
 // See docs/panes.md § Not a pane: the reference panel for what `openRefPanel` does.
 export { closeRefPanel, openRefPanel } from '@acorn/client-core/host/registries/panes/refPanels.ts'
@@ -200,8 +199,7 @@ export { markAttentionSeen } from '@acorn/client-core/features/notifications/att
 // Transient feedback. Notices persist in the bell, and a toast says "that worked" then gets out of
 // the way.
 export { toast } from '@acorn/client-core/features/notifications/toast.ts'
-export { fuzzyScore } from '@acorn/client-core/kit/lib/paletteModel.ts'
-export type { PaletteItem } from '@acorn/client-core/kit/lib/paletteModel.ts'
+export { fuzzyScore } from '@acorn/client-core/kit/lib/fuzzy.ts'
 export { createOverlayPalette } from '@acorn/client-core/host/palette/overlay.ts'
 
 // ── Design-system helpers ─────────────────────────────────────────────────────────────────────

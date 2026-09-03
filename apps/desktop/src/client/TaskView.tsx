@@ -114,7 +114,7 @@ export default function TaskView(props: {
 
   onMount(() => {
     // The pane operations hang under one group rather than filling the root with five rows per pane
-    // (docs/future/command-palette/command-catalog.md § Core). Their conditions are untouched: each
+    // (docs/command-palette-and-shortcuts.md). Their conditions are untouched: each
     // still answers for itself, and the group only says where they are.
     const paneCommands = paneContributions().flatMap((pane) => [
       {
@@ -167,7 +167,7 @@ export default function TaskView(props: {
       // A plain shell only. A terminal running a harness CLI is that harness's command and is
       // registered by the agents plugin (plugins/agents/src/client/terminalProfileCommands.ts), which
       // is a different owner and so cannot hang inside this group
-      // (docs/future/command-palette/refused.md § Cross-owner command parenting).
+      // (docs/command-palette-and-shortcuts.md § What the palette refuses).
       { id: 'task.terminal.new-shell', parentId: TERMINAL_GROUP, title: 'New terminal', hint: 'open a shell in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('shell') },
       // Top-level, and deliberately: one guarded action with a confirmation behind it is not a group,
       // and burying it a keystroke deeper would not make it safer.

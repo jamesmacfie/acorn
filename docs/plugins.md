@@ -169,6 +169,18 @@ theme name is not a thing CodeMirror has. What the entrypoint offers instead is 
 `captureViewState`/`applyViewState` with its `EditorViewState` type, which is the selection and
 scroll a pane used to hand back to a library as an opaque blob.
 
+It went to `10` on 2026-09-03, when the command palette stopped having two vocabularies.
+`PaletteRowSource` and `PaletteItem` came off `/client` with the registry behind them: a second way to
+put a row in the palette, with `rows` and `invoke` where a command has `run`, and with no owner, no
+capability gate, no disposal and no shortcut of its own — each of those had to be arranged for it
+separately. Only a compiled plugin could supply its callbacks, so a loaded plugin could never
+contribute a live row through it at all. Its last two contributors, the terminal's run targets and the
+workflow definitions, are `search` commands their plugins register through `ctx.commands`
+([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)). `ctx.paletteRows` went with
+them. The manifest's `contributions.palette` alias did **not**: it names a command rather than a row,
+it has always been read as one, and its removal is a separate announcement rather than something this
+batch could carry quietly.
+
 **Folding a removal into an open batch is a judgement, not a loophole.** The snapshot guard compares the
 committed major against the current one, so it cannot tell "this major already shipped" from "this major
 was bumped an hour ago in the same uncommitted change". Nothing had been released under `4` when the
@@ -1494,7 +1506,7 @@ allowlist, the list deciding which pane ids a sandboxed frame may ask the host t
 check maintained in two copies, connected by nothing, fails silently in whichever direction an author
 updates only one of them, and `tsc` stays quiet because each copy is locally consistent on its own.
 `packages/client-core/src/host/plugins/contributions.ts` now owns that shared half; the passes keep their
-own job, rendering a sandboxed iframe versus registering a command palette row.
+own job, rendering a sandboxed iframe versus registering a command.
 
 `eligiblePlugins()` returns one row per plugin id, and each row's `hash` and `trusted` come from the
 same place: the bundle that **won fleet resolution**, not the first one a roster happened to list. In a
@@ -2430,8 +2442,14 @@ command from the same manifest, uses the canonical `meta+ctrl+alt+shift+key` spe
 
 `when` is `global`, `task`, or `surface`; loaded plugins cannot request `typing-exempt`. Command and
 binding ids must remain stable across versions because the qualified binding id is the key in the
-user's persisted override map. The old `contributions.palette` descriptor remains an alias for a
-command with `palette: true` for plugin API v1 and is scheduled for removal in plugin API v2.
+user's persisted override map.
+
+The older `contributions.palette` array remains an alias for a command with `palette: true`, and it
+never produces a second row. It survived the `10` bump on purpose: a removal is a major on its own
+announcement, and folding it into a batch bought for something else would take it off manifests
+written against a number that never said it was going. Nothing in the host branches on it — the
+registration pass rewrites each entry into a command descriptor before anything else sees it — so it
+costs one `flatMap` and no second code path.
 
 ### Command kinds
 
@@ -2648,7 +2666,7 @@ persisted layout keys and two versions registering at once would collide on them
 
 Client initialization for compiled-in plugins is synchronous registration. The host exposes contribution
 points for panes, sources, settings pages, slots, extension points, extensions, provider reference
-panels, palette rows, agent contexts, schedules, persisted-state slices, Node statistics, attention
+panels, agent contexts, schedules, persisted-state slices, Node statistics, attention
 sources, brand marks, and content links. `slots` is one point for both shapes: the
 slot id decides whether the component receives the shell context or only a task id (`docs/frontend.md §
 Registries and plugins`). `schedules` is the same word the node half uses for the same idea, taking a

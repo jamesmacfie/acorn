@@ -5,10 +5,11 @@ import { resolveTerminalFontSize, TERMINAL_FONT_SIZE_OPTIONS } from './preferenc
 
 // The three terminal preferences a person can change, as one reader and one writer each.
 //
-// Settings → Terminal had all three inline, and the palette is about to offer the same three
-// (docs/future/command-palette/phase-3-settings-and-core-commands.md § Migration steps). A setting with
-// two persistence paths starts disagreeing with itself, so the defaulting, the option lists and the
-// writes live here and both callers use them.
+// Settings → Terminal had all three inline. A value with two persistence paths starts disagreeing
+// with itself, so the defaulting, the option lists and the writes live here and every caller uses
+// them. There is no `setting` command over these three yet, and that is the point of extracting the
+// accessor before there is: one registered later cannot become a second writer
+// (docs/terminal.md § From the command palette).
 //
 // Beside `./preferences.ts` rather than inside it, because that file is the pure half — the font-size
 // bounds and the line height xterm measures with — and it is imported by a bare-Node test. This half

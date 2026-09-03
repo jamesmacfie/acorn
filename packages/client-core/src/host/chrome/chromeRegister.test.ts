@@ -542,7 +542,7 @@ describe('syncChromeContributions', () => {
 
   // The fixture the phase asks for: a loaded plugin's setting, driven through the real registration
   // pass rather than through a hand-built contribution
-  // (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Manifest and lifecycle cleanup).
+  // (docs/plugins.md § Command kinds).
   //
   // Two non-secret choices, because that is what a setting command may be: a bounded, visible choice
   // with its current value shown. Deliberately a fixture and not a real plugin's setting — none of the

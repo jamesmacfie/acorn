@@ -19,8 +19,8 @@ export default function DockerSettings() {
   const current = () => readDockerPrefs(prefs.data)
 
   const [info] = createResource(fetchDockerInfo)
-  // Through the shared merge, which is what the palette's setting commands write with too: both
-  // switches share one key, so an unmerged write would drop the other one (./dockerPrefs.ts).
+  // Through the shared merge: both switches share one key, so an unmerged write would drop the other
+  // one (./dockerPrefs.ts).
   const toggle = (key: keyof DockerPrefs) => void saveDockerPref(qc, prefs.data, key, !current()[key])
 
   return (

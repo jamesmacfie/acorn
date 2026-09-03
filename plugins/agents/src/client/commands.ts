@@ -9,7 +9,7 @@ import { managedAgentApi } from './sessions/managedClient'
 import { openManagedSession } from './sessions/managedSelection'
 
 // What this plugin puts in the palette: the rail source it owns, and one search over the managed
-// sessions of the open task (docs/future/command-palette/command-catalog.md § Agents).
+// sessions of the open task (docs/managed-agents.md § From the command palette).
 //
 // The two harness terminals are next door in ./terminalProfileCommands.ts, and the settings the
 // catalogue admits are in ./AgentCommands.tsx, which needs a query client and so has to be mounted
@@ -21,11 +21,11 @@ import { openManagedSession } from './sessions/managedSelection'
 // route change belongs to a router that a plugin has no handle on. A search whose rows cannot all be
 // opened is worse than a narrower one, so the palette asks about the task the session captured and
 // Agent Center remains the surface that spans them
-// (docs/future/command-palette/phase-4-compiled-plugin-adoption.md § STOP conditions).
+// (docs/command-palette-and-shortcuts.md).
 //
 // Stopping, archiving, forking, compacting and handing off are deliberately absent. Each needs a
 // selected session and most need a confirmation, which is a result action panel rather than a search
-// (docs/future/command-palette/refused.md § Result action panels in the first version).
+// (docs/command-palette-and-shortcuts.md § What the palette refuses).
 
 /** How many sessions one frame asks the node for. The host caps the rendered set at 50 as well; this
  *  is the provider keeping the same promise on the wire. */

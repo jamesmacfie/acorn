@@ -3,7 +3,7 @@ import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import type { CommandExecutionContext } from './commands'
 import { localSearch } from './localSearch'
 
-// The load-once adapter, which is what the two `paletteRows` contributions become when they migrate.
+// The load-once adapter, which is what the last two `paletteRows` contributions became.
 // What is worth pinning is the thing that makes it worth having: one fetch per session, whatever the
 // reader types.
 

@@ -324,6 +324,27 @@ aliases for one release and resolve through the same notes store.
 | `rollbar` | normalized items, occurrences, and details |
 | `preview` | preview rules and browser-agent operations |
 
+### Command palette routes
+
+A loaded plugin's `search`, `input` and `setting` commands name a route in the plugin's own
+namespace, and the host calls it with the query and the identifiers the declared scope owns
+([plugins.md](./plugins.md) § Command kinds). They are ordinary plugin routes with ordinary
+authentication and owner context; the only thing particular to them is that the answer is untrusted
+display data with no field that can choose a route, a URL or a verb.
+
+```text
+GET  /v2/p/rollbar/palette/issues        ?q&projectId
+GET  /v2/p/linear/palette/issues         ?q&projectId
+GET  /v2/p/database/palette/queries      ?q&taskId
+POST /v2/p/database/palette/generate     { input, taskId }
+GET  /v2/p/http/palette/requests         ?q&projectId
+POST /v2/p/http/palette/import-curl      { input, taskId }
+```
+
+Each search re-checks the project or task owner on the node and answers at most 50 rows. The two
+POSTs require an interactive owner and commit their write before answering success, so the reader is
+never navigated to something that is not there yet.
+
 ## WebSocket
 
 `/v2/events` carries sequence-numbered events and feature frames. The event stream is a live

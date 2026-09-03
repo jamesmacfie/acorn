@@ -22,7 +22,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [command-palette/](./command-palette/README.md) | One command graph and host-neutral palette session for core, compiled plugins, and loaded plugins: nested commands, cancellable search, submitted input, opt-in settings, a first-party command catalogue, seven phases, and the refusals. | In progress, 2026-09-03. Phases 0–5 shipped; only phase 6, the cutover, remains. |
 | [terminal-rewrite/](./terminal-rewrite/README.md) | The terminal client leaves OpenTUI for a painter of its own: a plain node tree Solid mutates, a Yoga pass through the WebAssembly build, a cell buffer with a diff and a flush, an input parser, and the region store as the one owner of focus; the pty rectangle moves to `@xterm/headless`. Kit, layouts, plugins, and the keyboard rules are unchanged. A review, an architecture, six phases, and the refusals (a Rust or Go painter behind a wire chief among them). | Proposal, 2026-09-03. Not started; nothing blocks phase 0. |
 
 ## The single files
@@ -58,6 +57,34 @@ doc owns it and the others point.
 the single `events.md` above on 2026-08-28 when all but three items shipped), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `notifications/`, and
 the single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
+
+`command-palette/` was seven phases that gave acorn one command graph and one host-neutral palette
+session. Shipped and deleted 2026-09-03.
+[command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) owns the whole of it: the
+five command kinds and the graph's validation rules, the frame stack and what Enter and Escape do,
+the search and input and setting semantics with their generation check, scope and the one opt-in
+fan-out, the outcome contract, the shared setting accessor, core's own catalogue, and the nine
+refusals — a plugin-rendered frame, a second registry, an executable search response, result action
+panels, fleet by default, a model called as you type, reflected Settings pages, free-form secrets,
+and cross-owner parenting. [plugins.md](../plugins.md) § Command kinds is the manifest half, with the
+bounds the host enforces on a loaded search, input and setting;
+[plugin-authoring.md](../plugin-authoring.md) and `packages/plugin-types/README.md` are the
+third-party halves of the same. Each plugin's own document has its share under "From the command
+palette": [database.md](../database.md), [http-client.md](../http-client.md),
+[integrations.md](../integrations.md) for Linear and Rollbar, [terminal.md](../terminal.md),
+[workflows.md](../workflows.md), [editor.md](../editor.md),
+[github-integration.md](../github-integration.md), [managed-agents.md](../managed-agents.md),
+[docker.md](../docker.md) and [notes-and-memory.md](../notes-and-memory.md).
+[api-reference.md](../api-reference.md) § Command palette routes has the six plugin routes, and
+[testing.md](../testing.md) has the fixture suites and the twelve manual checks the programme owes.
+
+Five invariants outlived the folder, and each is a test rather than a paragraph. There is one
+`createCommandSession`, and both hosts build theirs from it. Neither host's palette files compose,
+fetch, rank or invoke. No manifest frame target and no slot id is the palette. No search response
+carries a field that could name an action, a route, a URL or a verb. And there is no palette-row
+registry beside the command one — `ctx.paletteRows` and its two published types came off the plugin
+API on the same day, which is what moved `PLUGIN_API_MAJOR` to `10`. All five are in
+`tools/arch/boundaries.test.ts`.
 
 `performance/` was deleted on 2026-09-03 when its eleventh phase closed it, and it ended differently
 from the rest. Its behaviour moved into the owning docs as usual, but three of its files were records

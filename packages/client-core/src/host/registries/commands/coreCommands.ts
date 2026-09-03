@@ -28,7 +28,7 @@ import { settingsContributions } from '../shell/settings'
 import type { ContributedCommand } from './commands'
 
 // Core's own catalogue: the groups the shell's commands hang under, the Settings pages as rows, and
-// the two settings core owns (docs/future/command-palette/command-catalog.md § Core).
+// the two settings core owns (docs/command-palette-and-shortcuts.md).
 //
 // Builders rather than a registration, because what a host can honour differs: the desktop has a
 // Settings modal and paints themes, and the terminal has neither. Each shell registers the ones it can
@@ -37,8 +37,8 @@ import type { ContributedCommand } from './commands'
 //
 // **A setting is not a toggle.** Every Boolean here is an explicit On and Off with the current value
 // marked, so the command shows what is set, means the same thing pressed twice, and reads the same as
-// a theme picker (docs/future/command-palette/refused.md § Free-form secret settings draws the other
-// edge of the same line). Nothing here is free text, a secret, or a field that depends on another;
+// a theme picker. (docs/command-palette-and-shortcuts.md § What the palette refuses draws the other
+// edge of the same line.) Nothing here is free text, a secret, or a field that depends on another;
 // those stay pages.
 //
 // **Nothing here is a second persistence path.** Every read and every write goes through the same
@@ -88,7 +88,7 @@ export const goToGroup = (): ContributedCommand => ({
  * hand-written list would go stale the moment one loads. It is not a reflection of the pages'
  * *contents*: a page is an arbitrary component, and scraping one would couple the palette to rendering
  * and create the second persistence path this whole file exists to avoid
- * (docs/future/command-palette/refused.md § Reflecting Settings pages into commands). What is
+ * (docs/command-palette-and-shortcuts.md § What the palette refuses). What is
  * generated is one action that opens the modal where the reader asked for it.
  *
  * The registry is a signal, so the caller re-registers when it changes.

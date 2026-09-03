@@ -17,7 +17,7 @@ import {
 import { invokeLayoutRecipe, type RecipeSpec } from './recipes'
 
 // The three things this plugin knows about the open task: what it can run, how it can be laid out, and
-// which terminals are alive in it (docs/future/command-palette/command-catalog.md § Terminal).
+// which terminals are alive in it (docs/terminal.md § From the command palette).
 //
 // These were a `paletteRows` source until 2026-09-03 — a second contribution vocabulary with `rows` and
 // `invoke`, fetched when the palette opened whatever the reader was after, and merged into the root
@@ -35,7 +35,7 @@ import { invokeLayoutRecipe, type RecipeSpec } from './recipes'
 // (apps/desktop/src/client/TaskView.tsx), and a terminal running a harness CLI is that harness's
 // (plugins/agents/src/client/terminalProfileCommands.ts). Neither is repeated here: two rows saying one
 // thing is one too many, and cross-owner parenting is refused anyway
-// (docs/future/command-palette/refused.md § Cross-owner command parenting).
+// (docs/command-palette-and-shortcuts.md § What the palette refuses).
 
 /** The group these three hang under. Not core's `core.terminal`, which is the drawer and a shell: a
  *  plugin may not parent under another owner's group, and these are about the task's configuration. */

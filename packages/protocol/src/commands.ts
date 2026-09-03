@@ -12,7 +12,7 @@ import { z } from 'zod'
 //
 // Nothing in `plugin/contract.ts` reads these yet. A manifest command is still an action with a
 // context-free verb, and it stays that way until a palette can render an interactive one
-// (docs/future/command-palette/phase-0-baseline-and-contract.md).
+// (docs/command-palette-and-shortcuts.md).
 
 /** What an entry in the command graph is. `action` is the only kind a manifest may declare today. */
 export const COMMAND_KINDS = ['action', 'group', 'search', 'input', 'setting'] as const
@@ -22,7 +22,7 @@ export type CommandKind = (typeof COMMAND_KINDS)[number]
  * Which identity a command needs before it can run, and how wide it reaches.
  *
  * `node` is the default and means "the node this session captured". `fleet` is the only one that fans
- * out, and it is opt-in for the reason docs/future/command-palette/refused.md § Fleet search by default
+ * out, and it is opt-in for the reason docs/command-palette-and-shortcuts.md § What the palette refuses
  * gives: fanning out by default multiplies provider traffic, rate-limit pressure and partial errors.
  */
 export const COMMAND_SCOPES = ['none', 'task', 'project', 'workspace', 'node', 'fleet'] as const
@@ -52,7 +52,7 @@ export const MAX_COMMAND_SEARCH_QUERY = 200
 export const MAX_COMMAND_SEARCH_ITEMS = 50
 
 /** A setting is a visible choice, so it needs at least two of them, and a list long enough to need
- *  scrolling is a page rather than a command (docs/future/command-palette/refused.md). */
+ *  scrolling is a page rather than a command (docs/command-palette-and-shortcuts.md § What the palette refuses). */
 export const MIN_COMMAND_SETTING_OPTIONS = 2
 export const MAX_COMMAND_SETTING_OPTIONS = 32
 
@@ -63,9 +63,8 @@ export const MAX_COMMAND_SETTING_OPTIONS = 32
  *
  * There is deliberately no action field, no route and no verb. A response is untrusted wire input, and
  * letting a row choose what happens when it is picked would make a changing server answer more
- * powerful than the manifest somebody reviewed (docs/future/command-palette/refused.md § Returning
- * executable commands from a loaded search response). The search command owns one static action; this
- * is the fact it is handed.
+ * powerful than the manifest somebody reviewed (docs/command-palette-and-shortcuts.md § What the
+ * palette refuses). The search command owns one static action; this is the fact it is handed.
  *
  * Unknown keys are stripped rather than kept, which is what makes that true in practice: a row that
  * ships an `action` field loses it here, before anything can read one.

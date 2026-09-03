@@ -8,7 +8,7 @@ import type { DbSavedQuery } from '../shared/database'
 // not available to it (that lives in client-core's kit); the ordering below is the same idea spelled
 // for a short, stable list — a name beats a note, a note beats the SQL, and equal matches keep the
 // order they arrived in, which is the saved-query order the pane's own picker shows
-// (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Database).
+// (docs/database.md § From the command palette).
 //
 // Three fields, and they are the three a person types: the name they gave it, the note they wrote
 // beside it, and a table or a column they remember appearing in the query itself.

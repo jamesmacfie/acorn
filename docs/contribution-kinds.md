@@ -44,9 +44,8 @@ component: a tree names one, and the host mounts its own.
 | Webviews | Both | — / `frames` (`target: 'webview'`) | A pane showing external web content |
 | Rail sources | Both | `ctx.sources` / `contributions.sources` | The left rail |
 | Slots | Both | `ctx.slots` / `contributions.slots` | See the slot vocabulary below |
-| Commands | Both | `ctx.commands` / `contributions.commands` | The command palette and chords |
+| Commands | Both | `ctx.commands` / `contributions.commands`, `contributions.palette` | The command palette and chords. One kind, five shapes: an action, a group, a search, an input, a setting ([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)). `contributions.palette` is the older array and is an alias for a command with `palette: true` — it is rewritten into one at registration and never produces a second row |
 | Keybindings | Both | `ctx.keybindings` / `contributions.keybindings` | The chord dispatcher |
-| Palette rows | Both | `ctx.paletteRows` / `contributions.palette` | The command palette's row sources. **No contributor left**: the terminal and workflows registered the last two and both are `search` commands now ([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)). The point and the registry are still wired and go with the palette cutover |
 | Attention sources | Both | `ctx.attentionSources` / `contributions.attention` | The notification inbox. An item of `info` severity is a nudge the owner can retire by acknowledging it; `warn` and `danger` stay until the block is lifted ([notifications.md](./notifications.md) § Acknowledging an attention row) |
 | Node stats | Both | `ctx.nodeStats` / `contributions.nodeStats` | A node card on Fleet home |
 | Content links | Both | `ctx.contentLinks` / `contributions.contentLinks` | The in-app link router |

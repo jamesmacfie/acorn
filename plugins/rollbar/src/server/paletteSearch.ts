@@ -13,7 +13,7 @@ import { rollbarRailItemId } from '../shared/rail'
 //
 // Four fields, and they are the four a person types: the message, the counter they were handed in a
 // stack trace, the level they are triaging by, and the framework when one account carries several
-// services (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Rollbar).
+// services (docs/integrations.md § From the command palette).
 
 // The bounds @acorn/protocol/commands.ts holds a row to. Trimmed here rather than left to the host,
 // because the host drops an oversized row outright and a long error message is ordinary in Rollbar.

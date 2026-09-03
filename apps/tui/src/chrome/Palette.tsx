@@ -9,7 +9,7 @@ import { overlayKeys } from '../keys/trap'
 
 // The command palette, over the same session the desktop's runs on.
 //
-// This file used to hold a copy of the desktop's palette: the same resource over every `paletteRows`
+// This file used to hold a copy of the desktop's palette: the same resource over every contributed row
 // source, the same composition with the actions and the task and workspace lists, the same fuzzy
 // filter, the same row-to-source map, the same invoke. All of it is
 // `client-core/host/registries/commands/session.ts` now, which is where the two hosts were always

@@ -110,7 +110,7 @@ describe('Rollbar loaded routes', () => {
 // The palette's search is the same three facts as the rail beside it — the routed project decides the
 // connections, the cached listing decides the items, one connection failing does not erase another's
 // — with the reader's word filtering what comes back
-// (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Rollbar).
+// (docs/integrations.md § From the command palette).
 describe('Rollbar palette search', () => {
   const mappingFor = (rows: { connectionId: string; externalId: string; projectId: string }[]) => ({
     byId: async (id: string) => ({ id, workspaceId: 'workspace-1' } as never),
