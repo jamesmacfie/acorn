@@ -81,7 +81,7 @@ const wrapStatement = (stmt: StatementSync): SqliteStatement => {
 
 // Every statement, timed by its first two words, behind `ACORN_PERF=1`. This loop is synchronous and
 // shared with terminal emulation and git spawns, and the performance programme refused to split it into
-// threads without numbers (docs/future/performance/refused.md § Splitting the node), so this is where
+// threads without numbers (docs/performance.md § Splitting the node), so this is where
 // the numbers come from.
 //
 // The whole statement text is not the key: bound parameters are out of it already, but a hundred

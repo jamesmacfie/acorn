@@ -83,7 +83,7 @@ describe('wsClient', () => {
   })
 
   // Phase 6 of the performance programme: output arrives as bytes and reaches the same subscriber
-  // (docs/future/performance/phase-6-terminals-work-only-when-watched.md).
+  // (docs/performance.md § 2026-09-03 — phase 6).
   it('routes a binary frame to the session it names, decoded', () => {
     const session = '11111111-2222-3333-4444-555555555555'
     const output: unknown[] = []
@@ -147,7 +147,7 @@ describe('wsClient', () => {
   })
 
   // Phase 5 split the old content-free `term:status` ping in two and gave what is left of it a plugin
-  // id (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+  // id (docs/performance.md § 2026-09-03 — phase 5).
   it('hands a status subscriber the plugin id the frame named, and nothing when it named none', () => {
     const named: (string | undefined)[] = []
     client.wsOnStatus((pluginId) => named.push(pluginId))

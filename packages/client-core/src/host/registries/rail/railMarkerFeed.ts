@@ -34,7 +34,7 @@ export const railMarkerRegistry = new Registry<RailMarkerContribution>('rail-mar
  *  used to copy and `localeCompare`-sort the whole registry each time. The registry is a signal, so
  *  the sorted list is cached against the array it was sorted from: reading `entries()` keeps the
  *  caller reactive, and the identity check keeps the sort to once per register or unregister
- *  (docs/future/performance/phase-9-the-terminal-clients-keystroke.md). A `createMemo` would say the
+ *  (docs/performance.md § 2026-09-03 — phase 9). A `createMemo` would say the
  *  same thing, and this file is imported by `registries/plugin.ts` and has no root to own one. */
 let sortedFrom: readonly RailMarkerContribution[] | null = null
 let sorted: RailMarkerContribution[] = []

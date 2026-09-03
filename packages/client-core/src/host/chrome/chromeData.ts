@@ -107,7 +107,7 @@ let interval: ReturnType<typeof setInterval> | null = null
  * is the smallest polling fallback any of them declared, or undefined when none did. */
 export function watchChrome(refreshSeconds: number | undefined): void {
   // The plugin id, forwarded. This was the one caller that passed nothing, so every ping refetched
-  // every plugin's descriptor routes (docs/future/performance/decisions.md § Corrections to the first
+  // every plugin's descriptor routes (docs/performance.md § Corrections to the first
   // reads). Core's own pings still carry no id, which still means everyone's.
   unsubscribe ??= wsOnStatus((pluginId) => bumpChrome(pluginId))
   unsubscribePush ??= onPluginPush(bumpChrome)

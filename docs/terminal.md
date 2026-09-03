@@ -47,7 +47,7 @@ keep the ring alone.
 still holds, so history older than 256 KB is gone and an alternate-screen program whose state depends
 on older bytes redraws from its next output. If a class of session turns up where the full history
 matters, the answer is a bigger ring for that class, not a parser running for ever
-(`docs/future/performance/refused.md` § Scrollback beyond the ring).
+([performance.md](./performance.md) § Scrollback beyond the ring).
 
 **The ring is a list of chunks, not a string.** 256 KB of recent raw output, kept as the buffers it
 arrived in with a running byte count, dropping from the head once the budget is spent. It used to be

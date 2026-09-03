@@ -11,7 +11,7 @@
 // The entries import their grammar and then build a parser from it, so a document downloads exactly
 // one of them. They used to import all seventeen statically, which put every grammar in whichever
 // chunk held this module: 954,915 bytes for a pane that opens one file
-// (docs/future/performance/decisions.md § Registries hold loaders). The engine — `StreamLanguage` and
+// (docs/performance.md § Registries hold loaders). The engine — `StreamLanguage` and
 // the `Extension` type — stays static, because `basicSetup` has already brought it in wherever this
 // is asked.
 //

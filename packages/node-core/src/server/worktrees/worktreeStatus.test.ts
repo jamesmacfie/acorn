@@ -93,7 +93,7 @@ describe('the coalesced worktree status read', () => {
     expect(statuses()).toBe(2)
   })
 
-  // The one rule this file exists to protect (docs/future/performance/decisions.md § 4). A cached
+  // The one rule this file exists to protect (docs/performance.md § The node owns freshness). A cached
   // "clean" reaching `removeWorktree` would delete somebody's uncommitted work, so the guard reads
   // fresh and this is the test that says it does.
   it('still refuses to remove a worktree whose only change was written 100 ms ago', async () => {

@@ -23,7 +23,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [terminal-rewrite/](./terminal-rewrite/README.md) | The terminal client leaves OpenTUI for a painter of its own: a plain node tree Solid mutates, a Yoga pass through the WebAssembly build, a cell buffer with a diff and a flush, an input parser, and the region store as the one owner of focus; the pty rectangle moves to `@xterm/headless`. Kit, layouts, plugins, and the keyboard rules are unchanged. A review, an architecture, six phases, and the refusals (a Rust or Go painter behind a wire chief among them). | Proposal, 2026-09-03. Not started; nothing blocks phase 0. |
-| [performance/](./performance/README.md) | Four reads (desktop surfaces, desktop shapes, the terminal client, and the decisions drawn from them) and eleven phases across both hosts and the node: instrument and unblock the red renderer budget, registries hold loaders, paint before the node, the node listens sooner, the terminal client draws first, stop the event amplifiers, terminals work only when watched, streaming surfaces render incrementally, switching and hydration, the terminal client's keystroke, then re-measure. | Plan, 2026-08-31, widened 2026-09-02. Phases 0-7 shipped 2026-09-02 and 2026-09-03; the renderer budget is green again; phases 8-10 not started. |
 
 ## The single files
 
@@ -58,6 +57,12 @@ doc owns it and the others point.
 the single `events.md` above on 2026-08-28 when all but three items shipped), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `notifications/`, and
 the single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
+
+`performance/` was deleted on 2026-09-03 when its eleventh phase closed it, and it ended differently
+from the rest. Its behaviour moved into the owning docs as usual, but three of its files were records
+rather than plans — the decisions about the system's shape, the refusals with their exit conditions, and
+every number the programme took — and those had no owner to move to. They are
+[docs/performance.md](../performance.md) now. The reads and the phase files are in git history.
 
 `notifications/` was six phases that stopped acorn notifying on every agent step. Shipped and deleted
 2026-09-02. [notifications.md](../notifications.md) owns all of it: the five states and the two

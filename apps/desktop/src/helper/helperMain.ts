@@ -138,7 +138,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
   // line goes out here, and Rust opens the window on the helper being *listening* rather than on the
   // node being up.
   helper.bootComplete()
-  // The node boots behind the window (docs/future/performance/decisions.md § Every host draws first).
+  // The node boots behind the window (docs/performance.md § Every host draws first).
   // `startInBackground` rather than `void helper.start()`, because a start that rejects before it
   // spawns anything has to reach the recovery dialog — with the window already open there is nowhere
   // else to report it.

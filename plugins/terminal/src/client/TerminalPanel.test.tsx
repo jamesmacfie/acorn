@@ -8,7 +8,7 @@ import type { Task } from '@acorn/plugin-api/client'
 // the performance programme is the reason it needs one: the panel used to mount the active tab alone,
 // so every switch destroyed an xterm and its WebGL context and asked the node to serialize a
 // thousand-line framebuffer, and nothing short of a person clicking tabs would notice a regression
-// back to that (docs/future/performance/phase-6-terminals-work-only-when-watched.md).
+// back to that (docs/performance.md § 2026-09-03 — phase 6).
 //
 // The real `TerminalSurface` runs here. What is stubbed is xterm, because it draws to a canvas and
 // jsdom has no layout to draw into; everything this file is about — when a surface is built, when it

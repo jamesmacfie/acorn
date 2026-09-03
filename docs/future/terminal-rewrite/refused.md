@@ -59,7 +59,7 @@ through its HTML adapter via `packages/client-core/src/kit/keys/keymapHost.ts`, 
 host is a second set of dispatch semantics to keep in step by hand. Its two known costs, the
 active-key cache turning off under runtime matchers and the registration-order tie-break that tier 41
 exists for, are both fixable through its own API, and
-[performance/phase-9-the-terminal-clients-keystroke.md](../performance/phase-9-the-terminal-clients-keystroke.md)
+[performance.md](../../performance.md) § 2026-09-03 — phase 9
 measures the first. Reopens if a measured keystroke cost is the engine's and cannot be fixed inside
 it, or if the desktop leaves the engine.
 
@@ -104,9 +104,9 @@ Reopens if xterm's headless build loses the buffer API or the desktop moves off 
 Considered: 39 of 42 `Rows` sites build every row, and the new painter is a chance to window them all.
 
 Refused because `virtual` changes the box's flex so the list grows into its panel, and a short list
-would stretch. That is [performance/refused.md](../performance/refused.md)'s decision and it stands.
+would stretch. That is [performance.md](../../performance.md)'s decision and it stands.
 Windowing the long sites and the diff pane is
-[performance/phase-9-the-terminal-clients-keystroke.md](../performance/phase-9-the-terminal-clients-keystroke.md),
+[performance.md](../../performance.md) § 2026-09-03 — phase 9,
 done after phase 4 against the new painter.
 
 ## A `tui` surface, a per-host prop, or a new kit node
@@ -132,6 +132,6 @@ key for it, the way Tab is a host key for `nextRegion`; one that does not is ref
 Considered because lazygit starts in tens of milliseconds and `acorn` does not.
 
 Refused because the cost is booting client-core under Node, and
-[performance/phase-4-the-terminal-client-draws-first.md](../performance/phase-4-the-terminal-client-draws-first.md)
+[performance.md](../../performance.md) § 2026-09-03 — phase 4
 owns it and has already moved the first draw to 67 ms attached. Removing OpenTUI's 1.5 MB entry from
 the eager graph will help and phase 4 measures it, but the programme does not promise a number.

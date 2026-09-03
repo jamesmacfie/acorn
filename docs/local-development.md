@@ -126,8 +126,8 @@ while using the app:
 | Process | Set | Prints |
 | --- | --- | --- |
 | Helper | `ACORN_PERF=1` in the environment the shell was started from | `[helper:boot]` on **stderr** for handshake, plugin-cache sweep, bundled plugins trusted, `service.start`, node adopted, WebSocket bound, ready line. stderr and not stdout: stdout is the line protocol Rust parses |
-| Node | same variable | `[perf:request]` per request (method, matched route pattern, status, ms, request id), plus `git` and SQLite histograms |
-| Renderer | `localStorage.setItem('acorn.perf', '1')` and reload | `[renderer:boot]` in the devtools console for script start, node selected, plugins applied, first paint, `nodeReady`. A `localStorage` switch rather than the variable because a webview has no environment — Rust loads the renderer from a custom scheme rather than spawning it. The `performance.mark`s are made either way, so the devtools performance panel has the same labels with the switch off |
+| Node | same variable | `[perf:request]` per request (method, matched route pattern, status, ms, response bytes, request id), plus `git` and SQLite histograms. The byte count is the response's `content-length`, and `-1` where it declares none, which is what a stream looks like |
+| Renderer | `localStorage.setItem('acorn.perf', '1')` and reload | `[renderer:boot]` in the devtools console for script start, node selected, plugins applied, tree built, first paint, `nodeReady`. A `localStorage` switch rather than the variable because a webview has no environment — Rust loads the renderer from a custom scheme rather than spawning it. The `performance.mark`s are made either way, so the devtools performance panel has the same labels with the switch off |
 | `acorn` | nothing | `[acorn:boot]` on exit for node open, App imported, tasks read, renderer created, first draw. Held rather than printed live, because stderr is the file the renderer draws on while it owns the terminal — a line written mid-session reads as the shell going to garbage. Printed after `renderer.destroy()`, beside the held Node warnings |
 
 The node's histograms count what it does over and over with nothing else counting it: `git status` and
@@ -145,16 +145,19 @@ so `ready line` to `service.start` is how long the shell was on screen without a
 
 Two things about the node's own account are worth knowing before quoting it. Its clock starts inside
 `startServiceRuntime`, so spawning the process and evaluating the service bundle are in front of `+0ms`
-and appear in no step. That gap is 316 ms of which 293 ms is evaluating the bundle's module graph, and
-242 ms of that 293 ms is external libraries rather than acorn's own code, `drizzle-orm` alone being
-161 ms (measurements.md § 2026-09-03 — phase 3). And measuring the node by calling
+and appear in no step. That gap is a little over 350 ms, nearly all of it evaluating the
+bundle's module graph, and most of that is external libraries rather than acorn's own code,
+`drizzle-orm` and its `sqlite-core` being a third of the whole
+([performance.md](./performance.md) § The service bundle's evaluation). And measuring the node by calling
 `startServiceRuntime` under `tsx` rather than launching the app inflates `graph` roughly sevenfold,
 because the loader then transpiles as it imports.
 
 **`[renderer:boot] first paint` does not print from a background window.** It is a
 `requestAnimationFrame` callback, and macOS pauses those while the window is occluded, so a launch
-watched from a terminal never records it. Bring the window to the front before reloading, or read the
-other four marks and leave that one out.
+watched from a terminal never records it. Bring the window to the front before reloading, or read
+`tree built` instead: that one is printed synchronously when `render` returns, so it fires wherever the
+window is, and it is the end of the renderer's own work. The difference between the two is the
+compositor, which is the part a background window does not do.
 
 ## Build artifacts
 

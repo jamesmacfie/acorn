@@ -4,7 +4,7 @@ import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 // The device's memory of which node this window talks to, and what it buys: a cache partition on the
 // first tick.
 //
-// The window opens before the node does now (docs/future/performance/decisions.md § Every host draws
+// The window opens before the node does now (docs/performance.md § Every host draws
 // first), so `activeNodeId()` has to answer before the fleet does. If it does not, the shell mounts on
 // the `origin` partition, the fleet answers, and the whole first paint is thrown away and remounted on
 // the real one.

@@ -83,7 +83,7 @@ export async function openNode(target: string | undefined, at: Custody = custody
   // Nothing holds the root, so start one — and do not wait for it. A started node's boot is the
   // longest thing on this command's critical path (120 seconds of budget, and a full tsx boot in a
   // checkout), and the shell has a persisted cache it can draw from meanwhile
-  // (docs/future/performance/decisions.md § Every host draws first).
+  // (docs/performance.md § Every host draws first).
   const node = startNode(dataDir, tokens.read(LOCAL_TOKEN_SCOPE))
   const remember = (handshake: Handshake): Handshake => {
     fleet.remember(

@@ -94,11 +94,11 @@ The test suite keeps its scenarios; what changes is the harness they drive.
 
 ## How this relates
 
-[performance/phase-9-the-terminal-clients-keystroke.md](../performance/phase-9-the-terminal-clients-keystroke.md)
+[performance.md](../../performance.md) § 2026-09-03 — phase 9
 indexes the region store's walks and windows the diff pane. Its indexing half is subsumed here: phase 1
 rewrites the walks over a tree the store owns, and the arrays it would index become maps by
 construction. Its windowing half stands and should be done after phase 4, against the new painter.
-[performance/phase-4-the-terminal-client-draws-first.md](../performance/phase-4-the-terminal-client-draws-first.md)
+[performance.md](../../performance.md) § 2026-09-03 — phase 4
 shipped and is unaffected: it is about what loads before the first frame, not what draws it.
 [bundle.md](../bundle.md) § Ordering step 7 ships `acorn` in the node tarball, and today it carries a
 runtime pin that this programme removes; the step gets simpler, not different.

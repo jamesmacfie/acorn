@@ -96,7 +96,7 @@ In:
 
 Out: any change to a kit component's drawing. Any change to the intents, the tiers' meanings, or
 [tui.md](../../tui.md) § The five key groups. The typing-gate-as-a-layer change from
-[performance/phase-9-the-terminal-clients-keystroke.md](../performance/phase-9-the-terminal-clients-keystroke.md);
+[performance.md](../../performance.md) § 2026-09-03 — phase 9;
 it composes with this phase but is measured work and stays there. Replacing the keymap engine itself,
 which is refused below.
 

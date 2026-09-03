@@ -91,7 +91,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   // pushes every frame here, and the renderer drops whatever is not the active node on arrival
   // (@acorn/client-core/infra/node/wsClient.ts) — so an N-node fleet used to pay two process
   // boundaries, a JSON stringify and a JSON parse per frame to deliver frames that were then thrown
-  // away (docs/future/performance/architecture.md § 4).
+  // away (docs/performance.md).
   //
   // Nobody has to tell us: every request the renderer makes names the node it is addressing, so the
   // last one named is the active one. A node switch changes the fact with the renderer's first request

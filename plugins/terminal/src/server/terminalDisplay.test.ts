@@ -185,7 +185,7 @@ describe('TerminalDisplay', () => {
 })
 
 // Phase 6 of the performance programme: the emulator is a consequence of attachment
-// (docs/future/performance/phase-6-terminals-work-only-when-watched.md).
+// (docs/performance.md § 2026-09-03 — phase 6).
 describe('TerminalDisplay emulates only while somebody is watching', () => {
   it('builds no emulator for a session nobody has attached to', () => {
     let built = 0

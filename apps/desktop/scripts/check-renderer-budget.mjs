@@ -25,7 +25,7 @@ const limits = {
 
 // Chunk-name prefixes that must not be fetched at startup, whatever they weigh. Each one is a lazy
 // surface that leaked into the eager graph through a registry holding values instead of loaders
-// (docs/future/performance/decisions.md § Registries hold loaders).
+// (docs/performance.md § Registries hold loaders).
 //
 // A chunk's name is the name of one module in it, so a name here can move when the graph changes: the
 // pull-request model was `prModel` until phase 1 made the PR pane's contribution lazy, after which

@@ -52,7 +52,7 @@ describe('bundled plugin client trust', () => {
 
   // The whole second launch, which is the shape the performance programme cared about: sweep the cache,
   // trust the bundled roster, and write nothing at all because nothing changed
-  // (docs/future/performance/phase-3-the-node-listens-sooner.md).
+  // (docs/performance.md § 2026-09-03 — phase 3).
   it('writes nothing under the plugin cache on a second launch with unchanged bundles', () => {
     const resources = temporary('acorn-bundled-trust-idempotent-')
     const userData = temporary('acorn-bundled-trust-user-')

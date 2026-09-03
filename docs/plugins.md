@@ -1434,6 +1434,13 @@ a terminal, which is the host's decision rather than the protocol's: `insert(par
 root. A batch applies atomically or is dropped whole with a row on the plugin's page — half a batch is
 a tree the sandbox never described.
 
+The check that decides is a simulation: the host projects the batch against a copy of the parent map
+and a child index built once, so an op is judged against the tree the ops before it in the same batch
+would have left. A `remove` takes its whole subtree out of that projection by walking down the index,
+which means a batch costs its own ops rather than the tree it is applied to — emptying a tree at the
+5,000-node cap is 71 ms rather than the 1.1 seconds the earlier scan-every-node walk took
+([performance.md](./performance.md) § The tree host's remove).
+
 **Eleven events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
 `onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`.
 Never a key and never a pointer event, because a terminal host has neither and has to be able to map

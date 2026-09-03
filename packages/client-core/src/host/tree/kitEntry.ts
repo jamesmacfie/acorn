@@ -5,7 +5,7 @@
 // every value into whichever chunk holds the table. That is how a diff viewer and a syntax
 // highlighter ended up in the renderer's first paint: nothing drew them, but `RemoteTree` is the
 // fallback branch of ./Slot.tsx, so the table was preloaded whether or not a loaded plugin existed
-// (docs/future/performance/decisions.md § Registries hold loaders).
+// (docs/performance.md § Registries hold loaders).
 //
 // So an entry is either the component or a loader for it. Cheap primitives stay components — a
 // `Button` behind a dynamic import would cost a frame for nothing — and the heavy names, the ones

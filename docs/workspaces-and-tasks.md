@@ -145,7 +145,7 @@ run produced. The changes pane's local-changes read takes the same output, which
 carries `--branch` that only the rail needs. The node drops a path's entry when it writes under it,
 which covers a stage, a commit, a discard, a push, an editor save, a worktree created, and a terminal
 session's command going quiet. A change made outside acorn shows up on the next poll past the window.
-There is no filesystem watcher, and `docs/future/performance/refused.md` holds the argument and the
+There is no filesystem watcher, and [performance.md](./performance.md) holds the argument and the
 condition that would change it.
 
 **The cache serves reads, never a refusal.** `removeWorktree` refuses to delete a worktree with

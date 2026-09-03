@@ -169,6 +169,14 @@ a call finishing does not slam its card shut, and the sidebar's rows are keyed b
 than by object identity, so the roster rebuilding on every socket frame does not replace the row
 somebody is reading.
 
+**A selection survives a streaming update**, and a test says so rather than a habit. A message
+re-renders only the block that is still growing, so the paragraphs above it keep their elements and
+their text nodes, and a reader who selected across two of them still has that selection when the next
+delta lands. `packages/client-core/src/kit/components/content/Markdown.test.tsx` holds it against the
+real `Selection`: it selects across two blocks, streams an update into a third, and asserts the
+selection reads back the same text. Written that way rather than as an element-identity check because
+it fails for any reason a selection can break, not only for the one it was written after.
+
 - Agent Center aggregates sessions, search, provider health, attention, transcript import, and launch.
 - A provider draws as its own mark wherever it is named: the onboarding cards, the New picker, each
   block in Settings -> Agent defaults, and the session icon in Agent Center. The name comes off the

@@ -71,7 +71,7 @@ export type PluginHostOptions = {
   // 24 ms warm and 38 to 41 ms on a first boot against a realistic data root, out of a 132 ms boot,
   // which is not worth a code every client and the MCP child would honour forever
   // (apps/node/src/composition/runtime.ts § bootTimer,
-  // docs/future/performance/refused.md § A 503-until-ready node contract).
+  // docs/performance.md § A 503-until-ready node contract).
   mark?: (label: string) => void
 }
 
@@ -412,7 +412,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // Do not expect this to be faster. Most of these inits are synchronous: `ctx.storage.open()` opens a
   // node:sqlite handle and runs drizzle's migration chain without awaiting anything, so one thread runs
   // them one after another either way, and the measured pass is 24 ms warm before and after
-  // (docs/future/performance/measurements.md § 2026-09-03 — phase 3). What this buys is that a plugin
+  // (docs/performance.md § 2026-09-03 — phase 3). What this buys is that a plugin
   // that does await something no longer holds up its neighbours.
   //
   // `allSettled` rather than `all`, because the failure handling per plugin is the same as the serial

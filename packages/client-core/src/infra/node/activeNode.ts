@@ -9,7 +9,7 @@ import { homeNode, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
 //
 // It has to be readable synchronously, because it picks the query cache's partition
 // (`activeCacheId()` below, node/fleet.ts § clientFor) and the window now renders before anything has
-// asked the helper anything (docs/future/performance/decisions.md § Every host draws first). Reading
+// asked the helper anything (docs/performance.md § Every host draws first). Reading
 // it a tick late would mount the shell on the `origin` partition and then remount it on the real one,
 // which is a flash and a thrown-away first paint.
 //

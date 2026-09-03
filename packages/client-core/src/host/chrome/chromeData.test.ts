@@ -118,7 +118,7 @@ describe('collection reads', () => {
 // The amplifier this pins closed: `term:status` used to be one content-free ping that a terminal
 // emitted on every idle-to-working edge, and the chrome sweep answered it by refetching every plugin's
 // rail rows, badges and collections on every connected client
-// (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+// (docs/performance.md § 2026-09-03 — phase 5).
 describe('chrome freshness hears only what names it', () => {
   const emit: ((nodeId: string, frame: unknown) => void)[] = []
 

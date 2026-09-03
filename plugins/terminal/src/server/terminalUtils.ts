@@ -10,7 +10,7 @@ export const RING_CAP = 256 * 1024 // bytes of recent raw output kept for prompt
  *
  * It used to be one string, rebuilt as `ring = trimRing(ring + data)` on every chunk the
  * pseudo-terminal produced. That copies up to 256 KB per chunk to serve readers that ask for the last
- * four or ten kilobytes of it (docs/future/performance/architecture.md § 3). Now a chunk is pushed,
+ * four or ten kilobytes of it (docs/performance.md). Now a chunk is pushed,
  * the oldest are dropped once the budget is spent, and a reader concatenates only the tail it asked
  * for.
  *

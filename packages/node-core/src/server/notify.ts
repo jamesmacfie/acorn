@@ -8,7 +8,7 @@ import { wsBroadcast } from './transport/wsHub'
 //
 // The plugin id is the whole point of the argument. Without it every ping refetched every plugin's
 // descriptor routes on every connected client, and a terminal flipping between busy and idle fired
-// one per edge (docs/future/performance/phase-5-stop-the-event-amplifiers.md). With it, a plugin
+// one per edge (docs/performance.md § 2026-09-03 — phase 5). With it, a plugin
 // saying "my rows moved" costs one plugin's rows. Core's own pings still pass nothing, because a task
 // create or a worktree appearing can move anyone's, and they happen at human speed.
 //

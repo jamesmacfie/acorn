@@ -7,7 +7,7 @@
 // file read-only and hands the reader's own `$EDITOR` a PTY when they want to type (./rectangle.tsx,
 // docs/editor.md § Editing in your own editor). Left unaliased, `EditorPane.tsx` reached the real
 // module and the terminal client carried seventeen CodeMirror grammars and a colour theme it has no
-// way to draw (docs/future/performance/decisions.md § Registries hold loaders).
+// way to draw (docs/performance.md § Registries hold loaders).
 //
 // A module rather than an empty alias, with the facade's names and the facade's types, so
 // `EditorPane.tsx` compiles and runs unchanged and this host loses no feature. The CodeMirror types

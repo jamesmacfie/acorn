@@ -22,7 +22,7 @@ const LAST_SEEN_THROTTLE_MS = 5 * 60_000
 // How long a resolved bearer is answered from memory instead of from SQLite. Every authenticated
 // request used to run a synchronous `SELECT` on the node's single event loop, which on a client
 // holding a live socket and refetching a few queries is the most-executed statement in the process
-// (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+// (docs/performance.md § 2026-09-03 — phase 5).
 //
 // Sixty seconds, matched to the hub's revocation sweep (server/transport/wsHub.ts): a revoke made
 // through this service clears the entry immediately, and the only way an entry outlives its device is

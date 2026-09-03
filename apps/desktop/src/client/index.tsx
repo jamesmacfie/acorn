@@ -159,13 +159,18 @@ render(
   document.getElementById('root')!,
 )
 
+// The tree the first frame will draw, finished. `render` returns once Solid has built it, so this is
+// the last mark the renderer's own work is responsible for, and it is the one to read when a launch is
+// watched from a terminal: a background window never records `first paint` below.
+bootMark('tree built')
+
 // After the frame the tree above produced, which is the first thing the owner sees, and separately the
 // moment a node was selected. The two are far apart on purpose: nothing between `script start` and
-// this frame waits on the helper or the node (docs/future/performance/decisions.md § Every host draws
+// this frame waits on the helper or the node (docs/performance.md § Every host draws
 // first).
-// A background window never records this: macOS pauses `requestAnimationFrame` while the window is
-// occluded, so a launch watched from a terminal prints the other four marks and not this one
-// (docs/local-development.md § Timing a cold start).
+// macOS pauses `requestAnimationFrame` while the window is occluded, so this mark is the compositor's
+// and not the renderer's: a launch watched from behind another window prints every other mark and not
+// this one, which is why `tree built` above exists (docs/local-development.md § Timing a cold start).
 requestAnimationFrame(() => bootMark('first paint'))
 createRoot((dispose) => {
   createEffect(() => {

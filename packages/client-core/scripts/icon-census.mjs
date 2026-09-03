@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 // `Icon` resolves a name against a map at render time, so a bundler cannot see which of Lucide's 1,756
 // icons are reachable and puts all 706 KB of geometry in a startup chunk. Dropping the unreachable ones
 // is not on the table: a person can assign any icon to a task and a plugin manifest can name any one,
-// and both choices are persisted (docs/future/performance/refused.md § Dropping unreferenced icons).
+// and both choices are persisted (docs/performance.md § Dropping unreferenced icons).
 //
 // So the set is split. The names that appear as literals in this tree are the ones the chrome draws on
 // the first frame, and they are written to iconNodes.eager.json, which the Icon chunk carries. Everything

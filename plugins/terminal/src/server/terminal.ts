@@ -120,7 +120,7 @@ let worktreeBroadcast: (taskId: string) => void = () => {}
 // A session's command went quiet, exited, or finished setting up. Whatever it was doing to the files in
 // its worktree, it has stopped doing it, so drop the coalesced `git status` for that directory and tell
 // every client to re-read the dirty markers. This is what keeps a `git commit` typed into a terminal
-// showing up immediately without a filesystem watcher (docs/future/performance/refused.md).
+// showing up immediately without a filesystem watcher (docs/performance.md).
 function worktreeSettled(s: Session): void {
   invalidateWorktreeStatus(s.meta.cwd)
   worktreeBroadcast(s.meta.taskId)
@@ -543,7 +543,7 @@ export type TerminalChannelDeps = {
   // "Something under this task's worktree may have changed." Fired on the human-rate edges only — a
   // command going quiet, a session exiting, a setup script finishing — because those are the moments a
   // person's `git commit` in a shell is done. A working edge is not one of them
-  // (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+  // (docs/performance.md § 2026-09-03 — phase 5).
   worktreeChanged?: (taskId: string) => void
   streams?: (handlers: Parameters<CompiledPluginBroadcast['streams']>[0]) => void
 }

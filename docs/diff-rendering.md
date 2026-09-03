@@ -126,7 +126,7 @@ its own key. It used to keep them in a `Map` behind one version counter, which m
 like a change to every file: `DiffPane` reads a status per file, so each of the two or three publishes
 per file rebuilt the row model for the whole diff. On a 200-file pull request that was 226 rebuilds of
 every file's rows during load, against 102 now — one per file that actually arrives, which is the floor
-for a row model built over all files (`docs/future/performance/measurements.md` § 2026-09-03 — phase 8).
+for a row model built over all files ([performance.md](./performance.md) § 2026-09-03 — phase 8).
 
 The hydrator keeps a plain `Map` beside the store for its own queue, and that is deliberate: its pump
 reads statuses synchronously from whatever reactive scope called `reset()`, and reading the store there

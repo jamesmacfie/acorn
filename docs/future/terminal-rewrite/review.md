@@ -170,7 +170,7 @@ nobody can see. The specific mechanics, each the cause of a shipped fix:
 - The engine caches active keys only while no layer carries a runtime matcher, and this host puts
   `active: () => !typing()` on every bare-key binding, so the cache is off for the process and the
   footer collects every layer twice per render
-  ([performance/tui-analysis.md](../performance/tui-analysis.md) item 10).
+  ([performance.md](../../performance.md) item 10).
 
 The invariant that catches all of this is one line in `apps/tui/src/reachability.test.tsx`: after
 every press, the renderer's focused renderable and the store's must be the same object. That suite

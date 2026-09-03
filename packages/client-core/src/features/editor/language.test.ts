@@ -12,7 +12,7 @@ import { languageFor, languageForPath } from './language'
 // no grammar is reachable statically. That is the property the whole split was for — the editor's
 // chunk used to be 954,915 bytes because this module imported all seventeen up front, so a pane that
 // opens one file downloaded every language the app knows
-// (docs/future/performance/measurements.md).
+// (docs/performance.md).
 
 /** Every grammar package the map can reach, from the source rather than from a list kept beside it. */
 const SOURCE = readFileSync(new URL('./language.ts', import.meta.url), 'utf8')
