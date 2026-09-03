@@ -13,3 +13,8 @@ const builtInStyles: StyleContribution[] = [
 if (!styleRegistry.entries().length) for (const style of builtInStyles) styleRegistry.register(style)
 
 export const STYLES = (): [string, string][] => styleContributions().map((style) => [style.id, style.label])
+
+/** What is on screen when nothing is stored. Named here rather than spelled at each reader, because the
+ *  three that need it — the startup effect, the Appearance page and its palette command — must agree,
+ *  and the plain-:root default is this file's fact. */
+export const DEFAULT_STYLE = 'terminal'

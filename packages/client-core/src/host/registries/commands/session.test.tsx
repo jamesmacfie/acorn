@@ -10,6 +10,7 @@ import {
   type CommandOutcome,
   type InputCommand,
   type SearchCommand,
+  type SettingCommand,
 } from './commands'
 import {
   createCommandSession,
@@ -841,5 +842,194 @@ describe('scope', () => {
       await settle()
       expect(ids(session)).toEqual(['node-1:dup', 'node-2:dup'])
     }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
+  })
+})
+
+
+const setting = (id: string, over: Partial<SettingCommand>): CommandContribution => ({
+  id, title: id, category: 'navigation', palette: true, kind: 'setting',
+  options: [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }],
+  read: async () => 'on',
+  write: async (value: string) => value,
+  ...over,
+} as CommandContribution)
+
+const badges = (session: CommandSession): (string | undefined)[] => session.rows().map((row) => row.badge)
+
+describe('a setting frame', () => {
+  it('asks the owner what the value is on entry, and marks that choice and no other', async () => {
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'dark',
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      // Nothing is drawn until the answer lands: a list with nothing marked reads as "none of these".
+      expect(labels(session)).toEqual(['Loading…'])
+      expect(session.busy()).toBe(true)
+      await settle()
+      expect(labels(session)).toEqual(['Light', 'Dark'])
+      expect(badges(session)).toEqual([undefined, 'current'])
+    })
+  })
+
+  it('writes the picked value, stays open, and marks what the owner says it stored', async () => {
+    const written: string[] = []
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'light',
+      // A provider that normalises what it was given still leaves the list marking the right row.
+      write: async (value) => { written.push(value); return 'dark' },
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      session.select('setting:dark')
+      session.activate()
+      await settle()
+      expect(written).toEqual(['dark'])
+      expect(session.open()).toBe(true)
+      expect(session.status()).toBe('Set to Dark.')
+      expect(badges(session)).toEqual([undefined, 'current'])
+    })
+  })
+
+  it('keeps the old value on a failed write, and says why', async () => {
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'light',
+      write: async () => { throw new Error('the node said no') },
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      session.select('setting:dark')
+      session.activate()
+      await settle()
+      expect(session.status()).toBe('the node said no')
+      // Nothing optimistic: the marker still says what is actually set.
+      expect(badges(session)).toEqual(['current', undefined])
+    })
+  })
+
+  it('refuses a canonical value that names none of the declared choices', async () => {
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'light',
+      write: async () => 'neon',
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      session.activate()
+      await settle()
+      expect(session.status()).toContain('not one of the choices')
+    })
+  })
+
+  it('draws the choices unmarked when the stored value names none of them', async () => {
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+      read: async () => 'a-theme-whose-plugin-left',
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      expect(labels(session)).toEqual(['Light', 'Dark'])
+      expect(badges(session)).toEqual([undefined, undefined])
+    })
+  })
+
+  it('shows a failed read as one unselectable line, and Enter reads again', async () => {
+    let attempts = 0
+    register(setting('theme', {
+      read: async () => {
+        attempts++
+        if (attempts === 1) throw new Error('the node is not answering')
+        return 'off'
+      },
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      expect(labels(session)).toEqual(['the node is not answering'])
+      expect(session.selectedIndex()).toBe(-1)
+
+      session.activate()
+      await settle()
+      expect(labels(session)).toEqual(['On', 'Off'])
+      expect(badges(session)).toEqual([undefined, 'current'])
+    })
+  })
+
+  it('is idempotent: On written twice is On both times', async () => {
+    let stored = 'off'
+    register(setting('sound', { read: async () => stored, write: async (value) => (stored = value) }))
+    await withSession(async (session) => {
+      session.openAt('sound')
+      await settle()
+      session.select('setting:on')
+      session.activate()
+      await settle()
+      expect(badges(session)).toEqual(['current', undefined])
+      session.select('setting:on')
+      session.activate()
+      await settle()
+      expect(stored).toBe('on')
+      expect(badges(session)).toEqual(['current', undefined])
+    })
+  })
+
+  it('narrows the choices with the query rather than asking anybody again', async () => {
+    let reads = 0
+    register(setting('theme', {
+      options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'nord', label: 'Nord' }],
+      read: async () => { reads++; return 'light' },
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      await settle()
+      session.setQuery('dar')
+      await settle()
+      expect(labels(session)).toEqual(['Dark'])
+      expect(reads).toBe(1)
+    })
+  })
+
+  it('leaves an answer that arrives after Escape nowhere to land', async () => {
+    let release: (value: string) => void = () => {}
+    register(group('appearance'))
+    register(setting('theme', {
+      parentId: 'appearance',
+      read: () => new Promise<string>((resolve) => { release = resolve }),
+    }))
+    await withSession(async (session) => {
+      session.openAt('theme')
+      session.back()
+      release('on')
+      await settle()
+      // Back on the group's frame, with its own row and no setting state written into it.
+      expect(labels(session)).toEqual(['theme'])
+      expect(session.frame()?.setting).toBeUndefined()
+    })
+  })
+
+  it('is found from the root by its breadcrumb, and Escape comes back to it', async () => {
+    register(group('appearance', { title: 'Appearance' }))
+    register(setting('theme', { parentId: 'appearance', title: 'Theme', read: async () => 'on' }))
+    await withSession(async (session) => {
+      session.openRoot()
+      session.setQuery('appearance theme')
+      expect(labels(session)).toEqual(['Theme'])
+      expect(session.rows()[0]?.breadcrumb).toEqual(['Appearance'])
+
+      session.activate()
+      await settle()
+      expect(session.breadcrumb()).toEqual(['Appearance', 'Theme'])
+      expect(labels(session)).toEqual(['On', 'Off'])
+
+      session.back()
+      expect(session.query()).toBe('appearance theme')
+    })
   })
 })

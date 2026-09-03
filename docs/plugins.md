@@ -2433,7 +2433,7 @@ command with `palette: true` for plugin API v1 and is scheduled for removal in p
 
 A command descriptor carries an optional `kind`. Omitted, or `action`, it is one closed verb the host
 runs, which is what every command was before 2026-09-03 and what every already-installed manifest
-still parses as. The other three are additive:
+still parses as. The other four are additive:
 
 - **`group`** holds children and has no action of its own. Any command may name a `parentId`, which
   must be a group in the same manifest; cross-plugin parenting is refused, and a missing parent, a
@@ -2448,6 +2448,14 @@ still parses as. The other three are additive:
 - **`input`** names a POST `route` and one static `onSuccess` verb. The host sends
   `{ input, taskId? }` when the reader presses Enter and expects `{ ok: true, item?, message? }`; a
   failure is the ordinary error envelope, keeps the reader's text on screen, and runs no action.
+- **`setting`** names a GET `readRoute`, a PUT `writeRoute` and 2–32 static
+  `{ value, label, keywords? }` choices. The host GETs the read route when the frame opens and PUTs
+  the write route with `{ value, taskId?, projectId?, workspaceId? }` when a choice is picked; both
+  answer `{ value }`. The value has to name one of the declared choices — the host checks its own copy
+  on the way out and on the way back, so a route that starts answering with something new cannot add a
+  choice nobody reviewed. Two choices spelled the same way is an install-time error. A Boolean is two
+  choices, `On` and `Off`, not a toggle. Secrets and free-form values are not this variant: they need
+  secure input, a reveal policy and recovery that a list of labelled choices does not have.
 
 `scope` is `none`, `task`, `project`, `workspace` or `node` (the default). A command whose scope names
 an identity the palette session does not have is not offered. `fleet` is not a scope a manifest may
@@ -2456,8 +2464,8 @@ somebody else's network.
 
 A route's answer never chooses behaviour. Every field but the ones listed above is dropped before the
 row is rendered, malformed rows are dropped individually, and the verb that runs when a row is picked
-or a submission succeeds is the static one the manifest declared. A search or an input needs a `node`
-entrypoint, because only a node half serves `/v2/p/<id>/`.
+or a submission succeeds is the static one the manifest declared. A search, an input or a setting
+needs a `node` entrypoint, because only a node half serves `/v2/p/<id>/`.
 
 ```json
 {
@@ -2473,6 +2481,19 @@ entrypoint, because only a node half serves `/v2/p/<id>/`.
         "route": "/v2/p/linear/issues/search",
         "placeholder": "Search issues…",
         "onSelect": { "verb": "runNodeAction", "path": "/v2/p/linear/issues/open" }
+      },
+      {
+        "id": "grouping",
+        "title": "Linear: group issues by",
+        "kind": "setting",
+        "parentId": "issues",
+        "scope": "project",
+        "readRoute": "/v2/p/linear/issues/grouping",
+        "writeRoute": "/v2/p/linear/issues/grouping",
+        "options": [
+          { "value": "status", "label": "Status" },
+          { "value": "assignee", "label": "Assignee" }
+        ]
       }
     ]
   }

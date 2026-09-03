@@ -8,7 +8,7 @@ import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces
 import { createPaletteRowsProvider } from '../registries/palette/provider'
 import type { CommandExecutionContext } from '../registries/commands/commands'
 import type { SessionRowProvider } from '../registries/commands/session'
-import { createTaskRowsProvider, createWorkspaceRowsProvider } from './navigationRows'
+import { registerNavigationCommands } from './navigationCommands'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
 import { PaletteSurface } from './PaletteSurface'
@@ -26,11 +26,7 @@ export default function CommandPalette() {
   const params = useParams()
   const fleetWorkspaces = createFleetWorkspaces()
 
-  // Filled in below the view, and read only when a session opens. `createTaskRowsProvider` fans out
-  // over the fleet keyed on the palette being open, so it needs the session that does not exist yet;
-  // a thunk over a `let` is the smallest way to tie the knot, and it is only ever read after both
-  // halves exist.
-  let providers: readonly SessionRowProvider[] = []
+  const providers: readonly SessionRowProvider[] = [createPaletteRowsProvider()]
 
   const context = (): CommandExecutionContext => ({
     host: 'desktop',
@@ -51,13 +47,19 @@ export default function CommandPalette() {
     toggleChord: 'meta+k',
     context,
     providers: () => providers,
-    // Read only by a `fleet`-scoped search, which nothing declares yet. Supplied here because this is
-    // the host that has a fleet at all: the terminal draws one node and answers with the one it
-    // captured (apps/tui/src/chrome/paletteSession.ts).
-    fleet: () => nodes().map((node) => ({ nodeId: node.nodeId, label: node.label })),
+    // Supplied here because this is the host that has a fleet at all: the terminal draws one node and
+    // answers with the one it captured (apps/tui/src/chrome/paletteSession.ts).
+    //
+    // Empty below two nodes, and that is the answer rather than a shortcut: one machine is not a
+    // fleet. An empty roster makes a `fleet` search ask once, against the node it captured, and leaves
+    // the node label off every row — which is what the task and workspace lists have always shown on a
+    // single-node install.
+    fleet: () => (nodes().length > 1 ? nodes().map((node) => ({ nodeId: node.nodeId, label: node.label })) : []),
   })
 
-  providers = [createPaletteRowsProvider(), createWorkspaceRowsProvider(fleetWorkspaces), createTaskRowsProvider(session.open)]
+  // The four navigation searches, which need the session's own open flag: the task fan-out runs only
+  // while somebody is looking at the palette.
+  registerNavigationCommands({ open: session.open, fleetWorkspaces })
 
   const announce = () => {
     if (session.busy()) return 'Loading…'

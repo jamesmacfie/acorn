@@ -15,6 +15,7 @@ const { pluginCommand, usablePluginCommands } = await import('./chromeCommands')
 type CommandExecutionContext = import('../registries/commands/commands').CommandExecutionContext
 type SearchCommand = import('../registries/commands/commands').SearchCommand
 type InputCommand = import('../registries/commands/commands').InputCommand
+type SettingCommand = import('../registries/commands/commands').SettingCommand
 
 // A loaded plugin's interactive commands, which is where a manifest meets a route's answer.
 //
@@ -42,6 +43,13 @@ const inputDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescr
   id: 'ask', title: 'Generate SQL', category: 'action', palette: true, kind: 'input',
   scope: 'task', route: '/v2/p/database/generate',
   onSuccess: { verb: 'runNodeAction', path: '/v2/p/database/open' },
+  ...over,
+} as PluginCommandDescriptor)
+
+const settingDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
+  id: 'theme', title: 'Board theme', category: 'action', palette: true, kind: 'setting',
+  scope: 'project', readRoute: '/v2/p/linear/theme', writeRoute: '/v2/p/linear/theme',
+  options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
   ...over,
 } as PluginCommandDescriptor)
 
@@ -208,9 +216,18 @@ describe('which descriptors this device will honour', () => {
 
   it('skips a kind this build has no frame for rather than treating it as an action', () => {
     expect(usable([
-      { id: 'later', title: 'Theme', category: 'action', palette: true, kind: 'setting' } as unknown as PluginCommandDescriptor,
+      { id: 'later', title: 'A sixth kind', category: 'action', palette: true, kind: 'toggle' } as unknown as PluginCommandDescriptor,
       searchDescriptor(),
     ])).toEqual(['find'])
+  })
+
+  it('refuses a setting whose routes are not its own, or that declares too few choices', () => {
+    expect(usable([
+      settingDescriptor({ id: 'own' }),
+      settingDescriptor({ id: 'reads-core', readRoute: '/v2/prefs' }),
+      settingDescriptor({ id: 'writes-a-neighbour', writeRoute: '/v2/p/rollbar/theme' }),
+      settingDescriptor({ id: 'one-choice', options: [{ value: 'on', label: 'On' }] }),
+    ])).toEqual(['own'])
   })
 
   it('drops a child whose parent is missing, is not a group, or is its own descendant', () => {
@@ -231,5 +248,41 @@ describe('which descriptors this device will honour', () => {
       { id: 'issues', title: 'Issues', category: 'navigation', palette: true, kind: 'group', parentId: 'gone' } as PluginCommandDescriptor,
       searchDescriptor({ id: 'inside', parentId: 'issues' }),
     ])).toEqual([])
+  })
+})
+
+describe('a loaded setting', () => {
+  const command = (over: Record<string, unknown> = {}): SettingCommand =>
+    pluginCommand('linear', settingDescriptor(over), binding) as SettingCommand
+
+  it('reads the current value from the plugin’s own route, with the identifiers its scope owns', async () => {
+    readJson.mockResolvedValue({ value: 'dark' })
+    await expect(command().read(CONTEXT, signal())).resolves.toBe('dark')
+    // The project, because the descriptor said `project`. Never the task, which the session also
+    // captured and this scope does not own.
+    expect(readJson).toHaveBeenCalledWith('/v2/p/linear/theme?projectId=p-1', expect.objectContaining({ nodeId: 'node-b' }))
+  })
+
+  it('writes the chosen value and answers with the value the node says is now stored', async () => {
+    writeJson.mockResolvedValue({ value: 'light' })
+    await expect(command().write('dark', CONTEXT, signal())).resolves.toBe('light')
+    expect(writeJson).toHaveBeenCalledWith('/v2/p/linear/theme', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ value: 'dark', projectId: 'p-1' }),
+    }))
+  })
+
+  it('refuses to write a value the manifest never declared', async () => {
+    await expect(command().write('neon', CONTEXT, signal())).rejects.toThrow('not one of the choices')
+    expect(writeJson).not.toHaveBeenCalled()
+  })
+
+  it('refuses an answer this build cannot read, rather than showing an unmarked list', async () => {
+    readJson.mockResolvedValue({ theme: 'dark' })
+    await expect(command().read(CONTEXT, signal())).rejects.toThrow('cannot read')
+  })
+
+  it('carries the manifest’s choices through unchanged, because they are what a value is checked against', () => {
+    expect(command().options).toEqual([{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }])
   })
 })

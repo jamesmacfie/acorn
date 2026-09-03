@@ -5,6 +5,7 @@ import {
   MAX_COMMAND_SEARCH_ITEMS,
   MAX_COMMAND_SEARCH_QUERY,
   type CommandSearchItem,
+  type CommandSettingOption,
 } from '@acorn/protocol/commands.ts'
 import { fuzzyScore } from '../../../kit/lib/paletteModel'
 import {
@@ -17,6 +18,7 @@ import {
   type CommandOutcome,
   type InputCommand,
   type SearchCommand,
+  type SettingCommand,
 } from './commands'
 import { buildCommandGraph, type CommandGraph, type CommandNode } from './graph'
 import { setCommandPresenter } from './presenter'
@@ -38,12 +40,14 @@ import { setCommandPresenter } from './presenter'
 //
 // Search and input arrived on 2026-09-03 into the shape phase 1 left for them: the frame stack holds
 // their state, the generation counter decides whose answer is still wanted, and the abort controller
-// belongs to whatever the top frame has in flight. A setting's current value is phase 3.
+// belongs to whatever the top frame has in flight. A setting arrived the same day and is the fifth: it
+// asks its owner what the value is when the frame opens, marks that choice, writes the one that is
+// picked, and marks whatever the write says was stored.
 
 /** What activating a row does. Owned by whoever produced the row, so the session never switches on
  *  what kind of thing a row is about. */
 export type SessionRowAction =
-  /** Push this command's own frame. A group, and later a search, an input or a setting. */
+  /** Push this command's own frame. A group, a search, an input or a setting. */
   | { effect: 'enter'; commandId: string }
   /** Run something. A leaf action and every compatibility row are both this. */
   | { effect: 'run'; run: (context: CommandExecutionContext) => Promise<CommandOutcome | void> | CommandOutcome | void }
@@ -78,9 +82,10 @@ export type SessionRowBatch = {
 /**
  * A row source that is not a command yet.
  *
- * Three of them exist and all three are compatibility: the `paletteRows` contributions
- * (../palette/provider.ts), go-to-task and switch-workspace. They go away as their owners become
- * commands, and this type goes with them (docs/future/command-palette/phase-6-cutover-and-documentation.md).
+ * One is left and it is compatibility: the `paletteRows` contributions (../palette/provider.ts).
+ * Go-to-task and switch-workspace were two more until 2026-09-03 and are commands now
+ * (../../palette/navigationCommands.ts). This type goes when the last source does
+ * (docs/future/command-palette/phase-6-cutover-and-documentation.md).
  *
  * Asked once when the session opens, with the context it captured. A provider that throws contributes
  * an error line rather than taking the list down.
@@ -92,13 +97,13 @@ export type SessionRowProvider = {
   rows(context: CommandExecutionContext, signal: AbortSignal): Promise<SessionRowBatch> | SessionRowBatch
 }
 
-/** Where the command rows sit in the root list. The flat list put the actions between the contributed
- *  rows and the workspace and task rows, and this is that position as a number. */
+/** Where the command rows sit in the root list. The flat list put the actions after the contributed
+ *  rows, and this is that position as a number. */
 export const COMMAND_ROW_ORDER = 500
 
-/** What the top frame is for. The root and a group list commands; the other two are the interactive
- *  kinds, and each owns the field above the list rather than filtering it. */
-export type SessionFrameKind = 'root' | 'group' | 'search' | 'input'
+/** What the top frame is for. The root, a group and a setting list rows; the other two own the field
+ *  above the list rather than filtering it. */
+export type SessionFrameKind = 'root' | 'group' | 'search' | 'input' | 'setting'
 
 /** Where a search frame is between "nothing typed" and "here are the rows". */
 export type SessionSearchPhase = 'instruction' | 'loading' | 'ready' | 'error'
@@ -138,6 +143,29 @@ export type SessionSearchState = {
   readonly errors: readonly { source: string; message: string }[]
 }
 
+/** Where a setting frame is between "asking the owner what it is" and "here are the choices". */
+export type SessionSettingPhase = 'loading' | 'ready' | 'error'
+
+/**
+ * A setting frame's current value.
+ *
+ * Read from the owner when the frame opens and re-read from what a write answered, never guessed: the
+ * marker beside a choice is the whole point of the frame, and a value the palette assumed rather than
+ * asked for is a marker that can be wrong (docs/future/command-palette/architecture.md § Settings
+ * integration).
+ *
+ * `value` is `null` while it is unknown — still loading, the read failed, or the owner answered with a
+ * value none of the declared choices names. The choices are still drawn in that last case; nothing is
+ * marked, which says "not one of these" rather than picking one at random.
+ */
+export type SessionSettingState = {
+  readonly phase: SessionSettingPhase
+  /** The one explanatory line when there are no choices to draw: the loading line, or why the read
+   *  failed. Empty once the choices are showing. */
+  readonly message: string
+  readonly value: string | null
+}
+
 /**
  * One level of the stack.
  *
@@ -163,6 +191,8 @@ export type SessionFrame = {
   readonly placeholder: string
   /** Present exactly on a search frame. */
   readonly search?: SessionSearchState
+  /** Present exactly on a setting frame. */
+  readonly setting?: SessionSettingState
 }
 
 export type CommandSession = {
@@ -175,8 +205,9 @@ export type CommandSession = {
   /** Where this frame is, from the top level down to and including its own title. Empty at the root,
    *  which is the one frame that is not a command. */
   breadcrumb: Accessor<readonly string[]>
-  /** What the top frame is: the root, a group, a search or an input. A renderer draws the same field
-   *  and list for all four and reads this only to label the field and to know that Enter submits. */
+  /** What the top frame is: the root, a group, a search, an input or a setting. A renderer draws the
+   *  same field and list for all five and reads this only to label the field and to know that Enter
+   *  submits. */
   kind: Accessor<SessionFrameKind>
   query: Accessor<string>
   /** The top frame's own placeholder, or empty where the host's own still describes the list. */
@@ -252,7 +283,7 @@ const ROOT: SessionFrame = {
 }
 
 const frameKind = (command: CommandContribution): SessionFrameKind =>
-  command.kind === 'search' || command.kind === 'input' ? command.kind : 'group'
+  command.kind === 'search' || command.kind === 'input' || command.kind === 'setting' ? command.kind : 'group'
 
 /** How much has to be typed before a search asks anybody. Zero is legitimate and is what a provider
  *  that loads once on entry and filters locally declares (./localSearch.ts). */
@@ -273,6 +304,10 @@ const instructionState = (command: SearchCommand): SessionSearchState => {
   }
 }
 
+/** What a setting frame says before the owner has answered. A choice list with nothing marked would
+ *  read as "none of these", so the choices wait until there is something true to say about them. */
+const SETTING_LOADING: SessionSettingState = { phase: 'loading', message: 'Loading\u2026', value: null }
+
 const frameFor = (node: CommandNode): SessionFrame => ({
   kind: frameKind(node.command),
   commandId: node.id,
@@ -281,8 +316,13 @@ const frameFor = (node: CommandNode): SessionFrame => ({
   query: '',
   selectedId: null,
   status: '',
-  placeholder: (node.command.kind === 'search' || node.command.kind === 'input' ? node.command.placeholder : '') ?? '',
+  // A setting's field narrows the choices rather than asking for anything, and it says so: the root's
+  // own placeholder is about running commands, which is not what this list holds.
+  placeholder: node.command.kind === 'setting'
+    ? 'Filter the choices…'
+    : (node.command.kind === 'search' || node.command.kind === 'input' ? node.command.placeholder : '') ?? '',
   ...(node.command.kind === 'search' ? { search: instructionState(node.command) } : {}),
+  ...(node.command.kind === 'setting' ? { setting: SETTING_LOADING } : {}),
 })
 
 /** The four identities a session is about. A pane or a surface moving under it is not a reason to
@@ -367,8 +407,8 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   const rootRows = (query: string): SessionRow[] => {
     const trimmed = query.trim()
     if (!trimmed) {
-      // The empty root, in the order the flat list had: contributed rows, then the commands, then the
-      // workspace and task rows. `sort` is stable, so each provider's own row order survives.
+      // The empty root, in the order the flat list had: contributed rows, then the commands. `sort` is
+      // stable, so each provider's own row order survives.
       const ordered = [
         ...providerRows(),
         ...graph().top().map((node) => ({ row: commandRow(node, false), order: COMMAND_ROW_ORDER })),
@@ -377,8 +417,8 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     }
     // A typed root searches descendants too, so a nested command stays findable by its breadcrumb.
     // Scored against the compatibility rows and interleaved with them, because a flat list is what the
-    // reader still sees: showing every command above every task would be a new ranking nobody asked
-    // for.
+    // reader still sees: showing every command above every contributed row would be a new ranking
+    // nobody asked for.
     const scored = [
       ...providerRows().map((entry) => ({ ...entry, score: fuzzyScore(trimmed, entry.row.label) })),
       ...graph().ranked(trimmed).map((hit) => ({ row: commandRow(hit.node, true), order: COMMAND_ROW_ORDER, score: hit.score })),
@@ -401,12 +441,12 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
 
   /** The command a frame is showing, when it is the kind the frame says it is. A frame outlives
    *  nothing — a disposed contribution simply stops answering — so every reader checks. */
-  const commandFor = <K extends 'search' | 'input'>(frameAt: SessionFrame | null, kind: K):
-    (K extends 'search' ? SearchCommand : InputCommand) | null => {
+  type InteractiveKind = { search: SearchCommand; input: InputCommand; setting: SettingCommand }
+  const commandFor = <K extends keyof InteractiveKind>(frameAt: SessionFrame | null, kind: K): InteractiveKind[K] | null => {
     if (!frameAt?.commandId || frameAt.kind !== kind) return null
     const command = commandRegistry.get(frameAt.commandId)
     if (!command || command.kind !== kind) return null
-    return command as K extends 'search' ? SearchCommand : InputCommand
+    return command as InteractiveKind[K]
   }
 
   const searchRow = (result: SessionSearchResult): SessionRow => ({
@@ -445,12 +485,75 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     action: { effect: 'none' },
   }]
 
+  /** The word beside the choice the owner reports as current. A badge rather than a tick, because both
+   *  renderers already draw one and neither has a column for a glyph (../palette/PaletteSurface.tsx,
+   *  apps/tui/src/chrome/Palette.tsx). */
+  const CURRENT_BADGE = 'current'
+
+  /**
+   * One choice, and what picking it does.
+   *
+   * The write is the row's own `run`, so it goes through the ordinary activation path: one at a time,
+   * a `stay` outcome keeps the frame open, and a rejection leaves the message under the field. What is
+   * particular to a setting is the answer — the owner says which value it actually stored, and that is
+   * what moves the marker. Nothing is marked optimistically, so a write that failed leaves the list
+   * saying what is really set (docs/future/command-palette/architecture.md § Settings integration).
+   */
+  const settingRow = (command: SettingCommand, option: CommandSettingOption, current: string | null): SessionRow => ({
+    id: `setting:${option.value}`,
+    label: option.label,
+    ...(option.value === current ? { badge: CURRENT_BADGE } : {}),
+    action: {
+      effect: 'run',
+      run: async (context): Promise<CommandOutcome> => {
+        // The session's own controller, not a keystroke's: a write is not cancelled by typing, and it
+        // is abandoned when the session closes, which is the only reason left to stop caring.
+        const signal = controller?.signal ?? new AbortController().signal
+        const canonical = await command.write(option.value, context, signal)
+        // Refused rather than shown, and refused here so a compiled provider and a manifest route are
+        // held to the same rule: a value naming no declared choice would leave a list where nothing is
+        // marked and no way to tell whether the write landed.
+        const stored = command.options.find((choice) => choice.value === canonical)
+        if (!stored) throw new Error(`'${canonical}' is not one of the choices`)
+        patchFrame({ setting: { phase: 'ready', message: '', value: canonical } })
+        return { effect: 'stay', status: `Set to ${stored.label}.` }
+      },
+    },
+  })
+
+  const settingRows = (command: SettingCommand, state: SessionSettingState, query: string): SessionRow[] => {
+    // One explanatory line and no choices while the current value is unknown for a reason the reader
+    // can do something about. Enter on the failed frame reads again (./retry).
+    if (state.phase !== 'ready') {
+      return state.message ? [{ id: 'setting:message', label: state.message, action: { effect: 'none' } }] : []
+    }
+    const trimmed = query.trim()
+    if (!trimmed) return command.options.map((option) => settingRow(command, option, state.value))
+    // The same scorer the rest of the palette narrows a list with, over the label and whatever extra
+    // words the option declared. A theme list is long enough to want it.
+    return command.options
+      .map((option, at) => ({
+        option,
+        at,
+        score: [option.label, ...(option.keywords ?? [])]
+          .map((text) => fuzzyScore(trimmed, text))
+          .reduce<number | null>((best, hit) => (hit === null ? best : best === null ? hit : Math.max(best, hit)), null),
+      }))
+      .filter((row): row is { option: CommandSettingOption; at: number; score: number } => row.score !== null)
+      .sort((a, b) => b.score - a.score || a.at - b.at)
+      .map((row) => settingRow(command, row.option, state.value))
+  }
+
   const rows = createMemo<readonly SessionRow[]>(() => {
     if (!open()) return []
     const current = frame()
     if (!current) return []
     if (current.kind === 'search') return current.search ? searchRows(current.search) : []
     if (current.kind === 'input') return inputRows(pending())
+    if (current.kind === 'setting') {
+      const command = commandFor(current, 'setting')
+      return command && current.setting ? settingRows(command, current.setting, current.query) : []
+    }
     return current.commandId === null ? rootRows(current.query) : groupRows(current.commandId, current.query)
   })
 
@@ -588,12 +691,48 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
 
   const retry = (): void => {
     const current = untrack(frame)
+    if (current?.kind === 'setting') return loadSetting()
     const command = commandFor(current, 'search')
     if (!current || !command) return
     const text = current.query.trim().slice(0, MAX_COMMAND_SEARCH_QUERY)
     if (text.length < minQueryOf(command)) return applySearch(instructionState(command))
     applySearch({ phase: 'loading', message: 'Searching…', results: [], errors: [] })
     runSearch(command, text)
+  }
+
+  // ── Reading a setting ───────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Ask the owner what the setting currently is.
+   *
+   * Once on entry and again on a retry, and never on a keystroke: the query on a setting frame narrows
+   * the choices the owner already declared, so typing costs nothing. Guarded by the same generation the
+   * interactive frames use, so an answer that arrives after a pop has nowhere to land.
+   */
+  const loadSetting = (): void => {
+    const current = untrack(frame)
+    const command = commandFor(current, 'setting')
+    const context = untrack(captured)
+    if (!current || !command || !context) return
+    abortWork()
+    const controllerForRead = new AbortController()
+    work = controllerForRead
+    const mine = generation
+    patchFrame({ setting: SETTING_LOADING, selectedId: null })
+    void Promise.resolve()
+      .then(() => command.read(context, controllerForRead.signal))
+      .then((value) => {
+        if (mine !== generation || controllerForRead.signal.aborted) return
+        // A value none of the choices names leaves the list unmarked rather than empty: the choices are
+        // still the choices, and "not one of these" is a true thing to show.
+        const known = command.options.some((option) => option.value === value)
+        patchFrame({ setting: { phase: 'ready', message: '', value: known ? value : null } })
+      })
+      .catch((error: unknown) => {
+        if (mine !== generation) return
+        if (isAbort(error)) return
+        patchFrame({ setting: { phase: 'error', message: messageOf(error), value: null } })
+      })
   }
 
   // ── Submitting ──────────────────────────────────────────────────────────────────────────────────
@@ -673,7 +812,9 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   /** Landing on a frame. A search asks straight away, which is what a provider with no minimum and no
    *  debounce means by "loads once on entry" (./localSearch.ts); everything else has nothing to ask. */
   const entered = (): void => {
-    if (untrack(frame)?.kind === 'search') scheduleSearch()
+    const kind = untrack(frame)?.kind
+    if (kind === 'search') scheduleSearch()
+    else if (kind === 'setting') loadSetting()
   }
 
   const start = (stack: readonly SessionFrame[]): void => {
@@ -789,9 +930,10 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     if (current?.kind === 'input') return submitInput()
     const row = untrack(selectedRow)
     if (row) return activateRow(row.id)
-    // A failed search has an error row and no selectable one, so Enter is the retry. Nothing else has
-    // a meaning for Enter with nothing under the cursor.
+    // A failed search or a setting whose read failed has an error row and no selectable one, so Enter
+    // is the retry. Nothing else has a meaning for Enter with nothing under the cursor.
     if (current?.kind === 'search' && current.search?.phase === 'error') retry()
+    else if (current?.kind === 'setting' && current.setting?.phase === 'error') retry()
   }
 
   // ── The world moving underneath ─────────────────────────────────────────────────────────────────
@@ -824,7 +966,7 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     placeholder: () => frame()?.placeholder ?? '',
     status: () => frame()?.status ?? '',
     // A search waiting on its provider is busy too, and the loading row says so where a spinner cannot.
-    busy: () => pending() || loading() || frame()?.search?.phase === 'loading',
+    busy: () => pending() || loading() || frame()?.search?.phase === 'loading' || frame()?.setting?.phase === 'loading',
     rows,
     selectedIndex,
     selectedRow,

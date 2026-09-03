@@ -36,7 +36,7 @@ import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/kit/components/content/Acorn.tsx'
 import { clientEvents } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
-import { registerCommandGroupExample } from '@acorn/client-core/host/registries/commands/example.ts'
+import { appearanceCommands, notificationCommands, settingsPageCommands } from '@acorn/client-core/host/registries/commands/coreCommands.ts'
 import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
 import { CheatSheet } from '@acorn/client-core/host/keys/CheatSheet.tsx'
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
@@ -133,11 +133,23 @@ export default function App() {
       { id: 'core.settings.open', command: 'core.settings.open', description: 'Open settings', category: 'Global', defaultChord: 'meta+,', when: 'global' },
       { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Toggle focused pane or terminal maximize', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
     ])
-    // Temporary, and phase 3 takes it: one group with two children, so hierarchy is something a
-    // person can press Enter on before the catalogue moves
-    // (client-core/host/registries/commands/example.ts).
-    const example = registerCommandGroupExample()
-    onCleanup(() => { example.dispose(); bindings.dispose(); commands.dispose() })
+    // The two settings core owns, as bounded choices with the current value marked. Both write through
+    // the same accessors Settings → Appearance and Settings → Notifications call
+    // (client-core/host/registries/commands/coreCommands.ts), so there is one persistence path per
+    // value and not two.
+    //
+    // Registered here rather than in client-core because this app is what contributes those pages
+    // (./pageContributions.tsx): a host with no Appearance page has nothing for an Appearance command
+    // to agree with.
+    const settings = registerCommands([...appearanceCommands(queryClient), ...notificationCommands(queryClient)])
+    onCleanup(() => { settings.dispose(); bindings.dispose(); commands.dispose() })
+  })
+
+  // One row per registered Settings page, rebuilt when the roster changes: a plugin contributes pages,
+  // so a list taken once would go stale the moment one loads or is disabled.
+  createEffect(() => {
+    const pages = registerCommands(settingsPageCommands(openSettings))
+    onCleanup(() => pages.dispose())
   })
 
   onMount(() => {

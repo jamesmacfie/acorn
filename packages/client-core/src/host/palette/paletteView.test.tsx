@@ -280,4 +280,32 @@ describe('the interactive frames', () => {
     await settle()
     expect(dialog()).toBeNull()
   })
+
+  it('draws a setting as its choices, marks the one that is set, and stays open on a write', async () => {
+    let stored = 'quiet'
+    register({
+      id: 'volume', title: 'Volume', category: 'navigation', palette: true, kind: 'setting',
+      options: [{ value: 'loud', label: 'Loud' }, { value: 'quiet', label: 'Quiet' }],
+      read: () => Promise.resolve(stored),
+      write: (value: string) => Promise.resolve((stored = value)),
+    } as unknown as CommandContribution)
+    mount()
+    session.openAt('volume')
+
+    // Nothing to choose from until the owner has answered: a list with nothing marked would read as
+    // "none of these".
+    expect(options().map((row) => row.textContent)).toEqual(['Loading…'])
+    expect(dialog()?.getAttribute('aria-busy')).toBe('true')
+    await settle()
+
+    expect(options().map((row) => row.textContent)).toEqual(['Loud', 'Quiet'])
+    expect(session.rows().map((row) => row.badge)).toEqual([undefined, 'current'])
+
+    press('Enter')
+    await settle()
+    expect(dialog()).not.toBeNull()
+    expect(stored).toBe('loud')
+    expect(session.rows().map((row) => row.badge)).toEqual(['current', undefined])
+    expect(document.querySelector('.ui-alert')?.textContent).toContain('Set to Loud.')
+  })
 })

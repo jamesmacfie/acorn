@@ -297,9 +297,9 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // refinement can see.
   contextMenus.forEach((entry, i) => action(entry.action, ['contributions', 'contextMenus', i, 'action']))
   palette.forEach((entry, i) => action(entry.action, ['contributions', 'palette', i, 'action']))
-  // Four kinds, and each one is checked for what it alone can name: a leaf action's verb, a search or
-  // an input's route and its one static verb, a group's nothing at all
-  // (@acorn/protocol/plugin/contract.ts).
+  // Five kinds, and each one is checked for what it alone can name: a leaf action's verb, a search or
+  // an input's route and its one static verb, a setting's two routes and its choices, a group's nothing
+  // at all (@acorn/protocol/plugin/contract.ts).
   const commandKind = new Map<string, string>()
   commands.forEach((entry, i) => {
     const at = ['contributions', 'commands', i] as (string | number)[]
@@ -318,11 +318,25 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
         route(entry.route, [...at, 'route'])
         action(entry.onSuccess, [...at, 'onSuccess'])
         break
+      case 'setting': {
+        route(entry.readRoute, [...at, 'readRoute'])
+        route(entry.writeRoute, [...at, 'writeRoute'])
+        // Two choices spelled the same way is a list where picking either marks both and the host
+        // cannot tell which one a returned value meant.
+        const values = new Set<string>()
+        entry.options.forEach((option, at2) => {
+          if (values.has(option.value)) {
+            ctx.addIssue({ code: 'custom', path: [...at, 'options', at2, 'value'], message: `setting '${entry.id}' declares '${option.value}' twice` })
+          }
+          values.add(option.value)
+        })
+        break
+      }
     }
     // Verbatim the schedule and task-check rule above, and for the identical reason: only a node half
-    // serves `/v2/p/<id>/`, so a search declared by a client-only package would 404 on every keystroke
-    // and an input on every Enter.
-    if ((entry.kind === 'search' || entry.kind === 'input') && !manifest.node) {
+    // serves `/v2/p/<id>/`, so a search declared by a client-only package would 404 on every keystroke,
+    // an input on every Enter, and a setting the moment its frame opens.
+    if ((entry.kind === 'search' || entry.kind === 'input' || entry.kind === 'setting') && !manifest.node) {
       const article = entry.kind === 'input' ? 'an' : 'a'
       ctx.addIssue({ code: 'custom', path: at, message: `${article} ${entry.kind} command calls a node route; declare \`node\` in the manifest` })
     }

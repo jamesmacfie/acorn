@@ -5,7 +5,7 @@ import { createResource, Show } from 'solid-js'
 import { prefsOptions } from '@acorn/plugin-api/client'
 import type { DockerInfo } from '../shared/model'
 import { fetchDockerInfo } from './dockerClient'
-import { readDockerPrefs, saveDockerPrefs, type DockerPrefs } from './dockerPrefs'
+import { readDockerPrefs, saveDockerPref, type DockerPrefs } from './dockerPrefs'
 import { Checkbox, CodeBlock, Stack, Text } from '@acorn/plugin-api/ui'
 
 const infoText = (info: DockerInfo): string =>
@@ -19,7 +19,9 @@ export default function DockerSettings() {
   const current = () => readDockerPrefs(prefs.data)
 
   const [info] = createResource(fetchDockerInfo)
-  const toggle = (key: keyof DockerPrefs) => void saveDockerPrefs(qc, { ...current(), [key]: !current()[key] })
+  // Through the shared merge, which is what the palette's setting commands write with too: both
+  // switches share one key, so an unmerged write would drop the other one (./dockerPrefs.ts).
+  const toggle = (key: keyof DockerPrefs) => void saveDockerPref(qc, prefs.data, key, !current()[key])
 
   return (
     <Stack gap="section">

@@ -6,6 +6,7 @@ import { tasksKey, type Task } from '@acorn/protocol/api.ts'
 import { createRoot, createSignal } from 'solid-js'
 import type { KeyEvent, Renderable } from '@opentui/core'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
 import { keyedRows } from '../kit/showing'
 import { recordedRequests } from '../fixture'
 import { hasFfi } from '../ffi'
@@ -19,6 +20,50 @@ import { renderFixture } from '../harness'
 // caret is a screen nobody can drive (docs/testing.md § Test layers).
 
 const caretRow = (frame: string): number => frame.split('\n').findIndex((line) => line.includes('›'))
+
+/**
+ * One group with a child of every kind, registered by the test that needs it.
+ *
+ * The shipped catalogue has groups and searches of its own, but they are about a fleet, a workspace
+ * roster and a theme list — data this fixture node does not have and this suite has no business
+ * asserting on. What is being drawn here is the rectangle: a field, a list, a marker and a status
+ * line, one per frame kind.
+ */
+const registerFixtureCommands = () => {
+  let volume = 'quiet'
+  return registerCommands([
+    { id: 'fixture.group', kind: 'group', title: 'Fixture group', category: 'navigation', palette: true, order: 900 },
+    {
+      id: 'fixture.stay', parentId: 'fixture.group', title: 'Stay open and say so', category: 'action',
+      palette: true, order: 100, run: () => ({ effect: 'stay', status: 'Still here.' }),
+    },
+    {
+      id: 'fixture.close', parentId: 'fixture.group', title: 'Close the palette', category: 'action',
+      palette: true, order: 200, run: () => {},
+    },
+    {
+      id: 'fixture.search', parentId: 'fixture.group', kind: 'search', title: 'Search a list',
+      category: 'navigation', palette: true, order: 300, placeholder: 'Type to narrow the colours…',
+      minQueryLength: 0, debounceMs: 0,
+      query: async (text) => ['amber', 'cyan', 'magenta', 'teal']
+        .filter((colour) => colour.includes(text.trim()))
+        .map((colour) => ({ id: colour, title: colour })),
+      select: (item) => ({ effect: 'stay', status: `You picked ${item.title}.` }),
+    },
+    {
+      id: 'fixture.input', parentId: 'fixture.group', kind: 'input', title: 'Say something back',
+      category: 'navigation', palette: true, order: 400, placeholder: 'Type a line and press Enter…',
+      submit: (text) => ({ effect: 'stay', status: `You said ${text}.` }),
+    },
+    {
+      id: 'fixture.setting', parentId: 'fixture.group', kind: 'setting', title: 'Volume',
+      category: 'navigation', palette: true, order: 500,
+      options: [{ value: 'loud', label: 'Loud' }, { value: 'quiet', label: 'Quiet' }],
+      read: async () => volume,
+      write: async (value) => (volume = value),
+    },
+  ])
+}
 
 describe.skipIf(!hasFfi)('the shell', () => {
   it('draws the topbar, the rail, the pane strip and the footer at 80 by 24', async () => {
@@ -132,10 +177,11 @@ describe.skipIf(!hasFfi)('the shell', () => {
   }, 30_000)
 
   it('walks into a command group on return and back out of it on escape', async () => {
+    const commands = registerFixtureCommands()
     const screen = await renderFixture({ width: 100, height: 28 })
     await screen.press('k', { ctrl: true })
-    for (const letter of 'groups') await screen.press(letter)
-    expect(await screen.frame()).toContain('Command groups')
+    for (const letter of 'fixture') await screen.press(letter)
+    expect(await screen.frame()).toContain('Fixture group')
 
     await screen.press('RETURN')
     const inside = await screen.frame()
@@ -147,12 +193,12 @@ describe.skipIf(!hasFfi)('the shell', () => {
     // (client-core/host/palette/paletteView.test.tsx).
     await screen.press('ESCAPE')
     const back = await screen.frame()
-    expect(back).toContain('Command groups')
+    expect(back).toContain('Fixture group')
     expect(back).not.toContain('Close the palette')
 
     await screen.press('ESCAPE')
     const closed = await screen.frame()
-    expect(closed).not.toContain('Command groups')
+    expect(closed).not.toContain('Fixture group')
     expect(closed).toContain('Reviews')
 
     // A typed root reaches a descendant by its breadcrumb, so nesting hides nothing
@@ -161,20 +207,22 @@ describe.skipIf(!hasFfi)('the shell', () => {
     for (const letter of 'stay') await screen.press(letter)
     const found = await screen.frame()
     screen.done()
+    commands.dispose()
     expect(found).toContain('Stay open and say so')
   }, 30_000)
 
-  it('draws a search and an input in the same rectangle as the list', async () => {
+  it('draws a search, an input and a setting in the same rectangle as the list', async () => {
     // The interactive kinds, over the same session the desktop's palette runs on; the transitions
     // themselves are client-core/host/registries/commands/session.test.tsx. What is asked here is only
     // what a terminal can answer: the frame's own placeholder is in the field, the rows are the
-    // provider's, and Enter reaches the outcome.
+    // provider's, the current value is marked, and Enter reaches the outcome.
+    const commands = registerFixtureCommands()
     const screen = await renderFixture({ width: 100, height: 28 })
     await screen.press('k', { ctrl: true })
-    for (const letter of 'groups') await screen.press(letter)
+    for (const letter of 'fixture') await screen.press(letter)
     await screen.press('RETURN')
 
-    // The group's four children, in the order they declared: stay, close, search, input.
+    // The group's five children, in the order they declared: stay, close, search, input, setting.
     await screen.press('ARROW_DOWN')
     await screen.press('ARROW_DOWN')
     await screen.press('RETURN')
@@ -198,9 +246,22 @@ describe.skipIf(!hasFfi)('the shell', () => {
 
     for (const letter of 'hello') await screen.press(letter)
     await screen.press('RETURN')
-    const answered = await screen.until('You said')
+    expect(await screen.until('You said')).toContain('hello')
+
+    // And a setting: both choices drawn, the one that is set marked, and picking the other one keeps
+    // the frame open with the marker moved.
+    await screen.press('ESCAPE')
+    await screen.press('ARROW_DOWN')
+    await screen.press('RETURN')
+    const choices = await screen.until('Loud')
+    expect(choices).toContain('Quiet')
+    expect(choices).toContain('current')
+
+    await screen.press('RETURN')
+    const chosen = await screen.until('Set to Loud')
     screen.done()
-    expect(answered).toContain('hello')
+    commands.dispose()
+    expect(chosen).toContain('Quiet')
   }, 30_000)
 
   it('draws the cheat sheet on ? with the keys that are live', async () => {

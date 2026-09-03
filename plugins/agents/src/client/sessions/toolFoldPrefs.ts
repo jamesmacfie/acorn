@@ -56,6 +56,21 @@ export const foldPrefsAfterToggle = (
 export const saveAgentToolFoldPrefs = (qc: QueryClient, next: AgentToolFoldPrefs): Promise<boolean> =>
   saveJsonPref(qc, PrefKeys.agentToolFold, next)
 
+/** Choose the mode without disturbing the `last` toggle beside it. The page and the palette's setting
+ *  command both write through this, so one value keeps one persistence path. */
+export const saveAgentToolFoldMode = (
+  qc: QueryClient,
+  prefs: Record<string, string> | undefined,
+  mode: AgentToolFoldMode,
+): Promise<boolean> => saveAgentToolFoldPrefs(qc, { ...readAgentToolFoldPrefs(prefs), mode })
+
+/** The three choices, spelled once for the page's picker and the command's options. */
+export const AGENT_TOOL_FOLD_CHOICES: readonly { value: AgentToolFoldMode; label: string }[] = [
+  { value: 'collapsed', label: 'Start collapsed' },
+  { value: 'expanded', label: 'Start expanded' },
+  { value: 'sticky', label: 'Carry my last one forward' },
+]
+
 /** How the tool cards in the surrounding transcript fold. */
 export type AgentToolFoldSetting = {
   /** Whether a card mounting now starts open. Call at mount and do not track it. */

@@ -3,10 +3,17 @@ import type {
   PluginCommandDescriptor,
   PluginRailItem,
 } from '@acorn/protocol/api.ts'
-import type { CommandScope, CommandSearchItem } from '@acorn/protocol/commands.ts'
+import { MIN_COMMAND_SETTING_OPTIONS, type CommandScope, type CommandSearchItem } from '@acorn/protocol/commands.ts'
 import { qualifiedPluginCommandId } from '@acorn/protocol/keybindings.ts'
 import { COMMAND_CLOSED, type CommandContribution, type CommandExecutionContext, type CommandOutcome } from '../registries/commands/commands'
-import { ownsRoute, readCommandSearch, submitCommandInput, type CommandRouteScope } from './chromeData'
+import {
+  ownsRoute,
+  readCommandSearch,
+  readCommandSetting,
+  submitCommandInput,
+  writeCommandSetting,
+  type CommandRouteScope,
+} from './chromeData'
 import { runChromeAction } from './actions'
 
 // Turns `contributions.commands` into command-registry contributions, one per kind.
@@ -31,8 +38,8 @@ export type PluginCommandBinding = {
   usableAction: (action: PluginCommandAction) => boolean
 }
 
-/** The manifest's own kind vocabulary, as this build knows it. A newer node may name a fifth. */
-const KNOWN_KINDS = new Set(['action', 'group', 'search', 'input'])
+/** The manifest's own kind vocabulary, as this build knows it. A newer node may name a sixth. */
+const KNOWN_KINDS = new Set(['action', 'group', 'search', 'input', 'setting'])
 
 const kindOf = (descriptor: PluginCommandDescriptor): string => descriptor.kind ?? 'action'
 
@@ -96,8 +103,17 @@ export function usablePluginCommands(
         const input = descriptor as { route: string; onSuccess: PluginCommandAction }
         return ownsRoute(pluginId, input.route) && binding.usableAction(input.onSuccess)
       }
+      case 'setting': {
+        // Both routes and the choices. A setting runs no verb of its own — what it does is write one of
+        // the values it declared — so there is no action to check and the choices are the thing that
+        // has to be there instead: a value the manifest did not declare can never be marked or stored.
+        const setting = descriptor as { readRoute: string; writeRoute: string; options?: readonly { value: string }[] }
+        return ownsRoute(pluginId, setting.readRoute)
+          && ownsRoute(pluginId, setting.writeRoute)
+          && (setting.options?.length ?? 0) >= MIN_COMMAND_SETTING_OPTIONS
+      }
       // A kind this build has no frame for. Skipped rather than treated as an action: a newer node's
-      // `setting` command must not become a row that runs something.
+      // sixth kind must not become a row that runs something.
       default: return false
     }
   }).filter((descriptor) => KNOWN_KINDS.has(kindOf(descriptor)))
@@ -206,6 +222,40 @@ export function pluginCommand(
           // A route that said something keeps the frame open to say it. Silence closes, which is what
           // an action means.
           return result.message ? { effect: 'stay', status: result.message } : COMMAND_CLOSED
+        },
+      }
+    }
+    case 'setting': {
+      const setting = descriptor as Extract<PluginCommandDescriptor, { kind: 'setting' }>
+      return {
+        ...common,
+        kind: 'setting',
+        scope: setting.scope,
+        // The manifest's copy, and the only copy. The session marks a choice by matching what the route
+        // answered against this list and refuses a value that names none of it, so a route that starts
+        // replying with something new cannot quietly add a choice nobody reviewed.
+        options: setting.options,
+        read: (context, signal) => readCommandSetting(
+          pluginId,
+          setting.readRoute,
+          context.nodeId ?? binding.nodeId(),
+          commandRouteScope(setting.scope, context),
+          signal,
+        ),
+        write: (value, context, signal) => {
+          // Checked on the way out as well as on the way back. The value a row carries is one of these
+          // by construction; this is what keeps that true if a caller ever hands over another one.
+          if (!setting.options.some((option) => option.value === value)) {
+            return Promise.reject(new Error(`'${value}' is not one of the choices`))
+          }
+          return writeCommandSetting(
+            pluginId,
+            setting.writeRoute,
+            context.nodeId ?? binding.nodeId(),
+            value,
+            commandRouteScope(setting.scope, context),
+            signal,
+          )
         },
       }
     }

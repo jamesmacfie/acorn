@@ -44,7 +44,7 @@ const at = (schema: JsonSchema | undefined, ...path: string[]): JsonSchema | und
 /**
  * One field off a descriptor's items, where the items may be a union of kinds.
  *
- * A command is four shapes now — action, group, search, input — so `items.properties` is only there
+ * A command is five shapes now — action, group, search, input, setting — so `items.properties` is only there
  * for the descriptors that are one shape. The first member carrying the field is the answer, because a
  * field two members both declare has the same shape in both (@acorn/protocol/plugin/contract.ts).
  */
@@ -308,13 +308,15 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
       + `Context-menu locations: ${manifest.contextMenuLocations.map((value) => `\`${value}\``).join(', ')}. `
       + `Command categories: ${manifest.commandCategories.map((value) => `\`${value}\``).join(', ')}.`,
     '',
-    '**Commands come in four kinds.** Omit `kind`, or say `action`, and your command is one verb the host',
+    '**Commands come in five kinds.** Omit `kind`, or say `action`, and your command is one verb the host',
     'runs — which is what every command has always been. `group` holds children: a command may name a',
     '`parentId` that is a group in your own manifest, and nothing else. `search` names a GET route in your',
     'own namespace and one static `onSelect` verb; the host debounces the reader’s typing, sends `q` plus',
     'the identifier your `scope` owns, and renders `{ items: [{ id, title, subtitle?, icon?, badge?, ref?,',
     'taskId? }] }`. `input` names a POST route and one static `onSuccess` verb; the host sends',
-    '`{ input, taskId? }` on Enter and expects `{ ok: true, item?, message? }`. A result never chooses what',
+    '`{ input, taskId? }` on Enter and expects `{ ok: true, item?, message? }`. `setting` names a GET',
+    '`readRoute`, a PUT `writeRoute` and 2–32 `{ value, label }` choices; both routes answer `{ value }`,',
+    'and a value naming none of your choices is refused rather than shown. A result never chooses what',
     'happens to it: everything but those fields is dropped, and the verb that runs is the one you declared',
     'and a reader reviewed.',
     '',

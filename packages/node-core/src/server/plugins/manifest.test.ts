@@ -17,6 +17,10 @@ const permissionManifest = (permissions: Record<string, unknown>) =>
 const messages = (result: ReturnType<typeof manifest>) =>
   result.success ? [] : result.error.issues.map((issue) => issue.message)
 
+/** Where each issue landed. The field, when two fields share one message. */
+const paths = (result: ReturnType<typeof manifest>) =>
+  result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'))
+
 // A pane says how it is drawn. `single` over a `frame` region is the plainest true answer and what
 // almost every case here wants: the host draws the box, the plugin's own bundle draws the inside.
 const PANE = { target: 'pane', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' } }
@@ -907,9 +911,9 @@ describe('plugin commands and keybindings', () => {
     expect(manifest({ commands: [{ ...command, action: { verb: 'createTask' } }] }).success).toBe(false)
   })
 
-  // The four kinds a manifest may declare (@acorn/protocol/plugin/contract.ts). What is worth pinning
+  // The five kinds a manifest may declare (@acorn/protocol/plugin/contract.ts). What is worth pinning
   // is that the addition is additive — the descriptor above, with no `kind` at all, is still the action
-  // it always was — and that the two new kinds are held to the same confinement every other route is.
+  // it always was — and that the new kinds are held to the same confinement every other route is.
   const group = { id: 'cards', title: 'Cards', category: 'navigation', kind: 'group' }
   const find = {
     id: 'find', title: 'Find a card', kind: 'search', route: '/v2/p/board/search',
@@ -918,6 +922,11 @@ describe('plugin commands and keybindings', () => {
   const ask = {
     id: 'ask', title: 'New card', kind: 'input', route: '/v2/p/board/new-card',
     onSuccess: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+  }
+  const theme = {
+    id: 'theme', title: 'Board theme', kind: 'setting',
+    readRoute: '/v2/p/board/theme', writeRoute: '/v2/p/board/theme',
+    options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
   }
 
   it('reads a command with no kind as the action it has always meant', () => {
@@ -956,11 +965,41 @@ describe('plugin commands and keybindings', () => {
       .toContain('route must be inside /v2/p/board/')
   })
 
-  it('refuses a search or an input from a package with no node half to answer it', () => {
+  it('refuses a search, an input or a setting from a package with no node half to answer it', () => {
     expect(messages(manifest({ commands: [find] })))
       .toContain('a search command calls a node route; declare `node` in the manifest')
     expect(messages(manifest({ commands: [ask] })))
       .toContain('an input command calls a node route; declare `node` in the manifest')
+    expect(messages(manifest({ commands: [theme] })))
+      .toContain('a setting command calls a node route; declare `node` in the manifest')
+  })
+
+  it('accepts a setting with two of its own routes and a bounded list of choices', () => {
+    const result = nodeManifest({ commands: [group, { ...theme, parentId: 'cards', scope: 'project' }] })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.commands[1]).toMatchObject({
+      kind: 'setting', scope: 'project', readRoute: '/v2/p/board/theme',
+    })
+  })
+
+  it('confines both of a setting’s routes to the plugin’s own namespace', () => {
+    // The message is the shared one; what the path in the issue names is which of the two routes.
+    expect(messages(nodeManifest({ commands: [{ ...theme, readRoute: '/v2/prefs' }] })))
+      .toContain('route must be inside /v2/p/board/')
+    expect(paths(nodeManifest({ commands: [{ ...theme, readRoute: '/v2/prefs' }] })))
+      .toContain('contributions.commands.0.readRoute')
+    expect(paths(nodeManifest({ commands: [{ ...theme, writeRoute: '/v2/p/other/theme' }] })))
+      .toContain('contributions.commands.0.writeRoute')
+  })
+
+  it('refuses a setting that is not a choice: too few options, too many, or two spelled the same', () => {
+    expect(nodeManifest({ commands: [{ ...theme, options: [{ value: 'light', label: 'Light' }] }] }).success).toBe(false)
+    expect(nodeManifest({
+      commands: [{ ...theme, options: Array.from({ length: 33 }, (_, at) => ({ value: `v${at}`, label: `V${at}` })) }],
+    }).success).toBe(false)
+    expect(messages(nodeManifest({
+      commands: [{ ...theme, options: [{ value: 'light', label: 'Light' }, { value: 'light', label: 'Also light' }] }],
+    }))).toContain("setting 'theme' declares 'light' twice")
   })
 
   it('holds the parent graph together across the whole array', () => {

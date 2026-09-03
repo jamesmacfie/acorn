@@ -438,7 +438,7 @@ describe('syncChromeContributions', () => {
     expect(binding.plugin?.state()).toBe('disabled')
   })
 
-  it('registers the four kinds a manifest may declare, and skips a fifth it does not know', () => {
+  it('registers the five kinds a manifest may declare, and skips a sixth it does not know', () => {
     const declared: Partial<PluginContributions> = {
       commands: [
         { id: 'issues', title: 'Board: issues', category: 'navigation', palette: true, kind: 'group' },
@@ -452,8 +452,13 @@ describe('syncChromeContributions', () => {
           scope: 'project', route: '/v2/p/board/new-card',
           onSuccess: { verb: 'runNodeAction', path: '/v2/p/board/open' },
         },
+        {
+          id: 'theme', title: 'Board: theme', category: 'action', palette: true, kind: 'setting',
+          scope: 'project', readRoute: '/v2/p/board/theme', writeRoute: '/v2/p/board/theme',
+          options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+        },
         // A kind a newer node knows about. Skipped rather than coerced into an action.
-        { id: 'theme', title: 'Board: theme', category: 'action', palette: true, kind: 'setting' },
+        { id: 'later', title: 'Board: a sixth kind', category: 'action', palette: true, kind: 'toggle' },
         // A route outside the plugin's own namespace, refused here as well as at parse time.
         {
           id: 'core', title: 'Board: core search', category: 'action', palette: true, kind: 'search',
@@ -463,11 +468,14 @@ describe('syncChromeContributions', () => {
     }
     _seedPluginDistribution([['node-a', [row('board', {}, declared)]]])
     syncChromeContributions()
-    expect(ids().commands).toEqual(['plugin.board.issues', 'plugin.board.find', 'plugin.board.ask'])
+    expect(ids().commands).toEqual(['plugin.board.issues', 'plugin.board.find', 'plugin.board.ask', 'plugin.board.theme'])
     expect(commandRegistry.get('plugin.board.find')).toMatchObject({
       kind: 'search', ownerId: 'board', parentId: 'plugin.board.issues', scope: 'task',
     })
     expect(commandRegistry.get('plugin.board.ask')).toMatchObject({ kind: 'input', scope: 'project' })
+    expect(commandRegistry.get('plugin.board.theme')).toMatchObject({
+      kind: 'setting', scope: 'project', options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+    })
   })
 
   it('keeps one plugin’s bad descriptor from costing it the rest of its chrome', () => {
