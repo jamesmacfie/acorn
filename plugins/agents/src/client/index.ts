@@ -14,6 +14,8 @@ import { agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
 import { agentCenterSourceContribution } from './sourceContribution'
+import { agentsCommands } from './commands'
+import { agentCommandsSlotContribution } from './AgentCommands'
 import { harnessTerminalCommands } from './terminalProfileCommands'
 import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
 
@@ -56,6 +58,11 @@ export const agentsClientPlugin: ClientPlugin = {
     // A terminal running one of this plugin's harness CLIs (./terminalProfileCommands.ts). The shell
     // keeps the drawer toggle and the plain shell; it no longer knows a harness by name.
     for (const contribution of harnessTerminalCommands) ctx.commands.register(contribution)
+    // Agent Center, and a search over this task's managed sessions (./commands.ts).
+    for (const contribution of agentsCommands) ctx.commands.register(contribution)
+    // The two agent defaults the palette can change. A mounted component rather than a line here,
+    // because both write through accessors that take a query client (./AgentCommands.tsx).
+    ctx.slots.register(agentCommandsSlotContribution)
     // The same roster the stat counts and the inbox filters, with a schema on it, so a dashboard panel
     // can be composed over running agents (collectionContribution.ts).
     ctx.collections.register(agentSessionsCollection)

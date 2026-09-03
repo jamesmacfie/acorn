@@ -153,7 +153,7 @@ export type ClientPluginHostResult = {
 const contributed = new Map<string, Disposable[]>()
 
 // A contribution that names a provider must name its own plugin. Contribution ids stay un-namespaced,
-// because `pr`, `changes` and `palette.files` are persisted layout keys and chord targets, so
+// because `pr`, `changes` and `terminal.drawer` are persisted layout keys and chord targets, so
 // prefixing them breaks stored state.
 const declaredProvider = (entry: object): string | undefined =>
   'providerId' in entry && typeof (entry as { providerId?: unknown }).providerId === 'string'

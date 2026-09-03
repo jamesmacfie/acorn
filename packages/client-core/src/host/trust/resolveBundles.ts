@@ -2,7 +2,7 @@ import { speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
 // Which client bundle wins when a fleet disagrees (docs/plugins.md).
 //
 // Two nodes may carry different versions of one plugin. Contribution IDs are not namespaced (`pr`,
-// `changes`, `palette.files` are persisted layout keys and user-visible chord targets, see the comment
+// `changes`, `terminal.drawer` are persisted layout keys and user-visible chord targets, see the comment
 // block in registries/plugin.ts), so two versions of one plugin registering at once would collide on
 // ids that a user's saved layout points at. Exactly one bundle per plugin id may be active, and this is
 // where that one is chosen.

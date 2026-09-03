@@ -72,8 +72,24 @@ export type { RefPanelProps, RefPanelTarget } from '@acorn/client-core/host/regi
 export { projectImporterRegistry } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
 export type { ProjectImporterProps } from '@acorn/client-core/host/registries/sources/projectImporters.ts'
 export type { IntegrationFlowContribution } from '@acorn/client-core/host/registries/sources/integrationFlows.ts'
-export { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
-export type { CommandContribution } from '@acorn/client-core/host/registries/commands/commands.ts'
+export { COMMAND_CLOSED, registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
+// `InputCommand`, `SearchCommand` and `SettingCommand` are the three interactive members, for a plugin
+// that builds one in a function rather than inline. The action and group members add nothing over
+// `ContributedCommand` and stay off this surface.
+export type {
+  CommandContribution,
+  CommandExecutionContext,
+  CommandOutcome,
+  ContributedCommand,
+  InputCommand,
+  SearchCommand,
+  SettingCommand,
+} from '@acorn/client-core/host/registries/commands/commands.ts'
+// The load-once search adapter (docs/command-palette-and-shortcuts.md § Palette data). A plugin whose
+// rows are already on this machine — run targets, notes, docker resources — spreads this into a
+// `search` command and gets no debounce, no minimum query, one fetch when the frame opens and local
+// fuzzy filtering after that. A plugin querying a node instead writes its own `query`.
+export { localSearch } from '@acorn/client-core/host/registries/commands/localSearch.ts'
 // See docs/dashboards.md § Provenance, and what a row may not claim for what `openInAppUrl`
 // answers and how a URL's destination gets resolved.
 export {

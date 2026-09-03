@@ -27,7 +27,7 @@ adoption.
 | [1](./phase-1-command-graph-and-session.md) | P1 | L | High | 0 | Shipped |
 | [2](./phase-2-search-and-input.md) | P1 | L | High | 1 | Shipped |
 | [3](./phase-3-settings-and-core-commands.md) | P2 | M | Medium | 2 | Shipped |
-| [4](./phase-4-compiled-plugin-adoption.md) | P2 | L | Medium | 2, 3 | Not started |
+| [4](./phase-4-compiled-plugin-adoption.md) | P2 | L | Medium | 2, 3 | Shipped |
 | [5](./phase-5-loaded-plugin-adoption.md) | P2 | L | High | 2 | Not started |
 | [6](./phase-6-cutover-and-documentation.md) | P1 | M | Medium | 3, 4, 5 | Not started |
 

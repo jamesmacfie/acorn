@@ -10,6 +10,29 @@
       "notes",
       "preview"
     ],
+    "commands": [
+      "task.terminal.new-claude",
+      "task.terminal.new-codex",
+      "source.agents.open",
+      "agents.sessions.find",
+      "changes.open",
+      "context.open",
+      "source.docker.open",
+      "docker.find",
+      "editor.files.open",
+      "editor.search.open",
+      "source.github.open",
+      "memory.search",
+      "memory.proposals.open",
+      "notes.find",
+      "notes.create",
+      "preview.open",
+      "terminal.run",
+      "terminal.run.targets",
+      "terminal.run.layouts",
+      "terminal.run.sessions",
+      "workflows.run"
+    ],
     "sources": [
       "agents",
       "docker",
@@ -24,9 +47,9 @@
       "workflows"
     ],
     "slots": [
+      "overlay/agents.commands",
       "task.footer/docker-footer-badge",
-      "overlay/palette.files",
-      "overlay/palette.pull-files",
+      "overlay/github.shortcuts",
       "overlay/onboarding.first-run",
       "drawer/terminal.drawer"
     ],
@@ -48,10 +71,7 @@
     "refPanels": [
       "github-pull"
     ],
-    "paletteRows": [
-      "terminal.run",
-      "workflows.defs"
-    ],
+    "paletteRows": [],
     "agentContexts": [
       "acorn-task-context",
       "acorn-docker",
@@ -101,6 +121,9 @@
       "panes": [
         "changes"
       ],
+      "commands": [
+        "changes.open"
+      ],
       "extensionPoints": [
         "changes:diff-line"
       ],
@@ -111,6 +134,9 @@
     "context": {
       "panes": [
         "context"
+      ],
+      "commands": [
+        "context.open"
       ],
       "extensionPoints": [
         "context:section"
@@ -125,6 +151,10 @@
     "docker": {
       "panes": [
         "docker"
+      ],
+      "commands": [
+        "source.docker.open",
+        "docker.find"
       ],
       "sources": [
         "docker"
@@ -159,8 +189,9 @@
       "panes": [
         "editor"
       ],
-      "slots": [
-        "overlay/palette.files"
+      "commands": [
+        "editor.files.open",
+        "editor.search.open"
       ],
       "persistedStateSlices": [
         "editor.open-files"
@@ -170,11 +201,14 @@
       "panes": [
         "pr"
       ],
+      "commands": [
+        "source.github.open"
+      ],
       "sources": [
         "github"
       ],
       "slots": [
-        "overlay/palette.pull-files"
+        "overlay/github.shortcuts"
       ],
       "extensionPoints": [
         "github:diff-line",
@@ -205,14 +239,17 @@
     "preview": {
       "panes": [
         "preview"
+      ],
+      "commands": [
+        "preview.open"
       ]
     },
     "workflows": {
+      "commands": [
+        "workflows.run"
+      ],
       "settingsPages": [
         "workflows"
-      ],
-      "paletteRows": [
-        "workflows.defs"
       ]
     }
   }

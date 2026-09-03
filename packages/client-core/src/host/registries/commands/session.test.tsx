@@ -1033,3 +1033,93 @@ describe('a setting frame', () => {
     })
   })
 })
+
+describe('a contributor going away underneath', () => {
+  // Disabling a plugin disposes everything it registered, in reverse order, while whatever it
+  // contributed may be on screen (registries/extensionPoints/plugin.ts). A group and the searches
+  // under it are the first contribution kind that can hold each other, so the question is not only
+  // "does the row go" but "does anything of it survive"
+  // (docs/future/command-palette/phase-4-compiled-plugin-adoption.md § Lifecycle and ownership).
+
+  const plugin = (): Disposable[] => {
+    const registrations = [
+      commandRegistry.register(group('docker', { title: 'Docker', ownerId: 'docker' })),
+      commandRegistry.register(leaf('docker.open', { parentId: 'docker', title: 'Open Docker', ownerId: 'docker' })),
+    ]
+    return registrations
+  }
+
+  it('takes the group, its descendants and their breadcrumbs with it', async () => {
+    const registrations = plugin()
+    await withSession((session) => {
+      session.openRoot()
+      session.setQuery('docker open')
+      expect(labels(session)).toEqual(['Open Docker'])
+      expect(session.rows()[0]?.breadcrumb).toEqual(['Docker'])
+
+      // Reverse order, which is what the plugin host does: the child goes before the parent.
+      for (const registration of registrations.reverse()) registration.dispose()
+
+      // Not an orphan promoted to the top level, and not a breadcrumb pointing at a group nobody
+      // registered any more. Nothing.
+      expect(labels(session)).toEqual([])
+      session.setQuery('')
+      expect(labels(session)).toEqual([])
+    })
+  })
+
+  it('leaves an open frame with nothing to act on rather than a stale row', async () => {
+    const registrations = plugin()
+    await withSession((session) => {
+      session.openAt('docker')
+      expect(labels(session)).toEqual(['Open Docker'])
+      for (const registration of registrations.reverse()) registration.dispose()
+      // The frame is still the one the reader is looking at — the session does not close under them —
+      // but there is nothing selectable in it, so Enter cannot reach a disposed executor.
+      expect(labels(session)).toEqual([])
+      expect(session.selectedRow()).toBeNull()
+      session.activate()
+    })
+  })
+
+  it('cannot invoke a search result once its command has gone', async () => {
+    vi.useFakeTimers()
+    try {
+      let picked = 0
+      const register2 = () => commandRegistry.register(search('docker.find', {
+        ownerId: 'docker',
+        minQueryLength: 0,
+        debounceMs: 0,
+        query: async () => [item('c1')],
+        select: () => { picked++ },
+      }))
+
+      // The control, so the assertion below is about disposal rather than about a row that was never
+      // selectable: with the command registered, picking the row reaches its `select`.
+      const live = register2()
+      await withSession(async (session) => {
+        session.openAt('docker.find')
+        await tick()
+        expect(labels(session)).toEqual(['c1'])
+        session.activateRow('c1')
+        await tick()
+        expect(picked).toBe(1)
+      })
+      live.dispose()
+
+      const registration = register2()
+      await withSession(async (session) => {
+        session.openAt('docker.find')
+        await tick()
+        registration.dispose()
+        // The row is still drawn from the frame's own state, and activating it finds no command to
+        // ask, so a disposed plugin's `select` is never called in a world it no longer lives in.
+        session.activateRow('c1')
+        await tick()
+        expect(picked).toBe(1)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

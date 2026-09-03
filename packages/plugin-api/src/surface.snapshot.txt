@@ -1,13 +1,18 @@
 # plugin API major: 9
 client: CHECK_TONE
+client: COMMAND_CLOSED
 client: ClientPlugin
 client: ClientScheduleContribution
 client: CommandContribution
+client: CommandExecutionContext
+client: CommandOutcome
 client: ContentLinkContribution
+client: ContributedCommand
 client: FAILED_STATUSES
 client: HostCapabilityRequirement
 client: HostRequirement
 client: InAppTarget
+client: InputCommand
 client: IntegrationFlowContribution
 client: PaletteItem
 client: PaletteRowSource
@@ -37,6 +42,8 @@ client: RefPanelProps
 client: RefPanelTarget
 client: RemoteContribution
 client: SaveRequest
+client: SearchCommand
+client: SettingCommand
 client: ShellSlotContribution
 client: SourceContribution
 client: SourceRouteContribution
@@ -101,6 +108,7 @@ client: isTerminalMax
 client: latestOnly
 client: learnRefPrefixes
 client: linkifyRefs
+client: localSearch
 client: markAttentionSeen
 client: nodeReady
 client: nodes
