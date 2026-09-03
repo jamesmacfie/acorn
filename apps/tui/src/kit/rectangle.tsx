@@ -3,7 +3,7 @@ import { createEffect, createSignal, onCleanup, Show, type JSX } from 'solid-js'
 import { extend } from '@opentui/solid'
 import { EmbeddedTerminalRenderable, type BoxRenderable, type KeyEvent, type Renderable } from '@opentui/core'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { focusRenderable, focusedRenderable, onScreen } from '../keys/regions'
+import { focusRenderable, focusWithin, focusedRenderable, onScreen } from '../keys/regions'
 import { RECTANGLE } from '../keys/tiers'
 import { Line } from './cells'
 import { boxBorder } from './roles'
@@ -102,15 +102,14 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
 
   // Whether the keys are this rectangle's, as a fact about the screen rather than a flag anybody
   // maintains: the reader pressed Enter since the box last lost the keys, the box has them, and the
-  // box is on screen. Asking the box is what makes a rectangle hidden without being unmounted stop
-  // eating keys. `visible` is per node in OpenTUI, so hiding an ancestor blurs the ancestor and
-  // leaves a focused descendant reporting itself focused and visible, which is why `onScreen` walks
-  // the parents (../keys/regions.ts § onScreen).
+  // box is on screen. Asking the store is what makes a rectangle hidden without being unmounted stop
+  // eating keys, because `visible` is per node in OpenTUI and `onScreen` walks the parents
+  // (../keys/regions.ts § onScreen).
   //
-  // `armed()` is read first because it is the only reactive term, and this answer is drawn: the title
-  // and the border tone are this box's own, so a render that short-circuited before the signal would
-  // never re-run when Enter set it, and the rectangle would take the keys without saying so.
-  const entered = (): boolean => armed() && !!box && box.focused && onScreen(box)
+  // Both terms are reactive now and both have to be, because this answer is drawn: the title and the
+  // border tone are this box's own, so a render that short-circuited before either signal would not
+  // re-run when the keys arrived, and the rectangle would take them without saying so.
+  const entered = (): boolean => armed() && !!box && focusedRenderable() === box && onScreen(box)
 
   const enter = () => setArmed(true)
   const leave = () => {
@@ -118,24 +117,17 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     setArmed(false)
     leftAt = Date.now()
     // Back on the door, through the store's one door, so the region the rectangle is in sees the keys
-    // come back to it (../keys/regions.ts § The one writer).
+    // come back to it (../keys/regions.ts § The one owner).
     focusRenderable(box)
   }
-  // The keys leaving the box disarms it, and there are two ways for that to happen. One raises an
-  // event: the renderer blurs the box when something else takes the keys, including the landing rule
-  // moving them off a node that has gone off screen.
-  const disarmOnBlur = (element: BoxRenderable) => {
-    element.on('blurred', () => setArmed(false))
-  }
-  // The other raises nothing at all. A box hidden without being unmounted keeps the renderer's focus,
-  // so the flag is also cleared once the box has stopped being on screen. The store's focus signal is
-  // the moment to ask at: hiding a subtree asks for a landing pass, the pass moves the keys off the
-  // node that went off screen, and that write is this effect's turn to run. Read for the dependency
-  // and not for the value: `Renderable.focused` and `visible` are plain fields the renderer writes,
-  // and the signal is the view of them the one writer keeps (../keys/regions.ts § The landing rule).
+  // The keys leaving the box disarms it, and there are two ways for that to happen: something else
+  // takes them, or the box goes off screen behind an overlay or a switched-away tab. Neither used to
+  // be one thing to watch — the first raised the renderer's `blurred` event and the second raised
+  // nothing at all — and one store's signal is both of them now. Hiding a subtree asks for a landing
+  // pass, the pass moves the keys off the node that went off screen, and that write is this effect's
+  // turn to run (../keys/regions.ts § The landing rule).
   createEffect(() => {
-    focusedRenderable()
-    if (armed() && !onScreen(box)) setArmed(false)
+    if (armed() && !entered()) setArmed(false)
   })
   // A rectangle unmounted while entered — a pane closed with Ctrl+C still in flight — must not leave
   // the footer telling a reader to press Escape at nothing.
@@ -188,7 +180,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
         // One stop from outside: the box holds the focus, not what is in it. Enter goes in, and a
         // second Escape just after leaving goes back in and sends the Escape through, which is how a
         // reader reaches vim's normal mode from in here.
-        if (!box || !(box.focused || box.hasFocusedDescendant)) return
+        if (!focusWithin(box)) return
         if (key.name === 'return') { enter(); ctx.consume(); return }
         if (key.name === 'escape' && Date.now() - leftAt < ESCAPE_PAIR_MS) {
           enter()
@@ -205,7 +197,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
 
   return (
     <box
-      ref={(element: BoxRenderable) => { box = element; element.focusable = true; disarmOnBlur(element) }}
+      ref={(element: BoxRenderable) => { box = element; element.focusable = true }}
       flexDirection="column"
       flexGrow={1}
       // Kept mounted and taken off the screen, which is what a tab strip over several of these asks

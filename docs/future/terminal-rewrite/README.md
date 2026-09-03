@@ -71,7 +71,7 @@ The test suite keeps its scenarios; what changes is the harness they drive.
 | Phase | What it is | Status |
 | --- | --- | --- |
 | [0](./phase-0-baseline-and-spikes.md) | Golden frames of every pane and the shell at two sizes from the current renderer, the reachability suite pinned as the acceptance property, and four spikes that decide the design's open questions. | Not started. |
-| [1](./phase-1-one-owner-of-the-keys.md) | The region store becomes the only owner of focus, the keymap engine reads it through a host adapter of ours, and OpenTUI's focus is reduced to a cursor. Ships on its own and ends the navigation class. | Waits on phase 0's spike 1. |
+| [1](./phase-1-one-owner-of-the-keys.md) | The region store becomes the only owner of focus, the keymap engine reads it through a host adapter of ours, and OpenTUI's focus is reduced to a cursor. Ships on its own and ends the navigation class. | Built 2026-09-03. Four false premises and the second reveal's stay of execution are recorded at the bottom of the phase file. |
 | [2](./phase-2-the-painter.md) | The node tree, the Yoga pass, the cell buffer, the diff, and the flush, behind a build switch so both painters run against the golden frames. | Waits on phase 0's spikes 2 and 3. |
 | [3](./phase-3-widgets-and-the-pty.md) | The scroll viewport, `Input`, `Textarea`, mouse hit testing, and the `pty` rectangle over `@xterm/headless`. | Waits on phase 2. |
 | [4](./phase-4-cut-over.md) | Remove OpenTUI, the FFI gate, the Node 26 floor, and the seven workarounds; rewrite the test harness; move the behaviour into `docs/tui.md`. | Waits on phases 1 and 3. |

@@ -100,9 +100,9 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   rather than a scenario: it walks every stop on eight surfaces, which are the browse rail, the six
   panes the pane sweep opens, and the browse rail again with the cheat sheet open over it. After
   every press it asks that at most one caret is drawn, that focus is on a node still on screen, that
-  the word the footer puts beside each bare key is what that key does there, that the renderer and
-  the store agree about which renderable has them, and that the keys have not reached out of the
-  open dialog.
+  the word the footer puts beside each bare key is what that key does there, that the one focus value
+  names a node that is in the tree and can hold the keys, and that the keys have not reached out of
+  the open dialog.
   At the end it asks that the walk landed on every stop `_allStops()` declared, that pressing `h` and
   `l` on every kind of focused thing it met did what the footer said it would, and a second
   block presses Escape out of each surface and asks that the climb ends in the rail. It runs at 80 by

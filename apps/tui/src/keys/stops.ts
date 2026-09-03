@@ -13,7 +13,7 @@
 // Nothing here decides which node is a stop and nothing here draws. The node asks for a press and is
 // told whether it has the keys (docs/tui.md § Rendering).
 
-import { createEffect, createSignal, onCleanup } from 'solid-js'
+import { createEffect, createSignal, onCleanup, untrack } from 'solid-js'
 import type { Renderable } from '@opentui/core'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
@@ -64,19 +64,20 @@ export function pressable(box: Renderable, options: StopOptions): void {
   if (options.on?.expand || options.on?.collapse) crossing.add(box)
   createEffect(() => {
     if (!off()) { box.focusable = true; return }
-    // Blurred before the flag goes. `blur()` refuses a node that is not focusable, so clearing the
-    // flag first would leave a control that was holding the keys holding them for the rest of the
-    // run, and every box above it reporting a focused descendant with it
-    // (@opentui/core § Renderable.blur).
-    //
-    // And then the keys are nowhere, which nothing else on this turn would notice: a blur is not a
-    // commit and a screen with one region cannot Tab out of it. So the landing rule gets a turn
-    // (./regions.ts § The landing rule).
-    if (box.focused) {
-      box.blur()
-      scheduleSettle()
-    }
     box.focusable = false
+    // The flag is the store's own declaration of what can hold the keys, so a control that goes
+    // disabled while it has them is a node the landing rule has to take them off. Nothing else on
+    // this turn would notice: a screen with one region cannot Tab out of it, and there is no blur
+    // event any more for anybody to hear (./regions.ts § The landing rule).
+    //
+    // It used to blur the box before clearing the flag, because `blur()` refuses a node that is not
+    // focusable and a control that lost the flag while focused kept the keys for the rest of the run.
+    // The order does not matter now: the store decides where the keys are and reads the flag when it
+    // does (./regions.ts § The one owner).
+    //
+    // Untracked, because this effect is about `disabled` and nothing else. Tracked, every control on
+    // screen would re-run it on every focus move and rewrite a flag that had not changed.
+    if (untrack(focusedRenderable) === box) scheduleSettle()
   })
   const given = options.on ?? {}
   const runs: Partial<Record<Intent, () => boolean>> = {
@@ -98,9 +99,9 @@ export function pressable(box: Renderable, options: StopOptions): void {
     return runs[intent]?.() ?? false
   }, { priority: STOP, mode: 'focus' }))
   // Click to focus and then press, which is the whole of this host's pointer model
-  // (docs/tui.md § What the TUI never does). Only the press is here: the renderer focuses the
-  // nearest focusable ancestor of a left mouse-down itself and the store reads that off the same
-  // event a key move raises, so a click needs no bridge (../keys/regions.ts § The one writer).
+  // (docs/tui.md § What the TUI never does). Only the press is here: the store hit-tests the same
+  // mouse-down on its way up to the root and focuses the nearest stop above it, which is this box
+  // (./regions.ts § Clicks are hit tests).
   box.onMouseDown = () => {
     if (off()) return
     options.onPress?.()

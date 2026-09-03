@@ -260,9 +260,9 @@ hand-written copies had quietly lost a prop by the time anything compiled both s
 A control is a stop, and on this host that has to be built rather than inherited. A `<button>` on the
 DOM is focusable, draws a ring, and raises a click on Enter; a cell renderable does none of the three.
 `apps/tui/src/keys/stops.ts` supplies all three in one call: `pressable(box, options)` sets the
-renderer's `focusable` flag unless the control is disabled, binds `activate` to the handler in `focus`
-target mode so Enter on a button inside a row belongs to the button, and adds the click-to-focus-then-
-press the pointer model allows. Its companion `stop(options)` returns the `ref` a component hands its
+`focusable` flag the store reads unless the control is disabled, binds `activate` to the handler in
+`focus` target mode so Enter on a button inside a row belongs to the button, and adds the press half
+of the click the pointer model allows, the store's hit test being the focus half. Its companion `stop(options)` returns the `ref` a component hands its
 box and a `focused()` accessor, because a `ref` callback cannot return a signal. The layer sits at
 priority 42, above a collection's 40: both layers match when focus is on a control inside a row, and
 at equal priority `@opentui/keymap` falls back to registration order, which is the reconciler's
@@ -477,13 +477,21 @@ mechanism.
 
 ### The adapter
 
-`apps/tui/src/keys/install.ts` builds `createDefaultOpenTuiKeymap(renderer)` from
-`@opentui/keymap/opentui`, where the DOM host builds `createDefaultHtmlKeymap(root)` from the same
-package. `keymapHost.ts` holds the engine at the widest type pair the engine allows and hands each
-host's pair back at the one call that reads it, rather than being generic over a pair every caller
-threads through: every caller in the kit means the DOM's, and forty components would have gained two
-type parameters to say nothing new. One host-supplied predicate crosses instead, "is somebody typing",
-which is the only question a binding asks about the focused thing.
+`apps/tui/src/keys/install.ts` builds the engine from `apps/tui/src/keys/keymapHost.ts`, this
+package's own `KeymapHost`, where the DOM host builds `createDefaultHtmlKeymap(root)` from the
+package's own adapter. Eleven of the host's thirteen members are `@opentui/keymap`'s OpenTUI adapter,
+delegated to unchanged, and two are ours: `getFocusedTarget` returns the region store's focused node,
+and `onFocusChange` subscribes to the store. That is the whole of the difference and it is the
+difference that matters — the package's adapter answers `getFocusedTarget` with whichever renderable
+the renderer has focused, so a layer bound to the node the *store* said had the keys did not fire
+while the renderer disagreed, and that disagreement is what the navigation fixes in this client's
+history were about (§ Focus regions).
+
+`client-core/kit/keys/keymapHost.ts` holds the engine at the widest type pair the engine allows and
+hands each host's pair back at the one call that reads it, rather than being generic over a pair
+every caller threads through: every caller in the kit means the DOM's, and forty components would
+have gained two type parameters to say nothing new. One host-supplied predicate crosses instead,
+"is somebody typing", which is the only question a binding asks about the focused thing.
 
 Chords are spelled with `ctrl` here. The engine reports the platform's primary modifier, which on
 macOS is `super`, and a terminal emulator keeps Cmd for itself and never delivers it, so `commit` was
@@ -541,8 +549,19 @@ loses them (`apps/tui/src/keys/install.ts` § The typing shadow, `apps/tui/src/k
 bindings claim the key so that nothing below the tier answers, and carry `preventDefault: false` so
 the key still reaches the field and is typed. That is the same shape as a `Modal`'s key claim — a
 scope, not a swallow (§ Traps) — with one difference: a scope is pushed by the box that is drawn, and
-the shadow follows the renderer's focus event, because "is the focused thing a field" is a fact about
-focus and the renderer is the only truth about that (§ Focus regions).
+the shadow follows the region store's focus signal, because "is the focused thing a field" is a fact
+about focus and the store is the only truth about that (§ Focus regions).
+
+The key still has to reach the field, and the dispatcher hands it over rather than leaving that to the
+renderer. `Renderable.focus` installs a handler that calls the renderable's own `handleKeyPress`, and
+the renderer runs those after every ordinary listener and only while nothing has called
+`preventDefault` — so typing used to work because the renderer happened to have focused the same
+field. `apps/tui/src/keys/install.ts` § typeInto is one ordinary listener after the engine's: where no
+binding claimed the key and the store's focused node is a field, it calls `handleKeyPress` itself and
+then claims the key, so the renderer's own route cannot type it a second time. An OpenTUI edit
+buffer's `handleKeyPress` reads the key and its own suspend trait and nothing else, which is what
+makes the hand-off possible, and `apps/tui/src/kit/kit.test.tsx` types into a field with the
+renderer's caret on another renderable to keep it that way.
 
 The reason it is a layer is a number. `@opentui/keymap` 0.5.9 caches the answer to "what is live right
 now" only while no registered layer, command or binding carries a runtime matcher, and the counter is
@@ -577,13 +596,28 @@ Screen
 ```
 
 A region is registered by its layout with its id and its order, from the layout's own knowledge of
-its regions rather than from `compareDocumentPosition`. Focus is OpenTUI's focus and the renderer owns
-it, so the store is a view of the renderer's `focused_renderable` event and one listener is the only
-thing that writes it: which renderable has the keys, which region that puts them in, and what the
-region should remember. Nothing else moves focus without asking, either, because everything goes
-through `focusRenderable`, which asks the renderer and reports what the renderer did. The mouse needs
-no bridge of its own: OpenTUI focuses the nearest focusable ancestor of a left click itself, and the
-store hears about that through the same event a Tab arrives by.
+its regions rather than from `compareDocumentPosition`. **Focus is a value the store holds, and
+nothing else has an opinion about it.** One signal says which renderable has the keys, one function
+writes it — which region that puts them in and what the region should remember are written in the
+same place — and everything that moves the keys goes through `focusRenderable`, which decides and
+reports whether they went. It used to be the other way round: focus was OpenTUI's and the store a
+view of the renderer's `focused_renderable` event, so in the gap between the renderer moving focus on
+its own and the view catching up the two disagreed. A lit border with dead arrows was that gap, and
+about 40% of this client's commits were repairs of it.
+
+One thing still goes out to the renderer and it is paint rather than focus. `EditBufferRenderable`
+draws no caret unless the renderer has focused it, so the store mirrors its own answer with one
+`renderable.focus()` in `paintCaret` and never reads it back. `apps/tui/src/invariants.test.ts` counts
+the calls: one `focus`, one `blur`, both in that mirror, and no source file outside a test asks the
+renderer which renderable has the keys.
+
+The mouse is a hit test rather than a focus event. The renderer resolves which renderable a left click
+landed on and bubbles it up to the root; the store walks up from there to the nearest thing that could
+hold the keys and focuses that through its own door, and a click with nothing focusable above it moves
+nothing. `autoFocus` is off wherever a renderer is built — `apps/tui/src/main.tsx` and both test
+harnesses — because with it on the renderer walks up from the same click and focuses the first
+focusable ancestor itself, which is a second opinion about focus for exactly the case one owner is
+for.
 
 Entering a region lands on its first parent stop, else its first collection row, else its first stop,
 else the region's own frame, walking OpenTUI's retained tree depth first. The middle step is this
@@ -647,7 +681,7 @@ the kit to none.
 
 A tree to read is the whole of what the microtask buys. It orders nothing against the reconciler's
 `process.nextTick` destruction, which exists for `Suspense` (§ Destroy on disposal) and is no longer
-load-bearing for focus: a scope popping blurs the keys out of the box that is going rather than
+load-bearing for focus: a scope popping takes the keys out of the box that is going rather than
 waiting to be told, and nothing in the pass depends on a node that has been disposed still reporting
 itself live.
 
@@ -672,9 +706,9 @@ renderable, and a stand-in is never restored.
 **Hiding a subtree asks for a pass.** Two boxes here hide what is inside them rather than unmounting
 it, so that the rail and the pane behind an overlay keep their queries and their models and a tab
 that is not showing keeps its state: the shell's main row, and the `ScrollViewport` that a `TabPanel`
-is. Neither of them blurs what is inside it, because `visible` is per node, so each schedules a
-landing pass when its flag goes false and the pass does the rest, since it already walks the parents
-before it decides who can still hold the keys. Without that the keys stayed on a node behind the
+is. Hiding raises nothing anybody can hear and `visible` is per node, so each schedules a landing
+pass when its flag goes false and the pass does the rest, since it already walks the parents before
+it decides who can still hold the keys. Without that the keys stayed on a node behind the
 overlay: invariant 6 was false of a hidden subtree, and an entered rectangle on a tab that had been
 switched went on eating every key in the app.
 
@@ -724,7 +758,8 @@ movement is disabled while an input owns the keys.
 ### Collections
 
 The intent half of `collection.ts` is shared. The element half has a DOM file and
-`apps/tui/src/keys/collection.ts`, where "focus the active item" sets the renderer's focus. A virtual
+`apps/tui/src/keys/collection.ts`, where "focus the active item" is a call to the store's own
+`focusRenderable`. A virtual
 `Rows` owns the visible window: keyboard movement reveals the active key by the smallest amount, and
 wheel movement changes the window without changing that key. `Grid` keeps its documented exception:
 a virtualised row has no renderable, so the arrows move `selected` and the view follows.
@@ -769,7 +804,7 @@ row, textarea, rectangle or other real stop, it is transparent to focus and a fo
 revealed through every scrollbox ancestor with `scrollChildIntoView`.
 
 A viewport whose `visible` flag goes false asks for a landing pass, because a `TabPanel` is this node
-and hiding a panel does not blur what is inside it (§ Focus regions).
+and hiding a panel raises nothing anybody can hear (§ Focus regions).
 
 A page key clamps rather than wrapping. `pageNext` goes to the last row and `pagePrev` to the first,
 and each hands the key back once the caret is already there, so the viewport below the collection
@@ -778,14 +813,21 @@ PageDown on the last row of a list stops. The arrows still wrap, because a list 
 the end of is a list you never have to look at.
 
 The reveal runs twice. Once synchronously on every focus move, and once more on the renderer's next
-`frame` event, from the single listener `apps/tui/src/keys/regions.ts` installs beside its focus
-listener. The second one exists because `scrollChildIntoView` compares a child's laid-out `y` against
+`frame` event, from the one renderer listener `apps/tui/src/keys/regions.ts` installs beside its click
+hit test. The second one exists because `scrollChildIntoView` compares a child's laid-out `y` against
 its viewport's, and `Renderable.y` is whatever the last completed layout pass left there: for a row
 that did not exist in the previous frame the first reveal reads stale or zero geometry, scrolls by
 the wrong delta, and nothing corrects it. A reader meets that three ways, and all three are common:
 a region entered on a freshly mounted list, a refetch replacing a row by identity, and a virtual
 window shift. It is not a landing rule and decides nothing about where the keys go; it only makes the
 viewport show where they already are.
+
+Phase 1 of the terminal rewrite meant to delete the second half and let the landing pass do the
+revealing, on the grounds that the pass runs after Solid has committed. It cannot: the pass is a
+microtask, so it runs before the next layout and reads the same stale geometry the first reveal did,
+and `apps/tui/src/kit/scrolling.test.tsx § reveals the caret in a list that has only just mounted`
+fails without it. It stays until phase 2, where layout and reveal are in one frame by construction
+(docs/future/terminal-rewrite/phase-2-the-painter.md).
 
 Arrows move and page keys scroll, which is the one sentence the footer has to be able to say
 everywhere. Arrow keys and `j`/`k` scroll a viewport only while the viewport itself has the keys, and
@@ -867,9 +909,9 @@ here the box holds the focus so Enter and Escape belong to the rectangle.
 **Being entered is a fact about the screen, not a flag anybody keeps.** A rectangle is entered while
 the reader has pressed Enter since the box last lost the keys, the box has the keys now, and the box
 is on screen all the way up to the root. The intercept asks all three of those at the moment a key
-arrives, so there is nothing to go stale. The one thing stored is the Enter, and it is cleared two
-ways: when the renderer blurs the box, and once the box has stopped being on screen. Those are two
-different ways to lose the keys and only the first raises an event.
+arrives, so there is nothing to go stale. The one thing stored is the Enter, and the store's own focus
+signal clears it: something else taking the keys and the box going off screen are two different ways
+to lose them, they used to raise a renderer event and nothing respectively, and one signal is both.
 
 It used to be a flag set by Enter and cleared by Escape or by unmounting, and neither of those
 happens when a subtree is hidden without being unmounted. `visible` is per node in OpenTUI, so hiding
@@ -939,22 +981,22 @@ label with nothing to drive, and a stop that does nothing is a hole a reader fal
 (`$XDG_STATE_HOME/acorn/keys.log`, else `~/.local/state/acorn/keys.log`):
 
 ```text
-17:08:29.001 key=f6      reason=binding-handled    focused=BoxRenderable#box-72 region=pane/body scope=overlay:2 agree=yes steps=11
-17:08:29.492 key=enter   reason=intercept-consumed focused=BoxRenderable#box-91 region=pane/body scope=screen    agree=yes steps=0
+17:08:29.001 key=f6      reason=binding-handled    focused=BoxRenderable#box-72 region=pane/body scope=overlay:2 steps=11
+17:08:29.492 key=enter   reason=intercept-consumed focused=BoxRenderable#box-91 region=pane/body scope=screen    steps=0
 ```
 
 The parsed key, what answered it and why, the renderable that had the keys, its region, how many
-overlays deep the keys are, whether the renderer and the store agree about where they are, and how
-many renderables the store walked to answer. It is
+overlays deep the keys are, and how many renderables the store walked to answer. There used to be an
+`agree` field beside those, for whether the renderer and the store agreed about where the keys were,
+and it is gone with the second owner it was watching (§ Focus regions). It is
 a `key:after` intercept in `keys/install.ts`, which runs once per key after dispatch and claims
 nothing; the hyphenated `key-after` is not a hook name and registers nothing at all. Registered
 without `release`, or every keystroke would log twice.
 
-Three lines are a bug wherever they appear. `agree=no` is the renderer and the store disagreeing,
-which draws a highlight on one thing while another answers. `reason=no-match` on a key the footer
-offers is the footer lying. `region=none` while the screen has regions means nothing owns the keys.
-The line quoted first above is a fourth: the region layer answered Tab while an overlay held the
-keys, which is how a dialog comes to be on screen and unanswerable.
+Two lines are a bug wherever they appear. `reason=no-match` on a key the footer offers is the footer
+lying. `region=none` while the screen has regions means nothing owns the keys. The line quoted first
+above is a third: the region layer answered Tab while an overlay held the keys, which is how a dialog
+comes to be on screen and unanswerable.
 
 The line ends with `steps=`, which is how many renderables the store's walks visited answering that
 key. It is the number the focus model is supposed to bound: it should track the depth of the tree the
@@ -986,7 +1028,7 @@ after every press, so a new pane or a new control joins the property the day it 
 | 6 | Focus never sits on a corpse. | `reachability.test.tsx`, after every press |
 | 7 | No chord this host cannot press: `super+` is spelled only where it is rewritten. | `invariants.test.ts` |
 | 8 | The footer tells the truth: the word beside a key is what that key does there. | `reachability.test.tsx`, against the word table |
-| 9 | The renderer and the store agree about what has the keys, and what has them can give them up. | `reachability.test.tsx`, after every press. Made structural by the one writer: `setFocusedNode` appears once, `.focus()` once, and `focusable =` only where `invariants.test.ts` allows it. |
+| 9 | There is one focus value, and it names a node that is in the tree and can hold the keys. | `reachability.test.tsx`, after every press. Made structural by the one owner: `setFocusedNode` appears once, `.focus()` and `.blur()` once each and both in the caret mirror, no source outside a test asks the renderer what has the keys, and `focusable =` appears only where `invariants.test.ts` allows it. |
 | 10 | Focus is inside the top scope: with a dialog open, no key moves the keys out of it. | `reachability.test.tsx`, after every press on the overlay surface |
 | 11 | A claimed key changed something. A handler that changed nothing returns `false` and the key bubbles. | `reachability.test.tsx` § crossKeys, which presses `h` and `l` on every kind of focused thing the walk met and asks whether the footer's word came true |
 

@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { createSignal, type JSX } from 'solid-js'
 import { describe, expect, it } from 'vitest'
-import { TextAttributes } from '@opentui/core'
+import { TextAttributes, type Renderable } from '@opentui/core'
 import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import { NODE_SUPPORT } from '@acorn/client-core/kit/tokens/support.ts'
 import { NODE_FOCUS } from '@acorn/client-core/kit/tokens/focusRoles.ts'
@@ -1305,6 +1305,10 @@ const NOT_DRIVEN_HERE: Partial<Record<KitNodeName, string>> = {
   Sections: 'driven in ../sections.test.tsx',
 }
 
+/** Every renderable under one, for a case that has to reach past what the store will hand it. */
+const every = (from: Renderable): Renderable[] =>
+  from.getChildren().flatMap((child) => [child, ...every(child)])
+
 describe.skipIf(!hasFfi)('every control is a stop', () => {
   it.each(BEHAVIOURS.map((entry) => [`${entry.node}: ${entry.does}`, entry] as const))('%s', async (_name, entry) => {
     _resetCollections()
@@ -1327,10 +1331,9 @@ describe.skipIf(!hasFfi)('every control is a stop', () => {
   }, 30_000)
 
   it('puts the keys on the control a click lands on, and Enter presses that one', async () => {
-    // The proof that dropping the pointer bridges lost nothing. The renderer focuses the nearest
-    // focusable ancestor of a left mouse-down itself, and the region store reads that off the same
-    // event a Tab raises, so a click is a focus move like any other
-    // (../keys/regions.ts § The one writer).
+    // The proof that a click is a hit test. The renderer's own `autoFocus` is off, so nothing but the
+    // store moves the keys: it takes the renderable the click landed on and walks up to the nearest
+    // thing that can hold them, which is this button (../keys/regions.ts § Clicks are hit tests).
     const pressed: string[] = []
     const screen = await renderCells(
       () => (
@@ -1366,11 +1369,65 @@ describe.skipIf(!hasFfi)('every control is a stop', () => {
     }
   }, 30_000)
 
+  it('types into the field that has the keys, wherever the renderer is drawing its caret', async () => {
+    // Spike 1's answer as a regression test, and the sentence the whole phase rests on: an OpenTUI
+    // edit buffer's `handleKeyPress` reads the key and its own suspend trait and nothing else, so the
+    // dispatcher can hand it a key without the renderer having focused it. If that stopped being
+    // true, typing would quietly start depending on the caret mirror agreeing with the store, which
+    // is the two owners this phase removed
+    // (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 1,
+    // ../keys/install.ts § typeInto).
+    const typed: string[] = []
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="typing"
+          label="Typing"
+          regions={{
+            body: () => (
+              <Stack>
+                <Input value="" onInput={(value) => typed.push(value)} />
+                <Button label="Elsewhere" onPress={() => {}} />
+              </Stack>
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 8 },
+    )
+    try {
+      // The pane opens on the field, which is its first stop.
+      const field = focusedRenderable()
+      expect(field, 'the field did not take the keys').not.toBe(null)
+
+      // Now put the renderer's caret somewhere else, behind the store's back. Only the caret moves:
+      // the store still says the field has the keys, and the store is the only thing that decides.
+      const elsewhere = every(screen.renderer.root).find((node) => node.focusable && node !== field)
+      expect(elsewhere, 'nothing else on the screen could take the caret').toBeTruthy()
+      elsewhere!.focus()
+      expect(screen.renderer.currentFocusedRenderable).toBe(elsewhere)
+
+      // `h` rather than a letter nothing binds, because it is a bare key: `collapse` is bound to it
+      // at the region tier, the typing shadow claims it inside the keymap while a field has the keys,
+      // and the hand-off types it. A letter would only prove the last of those three
+      // (../keys/tiers.ts § TYPING).
+      const one = await screen.press('h')
+      expect(typed).toEqual(['h'])
+      expect(one.text).toContain('h')
+      // And it went nowhere near the renderer's idea of focus, which has not moved.
+      expect(screen.renderer.currentFocusedRenderable).toBe(elsewhere)
+      expect(focusedRenderable()).toBe(field)
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+
   it('lets go of the keys when the control holding them goes disabled', async () => {
-    // `blur()` refuses a node that is not focusable, so a control that loses the flag while it holds
-    // the keys keeps them for the rest of the run, and every box above it goes on reporting a focused
-    // descendant. The reader sees a dialog whose buttons are lit and dead
-    // (../keys/stops.ts § pressable, docs/tui.md § The invariants).
+    // The flag is the store's declaration of what can hold the keys, so a control that loses it while
+    // it has them is a node the landing pass has to leave. It used to be worse than a stuck caret:
+    // `blur()` refuses a node that is not focusable, so the keys stayed for the rest of the run and
+    // every box above went on reporting a focused descendant, and the reader saw a dialog whose
+    // buttons were lit and dead (../keys/stops.ts § pressable, docs/tui.md § The invariants).
     const [off, setOff] = createSignal(false)
     const pressed: string[] = []
     const screen = await renderCells(

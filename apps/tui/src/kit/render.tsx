@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import type { JSX } from 'solid-js'
+import type { CliRenderer } from '@opentui/core'
 
 // Drawing one node to a cell buffer, reading it back, and pressing a key at it, which is what a test
 // of this kit is.
@@ -37,6 +38,11 @@ export type Cells = Frame & {
   /** Press and release the left button at a cell, which is what a reader's click is. */
   click: (x: number, y: number) => Promise<Cells>
   resize: (width: number, height: number) => Promise<Cells>
+  /** The renderer, for the one question the store does not answer: which renderable OpenTUI is
+   *  drawing the caret on. A case asserts that typing reaches a field the store has given the keys
+   *  to whatever the renderer thinks, which is the whole of the focus model in one line
+   *  (./kit.test.tsx § typing does not go through the renderer's focus). */
+  renderer: CliRenderer
   done: () => void
 }
 
@@ -81,7 +87,14 @@ export async function renderCells(
   // their key layer as they draw and a layer registered against no engine is silently dropped.
   // The same keyboard protocol the app asks for (../main.tsx), because without it Ctrl+Return is the
   // same byte as Return and half of what this suite presses would not exist.
-  const setup = await createTestRenderer({ width: size.width ?? 40, height: size.height ?? 8, kittyKeyboard: true })
+  // `autoFocus` off for the reason the app has it off: focus is the region store's and a renderer
+  // that focuses on a click by itself is a second owner (../keys/regions.ts § Clicks are hit tests).
+  const setup = await createTestRenderer({
+    width: size.width ?? 40,
+    height: size.height ?? 8,
+    kittyKeyboard: true,
+    autoFocus: false,
+  })
   setup.renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(setup.renderer)
   await render(node, setup.renderer)
@@ -110,6 +123,7 @@ export async function renderCells(
       scroll,
       click,
       resize,
+      renderer: setup.renderer,
       done: () => setup.renderer.destroy(),
     }
   }
