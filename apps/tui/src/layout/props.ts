@@ -72,6 +72,34 @@ const OVERFLOWS: Record<string, Overflow> = {
   scroll: Overflow.Scroll,
 }
 
+/**
+ * What `flexShrink` is where nobody said, and the three props that decide it.
+ *
+ * Yoga starts a node at 0 and every renderable in the old painter derived it, so we derive it the
+ * same way: a box given a width or a height in cells does not shrink, and everything else does. That
+ * is `Renderable.setupYogaProperties` in @opentui/core 0.5.9, and the kit is written against it —
+ * which is why 153 of its boxes say `flexShrink={0}` out loud and none says 1. A percentage is not a
+ * number here, deliberately: the old painter asked `typeof width === 'number'` too.
+ *
+ * The difference shows up wherever the children of a row want more room than the row has: at 0 they
+ * all keep their full size and the last of them is clipped, at 1 they give the overflow up between
+ * them. A `TableRow`'s caret marker was clipped outside its panel, and both halves of a `Sections`
+ * strip took the whole row each, because a viewport's content box is 100% wide and hands its half
+ * that as a floor to grow from (../kit/scrolling.tsx § ownViewport).
+ *
+ * A blanket 1 also passes every test in this package. The derived rule is here anyway, because it is
+ * the answer the kit was written against rather than the answer that happens to be green: the two
+ * differ on a fixed-size box inside an overflowing row, which is a shape no golden holds.
+ */
+export function flexShrinkFor(props: Record<string, unknown>): number {
+  const said = props.flexShrink
+  if (typeof said === 'number' && Number.isFinite(said)) return said
+  return typeof props.width === 'number' || typeof props.height === 'number' ? 0 : 1
+}
+
+/** The props `flexShrinkFor` reads, so a write to any of them re-derives it. */
+export const SHRINK_DEPENDS: ReadonlySet<string> = new Set(['flexShrink', 'width', 'height'])
+
 export const SETTERS: Record<string, Setter> = {
   flexDirection: (yoga, value) => yoga.setFlexDirection(FLEX_DIRECTIONS[String(value)] ?? FlexDirection.Column),
   flexGrow: (yoga, value) => yoga.setFlexGrow(number(value)),
@@ -144,10 +172,11 @@ export const NOT_YOGA: Readonly<Record<string, string>> = {
   placeholder: 'a widget\'s empty-state text, phase 3',
   value: 'a widget\'s content, phase 3',
   initialValue: 'a widget\'s content, phase 3',
-  contentOptions: 'the props a scrollbox puts on its own content box, phase 3',
-  scrollX: 'a scrollbox offset, phase 3',
-  scrollY: 'a scrollbox offset, phase 3',
-  virtual: 'whether a scrollbox windows its rows, phase 3',
+  offset: 'how many rows a viewport has scrolled, applied by the read-back (./pass.ts)',
+  contentOptions: 'the props the old painter\'s scrollbox puts on its own content box; ours draws one',
+  scrollX: 'which axis the old painter\'s scrollbox owns; ours is vertical, and one offset says so',
+  scrollY: 'the same',
+  virtual: 'whether a scrollbox windows its rows, which is the virtualiser\'s question and not Yoga\'s',
   focused: 'the region store owns focus; paint reads it (../keys/regions.ts)',
 }
 

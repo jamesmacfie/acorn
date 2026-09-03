@@ -114,9 +114,11 @@ const openSurface = async (size: { width: number; height: number }): Promise<Sur
         renderer.frame()
       },
       pressKey: (key, modifiers) => { renderer.keyInput.emit('keypress', pressedKey(key, modifiers)) },
-      // Mouse hit testing is phase 3, so a case that scrolls or clicks skips under this painter
-      // rather than driving a pointer that reaches nothing (./kit.test.tsx § PHASE_3).
-      scroll: async () => {},
+      // A wheel hit-tests to the innermost viewport under the cell and moves its offset. A click is
+      // the other half of the pointer and is a later slice: focusing what was clicked is the store's
+      // question, and a case that clicks skips until it is answered
+      // (../tree/hit.ts, ./kit.test.tsx § PHASE_3).
+      scroll: async (x, y, direction) => { renderer.mouseScroll(x, y, direction) },
       click: async () => {},
       destroy: () => renderer.destroy(),
     }

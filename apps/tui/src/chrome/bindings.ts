@@ -18,11 +18,11 @@
 // The keys come from the host's own intent table, so a hint can never name a key nothing is bound to.
 
 import { createSignal } from 'solid-js'
-import { InputRenderable, ScrollBoxRenderable, TextareaRenderable, type KeyEvent, type Renderable } from '@opentui/core'
+import { InputRenderable, TextareaRenderable, type KeyEvent, type Renderable } from '@opentui/core'
 import { isTyping, keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { hostKeysFor } from '../keys/install'
-import { focusedExpands, focusedItem, focusedRenderable, isParentStop, regionsInScope } from '../keys/regions'
+import { focusedExpands, focusedItem, focusedRenderable, isParentStop, isViewport, regionsInScope } from '../keys/regions'
 import { focusedCrosses, focusedOpens } from '../keys/stops'
 import { openOverlays } from './state'
 
@@ -61,7 +61,10 @@ export const focusedKind = (): FocusedKind => {
   if (focusedItem()) return 'item'
   if (isParentStop(node)) return 'parent'
   if (focusedOpens()) return 'opens'
-  if (node instanceof ScrollBoxRenderable) return 'viewport'
+  // Through the store's own question rather than an `instanceof`, because under our painter a
+  // viewport is a plain object and this row is what tells a reader the arrows scroll here
+  // (../keys/regions.ts § isViewport).
+  if (node && isViewport(node)) return 'viewport'
   return 'stop'
 }
 

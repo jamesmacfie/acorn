@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { openScreen, type Screen, type Sink } from './paint/screen'
 import { onFrame } from './tree/frames'
+import { wheelAt } from './tree/hit'
 import { openTerminal } from './input/terminal'
 import type { Node } from './tree/node'
 
@@ -48,6 +49,10 @@ export type OwnRenderer = {
    *  the frame; we write cells to stdout and nothing else, so there is nothing to hide and nothing
    *  cached (docs/future/terminal-rewrite/architecture.md § 3). */
   console: { hide: () => void; deactivate: () => void; activate: () => void; getCachedLogs: () => string }
+  /** One wheel step at a cell: the innermost viewport under the pointer moves its offset and the keys
+   *  stay where they are. The only thing done with the pointer so far, because a viewport is the only
+   *  node that needs one (./tree/hit.ts § wheelAt). */
+  mouseScroll: (x: number, y: number, direction: 'up' | 'down') => void
   /** Draw now rather than on the next turn of the event loop, which is what a test wants. */
   frame: () => void
   destroy: () => void
@@ -69,9 +74,10 @@ export function openOwnRenderer(options: {
   })
   let destroyed = false
 
-  // `frame` is the event the store's second reveal waits for, and it has to fire on the side of
-  // layout where a child's geometry is real. Here that is after the frame, because a frame is layout
-  // and paint in one function (./keys/regions.ts § The second reveal).
+  // `frame` is the event the store's reveal waits for, and it has to fire on the side of layout where
+  // a child's geometry is real. Here that is after the frame, because a frame is layout and paint in
+  // one function — which is what makes one reveal enough under this painter and two necessary under
+  // the other (./keys/regions.ts § The reveal).
   //
   // Registered over the screen's own subscriber rather than beside it: `./tree/frames.ts` holds one,
   // because there is one painter, and `screen.close()` still clears it.
@@ -96,6 +102,7 @@ export function openOwnRenderer(options: {
     prependInputHandler: () => {},
     removeInputHandler: () => {},
     console: { hide: () => {}, deactivate: () => {}, activate: () => {}, getCachedLogs: () => '' },
+    mouseScroll: (x, y, direction) => { wheelAt(screen.root, x, y, direction) },
     frame,
     destroy: () => {
       if (destroyed) return
