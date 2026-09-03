@@ -67,6 +67,7 @@
     "shiki": "^4.2.0",
     "solid-js": "catalog:",
     "ws": "^8.21.0",
+    "yoga-layout": "3.2.1",
     "zod": "catalog:"
   },
   "devDependencies": {
