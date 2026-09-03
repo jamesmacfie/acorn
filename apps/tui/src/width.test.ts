@@ -45,13 +45,12 @@ describe('the width measure', () => {
   })
 
   it('is one cell for every glyph in the table but `list`', () => {
-    // The assertion the comment at the top of `kit/glyphs.ts` should always have been: it claims every
-    // glyph is one cell wide and tests that claim with `\p{Emoji_Presentation}`, which passes all 73
-    // names and misses all six wide ones. This is the check that catches a seventh. `list` is the one
-    // still failing the rule, and it fails here on purpose until the slice that owns that file swaps
-    // the character.
+    // The assertion the comment at the top of `kit/glyphs.ts` should always have been: it claimed
+    // every glyph is one cell wide and tested that claim with `\p{Emoji_Presentation}`, which passes
+    // all 73 names and misses all six wide ones. This is the check that catches a seventh. Empty now:
+    // five of the six were only ever wide to OpenTUI's measure, and `list` gave up `☰` for `≡`.
     const wide = Object.entries(GLYPHS).filter(([, glyph]) => stringWidth(glyph) !== 1)
-    expect(wide.map(([name]) => name)).toEqual(['list'])
+    expect(wide.map(([name]) => name)).toEqual([])
   })
 
   it('counts a combining mark as nothing and keeps it with its base', () => {

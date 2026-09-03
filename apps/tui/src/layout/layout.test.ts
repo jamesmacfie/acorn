@@ -41,7 +41,12 @@ describe('the prop table', () => {
   it('covers the props that only ever arrive through a spread', () => {
     // `roles.ts` § boxBorder and § textStyle are the two helpers whose whole output is spread onto an
     // intrinsic, so their keys never appear beside a tag for the scan above to find.
-    for (const name of ['border', 'borderStyle', 'borderColor', 'fg', 'attributes', 'transform']) {
+    for (const name of [
+      'border', 'borderStyle', 'borderColor', 'fg', 'attributes', 'transform',
+      // …and the four `textStyle` says twice, because a span reads its weight out of the `style`
+      // object rather than off the mask (../kit/roles.ts § textStyle).
+      'style', 'bold', 'dim', 'underline', 'inverse',
+    ]) {
       expect(name in SETTERS || name in NOT_YOGA, name).toBe(true)
     }
   })

@@ -169,3 +169,38 @@ export function bufferLines(buffer: Buffer): string[] {
   }
   return lines
 }
+
+/** One stretch of a row drawn the same way: what it says, how it is styled, and how many columns it
+ *  took. */
+export type Run = { text: string; fg: Color; bg: Color; attrs: number; width: number }
+
+/**
+ * The buffer as runs, one array per row. What a test asks when the question is not what the screen
+ * says but how it says it.
+ *
+ * `width` is the count that matters and it is not `text.length`: a row held as characters cannot see
+ * a column shift at all, because a wide glyph contributes one character and two cells. So a run
+ * carries both, and a continuation marker adds a column to the run it belongs to rather than a run
+ * of its own (§ A wide glyph is a pair, ../harness.tsx § Span).
+ */
+export function bufferRuns(buffer: Buffer): Run[][] {
+  const rows: Run[][] = []
+  for (let y = 0; y < buffer.rows; y += 1) {
+    const runs: Run[] = []
+    for (let x = 0; x < buffer.cols; x += 1) {
+      const cell = cellAt(buffer, x, y)
+      if (!cell) continue
+      const last = runs.at(-1)
+      // The second cell of a wide glyph: a column of the run before it, and no character.
+      if (cell.char === '' && last) { last.width += 1; continue }
+      if (last && last.attrs === cell.attrs && sameColor(last.fg, cell.fg) && sameColor(last.bg, cell.bg)) {
+        last.text += cell.char
+        last.width += 1
+        continue
+      }
+      runs.push({ text: cell.char, fg: cell.fg, bg: cell.bg, attrs: cell.attrs, width: 1 })
+    }
+    rows.push(runs)
+  }
+  return rows
+}

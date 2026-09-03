@@ -78,6 +78,35 @@ export async function readFrame(screen: Screen, surface: string, width: number, 
   return previous
 }
 
+/**
+ * Adjacent runs drawn the same way, joined.
+ *
+ * Both sides of the comparison, and it is what makes "run for run" a question about the screen rather
+ * than about the renderer. OpenTUI's capture emits one run per text renderable, so a row of tab
+ * labels in one colour comes back as eleven runs with the same foreground and no attribute between
+ * them; our painter reads the cells, so the same row is one run. Neither is wrong and a reader cannot
+ * tell them apart — what a reader sees is which cells are which colour, and joining leaves exactly
+ * that, because a joined run keeps the columns its parts had.
+ *
+ * The one thing this must not do is join across a difference, which is why it compares the whole
+ * style: the accent-coloured space that marks the current document tab sits between two default runs
+ * and stays a run of its own (../harness.tsx § Span).
+ */
+const joined = (line: readonly Span[]): Span[] => {
+  const runs: Span[] = []
+  for (const span of line) {
+    const last = runs.at(-1)
+    if (last && last.attributes === span.attributes
+      && last.fg.r === span.fg.r && last.fg.g === span.fg.g && last.fg.b === span.fg.b) {
+      last.text += span.text
+      last.width += span.width
+      continue
+    }
+    runs.push({ ...span, fg: { ...span.fg } })
+  }
+  return runs
+}
+
 /** The column a run starts at, which is the sum of the widths before it rather than the characters
  *  before it. The two differ wherever anything on the line is wide (§ Frame). */
 const columnsOf = (line: Span[]): number[] => {
@@ -137,8 +166,8 @@ export function compare(live: Frame, golden: Frame): string[] {
 
   const runRows = Math.max(live.runs.length, golden.runs.length)
   for (let row = 0; row < runRows; row += 1) {
-    const expected = golden.runs[row] ?? []
-    const actual = live.runs[row] ?? []
+    const expected = joined(golden.runs[row] ?? [])
+    const actual = joined(live.runs[row] ?? [])
     if (JSON.stringify(expected) === JSON.stringify(actual)) continue
     const columns = columnsOf(expected)
     let run = 0

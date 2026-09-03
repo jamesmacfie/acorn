@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { createComponent } from 'solid-js'
 import { describe, expect, it } from 'vitest'
-import { hasFfi } from './ffi'
+import { canDraw } from './ffi'
 import { bootFixture } from './harness'
 import { renderCells } from './kit/render'
 import type { Cells } from './kit/render'
@@ -19,7 +19,7 @@ import { regionFocus } from './keys/regions'
 
 const caretLine = (screen: Cells): string => screen.lines.find((line) => line.includes('›')) ?? ''
 
-describe.skipIf(!hasFfi)('a descriptor source list', () => {
+describe.skipIf(!canDraw)('a descriptor source list', () => {
   it('filters by title on / and gives the rows back on escape', async () => {
     await bootFixture()
     const { sourcePanel } = await import('./plugins/SourcePanel')

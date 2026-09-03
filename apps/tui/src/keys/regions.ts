@@ -35,6 +35,14 @@ import { MouseButton, ScrollBoxRenderable, type CliRenderer, type MouseEvent, ty
 
 export type RegionRef = { paneId: string; regionId: string }
 
+/** Is this a scroll viewport?
+ *
+ *  `instanceof` answers under the painter we are leaving. Under ours a node is a plain object with a
+ *  `kind`, and no shim can be an instance of somebody else's class, so the question is asked by name
+ *  as well (../tree/compat.ts). Phase 4 leaves the second half. */
+const isViewport = (node: Renderable): node is ScrollBoxRenderable =>
+  node instanceof ScrollBoxRenderable || (node as unknown as { kind?: string }).kind === 'scrollbox'
+
 /** The leftmost column. Two facts about the screen are two too many for this module to know, so this
  *  is the one: the column at the far left is the chrome's and has no pane behind it, which is what
  *  makes a pane cycle from there a cycle of a pane the reader is not in (§ movePane). Which regions
@@ -821,7 +829,7 @@ const entryStop = (box: Renderable): Renderable | undefined =>
 const revealInViewports = (node: Renderable): void => {
   for (let at: Renderable | null = node.parent; at; at = at.parent) {
     step()
-    if (at instanceof ScrollBoxRenderable) at.scrollChildIntoView(node.id)
+    if (isViewport(at)) at.scrollChildIntoView?.(node.id)
   }
 }
 
@@ -877,7 +885,7 @@ export const stopsIn = (box: Renderable): Renderable[] => {
         else if (child.focusable) found.push(child)
         continue
       }
-      if (child instanceof ScrollBoxRenderable) {
+      if (isViewport(child)) {
         const nestedBefore = found.length
         visit(child)
         if (found.length === nestedBefore) found.push(child)

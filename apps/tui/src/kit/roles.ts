@@ -1,71 +1,69 @@
-import { TextAttributes } from '@opentui/core'
-import type { RGBA } from '@opentui/core'
-import { roleCell, type CellAttribute, type CellStyle } from '@acorn/client-core/kit/tokens/roles.ts'
+import { roleCell, type CellStyle } from '@acorn/client-core/kit/tokens/roles.ts'
 import type { Border, Space, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import { isCompact, slotColor } from '../appearance'
+import { paintColor } from '../colourCompat'
+import { ATTRS } from '../paint/buffer'
 
 // Roles as cells: what a role token means to a terminal, as something a renderable can be handed.
 //
 // The decision is `roleCell()`'s, in client-core, beside the sentence it came from. This file is the
-// last inch: turning a `CellStyle` into the props OpenTUI's renderables take. Nothing in this package
-// names a colour, a gap or a box character — it asks for a role, and the answer arrives here.
+// last inch: turning a `CellStyle` into the props a run of cells takes. Nothing in this package names
+// a colour, a gap or a box character — it asks for a role, and the answer arrives here.
+//
+// The attribute bits are `../paint/buffer.ts`'s, which are deliberately the same numbers
+// `TextAttributes` used: bold 1, dim 2, underline 8, inverse 32, with its italic and blink left as
+// gaps. Keeping the positions means the mask needs no translating while both painters run and no
+// golden frame moves on the day this file stopped importing OpenTUI's copy of them.
 
 export type Style = {
-  fg: RGBA
-  attributes?: number
+  /** A `../colour.ts` colour, typed as OpenTUI's while both painters compile from one component
+   *  source (../colourCompat.ts). */
+  fg: ReturnType<typeof paintColor>
+  attributes: number
+  /** The same four bits as booleans. Not a second answer: a `span` under the old painter reads its
+   *  colour and its weight out of one object and ignores an `attributes` prop entirely, so a run
+   *  inside a line has to be told both ways (§ Run). */
+  bold?: true
+  dim?: true
+  underline?: true
+  inverse?: true
   transform?: (value: string) => string
 }
 
-const bits: Record<CellAttribute, number> = {
-  bold: TextAttributes.BOLD,
-  dim: TextAttributes.DIM,
-  underline: TextAttributes.UNDERLINE,
-  inverse: TextAttributes.INVERSE,
+/** A role's attribute list as the mask paint reads. `ATTRS` is keyed by exactly the four names a
+ *  `CellAttribute` can be, so there is no table between them.
+ *
+ *  A loop rather than a seeded `reduce`, and the reason is a grep: `../keys/tiers.test.ts` forbids a
+ *  keymap priority spelled outside the tier table and finds one by looking for a bare number after a
+ *  closing bracket, which `}, 0)` reads as. */
+function attributes(cell: CellStyle): number {
+  let mask = 0
+  for (const attr of cell.attrs ?? []) mask |= ATTRS[attr]
+  return mask
 }
 
-const attributes = (cell: CellStyle): number =>
-  (cell.attrs ?? []).reduce((mask, attr) => mask | bits[attr], TextAttributes.NONE)
-
-/** A run of text: its colour, its weight, and whether the role changes the characters themselves. */
+/**
+ * A run of text: its colour, its weight, and whether the role changes the characters themselves.
+ *
+ * One answer for a `text` and for a `span`, which used to be two. The shapes differ, not the
+ * decision: a `text` takes `fg` and a mask as props and a `span` takes one object with booleans in
+ * it, so this returns both and each caller spends the half it needs (§ Run, ./cells.tsx).
+ */
 export function textStyle(role: TextRole | undefined, tone?: Tone): Style {
   const text = roleCell('text', role ?? 'body')
   const colour = tone ? roleCell('tone', tone) : undefined
+  // The tone decides where a colour is given, and the text role decides where one is not. Both name a
+  // slot, and a caller that passes neither still lands on `default` — which is what makes
+  // `role="muted"` a grey rather than the default foreground with the dim bit set.
+  const mask = attributes(text) | (colour ? attributes(colour) : 0)
   return {
-    // Always a colour, never omitted: an unset `fg` is opaque white to OpenTUI rather than the
-    // terminal's own foreground (../appearance.ts).
-    //
-    // The tone decides where one is given, and the text role decides where one is not. Both name a
-    // slot now, and a caller that passes neither still lands on `default` — which is what makes
-    // `role="muted"` a grey rather than the default foreground with the dim bit set.
-    fg: slotColor(colour?.slot ?? text.slot),
-    attributes: attributes(text) | (colour ? attributes(colour) : 0),
+    fg: paintColor(slotColor(colour?.slot ?? text.slot)),
+    attributes: mask,
+    ...(mask & ATTRS.bold ? { bold: true } : {}),
+    ...(mask & ATTRS.dim ? { dim: true } : {}),
+    ...(mask & ATTRS.underline ? { underline: true } : {}),
+    ...(mask & ATTRS.inverse ? { inverse: true } : {}),
     ...(text.upper ? { transform: (value: string) => value.toUpperCase() } : {}),
-  }
-}
-
-/** The same answer as a `span` takes, which is not the same shape a `text` takes.
- *
- *  A `text` renderable gets `fg` and an attribute bitmask as props. A `span` inside one gets neither:
- *  the Solid reconciler ignores every prop on a text node except `href` and `style`, and reads the
- *  colour and the attributes out of that one object as booleans
- *  (`@opentui/solid` § setProperty, `@opentui/core` § createTextAttributes). A `fg` handed to a span
- *  is dropped without a word, so the run inherits its parent `text`'s colour — and a parent that was
- *  given none draws opaque white, which on a light terminal is white on white. That was every
- *  markdown paragraph and every line of every diff. */
-export const spanStyle = (role: TextRole | undefined, tone?: Tone): {
-  fg: RGBA
-  bold?: boolean
-  dim?: boolean
-  underline?: boolean
-  inverse?: boolean
-} => {
-  const style = textStyle(role, tone)
-  return {
-    fg: style.fg,
-    ...(style.attributes! & TextAttributes.BOLD ? { bold: true } : {}),
-    ...(style.attributes! & TextAttributes.DIM ? { dim: true } : {}),
-    ...(style.attributes! & TextAttributes.UNDERLINE ? { underline: true } : {}),
-    ...(style.attributes! & TextAttributes.INVERSE ? { inverse: true } : {}),
   }
 }
 
@@ -91,13 +89,13 @@ export const spaceLines = (space: Space | undefined): number => {
 export const boxBorder = (border: Border, opts: { when?: boolean; tone?: Tone } = {}): {
   border: boolean
   borderStyle: 'single'
-  borderColor: RGBA | undefined
+  borderColor: Style['fg'] | undefined
 } => {
   const box = (opts.when ?? true) && borderCell(border).box
   return {
     border: box,
     borderStyle: 'single',
-    borderColor: box ? slotColor(roleCell('tone', opts.tone ?? 'neutral').slot) : undefined,
+    borderColor: box ? paintColor(slotColor(roleCell('tone', opts.tone ?? 'neutral').slot)) : undefined,
   }
 }
 

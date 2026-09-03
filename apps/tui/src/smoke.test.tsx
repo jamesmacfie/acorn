@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { expect, test } from 'vitest'
-import { hasFfi } from './ffi'
+import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 
 // The one test phase 0 owes: a first-party pane, unchanged, drawn to a cell buffer at 80 by 24.
@@ -18,7 +18,7 @@ const intoPane = async (screen: { press: (key: string) => Promise<void> }): Prom
   await screen.press('TAB')
 }
 
-test.skipIf(!hasFfi)('the notes pane draws its list at 80 by 24', async () => {
+test.skipIf(!canDraw)('the notes pane draws its list at 80 by 24', async () => {
   const screen = await renderFixture({ pane: 'notes' })
   // `until`, not `frame`: the pane's rows are a query away and the shell has more to draw than it
   // used to, so reading the first frame is a race that passes alone and fails beside eleven other
@@ -38,7 +38,7 @@ test.skipIf(!hasFfi)('the notes pane draws its list at 80 by 24', async () => {
 // The other half of what phase 0 set out to prove: the pane handles no keys, and the arrows still
 // walk it. `j` is `next` in the one table both hosts read (kit/keys/keymap.ts), and the caret is
 // where this host draws the collection's active row.
-test.skipIf(!hasFfi)('j moves the caret down the list', async () => {
+test.skipIf(!canDraw)('j moves the caret down the list', async () => {
   const screen = await renderFixture({ pane: 'notes' })
   await intoPane(screen)
   const first = await screen.frame()
@@ -60,7 +60,7 @@ test.skipIf(!hasFfi)('j moves the caret down the list', async () => {
 // chrome spends three cells on the rail and its rule, so at 80 columns the pane is 77 and
 // `list-detail` is below its own 80-cell threshold — one group at a time, with `expand` switching
 // between them. Opening a note there does not reveal it until you go and look.
-test.skipIf(!hasFfi)('enter opens the row the caret is on', async () => {
+test.skipIf(!canDraw)('enter opens the row the caret is on', async () => {
   const screen = await renderFixture({ pane: 'notes' })
   await intoPane(screen)
   // Past the scratchpad, which the pane opens by itself, onto the second note.
@@ -80,7 +80,7 @@ test.skipIf(!hasFfi)('enter opens the row the caret is on', async () => {
 // Notes rather than the http pane, which is what phase 1 asked for: http ships only a tree bundle
 // (plugins/http/src/tree/, no client/), so drawing it means the worker sandbox and that is phase 5.
 // See docs/tui.md.
-test.skipIf(!hasFfi)('the pane holds together at 120 by 40 as well as at 80 by 24', async () => {
+test.skipIf(!canDraw)('the pane holds together at 120 by 40 as well as at 80 by 24', async () => {
   const wide = await renderFixture({ width: 120, height: 40, pane: 'notes' })
   const frame = await wide.frame()
   wide.done()

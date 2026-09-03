@@ -51,15 +51,17 @@ export function clampRect(
   }
 }
 
-/** Walk the tree writing each node's absolute rectangle.
+/** Walk the tree writing each node's absolute rectangle, collecting whoever asked to be told their
+ *  size changed.
  *
  *  A node with no Yoga node of its own — a `span`, a `#text` — keeps the rectangle it has and passes
  *  its parent's origin down, because a run's position inside a line is paint's to work out from the
  *  lines the measure function produced, not a box anybody laid out. */
-export function readBack(node: Node, originX = 0, originY = 0): void {
+export function readBack(node: Node, originX = 0, originY = 0, resized: Node[] = []): Node[] {
   let x = originX
   let y = originY
   if (node.yoga) {
+    const before = node.rect
     node.rect = clampRect(
       node.yoga.getComputedLeft(),
       node.yoga.getComputedTop(),
@@ -68,15 +70,35 @@ export function readBack(node: Node, originX = 0, originY = 0): void {
       originX,
       originY,
     )
+    // The size only, not the position: a box that moved sideways is not a box whose contents have to
+    // decide anything again, and that is also what the prop is called.
+    if ((before.w !== node.rect.w || before.h !== node.rect.h) && typeof node.props.onSizeChange === 'function') {
+      resized.push(node)
+    }
     x = node.rect.x
     y = node.rect.y
   }
-  for (const child of node.children) readBack(child, x, y)
+  for (const child of node.children) readBack(child, x, y, resized)
+  return resized
 }
 
-/** Lay the whole tree out at a terminal size and read it back. Called once per dirty frame. */
+/**
+ * Lay the whole tree out at a terminal size and read it back. Called once per dirty frame.
+ *
+ * The `onSizeChange` calls come after the whole read-back rather than during it, and they are the
+ * one thing in this file that runs somebody else's code. Eight components in this package pick a
+ * form from the width they were given — the rail takes a third of the shell, the footer cuts its
+ * hints to the row it has, a `list-detail` stacks below 80 cells — and every one of them reads it
+ * from this prop. Without the call each of those reads the zero its `ref` saw before the first
+ * layout and never hears otherwise: the rail drew at its 20-cell floor instead of 24, and the footer
+ * cut every hint to nothing (../chrome/Rail.tsx § railCells, ../chrome/Footer.tsx).
+ *
+ * After the walk, because a handler writes a signal, and a signal written mid-walk is a tree
+ * changing while it is being measured. It asks for the next frame instead, which the scheduler
+ * coalesces with everything else that moved (../tree/frames.ts).
+ */
 export function layoutTree(root: Node, cols: number, rows: number): void {
   if (!root.yoga) return
   root.yoga.calculateLayout(cols, rows, Direction.LTR)
-  readBack(root)
+  for (const node of readBack(root)) (node.props.onSizeChange as () => void)()
 }

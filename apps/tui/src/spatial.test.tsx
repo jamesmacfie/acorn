@@ -1,13 +1,13 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { hasFfi } from './ffi'
+import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 import { focusedRegion } from './keys/regions'
 
 const caretLine = (frame: string): string =>
   frame.split('\n').find((line) => line.includes('\u203a')) ?? ''
 
-describe.skipIf(!hasFfi)('spatial focus', () => {
+describe.skipIf(!canDraw)('spatial focus', () => {
   it('enters main from rail shortcuts, restores rail, and lets h/l walk detail tabs', async () => {
     const screen = await renderFixture({ width: 100, height: 32 })
 

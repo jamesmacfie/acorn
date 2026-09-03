@@ -1,6 +1,11 @@
 /** @jsxImportSource @opentui/solid */
 import type { JSX } from 'solid-js'
 import type { CliRenderer } from '@opentui/core'
+import { rgbOf } from '../colourCompat'
+import { openOwnRenderer } from '../ownRenderer'
+import { frameRequested } from '../tree/frames'
+import { pressedKey } from '../ownKeys'
+import { drawsOwn } from '../painter'
 
 // Drawing one node to a cell buffer, reading it back, and pressing a key at it, which is what a test
 // of this kit is.
@@ -65,13 +70,87 @@ export const RAW_KEYS: Record<string, string> = {
 // loop does not make that timer run.
 const KEY_SETTLE_MS = 80
 
+/**
+ * The renderer, the frame readers, the key queue and the pointer, from whichever painter this build
+ * picked. The same six answers `../harness.tsx § Surface` gives for the whole shell, plus the mouse
+ * two, because a kit case clicks and scrolls where a shell case does not.
+ */
+type Surface = {
+  renderer: CliRenderer
+  flush: () => Promise<unknown>
+  captureCharFrame: () => string
+  runs: () => Run[]
+  resize: (width: number, height: number) => void
+  pressKey: (key: string, modifiers?: Modifiers) => void
+  scroll: (x: number, y: number, direction: 'up' | 'down') => Promise<void>
+  click: (x: number, y: number) => Promise<void>
+  destroy: () => void
+}
+
+type Modifiers = { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }
+
+const openSurface = async (size: { width: number; height: number }): Promise<Surface> => {
+  if (drawsOwn()) {
+    const renderer = openOwnRenderer({ cols: size.width, rows: size.height })
+    return {
+      renderer: renderer as unknown as CliRenderer,
+      // Turn the event loop until the tree stops asking for frames, then draw once, for the reason
+      // `../harness.tsx § ownSurface` gives: one frame produces the next, so a fixed number of turns
+      // reads a screen that is still settling (../tree/frames.ts).
+      flush: async () => {
+        for (let turn = 0; turn < 20 && frameRequested(); turn += 1) {
+          await new Promise((done) => setImmediate(done))
+        }
+        renderer.frame()
+      },
+      captureCharFrame: () => `${renderer.screen.lines().join('\n')}\n`,
+      runs: () => renderer.screen.runs().flatMap((line) => line.map((run) => ({
+        text: run.text,
+        fg: rgbOf(run.fg),
+        attributes: run.attrs,
+      }))),
+      resize: (width, height) => {
+        renderer.screen.resize(width, height)
+        renderer.frame()
+      },
+      pressKey: (key, modifiers) => { renderer.keyInput.emit('keypress', pressedKey(key, modifiers)) },
+      // Mouse hit testing is phase 3, so a case that scrolls or clicks skips under this painter
+      // rather than driving a pointer that reaches nothing (./kit.test.tsx § PHASE_3).
+      scroll: async () => {},
+      click: async () => {},
+      destroy: () => renderer.destroy(),
+    }
+  }
+  const { createTestRenderer } = await import('@opentui/core/testing')
+  const setup = await createTestRenderer({
+    width: size.width,
+    height: size.height,
+    kittyKeyboard: true,
+    autoFocus: false,
+  })
+  return {
+    renderer: setup.renderer,
+    flush: setup.flush,
+    captureCharFrame: setup.captureCharFrame,
+    runs: () => setup.captureSpans().lines.flatMap((line) => line.spans.map((span) => ({
+      text: span.text,
+      fg: { r: span.fg.r, g: span.fg.g, b: span.fg.b },
+      attributes: span.attributes,
+    }))),
+    resize: setup.resize,
+    pressKey: (key, modifiers) => { setup.mockInput.pressKey(RAW_KEYS[key] ?? key, modifiers) },
+    scroll: (x, y, direction) => setup.mockMouse.scroll(x, y, direction),
+    click: (x, y) => setup.mockMouse.click(x, y),
+    destroy: () => setup.renderer.destroy(),
+  }
+}
+
 /** Render a fragment at a size, with the keymap installed on it. Small by default, because a node
  *  under test is a node and not a screen, and a wide buffer hides a node that overflows its row. */
 export async function renderCells(
   node: () => JSX.Element,
   size: { width?: number; height?: number } = {},
 ): Promise<Cells> {
-  const { createTestRenderer } = await import('@opentui/core/testing')
   const { render } = await import('@opentui/solid')
   const { installKeymap } = await import('../keys/install')
   const { installRenderGuard, RENDERER_LISTENER_CAP } = await import('../renderGuard')
@@ -89,15 +168,19 @@ export async function renderCells(
   // same byte as Return and half of what this suite presses would not exist.
   // `autoFocus` off for the reason the app has it off: focus is the region store's and a renderer
   // that focuses on a click by itself is a second owner (../keys/regions.ts § Clicks are hit tests).
-  const setup = await createTestRenderer({
-    width: size.width ?? 40,
-    height: size.height ?? 8,
-    kittyKeyboard: true,
-    autoFocus: false,
-  })
+  const setup = await openSurface({ width: size.width ?? 40, height: size.height ?? 8 })
   setup.renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(setup.renderer)
-  await render(node, setup.renderer)
+  // The root node under our painter and the renderer under OpenTUI's, which is the one line of the
+  // mount that differs between them (../harness.tsx § Surface).
+  const mounted = await render(node, (drawsOwn() ? (setup.renderer as unknown as { root: unknown }).root : setup.renderer) as never)
+  // The Solid root as well as the surface. `@opentui/solid` disposes the root inside
+  // `renderer.destroy()`; ours hands the disposer back and leaves the lifetime to the caller, and a
+  // tree left mounted re-runs its effects against a torn-down keymap (../harness.tsx § previous).
+  const tearDown = (): void => {
+    if (drawsOwn()) (mounted as unknown as () => void)()
+    setup.destroy()
+  }
   // Bounded, and the frame is taken either way: a tree that never settles is itself a finding, and a
   // capture that hangs says nothing about which node did it.
   const settle = (ms: number) => Promise.race([setup.flush(), new Promise((done) => setTimeout(done, ms))])
@@ -113,18 +196,14 @@ export async function renderCells(
     return {
       lines: raw.split('\n').map((line) => line.replace(/\s+$/, '')),
       text: raw,
-      runs: () => setup.captureSpans().lines.flatMap((line) => line.spans.map((span) => ({
-        text: span.text,
-        fg: { r: span.fg.r, g: span.fg.g, b: span.fg.b },
-        attributes: span.attributes,
-      }))),
+      runs: () => setup.runs(),
       frame,
       press,
       scroll,
       click,
       resize,
       renderer: setup.renderer,
-      done: () => setup.renderer.destroy(),
+      done: tearDown,
     }
   }
   const frame = async (): Promise<Cells> => {
@@ -135,16 +214,16 @@ export async function renderCells(
     key: string,
     modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean },
   ): Promise<Cells> => {
-    setup.mockInput.pressKey(RAW_KEYS[key] ?? key, modifiers)
+    setup.pressKey(key, modifiers)
     await new Promise((done) => setTimeout(done, KEY_SETTLE_MS))
     return frame()
   }
   const scroll = async (x: number, y: number, direction: 'up' | 'down'): Promise<Cells> => {
-    await setup.mockMouse.scroll(x, y, direction)
+    await setup.scroll(x, y, direction)
     return frame()
   }
   const click = async (x: number, y: number): Promise<Cells> => {
-    await setup.mockMouse.click(x, y)
+    await setup.click(x, y)
     return frame()
   }
   const resize = async (width: number, height: number): Promise<Cells> => {

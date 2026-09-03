@@ -25,6 +25,7 @@ import { bindKeys } from '../keys/install'
 import { flatten, hasNode, Line, slot } from './cells'
 import { boxBorder, litControl } from './roles'
 import { slotColor } from '../appearance'
+import { paintColor } from '../colourCompat'
 import { Menu } from './grouping'
 import { copyToTerminal } from './copy'
 
@@ -119,7 +120,7 @@ export function Input(props: InputProps) {
       flexGrow={props.width === 'narrow' ? 0 : 1}
       // An edit buffer's own text colour is opaque white, same as every other renderable's
       // (../appearance.ts), so both fields say the default slot out loud.
-      textColor={slotColor('default')}
+      textColor={paintColor(slotColor('default'))}
       value={text()}
       placeholder={props.placeholder ?? ''}
       ref={(element: InputRenderable) => { field = element }}
@@ -168,7 +169,7 @@ export function Textarea(props: {
   return (
     <textarea
       flexGrow={props.grow ? 1 : 0}
-      textColor={slotColor('default')}
+      textColor={paintColor(slotColor('default'))}
       // `initialValue`, not a child: a string child of an edit buffer is an orphan text node.
       initialValue={props.value ?? ''}
       placeholder={props.placeholder ?? ''}

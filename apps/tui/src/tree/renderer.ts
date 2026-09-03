@@ -4,6 +4,7 @@ import { invalidateRun } from '../layout/measure'
 import { applyProp } from '../layout/props'
 import { createYogaNode, freeYogaNode } from '../layout/yoga'
 import { KINDS, measuresText, textOwner, type Node } from './node'
+import { makeNode } from './compat'
 import { requestFrame } from './frames'
 
 // The reconciler this host draws through: ours, over plain objects.
@@ -39,14 +40,10 @@ import { requestFrame } from './frames'
  *  deliberately the whole type and this is bookkeeping, not state anything reads. */
 const freeOnRemove = new WeakSet<Node>()
 
-const make = (kind: Node['kind']): Node => ({
-  kind,
-  props: {},
-  parent: null,
-  children: [],
-  yoga: null,
-  rect: { x: 0, y: 0, w: 0, h: 0 },
-})
+// Through `./compat.ts`, which puts the region store's view of a node on its prototype while the
+// store is still typed on OpenTUI's tree. The fields it sets are this file's; the accessors are that
+// file's, and phase 4 deletes them.
+const make = (kind: Node['kind']): Node => makeNode(kind)
 
 /** The nearest `text` ancestor has to re-measure, because what it measures is the concatenation of
  *  everything under it. A no-op anywhere else in the tree, which is most of the time. */
