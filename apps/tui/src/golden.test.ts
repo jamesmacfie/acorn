@@ -5,6 +5,7 @@ import { _resetNotices, pushNotice } from '@acorn/client-core/features/notificat
 import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications/toast.ts'
 import { renderFixture } from './harness'
 import { compare, readFrame, type Frame } from './golden'
+import { ATTRS } from './paint/buffer'
 import { SIZES, SURFACES } from './goldenSurfaces'
 import { drawsOwn } from './painter'
 
@@ -30,53 +31,79 @@ import { drawsOwn } from './painter'
 // answer, measured rather than assumed
 // (docs/future/terminal-rewrite/phase-2-the-painter.md § What building it found).
 //
-// **The four the viewport unblocked are still held, and by three different things.** The scroll
-// viewport this phase built took `pr` and `changes` off this list at both sizes, and none of the four
-// matches yet. `pr` reaches a `Textarea`'s `setText` before it draws anything, so the pane is the
-// message and the frame says nothing about the painter. `changes` at 80 differs by one row and it is
-// the harness rather than the painter: our `flush` turns the loop until the tree stops asking for
-// frames, which drains the fixture's delayed answers, so the pane's own header row is on screen —
-// under the old painter's flush the same read settles a step earlier, and the golden holds that
-// screen. `changes` at 120 is down from 74 differences to 16 with Yoga's shrink default derived the
-// way the old painter derived it, and the 16 left are one cell each: an overflowing row's last child
-// keeps a cell there that it loses here, which is the two Yoga builds rounding negative free space
+// **Five of the twenty-eight are still held, and none of the five is held by a widget.** The two
+// field slices took `browse`, `palette`, `notes` at 80 and `pr` off this list, and what is left is
+// two measured differences that sit under the painter rather than in it. `changes` and `agents` at 80
+// differ by rows of content, and it is the harness rather than the painter: our `flush` turns the loop
+// until the tree stops asking for frames, which drains the fixture's delayed answers, so a section
+// the capture never saw is on screen. On `agents` that is measured rather than argued — the old
+// painter driven through this same harness draws exactly the cells ours does, on every row. `changes`,
+// `agents` and `notes` at 120 differ by one cell on rows that overflow their column, where the last
+// child keeps a cell under OpenTUI that it loses here: the two Yoga builds round negative free space
 // differently (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § What building it found).
 //
-// **188 runs across those 16 goldens were corrected rather than matched.** Every one of them was
-// `#00AAFF`, the default `focusedBorderColor` of OpenTUI's `BoxRenderable`: the caret mirror focuses
-// whatever the store focused, and a focused box then drew its own colour over the `borderColor` the
-// role handed it. On a terminal a tone is "default, and the palette's grey, accent, green, yellow and
-// red" (docs/ui-design.md § Roles, and what each host makes of them), and that hex is none of the sixteen,
-// so the sentence won and each run took the colour `../kit/roles.ts § boxBorder` returned — the accent
-// slot on a lit panel, the terminal's own foreground on an overlay that names no tone.
+// **325 runs across the set were corrected rather than matched, and they carry two colours between
+// them.** 320 were `#00AAFF`, the default `focusedBorderColor` of OpenTUI's `BoxRenderable`: the caret
+// mirror focuses whatever the store focused, and a focused box then drew its own colour over the
+// `borderColor` the role handed it. Five were `#666666`, `TextareaRenderable`'s default
+// `placeholderColor`. On a terminal a tone is "default, and the palette's grey, accent, green, yellow
+// and red" (docs/ui-design.md § Roles, and what each host makes of them), and neither hex is one of the
+// sixteen, so the sentence won: each run took the colour the kit's own role returned, read off the live
+// frame at the same column and refused unless it was one of the slots — the accent slot on a lit panel,
+// the terminal's own foreground on an overlay that names no tone, the palette's grey on a placeholder.
 
 /** The delay the goldens were captured with. Without it every cache is warm before the first frame
  *  and the screen is one no reader ever sees (./captureGolden.tsx). */
 process.env.ACORN_FIXTURE_DELAY_MS ??= '50'
 
 /**
- * Surfaces this phase does not draw, and the widget in each that phase 3 owes it.
+ * Goldens still held, by name and size, with what each is waiting for.
  *
- * A `scrollbox` whose content fits is a box, and our paint draws one — that is why this list is six
- * surfaces rather than all fourteen. What is on it is a rectangle with content or an API of its own:
- * a field's value or placeholder, a `Textarea`'s `setText`, a viewport's `viewport`. Those are phase
- * 3's, and until then the comparison would be reporting the absence of work nobody has done.
- *
- * Two of the six are one row from matching. `notes` at 80 differs by the seven characters of a
- * placeholder, and `browse` by the one row an `Input` is a cell tall to OpenTUI and nothing to us.
- * Three throw inside a component reaching for a widget's own API, which the panel catches and draws —
- * `! notes area.setText is not a function` in the pane's own frame, which is `PanelBody` doing
- * exactly what it promises (../panel.tsx). The sixth, `changes`, has a reason per size and neither is
- * a widget (§ The four the viewport unblocked).
+ * By the full name rather than by surface, because the reasons stopped agreeing across the two sizes:
+ * at 80 the harness settles deeper than the capture did, and at 120 the two Yoga builds round a
+ * squeezed row differently. Neither is a widget and neither is above the layout pass, so nothing here
+ * is a to-do list any more — each of these is a difference to accept or a Yoga question for somebody
+ * with a spare afternoon (§ Five of the twenty-eight are still held).
  */
 const PHASE_3: Readonly<Record<string, string>> = {
-  browse: 'the filter Input, whose row is a cell tall to OpenTUI and nothing to us',
-  changes: 'at 80 the pane\'s own header row, which this harness settles far enough to draw and the '
-    + 'capture did not; at 120 one cell of squeeze per overflowing row (§ The four the viewport unblocked)',
-  pr: 'the description Textarea\'s `setText`, which throws and replaces the pane with the message',
-  notes: 'the filter Input\'s placeholder at 80, and the Textarea\'s `setText` at 120',
-  agents: 'the transcript Textarea\'s `setText` (../kit/asking.tsx)',
-  palette: 'the search Input\'s placeholder line',
+  'changes-80x24': 'the pane\'s own header row, which this harness settles far enough to draw and the '
+    + 'capture did not',
+  'changes-120x40': 'one cell of squeeze per overflowing row, on 16 rows',
+  'agents-80x24': 'six rows of a section this harness settles far enough to show; the old painter '
+    + 'driven through the same harness draws the same cells on every row, so the painters agree and '
+    + 'the capture is the shallower screen',
+  'agents-120x40': 'one cell of squeeze on the header row, and the composer\'s hint wrapping a row '
+    + 'differently because of it',
+  'notes-120x40': 'one cell of squeeze on two overflowing rows',
+}
+
+/**
+ * The one span in the set that is not deterministic, neutralised on both sides rather than compared.
+ *
+ * `notes-80x24` is the file phase 0's determinism check could not reproduce: it flips a single
+ * `inverse` bit on the word `Scratchpad` across runs, and five runs came out inverse, plain, plain,
+ * plain, inverse, so both states are where the screen comes to rest. What varies is whether the notes
+ * list ends up marking the note it is showing, which is a fault a reader meets rather than an
+ * artefact of the capture, and phase 0 asked for it to be held as an accepted difference until
+ * somebody chases the race (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § The golden
+ * set).
+ *
+ * One bit on one run rather than the whole row, so everything else about that span is still compared:
+ * a golden that cannot be trusted about one bit should not become a golden nobody checks.
+ */
+const RACES: Readonly<Record<string, string>> = {
+  'notes-80x24': 'Scratchpad',
+}
+
+const settled = (frame: Frame, name: string): Frame => {
+  const mark = RACES[name]
+  if (mark === undefined) return frame
+  return {
+    ...frame,
+    runs: frame.runs.map((line) => line.map((span) => (
+      span.text.includes(mark) ? { ...span, attributes: span.attributes & ~ATTRS.inverse } : span
+    ))),
+  }
 }
 
 const OUT = resolve(import.meta.dirname, '../golden')
@@ -94,7 +121,7 @@ describe.skipIf(!drawsOwn())('the goldens, under our own painter', () => {
   for (const size of SIZES) {
     for (const surface of SURFACES) {
       const name = `${surface.name}-${size.width}x${size.height}`
-      const owed = PHASE_3[surface.name]
+      const owed = PHASE_3[name]
       it.skipIf(owed !== undefined)(`draws ${name} cell for cell${owed ? ` (phase 3: ${owed})` : ''}`, async () => {
         _resetNotices()
         for (const notice of surface.notices ?? []) pushNotice(notice)
@@ -114,7 +141,7 @@ describe.skipIf(!drawsOwn())('the goldens, under our own painter', () => {
           screen.renderer.console.hide()
           for (const stale of activeToasts()) dismissToast(stale.id)
           const live = await readFrame(screen, surface.name, size.width, size.height)
-          const found = compare(live, await readGolden(name))
+          const found = compare(settled(live, name), settled(await readGolden(name), name))
           expect(found, say(found)).toEqual([])
         } finally {
           screen.done()

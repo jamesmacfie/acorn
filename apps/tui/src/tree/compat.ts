@@ -1,4 +1,4 @@
-import { laysOut, type Kind, type Node } from './node'
+import { isFieldKind, laysOut, type Kind, type Node } from './node'
 
 // The `Renderable`-shaped view of a node, and the whole reason it exists is that the region store is
 // still typed on OpenTUI's tree.
@@ -58,19 +58,29 @@ const accessors = {
   isDestroyed: { get() { return false } },
   // What can hold the keys. An ordinary property everywhere else — `../keys/stops.ts` and five
   // components write it on the node they built, and `../invariants.test.ts` counts those places — and
-  // an accessor here for the one kind that used to arrive with a default: OpenTUI's
+  // an accessor here for the three kinds that arrive with a default of their own. OpenTUI's
   // `ScrollBoxRenderable` is focusable unless told otherwise, which is what makes a viewport the stop
   // of last resort for a document with no controls in it (`../keys/regions.ts § stopsIn`). Without it
   // a `list-detail` narrow enough to show one half at a time had nothing to put the keys on, so `l`
-  // never reached the layer that switches the halves. Backed by `props`, so a write lands where the
-  // getter reads it rather than shadowing the accessor.
+  // never reached the layer that switches the halves. An `input` and a `textarea` are the other two,
+  // through the flag `EditBufferRenderable` sets true on itself, and they are why nothing typed under
+  // this painter before phase 3's second slice: no component asks a field to be focusable, so the
+  // store would not give it the keys and there was nothing for the hand-off to type into
+  // (`../keys/install.ts § typeInto`). Backed by `props`, so a write lands where the getter reads it
+  // rather than shadowing the accessor.
   focusable: {
-    get(this: Node) { return (this.props.focusable as boolean | undefined) ?? this.kind === 'scrollbox' },
+    get(this: Node) {
+      const said = this.props.focusable as boolean | undefined
+      return said ?? (this.kind === 'scrollbox' || isFieldKind(this.kind))
+    },
     set(this: Node, value: boolean) { this.props.focusable = value },
   },
   // The caret, which is the one thing about focus the store still asks a renderable for
-  // (`../keys/regions.ts § paintCaret`). There is no caret to draw until phase 3 puts a cursor in a
-  // field, so both are no-ops rather than absences: the store calls them unconditionally.
+  // (`../keys/regions.ts § paintCaret`). Still no-ops rather than absences, because the store calls
+  // them unconditionally — and deliberately so now that there is a caret to draw. A field asks the
+  // store whether it has the keys and writes the answer into its own props, where paint reads it, so
+  // the mirror stays one-way: nothing here holds focus state for the store to disagree with
+  // (`../kit/asking.tsx § ownInput`, `../paint/paint.ts § drawField`).
   focus: { value() {} },
   blur: { value() {} },
   getChildren: {

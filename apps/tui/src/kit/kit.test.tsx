@@ -55,6 +55,14 @@ const lacks = (frame: Frame, value: string) => expect(frame.text).not.toContain(
 const lineWith = (frame: Frame, value: string) => frame.lines.find((line) => line.includes(value)) ?? ''
 const rowOf = (frame: Frame, value: string) => frame.lines.findIndex((line) => line.includes(value))
 
+/** The rows inside the `Controls` panel a behaviour case is drawn in, without its border.
+ *
+ *  For the two cases whose promise is which row something landed on rather than whether it is on the
+ *  screen at all: a caret is the terminal's own and draws no cell, so the only way to see where it is
+ *  is to type at it and say which row the character appeared on (../paint/paint.ts § drawField). */
+const bodyLines = (frame: Frame, count: number): string[] =>
+  frame.lines.slice(1, 1 + count).map((line) => line.replace(/^│/, '').replace(/│$/, '').trimEnd())
+
 const noteFile = {
   path: 'src/login.ts',
   status: 'modified',
@@ -823,18 +831,6 @@ const CASES: Case[] = [
  * skipped rather than as a silent skip of the wrong one — the anti-vacuity check below reads it.
  */
 const PHASE_3: Readonly<Record<string, string>> = {
-  // A field's own content: the value or the placeholder, and the caret in it.
-  'Input: a field that takes the room its row has left': 'Input',
-  'Textarea: a multi-line field holding its value': 'Textarea',
-  'Composer: a boxed field with a > prompt': 'Textarea',
-  'MentionTextarea: reduced: a Textarea with the mention menu below it, no inline highlight': 'Textarea',
-  'KeyValueEditor: a two-column table with editable cells': 'Input',
-  'FindBar: / query  3/12 on one line': 'Input',
-  'Input: takes what is typed at it': 'Input',
-  'Textarea: takes what is typed at it': 'Textarea',
-  'FindBar: takes a query typed at it': 'Input',
-  'Composer: submits what is in the box on commit': 'Textarea',
-  'MentionTextarea: completes the word being typed from the list under the field': 'Textarea',
   // Not phase 3's, and not the painter's either: the two Yoga builds disagree about what a
   // `flexBasis: 0` child contributes to a parent whose own height is `auto`. Ours contributes the
   // basis, so the box is nought tall and nothing inside it is drawn; OpenTUI's Zig-side factory
@@ -851,8 +847,6 @@ const PHASE_3: Readonly<Record<string, string>> = {
   // (../keys/regions.ts § Clicks are hit tests).
   'puts the keys on the control a click lands on, and Enter presses that one': 'mouse hit testing',
   'lets go of the keys when the control holding them goes disabled': 'mouse hit testing',
-  // And the hand-off that types a key into the field holding them.
-  'types into the field that has the keys, wherever the renderer is drawing its caret': 'typing',
 }
 
 /** The reason this case is held, or nothing at all under the painter that can draw it. */
@@ -1317,6 +1311,59 @@ const BEHAVIOURS: Behaviour[] = [
     },
   },
   {
+    node: 'Textarea',
+    does: 'moves the caret up and down over the visual lines of a wrapped value',
+    render: () => (
+      <Textarea value={'alpha bravo charlie delta'} grow />
+    ),
+    // Twelve cells, ten of them inside the panel's border, so the value wraps into four rows and the
+    // arrows have rows to move between rather than one line to sit on. Four is also what fits, so no
+    // scroll bar is drawn over the last column of them (../paint/paint.ts § drawBar).
+    size: { width: 12, height: 6 },
+    drive: async (screen) => {
+      expect(bodyLines(screen, 4)).toEqual(['alpha', 'bravo', 'charlie', 'delta'])
+      // Home first, so the caret starts somewhere known: the field opens at the end of its value,
+      // which is the last row. Then Up three times reaches the first, and typing marks where it
+      // landed — which is the only way a test can see a caret.
+      const start = await screen.press('HOME')
+      const up = await (await (await start.press('ARROW_UP')).press('ARROW_UP')).press('ARROW_UP')
+      const typed = await up.press('X')
+      expect(bodyLines(typed, 1)).toEqual(['Xalpha'])
+      // And Down comes back down at the column it left, over the two short rows in between, which is
+      // what the goal column is for (./field.ts § byRow).
+      const down = await (await (await typed.press('ARROW_DOWN')).press('ARROW_DOWN')).press('ARROW_DOWN')
+      const back = await down.press('Y')
+      expect(bodyLines(back, 4)).toEqual(['Xalpha', 'bravo', 'charlie', 'dYelta'])
+    },
+  },
+  {
+    node: 'Input',
+    does: 'takes a pasted line whole, with its newlines flattened',
+    render: (record) => <Input value="" onInput={record} />,
+    size: { width: 40, height: 3 },
+    drive: async (screen, pressed) => {
+      // A bracketed paste is one event rather than a run of key presses, which is the difference
+      // between pasting into a field and sending it a hundred Returns (../input/events.ts).
+      const pasted = await screen.paste('one\ntwo')
+      // Flattened, the way `InputRenderable.handlePaste` strips newlines: a one-row field has nowhere
+      // to put the second line and a filter that filtered by a newline would match nothing.
+      expect(pressed.at(-1)).not.toContain('\n')
+      expect(pasted.text).toContain('one')
+      expect(pasted.text).toContain('two')
+    },
+  },
+  {
+    node: 'Textarea',
+    does: 'takes a pasted block whole, keeping its lines',
+    render: (record) => <Textarea value="" onInput={record} grow />,
+    size: { width: 30, height: 6 },
+    drive: async (screen, pressed) => {
+      const pasted = await screen.paste('one\ntwo')
+      expect(pressed.at(-1)).toBe('one\ntwo')
+      expect(bodyLines(pasted, 2)).toEqual(['one', 'two'])
+    },
+  },
+  {
     node: 'ModelConnectionPicker',
     does: 'opens its model list on Enter',
     render: (record) => (
@@ -1487,7 +1534,12 @@ describe.skipIf(!canDraw)('every control is a stop', () => {
       const elsewhere = every(screen.renderer.root).find((node) => node.focusable && node !== field)
       expect(elsewhere, 'nothing else on the screen could take the caret').toBeTruthy()
       elsewhere!.focus()
-      expect(screen.renderer.currentFocusedRenderable).toBe(elsewhere)
+      // Under our painter there is no caret to move: `focus()` on a node is the mirror, the mirror is
+      // a no-op, and a field asks the store whether it has the keys rather than being told
+      // (../tree/compat.ts § focus). So half of this case has nothing left to disagree with, which is
+      // the point of the phase, and what it checks under that painter is the half that survives —
+      // the store did not move and the key was typed.
+      if (!drawsOwn()) expect(screen.renderer.currentFocusedRenderable).toBe(elsewhere)
 
       // `h` rather than a letter nothing binds, because it is a bare key: `collapse` is bound to it
       // at the region tier, the typing shadow claims it inside the keymap while a field has the keys,
@@ -1497,7 +1549,7 @@ describe.skipIf(!canDraw)('every control is a stop', () => {
       expect(typed).toEqual(['h'])
       expect(one.text).toContain('h')
       // And it went nowhere near the renderer's idea of focus, which has not moved.
-      expect(screen.renderer.currentFocusedRenderable).toBe(elsewhere)
+      if (!drawsOwn()) expect(screen.renderer.currentFocusedRenderable).toBe(elsewhere)
       expect(focusedRenderable()).toBe(field)
     } finally {
       screen.done()

@@ -22,14 +22,15 @@ import { join } from 'node:path'
 import { onCleanup } from 'solid-js'
 import { Keymap, type TargetMode } from '@opentui/keymap'
 import { registerDefaultKeys, registerEnabledFields, registerMetadataFields } from '@opentui/keymap/addons'
-import { InputRenderable, TextareaRenderable, type CliRenderer, type KeyEvent, type Renderable } from '@opentui/core'
+import type { CliRenderer, KeyEvent, Renderable } from '@opentui/core'
 import { keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { drawsOwn } from '../painter'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications/toast.ts'
 import {
-  focusedRegion, focusedRenderable, installRegions, moveBack, moveColumn, moveRegion, movePane,
-  onFocusMove, scopeDepth, walkSteps,
+  focusedRegion, focusedRenderable, installRegions, isField, moveBack, moveColumn, moveRegion,
+  movePane, onFocusMove, scopeDepth, walkSteps,
 } from './regions'
 import { tuiKeymapHost } from './keymapHost'
 import { REGION, TYPING } from './tiers'
@@ -182,8 +183,10 @@ const SHADOWED = [...BARE_KEYS]
  *  `installRegions`'s subscription is: a suite builds a renderer per test. */
 let stopShadow: (() => void) | null = null
 
-const isTypingTarget = (node: Renderable | null): node is InputRenderable | TextareaRenderable =>
-  !!node && (node instanceof InputRenderable || node instanceof TextareaRenderable)
+/** Is the thing with the keys a field? The one question the shadow and the hand-off both ask, and
+ *  `./regions.ts § isField` is where it is answered: the two `instanceof`s that used to be here were
+ *  false under our painter, which is why nothing typed under it. */
+const isTypingTarget = (node: Renderable | null): boolean => !!node && isField(node)
 
 /**
  * Type the key into the field that has the keys, once nothing else has claimed it.
@@ -205,9 +208,29 @@ const isTypingTarget = (node: Renderable | null): node is InputRenderable | Text
 const typeInto = (event: KeyEvent): void => {
   if (event.defaultPrevented) return
   const node = focusedRenderable()
-  if (!isTypingTarget(node)) return
+  if (!node || !isTypingTarget(node)) return
+  // Whichever painter drew it, the field answers the same call. OpenTUI's edit buffer has
+  // `handleKeyPress` from `TextareaRenderable`; ours is installed on the node by the component that
+  // owns the model, from its `ref`, which is where a widget's imperative API goes under this painter
+  // (../kit/asking.tsx § api).
   node.handleKeyPress?.(event)
   event.preventDefault()
+}
+
+/**
+ * Hand a bracketed paste to the field that has the keys.
+ *
+ * The same hand-off as `typeInto` one event over, and it is registered only under our painter because
+ * OpenTUI already has a route: its renderer delivers a paste to the renderable *it* has focused, and
+ * the caret mirror has focused the same field, so a second listener would paste twice. Phase 4 leaves
+ * this one (./regions.ts § paintCaret).
+ */
+const pasteInto = (event: { text?: string; bytes?: Uint8Array }): void => {
+  const node = focusedRenderable()
+  if (!node || !isTypingTarget(node)) return
+  const text = event.text ?? (event.bytes ? new TextDecoder().decode(event.bytes) : '')
+  if (text !== '') (node as unknown as { handlePaste?: (event: { text: string }) => void })
+    .handlePaste?.({ text })
 }
 
 const syncTypingShadow = (engine: TuiKeymap): void => {
@@ -283,6 +306,7 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
   // ordinary listener, so it runs after the engine's prepended one and before the renderer routes
   // anything to a renderable of its own.
   renderer.keyInput.on('keypress', typeInto)
+  if (drawsOwn()) renderer.keyInput.on('paste', pasteInto as (event: unknown) => void)
 
   // Per-binding gating, the same field the DOM installer registers: `registerEnabledFields` only
   // reaches layers and commands, and a bare key's "not while somebody is typing" is a property of one

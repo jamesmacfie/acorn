@@ -51,11 +51,39 @@ export const KINDS: Readonly<Record<string, Kind>> = {
   embedded_terminal: 'pty',
 }
 
+/**
+ * What a kind arrives with, before a single JSX prop lands on it.
+ *
+ * One entry, and it is `InputRenderable`'s constructor: it hands `height: 1` to the textarea it
+ * extends, so a field is a cell tall whatever is in it. Said as a prop rather than straight to Yoga
+ * because the height decides a second thing — `../layout/props.ts § flexShrinkFor` reads a numeric
+ * height as "does not shrink", which is what keeps a field its full width in an overflowing row, and
+ * a height set behind the prop's back would have left it shrinking.
+ *
+ * It cannot be a JSX attribute: `InputRenderableOptions` omits `height` outright, and while the
+ * switch exists tsc types every intrinsic in this package against OpenTUI's prop shapes whichever
+ * painter the build picked (docs/future/terminal-rewrite/phase-2-the-painter.md).
+ */
+export const INTRINSIC: Partial<Readonly<Record<Kind, Readonly<Record<string, unknown>>>>> = {
+  input: { height: 1 },
+}
+
 /** Does this kind get a Yoga node of its own? */
 export const laysOut = (kind: Kind): boolean => kind !== 'span' && kind !== '#text'
 
 /** Does this kind measure its own text, which makes it a leaf to Yoga? */
 export const measuresText = (kind: Kind): boolean => kind === 'text'
+
+/** Does this kind measure its own wrapped value, which also makes it a leaf to Yoga?
+ *
+ *  A `textarea` only. An `input` is a cell tall by `INTRINSIC` above and needs no measure of its own,
+ *  and giving it one would be a second answer to its height. */
+export const measuresField = (kind: Kind): boolean => kind === 'textarea'
+
+/** Does this kind hold text of its own that a reader types into? Asked by paint, by the layout pass
+ *  and by the dispatcher's typing hand-off, each of which has a different reason to care
+ *  (../keys/regions.ts § isField). */
+export const isFieldKind = (kind: Kind): boolean => kind === 'input' || kind === 'textarea'
 
 /** The nearest ancestor that measures text, starting at the node itself. What a `#text` or a `span`
  *  has to tell to re-measure when its content changes. */

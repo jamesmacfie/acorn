@@ -22,7 +22,14 @@ import { clusterWidth, graphemes } from '../width'
  *  of a wide glyph and `' '` for an empty one. */
 export type Cell = { char: string; fg: Color; bg: Color; attrs: number }
 
-export type Buffer = { cols: number; rows: number; cells: Cell[] }
+/** Where the terminal's own caret goes after the frame, and null where it is hidden.
+ *
+ *  On the buffer rather than beside it, so it is diffed with everything else: the cursor is part of
+ *  what a frame says, and a frame that moved nothing must not write a cursor sequence either
+ *  (./flush.ts). */
+export type Cursor = { x: number; y: number } | null
+
+export type Buffer = { cols: number; rows: number; cells: Cell[]; cursor: Cursor }
 
 /** The four attributes a role can ask for, as bits.
  *
@@ -54,13 +61,16 @@ const blank = (cell: Cell): void => {
 export function createBuffer(cols: number, rows: number): Buffer {
   const count = Math.max(0, cols) * Math.max(0, rows)
   const cells: Cell[] = Array.from({ length: count }, () => ({ char: ' ', fg: 'default', bg: 'default', attrs: 0 }))
-  return { cols, rows, cells }
+  return { cols, rows, cells, cursor: null }
 }
 
 /** Back to blank, in place. Every frame starts here, so a node that stopped drawing leaves nothing
  *  behind for the diff to think is still on screen. */
 export function clearBuffer(buffer: Buffer): void {
   for (const cell of buffer.cells) blank(cell)
+  // The caret with them: it belongs to whichever field is focused this frame, and a frame where none
+  // is has no caret rather than the last one's.
+  buffer.cursor = null
 }
 
 /** Same buffer object, new size. The cells are replaced rather than kept, because a resize changes
@@ -70,6 +80,7 @@ export function resizeBuffer(buffer: Buffer, cols: number, rows: number): void {
   buffer.cols = fresh.cols
   buffer.rows = fresh.rows
   buffer.cells = fresh.cells
+  buffer.cursor = null
 }
 
 /** The whole buffer as a clip, which is the clip paint starts from. */
@@ -150,6 +161,10 @@ export function writeRun(buffer: Buffer, clip: Clip, x: number, y: number, text:
   }
   return at - x
 }
+
+/** Are the caret in the same place, or hidden in both? */
+export const sameCursor = (one: Cursor, two: Cursor): boolean =>
+  one === two || (!!one && !!two && one.x === two.x && one.y === two.y)
 
 /** Do these two cells draw the same thing? The diff's whole question. */
 export const sameCell = (one: Cell, two: Cell): boolean =>

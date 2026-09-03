@@ -1,9 +1,10 @@
 import { colorOr, toColor } from '../colour'
 import { measuredRun } from '../layout/measure'
-import { laysOut, type Node } from '../tree/node'
+import { isFieldKind, laysOut, type Node } from '../tree/node'
 import { sliceToWidth } from '../width'
+import { measuredField, toVisual } from '../wrap'
 import {
-  ATTRS, clipOf, fill, intersect, isEmptyClip, put, wholeOf, writeRun,
+  ATTRS, clipOf, fill, inside, intersect, isEmptyClip, put, wholeOf, writeRun,
   type Buffer, type Clip, type Style,
 } from './buffer'
 
@@ -28,10 +29,10 @@ import {
 // to be outside one is to overflow it, and a run drawn over a sibling is never the answer we want.
 // The early-out on an empty clip is also what makes a subtree scrolled off screen free.
 //
-// **What is not here.** An edit cursor and the emulator's cells are a later slice of phase 3, so an
-// `input`, a `textarea` and a `pty` draw as the boxes they are until then — which is all they are to
-// layout as well. A `scrollbox` is a box plus one column of bar: the offset is the read-back's, so
-// there is nothing to translate here (§ drawBar).
+// **What is not here.** The emulator's cells are a later slice of phase 3, so a `pty` draws as the
+// box it is until then — which is all it is to layout as well. A `scrollbox` is a box plus one column
+// of bar: the offset is the read-back's, so there is nothing to translate here (§ drawBar). An
+// `input` and a `textarea` are a box plus their own content and the caret (§ drawField).
 
 /** The six characters a border draws with, and there is one set because there is one style.
  *
@@ -269,12 +270,83 @@ function drawBar(node: Node, buffer: Buffer, clip: Clip): void {
   }
 }
 
+/** A prop that should be a whole number of cells, and nought where it is anything else.
+ *
+ *  The zero comes first rather than last, and that is not a style choice: `../keys/tiers.test.ts`
+ *  greps every file in this package for a bare number after a closing bracket, because that is how a
+ *  keymap priority spelled outside the tier table looks, and a floor written the other way round
+ *  reads as one. */
+const cellsOf = (value: unknown): number => Math.max(0, Math.trunc(Number(value) || 0))
+
+/**
+ * An `input` or a `textarea`: its rows, or its placeholder, and the caret where it has the keys.
+ *
+ * Everything drawn here comes off the node as a prop, because the state is the component's — the
+ * value the model holds, the caret's offset into it, how far the field has scrolled, and whether the
+ * region store has given it the keys. Nothing on the node knows how to edit, so nothing on the node
+ * can be in a state the component disagrees with
+ * (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § Design, ../kit/asking.tsx).
+ *
+ * **The rows are the ones Yoga measured**, out of the same cache, which is what keeps the caret on a
+ * row the reader can see (../wrap.ts § measuredField).
+ *
+ * **`scroll` means one thing per kind and one number says it**, the way `offset` does on a viewport:
+ * cells left for an `input`, whose one row is wider than its box, and rows up for a `textarea`, whose
+ * content is taller. The component clamps it so the caret is inside the box, and a field with room
+ * for all of itself scrolls to nought.
+ *
+ * **The two colours are the component's, said out loud.** A field's text colour and its placeholder's
+ * are both props here, for the reason `../kit/asking.tsx` already gives about the first: an edit
+ * buffer that says neither draws opaque white and a hardcoded `#666666`, and neither is one of the
+ * sixteen colours a terminal has or comes from any theme. So the kit names the slot and both painters
+ * read it (docs/ui-design.md § Roles, and what each host makes of them).
+ */
+function drawField(node: Node, buffer: Buffer, clip: Clip): void {
+  const own = intersect(clip, clipOf(node.rect))
+  if (isEmptyClip(own)) return
+  const line = node.kind === 'input'
+  const value = typeof node.props.value === 'string' ? node.props.value : ''
+  const scroll = cellsOf(node.props.scroll)
+  const { rows } = measuredField(node, node.rect.w)
+
+  if (value === '') {
+    const hint = typeof node.props.placeholder === 'string' ? node.props.placeholder : ''
+    const style: Style = { fg: toColor(node.props.placeholderColor), attrs: 0 }
+    if (hint !== '') writeRun(buffer, own, node.rect.x, node.rect.y, hint, style)
+  } else {
+    const style: Style = { fg: toColor(node.props.textColor), attrs: 0 }
+    const first = line ? 0 : scroll
+    for (let at = first; at < rows.length && at - first < Math.max(node.rect.h, 1); at += 1) {
+      const row = rows[at]!
+      writeRun(buffer, own, node.rect.x - (line ? scroll : 0), node.rect.y + at - first,
+        value.slice(row.from, row.to), style)
+    }
+  }
+
+  // The caret, which is the terminal's own rather than a character of ours, and only for the one
+  // field at most that has the keys (./flush.ts § SHOW).
+  //
+  // Through the same function the model's own Up and Down go through, because a soft break gives one
+  // offset two homes and the tie-break between them is `assoc`: a second implementation of that rule
+  // here would draw the caret on the row the reader is not on, one press in three
+  // (../wrap.ts § toVisual).
+  if (node.props.focused !== true) return
+  const cursor = Math.min(cellsOf(node.props.cursor), value.length)
+  const { row, col } = toVisual(value, rows, cursor, Number(node.props.assoc) || 0)
+  const x = node.rect.x + col - (line ? scroll : 0)
+  const y = node.rect.y + row - (line ? 0 : scroll)
+  if (inside(own, x, y)) buffer.cursor = { x, y }
+}
+
 function drawNode(node: Node, buffer: Buffer, clip: Clip): void {
   // `visible === false` is skipped whole, which is also what Yoga does with `DISPLAY_NONE`, so the
   // two agree without a rule between them (../layout/props.ts § visible).
   if (node.props.visible === false) return
   if (node.kind === 'text') { drawText(node, buffer, clip); return }
   drawBox(node, buffer, clip)
+  // A field's own content and caret go inside the box it also is, so a bordered or coloured field
+  // draws both. Nothing in the kit gives one a border, and the box half costs one branch.
+  if (isFieldKind(node.kind)) drawField(node, buffer, clip)
   // After the children, because the bar is drawn over the last column of whatever they put there.
   if (node.kind === 'scrollbox') drawBar(node, buffer, intersect(clip, clipOf(node.rect)))
 }

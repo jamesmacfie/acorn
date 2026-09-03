@@ -1,7 +1,7 @@
 import Yoga from 'yoga-layout'
 import type { Node as YogaNode } from 'yoga-layout'
-import { laysOut, measuresText, type Node } from '../tree/node'
-import { measureRun } from './measure'
+import { laysOut, measuresField, measuresText, type Node } from '../tree/node'
+import { measureField, measureRun } from './measure'
 
 // Yoga, once, through its WebAssembly build, and the two operations the tree needs from it.
 //
@@ -36,8 +36,10 @@ export function createYogaNode(node: Node): YogaNode | null {
   // `../tree/renderer.ts § setProperty` re-derives it as the props arrive.
   yoga.setFlexShrink(1)
   // A `text` is a leaf to Yoga and measures its own content, which is also why nothing may be
-  // attached under it.
+  // attached under it. A `textarea` is the same arrangement over its wrapped value, and it is the
+  // reason a field without `grow` is exactly as tall as what is in it (./measure.ts § measureField).
   if (measuresText(node.kind)) yoga.setMeasureFunc(measureRun(node))
+  else if (measuresField(node.kind)) yoga.setMeasureFunc(measureField(node))
   return yoga
 }
 

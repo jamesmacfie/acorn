@@ -192,6 +192,74 @@ describe('a wide glyph', () => {
   })
 })
 
+describe('a field', () => {
+  it('is a cell tall and does not shrink, without either being spelled', () => {
+    // `InputRenderable`'s constructor hands `height: 1` to the textarea it extends, so a field is a
+    // cell tall whatever is in it — and the height decides a second thing, because a numeric one is
+    // what `../layout/props.ts § flexShrinkFor` reads as "does not shrink". Neither can be a JSX
+    // attribute: `InputRenderableOptions` omits `height` outright (../tree/node.ts § INTRINSIC).
+    const field = el('input', { value: 'a much longer value than fits' })
+    expect(drawn(boxOf(8, 3, {}, [field]), 8, 3)).toEqual(['a much l', '        ', '        '])
+    expect(field.rect.h).toBe(1)
+    expect(field.yoga?.getFlexShrink()).toBe(0)
+  })
+
+  it('slides one row sideways and a wrapped one up, off the same prop', () => {
+    // One number, one meaning per kind, the way `offset` works on a viewport: cells for an `input`
+    // whose row is wider than its box, rows for a `textarea` whose content is taller (§ drawField).
+    const line = el('input', { value: 'abcdefghij', scroll: 4 })
+    expect(drawn(boxOf(4, 1, {}, [line]), 4, 1)).toEqual(['efgh'])
+    const area = el('textarea', { value: 'one\ntwo\nthree\nfour', scroll: 2, flexGrow: 1 })
+    expect(drawn(boxOf(6, 2, {}, [area]), 6, 2)).toEqual(['three ', 'four  '])
+  })
+
+  it('draws its placeholder in the colour the kit named, and only while it is empty', () => {
+    const hint = el('input', { placeholder: 'Find…', placeholderColor: 8, value: '' })
+    const buffer = createBuffer(8, 1)
+    const root = boxOf(8, 1, {}, [hint])
+    layoutTree(root, 8, 1)
+    paint(root, buffer)
+    expect(bufferLines(buffer)).toEqual(['Find…   '])
+    // The slot rather than the `#666666` OpenTUI's own placeholder invents, which is none of the
+    // sixteen a terminal has (../appearance.ts § TERMINAL_PALETTE).
+    expect(cellAt(buffer, 0, 0)?.fg).toBe(8)
+    setProperty(hint, 'value', 'x')
+    expect(drawn(root, 8, 1)).toEqual(['x       '])
+  })
+
+  it('writes the terminal\'s caret where the focused field says, and hides it otherwise', () => {
+    // The caret is the terminal's own rather than a cell of ours, so paint says where and the flush
+    // says whether — and a frame with no field being typed into hides it, because a caret parked in
+    // the corner of a list means nothing (./flush.ts § SHOW).
+    const { screen, writes } = screenOf(10, 2)
+    try {
+      const field = el('input', { value: 'hello', cursor: 3, focused: true })
+      insertNode(screen.root, field)
+      screen.frame()
+      expect(writes.join('')).toContain('\x1b[1;4H\x1b[?25h')
+
+      // Moved, and only the move is written: the cells did not change.
+      writes.length = 0
+      setProperty(field, 'cursor', 5)
+      screen.frame()
+      expect(writes.join('')).toContain('\x1b[1;6H')
+
+      // And gone with the keys.
+      writes.length = 0
+      setProperty(field, 'focused', false)
+      screen.frame()
+      expect(writes.join('')).toContain('\x1b[?25l')
+
+      // A frame that changed nothing writes nothing at all, caret included.
+      writes.length = 0
+      screen.frame()
+      expect(writes).toEqual([])
+    } finally {
+      screen.close()
+    }
+  })
+})
+
 describe('the flush', () => {
   it('writes one cursor move and one run for a one-cell change', () => {
     const { screen, writes } = screenOf(6, 1)

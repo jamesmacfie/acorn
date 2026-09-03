@@ -1,9 +1,8 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { TextareaRenderable } from '@opentui/core'
 import { canDraw } from './ffi'
 import { renderFixture } from './harness'
-import { focusedRegion, focusedRenderable } from './keys/regions'
+import { focusedRegion, focusedRenderable, isField } from './keys/regions'
 
 // Menu, Browse, detail: the one path through the shell that needs every piece of this host at once.
 //
@@ -105,7 +104,10 @@ describe.skipIf(!canDraw)('browsing a source', () => {
       // Down enters the active panel's first real control. Escape returns to the strip (proved by
       // Left changing tabs), and the next Escape restores the Browse row in the left column.
       await screen.press('ARROW_DOWN')
-      expect(focusedRenderable()).toBeInstanceOf(TextareaRenderable)
+      // Through the store's own question rather than an `instanceof`, because a field under our
+      // painter is a plain object with a `kind` and no shim can be an instance of somebody else's
+      // class (../keys/regions.ts § isField).
+      expect(isField(focusedRenderable()!)).toBe(true)
       await screen.press('ESCAPE')
       await screen.press('ARROW_LEFT')
       expect(await screen.frame()).toContain('[Files] 2')
