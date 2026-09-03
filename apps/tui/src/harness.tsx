@@ -57,8 +57,15 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
  *  What it draws is the fixture node's one task and its notes pane, because that is the roster
  *  `App.tsx` registers. The chrome around it is real: the same rail, strip, palette and footer a
  *  person gets. */
-/** One run of cells in a captured frame: what it says and what colour it says it in. */
-export type Span = { text: string; fg: { r: number; g: number; b: number }; attributes: number }
+/** One run of cells in a captured frame: what it says, what colour it says it in, and how many
+ *  columns it takes.
+ *
+ *  `width` is not `text.length`. `captureCharFrame` gives us one character per grapheme, so a frame
+ *  held as characters alone cannot see a column shift at all — `你|` comes back with the bar at index
+ *  1 whether the wide character drew in one cell or two. The run frame is the only place the column
+ *  count survives, which is why the golden capture reads it and why it must not be dropped again
+ *  (docs/future/terminal-rewrite/phase-0-baseline-and-spikes.md § Spike 3). */
+export type Span = { text: string; fg: { r: number; g: number; b: number }; attributes: number; width: number }
 
 /** Where the keys are and what the line under them says (./keys/regions.ts). */
 export type Caret = { region: RegionRef | null; text: string }
@@ -344,6 +351,7 @@ export async function renderFixture(size: {
         text: span.text,
         fg: { r: span.fg.r, g: span.fg.g, b: span.fg.b },
         attributes: span.attributes,
+        width: span.width,
       })))
     },
     resize,

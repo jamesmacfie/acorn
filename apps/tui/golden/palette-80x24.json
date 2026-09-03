@@ -1,0 +1,1018 @@
+{
+  "surface": "palette",
+  "width": 80,
+  "height": 24,
+  "frame": [
+    "acorn > acorn · 1 task                                                         ●",
+    "┌─Commands─────────────────────────────────────────────────────────────────────┐",
+    "│ Run a command, switch a pane, task or workspace…                             │",
+    "│   › Go to GitHub in the left rail                                            │",
+    "│     Help                                   what the keyboard does right here │",
+    "│     Switch workspace                                                         │",
+    "│     Switch project                                                           │",
+    "│     Rail                                                                     │",
+    "│     Notifications                          what needs you, and what happened │",
+    "│     Quit                                                                     │",
+    "│     Command groups (temporary)      proves nesting until the catalogue moves │",
+    "│     Go to task: fix-login                                          fix-login │",
+    "└──────────────────────────────────────────────────────────────────────────────┘",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "ctrl+meta+right pane · esc back · ctrl+0 go to github in the left rail · ctrl…  ",
+    ""
+  ],
+  "runs": [
+    [
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 5
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": ">",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 5
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "· 1 task",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 8
+      },
+      {
+        "text": "                                                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 57
+      },
+      {
+        "text": "●",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "┌─Commands─────────────────────────────────────────────────────────────────────┐",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Run a command, switch a pane, task or workspace…",
+        "fg": {
+          "r": 0.4,
+          "g": 0.4,
+          "b": 0.4
+        },
+        "attributes": 0,
+        "width": 48
+      },
+      {
+        "text": "                             ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 29
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " › ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "Go to GitHub in the left rail",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 32,
+        "width": 29
+      },
+      {
+        "text": "                                            ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 44
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "Help",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 4
+      },
+      {
+        "text": "                                   what the keyboard does right here ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 69
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "Switch workspace",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 16
+      },
+      {
+        "text": "                                                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 57
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "Switch project",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 14
+      },
+      {
+        "text": "                                                           ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 59
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "Rail",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 4
+      },
+      {
+        "text": "                                                                     ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 69
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "Notifications",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 13
+      },
+      {
+        "text": "                          what needs you, and what happened ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 60
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "Quit",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 4
+      },
+      {
+        "text": "                                                                     ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 69
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "Command groups (temporary)",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 26
+      },
+      {
+        "text": "      proves nesting until the catalogue moves ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 47
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "Go to task: fix-login",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 21
+      },
+      {
+        "text": "                                          fix-login ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 52
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "└──────────────────────────────────────────────────────────────────────────────┘",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "ctrl+meta+right pane · esc back · ctrl+0 go to github in the left rail · ctrl…",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 78
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      }
+    ]
+  ],
+  "focus": [
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      2
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "InputRenderable",
+      0
+    ]
+  ]
+}

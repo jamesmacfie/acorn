@@ -101,6 +101,10 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'src/main.tsx'),
         capture: resolve(import.meta.dirname, 'src/capture.tsx'),
+        // The golden set, its own entry beside the screenshot for the same reason the screenshot has
+        // one: it is a script Node runs by path, so its name has to be stable
+        // (src/captureGolden.tsx). It goes with the goldens in phase 4.
+        captureGolden: resolve(import.meta.dirname, 'src/captureGolden.tsx'),
         // The plugin sandbox's bootstrap, emitted beside `main.js` because a worker is pointed at it
         // by path and it has to be one file a thread with almost no filesystem can read. Its own
         // entry rather than a chunk, so its name is stable and `workerFactory.ts` can spell it.

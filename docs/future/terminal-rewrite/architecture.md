@@ -72,8 +72,9 @@ in a ref today) and a `pty` rectangle's `size()`. Both read the rectangle the la
 **What it is.** `yoga-layout` 3.2.1 from npm, the WebAssembly build of Yoga, loaded once at boot. One
 Yoga node per tree node, created in `createElement`, freed in `removeNode`. `setProperty` maps the
 flex props the kit uses (`flexDirection`, `flexGrow`, `flexShrink`, `flexBasis`, `gap`, the paddings
-and margins, `width`, `height`, `minWidth`, `minHeight`, `maxHeight`, `alignItems`, `flexWrap`,
-`border`) onto the Yoga setters. A `text` node gets a measure function returning its wrapped or
+and margins, `width`, `height`, `minWidth`, `minHeight`, `alignItems`, `flexWrap`, `overflow`,
+`border`) onto the Yoga setters. Spike 2 tallied those at 21 distinct props across the 154 `<box>`
+and six `<text>` tags, and every one has a setter. A `text` node gets a measure function returning its wrapped or
 truncated extent. `visible={false}` is `DISPLAY_NONE`, which is what OpenTUI does today, so a hidden
 subtree costs no layout and no paint. Each frame calls `calculateLayout(cols, rows)` on the root and
 reads computed left, top, width, height into each node's rectangle.
@@ -94,9 +95,15 @@ that reads computed sizes back, where it belongs, and there is no Zig side to th
 and the test that pins the guard today (`apps/tui/src/renderGuard.test.ts`) becomes a test of that
 function.
 
-**Spike 2 decides** whether the synchronous `yoga-layout` entry (which embeds the wasm as base64) or
-the async `yoga-layout/load` entry is used, and measures a layout pass over the widest pane at 120 by
-40. The sync entry is simpler and fits `main.tsx`'s top-level awaits either way.
+**Spike 2 answered** the entry and the speed, and its numbers are in
+[phase-0-baseline-and-spikes.md](./phase-0-baseline-and-spikes.md) § Spike 2. Take the synchronous
+`yoga-layout` entry: both entries reach the same 71,736-byte wasm module, both cost about 20 ms to
+load on Node 24.11.0, and the synchronous one is a top-level await that `main.tsx` already has. A
+200-row `list-detail` at 120 by 40 lays out in 0.19 ms when one row's text changed and 1.9 ms when
+all 200 did, against a 5 ms target. One correction to the paragraph above: an unmeasured node's
+computed width and height come back `NaN`, not zero, so the read-back clamp is Yoga's problem too
+and not OpenTUI's alone. Yoga does round sizes to whole cells by itself, at the default point scale
+factor of 1.
 
 ## 3. Paint
 
@@ -123,9 +130,13 @@ naming a colour. `apps/tui/src/kit/roles.ts` loses its `RGBA` and `TextAttribute
 
 **Width.** `apps/tui/src/kit/cells.tsx` truncates by `String.length` today and `apps/tui/src/kit/glyphs.ts`
 bans emoji to compensate. Paint measures with a grapheme segmenter and an East Asian width table, so a
-wide character occupies two cells and a combining mark occupies none. `string-width` is in the
-lockfile three times already and does this; spike 3 decides whether to use it or `Intl.Segmenter`
-with a small width table. `ellipsise` and `pad` move onto the same measure.
+wide character occupies two cells and a combining mark occupies none. Spike 3 chose `Intl.Segmenter`
+with a hand table of the East Asian Width `W` and `F` ranges, in front of a `String.length` branch for
+a pure-ASCII string. Not `string-width`: it doubles nine of the kit's own glyph names, because
+`emoji-regex` matches a bare text-presentation emoji, and it is in the lockfile once as a dependency
+of `@opentui/core`, so it leaves the tree in phase 4 rather than being ours already. `ellipsise` and
+`pad` move onto the same measure. Six characters in `apps/tui/src/kit/glyphs.ts` measure two cells
+today against a comment there that says every glyph is one; phase 2 replaces the glyphs.
 
 **What it replaces.** OpenTUI's `OptimizedBuffer`, its Zig diff and flush, its console overlay, and
 the stderr rules in `apps/tui/src/main.tsx`: stderr is no longer the file the renderer draws on,
@@ -215,11 +226,12 @@ lines, replacing `apps/tui/src/kit/scrolling.tsx`'s use of `ScrollBoxRenderable`
 visible slice and the cursor when focused. About 150 lines.
 
 **Textarea.** The hardest widget and the one to design before writing. It needs a multi-line model
-with word wrap, a cursor with line and column, up and down within the text, Home and End, word
-motions, and selection for the composer's needs. Two routes, and spike 4 picks one: write it, at
-about 400 lines; or use `@codemirror/state` as the model, which is already in `apps/tui/package.json`,
-is pure data with transactions and selections and no DOM, and paint the visible lines ourselves.
-The second is the ladder's answer if its wrapping can be driven without a view.
+with word wrap, a cursor with line and column, up and down within the text, Home and End, and word
+motions. Spike 4 wrote it both ways and it is ours: 89 lines over a plain string plus a 44-line wrap
+function, against 63 lines plus the same 44 over `@codemirror/state`. The 26 lines that package saves
+cost 47,922 bytes in the eager graph, and this host runs no CodeMirror today, so the budget here is
+135 lines rather than the 400 this file first guessed
+([phase 0](./phase-0-baseline-and-spikes.md) § Spike 4).
 
 **The `pty` rectangle.** `@xterm/headless` 5.5.0 is a dependency of `apps/desktop`,
 `plugins/terminal`, and `plugins/agents` already, and `plugins/agents/src/server/usage/processRunner.ts`

@@ -56,9 +56,13 @@ In:
   `RGBA` and `TextAttributes` imports for a `Color` type of ours (an index 0 to 15, an RGB triple, or
   `default`) and a bitmask of ours. `spanStyle` merges into `textStyle` because a span takes the same
   props as a text.
-- **Width**: `ellipsise` and `pad` in `apps/tui/src/kit/cells.tsx` measure with the function spike 3
-  chose. The emoji ban in `apps/tui/src/kit/glyphs.ts` stays until phase 4 proves a wide glyph draws
-  at two cells and the ban can go.
+- **Width**: `ellipsise` and `pad` in `apps/tui/src/kit/cells.tsx` measure with `Intl.Segmenter` and
+  the East Asian Width table spike 3 chose. `☰`, `🗀`, `🗎`, `🗒`, `🗃` and `🖵` in
+  `apps/tui/src/kit/glyphs.ts` become one-cell characters, because they measure two today and the
+  file's own comment says they do not; the goldens for the trust prompt and the notes tab are
+  recaptured after the swap. The emoji ban in that file stays, and its `\p{Emoji_Presentation}` test
+  becomes an assertion that the painter's measure returns 1 for every value in `GLYPHS`, which is the
+  check that would have caught those six.
 - **The switch**: `ACORN_TUI_PAINTER` read in `apps/tui/vite.config.ts` and `apps/tui/vitest.config.ts`
   to pick the alias target, defaulting to `opentui`. `main.tsx` picks `createCliRenderer` or our
   `openTerminal` from the same define.
@@ -185,7 +189,8 @@ intent table already use (`up`, `down`, `return`, `escape`, `pageup`, `pagedown`
   removing and re-inserting the same node keeps its Yoga node; disposing the owner frees it.
 - `apps/tui/src/layout/layout.test.ts` (new): the prop table covers every flex prop the kit uses
   (grep the kit for `flexDirection=` and friends, assert each has a setter); a node inserted after a
-  pass reads a zero rect, not `NaN`; the measure cache hits on an unchanged text.
+  pass reads a zero rect, because the read-back clamps the `NaN` width and height spike 2 measured
+  coming out of Yoga; the measure cache hits on an unchanged text.
 - `apps/tui/src/paint/paint.test.ts` (new): a box with each border style; a wrapped text; a wide
   glyph occupies two cells and one flush run; a diff of a one-cell change emits one cursor move and
   one run; a full clear after resize.
