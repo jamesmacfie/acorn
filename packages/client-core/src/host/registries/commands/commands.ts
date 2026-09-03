@@ -2,6 +2,7 @@ import type { CommandScope, CommandSearchItem, CommandSettingOption } from '@aco
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { hasHostCapability } from '../../../infra/node/hostCapabilities'
 import { Registry, type Disposable } from '../../../kit/lib/registry'
+import { presentCommand } from './presenter'
 
 // The command vocabulary: what a contributor declares, what a command runs in, and what running one
 // says happened (docs/command-palette-and-shortcuts.md).
@@ -188,9 +189,13 @@ export const stampCommandOwner = (command: ContributedCommand, ownerId: string):
 export function executeCommand(id: string, context?: CommandExecutionContext): Promise<CommandOutcome> {
   const command = commandRegistry.get(id)
   if (!command || !commandAvailable(command)) return Promise.resolve(COMMAND_CLOSED)
-  // An interactive command is entered at its own frame, and the session that enters one is not built
-  // yet. `stay` is the honest answer meanwhile: nothing ran, so nothing should close over it.
-  if (!isActionCommand(command)) return Promise.resolve({ effect: 'stay' })
+  // An interactive command is entered at its own frame rather than run, so the id goes to whichever
+  // host is drawing a palette (./presenter.ts) and the answer is `stay`: nothing ran, so nothing that
+  // was already open should close over it, and a shortcut has nothing to close.
+  if (!isActionCommand(command)) {
+    presentCommand(command.id)
+    return Promise.resolve({ effect: 'stay' })
+  }
   try {
     return Promise.resolve(command.run(context ?? DETACHED_COMMAND_CONTEXT))
       .then((outcome) => outcome ?? COMMAND_CLOSED)

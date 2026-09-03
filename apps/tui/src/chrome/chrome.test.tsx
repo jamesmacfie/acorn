@@ -131,6 +131,39 @@ describe.skipIf(!hasFfi)('the shell', () => {
     expect(caretRow(closed)).toBe(before)
   }, 30_000)
 
+  it('walks into a command group on return and back out of it on escape', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.press('k', { ctrl: true })
+    for (const letter of 'groups') await screen.press(letter)
+    expect(await screen.frame()).toContain('Command groups')
+
+    await screen.press('RETURN')
+    const inside = await screen.frame()
+    expect(inside).toContain('Stay open and say so')
+    expect(inside).toContain('Close the palette')
+
+    // Escape pops to exactly where it was — the query that was typed is still there — and only the
+    // second one closes, which is the same sequence the desktop runs
+    // (client-core/host/palette/paletteView.test.tsx).
+    await screen.press('ESCAPE')
+    const back = await screen.frame()
+    expect(back).toContain('Command groups')
+    expect(back).not.toContain('Close the palette')
+
+    await screen.press('ESCAPE')
+    const closed = await screen.frame()
+    expect(closed).not.toContain('Command groups')
+    expect(closed).toContain('Reviews')
+
+    // A typed root reaches a descendant by its breadcrumb, so nesting hides nothing
+    // (client-core/host/registries/commands/graph.ts).
+    await screen.press('k', { ctrl: true })
+    for (const letter of 'stay') await screen.press(letter)
+    const found = await screen.frame()
+    screen.done()
+    expect(found).toContain('Stay open and say so')
+  }, 30_000)
+
   it('draws the cheat sheet on ? with the keys that are live', async () => {
     const screen = await renderFixture({ width: 100, height: 28 })
     await screen.press('?')

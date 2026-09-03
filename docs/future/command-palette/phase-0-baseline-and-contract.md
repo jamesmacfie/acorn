@@ -1,6 +1,6 @@
 # Phase 0: pin the baseline and introduce the command contract
 
-Planned 2026-09-03 at `7d62e3ec`. Not started.
+Planned 2026-09-03 at `7d62e3ec`. Shipped 2026-09-03.
 
 ## Status
 

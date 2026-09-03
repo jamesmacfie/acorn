@@ -1,6 +1,6 @@
 # Phase 1: make the graph and session the only palette brain
 
-Planned 2026-09-03 at `7d62e3ec`. Not started.
+Planned 2026-09-03 at `7d62e3ec`. Shipped 2026-09-03.
 
 ## Status
 

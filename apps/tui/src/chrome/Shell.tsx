@@ -7,6 +7,7 @@ import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
+import { registerCommandGroupExample } from '@acorn/client-core/host/registries/commands/example.ts'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
@@ -35,6 +36,7 @@ import { Notifications } from './Notifications'
 import { Inbox, initInbox } from './Inbox'
 import { TrustPrompt } from '../plugins/TrustPrompt'
 import { Palette } from './Palette'
+import { createShellPalette } from './paletteSession'
 import { CheatSheet } from './CheatSheet'
 
 // The arrangement: topbar, rail beside the pane, notifications, footer, and whatever overlay is on
@@ -53,6 +55,9 @@ const STRIP_ORDER = -50
 
 export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void }) {
   const model = createShellModel()
+  // One session for the whole shell, not one per open: `./Palette.tsx` is mounted only while the
+  // overlay is up, and a shortcut aimed at a group has to be able to open it (./paletteSession.ts).
+  const palette = createShellPalette(model)
   const prefs = createQuery(() => prefsOptions(true))
   let root: BoxRenderable | undefined
   const [strip, setStrip] = createSignal<BoxRenderable | undefined>()
@@ -153,7 +158,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       else props.onQuit()
     }
     const commands = registerCommands([
-      { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => openOverlay('palette') },
+      { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => palette.openRoot() },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
       { id: 'core.workspace.switch', title: 'Switch workspace', category: 'workspace', palette: true, run: () => openOverlay('workspace') },
       { id: 'core.project.switch', title: 'Switch project', category: 'workspace', palette: true, run: () => openOverlay('project') },
@@ -173,7 +178,11 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
       { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
     ])
-    onCleanup(() => { bindings.dispose(); commands.dispose() })
+    // Temporary, and phase 3 takes it: one group with two children, so hierarchy is something a
+    // person can press Enter on before the catalogue moves
+    // (client-core/host/registries/commands/example.ts).
+    const example = registerCommandGroupExample()
+    onCleanup(() => { example.dispose(); bindings.dispose(); commands.dispose() })
   })
 
   // One command per node this device has paired with, so switching node is a palette row rather than
@@ -256,7 +265,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
         {(name) => (
           <box flexDirection="column" flexGrow={1}>
             <Switch>
-              <Match when={name() === 'palette'}><Palette model={model} /></Match>
+              <Match when={name() === 'palette'}><Palette session={palette} /></Match>
               <Match when={name() === 'help'}><CheatSheet /></Match>
               <Match when={name() === 'workspace'}><WorkspacePicker model={model} /></Match>
               <Match when={name() === 'project'}><ProjectPicker model={model} /></Match>

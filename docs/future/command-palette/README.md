@@ -66,9 +66,9 @@ is not a command surface.
 
 | Phase | What it establishes | Status |
 | --- | --- | --- |
-| [0](./phase-0-baseline-and-contract.md) | Characterization tests, command and wire types, graph validation, and backward-compatible manifest parsing. | Not started. |
-| [1](./phase-1-command-graph-and-session.md) | One command graph and session controller, nested navigation, direct shortcut entry, and desktop/TUI renderers. | Waits on phase 0. |
-| [2](./phase-2-search-and-input.md) | Debounced search, explicit input submission, cancellation, scope and fleet fan-out, plus loaded-plugin route adapters. | Waits on phase 1. |
+| [0](./phase-0-baseline-and-contract.md) | Characterization tests, command and wire types, graph validation, and backward-compatible manifest parsing. | Shipped 2026-09-03. |
+| [1](./phase-1-command-graph-and-session.md) | One command graph and session controller, nested navigation, direct shortcut entry, and desktop/TUI renderers. | Shipped 2026-09-03. |
+| [2](./phase-2-search-and-input.md) | Debounced search, explicit input submission, cancellation, scope and fleet fan-out, plus loaded-plugin route adapters. | Next. |
 | [3](./phase-3-settings-and-core-commands.md) | Setting commands, core hierarchy, navigation searches, and the first shared preference accessors. | Waits on phase 2. |
 | [4](./phase-4-compiled-plugin-adoption.md) | The compiled plugins adopt the graph; terminal/workflow rows and specialist file finders leave their private paths. | Waits on phases 2 and 3. |
 | [5](./phase-5-loaded-plugin-adoption.md) | Database, HTTP, Linear, and Rollbar prove the declarative search/input contract. | Waits on phase 2; may run beside phase 4. |

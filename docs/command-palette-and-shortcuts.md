@@ -1,8 +1,48 @@
 # Command palette and shortcuts
 
-Keyboard commands are registered by the shell and feature contributions. `CommandPalette.tsx`
-combines static actions, plugin palette rows, task/workspace rows, and Node-aware aggregate results.
-It imports no feature implementation.
+Keyboard commands are registered by the shell and feature contributions.
+
+**One session draws both palettes.** `client-core/host/registries/commands/session.ts` owns what is
+open, where in the command tree it is, what is under the cursor, and what pressing Enter does. The
+desktop's `CommandPalette.tsx` and the terminal's `chrome/Palette.tsx` render it and bind keys to it;
+neither fetches a row or invokes one. Until 2026-09-03 each host did all of that itself, twice, which
+is why a nested or asynchronous command could not be added to one without being reproduced in the
+other.
+
+**A command may be a group.** `CommandContribution` is a discriminated union — an action, a group, and
+later a search, an input and a setting — and a static command may name a group registered by the same
+contributor as its `parentId`. Cross-contributor parenting is refused, and so are duplicate ids, a
+parent that is not a group, and a cycle: each becomes a dropped node and one diagnostic rather than a
+palette that will not draw (`registries/commands/graph.ts`).
+
+**Empty root lists top-level commands; a typed root searches everything.** A query at the root indexes
+every available command at any depth against its title, keywords, hint and joined breadcrumb, and a
+hit below the top level shows the trail it came from — so hierarchy reduces noise without making a
+command undiscoverable. Inside a group the query narrows that group's own children.
+
+**Enter enters, Escape goes back.** Enter runs a leaf and pushes a group. Escape pops one frame and
+restores that frame's query and cursor exactly, because the whole frame object was kept rather than
+rebuilt; at the root it closes and hands focus back. Focus is restored on the final close and never on
+an intermediate pop. Backspace edits the query rather than implicitly popping.
+
+**A shortcut aimed at a group opens the palette at it.** The keymap remains the only global
+dispatcher: it hands a command id to `executeCommand` whether the command is a leaf or not, and a
+command with no executor is passed to the registered palette presenter, which opens the session at that
+command's frame (`registries/commands/presenter.ts`). A leaf named that way opens at its parent with
+the cursor on it.
+
+**A command says what happened.** An action returns nothing, which means close; `{ effect: 'stay' }`
+keeps the frame open and may carry a line to show; a throw or a rejected promise keeps the frame open
+with the message on it. A second Enter while one is in flight is ignored.
+
+**The session closes when the world moves under it.** It captures one immutable execution context —
+host, node, workspace, project, task, pane, surface — when it opens, and passes that to every provider
+and executor. An external change to the node, workspace, project or task closes it and aborts what is
+outstanding; a command that navigates closes through its own outcome first, so its error still has
+somewhere to be reported.
+
+Task rows, workspace rows and `paletteRows` contributions are compatibility providers over that
+session and keep the order the flat list had. They go as their owners become commands.
 
 ## Global commands
 

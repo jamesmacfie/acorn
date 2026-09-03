@@ -1,5 +1,16 @@
-// Command palette model (docs/command-palette-and-shortcuts.md): pure item-source composition + fuzzy filter, unit
-// tested; the ⌘K overlay component is thin glue over this.
+// The flat palette list: pure item-source composition and a fuzzy filter, unit tested.
+//
+// `fuzzyScore` is live and widely spent — the graph ranks a command with it, the session ranks a
+// compatibility row with it, and three pickers outside the palette use it through
+// `@acorn/plugin-api/client`.
+//
+// `composeItems` and `fuzzyFilter` are not on the live path any more. Both hosts drew this list until
+// 2026-09-03 and now render the session instead, which owns the order and the ranking because a frame
+// stack cannot be expressed as one concatenation
+// (../../host/registries/commands/session.ts). They stay because `PaletteItem` is still the shape a
+// `paletteRows` contribution produces and these two are the baseline the session's ordering was held
+// to; all three go together when the last source becomes a command
+// (docs/future/command-palette/phase-6-cutover-and-documentation.md).
 
 export type PaletteItem =
   | { kind: 'run'; id: string; label: string; hint: string; running: boolean }
