@@ -8,7 +8,7 @@ import { setTerminalBadge } from './kit/notify'
 import { RAW_KEYS } from './kit/render'
 import { drawsOwn } from './painter'
 import { openOwnRenderer } from './ownRenderer'
-import { frameRequested } from './tree/frames'
+import { frameRequested, framesSettled } from './tree/frames'
 import { pressedKey } from './ownKeys'
 import { focusedRegion, focusedRenderable, type RegionRef } from './keys/regions'
 
@@ -135,6 +135,10 @@ function ownSurface(size: { width: number; height: number }): Surface {
       for (let turn = 0; turn < 20 && frameRequested(); turn += 1) {
         await new Promise((done) => setImmediate(done))
       }
+      // …and then anything that has *held* a frame rather than asked for one, which the loop above
+      // cannot outwait: a `pty` rectangle's emulator parses on a timer and twenty turns of
+      // `setImmediate` go by in two milliseconds (./tree/frames.ts § framesSettled).
+      await framesSettled()
       renderer.frame()
     },
     // A trailing newline, because that is the shape the other painter's capture has and the shape the

@@ -1,24 +1,41 @@
 /** @jsxImportSource @opentui/solid */
+import { createRequire } from 'node:module'
 import { createEffect, createSignal, onCleanup, Show, type JSX } from 'solid-js'
 import { extend } from '@opentui/solid'
 import { EmbeddedTerminalRenderable, type BoxRenderable, type KeyEvent, type Renderable } from '@opentui/core'
+import type { Terminal as HeadlessTerminal } from '@xterm/headless'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { focusRenderable, focusWithin, focusedRenderable, onScreen } from '../keys/regions'
 import { RECTANGLE } from '../keys/tiers'
+import { drawsOwn } from '../painter'
+import { holdFrame, requestFrame } from '../tree/frames'
+import type { Node } from '../tree/node'
 import { Line } from './cells'
+import { encodeKey, encodePaste, type PtyModes } from './ptyKeys'
 import { boxBorder } from './roles'
 
 // The PTY, natively, and the keyboard contract that makes a rectangle a rectangle.
 //
 // This is the one thing a terminal does better than the desktop. The desktop draws a terminal by
 // running a terminal emulator written in JavaScript inside a browser inside an app; here the emulator
-// is OpenTUI's, in cells, and the PTY's bytes go straight into it. The PTY itself does not move: it
-// stays on the node, reached over the same `term` WebSocket channel
+// draws in cells, and the PTY's bytes go straight into it. The PTY itself does not move: it stays on
+// the node, reached over the same `term` WebSocket channel
 // (docs/terminal-and-agents.md), and this is a second emulator for it.
+//
+// **Two emulators, one contract.** Under the painter we are leaving it is OpenTUI's
+// `EmbeddedTerminalRenderable`, which is Ghostty's emulator behind an FFI boundary with its own key
+// encoder in Zig. Under ours it is `@xterm/headless`, which three other packages in this repo already
+// depend on and which the desktop draws the same PTY through — so a program's output is parsed by the
+// same parser on both hosts and looks the same. The one thing headless xterm has no notion of is a
+// keyboard, hence `./ptyKeys.ts`. Everything above the emulator — the arming, the intercept, the
+// Escape pair, the footer's answer — is one piece of code either way, because the contract is the
+// contract (docs/tui.md § The Rectangle contract). Phase 4 deletes the OpenTUI half
+// (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md).
 //
 // `EmbeddedTerminalRenderable` is not one of OpenTUI's Solid intrinsics, so the catalogue is extended
 // once with it. `extend` is idempotent enough to call at module scope: the catalogue is a plain
-// record and this writes the same entry every time.
+// record and this writes the same entry every time. Under our painter it registers nothing, because
+// our kinds are fixed and `pty` is one of them (../tree/renderer.ts § extend).
 extend({ embedded_terminal: EmbeddedTerminalRenderable })
 
 /**
@@ -40,6 +57,19 @@ export type CellTerminal = {
    *  the first resize arrives. `onResize` alone would leave a PTY guessing until the reader dragged
    *  something (./pty.ts). */
   size: () => { cols: number; rows: number }
+}
+
+/** What the rectangle asks of whichever emulator is inside it, and the whole of the difference
+ *  between the two painters. Installed by the half that mounted one. */
+type Inside = {
+  /** The bytes this keystroke sends the program, honouring whatever modes it has set. */
+  encode: (key: KeyEvent) => Uint8Array
+  /** The bytes this paste sends it, bracketed where the program asked for that, and absent under the
+   *  painter we are leaving. The dispatcher's paste hand-off is ours alone — OpenTUI's renderer
+   *  delivers a paste to the renderable *it* focused, which is the box rather than the emulator — so
+   *  there is nothing there to answer and adding a second route to a shipping painter is a change
+   *  nobody asked for (../keys/install.ts § pasteInto). */
+  paste?: (text: string) => Uint8Array
 }
 
 // How long after leaving a rectangle a second Escape means "send an Escape to what is inside".
@@ -70,6 +100,38 @@ const [live, setLive] = createSignal<readonly (() => boolean)[]>([])
  *  back out (docs/tui.md § The footer). */
 export const enteredRectangle = (): boolean => live().some((held) => held())
 
+// ── The emulator under our painter ────────────────────────────────────────────────────────────
+
+/** How much scrollback the emulator keeps. The kit exposes no way to scroll a rectangle — its
+ *  viewport is the box — so this is for the program inside, which scrolls its own region and expects
+ *  the rows above to still be there. `less` on a long file is the case. */
+const SCROLLBACK = 1000
+
+/** The `Terminal` class, loaded the first time a rectangle under our painter is drawn.
+ *
+ *  Through `createRequire` because `@xterm/headless` ships one CommonJS bundle whose named exports
+ *  Node's ESM loader cannot see, which is the shape
+ *  `plugins/agents/src/server/usage/processRunner.ts` already uses for it. Lazily, and that half is
+ *  load-bearing: this module is in `App`'s eager graph, so a static import would put a whole terminal
+ *  emulator into the startup of the build that draws its terminals with OpenTUI's instead
+ *  (../scripts/check-startup-graph.mjs, docs/frontend.md § Startup budget). */
+let loaded: typeof HeadlessTerminal | undefined
+
+const emulatorClass = (): typeof HeadlessTerminal => {
+  loaded ??= (createRequire(import.meta.url)('@xterm/headless') as {
+    Terminal: typeof HeadlessTerminal
+  }).Terminal
+  return loaded
+}
+
+/** The modes the encoder needs, read off the emulator at the moment a key arrives rather than
+ *  remembered anywhere: the program inside is the only thing that sets them and it is free to set one
+ *  between two keystrokes (./ptyKeys.ts § The mode table). */
+const modesOf = (term: HeadlessTerminal): PtyModes => ({
+  applicationCursor: term.modes.applicationCursorKeysMode,
+  bracketedPaste: term.modes.bracketedPasteMode,
+})
+
 /**
  * A `pty` rectangle: an emulator in cells, one tab stop from outside.
  *
@@ -79,11 +141,11 @@ export const enteredRectangle = (): boolean => live().some((held) => held())
  */
 export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (terminal: CellTerminal) => void }) {
   // Enter was pressed and nothing has taken the keys off the box since. Half of the answer, and the
-  // only half worth storing: the other half is the box's own focus, which the renderer owns
+  // only half worth storing: the other half is the box's own focus, which the store owns
   // (§ entered).
   const [armed, setArmed] = createSignal(false)
   let box: BoxRenderable | undefined
-  let term: EmbeddedTerminalRenderable | undefined
+  let inside: Inside | undefined
   let leftAt = 0
   const dataListeners: ((bytes: Uint8Array) => void)[] = []
   const sizeListeners: ((cols: number, rows: number) => void)[] = []
@@ -92,18 +154,18 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     for (const listener of dataListeners) listener(bytes)
   }
   // A keystroke, encoded the way a PTY expects it, and handed to whoever is filling the rectangle.
-  // Through `encodeKey` rather than the emulator's own key handling: the emulator only takes keys
-  // when the renderer has focused it, and here the box holds the focus so that Enter and Escape
-  // belong to the rectangle rather than to what is inside it.
+  // Through an encoder rather than the emulator's own key handling: OpenTUI's only takes keys when
+  // the renderer has focused it, headless xterm has no keyboard at all, and here the box holds the
+  // focus either way so that Enter and Escape belong to the rectangle rather than to what is in it.
   const send = (key: KeyEvent) => {
-    const bytes = term?.encodeKey(key)
+    const bytes = inside?.encode(key)
     if (bytes?.length) emit(bytes)
   }
 
   // Whether the keys are this rectangle's, as a fact about the screen rather than a flag anybody
   // maintains: the reader pressed Enter since the box last lost the keys, the box has them, and the
   // box is on screen. Asking the store is what makes a rectangle hidden without being unmounted stop
-  // eating keys, because `visible` is per node in OpenTUI and `onScreen` walks the parents
+  // eating keys, because `visible` is per node and `onScreen` walks the parents
   // (../keys/regions.ts § onScreen).
   //
   // Both terms are reactive now and both have to be, because this answer is drawn: the title and the
@@ -134,22 +196,18 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
   setLive((all) => [...all, entered])
   onCleanup(() => setLive((all) => all.filter((held) => held !== entered)))
 
-  const handed = (renderable: EmbeddedTerminalRenderable) => {
-    term = renderable
-    // Not itself a stop. The rectangle is one stop from outside and the emulator is what is inside
-    // it, so focus lands on the box and the box decides when to hand the keys over. Leaving the
-    // emulator focusable would let a region's first stop land past the door.
-    renderable.focusable = false
-    // The emulator answering a query the program inside sent it — cursor position, device
-    // attributes. It goes to the PTY exactly like a keystroke does, and it is the only thing this
-    // callback carries: the keys are forwarded below, because a rectangle decides which keys are its
-    // before the emulator ever sees one.
-    renderable.onData = (bytes) => emit(bytes)
-    renderable.onTerminalResize = (cols, rows) => {
-      for (const listener of sizeListeners) listener(cols, rows)
-    }
+  /** A size the emulator has taken, passed on to whoever opened the channel. */
+  const resized = (cols: number, rows: number): void => {
+    for (const listener of sizeListeners) listener(cols, rows)
+  }
+
+  /** The handle a caller filling the rectangle is given: the emulator's own write and size, and this
+   *  component's two listener lists. The same four members whichever emulator mounted, which is what
+   *  keeps `./pty.ts` one piece of code (§ CellTerminal). */
+  const hand = (write: CellTerminal['write'], size: CellTerminal['size']): void => {
     props.mount?.({
-      write: (data) => renderable.write(data),
+      write,
+      size,
       onData: (listener) => {
         dataListeners.push(listener)
         onCleanup(() => {
@@ -164,8 +222,91 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
           if (at >= 0) sizeListeners.splice(at, 1)
         })
       },
-      size: () => ({ cols: renderable.width, rows: renderable.height }),
     })
+  }
+
+  const handedNative = (renderable: EmbeddedTerminalRenderable) => {
+    // Not itself a stop. The rectangle is one stop from outside and the emulator is what is inside
+    // it, so focus lands on the box and the box decides when to hand the keys over. Leaving the
+    // emulator focusable would let a region's first stop land past the door.
+    renderable.focusable = false
+    // The emulator answering a query the program inside sent it — cursor position, device
+    // attributes. It goes to the PTY exactly like a keystroke does, and it is the only thing this
+    // callback carries: the keys are forwarded below, because a rectangle decides which keys are its
+    // before the emulator ever sees one.
+    renderable.onData = (bytes) => emit(bytes)
+    renderable.onTerminalResize = resized
+    inside = { encode: (key) => renderable.encodeKey(key) }
+    hand((data) => renderable.write(data), () => ({ cols: renderable.width, rows: renderable.height }))
+  }
+
+  /**
+   * Our painter's half: a headless emulator held by the component and read by paint.
+   *
+   * The `Terminal` goes on the node as a prop, which is the one widget in this phase whose state does
+   * not reduce to numbers — paint has to read a buffer. It is still the component's: the node holds a
+   * reference and knows nothing about it, so there is no emulator state the node can be in that this
+   * component disagrees with (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § Design,
+   * ../paint/paint.ts § drawPty).
+   */
+  const handedOwn = (element: unknown) => {
+    const node = element as Node
+    const Emulator = emulatorClass()
+    // Before the first layout the rectangle is nought by nought and a `Terminal` refuses either
+    // dimension at nought, so the first size is a floor and the first `onSizeChange` is what makes it
+    // real.
+    const term = new Emulator({
+      cols: Math.max(1, node.rect.w),
+      rows: Math.max(1, node.rect.h),
+      scrollback: SCROLLBACK,
+      // `buffer` is behind this flag in 5.5.0 — `_checkProposedApi` throws on the getter without it —
+      // and the buffer is the whole of what paint reads. "Proposed" here means the shape may change
+      // in a major version rather than that it is unfinished: `apps/desktop` and `plugins/agents`
+      // both read the same buffer through it, and this pins the same 5.5.0 they do
+      // (../paint/paint.ts § drawPty).
+      allowProposedApi: true,
+    })
+    onCleanup(() => term.dispose())
+    node.props.terminal = term
+    // The emulator answering a query the program inside sent it, exactly as above. It is the only
+    // thing this event carries here, because nothing calls `term.input`: a rectangle decides which
+    // keys are its before the emulator sees one.
+    const replies = term.onData((text) => emit(new TextEncoder().encode(text)))
+    onCleanup(() => replies.dispose())
+    inside = {
+      encode: (key) => encodeKey(key, modesOf(term)),
+      paste: (text) => encodePaste(text, modesOf(term)),
+    }
+    node.props.onSizeChange = () => {
+      const cols = node.rect.w
+      const rows = node.rect.h
+      // A hidden rectangle lays out at nought by nought, and telling a full-screen program that its
+      // window is empty would have it redraw at that size the moment the tab came back
+      // (../keys/keys.test.tsx § stops taking the keys the moment an entered rectangle goes off
+      // screen).
+      if (cols <= 0 || rows <= 0) return
+      if (cols === term.cols && rows === term.rows) return
+      term.resize(cols, rows)
+      resized(cols, rows)
+    }
+    // Whether paint draws the emulator's own caret, which is exactly whether the rectangle is
+    // entered. Written from an effect rather than spelled as a JSX attribute, the way every other
+    // widget's props are while the switch exists: tsc types every intrinsic in this package against
+    // OpenTUI's prop shapes whichever painter the build picked
+    // (./scrolling.tsx § ownViewport, ../paint/paint.ts § drawPty).
+    createEffect(() => {
+      node.props.focused = entered()
+      requestFrame()
+    })
+    // A write is the one thing in this tree that produces cells later rather than now: xterm parses
+    // on a queue of its own, a macrotask after the call returns. So the frame is *held* rather than
+    // asked for, and the emulator's own callback is what lets go — without which a harness that draws
+    // as soon as nothing is asking draws the screen from before the output
+    // (../tree/frames.ts § holdFrame).
+    const write = (data: string | Uint8Array): void => {
+      term.write(data, holdFrame())
+    }
+    hand(write, () => ({ cols: node.rect.w, rows: node.rect.h }))
   }
 
   const engine = keymap<Renderable, KeyEvent>()
@@ -195,9 +336,23 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     }, { priority: RECTANGLE }))
   }
 
+  /** A paste while the rectangle is entered belongs to the program inside it, bracketed where that
+   *  program asked for it. The same member a field installs and the same route the dispatcher hands
+   *  one down, because "what has the keys" is one question and the box is what has them
+   *  (../keys/install.ts § pasteInto, ./asking.tsx § api). */
+  const pasted = (event: { text: string }): void => {
+    if (!entered()) return
+    const bytes = inside?.paste?.(event.text)
+    if (bytes?.length) emit(bytes)
+  }
+
   return (
     <box
-      ref={(element: BoxRenderable) => { box = element; element.focusable = true }}
+      ref={(element: BoxRenderable) => {
+        box = element
+        element.focusable = true
+        ;(element as unknown as { handlePaste?: (event: { text: string }) => void }).handlePaste = pasted
+      }}
       flexDirection="column"
       flexGrow={1}
       // Kept mounted and taken off the screen, which is what a tab strip over several of these asks
@@ -215,7 +370,16 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
       // entered (../chrome/Footer.tsx).
       title={`${props.label} · ${entered() ? 'esc leave' : 'enter'}`}
     >
-      <embedded_terminal ref={handed} flexGrow={1} />
+      {/* One tag each, in one component, because the tag is the only thing that differs: everything
+          above this line is the rectangle contract and is shared. A ternary in the JSX rather than
+          two components over a duplicated intercept, which `@opentui/solid`'s open intrinsic types
+          allow — its component catalogue is an interface with a string index signature, so any tag
+          compiles with `any` props (../tree/jsx.ts, § Two emulators, one contract). Neither of these
+          is a stop: the box is, and our `pty` is not focusable by default the way OpenTUI's had to
+          be told (../tree/compat.ts § focusable). */}
+      {drawsOwn()
+        ? <pty ref={handedOwn} flexGrow={1} />
+        : <embedded_terminal ref={handedNative} flexGrow={1} />}
     </box>
   )
 }

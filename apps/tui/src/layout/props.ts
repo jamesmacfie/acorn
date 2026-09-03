@@ -182,6 +182,7 @@ export const NOT_YOGA: Readonly<Record<string, string>> = {
   scrollY: 'the same',
   virtual: 'whether a scrollbox windows its rows, which is the virtualiser\'s question and not Yoga\'s',
   focused: 'the region store owns focus; paint reads it (../keys/regions.ts)',
+  terminal: 'the headless emulator a `pty` rectangle holds, by reference, so paint can copy its cells',
 }
 
 /** Apply one prop to one Yoga node, if it is one Yoga has an opinion about. */

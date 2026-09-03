@@ -1,9 +1,11 @@
 # Phase 3: widgets and the pty
 
-Status: two slices built, both 2026-09-04. The scroll viewport is built against `cf374cbd` and
-`Input` and `Textarea` against `a6a9e330`. The `pty` rectangle, the parser's wiring and the click hit
-test are not started. What building each slice found is at the bottom, newest section last, and the
-last two sections of each are the ones to read first.
+Status: built, in three slices, all 2026-09-04. The scroll viewport against `cf374cbd`, `Input` and
+`Textarea` against `a6a9e330`, and the `pty` rectangle, its key encoder, the click hit test and the
+parser's wiring against `27a9b1ab`. What building each slice found is at the bottom, newest section
+last, and the last two sections of each are the ones to read first. Five goldens are held and each
+is a measured difference under the layout pass rather than work; the list is in § The five goldens
+that are left.
 
 ## Goal
 
@@ -672,3 +674,222 @@ are gone, and the finding above says how they got there.
   § PHASE_3` says which is which per size. Neither is above the layout pass. If phase 4 wants all 28,
   the honest routes are to re-capture the two that the harness out-settles and to spend an afternoon
   on `pointScaleFactor` for the three that round a squeezed row differently.
+
+## What building the pty found (2026-09-04)
+
+The last slice is built: the `pty` rectangle over `@xterm/headless`, the key encoder beside it, the
+click hit test, and the input parser wired into the dispatcher. `apps/tui/src/kit/rectangle.tsx` is
+rewritten in place with both emulators behind `drawsOwn()` — 399 lines where it was 235, of which 188
+are code, and the two emulators' own halves are 34 lines of code in 60 and seven in 24. One new file
+of its own, `apps/tui/src/kit/ptyKeys.ts`, which is 107 lines of code in 232 and of which the byte
+tables are 44. Paint's share is 50 lines of code in 92, the click is 26 in 47 at the bottom of
+`apps/tui/src/tree/hit.ts`, and the frame scheduler grew a hold, which is 24. Against
+[architecture.md](./architecture.md)'s budget of about 150 for the encoder: 107, and the tables are
+most of it. Two new test files beside them, `apps/tui/src/kit/ptyKeys.test.ts` and
+`apps/tui/src/ownRenderer.test.ts`, and six cases added to `apps/tui/src/paint/paint.test.ts`.
+
+The shape held. An emulator is a component's, a node carries a reference to it, and paint copies one
+cell per cell. `apps/tui/src/kit/pty.ts` is byte-identical to its state at `9e5d90ca` — the same blob
+hash, `8df7dcf7` — which is the proof the `CellTerminal` seam held. Eleven things this file,
+[architecture.md](./architecture.md) or § Verify before building said turned out otherwise.
+
+**`ctx.consume()` was a no-op under our painter, and the rectangle is the only thing in this app that
+would ever have noticed.** `@opentui/keymap`'s `handleKeyEvent` asks the *event* whether an intercept
+took the key — `if (event.propagationStopped) return` — and `apps/tui/src/ownKeys.ts § ownKeyEvent`
+had `stopPropagation: () => {}` with no flag behind it. Its twin `defaultPrevented` was implemented,
+one line above. So an entered rectangle sent every key to the program inside it and then let the app's
+own bindings answer the same key: F6 walked out of the rectangle it had just taken, and
+`ACORN_TUI_KEYS_TRACE` said `binding-handled` for a key an intercept had consumed. Two slices went by
+without it showing because nothing else in this app intercepts — a layer is held off by priority and
+never has to stop anything.
+
+**`buffer` is behind `allowProposedApi` in `@xterm/headless` 5.5.0, and the buffer is the whole of
+what paint reads.** `_checkProposedApi` throws from the getter, which here is from inside the paint
+walk, so the process ends rather than drawing an empty box. § Verify before building is right about
+every member it lists; the flag in front of them is the part nobody had written down. "Proposed"
+means the shape may change in a major version rather than that it is unfinished, and `apps/desktop`
+and `plugins/agents` read the same buffer through the same flag at the same pinned version.
+
+**A write is the first thing in this tree that produces cells later rather than now, and
+`frameRequested` had no way to say so.** Everything else is synchronous: an operation changes the tree
+and the next turn draws it. xterm parses on a queue of its own, so a harness that draws as soon as
+nothing is asking drew the screen from before the output. Measured rather than reasoned about: in a
+bare Node process the parse lands on the eighth turn of `setImmediate`, and inside a test it had not
+landed after the harness's twenty turns, which go by in two milliseconds — a zero-delay timer is a
+millisecond, so a loop over `setImmediate` cannot outwait one however many turns it is given. So
+`apps/tui/src/tree/frames.ts` grows a hold: a source that knows a frame is owed and cannot yet ask for
+one takes one, `frameRequested` stays true until it lets go, and both harnesses wait the holds out
+after their loop (§ framesSettled). It is the only mechanism in this programme that exists because
+something outside the tree is slow.
+
+**A node leaving the tree told nobody, and both classes of reachability failure were that.**
+[architecture.md](./architecture.md) § 5 says `removeNode` tells the store and the landing pass runs.
+It was never built, and under this painter nothing is destroyed, so there was no second signal to fall
+back on. Two halves, one per failure class:
+
+- `apps/tui/src/tree/compat.ts § removed` marks the top of a removed subtree and `insertNode` unmarks
+  it, which is what `Suspense` handing the same object back looks like. `apps/tui/src/keys/regions.ts
+  § onScreen` asks the question at the *end* of its parent walk, where it costs nothing, because only
+  the top of a removed subtree is ever unlinked. Without it whole detached subtrees answered "on
+  screen" from nowhere at all, and that is the five failures at 80 by 24: the reachability property
+  filters the stops it owes by `onScreen`, so a stop a re-render had replaced was still owed.
+- `removeNode` asks for a landing pass where the keys are no longer in the tree, and that is the seven
+  at 120 by 40: a filter field the walk had replaced went on holding them and nothing looked again.
+  Gated on `onScreen(focusedRenderable())` rather than fired on every removal, because a pass per
+  removal would reveal the focused node in its viewports on every re-render — and read untracked,
+  because `removeNode` runs inside whatever computation was updating the tree.
+
+**`pty` type-checks as an intrinsic without being declared anywhere the OpenTUI build can see, and
+that is what lets both emulators sit in one component.** `OpenTUIComponents` in `@opentui/solid` 0.5.9
+is an interface with a string index signature, so `ExtendedIntrinsicElements` accepts any tag at all
+and gives it `any` props. That is why `embedded_terminal` compiles today and why `<pty>` compiles
+beside it, so the rectangle is one component with a ternary in its JSX rather than two components over
+a duplicated intercept. The rule the last slice recorded still holds for the kinds OpenTUI names
+itself: `scrollbox`, `input` and `textarea` have closed prop shapes, and a new prop on one of those is
+still a `node.props` write from an effect, which is what `terminal`, `focused` and `onSizeChange` are
+here.
+
+**The emulator's modes are two, not four.** § Scope and [architecture.md](./architecture.md) both ask
+the encoder to honour "the modifyOtherKeys or kitty state the emulator reports through its modes".
+`IModes` in `@xterm/headless` 5.5.0 reports ten modes and neither of those is among them, so there is
+nothing to honour and a chord is encoded the legacy way: the C0 byte for Ctrl, an `ESC` prefix for
+Alt. The two that are there and matter are application cursor keys and bracketed paste. Application
+keypad is reported and deliberately ignored, because our parser already names a keypad key after the
+key it duplicates, so by the time a key reaches the encoder there is nothing left to tell apart.
+
+**The emulator is loaded on the first rectangle rather than imported.** `createRequire` was going to
+be needed anyway — the package ships one CommonJS bundle whose named exports Node's ESM loader cannot
+see, which is the shape `plugins/agents/src/server/usage/processRunner.ts` already uses — and making
+the call lazy costs one `??=`. It is worth the `??=`: this module is in `App`'s eager graph, so a
+static import would put a whole terminal emulator into the startup of the build that draws its
+terminals with OpenTUI's.
+
+**A click is delivered the way a wheel is, and the store's half was already installed.**
+`apps/tui/src/keys/regions.ts § focusClicked` sits on the root's `onMouseDown` under both painters and
+walks up from `event.target`; what was missing was anything calling it.
+`apps/tui/src/tree/hit.ts § pressAt` is that, and it is the old painter's order at both ends: the
+deepest node under the cell, then each ancestor's own handler, so a stop's handler presses what was
+clicked and the root's handler focuses it. `MouseButton.LEFT` is nought and is spelled out here rather
+than imported, because this module deliberately reaches no OpenTUI.
+
+**The paste gate had to come off `isTypingTarget`, and that is not a loosening.** An entered rectangle
+is a typing target and a stricter one, and it deliberately does not go through that predicate — it
+takes its keys by intercepting above every layer. So `apps/tui/src/keys/install.ts § pasteInto` asks
+whether the focused node has a `handlePaste` rather than whether it is a field, and the two things
+that install one are a field and a rectangle's box. Under the old painter the rectangle installs no
+paste encoder at all, so nothing there answers and the shipping painter gains nothing it did not have.
+
+**A chord types nothing, so the encoder reads the key's name where the text is empty.** The obvious
+reading of `sequence` is "the character this key produced", and for Ctrl+C and Alt+B our parser
+deliberately leaves it empty: a terminal that sent `ESC` first has already decided the key is not a
+character (`apps/tui/src/input/parser.ts § character`). Reading the text alone therefore sent a shell
+nothing at all for every chord, and the first cut of the encoder's own test hid it, because the test
+built its keys through a helper that always filled the text in. The table has three rows spelled the
+way the parser actually sends them now, beside the three spelled the way the harness does.
+
+**The 256-colour cube is arithmetic, and it had to be done in paint.** A `Color` on this host is the
+terminal's own, one of the sixteen slots, or a 24-bit triple, and a program inside a rectangle is free
+to ask for any of 256. The first sixteen stay slots, which is the whole point of the type; above that
+`apps/tui/src/paint/paint.ts § paletteColor` turns the cube and the grey ramp into triples, which is
+what a terminal that takes 24-bit colour can draw and is no worse on one that cannot.
+
+### The five goldens that are left
+
+Every one of the 28 was compared with the held list emptied. Twenty-three match cell for cell and run
+for run, and the five that do not are the same five by name that the field slice left, for the same
+two reasons. This slice closed none of them and added none, which is what "neither is above the layout
+pass" means in practice. The counts moved by one or two either way, because both reasons are about how
+far a screen has settled and neither is stable to the cell. Each is listed with what would close it,
+because phase 4 has to report this list, and `apps/tui/src/golden.test.ts § PHASE_3` carries the same
+sentences where a reader running the suite will find them:
+
+| Golden | Differences | Why | What would close it |
+| --- | --- | --- | --- |
+| `changes-80x24` | 23 | The pane's own header row. Our flush turns the loop until the tree stops asking for frames, which drains the fixture's delayed answers, so `ChangesHeader` is on screen; the old painter's flush settles a step earlier and the capture holds that screen. Measured: the old painter through this harness reports no differences against the golden, so the difference is between the two harnesses' settling rather than between the two painters' cells. | A re-capture, or a phase 4 that no longer has two flushes to disagree. |
+| `agents-80x24` | 12, over six rows | The same settling one step further on, and here the evidence is stronger: the old painter through this harness draws exactly the cells ours does on all 24 rows, and both differ from the golden. So the capture is a screen neither painter produces through this harness. | A re-capture. Nothing in either painter is wrong. |
+| `changes-120x40` | 15 | Two things. Every row that overflows its column loses a cell the old painter keeps — the `⧉` of a copy button, the `−` of a diff count — because the two Yoga builds round negative free space differently. And some of the border runs still hold `#00AAFF`, which phase 2's correction could not reach on rows whose characters do not line up. | An afternoon on `pointScaleFactor`, then the colour correction over what is left. |
+| `agents-120x40` | 10 | The same rounding, on the header row, and it knocks on: the cell it loses is enough for the composer's hint to stop wrapping, which moves four rows up by one. | The same afternoon. |
+| `notes-120x40` | 4 | The same rounding, on two overflowing rows, with no knock-on. | The same afternoon. |
+
+
+**Recapturing under our own painter was considered and refused.** It would close two of the five in a
+minute, and it would make those two files mean something different from their twenty-six siblings
+without saying so anywhere a reader of the file would look: every golden in the set was captured from
+the painter we are leaving, and that is the whole of what makes a match a statement. The honest
+recapture for the two that differ by settling is under the *old* painter through this harness, which
+is where they were measured, followed by phase 2's colour correction over the runs that come back
+holding `#00AAFF`. Phase 4 deletes the set anyway, so that is one afternoon's work at the moment it
+is worth least.
+
+### Test results (2026-09-04)
+
+`pnpm --filter @acorn/tui test` on Node 26.8.1 with the switch at its default: **559 passing, 2
+failing, 31 skipped**, against 475, 2 and 28 before the slice. The 84 extra passes are this slice's
+new cases — 78 in `apps/tui/src/kit/ptyKeys.test.ts` and six in `apps/tui/src/paint/paint.test.ts` —
+and the three extra skips are `apps/tui/src/ownRenderer.test.ts`, which is about a renderer the
+default build does not have. The two failures are `walks into a command group on return and back out
+of it on escape` and `draws a search and an input in the same rectangle as the list`, both in
+`apps/tui/src/chrome/chrome.test.tsx`, both another session's in-flight palette work and both failing
+before this slice.
+
+On Node 24.11.0 with `ACORN_TUI_PAINTER=own`, no FFI and no flag: **583 passing, 2 failing, 7
+skipped**, against 488, 8 and 9 before it. Everything this phase owns is green.
+`apps/tui/src/reachability.test.tsx` is 23 for 23 with `ACORN_TUI_WIDE` set, which is eight surfaces
+at both sizes and all eleven invariants — the acceptance property, which was 11 for 23 before the
+slice. `apps/tui/src/keys/keys.test.tsx` is 12 for 12, including all four `pty` cases.
+`apps/tui/src/kit/kit.test.tsx` is 112 passing and 2 skipped, up from 110 and 4: the two mouse cases
+run, and the two left are the Yoga-build pair that was never phase 3's.
+`apps/tui/src/paint/paint.test.ts` is 29 for 29, `apps/tui/src/kit/ptyKeys.test.ts` 78 for 78,
+`apps/tui/src/ownRenderer.test.ts` three for three, and `apps/tui/src/golden.test.ts` 23 passing with
+five skipped.
+
+The two that remain under `own`, each checked on its own:
+
+- **`walks into a command group on return and back out of it on escape`**, which is one of the two
+  failing under the default switch and is not this slice's.
+- **`draws many frames without re-collecting, and re-collects when the keys move`**, which asks for at
+  most eight collects after a Tab and saw nine in a full run. It passes on its own three times in a
+  row, so it is the same load-dependent family as the timeout cascade this suite has always had:
+  check alone before blaming a diff.
+
+`pnpm --filter @acorn/tui lint` is clean under both switch values. `tools/arch` is 54 for 55 and the
+one red is its pre-existing `docPaths` case over dotfile paths in three other docs; every boundary
+rule passes, including the two new edges — `apps/tui/src/tree/renderer.ts` reaching the store, and the
+store reaching `apps/tui/src/tree/compat.ts`.
+
+`apps/tui/scripts/check-startup-graph.mjs` measures the eager closure at 978,482 B under `opentui` and
+970,037 B under `own`, against 957,638 B and 954,069 B before the slice: 21 KB and 16 KB more. It is
+this slice's own source, because the build does not minify —
+`apps/tui/src/kit/rectangle.tsx` went from 235 lines to 399 in a file already in the graph,
+`apps/tui/src/kit/ptyKeys.ts` is reached from it, and the store now reaches
+`apps/tui/src/tree/compat.ts` and `apps/tui/src/tree/node.ts`, which is 12 KB of the OpenTUI build's
+share and no Yoga, because `node.ts` imports `yoga-layout` as a type alone. The emulator itself is in
+neither number: `@xterm/headless` is left external and is loaded on the first rectangle. Both numbers
+are over the 870,000 B ceiling the check has been failing since before this programme.
+
+### What phase 4 must know
+
+- **`apps/tui/src/kit/pty.ts` never changed**, and its blob hash is still `8df7dcf7`. Both emulators
+  answer the same four members, so the file that plumbs a rectangle to its channel has no idea which
+  painter drew it, and phase 4 deletes one emulator without touching it.
+- **The `own` half of `rectangle.tsx` is 34 lines of code and the OpenTUI half is seven**, and the
+  shared half — the arming, the intercept, the Escape pair, the listener lists, the footer's answer —
+  is neither. Deleting the OpenTUI half is deleting `handedNative`, the `extend` call, the
+  `EmbeddedTerminalRenderable` import, `Inside.paste`'s sentence about it, and the ternary in the JSX.
+- **`propagationStopped` is why the intercept works**, and if the harness ever stops constructing its
+  events through `apps/tui/src/ownKeys.ts § ownKeyEvent` that flag has to come with it. There is no
+  test that would catch its absence other than the rectangle's own four.
+- **A hold is the seam for anything else that produces cells late** (`apps/tui/src/tree/frames.ts §
+  holdFrame`). One thing takes one today. Anything that parses, fetches or decodes on a queue of its
+  own belongs there rather than in a longer loop in the harness.
+- **`removeNode` telling the store is what makes the reachability property pass**, and it is the half
+  of architecture.md § 5 that had not been built. Phase 4's rewrite of the store against `Node`
+  directly should keep both halves: the mark on the removed subtree's top, and the landing pass where
+  the keys have left the tree.
+- **The two hide-site `scheduleSettle` calls did not move into `setProperty('visible')`**, which
+  § Code touched asks for. They still work where they are, and moving them would change the painter
+  that ships for no gain while both exist. It is a one-line move once there is one painter.
+- **The `$EDITOR` handoff in a real terminal has not been checked by hand**, which § Done when asks
+  for. Everything it needs is built — the encoder sends what vim expects in both cursor modes, the
+  rectangle's Escape pair reaches normal mode, and `apps/tui/src/kit/pty.ts` opens the channel at the
+  right size — but a person has to run it in a terminal and write down which one.

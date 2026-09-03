@@ -1,3 +1,5 @@
+import type { KeyEvent as ParsedKey } from './input/events'
+
 // A key as the keymap engine reads one, and the spelling table the two harnesses press through.
 //
 // Its own module rather than part of `./ownRenderer.ts`, and the reason is a byte count. The keymap
@@ -6,11 +8,19 @@
 // the startup closure of the build that does not use it, which the budget check caught
 // (../scripts/check-startup-graph.mjs, docs/frontend.md § Startup budget).
 //
-// Nothing here knows about the parser. Wiring `./input/parser.ts`'s events into the dispatcher is
-// phase 3's, along with the one translation it needs: `alt` becomes the keymap's `meta`.
+// The parser's own vocabulary meets the engine's here, and the whole of the difference is one word:
+// what our parser calls `alt` the keymap calls `meta` (§ keyPressed). Everything else is the same
+// key under two names for the same thing.
 
 /** A key as the keymap engine reads one: the fields its default matcher looks at, plus the two the
- *  dispatcher calls. Structurally OpenTUI's `KeyEvent`, which is all the engine ever wanted of it. */
+ *  dispatcher calls and the two flags those set.
+ *
+ *  Structurally OpenTUI's `KeyEvent`, and both flags have to be here rather than in the closures that
+ *  set them. `defaultPrevented` is what `./keys/install.ts § typeInto` reads to leave a claimed key
+ *  alone; `propagationStopped` is what the engine reads to know an intercept consumed the key, and
+ *  without it `ctx.consume()` was a no-op — an entered `pty` rectangle sent every key to its program
+ *  and then let the app's own bindings answer the same key, so Escape's pair left and F6 walked out
+ *  of the rectangle it had just taken (@opentui/keymap § handleKeyEvent). */
 export type OwnKeyEvent = {
   name: string
   ctrl: boolean
@@ -24,6 +34,7 @@ export type OwnKeyEvent = {
   eventType: 'press' | 'repeat' | 'release'
   source: 'raw'
   defaultPrevented: boolean
+  propagationStopped: boolean
   preventDefault: () => void
   stopPropagation: () => void
 }
@@ -98,8 +109,32 @@ export const ownKeyEvent = (name: string, modifiers: {
     eventType: 'press',
     source: 'raw',
     defaultPrevented: false,
+    propagationStopped: false,
     preventDefault: () => { event.defaultPrevented = true },
-    stopPropagation: () => {},
+    stopPropagation: () => { event.propagationStopped = true },
   }
+  return event
+}
+
+/**
+ * A key from the input parser, as the engine reads one.
+ *
+ * The one translation the two vocabularies need. Our parser reports the modifier the terminal
+ * reports, which is `alt`; `@opentui/keymap` matches on `meta` and OpenTUI's own event carries both
+ * `meta` and `option` for it, so all three are the same flag here and a binding matches whichever
+ * name the engine's matcher asks for (./input/events.ts § Modifiers).
+ *
+ * `text` becomes `sequence`, which is what a field types and what the pty encoder sends: a key that
+ * types nothing carries an empty string, and the model decides from the name what a Return does
+ * (./kit/field.ts § typedBy, ./kit/ptyKeys.ts).
+ */
+export function keyPressed(key: ParsedKey): OwnKeyEvent {
+  const event = ownKeyEvent(key.name, {
+    ctrl: key.ctrl,
+    meta: key.alt,
+    shift: key.shift,
+    super: key.super,
+  }, key.text)
+  event.eventType = key.action
   return event
 }

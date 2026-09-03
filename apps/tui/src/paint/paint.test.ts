@@ -1,4 +1,6 @@
+import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
+import type { Terminal as HeadlessTerminal } from '@xterm/headless'
 import { layoutTree } from '../layout/pass'
 import { createElement, createTextNode, insertNode, replaceText, setProperty } from '../tree/renderer'
 import type { Node } from '../tree/node'
@@ -257,6 +259,104 @@ describe('a field', () => {
     } finally {
       screen.close()
     }
+  })
+})
+
+describe('a pty rectangle', () => {
+  // A real emulator rather than a stand-in, because what is under test is the copy and a stand-in
+  // would only be a second opinion about what xterm puts in a cell. `createRequire` for the reason
+  // `../kit/rectangle.tsx` gives: the package ships one CommonJS bundle.
+  const { Terminal } = createRequire(import.meta.url)('@xterm/headless') as {
+    Terminal: typeof HeadlessTerminal
+  }
+
+  /** An emulator of a known size with those bytes already parsed. xterm parses on a queue of its own,
+   *  so the callback is what says the cells are there (../kit/rectangle.tsx § write). */
+  const emulator = async (cols: number, rows: number, data: string): Promise<HeadlessTerminal> => {
+    const term = new Terminal({ cols, rows, allowProposedApi: true })
+    await new Promise<void>((parsed) => term.write(data, parsed))
+    return term
+  }
+
+  it('copies the emulator\'s cells, colours and attributes into the rectangle', async () => {
+    // Bold red on the palette's blue, then plain, which is what a shell prompt is made of. The
+    // sixteen-slot forms stay slots, because that is what the reader's own theme fills in
+    // (../colour.ts).
+    const term = await emulator(12, 2, '\x1b[1;31;44mred\x1b[0m plain')
+    const rect = el('pty', { terminal: term, flexGrow: 1 })
+    const buffer = createBuffer(12, 2)
+    const root = boxOf(12, 2, {}, [rect])
+    layoutTree(root, 12, 2)
+    paint(root, buffer)
+    expect(bufferLines(buffer)).toEqual(['red plain   ', '            '])
+    expect(cellAt(buffer, 0, 0)).toMatchObject({ char: 'r', fg: 1, bg: 4, attrs: ATTRS.bold })
+    expect(cellAt(buffer, 4, 0)).toMatchObject({ char: 'p', fg: 'default', bg: 'default', attrs: 0 })
+  })
+
+  it('reads a 24-bit colour as a triple and a cube colour as the colour it is', async () => {
+    // A `Color` has three answers and the 256-colour cube is none of them, so paint does the
+    // arithmetic: 16 is the corner of the cube, which is black, and 226 is its yellow (§ paletteColor).
+    const term = await emulator(6, 1, '\x1b[38;2;10;20;30ma\x1b[38;5;226mb')
+    const rect = el('pty', { terminal: term, flexGrow: 1 })
+    const buffer = createBuffer(6, 1)
+    const root = boxOf(6, 1, {}, [rect])
+    layoutTree(root, 6, 1)
+    paint(root, buffer)
+    expect(cellAt(buffer, 0, 0)?.fg).toEqual([10, 20, 30])
+    expect(cellAt(buffer, 1, 0)?.fg).toEqual([255, 255, 0])
+  })
+
+  it('keeps a wide glyph and its second cell together', async () => {
+    // The emulator says it the same way our buffer does: the glyph reports a width of two and the
+    // cell after it reports no characters at all (./buffer.ts § A wide glyph is a pair).
+    const term = await emulator(6, 1, '\u4f60x')
+    const rect = el('pty', { terminal: term, flexGrow: 1 })
+    const buffer = createBuffer(6, 1)
+    const root = boxOf(6, 1, {}, [rect])
+    layoutTree(root, 6, 1)
+    paint(root, buffer)
+    expect(cellAt(buffer, 0, 0)?.char).toBe('\u4f60')
+    expect(cellAt(buffer, 1, 0)?.char).toBe('')
+    expect(cellAt(buffer, 2, 0)?.char).toBe('x')
+  })
+
+  it('follows the emulator\'s own viewport rather than an offset of ours', async () => {
+    // A rectangle's viewport is the rectangle, so there is no `scroll` prop here: the program inside
+    // scrolls its own region and `viewportY` is where the emulator is showing from (§ drawPty).
+    const term = await emulator(6, 2, 'one\r\ntwo\r\nthree\r\nfour')
+    const rect = el('pty', { terminal: term, flexGrow: 1 })
+    const buffer = createBuffer(6, 2)
+    const root = boxOf(6, 2, {}, [rect])
+    layoutTree(root, 6, 2)
+    paint(root, buffer)
+    expect(bufferLines(buffer)).toEqual(['three ', 'four  '])
+  })
+
+  it('draws the emulator\'s caret only while the rectangle is entered', async () => {
+    // The second writer of the buffer's one caret, and the rule is the same: paint says where and the
+    // flush says whether. At most one thing has the keys, so at most one of the two can be true
+    // (§ drawField, ./flush.ts § SHOW).
+    const term = await emulator(8, 2, 'ab')
+    const { screen, writes } = screenOf(8, 2)
+    try {
+      const rect = el('pty', { terminal: term, flexGrow: 1, focused: true })
+      insertNode(screen.root, rect)
+      screen.frame()
+      expect(writes.join('')).toContain('\x1b[1;3H\x1b[?25h')
+
+      writes.length = 0
+      setProperty(rect, 'focused', false)
+      screen.frame()
+      expect(writes.join('')).toContain('\x1b[?25l')
+    } finally {
+      screen.close()
+    }
+  })
+
+  it('draws nothing at all before an emulator is on the node', () => {
+    // The rectangle is a box for one frame: the component builds its emulator in the node's `ref`,
+    // and a paint between the two would otherwise throw rather than draw an empty box.
+    expect(drawn(boxOf(4, 1, {}, [el('pty', { flexGrow: 1 })]), 4, 1)).toEqual(['    '])
   })
 })
 
