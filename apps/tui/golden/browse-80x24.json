@@ -1,0 +1,1426 @@
+{
+  "surface": "browse",
+  "width": 80,
+  "height": 24,
+  "frame": [
+    "acorn > acorn · 1 task                                                         ●",
+    "┌─Menu─────────────────┐                           ()                           ",
+    "│› GitHub              │                         .-''-.                         ",
+    "│  Docker              │                        /::::::\\                        ",
+    "│  Agents              │                        '------'                        ",
+    "│                      │                        |      |                        ",
+    "│                      │                         \\    /                         ",
+    "└──────────────────────┘                           \\  /                         ",
+    "┌─Browse───────────────┐                            \\/                          ",
+    "│Reviews   [+ New PR] ↻│                         acorn                          ",
+    "│[Open]  Closed        │                                                        ",
+    "│Filter…               │                                                        ",
+    "│  ⇡ [JA] #42 Invalidat│                                                        ",
+    "│                      │                                                        ",
+    "│                      │                                                        ",
+    "└──────────────────────┘                                                        ",
+    "┌─Tasks────────────────┐                                                        ",
+    "│  fix-login           │                                                        ",
+    "│                      │                                                        ",
+    "│                      │                                                        ",
+    "│                      │                                                        ",
+    "│                      │                                                        ",
+    "└──────────────────────┘                                                        ",
+    "j/k move · enter open · ctrl+0 go to github in the left rail · ctrl+k command…  ",
+    ""
+  ],
+  "runs": [
+    [
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 5
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": ">",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 5
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "· 1 task",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 8
+      },
+      {
+        "text": "                                                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 57
+      },
+      {
+        "text": "●",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "┌─Menu─────────────────┐",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "                          ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 26
+      },
+      {
+        "text": " ()",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "                           ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 27
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "›",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "GitHub",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 32,
+        "width": 6
+      },
+      {
+        "text": "              ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 14
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      },
+      {
+        "text": ".-''-.",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Docker",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "              ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 14
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "/::::::\\",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 8
+      },
+      {
+        "text": "                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Agents",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "              ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 14
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "'------'",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 8
+      },
+      {
+        "text": "                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "|      |",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 8
+      },
+      {
+        "text": "                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": " \\    /",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 7
+      },
+      {
+        "text": "                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      }
+    ],
+    [
+      {
+        "text": "└──────────────────────┘",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      },
+      {
+        "text": "  \\  /",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      }
+    ],
+    [
+      {
+        "text": "┌─Browse───────────────┐",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      },
+      {
+        "text": "   \\/",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 5
+      },
+      {
+        "text": "                          ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 26
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Reviews",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 7
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": "[+ New PR]",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 10
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "↻│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      },
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 5
+      },
+      {
+        "text": "                          ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 26
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "[Open]",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 1,
+        "width": 6
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "Closed",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 8
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Filter…",
+        "fg": {
+          "r": 0.4,
+          "g": 0.4,
+          "b": 0.4
+        },
+        "attributes": 0,
+        "width": 7
+      },
+      {
+        "text": "               ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 15
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "⇡",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "[JA]",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 4
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "#42",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Invalidat│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 10
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "└──────────────────────┘",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "┌─Tasks────────────────┐",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "fix-login",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 9
+      },
+      {
+        "text": "           ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 11
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "└──────────────────────┘",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "                                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "j/k move · enter open · ctrl+0 go to github in the left rail · ctrl+k command…",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 78
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      }
+    ]
+  ],
+  "focus": [
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      1
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ]
+  ]
+}

@@ -1,0 +1,1976 @@
+{
+  "surface": "changes",
+  "width": 80,
+  "height": 24,
+  "frame": [
+    "acorn > acorn · 1 task                                               fix-login ●",
+    "┌─Menu─────────────────┐  PR review  Agent  [Changes]  Notes  Context  Editor   ",
+    "│  GitHub              │┌─List─────────────────────────────────────────────────┐",
+    "│  Docker              ││                                                      │",
+    "│  Agents              ││STAGED 1 −−                                           │",
+    "│                      ││  [M] src/session.ts                         +4 −0 − →│",
+    "│                      ││                                                      │",
+    "└──────────────────────┘│CHANGES 2 ++ ↺                                        │",
+    "┌─Browse───────────────┐│  [M] src/login.ts                        +12 −3 + ↺ →│",
+    "│Choose a source.      ││  [A] src/reset.test.ts                   +40 −0 + ↺ →│",
+    "│                      ││                                                      │",
+    "│                      ││                                                      │",
+    "│                      ││                                                      │",
+    "│                      ││                                                      │",
+    "│                      ││                                                      │",
+    "└──────────────────────┘│                                                      │",
+    "┌─Tasks────────────────┐│                                                      │",
+    "│› fix-login           ││                                                      │",
+    "│                      ││                                                      │",
+    "│                      ││                                                      │",
+    "│                      ││Commit message                                        │",
+    "│                      ││[Commit staged] [Push → origin]                       │",
+    "└──────────────────────┘└──────────────────────────────────────────────────────┘",
+    "j/k move · enter open · ctrl+shift+f find in files… · ctrl+0 go to github in …  ",
+    ""
+  ],
+  "runs": [
+    [
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 5
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": ">",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 5
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "· 1 task",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 8
+      },
+      {
+        "text": "                                               ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 47
+      },
+      {
+        "text": "fix-login",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 9
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "●",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "┌─Menu─────────────────┐",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "PR review",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 9
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "Agent",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 5
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "[Changes]",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 1,
+        "width": 9
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "Notes",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 5
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "Context",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 7
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "Editor",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 3
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "GitHub",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "              ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 14
+      },
+      {
+        "text": "│┌─List─────────────────────────────────────────────────┐",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 57
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Docker",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "              ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 14
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Agents",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "              ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 14
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "STAGED",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "1",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "−−",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "                                           ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 43
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "[M]",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "src/session.ts",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 14
+      },
+      {
+        "text": "                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      },
+      {
+        "text": "+4 −0",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 5
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "−",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "→│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "└──────────────────────┘│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      },
+      {
+        "text": "CHANGES",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 7
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "2",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "++",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "↺",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 40
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "┌─Browse───────────────┐│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "[M]",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "src/login.ts",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 12
+      },
+      {
+        "text": "                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "+12 −3",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "+",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "↺",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "→│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Choose a source.",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 16
+      },
+      {
+        "text": "      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "[A]",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0
+        },
+        "attributes": 0,
+        "width": 3
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "src/reset.test.ts",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 17
+      },
+      {
+        "text": "                   ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 19
+      },
+      {
+        "text": "+40 −0",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 6
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "+",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "↺",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "→│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "││",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "└──────────────────────┘│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 25
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "┌─Tasks────────────────┐",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "›",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "fix-login",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 32,
+        "width": 9
+      },
+      {
+        "text": "           ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 11
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 54
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "Commit message",
+        "fg": {
+          "r": 0.4,
+          "g": 0.4,
+          "b": 0.4
+        },
+        "attributes": 0,
+        "width": 14
+      },
+      {
+        "text": "                                        ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 40
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 22
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "[Commit staged]",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 15
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "[Push → origin]",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 15
+      },
+      {
+        "text": "                       ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 23
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "└──────────────────────┘",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 24
+      },
+      {
+        "text": "└──────────────────────────────────────────────────────┘",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 56
+      }
+    ],
+    [
+      {
+        "text": "j/k move · enter open · ctrl+shift+f find in files… · ctrl+0 go to github in …",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 78
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      }
+    ]
+  ],
+  "focus": [
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      1
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      2
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ]
+  ]
+}

@@ -1,0 +1,566 @@
+{
+  "surface": "project",
+  "width": 80,
+  "height": 24,
+  "frame": [
+    "acorn > acorn · 1 task                                                         ●",
+    "┌─Project──────────────────────────────────────────────────────────────────────┐",
+    "│ › acorn                                                                      │",
+    "│   sibling                                                                    │",
+    "└──────────────────────────────────────────────────────────────────────────────┘",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "                                                                                ",
+    "j/k move · enter open · ctrl+0 go to github in the left rail · ctrl+k command…  ",
+    ""
+  ],
+  "runs": [
+    [
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 5
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": ">",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 1,
+        "width": 5
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "· 1 task",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 8
+      },
+      {
+        "text": "                                                         ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 57
+      },
+      {
+        "text": "●",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "┌─Project──────────────────────────────────────────────────────────────────────┐",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "›",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "acorn",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 32,
+        "width": 5
+      },
+      {
+        "text": "                                                                      ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 70
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 0,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": " ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      },
+      {
+        "text": "sibling",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 7
+      },
+      {
+        "text": "                                                                    ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 68
+      },
+      {
+        "text": "│",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 1
+      }
+    ],
+    [
+      {
+        "text": "└──────────────────────────────────────────────────────────────────────────────┘",
+        "fg": {
+          "r": 0,
+          "g": 0.6666666666666666,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "                                                                                ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 80
+      }
+    ],
+    [
+      {
+        "text": "j/k move · enter open · ctrl+0 go to github in the left rail · ctrl+k command…",
+        "fg": {
+          "r": 0.5019607843137255,
+          "g": 0.5019607843137255,
+          "b": 0.5019607843137255
+        },
+        "attributes": 0,
+        "width": 78
+      },
+      {
+        "text": "  ",
+        "fg": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "attributes": 0,
+        "width": 2
+      }
+    ]
+  ],
+  "focus": [
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      2
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ],
+    [
+      "BoxRenderable",
+      0
+    ]
+  ]
+}

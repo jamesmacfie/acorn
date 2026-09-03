@@ -42,11 +42,17 @@ In:
   and writes the terminal cursor position when the node is focused. About 150 lines, most of them
   the key table: characters, Backspace, Delete, Left, Right, Home, End, Ctrl+A, Ctrl+E, Ctrl+U,
   Ctrl+W, and Return for `onSubmit`.
-- **`Textarea`.** A `textarea` node kind with a model chosen by spike 4: either an `EditorState`
-  from `@codemirror/state` with our wrap function, or a model of ours. Either way the component owns
-  the model, `edit(event)` handles insert, delete, the four arrows over visual lines, Home, End, word
-  motions, and Return (newline; `ctrl+return` is `commit` and stays the dispatcher's), and paint draws
-  the visible wrapped lines with the cursor. `Composer` and `MentionTextarea` in `asking.tsx` build
+- **`Textarea`.** A `textarea` node kind over a model of ours, which spike 4 wrote and measured at
+  89 lines beside a 44-line wrap function; `@codemirror/state` saves 26 of those and costs 47,922
+  bytes in the eager graph, so it loses. Start from the spike's `wrap.js` and `plain.js`. The
+  component owns the model, `edit(event)` handles insert, delete, the four arrows over visual lines,
+  Home, End, word motions, and Return (newline; `ctrl+return` is `commit` and stays the dispatcher's),
+  and paint draws the visible wrapped lines with the cursor. Home and End go to the visual line's ends,
+  not the document's, which is a deliberate difference from `@opentui/core`'s
+  `defaultTextareaKeyBindings`. The component holds the wrapped rows beside the model and rebuilds
+  them when the text or the width changes, rather than per keystroke: a wrap of a 400-line note is
+  163 microseconds. Selection and undo are out. Nothing under `apps/tui/src` reads either, and there
+  is no way to copy a selection out. `Composer` and `MentionTextarea` in `asking.tsx` build
   on it as they build on `TextareaRenderable` today; their `plainText` reads become a `value()` read.
 - **The `pty` rectangle.** A `pty` node kind whose component (`apps/tui/src/kit/rectangle.tsx`,
   rewritten in place) owns a headless xterm `Terminal` sized to the last rect. On `onSizeChange` it
