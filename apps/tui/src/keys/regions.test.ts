@@ -46,9 +46,8 @@ const fakeRenderer = () => {
     // A slot rather than a renderable, because `installRegions` writes one handler to it and the
     // store reads nothing else off the root (./regions.ts § installRegions).
     root: { onMouseDown: undefined as ((event: FakeClick) => void) | undefined },
-    // The `frame` event the second reveal waits for. Taken and never fired: a reveal is about
-    // geometry and there is none here, so `../kit/scrolling.test.tsx` owns that case
-    // (./regions.ts § The second reveal).
+    // The `frame` event the reveal waits for. Taken and never fired: a reveal is about geometry and
+    // there is none here, so `../kit/scrolling.test.tsx` owns that case (./regions.ts § The reveal).
     on: (): void => {},
     off: (): void => {},
     get currentFocusedRenderable(): Renderable | null { reads += 1; return held },

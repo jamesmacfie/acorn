@@ -30,6 +30,18 @@ import { drawsOwn } from './painter'
 // answer, measured rather than assumed
 // (docs/future/terminal-rewrite/phase-2-the-painter.md § What building it found).
 //
+// **The four the viewport unblocked are still held, and by three different things.** The scroll
+// viewport this phase built took `pr` and `changes` off this list at both sizes, and none of the four
+// matches yet. `pr` reaches a `Textarea`'s `setText` before it draws anything, so the pane is the
+// message and the frame says nothing about the painter. `changes` at 80 differs by one row and it is
+// the harness rather than the painter: our `flush` turns the loop until the tree stops asking for
+// frames, which drains the fixture's delayed answers, so the pane's own header row is on screen —
+// under the old painter's flush the same read settles a step earlier, and the golden holds that
+// screen. `changes` at 120 is down from 74 differences to 16 with Yoga's shrink default derived the
+// way the old painter derived it, and the 16 left are one cell each: an overflowing row's last child
+// keeps a cell there that it loses here, which is the two Yoga builds rounding negative free space
+// differently (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § What building it found).
+//
 // **188 runs across those 16 goldens were corrected rather than matched.** Every one of them was
 // `#00AAFF`, the default `focusedBorderColor` of OpenTUI's `BoxRenderable`: the caret mirror focuses
 // whatever the store focused, and a focused box then drew its own colour over the `borderColor` the
@@ -52,16 +64,18 @@ process.env.ACORN_FIXTURE_DELAY_MS ??= '50'
  *
  * Two of the six are one row from matching. `notes` at 80 differs by the seven characters of a
  * placeholder, and `browse` by the one row an `Input` is a cell tall to OpenTUI and nothing to us.
- * The other four throw inside a component reaching for a widget's own API, which the panel catches
- * and draws — `! notes area.setText is not a function` in the pane's own frame, which is `PanelBody`
- * doing exactly what it promises (../panel.tsx).
+ * Three throw inside a component reaching for a widget's own API, which the panel catches and draws —
+ * `! notes area.setText is not a function` in the pane's own frame, which is `PanelBody` doing
+ * exactly what it promises (../panel.tsx). The sixth, `changes`, has a reason per size and neither is
+ * a widget (§ The four the viewport unblocked).
  */
 const PHASE_3: Readonly<Record<string, string>> = {
   browse: 'the filter Input, whose row is a cell tall to OpenTUI and nothing to us',
-  changes: 'the filter Input at 80, and a scrollbox\'s own `viewport` at 120 (../kit/showing.tsx)',
+  changes: 'at 80 the pane\'s own header row, which this harness settles far enough to draw and the '
+    + 'capture did not; at 120 one cell of squeeze per overflowing row (§ The four the viewport unblocked)',
+  pr: 'the description Textarea\'s `setText`, which throws and replaces the pane with the message',
   notes: 'the filter Input\'s placeholder at 80, and the Textarea\'s `setText` at 120',
   agents: 'the transcript Textarea\'s `setText` (../kit/asking.tsx)',
-  pr: 'a scrollbox\'s own `viewport`, which the fit measure reads a height off',
   palette: 'the search Input\'s placeholder line',
 }
 

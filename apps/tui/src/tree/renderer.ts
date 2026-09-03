@@ -1,7 +1,7 @@
 import { createMemo, getOwner, onCleanup, splitProps, untrack } from 'solid-js'
 import { createRenderer } from 'solid-js/universal'
 import { invalidateRun } from '../layout/measure'
-import { applyProp } from '../layout/props'
+import { applyProp, flexShrinkFor, SHRINK_DEPENDS } from '../layout/props'
 import { createYogaNode, freeYogaNode } from '../layout/yoga'
 import { KINDS, measuresText, textOwner, type Node } from './node'
 import { makeNode } from './compat'
@@ -138,6 +138,10 @@ export function removeNode(parent: Node, node: Node): void {
 export function setProperty(node: Node, name: string, value: unknown): void {
   node.props[name] = value
   if (node.yoga) applyProp(node.yoga, name, value)
+  // A shrink nobody said is derived from the size somebody did, the way the old painter derived it,
+  // so all three props are re-read whenever any one of them lands — they arrive one at a time and in
+  // whatever order the JSX spelled them (../layout/props.ts § flexShrinkFor).
+  if (node.yoga && SHRINK_DEPENDS.has(name)) node.yoga.setFlexShrink(flexShrinkFor(node.props))
   // How a run wraps is an input to its measure function rather than a Yoga style, so the cache has
   // to be told by hand.
   if (name === 'wrapMode') runChanged(node)

@@ -139,6 +139,45 @@ describe.skipIf(!canDraw)('scrolling detail viewports', () => {
     }
   }, 30_000)
 
+  it('moves the viewport under the pointer with the wheel and leaves the keys where they were', async () => {
+    // A wheel is not a focus event, which is the whole of what this host does with the pointer
+    // (docs/tui.md § What the TUI never does). So the viewport moves and nothing else does: the
+    // button keeps the keys while it is scrolled off the top, and the key that presses it still
+    // presses it. Nothing pulls the offset back either — the reveal only runs where the keys moved,
+    // and they did not (../keys/regions.ts § The reveal).
+    const pressed: string[] = []
+    const screen = await renderCells(() => (
+      <HeaderBodyFooter
+        stateKey="wheeled"
+        label="Wheeled"
+        regions={{
+          body: () => (
+            <>
+              <Button onPress={() => pressed.push('press')}>Top</Button>
+              {items(24).map((row) => <Text>{row.label}</Text>)}
+            </>
+          ),
+        }}
+      />
+    ), { width: 44, height: 10 })
+
+    try {
+      expect(lit(screen)).toContain('[Top]')
+
+      const wheeled = await screen.scroll(10, 5, 'down')
+      // The content moved, and far enough that the row the button was drawn on is gone.
+      expect(wheeled.text).not.toContain('[Top]')
+      expect(wheeled.text).toMatch(/Row [4-9]/)
+
+      // And the keys never left the button, which is only visible in what the key does.
+      const activated = await wheeled.press('RETURN')
+      expect(pressed).toEqual(['press'])
+      expect(activated.text).not.toContain('[Top]')
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+
   it('moves a virtual list window with the wheel without changing its active item', async () => {
     const rows = items(30)
     const screen = await renderCells(() => (
@@ -257,8 +296,8 @@ describe.skipIf(!canDraw)('scrolling detail viewports', () => {
     // tick's geometry or none at all. So entering a region whose rows have only just arrived
     // scrolled by the wrong delta and nothing corrected it: with the reveal's second half taken out
     // this case leaves the caret on row 30 and the viewport showing rows 1 to 10, which is a lit
-    // border, no caret and dead-looking arrows. The store asks again on the renderer's next frame,
-    // which is the first moment the numbers are real (../keys/regions.ts § The second reveal).
+    // border, no caret and dead-looking arrows. The store reveals on the renderer's next frame,
+    // which is the first moment the numbers are real (../keys/regions.ts § The reveal).
     //
     // Built the way a reader meets it. They read to the end of a list, look at the detail beside it,
     // the list is replaced under them by a refresh, and they Tab back: the region remembers the row
@@ -299,6 +338,51 @@ describe.skipIf(!canDraw)('scrolling detail viewports', () => {
       setReady(true)
       const back = await detail.press('TAB')
       expect(caret(back)).toContain('Row 30')
+    } finally {
+      screen.done()
+    }
+  }, 60_000)
+
+  it('reveals a row that mounted this tick by the delta the current frame says', async () => {
+    // The case above says the caret is somewhere on screen, which a reveal by the wrong delta can
+    // also manage: scroll too far and the row is still drawn, just not where the reader is looking.
+    // This one is the same scenario judged by where the row landed. The reveal runs between the
+    // layout and the paint of one frame, so a row revealed from below lands exactly at the bottom
+    // edge it came in from: Row 30 is the last row drawn, and no row is drawn twice. That is the
+    // promise one reveal makes and two never could, because the second was correcting the first
+    // (../keys/regions.ts § The reveal).
+    const [ready, setReady] = createSignal(true)
+    const screen = await renderCells(() => (
+      <ListDetail
+        stateKey="fresh-geometry"
+        label="Fresh"
+        regions={{
+          list: () => (
+            <Show when={ready()}>
+              <Rows id="fresh-geometry-rows" items={items(30)}>
+                {(row, item) => <Row item={item}>{row.label}</Row>}
+              </Rows>
+            </Show>
+          ),
+          detail: () => <Text>a detail</Text>,
+        }}
+      />
+    ), { width: 100, height: 12 })
+
+    try {
+      const end = await screen.press('END')
+      const detail = await end.press('TAB')
+      setReady(false)
+      await detail.frame()
+
+      // The rows and the key in one tick, so at the moment the landing asks where row 30 is, row 30
+      // has never been laid out.
+      setReady(true)
+      const back = await detail.press('TAB')
+      expect(caret(back)).toContain('Row 30')
+      const drawn = back.lines.filter((line) => /Row \d/.test(line))
+      expect(drawn.at(-1)).toContain('Row 30')
+      expect(new Set(drawn).size).toBe(drawn.length)
     } finally {
       screen.done()
     }

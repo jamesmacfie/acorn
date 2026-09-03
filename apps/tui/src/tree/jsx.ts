@@ -1,5 +1,6 @@
 import type { JSX as SolidJSX } from 'solid-js'
 import type { Color } from '../colour'
+import type { Wheel } from './hit'
 import type { Node } from './node'
 
 // What the intrinsics take, for tsc's benefit.
@@ -56,8 +57,9 @@ export type FlexProps = {
   visible?: boolean
 }
 
-/** A wheel event over a box, which phase 3 wires to the input parser's own `MouseEvent`. */
-type Scroll = { direction: 'up' | 'down'; x: number; y: number }
+/** A wheel event over a box, as `./hit.ts § wheelAt` delivers one. The later slice that wires the
+ *  input parser's mouse events to the same walk changes where it comes from and not its shape. */
+type Scroll = Wheel
 
 export type BoxProps = FlexProps & {
   ref?: Ref<Node>
@@ -97,6 +99,9 @@ export type SpanProps = TextProps
 
 export type ScrollBoxProps = FlexProps & {
   ref?: Ref<Node>
+  /** How many rows the viewport has scrolled its content by. The component owns the number and this
+   *  is where paint and the read-back read it (../kit/scrolling.tsx, ../layout/pass.ts). */
+  offset?: number
   scrollX?: number
   scrollY?: number
   /** Whether the box windows its rows to what fits. */

@@ -32,6 +32,7 @@
 
 import { createSignal, onCleanup } from 'solid-js'
 import { MouseButton, ScrollBoxRenderable, type CliRenderer, type MouseEvent, type Renderable } from '@opentui/core'
+import { drawsOwn } from '../painter'
 
 export type RegionRef = { paneId: string; regionId: string }
 
@@ -39,8 +40,12 @@ export type RegionRef = { paneId: string; regionId: string }
  *
  *  `instanceof` answers under the painter we are leaving. Under ours a node is a plain object with a
  *  `kind`, and no shim can be an instance of somebody else's class, so the question is asked by name
- *  as well (../tree/compat.ts). Phase 4 leaves the second half. */
-const isViewport = (node: Renderable): node is ScrollBoxRenderable =>
+ *  as well (../tree/compat.ts). Phase 4 leaves the second half.
+ *
+ *  Exported for the footer, which has to say `scroll` rather than `move` for the one stop that
+ *  scrolls, and which asked the same question with the same `instanceof`
+ *  (../chrome/bindings.ts § focusedKind). */
+export const isViewport = (node: Renderable): node is ScrollBoxRenderable =>
   node instanceof ScrollBoxRenderable || (node as unknown as { kind?: string }).kind === 'scrollbox'
 
 /** The leftmost column. Two facts about the screen are two too many for this module to know, so this
@@ -568,9 +573,9 @@ const setFocus = (node: Renderable | null): void => {
     scheduleSettle()
     return
   }
-  revealInViewports(node)
-  // And once more after the next layout, because the geometry this one read may not exist yet
-  // (§ The second reveal).
+  // One reveal after the next layout, and under the old painter one now as well, because there the
+  // frame the reveal waits for may not come (§ The reveal).
+  if (!drawsOwn()) revealInViewports(node)
   pendingReveal = node
   // One memory per move, and it belongs to whichever of the two levels holds the keys. A `Modal` or
   // an open `Menu` is drawn inside whatever region had them, so a region that also remembered a
@@ -589,20 +594,25 @@ const setFocus = (node: Renderable | null): void => {
   focused = { paneId: group.paneId, regionId: group.regionId }
 }
 
-// ── The second reveal ─────────────────────────────────────────────────────────────────────────
+// ── The reveal ────────────────────────────────────────────────────────────────────────────────
 //
-// `scrollChildIntoView` compares a child's laid-out `y` against its viewport's, and `Renderable.y` is
-// whatever the last completed layout pass left there — so for a row that did not exist in the
-// previous frame the reveal above reads stale or zero geometry, scrolls by the wrong delta, and
-// nothing corrects it. Asking again on the renderer's next `frame` is the answer, and it decides
-// nothing about where the keys go: it only makes the viewport show where they already are
-// (docs/tui.md § Scrolling viewports).
+// `scrollChildIntoView` compares a child's laid-out `y` against its viewport's, so the reveal is only
+// as good as the geometry it reads. For a row that did not exist in the previous frame there is none:
+// it scrolls by the wrong delta and nothing corrects it, which a reader meets three common ways — a
+// region entered on a freshly mounted list, a refetch replacing a row by identity, and a virtual
+// window shift. It decides nothing about where the keys go; it only makes the viewport show where
+// they already are (docs/tui.md § Scrolling viewports).
 //
-// Phase 1 of the terminal rewrite meant to delete this and let the settle pass reveal instead. It
-// cannot: the pass is a microtask, so it runs before the next layout and reads the same stale numbers
-// this one did. `../kit/scrolling.test.tsx § reveals the caret in a list that has only just mounted`
-// is the case, and it fails with this taken out. Phase 2 owns it, where layout and reveal are in one
-// frame by construction (docs/future/terminal-rewrite/phase-2-the-painter.md).
+// So the reveal runs on the renderer's `frame`, which is the side of layout where the numbers are
+// real, and that is the whole of it under our painter: a frame there is layout, then this, then
+// paint, so one reveal reads the geometry of the frame the reader is about to see. Under the old
+// painter it runs twice, once synchronously in `setFocus` and once here, because there a `frame` is
+// the render loop's and a store under a test renderer's `flush()` may never see one — phase 1 took
+// the synchronous half out on the grounds that the settle pass would do it, and the pass is a
+// microtask, so it read the same stale numbers. `../kit/scrolling.test.tsx § reveals the caret in a
+// list that has only just mounted` is the case that pins both halves
+// (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md). Phase 4 deletes the branch with the
+// painter.
 //
 // One renderer listener for the whole store rather than one per viewport, which is what the design
 // first asked for. Every live `scrollbox` already carries a `selection` listener and a pull request
@@ -645,7 +655,7 @@ const focusClicked = (event: MouseEvent): void => {
 // is one worker with a renderer per test (../harness.tsx).
 let detach = (): void => {}
 
-/** Point the store at a renderer: where a click landed, and the frame the second reveal waits for.
+/** Point the store at a renderer: where a click landed, and the frame the reveal waits for.
  *  Called by `installKeymap`, because "install the keyboard on this renderer" is one thing and where
  *  the keys are is half of it (./install.ts). */
 export function installRegions(renderer: CliRenderer): void {
@@ -659,7 +669,7 @@ export function installRegions(renderer: CliRenderer): void {
   renderer.root.onMouseDown = focusClicked
   // `frame` fires once per render-loop iteration and after the render, which is the side of layout
   // where a child's geometry is real: `onLifecyclePass` and `setFrameCallback` both run before it and
-  // would read the same stale numbers the synchronous reveal already read (§ The second reveal).
+  // would read the same stale numbers a synchronous reveal reads (§ The reveal).
   const afterFrame = (): void => {
     const node = pendingReveal
     pendingReveal = null

@@ -31,6 +31,10 @@ import { measureRun } from './measure'
 export function createYogaNode(node: Node): YogaNode | null {
   if (!laysOut(node.kind)) return null
   const yoga = Yoga.Node.create()
+  // A node with no props yet starts able to shrink, which is where the old painter started every
+  // renderable that was not given a size in cells. `./props.ts § flexShrinkFor` is the rule and
+  // `../tree/renderer.ts § setProperty` re-derives it as the props arrive.
+  yoga.setFlexShrink(1)
   // A `text` is a leaf to Yoga and measures its own content, which is also why nothing may be
   // attached under it.
   if (measuresText(node.kind)) yoga.setMeasureFunc(measureRun(node))

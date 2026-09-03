@@ -28,9 +28,10 @@ import {
 // to be outside one is to overflow it, and a run drawn over a sibling is never the answer we want.
 // The early-out on an empty clip is also what makes a subtree scrolled off screen free.
 //
-// **What is not here.** A scroll offset, an edit cursor and the emulator's cells are phase 3, so a
-// `scrollbox`, an `input`, a `textarea` and a `pty` draw as the boxes they are until then — which is
-// all they are to layout as well.
+// **What is not here.** An edit cursor and the emulator's cells are a later slice of phase 3, so an
+// `input`, a `textarea` and a `pty` draw as the boxes they are until then — which is all they are to
+// layout as well. A `scrollbox` is a box plus one column of bar: the offset is the read-back's, so
+// there is nothing to translate here (§ drawBar).
 
 /** The six characters a border draws with, and there is one set because there is one style.
  *
@@ -40,6 +41,12 @@ import {
  *  (client-core kit/tokens/roles.ts § border). A second set — heavy, rounded — is a second const and
  *  a lookup on `borderStyle` on the day a style pack asks for one, and not before. */
 const SINGLE = { h: '─', v: '│', tl: '┌', tr: '┐', bl: '└', br: '┘' } as const
+
+/** A scroll bar's two cells: the run the viewport covers, and the rest of the content under it. The
+ *  same pair `../kit/showing.tsx` draws beside a virtual `Rows`, because there is one bar in this app
+ *  and lazygit's is the shape a reader already knows (§ drawBar). */
+const THUMB = '█'
+const TRACK = '│'
 
 type Sides = { top: boolean; right: boolean; bottom: boolean; left: boolean }
 
@@ -192,7 +199,8 @@ function drawBorder(buffer: Buffer, clip: Clip, rect: Node['rect'], sides: Sides
   if (sides.bottom && sides.right) put(buffer, clip, right, bottom, glyphs.br, style)
 }
 
-/** A box, and every kind that is a box until phase 3 gives it content of its own. */
+/** A box, and every kind that is still a box: its background, its border, its caption, any run
+ *  directly under it, and then its children inside the border. */
 function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
   const own = intersect(clip, clipOf(node.rect))
   if (isEmptyClip(own)) return
@@ -229,12 +237,46 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
   for (const child of node.children) if (laysOut(child.kind)) drawNode(child, buffer, inner)
 }
 
+/**
+ * The one-column bar down a viewport's right edge, where its content is taller than it is.
+ *
+ * The offset itself is not drawn here: the read-back has already moved the content's rectangles by it
+ * and the clip above has already cut them to the viewport, so all a scroll viewport needs of paint is
+ * the bar (../layout/pass.ts § A viewport moves its children).
+ *
+ * **Drawn over the last column rather than given one.** OpenTUI's bar was a sibling of the viewport,
+ * so it took a cell of layout while it was visible — and that is a cycle: the content's height
+ * depends on the width it wraps at, the width depends on whether the bar is showing, and the bar
+ * depends on the height. A frame that resolves that cycle by iterating is a frame that can fail to
+ * settle. Overlaying it costs the rightmost column of a scrolling document and no oscillation. No
+ * golden in the set holds a visible bar, so nothing measures the difference either way.
+ *
+ * The two characters and the thumb's size and place are `../kit/showing.tsx § THUMB`'s, which is the
+ * bar a virtual `Rows` draws down its own edge. There is one bar in this app and it should look like
+ * itself.
+ */
+function drawBar(node: Node, buffer: Buffer, clip: Clip): void {
+  const content = node.children.find((child) => laysOut(child.kind))
+  const fits = node.rect.h
+  const total = content?.rect.h ?? 0
+  if (fits <= 0 || total <= fits) return
+  const offset = Math.max(0, Math.min(Math.round(Number(node.props.offset) || 0), total - fits))
+  const size = Math.max(1, Math.round((fits * fits) / total))
+  const at = Math.round((offset * (fits - size)) / (total - fits))
+  const x = node.rect.x + node.rect.w - 1
+  for (let row = 0; row < fits; row += 1) {
+    put(buffer, clip, x, node.rect.y + row, row >= at && row < at + size ? THUMB : TRACK, PLAIN)
+  }
+}
+
 function drawNode(node: Node, buffer: Buffer, clip: Clip): void {
   // `visible === false` is skipped whole, which is also what Yoga does with `DISPLAY_NONE`, so the
   // two agree without a rule between them (../layout/props.ts § visible).
   if (node.props.visible === false) return
-  if (node.kind === 'text') drawText(node, buffer, clip)
-  else drawBox(node, buffer, clip)
+  if (node.kind === 'text') { drawText(node, buffer, clip); return }
+  drawBox(node, buffer, clip)
+  // After the children, because the bar is drawn over the last column of whatever they put there.
+  if (node.kind === 'scrollbox') drawBar(node, buffer, intersect(clip, clipOf(node.rect)))
 }
 
 /** The whole tree into the whole buffer. Called once a frame, after layout. */

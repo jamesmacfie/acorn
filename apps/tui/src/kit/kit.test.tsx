@@ -835,26 +835,24 @@ const PHASE_3: Readonly<Record<string, string>> = {
   'FindBar: takes a query typed at it': 'Input',
   'Composer: submits what is in the box on commit': 'Textarea',
   'MentionTextarea: completes the word being typed from the list under the field': 'Textarea',
-  // A viewport is three nodes to the old painter — a wrapper, the viewport and a content box — and one
-  // box to ours, so its height comes from somewhere else and it has no `viewport` to read
-  // (../kit/scrolling.tsx, ../kit/showing.tsx).
-  'TabPanel: the rows under the tab strip, and nothing for a panel that is not current': 'the scroll viewport',
-  'DiffPane: reduced: unified only': 'the scroll viewport',
-  'is a parent stop: Down enters the panel it is showing, Escape comes back': 'the scroll viewport',
+  // Not phase 3's, and not the painter's either: the two Yoga builds disagree about what a
+  // `flexBasis: 0` child contributes to a parent whose own height is `auto`. Ours contributes the
+  // basis, so the box is nought tall and nothing inside it is drawn; OpenTUI's Zig-side factory
+  // contributes the child's content, so the same tree comes out one row tall. No `Config` knob in
+  // yoga-layout 3.2.1 reproduces it — web defaults, every errata and the web-flex-basis feature were
+  // each tried. Both cases put a viewport straight inside a `Stack`, which nothing in the app does:
+  // every viewport it draws is inside a `Panel` or a grown column, where the two agree
+  // (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § What building it found).
+  'TabPanel: the rows under the tab strip, and nothing for a panel that is not current':
+    'a viewport in a parent with no height of its own',
+  'is a parent stop: Down enters the panel it is showing, Escape comes back':
+    'a viewport in a parent with no height of its own',
   // A click is a hit test into the store, and the walk from a cell to a node does not exist yet
   // (../keys/regions.ts § Clicks are hit tests).
   'puts the keys on the control a click lands on, and Enter presses that one': 'mouse hit testing',
   'lets go of the keys when the control holding them goes disabled': 'mouse hit testing',
   // And the hand-off that types a key into the field holding them.
   'types into the field that has the keys, wherever the renderer is drawing its caret': 'typing',
-  // Not phase 3's. Yoga starts a node at `flexShrink: 0` and every renderable in the old painter
-  // started at 1, so a row one cell wider than its box keeps every child at full width here and the
-  // last of them — this row's caret marker — is clipped instead of squeezed. Setting the default to 1
-  // draws it and sends `ConfirmButton` into a layout that never settles, so it wants a proper look
-  // rather than a one-line default (docs/future/terminal-rewrite/phase-2-the-painter.md
-  // § What building it found).
-  'TableRow: presses on Enter, marking the focused row at its end':
-    'Yoga\'s flexShrink default, which is not a widget at all',
 }
 
 /** The reason this case is held, or nothing at all under the painter that can draw it. */

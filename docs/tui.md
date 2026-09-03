@@ -826,8 +826,10 @@ Phase 1 of the terminal rewrite meant to delete the second half and let the land
 revealing, on the grounds that the pass runs after Solid has committed. It cannot: the pass is a
 microtask, so it runs before the next layout and reads the same stale geometry the first reveal did,
 and `apps/tui/src/kit/scrolling.test.tsx § reveals the caret in a list that has only just mounted`
-fails without it. It stays until phase 2, where layout and reveal are in one frame by construction
-(docs/future/terminal-rewrite/phase-2-the-painter.md).
+fails without it. It stays for as long as this renderer draws. Under the painter phase 3 of that
+programme built there is one reveal, on the frame event, because a frame there is layout and then
+paint in one function and the geometry the reveal reads is the geometry the reader is about to see
+(docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md).
 
 Arrows move and page keys scroll, which is the one sentence the footer has to be able to say
 everywhere. Arrow keys and `j`/`k` scroll a viewport only while the viewport itself has the keys, and

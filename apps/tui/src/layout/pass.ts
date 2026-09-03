@@ -30,6 +30,13 @@ import type { Node } from '../tree/node'
 // Yoga rounds sizes to whole cells by itself at the default point scale factor of 1 — 101 split three
 // ways comes back 34, 33, 34 with edges that meet — so the rounding below is a belt, not the braces.
 
+/** How many rows a viewport has scrolled its content by, and nought for everything that is not one. */
+const scrollOffset = (node: Node): number => {
+  if (node.kind !== 'scrollbox') return 0
+  const offset = node.props.offset
+  return typeof offset === 'number' && Number.isFinite(offset) ? Math.round(offset) : 0
+}
+
 const position = (value: number): number => (Number.isFinite(value) ? Math.round(value) : 0)
 const size = (value: number): number => (Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0)
 
@@ -56,7 +63,21 @@ export function clampRect(
  *
  *  A node with no Yoga node of its own — a `span`, a `#text` — keeps the rectangle it has and passes
  *  its parent's origin down, because a run's position inside a line is paint's to work out from the
- *  lines the measure function produced, not a box anybody laid out. */
+ *  lines the measure function produced, not a box anybody laid out.
+ *
+ *  ── A viewport moves its children ──
+ *
+ *  A `scrollbox` carries an offset the component that drew it owns (`../kit/scrolling.tsx`), and the
+ *  whole of what scrolling is here is that its children are read back that many rows higher. Paint
+ *  then clips them to the viewport for nothing, because it clips every child to its parent's content
+ *  box already.
+ *
+ *  Here rather than in paint, which is a departure from what
+ *  docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § Scope asks for, and it buys the same
+ *  answer to three questions instead of one. A rectangle is where a node is on the screen, so a
+ *  translated rectangle is what a reveal compares, what a wheel hit test walks, and what the region
+ *  store reads through `x` and `y`. Translating in paint alone would leave those three reading a
+ *  position nothing was drawn at. */
 export function readBack(node: Node, originX = 0, originY = 0, resized: Node[] = []): Node[] {
   let x = originX
   let y = originY
@@ -78,7 +99,8 @@ export function readBack(node: Node, originX = 0, originY = 0, resized: Node[] =
     x = node.rect.x
     y = node.rect.y
   }
-  for (const child of node.children) readBack(child, x, y, resized)
+  const scrolled = y - scrollOffset(node)
+  for (const child of node.children) readBack(child, x, scrolled, resized)
   return resized
 }
 
