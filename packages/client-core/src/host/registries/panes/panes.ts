@@ -1,4 +1,5 @@
 import { createComponent, lazy, Suspense, type Component } from 'solid-js'
+import type { QueryClient } from '@tanstack/solid-query'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { Region } from '../../layouts'
 import { suppliedLayout } from '../../layouts/table'
@@ -20,7 +21,16 @@ type PaneCommon = {
   defaultChord?: string
   requires?: HostCapabilityRequirement
   when?: (task: Task) => boolean
-  keepAlive?: 'dom' | 'none'
+  /**
+   * Warm this pane's first read for a task the reader is pointing at but has not opened
+   * (docs/panes.md § Contributions).
+   *
+   * Called on a deliberate hover over a rail row rather than on a scroll past one, for every pane
+   * this task could show. It is best-effort by construction: it returns nothing, and a rejection
+   * inside it only means the first paint is not instant. A pane with nothing worth warming — or
+   * whose first read spawns a process rather than fetching a row — declares nothing.
+   */
+  prefetch?: (task: Task, queryClient: QueryClient) => void
   minWidth?: number
 }
 
@@ -65,6 +75,12 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see above
 export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
 
+// There is no `keepAlive` here either, and there was: the field promised the host would keep a pane's
+// DOM across a task switch, exactly one pane set it, and nothing ever read it. What keeps a pane cheap
+// to leave and come back to is ./paneModels.ts within a task and the query cache across tasks, warmed
+// by `prefetch` above. A hidden element tree per task is the memory shape this codebase already
+// declined for the agent transcript (docs/managed-agents.md), so it is not coming back as a pane field.
+//
 // There is no per-pane `freshness` hook here (docs/panes.md § Contributions has the reason).
 //
 // A pane's own query status is only knowable reactively. TanStack's `getQueryState` is a snapshot, so
@@ -145,3 +161,29 @@ export const paneIds = (): PaneId[] => paneContributions().map((pane) => pane.id
 export const paneLabel = (id: PaneId): string => paneContribution(id)?.label ?? id
 export const paneAvailable = (pane: PaneContribution, task?: Task): boolean =>
   hasHostCapability(pane.requires) && (!task || !pane.when || pane.when(task))
+
+/** A hover shorter than this is the pointer crossing the rail, not a reader looking at a row. */
+export const PANE_PREFETCH_HOVER_MS = 150
+
+/** Every available pane's `prefetch` for one task, run once. Failures are the pane's to swallow. */
+export const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
+  for (const pane of paneContributions()) {
+    if (!pane.prefetch || !paneAvailable(pane, task)) continue
+    try {
+      pane.prefetch(task, queryClient)
+    } catch (error) {
+      // A pane that throws on the way to warming a cache must not take the rail's pointer handler
+      // with it. Nothing is missing afterwards; the pane fetches on mount as it always did.
+      console.error(`pane '${pane.id}' failed to prefetch`, error)
+    }
+  }
+}
+
+/**
+ * The hover half: a rail row calls this on pointer enter and cancels it on leave, so scrolling the
+ * rail past twenty rows fetches nothing.
+ */
+export const schedulePanePrefetch = (task: Task, queryClient: QueryClient): { cancel: () => void } => {
+  const timer = setTimeout(() => prefetchPanes(task, queryClient), PANE_PREFETCH_HOVER_MS)
+  return { cancel: () => clearTimeout(timer) }
+}

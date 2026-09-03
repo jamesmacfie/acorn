@@ -9,7 +9,7 @@ import { fileStatusMeta } from '../lib/displayMeta'
 import MentionTextarea from '../components/inputs/MentionTextarea'
 import type { DiffFile, DiffThread } from './diffModel'
 import { UserAvatar } from '../components/content/UserAvatar'
-import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type Row, type ThreadRowT } from './diffModel'
+import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type LoadDiffStatus, type Row, type ThreadRowT } from './diffModel'
 import { markTokens, type FindHighlight } from './find'
 import { persistDraft } from '../lib/draftState'
 import { Button } from '../components/primitives'
@@ -33,6 +33,10 @@ export function NonCodeRow(props: {
   reply: (commentDatabaseId: number, body: string) => Promise<unknown>
   expandGap?: (gap: GapRow) => Promise<unknown>
   retryDiff?: (file: LoadDiffRow['file']) => void
+  /** The file's hydration state now, rather than when the row model was built. A row model over 200
+   *  files is rebuilt per parse, so baking a per-file status into it made every file's error rebuild
+   *  every other file's rows (docs/diff-rendering.md § Parsing and highlighting). */
+  loadStatus?: (path: string) => LoadDiffStatus
   mentions?: string[]
   threadCollapse?: (thread: DiffThread) => ThreadCollapseController
   fileCollapsed?: (path: string) => boolean
@@ -61,16 +65,19 @@ export function NonCodeRow(props: {
         <span class="diff-nodiff muted">No diff (binary or too large).</span>
       </Match>
       <Match when={props.row.kind === 'load' ? (props.row as LoadDiffRow) : null}>
-        {(row) => (
-          <span class="diff-load" classList={{ 'diff-load-error': row().status === 'error' }}>
-            <span>{row().status === 'error' ? 'Could not load diff.' : 'Loading diff…'}</span>
-            <Show when={row().status === 'error'}>
+        {(row) => {
+          const failed = () => (props.loadStatus?.(row().file.path) ?? row().status) === 'error'
+          return (
+          <span class="diff-load" classList={{ 'diff-load-error': failed() }}>
+            <span>{failed() ? 'Could not load diff.' : 'Loading diff…'}</span>
+            <Show when={failed()}>
               <Button variant="bare" onPress={() => props.retryDiff?.(row().file)}>
                 Retry
               </Button>
             </Show>
           </span>
-        )}
+          )
+        }}
       </Match>
       <Match when={props.row.kind === 'thread' ? (props.row as ThreadRowT) : null}>
         {(t) => (

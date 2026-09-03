@@ -187,3 +187,27 @@ guards a `SELECT` with a file read.
 The 111 ms the `migrate` boot label used to report was `diskBlobCache` sweeping 2,975 files with a
 `chmod` each, inside the same step. That is fixed in `packages/node-core/src/server/bindings.ts` and
 the step is 29 ms.
+
+### `keepAlive: 'dom'` on the pane contract
+
+Phase 8's own scope offered both halves: implement the field in `TaskPaneHost.tsx` for the panes that
+hurt, or delete it. It is deleted. One pane set it, nothing read it, and what it promised — a pane's
+elements kept alive across a task switch — is a hidden element tree per task, which is the memory shape
+`docs/managed-agents.md` records declining for the agent transcript. The two mechanisms that were
+already there cover what it was reaching for: `paneModels.ts` holds a pane's state per task across its
+own mounts, and the query cache holds a pane's data across tasks. Phase 8 warmed the second with a
+hover prefetch and moved the editor's document pool into the first, and then measured a pane toggle at
+zero requests. Exit condition: a pane whose cost on remount is the *elements* rather than the data —
+one holding a third-party canvas or a media element with no serialisable state — and a measurement
+saying so.
+
+### A per-file row model for the diff
+
+Phase 8's done-when line asked for one list re-render while a 200-file diff hydrates. It got 102, down
+from 226, and 102 is the floor for what is there: `buildRenderableRows` builds one array over every
+file, so a file arriving rebuilds it. Going lower means a row model per file with the virtualizer
+reading a concatenation, which is a redesign of the most carefully tuned surface in the app — the
+sticky header, the split bands, the find pass and the measure scheduling all read that one array — and
+phase 8's own scope refuses restructuring anything in the diff beyond the two quadratic costs. Exit
+condition: a profile of a real large pull request that puts `buildRenderableRows` above the tokenizer,
+rather than an argument from the count.

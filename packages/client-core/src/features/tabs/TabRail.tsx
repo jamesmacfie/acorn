@@ -8,6 +8,7 @@ import { checksState } from '../../kit/lib/displayMeta'
 import { createDismissable } from '../../kit/lib/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { defaultSourceId } from '../../host/registries/sources/sources'
+import { schedulePanePrefetch } from '../../host/registries/panes/panes'
 import { projectPath } from '../../host/registries/commands/corePaths'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { hasHostCapability } from '../../infra/node/hostCapabilities'
@@ -114,6 +115,15 @@ export default function TabRail() {
   }
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: tasksKey })
+
+  // One pending hover at a time: the pointer is in one row, and a row left before the delay is up
+  // never fetches, so scrolling the rail costs nothing.
+  let prefetching: { cancel: () => void } | undefined
+  const cancelPrefetch = () => {
+    prefetching?.cancel()
+    prefetching = undefined
+  }
+  onCleanup(cancelPrefetch)
 
   // Scope the rail to the active workspace through project IDs, so switching workspaces swaps the
   // roster.
@@ -386,6 +396,15 @@ export default function TabRail() {
             <div
               class="tabrail-item"
               draggable={true}
+              // Warm the panes this task can show, once the pointer has settled on the row
+              // (registries/panes/panes.ts). The tasks themselves are already cached; what is cold is
+              // each pane's own first read, and a task switch disposes the whole task scope, so
+              // nothing else is holding it.
+              onPointerEnter={() => {
+                cancelPrefetch()
+                prefetching = schedulePanePrefetch(w, queryClient)
+              }}
+              onPointerLeave={cancelPrefetch}
               // The second door onto the row's actions. The platform also dispatches `contextmenu`
               // for Shift+F10 and the menu key, so this is the keyboard path too.
               onContextMenu={(e) => {

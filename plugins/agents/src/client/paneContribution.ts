@@ -1,5 +1,6 @@
 import { lazy } from 'solid-js'
 import { createAgentPaneModel, type AgentPaneModel } from './sessions/agentPaneModel'
+import { managedAgentStore } from './sessions/managedStore'
 import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
 
 /** The pane id, spelled once: the collection's row action and the pane-intent listener both name it
@@ -28,6 +29,11 @@ export const agentPaneContribution: PaneLayoutContribution<AgentPaneModel> = {
   // The session list, which one is open, its snapshot subscription and the rename/archive dialog,
   // held once per task by the host (client-core registries/paneModels.ts).
   model: (task) => createAgentPaneModel(task),
+  // The session list, which is the first thing the model asks for. The store deduplicates it over a
+  // five-second window, so opening the task right after the hover costs nothing and the snapshot the
+  // pane opens on is the only request left. Not the snapshot itself: which session that would be is
+  // the reader's choice, and a wrong guess is a few thousand event rows.
+  prefetch: (task) => void managedAgentStore.loadTask(task.id).catch(() => {}),
   regions: {
     'list-header': AgentSidebarHeader,
     list: AgentTaskSidebar,

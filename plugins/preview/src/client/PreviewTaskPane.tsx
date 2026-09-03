@@ -78,5 +78,5 @@ export const previewPaneContribution: PaneLayoutContribution = {
   // `single`, so the pane inherits the host's frame, focus group and padding rules rather than the
   // `<section class="pane workspace-preview">` it used to write for itself.
   layout: 'single', regions: { body: PreviewTaskPane },
-  keepAlive: 'dom', minWidth: 320,
+  minWidth: 320,
 }

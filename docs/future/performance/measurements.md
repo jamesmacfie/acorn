@@ -1046,3 +1046,127 @@ that set.
   hand: select across two paragraphs of a streaming agent message and watch the selection hold.
 - **Memory.** Folding usage keeps roughly a third fewer event objects per session in the client, and
   the highlight cache holds up to 200 fences under 16 KB each. Neither was weighed.
+
+## 2026-09-03 — phase 8
+
+Same machine, Node 24.11.0. Phases 0 (`17b03dbe`), 1 (`77ed2ebd`), 2 (`7c826ad6`), 3 (`facd8288`),
+4 (`92983971`), 5 (`28781ae6`), 6 (`449807fb`) and 7 (`9e5d90ca`) had shipped.
+
+Every number here comes from a `*.test.tsx` under jsdom driving the real component — the real
+`DiffPane` over 200 files, the real `EditorPane` over a real CodeMirror, the real `TabRail` — and
+counting at the seam. The "before" columns are not modelled: they are the same harness run against the
+same tree with the phase's own files stashed, so both columns see the same fixture in the same process.
+The measurement files were deleted after they were read; the permanent assertions are named under each
+table.
+
+### List re-renders while a 200-file diff hydrates
+
+Counted as calls to `buildRenderableRows`, which walks every file in the diff and every row in each of
+them and is what the virtualizer, the measure passes and the sticky header all hang off. 200 files,
+each a small patch, hydrated to completion.
+
+| | Row-model rebuilds |
+| --- | --- |
+| Before | 226 |
+| After | **102** |
+
+One per file that arrives, near enough, against two to three per file before: the statuses moved from a
+`Map` behind one version counter to a store keyed by path, and the load row reads its own key rather
+than the row model carrying a status baked in at build time. Each rebuild also walks all 200 files, so
+the memo's own iterations went from about 45,000 to about 20,000, and the `hydrator.status()` calls
+inside them from about 45,000 to zero.
+
+**102 is not 1, and the phase file's done-when line said one.** Getting there means a row model built
+per file rather than over all files, and that is a restructure of the most carefully tuned surface in
+the app, which this phase's own scope refuses. What is left is the floor for the shape that is there: a
+file arriving changes the rows, and the rows are one array.
+
+Held by `packages/client-core/src/features/diff/DiffPane.test.tsx`, which fails at 226 against the old
+shape, and `packages/client-core/src/kit/diff/hydration.test.tsx`, which holds the property underneath
+it: a publish for one path does not re-run a memo reading another. That file is `.tsx` because the
+`logic` project runs in bare Node against Solid's server build, where a store notifies nobody.
+
+### Requests when the editor pane comes back
+
+Counting calls into the editor's API from a mount, driving the real pane.
+
+| | `root` | `read` |
+| --- | --- | --- |
+| Coming back to a task after visiting another, before | 1 | 1 |
+| Coming back to a task after visiting another, **after** | **0** | 1 |
+| Pane closed and reopened in the same task, before | 1 | 1 |
+| Pane closed and reopened in the same task, **after** | **0** | **0** |
+
+Zero requests for a pane toggled inside a task, which is the phase's done-when line, and the open file
+keeps its text, its undo history and its cursor with it: the per-file documents moved into the pane
+model, which the host holds per (pane, task).
+
+Across tasks the file is read again, deliberately. The agent shares the worktree, so the pane cannot
+serve a file's text out of a cache it left behind; what it does not ask for again is the checkout path,
+which is now a query with a one-minute window and is warmed by the rail on hover.
+
+Held by `plugins/editor/src/client/EditorPane.test.tsx`.
+
+### Round trips to first editor text on a remembered file
+
+The same harness with an artificial latency on every request, so the slope across two latencies counts
+serial round trips rather than milliseconds of jsdom.
+
+| Latency per request | Before | After |
+| --- | --- | --- |
+| 50 ms | 222 ms | **174 ms** |
+| 100 ms | 331 ms | **232 ms** |
+| slope (serial round trips) | **2.2** | **1.2** |
+
+Two serial requests became one. The first read's fixed cost — importing the file's grammar, and jsdom
+itself — is the ~120 ms both columns carry.
+
+The first read called this three round trips (root, mount, read). Only two of them are requests; the
+mount between them is local, and it is gated on the root rather than on the network.
+
+### The node-switch remount, which is an examination
+
+The phase said to measure it and act only if it is over a second. It is not, and the change is not
+made.
+
+What a node switch does is re-key `PersistQueryClientProvider` and the whole shell under it
+(`apps/desktop/src/client/index.tsx`), so the data half is: build or look up the node's cache
+partition, restore its persisted snapshot, and remount the subtree. Driven in jsdom against the real
+`clientFor` and a **2.4 MB snapshot of 300 queries**, far larger than a real partition:
+
+| | |
+| --- | --- |
+| First mount, including the restore | 9 ms |
+| Switching node A → B, subtree remount | 5 ms |
+| Switching node A → B, to the new cache restored | 5 ms |
+
+**Verdict: leave it.** Single-digit milliseconds on the half that can be measured here, against a
+threshold of a second.
+
+What that does not include is the shell's own re-render — the rail, the panes, the plugin chrome —
+which needs the packaged shell with two nodes configured and a person clicking the switcher. The
+nearest measured bound is phase 2's renderer marks, where everything from `script start` to
+`plugins applied` is 96 ms in a dev build (measurements.md § The renderer's own marks). A remount does
+a subset of that with the modules already evaluated, so it is not the second the phase set as its bar.
+
+### Rail hover prefetch
+
+Behavioural rather than numeric, held by `packages/client-core/src/features/tabs/TabRail.test.tsx`
+against the real rail: a pointer settled on a row for 200 ms warms every pane that declares a
+`prefetch`, a row crossed for 50 ms warms nothing, and a pane that declares none is not asked. The
+agent pane's session list is deduplicated over a five-second window in the store, so the hover and the
+click that follows it are one read rather than two
+(`plugins/agents/src/client/sessions/managedStore.test.ts`).
+
+### Not measured
+
+- **The app.** Every number here is in-process. Nobody has watched a task switch, a pane toggle or a
+  node switch through the packaged build with these changes in; this machine's live instance holds
+  port 4317 and the data root's lock. Phase 0's request log is still owed, and phase 10 should take it
+  with the app running — it is the only thing that can say what a real task switch issues across every
+  pane at once, rather than per pane at the seam.
+- **The rail's hover prefetch against real latency.** The test counts calls, not milliseconds, and
+  nobody has watched whether 150 ms is the right settle for a real pointer on a real rail.
+- **Memory.** The editor's document pool now outlives a pane mount, so a task with twenty files open
+  holds twenty `EditorState`s until the task is left. Nothing weighed that; it is bounded by the tabs
+  the reader opened, and it was already the shape within one mount.

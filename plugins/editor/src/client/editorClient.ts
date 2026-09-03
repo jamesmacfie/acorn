@@ -11,6 +11,7 @@ import {
   type EditorEntry,
   type EditorWriteResult,
 } from '../contract/api'
+import type { QueryClient } from '@tanstack/solid-query'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 
 export type { EditorEntry } from '../contract/api'
@@ -37,3 +38,25 @@ const api: EditorApi = {
 }
 
 export const editorApi = (): EditorApi => api
+
+/** The task's checkout path, in the query cache so a hover can warm it and a remount can skip it. */
+export const editorRootKey = (taskId: string): readonly unknown[] => ['editor', 'root', taskId]
+
+/**
+ * How long a known checkout path is trusted without asking again.
+ *
+ * A task's worktree path does not move underneath it — it is derived from the task and removed with
+ * it — so the only transition this window can hide is "no checkout yet" becoming a path. The pane
+ * never paints a cached *absent* root: it shows the cached value only when there is one, and awaits
+ * the fetch otherwise (EditorPane.tsx).
+ */
+export const EDITOR_ROOT_STALE_MS = 60_000
+
+/** Warm the checkout path for a task the reader is pointing at. Best-effort, like every prefetch. */
+export const prefetchEditorRoot = (queryClient: QueryClient, taskId: string): void => {
+  void queryClient.prefetchQuery({
+    queryKey: editorRootKey(taskId),
+    queryFn: () => api.root(taskId),
+    staleTime: EDITOR_ROOT_STALE_MS,
+  }).catch(() => {})
+}

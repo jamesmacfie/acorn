@@ -2,7 +2,7 @@ import { For, onCleanup, onMount, Show } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
 import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from '../../kit/diff/DiffRows'
 import type { FindHighlight } from '../../kit/diff/find'
-import { isCodeRow, type CodeRow, type DiffThread, type GapRow, type Row, type SplitBand, type ViewMode } from '../../kit/diff/diffModel'
+import { isCodeRow, type CodeRow, type DiffThread, type GapRow, type LoadDiffStatus, type Row, type SplitBand, type ViewMode } from '../../kit/diff/diffModel'
 import { createSplitScrollSync } from '../../kit/diff/splitScrollSync'
 
 type VirtualItem = { index: number; start: number; end: number }
@@ -31,6 +31,8 @@ export function DiffCanvas(props: {
   replyReview: (databaseId: number, body: string) => Promise<unknown>
   expandGap: (gap: GapRow) => Promise<void>
   retryDiff: (path: string) => void
+  /** A file's live hydration state, read by the row rather than baked into the row model. */
+  loadStatus: (path: string) => LoadDiffStatus
   mentions: () => string[]
   threadCollapse: (thread: DiffThread) => ThreadCollapseController
   fileCollapsed: (path: string) => boolean
@@ -103,6 +105,7 @@ export function DiffCanvas(props: {
                         reply={(databaseId, body) => props.replyReview(databaseId, body)}
                         expandGap={props.expandGap}
                         retryDiff={(file) => props.retryDiff(file.path)}
+                        loadStatus={props.loadStatus}
                         mentions={props.mentions()}
                         threadCollapse={props.threadCollapse}
                         fileCollapsed={props.fileCollapsed}
@@ -187,6 +190,7 @@ export function DiffCanvas(props: {
                           reply={(databaseId, body) => props.replyReview(databaseId, body)}
                           expandGap={props.expandGap}
                           retryDiff={(file) => props.retryDiff(file.path)}
+                          loadStatus={props.loadStatus}
                           mentions={props.mentions()}
                           threadCollapse={props.threadCollapse}
                           fileCollapsed={props.fileCollapsed}

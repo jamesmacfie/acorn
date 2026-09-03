@@ -24,6 +24,8 @@ vi.mock('./wsChannel', () => ({
 }))
 
 const snapshotCalls: string[] = []
+const sessionCalls: { taskId?: string }[] = []
+let failSessions = false
 let served: AgentSessionSnapshot
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
@@ -31,7 +33,11 @@ vi.mock('./managedClient', () => ({
       snapshotCalls.push(sessionId)
       return served
     },
-    sessions: async () => ({ sessions: [], nextCursor: null }),
+    sessions: async (query: { taskId?: string } = {}) => {
+      sessionCalls.push(query)
+      if (failSessions) throw new Error('offline')
+      return { sessions: [], nextCursor: null }
+    },
   },
 }))
 
@@ -208,5 +214,46 @@ describe('what a projected event costs', () => {
     served = { session, turns: [], events: [], requests: [request('expired')] }
     push({ channel: 'agent:event', event: event(1, { type: 'error', code: 'boom', message: 'boom', retryable: false }) })
     await vi.waitFor(() => expect(snapshotCalls).toEqual([SESSION]))
+  })
+})
+
+// The rail warms a task's session list on hover, and the pane model asks for the same list a moment
+// later when the reader clicks (docs/panes.md § Contributions). Without a window between them that is
+// two reads of the same rows for one click.
+describe('a task’s session list', () => {
+  beforeEach(() => {
+    sessionCalls.length = 0
+    managedAgentStore.clear()
+  })
+
+  it('is read once for a hover and the click that follows it', async () => {
+    await Promise.all([managedAgentStore.loadTask('t9'), managedAgentStore.loadTask('t9')])
+    await managedAgentStore.loadTask('t9')
+    expect(sessionCalls).toEqual([{ taskId: 't9', archived: false }])
+  })
+
+  it('is read again for another task, and again once the window has passed', async () => {
+    await managedAgentStore.loadTask('t9')
+    await managedAgentStore.loadTask('t10')
+    expect(sessionCalls).toHaveLength(2)
+
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(Date.now() + 6_000)
+      await managedAgentStore.loadTask('t9')
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(sessionCalls).toHaveLength(3)
+  })
+
+  it('never remembers a failure', async () => {
+    failSessions = true
+    await expect(managedAgentStore.loadTask('t11')).rejects.toThrow('offline')
+    failSessions = false
+    await managedAgentStore.loadTask('t11')
+    // Two reads for two asks: a window that held on to the rejection would leave the pane empty with
+    // nothing to retry.
+    expect(sessionCalls).toHaveLength(2)
   })
 })

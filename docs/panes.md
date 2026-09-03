@@ -202,6 +202,20 @@ The seam exists because four compiled panes had each hand-rolled the same per-ta
 the admission rule's own test. A pane whose regions share nothing omits `model` and its regions are
 handed `undefined`.
 
+**The model is also what makes a pane cheap to close and open again.** A pane drawing itself with one
+`component` rather than a layout can reach for the same holder directly — `paneModel(paneId, taskId,
+build)` on `@acorn/plugin-api/client` — and the editor does, for its per-file documents: the text, the
+undo history and the cursor of every open file survive the pane being toggled off and on, because they
+belong to the task rather than to the mount (`docs/editor.md` § One round trip to text). Across tasks
+the query cache is the keep-alive instead, warmed by `prefetch` below.
+
+There is deliberately no `keepAlive` field. The contract used to carry one — `'dom' | 'none'`, set by
+exactly one pane and read by nothing — which promised the host would keep a pane's elements alive
+across a task switch and delivered nothing. A hidden element tree per task is the memory shape this
+codebase already declined for the agent transcript (`docs/managed-agents.md`), and the two mechanisms
+above cover what the field was reaching for, so it was deleted rather than implemented. A test in
+`registries/panes/panes.test.tsx` fails compilation if it comes back.
+
 The PR pane still keeps two maps of its own. One is keyed by the pull request, because a task can be
 about several; the other is keyed by the task but holds a live subscription that must outlive the
 pane's own mounts. Neither is a copy of this seam waiting to be deleted; if a third appears with a
@@ -349,6 +363,18 @@ check over the roster row, because a manifest reaches a device as bytes a node s
 
 Shared diff rendering, the editor surface, markdown, grid, xterm, form, and wizard primitives live in
 client-core. Feature panes use those primitives without importing another plugin's implementation.
+
+A pane may declare a `prefetch(task, queryClient)`, which the task rail calls when the pointer settles
+on a task row for 150 milliseconds — long enough that scrolling the rail fetches nothing. Every
+registered pane the task could show is asked, and a pane with nothing worth warming declares nothing.
+It is best-effort by construction: it returns nothing, and a failure only means the first paint is not
+instant.
+
+What belongs in one is the pane's *first* read, and only when that read is a row rather than work. The
+editor warms the task's checkout path, which is the one request its mount used to make before it could
+draw anything; the agent pane warms the task's session list, which its model asks for on open and the
+store then serves from a five-second window. The changes pane declares none on purpose: its first read
+spawns git, and phase 5 of the performance programme spent itself getting that spawn count down.
 
 A pane contribution has no `freshness` hook of its own. A pane's query status can only be read
 reactively, so a `freshness(task)` field returning a plain value would render a badge that never

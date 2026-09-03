@@ -30,6 +30,10 @@ const usageLines = new Map<string, { at: number; turnId: string | null }>()
 // it also expires this session's pending requests and no frame names that set.
 const REFETCH_EVENT_TYPES = new Set(['error'])
 
+// How long a task's session list is served without asking the node again. See loadTask below.
+const TASK_LOAD_WINDOW_MS = 5_000
+const taskLoads = new Map<string, { at: number; run: Promise<AgentSession[]> }>()
+
 const byRecent = (a: AgentSession, b: AgentSession): number =>
   b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)
 
@@ -221,10 +225,30 @@ export const managedAgentStore = {
       }
     }
   },
-  async loadTask(taskId: string): Promise<AgentSession[]> {
-    const page = await managedAgentApi.sessions({ taskId, archived: false })
-    for (const session of page.sessions) upsertSession(session)
-    return page.sessions
+  /**
+   * This task's sessions, from the node, deduplicated over a short window.
+   *
+   * Two callers now ask for the same list at almost the same moment: the pane model when the task
+   * opens, and the rail's hover prefetch a fraction of a second earlier. The window is what makes the
+   * second one free — and it is short because the socket, not this call, is what keeps the roster
+   * current once a pane is watching.
+   */
+  loadTask(taskId: string): Promise<AgentSession[]> {
+    const held = taskLoads.get(taskId)
+    if (held && Date.now() - held.at < TASK_LOAD_WINDOW_MS) return held.run
+    // An async body rather than a `.then` chain on the call, so a caller that hands this store a
+    // broken API gets a rejection like any other failure instead of a synchronous throw.
+    const run: Promise<AgentSession[]> = (async () => {
+      const page = await managedAgentApi.sessions({ taskId, archived: false })
+      for (const session of page.sessions) upsertSession(session)
+      return page.sessions
+    })().catch((error: unknown) => {
+      // A failed read is never remembered: the next caller has to be able to try again.
+      if (taskLoads.get(taskId)?.run === run) taskLoads.delete(taskId)
+      throw error
+    })
+    taskLoads.set(taskId, { at: Date.now(), run })
+    return run
   },
   async loadAttention(): Promise<AgentSession[]> {
     const page = await managedAgentApi.sessions({ attention: true, archived: false })
@@ -265,6 +289,7 @@ export const managedAgentStore = {
     deletedSessionIds.clear()
     seenEventIds.clear()
     usageLines.clear()
+    taskLoads.clear() // another node's tasks, and the window would serve its answers for this one
     for (const timer of snapshotRefreshTimers.values()) clearTimeout(timer)
     snapshotRefreshTimers.clear()
   },

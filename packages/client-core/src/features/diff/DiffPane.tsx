@@ -1,4 +1,5 @@
-import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
+import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
+import { createStore, reconcile, unwrap } from 'solid-js/store'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { tokenizeDocument } from '../../infra/highlight/worker'
 import { readDraft, writeDraft } from '../../kit/lib/draftState'
@@ -111,7 +112,10 @@ export function DiffPane(props: {
 
   // Patch bodies come from the source. Hydration then parses and tokenizes in priority order:
   // selected or visible file first, the rest in small idle batches.
-  const [parsedByPath, setParsedByPath] = createSignal<Map<string, ParsedFile>>(new Map())
+  // Keyed by path, written one key at a time. It used to be a signal holding a `Map`, copied whole on
+  // every parse, which is one full copy per file in the diff (docs/diff-rendering.md § Parsing and
+  // highlighting).
+  const [parsedByPath, setParsedByPath] = createStore<Record<string, ParsedFile>>({})
   // Context lines revealed by clicking a gap, keyed by that gap's stable identity. Reset when the
   // file set changes.
   const [expanded, setExpanded] = createSignal<Map<string, CodeRow[]>>(new Map())
@@ -126,7 +130,8 @@ export function DiffPane(props: {
     setCollapsedFiles(next)
     rememberDiffCollapsed(source().scope, { filesSignature: filesSignature(), paths: [...next] })
   }
-  const [threadCollapsed, setThreadCollapsed] = createSignal<Map<string, boolean>>(new Map())
+  // Keyed by thread id, for the same reason `parsedByPath` above is keyed by path.
+  const [threadCollapsed, setThreadCollapsed] = createStore<Record<string, boolean | undefined>>({})
   const shouldUsePlainTokenizer = (file: DiffFile) => {
     const patch = file.patch ?? ''
     if (patch.length > HIGHLIGHT_MAX_PATCH_CHARS) return true
@@ -142,25 +147,30 @@ export function DiffPane(props: {
       file,
       diff: shouldUsePlainTokenizer(file) ? buildDiffRows(file, plainTokenize) : await buildDiffRowsAsync(file, tokenizeDocument),
     }),
-    onParsed: (parsedFile) => setParsedByPath((prev) => new Map(prev).set(parsedFile.file.path, parsedFile)),
+    onParsed: (parsedFile) => setParsedByPath(parsedFile.file.path, parsedFile),
     cachedFile: (path) => source().cachedFile(path),
     fetchPatches: (paths, signal) => source().fetchPatches?.(paths, signal) ?? Promise.resolve([]),
   })
   onCleanup(hydrator.dispose)
 
-  const parsed = createMemo<ParsedFile[]>(() => {
-    const parsedFiles = parsedByPath()
-    return files().map((file) => {
-      const parsedFile = parsedFiles.get(file.path)
-      if (parsedFile) return parsedFile
-      return { file, diff: [{ kind: 'load', file, status: hydrator.status(file.path) === 'error' ? 'error' : 'loading' }] }
-    })
-  })
+  const parsed = createMemo<ParsedFile[]>(() =>
+    files().map((file) => {
+      // `unwrap`, because everything downstream of here walks tens of thousands of row objects and a
+      // store proxy would mint a signal per property read on every one of them. The tracked read is
+      // the lookup above it, which is the point: this memo depends on the files it has, not on a
+      // counter every file shares.
+      const parsedFile = parsedByPath[file.path]
+      if (parsedFile) return unwrap(parsedFile)
+      // The placeholder says "loading" and stays saying it. Whether this file failed is read live by
+      // the row itself (`loadStatus` on the canvas below), so an error does not rebuild the row model
+      // for every other file, and the row's identity key does not change under the virtualizer.
+      return { file, diff: [{ kind: 'load', file, status: 'loading' }] }
+    }))
 
   // A different set of files: nothing about the old view survives.
   createEffect(on(filesSignature, (signature, previous) => {
     lastTarget = ''
-    setParsedByPath(new Map())
+    setParsedByPath(reconcile({}))
     setExpanded(new Map())
     // Restore the scope's collapsed files if they were saved against this same file set; a changed
     // signature means a different diff, and a collapse decision about the old one does not carry over.
@@ -215,6 +225,9 @@ export function DiffPane(props: {
     if (gap.sha == null || !fileText) return
     try {
       const lines = await expandGapAsync(gap, await fileText({ path: gap.path, sha: gap.sha }), tokenizeDocument)
+      // The one full copy left in this file, and it stays: `buildRenderableRows` takes a `Map` and is
+      // published on the plugin API (@acorn/plugin-api/ui/diff), and this write happens once per gap a
+      // reader clicks open rather than once per file in the diff.
       setExpanded((prev) => new Map(prev).set(gapId(gap), lines))
     } catch (error) {
       // The gap goes back to being a gap. A read can fail for reasons the row cannot fix (the file
@@ -301,18 +314,13 @@ export function DiffPane(props: {
     </Show>
   )
 
-  const threadLayoutSignature = createMemo(() => {
-    const collapsed = threadCollapsed()
-    return (source().threads?.() ?? []).map((thread) => `${thread.threadId}:${thread.resolved}:${collapsed.get(thread.threadId) ?? thread.resolved}`).join('\0')
-  })
+  const threadLayoutSignature = createMemo(() =>
+    (source().threads?.() ?? [])
+      .map((thread) => `${thread.threadId}:${thread.resolved}:${threadCollapsed[thread.threadId] ?? thread.resolved}`)
+      .join('\0'))
   const threadCollapseFor = (thread: DiffThread): ThreadCollapseController => ({
-    collapsed: () => threadCollapsed().get(thread.threadId) ?? thread.resolved,
-    setCollapsed: (collapsed) =>
-      setThreadCollapsed((prev) => {
-        const next = new Map(prev)
-        next.set(thread.threadId, collapsed)
-        return next
-      }),
+    collapsed: () => threadCollapsed[thread.threadId] ?? thread.resolved,
+    setCollapsed: (collapsed) => setThreadCollapsed(thread.threadId, collapsed),
   })
   let serverThreadResolved = new Map<string, boolean>()
   createEffect(() => {
@@ -324,25 +332,13 @@ export function DiffPane(props: {
       if (previous != null && previous !== thread.resolved) resolvedChanges.set(thread.threadId, thread.resolved)
     }
     serverThreadResolved = new Map(threads.map((thread) => [thread.threadId, thread.resolved]))
-    setThreadCollapsed((prev) => {
-      if (prev.size === 0 && resolvedChanges.size === 0) return prev
-      let changed = false
-      const next = new Map(prev)
-      for (const id of next.keys()) {
-        if (!ids.has(id)) {
-          next.delete(id)
-          changed = true
-        }
+    // `undefined` rather than a delete: every read of this store falls back to the thread's own
+    // resolved flag, so forgetting an override and never having had one are the same state.
+    batch(() => {
+      for (const id of Object.keys(unwrap(threadCollapsed))) {
+        if (!ids.has(id)) setThreadCollapsed(id, undefined)
       }
-      for (const [id, resolved] of resolvedChanges) {
-        if (!resolved) {
-          if (next.delete(id)) changed = true
-        } else if (!next.has(id)) {
-          next.set(id, true)
-          changed = true
-        }
-      }
-      return changed ? next : prev
+      for (const [id, resolved] of resolvedChanges) setThreadCollapsed(id, resolved ? true : undefined)
     })
   })
   createEffect(() => {
@@ -528,6 +524,7 @@ export function DiffPane(props: {
         replyReview={(databaseId, body) => source().reply?.(databaseId, body) ?? rejectUnsupported()}
         expandGap={handleExpand}
         retryDiff={(path) => hydrator.retry(path)}
+        loadStatus={(path) => (hydrator.status(path) === 'error' ? 'error' : 'loading')}
         mentions={mentionsList}
         threadCollapse={threadCollapseFor}
         fileCollapsed={(path) => collapsedFiles().has(path)}
