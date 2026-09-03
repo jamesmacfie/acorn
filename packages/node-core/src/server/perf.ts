@@ -14,7 +14,10 @@
 //   a histogram per seam, for the two things the node does over and over with nothing counting them:
 //   spawning git (./core/git.ts) and running SQLite statements (./storage/sqlite.ts). Those exist
 //   because the performance programme refused to split the node into threads on a structural argument
-//   and asked for numbers instead (docs/future/performance/refused.md § Splitting the node).
+//   and asked for numbers instead (docs/performance.md § Splitting the node). The first reading says
+//   the git seam is the whole of it: 60 `git status` spawns at 21.8 ms each against 183 SQLite
+//   statements totalling 3.4 ms, over the same ninety-one requests
+//   (docs/performance.md § The request log and the histograms, read for the first time).
 //
 // Printed, never stored. No perf database and no dashboard: a developer reads a dozen lines with a
 // running offset, and `kill -USR2 <pid>` asks for the histograms mid-session.

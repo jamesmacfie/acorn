@@ -57,10 +57,24 @@ export function createTreeState(input: TreeStateInput) {
    * Simulated against a projected copy of the parent map rather than the live one, so an op is judged
    * against the tree the ops before it in the same batch would have left — the alternative reads a
    * stale depth for anything a batch moves, and misses the case a `move` is dangerous for at all.
+   *
+   * The projection carries a child index beside the parent map so a `remove` costs its own subtree
+   * rather than the whole tree. Both are built once per batch, which is the copy this pass already
+   * paid for.
    */
   const acceptable = (ops: readonly TreeMutation[]): string | null => {
     if (ops.length > TREE_LIMITS.batchOps) return `batch of ${ops.length} mutations is over the cap`
     const projected = new Map(parents)
+    const kids = new Map<string | null, Set<string>>()
+    const link = (id: string, parent: string | null): void => {
+      let siblings = kids.get(parent)
+      if (!siblings) kids.set(parent, (siblings = new Set()))
+      siblings.add(id)
+    }
+    const unlink = (id: string): void => {
+      kids.get(projected.get(id) ?? null)?.delete(id)
+    }
+    for (const [id, parent] of projected) link(id, parent)
 
     /** Depth of a node, and the cycle check in the same walk: a chain that does not reach the root in
      *  `depth` steps is either too deep or a loop, and both are refusals. */
@@ -85,6 +99,7 @@ export function createTreeState(input: TreeStateInput) {
             if (depth > TREE_LIMITS.depth) return `tree deeper than ${TREE_LIMITS.depth}`
             if (projected.has(node.id)) return `duplicate node id ${node.id}`
             projected.set(node.id, parent)
+            link(node.id, parent)
             if (projected.size > TREE_LIMITS.treeNodes) return `more than ${TREE_LIMITS.treeNodes} nodes`
             for (const child of node.children) stack.push({ node: child, parent: node.id, depth: depth + 1 })
           }
@@ -100,25 +115,28 @@ export function createTreeState(input: TreeStateInput) {
             if (ancestor === op.id) return `move of ${op.id} inside itself`
             ancestor = projected.get(ancestor) ?? null
           }
+          unlink(op.id)
           projected.set(op.id, op.parent)
+          link(op.id, op.parent)
           if (depthIn(op.id) > TREE_LIMITS.depth) return `tree deeper than ${TREE_LIMITS.depth}`
           break
         }
         case 'remove': {
           if (!projected.has(op.id)) return `remove of an unknown node ${op.id}`
           // With its subtree: a later op addressing a removed descendant is the sandbox and the host
-          // disagreeing, which is what this whole pass exists to catch.
-          for (const [id, parent] of [...projected]) {
-            let at: string | null = parent
-            while (at !== null) {
-              if (at === op.id) {
-                projected.delete(id)
-                break
-              }
-              at = projected.get(at) ?? null
-            }
+          // disagreeing, which is what this whole pass exists to catch. Walked down through the child
+          // index, so this costs the subtree. It used to scan every live node and walk its ancestors
+          // for each `remove`, which was a second of blocked main thread for a batch that emptied a
+          // 4,500-node tree — and it missed a grandchild whose parent the same loop had already
+          // deleted, because the walk up stopped at the hole.
+          unlink(op.id)
+          const doomed = [op.id]
+          while (doomed.length) {
+            const id = doomed.pop()!
+            for (const child of kids.get(id) ?? []) doomed.push(child)
+            kids.delete(id)
+            projected.delete(id)
           }
-          projected.delete(op.id)
           break
         }
         case 'patch':

@@ -16,6 +16,11 @@ import type { AppEnv } from './middleware/auth'
 // middleware of its own because this is the outermost one and the id is minted here: a duration
 // nobody can tie back to a request correlates with nothing. The path is the matched route pattern, not
 // the URL, so a hundred task ids read as one line's worth of routes (./perf.ts).
+//
+// The response size rides along because the desktop's helper wire base64-encodes every body, and
+// `apps/desktop/src/shell/wire.ts` puts the ceiling on that at tens of megabytes. Nothing could say
+// whether a real body ever reaches it, because nothing measured a body. `-1` means the response is a
+// stream and did not declare a length, which is what terminal output and file downloads look like.
 export const requestIdMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const provided = c.req.header('x-request-id')
   const requestId = provided && requestIdSchema.safeParse(provided).success ? provided : randomUUID()
@@ -27,7 +32,8 @@ export const requestIdMiddleware = createMiddleware<AppEnv>(async (c, next) => {
     await next()
   } finally {
     const ms = Number(process.hrtime.bigint() - started) / 1e6
-    console.error(`[perf:request] ${c.req.method} ${c.req.routePath || c.req.path} ${c.res.status} ${ms.toFixed(1)}ms ${requestId}`)
+    const bytes = c.res.headers.get('content-length') ?? '-1'
+    console.error(`[perf:request] ${c.req.method} ${c.req.routePath || c.req.path} ${c.res.status} ${ms.toFixed(1)}ms ${bytes}B ${requestId}`)
   }
 })
 

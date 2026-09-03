@@ -103,7 +103,7 @@ describe('device tokens', () => {
 
   // Every authenticated request used to run this `SELECT` on the node's single event loop, which on a
   // client holding a live socket makes it the most-executed statement in the process
-  // (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+  // (docs/performance.md § 2026-09-03 — phase 5).
   it('answers a warm token from memory, with no read of the devices table', async () => {
     const { token, device } = await devices.issue('laptop')
     expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })

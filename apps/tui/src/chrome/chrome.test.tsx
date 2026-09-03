@@ -196,7 +196,7 @@ describe.skipIf(!hasFfi)('the shell', () => {
   }, 30_000)
 
   // Drawing in front of the node (docs/tui.md § Attach or start,
-  // docs/future/performance/decisions.md § Every host draws first). `acorn` creates its renderer before
+  // docs/performance.md § Every host draws first). `acorn` creates its renderer before
   // a node it spawned has printed its boot line, so the whole shell has to be drawable from the
   // persisted cache with nothing on the wire.
   it('draws the whole shell from the persisted cache while the node it started is booting', async () => {

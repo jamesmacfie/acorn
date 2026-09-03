@@ -136,7 +136,7 @@ function watchDrain(conn: Conn): void {
 // (@acorn/custody/broker/nodeBroker.ts), reconnect re-attaches every terminal, and each re-attach
 // makes the node serialise a framebuffer while the client refetches its active queries. A build
 // spewing output was answered with more load, at the moment the node was busiest
-// (docs/future/performance/architecture.md § 2).
+// (docs/performance.md).
 //
 // Now: a stream frame over the mark is still sent, and its producer is paused until the socket drains.
 // Nothing is dropped, so nothing is lost. A frame with no producer to pause — an invalidation ping —
@@ -175,7 +175,7 @@ function sendFrame(conn: Conn, frame: WsServerFrame): void {
 //
 // The bytes were bytes when the pseudo-terminal produced them, and this used to be the one channel that
 // re-escaped them once per attached socket and again on the helper hop, at 60 frames a second while a
-// build talks (docs/future/performance/architecture.md § 3). The frame is the session id and then the
+// build talks (docs/performance.md). The frame is the session id and then the
 // payload (@acorn/protocol/ws.ts § The one binary frame); the desktop broker forwards it without
 // looking inside, and the renderer's bridge tags it with the node id.
 //

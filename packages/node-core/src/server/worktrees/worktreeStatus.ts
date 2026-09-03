@@ -4,12 +4,12 @@
 // changes plugin's local-changes read, and `worktrees.ts` spawned a second and third `git status` for
 // the same worktree from a different caller. Every connected client asked independently, so two
 // clients and four worktrees was twelve processes per ping
-// (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+// (docs/performance.md § 2026-09-03 — phase 5).
 //
 // Built on the dedup shape server/sync/engine.ts already uses for provider mirrors: an in-flight map
 // so concurrent callers join one run, and a time-to-live so a caller just behind one gets the answer
 // that run produced. What it deliberately is not is a filesystem watcher — refused, with its exit
-// condition, in docs/future/performance/refused.md.
+// condition, in docs/performance.md.
 //
 // ── The one rule ──────────────────────────────────────────────────────────────────────────────────
 //

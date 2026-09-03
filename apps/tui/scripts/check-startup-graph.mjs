@@ -23,7 +23,7 @@ const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') :
 
 // Measured at 841,142 B on 2026-09-03, and rounded up by about 3% so an unrelated comment does not
 // turn the build red. The history, because each step moved it for a different reason
-// (docs/future/performance/measurements.md):
+// (docs/performance.md):
 //
 //   1,114,282 B  phase 0's first measurement
 //   1,024,422 B  phase 1 made the GitHub plugin's PR pane a lazy contribution. The kit table this host

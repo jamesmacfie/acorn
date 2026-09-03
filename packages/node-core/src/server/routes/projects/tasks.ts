@@ -136,7 +136,7 @@ export const tasks = new Hono<AppEnv>()
     // One query for every project the list mentions, not one per task. This was `await getProject` in
     // a loop over rows, so a hundred tasks in one project was a hundred identical `SELECT`s per list
     // read, and the list is read on every `tasks:changed`
-    // (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+    // (docs/performance.md § 2026-09-03 — phase 5).
     const projectIds = [...new Set(rows.flatMap((row) => (row.projectId ? [row.projectId] : [])))]
     const projects = new Map<string, ProjectRow>()
     if (projectIds.length) {

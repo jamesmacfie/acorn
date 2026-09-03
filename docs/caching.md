@@ -55,7 +55,7 @@ mode 0600, so a file with any other mode was written by an older build under a p
 mode comes off the `lstat` the sweep already does, and only a file that is actually wrong is
 chmodded. That matters because the sweep is synchronous and sits in front of the node's listener:
 2,975 blobs and an unconditional `chmod` each cost 102 ms of every boot and fixed nothing
-(`packages/node-core/src/server/bindings.ts`, docs/future/performance/measurements.md § 2026-09-03 —
+(`packages/node-core/src/server/bindings.ts`, docs/performance.md § 2026-09-03 —
 phase 3).
 
 ## Renderer query cache

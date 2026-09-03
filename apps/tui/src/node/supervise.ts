@@ -68,7 +68,7 @@ function nodeEntry(): { command: string; args: string[]; cwd?: string } {
  *
  *  Not awaited here, and that is the point: the renderer is created and the shell drawn while the
  *  child boots, which in a checkout with no build is a full tsx boot of the node
- *  (docs/future/performance/decisions.md § Every host draws first).
+ *  (docs/performance.md § Every host draws first).
  *
  *  `deviceToken` is whatever this TUI already holds for this data root. The node reuses a token that
  *  still authenticates and mints one otherwise, so passing it is what stops every launch adding a

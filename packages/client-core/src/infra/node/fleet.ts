@@ -66,7 +66,7 @@ function subscribeStatuses(): void {
     // A status for a node this list has never heard of. It used to be impossible: membership was read
     // after the local node had been adopted. The window now opens first, so on a first-ever launch the
     // list is empty and the local node's first status is the only news that it exists
-    // (docs/future/performance/decisions.md § Every host draws first). Re-reading costs the helper one
+    // (docs/performance.md § Every host draws first). Re-reading costs the helper one
     // file read.
     if (chased.has(status.nodeId) || nodes().some((node) => node.nodeId === status.nodeId)) return
     chased.add(status.nodeId)

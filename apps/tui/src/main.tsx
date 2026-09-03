@@ -62,7 +62,7 @@ if (nodeMajor < 26 || (nodeMajor === 26 && nodeMinor < 4)) {
 // Before the renderer: pairing asks a question on stdin, and it is the one thing here that does. What
 // no longer happens before the renderer is waiting for a node this run started — `openNode` returns as
 // soon as the child is spawned, and the shell draws from the persisted cache while it boots
-// (./node/open.ts, docs/future/performance/decisions.md § Every host draws first).
+// (./node/open.ts, docs/performance.md § Every host draws first).
 const opened = await openNode(values.node).catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)

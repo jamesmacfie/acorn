@@ -144,7 +144,7 @@ two native modules sentence loses OpenTUI's.
 [../README.md](../README.md): this programme's row moves to § Retired folders with a paragraph naming
 where each part went, in the shape the `terminal-updates/` paragraph has.
 
-[performance/phase-9-the-terminal-clients-keystroke.md](../performance/phase-9-the-terminal-clients-keystroke.md):
+[performance.md](../../performance.md) § 2026-09-03 — phase 9:
 its premises are re-read against the new store; the indexing items are marked done by construction or
 still open.
 

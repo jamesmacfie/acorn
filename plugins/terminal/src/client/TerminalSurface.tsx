@@ -26,7 +26,7 @@ function installScrollAreaGuard() {
 // One xterm bound to one live session over WebSocket (docs/terminal.md). One per open tab, and it
 // outlives a tab switch: the parent draws every session's surface and hides the ones nobody is looking
 // at, so switching back is a repaint rather than a fresh xterm, a fresh WebGL context, a `term:attach`
-// and a full framebuffer serialize on the node (docs/future/performance/architecture.md § 3).
+// and a full framebuffer serialize on the node (docs/performance.md).
 //
 // The xterm is still built lazily, on the first frame this surface is shown on. Two reasons: a session
 // nobody has opened yet costs nothing, and xterm measures its cell size from a laid-out element, which

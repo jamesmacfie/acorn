@@ -302,7 +302,7 @@ describe('wsHub streaming', () => {
 
   // Phase 6 of the performance programme: output crosses the wire once per broadcast as bytes rather
   // than once per socket as escaped JSON
-  // (docs/future/performance/phase-6-terminals-work-only-when-watched.md).
+  // (docs/performance.md § 2026-09-03 — phase 6).
   it('sends one binary frame per attached socket, byte for byte the same', async () => {
     const sinks: StreamSink[] = []
     setStreamHandlers({
@@ -586,7 +586,7 @@ describe('wsHub non-term channels and broadcast, under task scope', () => {
 // Backpressure, which used to be handled by amplifying load: the hub dropped a frame when a socket
 // buffered past its mark and incremented `seq` anyway, the broker read the gap as loss and closed the
 // socket, and reconnect re-attached every terminal and refetched every active query — at the moment
-// the node was busiest (docs/future/performance/architecture.md § 2).
+// the node was busiest (docs/performance.md).
 //
 // The mark is set to a byte here rather than four megabytes, so the pause and the resume happen over a
 // real socket without pushing real megabytes through it. `paused` on the client end is what makes the

@@ -246,7 +246,7 @@ per Node and must not write aggregate shapes into ordinary per-Node keys.
 
 The shell draws before the node it talks to is up, and corrects itself as the node arrives. Nothing
 between the renderer's first script and its first frame waits on a round trip
-([future/performance/decisions.md](./future/performance/decisions.md) § Every host draws first).
+([performance.md](./performance.md) § Every host draws first).
 
 `apps/desktop/src/client/index.tsx` starts `selectActiveNode()` and `applyNodePlugins()` and awaits
 neither. Both still run, and their effects arrive through the signals they already set:

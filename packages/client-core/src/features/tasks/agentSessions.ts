@@ -49,7 +49,7 @@ export const addSession = (s: TerminalSession): void => {
 export function initSessions(): () => void {
   if (!hasHostCapability({ plugin: 'terminal' })) return () => {}
   // Caught, because every host now mounts this in front of its node
-  // (docs/future/performance/decisions.md § Every host draws first): the first pull lands while the
+  // (docs/performance.md § Every host draws first): the first pull lands while the
   // node may still be booting, and an uncaught rejection is a crash under Node's default policy. The
   // terminal client made it visible — OpenTUI answers one by drawing its debug console over the shell.
   // A list that could not be read is an empty list, which is what the next status broadcast fixes.
@@ -59,7 +59,7 @@ export function initSessions(): () => void {
   pull()
   // `terminal:sessions-changed`, which is the half of the old `term:status` ping this list actually
   // wanted. The other five subscribers to that ping were paying for this one's edges
-  // (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+  // (docs/performance.md § 2026-09-03 — phase 5).
   return wsOnNodeEvent('terminal:sessions-changed', pull)
 }
 

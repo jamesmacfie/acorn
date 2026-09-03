@@ -354,7 +354,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         : wsBroadcast,
       // Bound to the caller's own id, which is the whole fix for the chrome sweep: `bumpChrome` has
       // held a per-plugin revision map all along and this was the one caller that told it nothing
-      // (docs/future/performance/decisions.md § Corrections to the first reads).
+      // (docs/performance.md § Corrections to the first reads).
       status: () => broadcastStatus(plugin),
       worktreeStatus: (taskId) => broadcastWorktreeStatusChanged({ taskId }),
       repoConfigTrustNotice: broadcastRepoConfigTrustNotice,

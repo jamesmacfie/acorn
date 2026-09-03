@@ -169,7 +169,7 @@ const watchLayers = (engine: { on: (name: 'state', fn: () => void) => () => void
  *  keyboard — a task list arriving, a terminal frame, a toast. `getActiveKeys` walks every active
  *  layer, so asking it per render was the cost this cache removes: the answer only moves when one of
  *  the four things below moves, and each of them is a signal or an identity
- *  (docs/future/performance/phase-9-the-terminal-clients-keystroke.md). */
+ *  (docs/performance.md § 2026-09-03 — phase 9). */
 let last: {
   node: Renderable | null
   overlays: readonly unknown[]

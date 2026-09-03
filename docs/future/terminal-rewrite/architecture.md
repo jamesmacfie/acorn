@@ -183,7 +183,7 @@ parser. The tier table in `apps/tui/src/keys/tiers.ts` and every registration sh
 (`registerIntentLayer`, `bindKeys`, the intercept for a rectangle) are untouched. Tier 41 stays as
 long as the engine breaks ties by registration order; `isTyping` becomes a check of the focused
 node's kind. The typing gate as a layer rather than a runtime matcher is
-[performance/phase-9-the-terminal-clients-keystroke.md](../performance/phase-9-the-terminal-clients-keystroke.md)'s
+[performance.md](../../performance.md) § 2026-09-03 — phase 9's
 and composes with this. Writing our own dispatcher is parked in [refused.md](./refused.md).
 
 **The footer reads the same table.** `apps/tui/src/chrome/bindings.ts` asks the engine which

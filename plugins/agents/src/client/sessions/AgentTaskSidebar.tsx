@@ -88,7 +88,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
     // The two frames the workflow half of this roster actually depends on: a gate or a finished run
     // for this task, and a live step edge. It used to hang off the content-free `term:status` ping,
     // which also fired on every terminal idle-to-working edge and refetched every run and every run's
-    // steps on every connected client (docs/future/performance/phase-5-stop-the-event-amplifiers.md).
+    // steps on every connected client (docs/performance.md § 2026-09-03 — phase 5).
     // The session half of the roster is already reactive: `sessions()` and `model.taskSessions()` are
     // signals somebody else keeps in step.
     onCleanup(wsOnNotice((notice) => {

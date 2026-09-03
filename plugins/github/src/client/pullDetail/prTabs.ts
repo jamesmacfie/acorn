@@ -102,7 +102,7 @@ function build(task: Task) {
   })
   // `head:changed` for this task, not the old content-free `term:status` ping. Two pull-request keys
   // were being invalidated on every terminal idle-to-working edge, on every connected client
-  // (docs/future/performance/phase-5-stop-the-event-amplifiers.md). What actually moves a pull is a
+  // (docs/performance.md § 2026-09-03 — phase 5). What actually moves a pull is a
   // commit landing in the task's worktree, which is what this event names.
   const offStatus = clientEvents.on('head:changed', (event) => {
     if (event.taskId !== task.id) return

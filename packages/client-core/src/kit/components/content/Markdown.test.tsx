@@ -126,4 +126,31 @@ describe('a streaming markdown message', () => {
     setText('Moved.')
     expect(blocks(root)[0]).not.toBe(before)
   })
+
+  // The property every other assertion in this file is a proxy for. A reader selecting across an
+  // agent's answer while it is still streaming used to lose the selection on the next delta, because
+  // the whole subtree was rewritten; the identity assertions above say the elements survive, and this
+  // one says what that is worth. Written against the real Selection rather than against element
+  // identity, so it fails for any reason a selection can break — a replaced text node, a reordered
+  // block, a re-parented paragraph — and not only for the one this phase fixed.
+  it('holds a selection across the blocks above the one still streaming', () => {
+    const { root, setText } = mount('First paragraph.\n\nSecond paragraph.\n\nThird para')
+    const [first, second] = blocks(root)
+    const range = document.createRange()
+    range.setStart(first.firstChild!, 6)
+    range.setEnd(second.firstChild!, 6)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    const selected = selection.toString()
+    expect(selected).toContain('paragraph')
+
+    setText('First paragraph.\n\nSecond paragraph.\n\nThird paragraph.')
+
+    // `toString()` is the assertion, not the boundary nodes: a rewritten subtree leaves the range
+    // pointing at surviving ancestors and reads as empty, which is exactly what the reader sees.
+    expect(selection.rangeCount).toBe(1)
+    expect(selection.toString()).toBe(selected)
+    expect(blocks(root)[0]).toBe(first)
+  })
 })

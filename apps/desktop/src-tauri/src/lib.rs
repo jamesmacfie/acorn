@@ -27,7 +27,7 @@ use webviews::Webviews;
 // which it does once it is listening, and the window opens on that. The node's own boot runs behind
 // the window and arrives as a `node-status` push, so the shell draws its persisted cache instead of
 // waiting a few hundred milliseconds for a node it will then re-read anyway
-// (docs/future/performance/decisions.md § Every host draws first). What the window still cannot open
+// (docs/performance.md § Every host draws first). What the window still cannot open
 // without is the helper: the renderer's first question is which nodes there are, and the fleet is the
 // helper's file.
 

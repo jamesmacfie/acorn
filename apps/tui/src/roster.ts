@@ -24,7 +24,7 @@ import { initClientPlugins } from '@acorn/client-core/host/registries/extensionP
 // `init` could register at module scope, and `main.tsx` awaits `App` before it creates a renderer — so
 // every pane, every source and every query module in twelve plugins was evaluated before a cell was
 // drawn. That was 224 KB of the 1.03 MB the shell loaded to draw a rail
-// (docs/future/performance/measurements.md § 2026-09-03 — phase 4).
+// (docs/performance.md § 2026-09-03 — phase 4).
 //
 // Registering after the frame is safe because every contribution registry is a Solid signal
 // (client-core kit/lib/registry.ts): the shell draws its chrome, this lands, and the rail, the pane

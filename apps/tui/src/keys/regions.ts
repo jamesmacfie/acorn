@@ -95,7 +95,7 @@ const groups: Group[] = []
 // a region" of every node it visits, `regionOf` asks it of every ancestor, and `groupAt` resolves the
 // claim on every move. A linear scan inside a walk is O(nodes × regions) where O(depth) would do,
 // which is what phase 9 of the performance programme is about
-// (docs/future/performance/phase-9-the-terminal-clients-keystroke.md).
+// (docs/performance.md § 2026-09-03 — phase 9).
 //
 // The array stays, because ordering is the one thing it is good at and `ordered()` is the only reader
 // that needs it (§ ordered). The maps are written where a region registers and deleted where it goes,

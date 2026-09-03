@@ -50,7 +50,7 @@ export const taskStatusScheduleContribution: ClientScheduleContribution = {
   run: refreshTaskStatuses,
   // Two narrow events rather than the old content-free `term:status` ping, which also fired on every
   // terminal idle-to-working edge and made a build's output spawn a `git status` per worktree per
-  // client (docs/future/performance/phase-5-stop-the-event-amplifiers.md). What actually moves a dirty
+  // client (docs/performance.md § 2026-09-03 — phase 5). What actually moves a dirty
   // marker is a write under the worktree, or an agent finishing a turn. Core's own transport, so no
   // feature accessor.
   subscribe: (refresh) => {

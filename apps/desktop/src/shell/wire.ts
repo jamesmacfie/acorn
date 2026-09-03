@@ -55,7 +55,7 @@ export const isPush = (message: HelperMessage): message is HelperPush => 'push' 
 // session, with no JSON parse and no base64 on the way.
 //
 // Request and response bodies stay base64 below. Nothing but terminal output has reached the ceiling
-// that would justify moving them (docs/future/performance/refused.md § Replacing base64 on the helper
+// that would justify moving them (docs/performance.md § Replacing base64 on the helper
 // wire ahead of a measurement).
 
 // Request and response bodies are bytes, and this channel is JSON, so they ride as base64.

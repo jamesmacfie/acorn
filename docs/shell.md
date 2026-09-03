@@ -280,7 +280,7 @@ that reads the session id and the one place the bytes become text. So a busy bui
 process boundaries with two copies and no parse, where it used to be JSON-escaped once per attached
 socket on the node and stringified again here. Request and response bodies stay base64 in the JSON
 messages: nothing else on this wire is measured in frames per second
-([docs/future/performance/refused.md](./future/performance/refused.md) § Replacing base64 on the helper
+([performance.md](./performance.md) § Replacing base64 on the helper
 wire ahead of a measurement).
 
 The file dialogs are the folder picker, `pick_files`, and `save_file`. The last two carry bytes, not
