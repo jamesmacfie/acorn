@@ -1072,7 +1072,7 @@ the kit as a stop without somebody deciding whether this host presses it.
 | `CodeBlock` | none | monospace lines, a grey rule above and below |
 | `Log` | stop | monospace lines, find as a bottom line |
 | `Markdown` | none | reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables, and a link as its text with the URL beside it in grey |
-| `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row |
+| `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row; windowed, so a long patch draws the rows around the viewport and not all of them |
 | `DiffLine` | none | reduced: one line, `+`/`-`/space in the gutter, no intra-line highlight |
 | `FileHead` | none | reduced: the path in bold with `+n −m` right-aligned |
 | `NonCodeRow` | none | reduced: a grey line saying what is not being shown, such as `binary file` |

@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { toast } from '@acorn/client-core/features/notifications/toast.ts'
 import { _resetNotices, pushNotice } from '@acorn/client-core/features/notifications/notifications.ts'
 import { tasksKey, type Task } from '@acorn/protocol/api.ts'
+import { createRoot, createSignal } from 'solid-js'
+import type { KeyEvent, Renderable } from '@opentui/core'
+import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { keyedRows } from '../kit/showing'
 import { recordedRequests } from '../fixture'
 import { hasFfi } from '../ffi'
 import { renderFixture } from '../harness'
@@ -261,4 +265,92 @@ describe.skipIf(!hasFfi)('the shell', () => {
     started.done()
     expect(started.quits()).toBe(1)
   }, 30_000)
+})
+
+// ── What the footer costs ─────────────────────────────────────────────────────────────────────
+//
+// The footer is drawn on every frame the shell draws, and its list comes from a walk of every active
+// keymap layer. Asking per render was the cost; asking per change is the fix, and "per change" has to
+// mean the four things that actually move the answer
+// (./bindings.ts § When the answer moves).
+
+describe.skipIf(!hasFfi)('the footer asks the keymap once per change', () => {
+  it('draws many frames without re-collecting, and re-collects when the keys move', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    try {
+      await screen.until('Reviews')
+      const engine = keymap<Renderable, KeyEvent>()!
+      let asks = 0
+      const real = engine.getActiveKeys
+      engine.getActiveKeys = ((options?: Parameters<typeof real>[0]) => {
+        asks += 1
+        return real.call(engine, options)
+      }) as typeof real
+      try {
+        // Frames that have nothing to do with the keyboard. A toast draws a line above the footer and
+        // a resize redraws the whole screen, and neither adds or removes a key.
+        toast('Saved.')
+        await screen.frame()
+        await screen.frame()
+        screen.resize(110, 30)
+        await screen.frame()
+        const idle = asks
+        expect(idle, 'the footer re-collected on a frame that moved no keys').toBeLessThanOrEqual(1)
+
+        // And a key that moves the keys is a change, so the answer is asked for again. A handful
+        // rather than one, because Tab into another region mounts the controls in it and each of them
+        // registering a layer is a real change to what the footer can offer — but a handful bounded
+        // by the move rather than one per frame for the rest of the run, which is what it was.
+        await screen.press('TAB')
+        await screen.frame()
+        expect(asks - idle).toBeGreaterThan(0)
+        expect(asks - idle).toBeLessThanOrEqual(8)
+      } finally {
+        engine.getActiveKeys = real
+      }
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+})
+
+// ── Rows a change does not rebuild ────────────────────────────────────────────────────────────
+//
+// `<For>` keys by object identity, so a rail that maps its tasks into fresh wrappers on every change
+// destroys and rebuilds every row renderable — including the rows that did not change
+// (../kit/showing.tsx § keyedRows).
+
+describe('the rail keeps the rows a change did not touch', () => {
+  it('hands the same wrapper back for an unchanged task, and the same array when nothing moved', () => {
+    createRoot((dispose) => {
+      const alpha = { id: 'a', title: 'Alpha' }
+      const bravo = { id: 'b', title: 'Bravo' }
+      const charlie = { id: 'c', title: 'Charlie' }
+      const [tasks, setTasks] = createSignal([alpha, bravo, charlie])
+      const rows = keyedRows(tasks, (task) => ({ key: task.id, task }))
+
+      const first = rows()
+      expect(first.map((row) => row.key)).toEqual(['a', 'b', 'c'])
+      // Read again with nothing moved: the same array, so `<For>` has nothing to diff.
+      expect(rows()).toBe(first)
+
+      // A reorder, which is what a `tasks:changed` that moved a task up the list is. Every row is the
+      // object it was, so every row renderable survives.
+      setTasks([charlie, alpha, bravo])
+      const reordered = rows()
+      expect(reordered.map((row) => row.key)).toEqual(['c', 'a', 'b'])
+      expect(reordered[0]).toBe(first[2])
+      expect(reordered[1]).toBe(first[0])
+      expect(reordered[2]).toBe(first[1])
+
+      // And a task whose data changed is a new wrapper, because the row has to redraw. The rows
+      // beside it are untouched, which is the half that matters.
+      setTasks([charlie, { id: 'a', title: 'Alpha renamed' }, bravo])
+      const changed = rows()
+      expect(changed[0]).toBe(first[2])
+      expect(changed[1]).not.toBe(first[0])
+      expect(changed[2]).toBe(first[1])
+      dispose()
+    })
+  })
 })

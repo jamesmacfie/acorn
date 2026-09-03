@@ -510,10 +510,13 @@ export function MentionTextarea(props: MentionTextareaProps) {
         // the `commit` chord here — the same key the footer already names beside a focused field.
         {...(props.onSubmit ? { onSubmit: () => props.onSubmit!() } : {})}
         ref={(element: Renderable) => {
-          // The one arrow key in the kit bound past the typing gate, and the reason is the shape: the
-          // field IS the typing target and the list under it is the field's own, so `↓` cannot mean
-          // "type a ↓" and there is nothing else for it to reach. The palette needs the same thing for
-          // the same reason and gets it above the trap instead (../keys/trap.ts § overlayKeys).
+          // The one arrow key in the kit that fires while somebody is typing, and the reason is the
+          // shape: the field IS the typing target and the list under it is the field's own, so `↓`
+          // cannot mean "type a ↓" and there is nothing else for it to reach. It says so with its
+          // tier: `STOP` sits above the typing shadow, and it is bound to the field itself, which is
+          // the one thing the shadow deliberately leaves alone (../keys/tiers.ts § TYPING). The
+          // palette needs the same thing for the same reason and gets it above the trap instead
+          // (../keys/trap.ts § overlayKeys).
           bindKeys(element, [{
             key: 'down',
             cmd: () => {
@@ -522,7 +525,7 @@ export function MentionTextarea(props: MentionTextareaProps) {
               // nothing to step from (../keys/regions.ts § walkStops).
               return focusRenderable(stopsIn(list)[0])
             },
-          }], STOP, { mode: 'focus', whileTyping: true })
+          }], STOP, { mode: 'focus' })
         }}
         onInput={props.onInput}
       />

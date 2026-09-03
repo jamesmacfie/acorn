@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
+import type { Renderable } from '@opentui/core'
 import { hasFfi } from './ffi'
 import { renderFixture } from './harness'
 
@@ -51,6 +52,40 @@ describe('a diff longer than its column', () => {
       expect(inserted!.fg.g).toBeGreaterThan(inserted!.fg.r)
       const deleted = runs.find((run) => run.text.includes('-  const somethingRatherLongIndeed'))
       expect(deleted!.fg.r).toBeGreaterThan(deleted!.fg.g)
+    } finally {
+      delete process.env.ACORN_FIXTURE_PATCH_LINES
+    }
+  }, 120_000)
+})
+
+// ── And how much of it is built ───────────────────────────────────────────────────────────────
+//
+// The pane used to say in its own comment that every row was built. A five-thousand-line diff in a
+// pane that shows twenty is five thousand renderables laid out on every frame, and the fix is the one
+// the rail already had: draw the slice around the offset and stand two boxes in for the rest
+// (./kit/showing.tsx § DiffPane).
+
+/** Every renderable under the root, which is what a frame costs to lay out. */
+const renderables = (root: Renderable): number => {
+  let count = 1
+  for (const child of root.getChildren()) count += renderables(child)
+  return count
+}
+
+describe.skipIf(!hasFfi)('a five-thousand-line diff', () => {
+  it('builds a window rather than the whole patch', async () => {
+    process.env.ACORN_FIXTURE_PATCH_LINES = '5000'
+    try {
+      const screen = await renderFixture({ width: 80, height: 24, pane: 'pr' })
+      await screen.until('somethingRatherLongIndeed', 45)
+      const built = renderables(screen.renderer.root)
+      screen.done()
+
+      // The whole screen, chrome included, against a patch of five thousand lines. Before the window
+      // this was the patch plus the chrome; the bound is the viewport plus the overscan the pane
+      // keeps either side of it, and there is a wide margin here because what is being pinned is the
+      // shape — a number that does not grow with the diff — rather than a layout.
+      expect(built).toBeLessThan(1000)
     } finally {
       delete process.env.ACORN_FIXTURE_PATCH_LINES
     }

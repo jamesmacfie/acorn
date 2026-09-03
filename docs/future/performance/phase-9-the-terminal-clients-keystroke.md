@@ -1,7 +1,13 @@
 # Phase 9: the terminal client's keystroke
 
-Status: not started. Waits on phase 0 for a step counter in the test harness; phase 4 is not a
-dependency.
+Status: **shipped 2026-09-03, with one half refused.** The focus store is indexed and asks `stopsIn`
+once per move, the footer's hints are cached against the five things that move them, typing is a layer
+at its own tier and the engine's active-key cache is on (`activeKeyCacheBlockers` 48 → 0 during
+ordinary navigation), the rail and the shell hand `<For>` stable rows, `markersFor` sorts once per
+registry change, the trace writes through a stream and carries a step count, and the diff pane windows
+(5,303 renderables → 376 at 5,000 lines). **The `virtual` opt-ins did not ship** and the reason is in
+[refused.md](./refused.md) § `virtual` opted in at the long-list sites in cells. Numbers in
+[measurements.md](./measurements.md) § 2026-09-03 — phase 9.
 
 ## Goal
 
@@ -144,3 +150,40 @@ viewports: the diff pane windows; § Seeing what the keys did: the step counter.
 - Confirm `Rows`'s `virtual` still swaps the box's flex before opting a site in; if that changed, the
   default question reopens.
 - Read `docs/tui.md` § Keys and focus in full first. Every change here must name the rule it serves.
+
+### What that turned up, 2026-09-03
+
+- **`regions.ts` was still 1,071 lines and still held the three arrays**, and `moveStop` still asked
+  `stopsIn` twice — once to decide whether it owned the stop and again inside `walkStops`. Both true
+  as written.
+- **The keymap still blocks its cache on any matcher and still has no layer toggle**, and the counter
+  is still global. It has no public stats API either, so the test that reads
+  `activeKeyCacheBlockers` goes through the `keymap-extension-context` symbol and says so.
+- **The phase's own sketch of the typing layer was wrong on the mechanism.** It said the layer should
+  bind the bare keys "to a no-op that returns `false`, letting the input's own handler take them". A
+  handler returning `false` is not handled, so dispatch carries straight on to the layer the shadow
+  was meant to shadow. The spelling that works is `cmd: () => true` with `preventDefault: false`:
+  handled inside the keymap, and the key still escapes to the focused renderable.
+- **Removing the matcher from `registerIntentLayer` would have changed the desktop**, because that
+  function is shared and the DOM host has no shadow. It is behind a `shadowsTyping` the terminal's
+  installer passes; the desktop keeps its matchers and the same win is available to it later.
+- **The typing shadow needed a tier, and there was no number between the collection's 40 and a stop's
+  41.** `STOP` moved to 42 and the shadow is 41. That placement is the design rather than an accident:
+  every layer that reaches a focused field from outside sits at or below it, and the two tiers above
+  it are bound to an exact renderable by focus. `tiers.test.ts` now names eleven tiers and asserts the
+  order.
+- **The command layer's `enabled` on each command was a second blocker** the scope did not mention,
+  and it alone would have kept the cache off. It is filtered where the layer is built.
+- **`Rows`'s `virtual` still swaps the box's flex, and the prop is shared with the DOM host.** So it
+  is never a one-prop change in a plugin's client file, the pull-request list already sets it, and the
+  other five named sites cannot take it. See [refused.md](./refused.md).
+- **The footer's cache needed a fifth key the scope did not name.** Memoising on
+  `(focusedRenderable, openOverlays, typing)` is unsound on its own: a control mounting registers a
+  layer and adds a key without any of the three moving, and the footer then keeps a stale list for the
+  rest of the run. The engine does have a signal for it — its `state` event, which fires on focus
+  changes and on layer registration — and the cache reads it as a revision counter.
+- **The panel set could not be written beside the panels.** The scope asked `grouping.tsx` to maintain
+  a set of panel renderables. Written there it is a second answer to "is this a panel" beside the
+  strips' own `panels()` getters, and the region suite's fakes — which mark parents without going
+  through the kit — proved it can disagree. It is derived from those getters and rebuilt when
+  `panelsChanged()` says they moved.

@@ -7,7 +7,7 @@ import { markersFor } from '@acorn/client-core/host/registries/rail/railMarkerFe
 import { resolveRailMarkers } from '@acorn/client-core/features/tabs/railMarkers.ts'
 import { requestTaskAnnotations } from '@acorn/client-core/host/annotations/taskAnnotations.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
-import { Icon, Row, Rows, StatusDot } from '../kit/showing'
+import { Icon, keyedRows, Row, Rows, StatusDot } from '../kit/showing'
 import { Line } from '../kit/cells'
 import { Panel, PanelBody } from '../panel'
 import { regionFocus } from '../keys/regions'
@@ -84,12 +84,16 @@ function TaskList(props: { model: ShellModel }) {
   // when the list changes. Nothing here reads the answers — they come back as markers.
   createEffect(() => requestTaskAnnotations(props.model.tasks().map((task) => task.id)))
 
+  // Kept rather than rebuilt, so a `tasks:changed` costs the rows that changed rather than all of
+  // them (../kit/showing.tsx § keyedRows).
+  const rows = keyedRows(() => props.model.tasks(), (task) => ({ key: task.id, task }))
+
   return (
     <Rows
       virtual
       id="chrome.rail.tasks"
       ariaLabel="Tasks"
-      items={props.model.tasks().map((task) => ({ key: task.id, task }))}
+      items={rows()}
       onActivate={(id) => {
         const task = props.model.tasks().find((row) => row.id === id)
         if (task) activateTaskSignals(task)
@@ -116,6 +120,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
   // starts on, are both the model's (./model.ts § defaultSource). A component that draws is a
   // component that cannot race the thing it draws.
   const sources = () => props.model.sources()
+  const sourceRows = keyedRows(sources, (entry) => ({ key: entry.id, ...entry }))
   const source = () => sourceRegistry.get(selectedSource() ?? '')
 
   return (
@@ -140,7 +145,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
             // instead of inheriting the previous workspace's active source.
             id={`chrome.rail.sources.${props.model.workspace()?.id ?? 'loading'}`}
             ariaLabel="Sources"
-            items={sources().map((entry) => ({ key: entry.id, ...entry }))}
+            items={sourceRows()}
             selected={selectedSource()}
             onSelect={setSelectedSource}
             onActivate={setSelectedSource}

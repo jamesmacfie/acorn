@@ -37,6 +37,20 @@ let typing: () => boolean = () => false
 // can press. So a host may say. Nothing supplies it but the terminal
 // (docs/tui.md § The adapter).
 let primary: 'super' | 'ctrl' | null = null
+// Whether this host shadows the bare keys with a layer of its own while somebody is typing, instead
+// of putting a matcher on every bare-key binding below.
+//
+// The matcher is the obvious spelling and it is the expensive one on a host that asks the engine what
+// is live. `@opentui/keymap` 0.5.9 caches its active keys only while no registered layer, command or
+// binding carries a runtime matcher, and the counter is global, so one such binding turns the cache
+// off for the whole process — and this function installs one per bare key per control on screen. A
+// host that says it shadows typing takes the gate off every one of them and expresses it once, as a
+// layer that is registered while a field has the keys and unregistered when it loses them.
+//
+// The terminal says so (`apps/tui/src/keys/install.ts`). The desktop does not yet, and the same win
+// is there for it: the shadow needs a `focusin`/`focusout` pair and a tier above the intent layers,
+// which is a change to the DOM installer rather than to this file.
+let shadowsTyping = false
 
 /** The installed keymap, or null before the host's root exists. */
 export const keymap = <
@@ -47,17 +61,24 @@ export const keymap = <
 /** Called by a host's installer only. Returns the teardown that clears the singleton again. */
 export function setKeymap<Target extends object, Event extends KeymapEvent>(
   engine: Keymap<Target, Event> | null,
-  host: { typing: () => boolean; primary?: 'super' | 'ctrl' } = { typing: () => false },
+  host: {
+    typing: () => boolean
+    primary?: 'super' | 'ctrl'
+    /** This host draws its own typing shadow, so the bare-key bindings below carry no matcher. */
+    shadowsTyping?: boolean
+  } = { typing: () => false },
 ): () => void {
   const held = engine as Keymap<object, KeymapEvent> | null
   installed = held
   typing = host.typing
   primary = host.primary ?? null
+  shadowsTyping = host.shadowsTyping ?? false
   return () => {
     if (installed !== held) return
     installed = null
     typing = () => false
     primary = null
+    shadowsTyping = false
   }
 }
 
@@ -102,8 +123,10 @@ export function registerIntentLayer<Target extends object>(
         key,
         cmd: () => handle(intent),
         // A bare key is a character somebody may be typing. The engine has no opinion about that, so
-        // the binding carries one.
-        ...(BARE_KEYS.has(key) ? { active: () => !typing() } : {}),
+        // the binding carries one — unless the host shadows the bare keys with a layer of its own
+        // while a field has the keys, which says the same thing once instead of once per binding
+        // (§ shadowsTyping).
+        ...(BARE_KEYS.has(key) && !shadowsTyping ? { active: () => !typing() } : {}),
       })
     }
   }

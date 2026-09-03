@@ -211,3 +211,30 @@ sticky header, the split bands, the find pass and the measure scheduling all rea
 phase 8's own scope refuses restructuring anything in the diff beyond the two quadratic costs. Exit
 condition: a profile of a real large pull request that puts `buildRenderableRows` above the tokenizer,
 rather than an argument from the count.
+
+### `virtual` opted in at the long-list sites in cells
+
+Phase 9's scope named six lists to opt into `Rows`'s `virtual` — the pull-request list, notes,
+changes, context, docker and the agents sidebar — and called each "a one-prop change in the plugin's
+client file". None of them shipped, for three reasons found against the source rather than argued:
+
+- **The prop is not the terminal's.** `virtual` is on the shared `Rows`, so a plugin's call site sets
+  it on both hosts, and the DOM half positions rows absolutely at a fixed `--row-h-virt`. The
+  "`Rows` virtual by default" entry above already records that 25 of 27 DOM call sites would render
+  wrong at a fixed row height; a plugin's list is one of those call sites.
+- **The pull-request list already passes it.** `plugins/github/src/client/PullList.tsx` has been
+  `virtual` on both hosts since before this programme.
+- **The other five cannot take the flex swap.** Notes, changes, context and the agents sidebar draw
+  several `Section`s stacked inside one scrolling body, and `virtual` makes a list grow into the room
+  its panel has left — which is the stretch the default entry above refuses, once per section.
+  Docker's images, volumes and networks are each the only list in a `TabPanel`, which on this host is
+  a `ScrollViewport`: a virtual list inside one measures the height its own rows want, which is the
+  failure `showing.tsx` names in its own comment ("it always fitted, always drew everything, and
+  overflowed the frame").
+
+What did ship from that half of the scope is the diff pane, which is where the number was: 5,303
+renderables to 376 at five thousand lines (measurements.md § 2026-09-03 — phase 9). Exit condition
+for revisiting the five: a list whose own panel bounds its height, on a host where the prop can be set
+without deciding for the other one — which means either a terminal-only prop on the shared node, or a
+measurement on the desktop saying its rows are uniform enough for the virtualiser.
+

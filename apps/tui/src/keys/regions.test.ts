@@ -4,8 +4,8 @@ import type { CliRenderer, Renderable } from '@opentui/core'
 import {
   _resetRegions, activationEntersMain, focusRenderable, focusedInScope, focusedRenderable,
   installRegions, markCollection, markItem, markParent, moveBack, moveColumn, movePane, moveRegion,
-  moveStop, onScreen, parentOf, pushScope, regionsInScope, registerRegion, scheduleSettle,
-  setTopology, stopsIn,
+  moveStop, onScreen, panelsChanged, parentOf, pushScope, regionsInScope, registerRegion,
+  scheduleSettle, setTopology, stopsIn, walkSteps,
 } from './regions'
 
 // Fakes rather than a rendered shell, because what is under test is bookkeeping: which node holds the
@@ -746,5 +746,111 @@ describe('focus regions', () => {
     // Down there belongs to the region tier, not to a walk with nothing to walk.
     expect(focusRenderable(region)).toBe(true)
     expect(moveStop(1)).toBe(false)
+  })
+})
+
+// ── What a key press costs ────────────────────────────────────────────────────────────────────
+//
+// The model's answers are the same whether the store scans arrays or reads maps, which is what every
+// case above is about. This is the other half: how much of the tree a move has to look at
+// (docs/future/performance/phase-9-the-terminal-clients-keystroke.md).
+
+describe('a key press costs the depth of the tree', () => {
+  beforeEach(fresh)
+
+  /** A region with `rows` rows in a list, plus a control beside it, nested `depth` boxes deep. */
+  const deepRegion = (rows: number, depth: number) => {
+    const cells: Renderable[] = []
+    const list = node(cells)
+    for (let at = 0; at < rows; at += 1) {
+      const cell = item()
+      asFake(cell).parent = list
+      cells.push(cell)
+      drawn(() => markItem(cell))
+    }
+    const button = control()
+    let body = node([list, button])
+    for (let at = 0; at < depth; at += 1) body = node([body])
+    drawn(() => markCollection(list, () => cells[0]))
+    registerRegion(body, { paneId: 'chrome', regionId: 'browse' }, 0)
+    return { button, list, cells }
+  }
+
+  it('visits a bounded number of nodes in a two-hundred-row region', () => {
+    walkSteps.count(true)
+    try {
+      const { button } = deepRegion(200, 3)
+      focusRenderable(button)
+      walkSteps.reset()
+      // Down from the control beside the list. The list is one stop — the row its caret is on — so
+      // the walk sees the list once and never its two hundred rows (./regions.ts § stopsIn).
+      moveStop(1)
+      const steps = walkSteps.take()
+      // The bound the phase asked for: depth times four, where depth is the nesting above the stop.
+      // Generous on purpose — what it forbids is the number growing with the rows, which is what a
+      // scan of the registries inside the walk did.
+      expect(steps).toBeLessThan(64)
+
+      // And the same move in a region with ten times the rows costs the same, which is the property
+      // the number alone cannot state.
+      _resetRegions()
+      installRegions(renderer as unknown as CliRenderer)
+      const wide = deepRegion(2000, 3)
+      focusRenderable(wide.button)
+      walkSteps.reset()
+      moveStop(1)
+      expect(walkSteps.take()).toBe(steps)
+    } finally {
+      walkSteps.count(false)
+    }
+  })
+
+  it('counts nothing while the flag is off', () => {
+    const { button } = deepRegion(20, 2)
+    focusRenderable(button)
+    walkSteps.reset()
+    moveStop(1)
+    expect(walkSteps.take()).toBe(0)
+  })
+})
+
+describe('the indexes agree with the lists they are built from', () => {
+  beforeEach(fresh)
+
+  it('answers the same after a region, a panel and a collection have come and gone', () => {
+    const rowOne = item()
+    const inPanel = control()
+    const panel = node([inPanel])
+    const list = node([rowOne])
+    const strip = control()
+    const region = node([strip, panel, list])
+
+    drawn(() => markItem(rowOne))
+    drawn(() => markCollection(list, () => rowOne))
+    drawn(() => markParent(strip, () => [panel]))
+    panelsChanged()
+    const unregister = registerRegion(region, { paneId: 'chrome', regionId: 'browse' }, 0)
+
+    // The strip is one stop and its panel is the level below, so the panel's own control is not a
+    // neighbour of anything in the region.
+    expect(stopsIn(region)).toEqual([strip, rowOne])
+    expect(parentOf(inPanel)).toBe(strip)
+    expect(regionsInScope()).toBe(1)
+
+    // The region goes. Every index that named it has to go with it, and the ordering cache with them.
+    unregister()
+    expect(regionsInScope()).toBe(0)
+
+    // And comes back under the same ref, which is what a `lazy()` region remounting is.
+    registerRegion(region, { paneId: 'chrome', regionId: 'browse' }, 0)
+    expect(regionsInScope()).toBe(1)
+    expect(stopsIn(region)).toEqual([strip, rowOne])
+
+    // A scope filters the same lists, so pushing one empties the region cycle and popping it fills it
+    // again — the cached order is not allowed to outlive either edge (./regions.ts § ordered).
+    const close = opened(panel)
+    expect(regionsInScope()).toBe(0)
+    close()
+    expect(regionsInScope()).toBe(1)
   })
 })

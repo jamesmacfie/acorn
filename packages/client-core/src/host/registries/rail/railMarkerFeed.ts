@@ -28,8 +28,27 @@ export const railMarkerRegistry = new Registry<RailMarkerContribution>('rail-mar
  * Every contributed marker for one control, qualified and clamped, ready for resolveRailMarkers.
  * One failing contribution is isolated: a plugin's broken getter must not blank the whole rail.
  */
+/** The contributions in draw order, sorted once per registry change.
+ *
+ *  `markersFor` is called per row per render — every task in the rail, on every redraw of it — and it
+ *  used to copy and `localeCompare`-sort the whole registry each time. The registry is a signal, so
+ *  the sorted list is cached against the array it was sorted from: reading `entries()` keeps the
+ *  caller reactive, and the identity check keeps the sort to once per register or unregister
+ *  (docs/future/performance/phase-9-the-terminal-clients-keystroke.md). A `createMemo` would say the
+ *  same thing, and this file is imported by `registries/plugin.ts` and has no root to own one. */
+let sortedFrom: readonly RailMarkerContribution[] | null = null
+let sorted: RailMarkerContribution[] = []
+
+const inOrder = (): readonly RailMarkerContribution[] => {
+  const entries = railMarkerRegistry.entries()
+  if (entries === sortedFrom) return sorted
+  sortedFrom = entries
+  sorted = [...entries].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+  return sorted
+}
+
 export function markersFor(target: RailMarkerTarget): RailMarker[] {
-  const contributions = [...railMarkerRegistry.entries()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+  const contributions = inOrder()
   const markers: RailMarker[] = []
   for (const contribution of contributions) {
     try {

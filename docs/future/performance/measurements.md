@@ -1170,3 +1170,82 @@ click that follows it are one read rather than two
 - **Memory.** The editor's document pool now outlives a pane mount, so a task with twenty files open
   holds twenty `EditorState`s until the task is left. Nothing weighed that; it is bounded by the tabs
   the reader opened, and it was already the shape within one mount.
+
+## 2026-09-03 — phase 9, the terminal client's keystroke
+
+Every number here is from `apps/tui`'s own suite under Node 26.8.1
+(`PATH=~/.nvm/versions/node/v26.8.1/bin:$PATH npx vitest run` from `apps/tui`; on the default Node
+the whole suite skips). Before and after were taken from the same working tree, the before by
+stashing the phase's source changes and running the same throwaway case again.
+
+### What a key press walks
+
+A region three boxes deep holding a list and one control beside it, and the move is Down from the
+control. The counter is `walkSteps` in `apps/tui/src/keys/regions.ts`, behind
+`ACORN_TUI_KEYS_TRACE`; it counts renderables visited.
+
+| Region | Nodes visited per move, before | After |
+| --- | --- | --- |
+| 200 rows, depth 3 | 20 | 15 |
+| 2,000 rows, depth 3 | 20 | 15 |
+
+The count is flat in the rows on both sides, because `stopsIn` already drew a collection as one stop.
+What the phase changed is the two things the count does not see:
+
+- **`stopsIn` ran twice per move.** `moveStop` asked once to decide whether it owned the stop and
+  `walkStops` asked again to move; that is the 20 against 15, one whole subtree walk per key press.
+- **Each visited node scanned the registries.** `groups.some`, `parents.find`, `containers.find` and
+  an `isPanel` that walked the parent stops and allocated a fresh panel array for each — on a browse
+  screen, about nine comparisons and one allocation per node visited, growing with the regions,
+  strips and lists on screen. It is four hash lookups and no allocation now.
+
+`apps/tui/src/keys/regions.test.ts` § a key press costs the depth of the tree holds both: the count
+is under the bound, and the count at 2,000 rows equals the count at 200.
+
+### What the footer costs
+
+The browse screen at 100 by 28, with `getActiveKeys` wrapped to count calls.
+
+| | Before | After |
+| --- | --- | --- |
+| `activeKeyCacheBlockers`, screen idle | 12 | 0 |
+| `activeKeyCacheBlockers`, after ordinary navigation | 48 | 0 |
+| `getActiveKeys` calls across three keyboard-free redraws (two toasts and a resize) | 6 | 0 |
+| `getActiveKeys` calls per focus change | 6 | 2 |
+
+The blocker count is what the engine's own active-key cache turns on: `@opentui/keymap` 0.5.9 caches
+only while it is zero, and it counts every layer, command or binding carrying a runtime matcher. It
+grew with the controls on screen, because every bare key of every control carried
+`active: () => !typing()`. Zero on both readings is the typing shadow and the command layer's
+build-time filtering together; either one alone leaves it non-zero.
+
+Two calls per focus change rather than one because both halves of the cache key move on a focus
+change: the focused renderable, and the engine's `state` event. Six before, because the list was
+rebuilt per render and each rebuild asked twice — once for the keys and once for the descriptions.
+
+### The diff pane at 5,000 lines
+
+`ACORN_FIXTURE_PATCH_LINES=5000`, the `pr` pane at 80 by 24, counting every renderable under the
+renderer's root — the whole screen, chrome included.
+
+| | Renderables |
+| --- | --- |
+| Before | 5,303 |
+| After | 376 |
+
+`apps/tui/src/diffLong.test.tsx` § a five-thousand-line diff holds the bound at under 1,000, which is
+the shape rather than the layout: what it forbids is a number that grows with the patch.
+
+### Not measured
+
+- **A frame rate.** The phase's done-when line asks the diff pane to scroll at the rate the rail
+  scrolls at. Nobody has watched either, here or anywhere in this programme: this machine's live
+  instance holds port 4317 and a worktree cannot run the app. What is measured is the renderable
+  count the frame rate follows from.
+- **The rail's row rebuilds against a real `tasks:changed`.** The fixture has one task, so the
+  property is held as a unit test of `keyedRows`
+  (`apps/tui/src/chrome/chrome.test.tsx` § the rail keeps the rows a change did not touch) rather
+  than as a count of destroyed renderables on a real refetch.
+- **`markersFor`.** The sort is once per registry change rather than per row per render, and the
+  registry is empty in the fixture, so there is nothing here to count.
+

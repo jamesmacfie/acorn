@@ -7,7 +7,9 @@ import { toast } from '@acorn/client-core/features/notifications/toast.ts'
 import { hasFfi } from '../ffi'
 import { renderFixture } from '../harness'
 import { focusedRegion } from './regions'
-import { COLLECTION, COMMAND, LIST, OVERLAY_OWN, PANE, PARENT, RECTANGLE, REGION, STOP, TRAP } from './tiers'
+import {
+  COLLECTION, COMMAND, LIST, OVERLAY_OWN, PANE, PARENT, RECTANGLE, REGION, STOP, TRAP, TYPING,
+} from './tiers'
 
 // The tier table, as the two things that can actually be checked.
 //
@@ -43,11 +45,11 @@ const AS_A_FIELD = /priority:\s*\d/
  * A priority as `bindKeys`'s third argument, which follows the bindings array or the `.map()` that
  * built it: `], 45, { mode: 'focus' })` or `})), 30)`.
  *
- * Held to the ten values the table names plus 35, which the deleted swallow layer used, so an
+ * Held to the eleven values the table names plus 35, which the deleted swallow layer used, so an
  * ordinary number in an ordinary call — `slice(at, 2)`, `Math.max(a[i], 0)` — is not a false alarm.
  * A relapse spells one of these, because a relapse is somebody re-adding a tier.
  */
-const AS_AN_ARGUMENT = /[\])],\s*(?:0|5|30|35|36|40|41|45|60|61|200)\s*(?:\)|,\s*\{)/
+const AS_AN_ARGUMENT = /[\])],\s*(?:0|5|30|35|36|40|41|42|45|60|61|200)\s*(?:\)|,\s*\{)/
 
 describe('the tiers are named in one place', () => {
   it('spells a keymap priority in tiers.ts and nowhere else', () => {
@@ -66,19 +68,24 @@ describe('the tiers are named in one place', () => {
     expect(spelled).toEqual([])
   })
 
-  it('names ten tiers, ordered, with no two the same', () => {
+  it('names eleven tiers, ordered, with no two the same', () => {
     // Anti-vacuity for the grep above, which passes on an empty table. The order is the whole meaning
-    // of the numbers: a rectangle above a trap above a strip above a stop above a list, and the
-    // screen's own keys below everything a pane draws.
-    const table = [RECTANGLE, OVERLAY_OWN, TRAP, PARENT, STOP, COLLECTION, LIST, PANE, REGION, COMMAND]
-    expect(table).toHaveLength(10)
-    expect(new Set(table).size).toBe(10)
+    // of the numbers: a rectangle above a trap above a strip above a stop above the typing shadow
+    // above a list, and the screen's own keys below everything a pane draws.
+    const table = [RECTANGLE, OVERLAY_OWN, TRAP, PARENT, STOP, TYPING, COLLECTION, LIST, PANE, REGION, COMMAND]
+    expect(table).toHaveLength(11)
+    expect(new Set(table).size).toBe(11)
     expect([...table].sort((a, b) => b - a)).toEqual(table)
     // And the one row this package states without setting: it is `registerIntentLayer`'s default in
     // client-core, which the desktop reads too, so a change there and not here would be a table that
     // lies (./tiers.ts § COLLECTION).
     expect(COLLECTION).toBe(40)
-    expect(STOP).toBe(COLLECTION + 1)
+    // The typing shadow sits between the collection and the stop, and that placement is the design
+    // rather than an accident of numbering: everything at or below it reaches a focused field from
+    // outside and has to go quiet while somebody types, and everything above it is bound to the
+    // focused renderable itself (./tiers.ts § TYPING).
+    expect(TYPING).toBe(COLLECTION + 1)
+    expect(STOP).toBe(TYPING + 1)
   })
 })
 

@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { createEffect, createMemo, createSignal, For, Index, Show, untrack, type JSX } from 'solid-js'
-import type { BoxRenderable, MouseEvent } from '@opentui/core'
+import type { BoxRenderable, MouseEvent, ScrollBoxRenderable } from '@opentui/core'
 import type { Size, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionItem,
@@ -231,6 +231,45 @@ export function RowActions(props: { ariaLabel: string; children: (menu: { close:
  *  reader can feel for. */
 const THUMB = '█'
 const TRACK = '│'
+
+/**
+ * A `Rows` item list that keeps its objects while the data behind them keeps theirs.
+ *
+ * `<For>` keys by object identity, so `items={tasks().map((task) => ({ key: task.id, task }))}` hands
+ * it a new object per row on every change and every row renderable is destroyed and rebuilt — which
+ * on the rail is every `tasks:changed`, and a rebuilt row is a row that has lost the caret and any
+ * scroll position around it (docs/tui.md § Collections).
+ *
+ * The wrapper is therefore cached against the row it wraps. TanStack Query's structural sharing keeps
+ * a row that did not change identical across a refetch, so a refetch that touched one task rebuilds
+ * one row, and a reorder rebuilds none. Where the row object itself is replaced the wrapper is too,
+ * which is the honest answer: the data in it is different.
+ *
+ * The array is kept as well as the objects, so a render where nothing moved hands `<For>` the list it
+ * already has (docs/future/performance/phase-9-the-terminal-clients-keystroke.md).
+ */
+export function keyedRows<T, R extends CollectionItem>(
+  items: () => readonly T[],
+  build: (item: T) => R,
+): () => readonly R[] {
+  let cache = new Map<T, R>()
+  let held: readonly R[] = []
+  return createMemo(() => {
+    const source = items()
+    const next = new Map<T, R>()
+    let same = source.length === held.length
+    const rows = source.map((item, at) => {
+      const row = cache.get(item) ?? build(item)
+      next.set(item, row)
+      if (held[at] !== row) same = false
+      return row
+    })
+    cache = next
+    if (same) return held
+    held = rows
+    return rows
+  })
+}
 
 /** Items on successive lines. `virtual` is the scroll window and changes nothing else: the component
  *  is the virtualiser, because OpenTUI has none, and it draws only the rows that fit. */
@@ -893,47 +932,124 @@ export function AnnotationMarks(props: { point: string; itemKey: PluginAnnotatio
  *  `annotations` is a point id, and it is a prop rather than something the source supplies for the
  *  reason the DOM viewer gives: the marks are drawn inside the row, so their placement is this
  *  component's business. A mark is text — it is not a stop and it changes nothing about how the diff
- *  is driven (docs/tui.md § What a plugin loses here). */
+ *  is driven (docs/tui.md § What a plugin loses here).
+ *
+ *  **Windowed.** This node used to say in its own comment that there was no virtual window here and
+ *  every row was built, which for a two-hundred-file pull request is tens of thousands of renderables
+ *  in a pane that can show forty lines. It is windowed now, and the shape is a slice with two spacers
+ *  rather than a virtualiser of its own: the rows are one flat list, the file headers are rows in it,
+ *  and what is drawn is the slice around the viewport's offset with a box above and below standing in
+ *  for the rest. The spacers are what keep this a `ScrollViewport` — the scrollbox owns the offset,
+ *  the bar, the wheel and the page keys exactly as before, and it is still the focus stop a document
+ *  with no controls needs (./scrolling.tsx, docs/tui.md § Scrolling viewports).
+ *
+ *  The known ceiling: a spacer is one line per row, and an annotated row draws two, so the content is
+ *  as many lines taller than the model as there are marked rows inside the window. Nothing else here
+ *  varies in height. If a row kind ever does, the upgrade is a cumulative offset per row rather than
+ *  a multiply, which is what the DOM viewer already keeps.
+ */
+
+/** One line of the flat model: a file's header, or one of its rows. */
+type DiffEntry = { head: DiffFile; code?: undefined } | { head?: undefined; code: DiffRowT }
+
+const isCode = (row: DiffRowT): row is CodeRow =>
+  row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete'
+
+/** Rows drawn beyond each edge of the viewport, so a wheel or a page key has something to show before
+ *  the next slice is built. Twenty is half a screen at this host's tallest ordinary size. */
+const DIFF_OVERSCAN = 20
+
+/** What to draw before the viewport has been laid out and can say how tall it is. A screenful on a
+ *  tall terminal: enough that the pane is never blank, bounded so a five-thousand-line diff does not
+ *  build itself once before the first correction. */
+const DIFF_ASSUMED_ROWS = 60
+
 export function DiffPane(props: { source: { files: () => DiffFile[] | undefined; loading: () => boolean }; annotations?: string }) {
-  const rows = createMemo(() =>
-    (props.source.files() ?? []).map((file) => ({ file, rows: buildDiffRows(file, plainTokenize) })))
+  // One flat list, because a window is a slice and a file header is a row like any other. It is also
+  // the anchor the design asked for: a file starts at an index.
+  const lines = createMemo<DiffEntry[]>(() => (props.source.files() ?? []).flatMap((file) => [
+    { head: file } as DiffEntry,
+    ...buildDiffRows(file, plainTokenize).map((row): DiffEntry => ({ code: row })),
+  ]))
 
   // Every code row this pane holds, asked about in one request per contributor rather than one per
-  // line. There is no virtual window here — the pane is one scrolling box and every row is built — so
-  // "the visible rows" is all of them. `requestAnnotations` compares the key set and does nothing when
-  // it has already asked, so a redraw costs a string compare (client-core/host/annotations).
+  // line. The keys are built from the diff rather than from what is on screen, so a reader scrolling
+  // does not re-ask, and they are rebuilt when the diff is rather than on every render — which is
+  // what the effect used to do, joining a string over every row each time
+  // (client-core/host/annotations).
+  const keys = createMemo(() => lines().flatMap((entry) => (
+    entry.code && isCode(entry.code) ? [annotationKey(entry.code)] : []
+  )))
   createEffect(() => {
     const point = props.annotations
     if (!point) return
-    requestAnnotations(point, rows().flatMap((entry) => entry.rows.flatMap((row) =>
-      (row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete' ? [annotationKey(row as CodeRow)] : []))))
+    requestAnnotations(point, keys())
+  })
+
+  let viewport: ScrollBoxRenderable | undefined
+  const [top, setTop] = createSignal(0)
+  const [fit, setFit] = createSignal(0)
+  /** Read the viewport's own offset and height. Called from the two places the offset moves: the
+   *  viewport's key handlers, which say so, and the wheel, which does not and is caught on the box
+   *  around the viewport instead (./scrolling.tsx § onScroll). */
+  const sync = (): void => {
+    if (!viewport) return
+    setTop(Math.max(0, Math.round(viewport.scrollTop)))
+    setFit(viewport.viewport.height)
+  }
+
+  const window = createMemo(() => {
+    const all = lines()
+    const height = fit() || DIFF_ASSUMED_ROWS
+    const at = Math.min(top(), Math.max(0, all.length - height))
+    const from = Math.max(0, at - DIFF_OVERSCAN)
+    const until = Math.min(all.length, at + height + DIFF_OVERSCAN)
+    return { from, rows: all.slice(from, until), after: Math.max(0, all.length - until) }
   })
 
   return (
-    // A viewport, where this was a yoga clip. Every row of every file is built here, so a clip drew
-    // the first screenful of the first file and left the rest unreachable
-    // (./scrolling.tsx, docs/tui.md § Scrolling viewports).
-    <ScrollViewport>
-      <Show when={props.source.files()} fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}>
-        <For each={rows()}>
-          {(entry) => (
-            /* `flexShrink={0}` for the reason each row inside carries it: a column of files taller
-               than the panel is squeezed rather than scrolled, and one file's rows are then drawn
-               over the next file's. The scroll is this pane's, at the box above. */
-            <box flexDirection="column" flexShrink={0}>
-              <FileHead file={entry.file} />
-              <For each={entry.rows}>
+    // The box around the viewport, and it is here for the wheel: OpenTUI walks a mouse event up the
+    // tree and runs each renderable's own handler before it hands the event to its parent, so a
+    // listener here sees the scroll after the scrollbox below has already moved its offset. On the
+    // scrollbox itself it would see it before (@opentui/core § Renderable.processMouseEvent).
+    <box
+      flexGrow={1}
+      flexShrink={1}
+      flexBasis={0}
+      minHeight={0}
+      onMouseScroll={sync}
+      onSizeChange={sync}
+    >
+      <ScrollViewport onScroll={sync} onBox={(box: ScrollBoxRenderable) => { viewport = box; sync() }}>
+        <Show when={props.source.files()} fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}>
+          {/* The rows above the window, as height rather than as renderables, so the scrollbox's own
+              offset and bar are about the whole diff and not about the slice. */}
+          <box flexShrink={0} height={window().from} />
+          <For each={window().rows}>
+            {(entry) => (
+              <Show
+                when={entry.code}
+                fallback={(
+                  /* `flexShrink={0}` for the reason each row carries it: a column taller than the
+                     panel is squeezed rather than scrolled, and one file's rows are then drawn over
+                     the next file's. The scroll is this pane's, at the box above. */
+                  <box flexDirection="column" flexShrink={0}>
+                    <FileHead file={entry.head!} />
+                  </box>
+                )}
+              >
                 {(row) => (
-                  <Show when={row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete'} fallback={<NonCodeRow row={row as Exclude<DiffRowT, CodeRow>} />}>
-                    <AnnotatedDiffLine r={row as CodeRow} point={props.annotations} />
+                  <Show when={isCode(row())} fallback={<NonCodeRow row={row() as Exclude<DiffRowT, CodeRow>} />}>
+                    <AnnotatedDiffLine r={row() as CodeRow} point={props.annotations} />
                   </Show>
                 )}
-              </For>
-            </box>
-          )}
-        </For>
-      </Show>
-    </ScrollViewport>
+              </Show>
+            )}
+          </For>
+          <box flexShrink={0} height={window().after} />
+        </Show>
+      </ScrollViewport>
+    </box>
   )
 }
 

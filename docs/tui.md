@@ -264,9 +264,10 @@ renderer's `focusable` flag unless the control is disabled, binds `activate` to 
 target mode so Enter on a button inside a row belongs to the button, and adds the click-to-focus-then-
 press the pointer model allows. Its companion `stop(options)` returns the `ref` a component hands its
 box and a `focused()` accessor, because a `ref` callback cannot return a signal. The layer sits at
-priority 41, one above a collection's: both layers match when focus is on a control inside a row, and
+priority 42, above a collection's 40: both layers match when focus is on a control inside a row, and
 at equal priority `@opentui/keymap` falls back to registration order, which is the reconciler's
-business and not something to depend on.
+business and not something to depend on. The number between them is the typing shadow
+(§ The five key groups).
 
 What a focused control draws is `litControl` in `apps/tui/src/kit/roles.ts`: `strong` in the `accent`
 tone, and nothing else about its characters changes. That is the caret's equivalent for something that
@@ -533,6 +534,35 @@ except `↑` and `↓` inside a multi-line `Textarea`, which move the cursor. Es
 its parent stop or the region's home, which is how a reader gets out of a composer without sending.
 Tab, Shift+Tab, `ctrl+⏎` and the pane chords all work from inside a field.
 
+**Typing is a layer, not a matcher.** That paragraph used to be said once per binding, as
+`active: () => !isTyping()` on every bare key of every control on screen. It is said once now, by a
+layer at the `TYPING` tier that binds the bare keys while a field has them and is unregistered when it
+loses them (`apps/tui/src/keys/install.ts` § The typing shadow, `apps/tui/src/keys/tiers.ts`). Its
+bindings claim the key so that nothing below the tier answers, and carry `preventDefault: false` so
+the key still reaches the field and is typed. That is the same shape as a `Modal`'s key claim — a
+scope, not a swallow (§ Traps) — with one difference: a scope is pushed by the box that is drawn, and
+the shadow follows the renderer's focus event, because "is the focused thing a field" is a fact about
+focus and the renderer is the only truth about that (§ Focus regions).
+
+The reason it is a layer is a number. `@opentui/keymap` 0.5.9 caches the answer to "what is live right
+now" only while no registered layer, command or binding carries a runtime matcher, and the counter is
+global, so one such binding turned the cache off for the whole process — and the footer asks that
+question on every render (§ The footer). On a browse screen 48 bindings carried the matcher during
+ordinary navigation; the count is zero now. The command layer follows the same rule for the same
+reason: its bindings are filtered where they are built rather than gated where they fire
+(`apps/tui/src/keys/commandLayer.ts`).
+
+The tier is the whole of the design and it sits between the collection's 40 and a stop's 42.
+Everything at or below it is a layer that reaches a focused field from somewhere else — the collection
+around it, a viewport's page keys, the screen's own column moves, the command layer's bare keys — and
+each has to go quiet while somebody types. The two tiers above it are bound to an exact renderable by
+focus, and a field is never the renderable they are bound to, with two deliberate exceptions that want
+their key while somebody types: the suggestions list under a `MentionTextarea` and the Down and Escape
+that leave a descriptor source's filter field. A `MenuList` wants the same thing and cannot have it at
+its own tier, because its arrows sit *below* the collection on purpose, so it registers a second pair
+above the shadow while a field inside it has the keys — a layer that comes and goes, like the shadow
+itself.
+
 ### Focus regions
 
 `apps/tui/src/keys/regions.ts` keeps the DOM host's contract and replaces every mechanism in it. It
@@ -594,6 +624,19 @@ Down is the way in. A collection counts once, drawn as the row its caret is on. 
 transparent while it holds a stop and is the stop itself otherwise. Anything else focusable counts
 once. `moveStop` answers false for whatever the walk does not own, which is how a row hands the arrows
 back to its collection and a document with no controls keeps them for scrolling.
+
+**The store is indexed, and the lists it keeps are for ordering.** Every question here is asked inside
+a walk of the retained tree: `stopsIn` asks of each child whether it is a region, a parent stop, a
+collection or somebody's panel, and `regionOf`, `parentOf` and `boxAround` ask the same of each
+ancestor. Each of those was a scan of a module-level array, and `isPanel` was a scan that allocated a
+panel list per parent per question, so a key press cost the number of renderables in the region times
+the number of regions on screen. They are a `Map` from box to region, a `Map` from node to parent stop,
+a `Map` from box to collection, and one `Set` of every panel on screen; the arrays stay, because
+ordering is what they are good at, and `ordered()` — the region cycle — caches its sorted answer until
+a region registers or a scope moves. The panel set is derived from the same `panels()` getters
+`parentOf` reads rather than written beside them, so there is still one answer to "is this a panel"
+(`apps/tui/src/keys/regions.ts`, `apps/tui/src/kit/grouping.tsx` § registerPanel). A move asks
+`stopsIn` once and hands the list to the walk, where it used to ask twice.
 
 **One deferred decision.** A focus decision that needs a renderable the current render has not
 produced yet waits in `ensureFocus`, queued at most once per turn by `scheduleSettle`. A microtask
@@ -753,6 +796,19 @@ list still goes to its first row. A long description with a copy button at the t
 with the page keys and the wheel: `↓` lands on the button and stops there, because the text between
 two stops is not a place the keys can be.
 
+The diff pane is the third shape, and it is a viewport with a window inside it. `DiffPane` in
+`apps/tui/src/kit/showing.tsx` used to build one `<text>` per line of every file, which for a
+five-thousand-line patch is five thousand renderables in a pane that shows twenty. It keeps its rows as
+one flat list — a file's header is a row in it, so an anchor is an index — and draws the slice around
+the viewport's offset with a box above and below standing in for the rest. The spacers are what keep
+it a `ScrollViewport`: the scrollbox still owns the offset, the bar, the wheel and the page keys, and
+it is still the focus stop a document with no controls needs. The offset reaches the window two ways,
+because the viewport raises an event for one of them and not the other: its own key handlers call an
+`onScroll` the pane passes in, and the wheel is caught on a box *around* the viewport, where OpenTUI's
+mouse walk delivers it after the scrollbox has already moved. The known ceiling is that a spacer is one
+line per row and an annotated row draws two, so the content is as many lines taller than the model as
+there are marked rows inside the window.
+
 Virtual `Rows` deliberately do not sit inside that mechanism: they render only their visible slice,
 so there is no offscreen child for a native scrollbox to move. Their own `top` offset handles wheel
 input and draws the custom thumb. A wheel can move the active row offscreen without changing
@@ -837,9 +893,16 @@ them come back to its door.
 ### The footer
 
 The footer lists the intents the focused thing accepts with their primary keys, read off the keymap's
-active layers. Nothing is declared twice. The engine has no signal for "the active layers changed", so
-`activeHints()` reads the two signals that move them: where the keys are, and whether an overlay has
-taken them. Without that the footer is whatever was true at the render that happened to build it.
+active layers. Nothing is declared twice. `activeHints()` reads the signals that move them: where the
+keys are, whether an overlay has taken them, how many regions are in scope, whether somebody is typing,
+and the engine's own `state` event, which fires when focus moves and when a layer is registered or
+unregistered. Without those the footer is whatever was true at the render that happened to build it.
+
+The list is cached against exactly those five, because the footer draws whenever anything on the screen
+does — a terminal frame, a toast, a task list arriving — and building it walks every active layer. A
+keyboard-free redraw costs nothing now, where it used to cost two full collects. Two, because the plain
+list and the descriptions were separate calls; `includeMetadata` enriches the same keys rather than
+choosing different ones, so it is one call.
 
 The words come from a table in `bindings.ts` with one row per kind of focused thing, because the same
 key promises different things in different places and a reader on a Merge button should not be told
@@ -876,12 +939,13 @@ label with nothing to drive, and a stop that does nothing is a hole a reader fal
 (`$XDG_STATE_HOME/acorn/keys.log`, else `~/.local/state/acorn/keys.log`):
 
 ```text
-17:08:29.001 key=f6      reason=binding-handled    focused=BoxRenderable#box-72 region=pane/body scope=overlay:2 agree=yes
-17:08:29.492 key=enter   reason=intercept-consumed focused=BoxRenderable#box-91 region=pane/body scope=screen    agree=yes
+17:08:29.001 key=f6      reason=binding-handled    focused=BoxRenderable#box-72 region=pane/body scope=overlay:2 agree=yes steps=11
+17:08:29.492 key=enter   reason=intercept-consumed focused=BoxRenderable#box-91 region=pane/body scope=screen    agree=yes steps=0
 ```
 
 The parsed key, what answered it and why, the renderable that had the keys, its region, how many
-overlays deep the keys are, and whether the renderer and the store agree about where they are. It is
+overlays deep the keys are, whether the renderer and the store agree about where they are, and how
+many renderables the store walked to answer. It is
 a `key:after` intercept in `keys/install.ts`, which runs once per key after dispatch and claims
 nothing; the hyphenated `key-after` is not a hook name and registers nothing at all. Registered
 without `release`, or every keystroke would log twice.
@@ -891,6 +955,16 @@ which draws a highlight on one thing while another answers. `reason=no-match` on
 offers is the footer lying. `region=none` while the screen has regions means nothing owns the keys.
 The line quoted first above is a fourth: the region layer answered Tab while an overlay held the
 keys, which is how a dialog comes to be on screen and unanswerable.
+
+The line ends with `steps=`, which is how many renderables the store's walks visited answering that
+key. It is the number the focus model is supposed to bound: it should track the depth of the tree the
+keys are in and not the number of rows in the region, so a `steps` that grows with a list is a walk
+that has started scanning something. The counter is in `apps/tui/src/keys/regions.ts` and is off unless
+this flag is on, because a counter nobody reads is a branch on every node of every walk.
+
+The log is an appending stream opened once rather than an `appendFileSync` per key. The second thing
+this flag is for is measuring, and a synchronous open, write and close on the loop that draws is a
+trace that measures itself.
 
 This is the first thing to turn on when somebody says the keys stopped working.
 
