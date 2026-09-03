@@ -1,13 +1,13 @@
-import { createMemo, createRoot, createSignal } from 'solid-js'
+import { createMemo, createRoot, createSignal, onCleanup } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  integrationsOptions, learnRefPrefixes, onScopeEvicted, openRefPanel, persistDraft,
+  integrationsOptions, learnRefPrefixes, onPluginFrame, onScopeEvicted, openRefPanel, persistDraft,
   refResolutionsOptions, scanContentRefs, summarizeFileStats,
 } from '@acorn/plugin-api/client'
 import {
   fileSummariesOptions, mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions,
 } from '../queries'
-import { pullPrefixKey, pullsPrefixKey, type Label } from '../../shared/api'
+import { pullKey, pullPrefixKey, pullsPrefixKey, type Label } from '../../shared/api'
 import {
   addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel,
   removeReviewer, reopenPr, requestReviewer, rerunFailed, setDraft, setViewed, submitReview,
@@ -77,6 +77,21 @@ function build(scope: PrScope) {
   const readOnly = scope.readOnly === true
   const queryClient = useQueryClient()
   const has = () => !!owner && !!repo && !!number
+
+  // A stale route response starts a background mirror refresh and returns before that refresh lands.
+  // Its provider-rendered HTML can contain GitHub image URLs whose signatures have already expired,
+  // so the `pr-synced` edge is part of the read contract: re-read the exact active detail after the
+  // node replaces its mirror. Subscribe before createQuery starts the request so a fast refresh cannot
+  // announce between the stale response and this listener being attached.
+  const offPrSynced = onPluginFrame('github', 'plugin:github:pr-synced', (payload) => {
+    if (!payload || typeof payload !== 'object') return
+    const event = payload as { repoOwner?: unknown; repoName?: unknown; pullNumber?: unknown }
+    if (typeof event.repoOwner !== 'string' || typeof event.repoName !== 'string' || typeof event.pullNumber !== 'number') return
+    if (event.pullNumber !== Number(number)) return
+    if (event.repoOwner.toLowerCase() !== owner.toLowerCase() || event.repoName.toLowerCase() !== repo.toLowerCase()) return
+    void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) })
+  })
+  onCleanup(offPrSynced)
 
   const detail = createQuery(() => pullDetailOptions(owner, repo, number, has()))
   const files = createQuery(() => fileSummariesOptions(owner, repo, number, has()))
