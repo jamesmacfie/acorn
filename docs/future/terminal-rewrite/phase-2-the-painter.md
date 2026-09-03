@@ -1,9 +1,9 @@
 # Phase 2: the painter
 
-Status: part built, 2026-09-03, against `9ee5546d`. The node tree, the width measure, the layout
-pass, the colour type and the paint pass are in the tree with their own unit tests; the input parser,
-the build switch and the golden comparison are not, and nothing in the running app has changed. What building the first
-part found is at the bottom. Independent of phase 1. Not shippable to readers on its own; it runs
+Status: part built, 2026-09-03, against `eb3f6afb`. The node tree, the width measure, the layout
+pass, the colour type, the paint pass and the input parser are in the tree with their own unit tests;
+the build switch and the golden comparison are not, and nothing in the running app has changed. What
+building each part found is at the bottom. Independent of phase 1. Not shippable to readers on its own; it runs
 behind a build switch until phase 3.
 
 ## Goal
@@ -420,14 +420,125 @@ OpenTUI's values on purpose — bold 1, dim 2, underline 8, inverse 32, with its
 as gaps — so the mask needs no translating while both painters run and no golden changes when the kit
 stops importing `TextAttributes`.
 
+### The input parser (2026-09-03)
+
+The third part is built: `apps/tui/src/input/` — `events.ts` (the five event types), `names.ts`
+(every key name this client can produce), `parser.ts` (the state machine and the decoders) and
+`terminal.ts` (the open and close sequences, raw mode, the stdin read and `SIGWINCH`) — with
+`apps/tui/src/input/parser.test.ts` beside them, 69 cases, all of which pass on Node 24.11.0 with no
+FFI and no flag. Nothing in the running app changed: `main.tsx` still builds OpenTUI's renderer and
+nothing yet calls `openTerminal`. No file outside the folder was touched.
+
+The shape held a third time. It is a state machine and two tables, there is no terminfo layer and no
+capability detection beyond reading the reply to the one question we ask, and `RAW_KEYS` in
+`apps/tui/src/kit/render.tsx` is an absence rather than a replacement — a harness that constructs a
+`KeyEvent` has no spelling to get wrong. Twelve more things the file or
+[architecture.md](./architecture.md) said turned out otherwise.
+
+**The lone-ESC timeout is 20 ms, and OpenTUI writes it down twice.** `DEFAULT_TIMEOUT_MS` in its
+`lib/stdin-parser.ts` is 20, and its renderer passes `timeoutMs: 20` to the parser explicitly at
+0.5.9 rather than taking the default. `ESC_TIMEOUT_MS` in `apps/tui/src/input/parser.ts` is that
+number and `parser.test.ts` asserts it, because a shorter wait turns a slow Down arrow into an Escape
+and a longer one makes leaving a modal feel stuck.
+
+**`useKittyKeyboard: { disambiguate: true }` never asked for event types, so a release has never been
+possible.** OpenTUI's `buildKittyKeyboardFlags` sets 1 for `disambiguate` and 4 for `alternateKeys`
+unless either is explicitly false, and sets 2 only for `events: true`, which `apps/tui/src/main.tsx`
+does not pass. Today's flags are therefore 5, and no terminal has ever sent this app a key release.
+So "matching what `main.tsx` does today so no capability is lost" and "its release events decoded"
+cannot both hold by copying the request: ours asks for 7, which is 1, 2 and 4. 8, report all keys as
+escape codes, is still refused — it would route every letter through `CSI u` for the benefit of
+knowing somebody let go of `j`.
+
+**A gate on the kitty decode cannot fail safe, so there is none.** § Design and § 4 both say the
+`CSI u` form is decoded "when the terminal answered the request". A terminal that speaks the protocol
+and leaves the query unanswered would then have every key it sends that way dropped, and those keys
+include Escape and Ctrl+Return, which is the whole reason we asked. Nothing else in any terminal's
+vocabulary ends a CSI sequence with `u`, so the sequence arriving *is* the answer.
+`kittyAnswered()` became a fact the parser reports — set by the reply to `CSI ? u` or by the first
+such key — rather than a switch it obeys.
+
+**A bracketed paste is a sixth state, and the five the file names are not enough.** Ground, ESC, CSI,
+SS3 and OSC parse a vocabulary; the bytes between `CSI 200 ~` and `CSI 201 ~` are somebody's file and
+may contain anything, an ESC included. Running the machine over them turns a pasted shell transcript
+into arrow presses. So the paste state reads raw bytes and looks only for its closing bracket, which
+is also the only place the parser cares where a sequence *started*.
+
+**A state machine over a stream has to be resumable, not restartable.** A terminal is free to deliver
+`ESC [ 6 ~` in four writes. The first cut kept the unread bytes and restarted the scan at index 0,
+which read the retained ESC a second time and emitted a spurious Escape before the Up that followed —
+the exact fault the timeout exists to prevent, reintroduced by the buffering. The read cursor and the
+start of the sequence in progress are parser state, not locals of the scan, and two cases pin it.
+
+**`R` cannot be a cursor key and `M` cannot be one either.** `CSI 1;2 R` is Shift+F3 in one reading
+and a cursor position report in another, and the ambiguity is thirty years old; OpenTUI's own
+`keyName` table leaves `[R` out for that reason and we do the same, since we never ask for a
+position. `CSI M` is the X10 mouse encoding. So the letter table is A to F, H, P, Q, S and Z, and
+`SS3 M` — the keypad's Enter, which is `return` — is a second one-row table rather than a row in the
+first.
+
+**Three control characters live inside the Ctrl+letter range, and the order of the two tests is a
+keyboard.** Backspace is 8, Tab is 9 and Return is 13, which are also Ctrl+H, Ctrl+I and Ctrl+M.
+Nothing in the app binds those three chords and every reader presses those three keys, so the named
+table is asked first and the range second. The other order costs three keys silently.
+
+**A key name is lower case with the case carried by `shift`, and `intentKeys` is why.** `last` is
+bound to `shift+g`, so a parser reporting `G` would produce a chord string of `G` and the binding
+would never fire. The same table binds `?` as itself and not as `shift+/`, so a printable character
+is reported as the character it is and only a letter's case moves into the modifier.
+
+**`meta` in a binding string is Option, and the parser must not spell it.** `intentKeys` spells
+`nextPane` as `ctrl+meta+right`, because `packages/client-core/src/kit/keys/keymap.ts` maps acorn's
+`alt` onto the keymap's `meta` — the one word the two vocabularies disagree about. Our event carries
+`alt`, and that translation belongs in the phase 3 keymap host, which is where the desktop's
+equivalent already lives. Written down so nobody adds a `meta` field to the event to make a table
+match.
+
+**`openTerminal` cannot return `cols` and `rows` as fields.** § 4 has it handing back
+`{ cols, rows, close, events }`. A number read at boot is wrong the moment somebody drags the window,
+and `SIGWINCH` is the only notice there is, so the size is a function and the new pair rides on the
+resize event. `events` became `on(listener)` returning its own unsubscribe, which is the shape every
+other subscription in this client has.
+
+**"SGR mouse" is three requests, not one.** 1006 is the coordinate encoding and says nothing about
+what is reported: 1000 asks for press and release, and 1002 adds motion while a button is held, which
+is what a splitter drag needs. 1003, any motion, is refused — nothing here wants hover and it is a
+report per cell the pointer crosses. The mode also has to be popped in the reverse order on the way
+out, or a reader's shell prints `<35;80;24M` when they move the mouse.
+
+**The enter sequence has two requests the file does not list.** § Scope names the alternate screen,
+raw mode, kitty, SGR mouse and DEC 1004, and then asks for a `PasteEvent`, which needs
+`CSI ? 2004 h`. Hiding the cursor is the other: with the cursor left visible it parks wherever the
+last run of the frame ended, and there is nothing for it to sit on until phase 3 draws a field.
+
+One thing that is not a correction. The parser owns its own timer and unrefs it, so a half-read
+sequence is never the reason this process stays alive; and `openTerminal` takes a stdin and a stdout
+of its own minimal shape, so the whole of `terminal.ts` is tested with an `EventEmitter` and an array
+— including that every mode is asked for and every mode is popped, which is the sort of thing that is
+otherwise only ever verified by a reader's shell going strange.
+
 ### Test results (2026-09-03)
 
-`pnpm --filter @acorn/tui test` on Node 26.8.1: 378 passing, 2 failing. The two are
+`pnpm --filter @acorn/tui test` on Node 26.8.1: 447 passing, 2 failing. The two are
 `walks into a command group on return and back out of it on escape` and `draws a search and an input
 in the same rectangle as the list`, both in `apps/tui/src/chrome/chrome.test.tsx`, both another
 session's in-flight palette work, and both failing on their own commits. The baseline for the tree
-and layout slice was 323 passing and those same 2; the 55 new cases are
+and layout slice was 323 passing and those same 2, and for the paint slice 378; the 124 new cases are
 `apps/tui/src/width.test.ts` (9), `apps/tui/src/tree/tree.test.ts` (14),
-`apps/tui/src/layout/layout.test.ts` (13) and `apps/tui/src/paint/paint.test.ts` (19). On the repo's
-own Node 24.11.0 all 55 pass with no flag, which is the whole of the new work drawing on the Node the
-repo pins. `pnpm --filter @acorn/tui lint` is clean.
+`apps/tui/src/layout/layout.test.ts` (13), `apps/tui/src/paint/paint.test.ts` (19) and
+`apps/tui/src/input/parser.test.ts` (69). On the repo's own Node 24.11.0 all 124 pass with no flag,
+which is the whole of the new work drawing and reading on the Node the repo pins.
+`pnpm --filter @acorn/tui lint` is clean.
+
+### What the next slice must know
+
+- Nothing calls `openTerminal` yet. The two halves compose rather than nest: `openTerminal` owns the
+  modes and the reading, `openScreen` owns the cells, and the wiring is four lines written out at the
+  top of `apps/tui/src/input/terminal.ts`. Close the screen before the terminal, so the last frame is
+  written while the alternate screen is still ours.
+- The events do not reach the dispatcher until phase 3, and the adapter that turns a `KeyEvent` into
+  the string the engine matches on is that phase's: `alt` becomes `meta`, and nothing else moves.
+- `apps/tui/src/input/parser.test.ts` § `no key is respelled` reads `intentKeys`, `BARE_KEYS` and the
+  `HOST_KEYS` block of `apps/tui/src/keys/install.ts` and insists every key they name is produced,
+  under that name, from a recorded sequence in both forms. A key added to any of those three tables
+  fails the test until somebody records its bytes, which is the point.
