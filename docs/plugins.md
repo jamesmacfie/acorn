@@ -865,7 +865,7 @@ usually a contribution id something else already owns — is skipped so the rest
 works, and reported in the attention inbox rather than only in the console.
 
 **A loaded plugin's ids sit inside its own namespace.** Contribution ids are un-namespaced by design:
-`pr`, `changes` and `palette.files` double as persisted layout keys and chord targets, so they cannot
+`pr`, `changes` and `terminal.drawer` double as persisted layout keys and chord targets, so they cannot
 carry an arbitrary prefix. Plugin-versus-plugin collisions fail loudly, which is fine. The one that
 did not was a collision with a *future core id*: core adds a pane called `notes`, an installed plugin
 already registered one, and core loses a first-come race against a package the owner installed.
@@ -2499,6 +2499,15 @@ needs a `node` entrypoint, because only a node half serves `/v2/p/<id>/`.
   }
 }
 ```
+
+A compiled plugin declares the same five kinds as typed objects through `ctx.commands.register`,
+which stamps the owner so a plugin cannot claim another contributor's group as a parent. Its `search`
+gets a live callback rather than a route, so it may query whatever its client already has: a plugin
+whose rows are on the device spreads `localSearch` from `@acorn/plugin-api/client` and gets one fetch
+when the frame opens, no debounce and no minimum query; a plugin asking its node writes `query`
+itself and keeps the defaults, because every keystroke is then a request. A `setting` shares the
+reader and writer its Settings page already uses. The first-party catalogue is in
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md).
 
 The webview manifest shape is:
 

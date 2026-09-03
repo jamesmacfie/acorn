@@ -70,8 +70,8 @@ is not a command surface.
 | [1](./phase-1-command-graph-and-session.md) | One command graph and session controller, nested navigation, direct shortcut entry, and desktop/TUI renderers. | Shipped 2026-09-03. |
 | [2](./phase-2-search-and-input.md) | Debounced search, explicit input submission, cancellation, scope and fleet fan-out, plus loaded-plugin route adapters. | Shipped 2026-09-03. |
 | [3](./phase-3-settings-and-core-commands.md) | Setting commands, core hierarchy, navigation searches, and the first shared preference accessors. | Shipped 2026-09-03. |
-| [4](./phase-4-compiled-plugin-adoption.md) | The compiled plugins adopt the graph; terminal/workflow rows and specialist file finders leave their private paths. | Ready. |
-| [5](./phase-5-loaded-plugin-adoption.md) | Database, HTTP, Linear, and Rollbar prove the declarative search/input contract. | Ready; may run beside phase 4. |
+| [4](./phase-4-compiled-plugin-adoption.md) | The compiled plugins adopt the graph; terminal/workflow rows and specialist file finders leave their private paths. | Shipped 2026-09-03. |
+| [5](./phase-5-loaded-plugin-adoption.md) | Database, HTTP, Linear, and Rollbar prove the declarative search/input contract. | Ready. |
 | [6](./phase-6-cutover-and-documentation.md) | Compatibility code is removed only after zero-use checks, owning docs take the behaviour, and this folder retires. | Waits on phases 3–5. |
 
 ## Done when
@@ -86,9 +86,9 @@ is not a command surface.
 - Theme and notification setting commands show the current value and write through the same helpers
   as Settings.
 - Terminal targets and workflows retain their current launch behaviour with no `paletteRows`
-  registrations left.
+  registrations left. Done: the census is zero outside that registry's own unit test.
 - The editor's Command-P and the GitHub changed-file finder open the unified session at their
-  interactive command.
+  interactive command. Done.
 - `pnpm lint`, `pnpm --filter @acorn/tui test`, `pnpm --filter @acorn/desktop test`, and `pnpm test`
   pass.
 - Shipped behaviour lives in the owning documents, this folder is removed, and the retirement is

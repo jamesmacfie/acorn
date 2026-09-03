@@ -2,7 +2,7 @@ import { lazy } from 'solid-js'
 import { registerNoticeTargetHandler, rememberActiveTerminal, requestTerminalFocus, setTerminalOpen, type ClientPlugin } from '@acorn/plugin-api/client'
 import { terminalAgentContextContribution } from './agentContextContribution'
 import { terminalDrawerContribution } from './drawerContribution'
-import { terminalPaletteRowSource } from './paletteRowSource'
+import { terminalCommands } from './commands'
 
 const TerminalSettings = lazy(() => import('./TerminalSettings'))
 
@@ -11,7 +11,9 @@ export const terminalClientPlugin: ClientPlugin = {
   required: true,
   init: (ctx) => {
     ctx.slots.register(terminalDrawerContribution)
-    ctx.paletteRows.register(terminalPaletteRowSource)
+    // The task's run targets, layout recipes and live terminals, as three searches under one group
+    // (./commands.ts). A `paletteRows` source until 2026-09-03.
+    for (const contribution of terminalCommands) ctx.commands.register(contribution)
     ctx.agentContexts.register(terminalAgentContextContribution)
     ctx.settingsPages.register({
       id: 'terminal', label: 'Terminal', group: 'general', order: 60, requires: { plugin: 'terminal' },

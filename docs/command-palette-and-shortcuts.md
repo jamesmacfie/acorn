@@ -92,15 +92,29 @@ settings core owns. Going to a task or a workspace was a special kind of palette
 a `fleet`-scoped search now, so the root shows one named row instead of every task the fleet has, and
 switching node still happens before a remote task is activated.
 
-`paletteRows` contributions are the one compatibility provider left over that session, and they keep
-the order the flat list had. They go as their owners become commands.
+**Compiled plugins own their own rows.** Since 2026-09-03 nothing registers a `paletteRows` source:
+the terminal's run targets, layout recipes and live sessions, and the workflow definitions, were the
+last two contributors and they are `search` commands their plugins register through
+`ctx.commands`. Ownership, capability gating and disposal come with that registration, so disabling a
+plugin takes its group and everything under it out of the graph together. The registry and its
+compatibility provider are still wired to the session and go when the last of the migration is
+removed.
+
+Each plugin's catalogue is short on purpose. The editor contributes quick-open, find-in-files and
+reveal-the-active-file; github a changed-file finder, a pull-request finder, create-a-pull-request and
+its rail source; agents the Agent Center and a session search; docker an open action and one search
+over containers, images, volumes and networks; memory a search and the proposals view; notes a
+three-scope finder and a create-a-note input; changes, context and preview one open action each; and
+onboarding none. What is *not* there is the point: stopping an agent, removing a container, deleting a
+note, merging a pull request and approving a workflow gate all need context and a confirmation that a
+low-context row cannot carry, so they stay in the surfaces that have both.
 
 ## Global commands
 
 | Shortcut | Action |
 | --- | --- |
 | `⌘K` | Open command palette |
-| `⌘P` | Open worktree file finder |
+| `⌘P` | Go to a file in the worktree (the palette, at the editor's search) |
 | `⌘L` | Open workspace switcher |
 | `⌘⇧N` | Create a local task |
 | `⌘⇧T` | Toggle terminal drawer |
@@ -118,8 +132,9 @@ Palette rows can be static or task/Node-backed. Fleet rows carry a Node label an
 availability. A row action targets the Node that owns its resource; no aggregate action pretends to
 be cross-Node atomic.
 
-Run targets and workflow rows are contributed from the Node's task configuration. Pane and source
-commands are registered by their owning plugin. A loaded plugin's manifest `commands` descriptors are
+Run targets, layout recipes and workflow definitions come from the Node's task configuration, read
+once when their frame opens and filtered on the device after that. Pane and source commands are
+registered by their owning plugin. A loaded plugin's manifest `commands` descriptors are
 promoted into the same command registry: one command supplies both its optional palette row and any
 keybinding target. The legacy manifest `palette` array is a compatibility alias for a command with
 `palette: true`; it never produces a second row.

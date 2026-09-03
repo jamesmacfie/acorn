@@ -242,9 +242,11 @@ by 24. Only the plugins that lose something are listed.
 
 What another plugin brings *into* these panes crosses too: github's diff-line marks and the badges
 beside a pull request's state draw in cells, and the changes pane's own diff point behaves the same
-way. What is still absent is the host UI slots — the editor's and github's palettes and the terminal
-drawer are registered and not drawn — and that is one row of [tui.md](./tui.md) § What a plugin loses
-here rather than a property of any plugin here.
+way. What is still absent is the host UI slots — the terminal drawer, and the two `overlay` entries
+github and agents use to mount router- and query-client-scoped command registrations — and that is one
+row of [tui.md](./tui.md) § What a plugin loses here rather than a property of any plugin here. The
+editor's ⌘P file palette used to be on that list; it is a command on the shared palette session now,
+so it draws here like everything else.
 
 Nothing is missing from **changes**, **context**, **memory**, **notes** or **onboarding**. The four
 plugins that ship only a tree bundle — **http**, **linear**, **rollbar**, **database** — reach the

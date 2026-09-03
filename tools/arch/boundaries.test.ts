@@ -367,8 +367,6 @@ describe('architecture boundaries', () => {
       '@acorn/client-core/infra/node',
       '@acorn/client-core/host/registries',
       '@acorn/client-core/features/settings',
-      '@acorn/client-core/features/tasks',
-      '@acorn/client-core/kit/lib',
       '@acorn/client-core/kit/tokens',
       '@acorn/node-core/server',
       '@acorn/node-core/server/core',
@@ -382,8 +380,10 @@ describe('architecture boundaries', () => {
     // 110 across 36 once the three roots the facade already re-exported were swapped for it
     // (docs/future/phased-review-steps/phase-3-plugin-api-integrity.md item 3.11). Two whole roots left
     // the list in that batch, which is the shape the exit condition wants: a root disappears, it does
-    // not shrink.
-    const MAX_DEEP_IMPORTS = 110
+    // not shrink. `kit/lib` and `features/tasks` went the same way on 2026-09-03: the two `paletteRows`
+    // tests were the last readers of the first, and the plugin command suites that replaced them mock
+    // the `@acorn/plugin-api/client` barrel rather than the core modules behind it.
+    const MAX_DEEP_IMPORTS = 105
     const rootOf = (spec: string): string => {
       const pkg = spec.startsWith('@acorn/node-core/') ? '@acorn/node-core/' : '@acorn/client-core/'
       const parts = spec.slice(pkg.length).split('/')

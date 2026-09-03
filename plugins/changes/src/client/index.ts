@@ -1,5 +1,5 @@
 // The changes plugin's client part (docs/plugins.md § The plugin API).
-import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { openPane, type ClientPlugin } from '@acorn/plugin-api/client'
 import { ChangesToolCard } from './ToolCard'
 import { changesPaneContribution } from './paneContribution'
 import { DIFF_LINE_KEY } from './extensionPoints'
@@ -9,6 +9,23 @@ export const changesClientPlugin: ClientPlugin = {
   name: 'changes',
   init: (ctx) => {
     ctx.panes.register(changesPaneContribution)
+    // A row that says what this pane is for, beside core's generic `Show pane: Changes`. Somebody
+    // reaching for the palette types "diff" or "staged", not "pane"
+    // (docs/future/command-palette/command-catalog.md § Changes). Staging, committing, pushing and
+    // review notes stay in the pane, where the diff and the selected files are visible.
+    ctx.commands.register({
+      id: 'changes.open',
+      title: 'Open the Changes pane',
+      hint: 'the diff between this task and its base',
+      keywords: ['diff', 'git', 'staged', 'commit'],
+      category: 'navigation',
+      palette: true,
+      scope: 'task',
+      requires: { plugin: 'changes' },
+      run: (context) => {
+        if (context.taskId) openPane(context.taskId, 'changes')
+      },
+    })
     // What another plugin may say about a line of this pane's diff: coverage, a lint result, a blame
     // note. Keyed by file, line and side, which is what the viewer already knows about a row
     // (docs/plugins.md § Cooperative extension points). The node-side `changes:before-commit` and

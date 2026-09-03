@@ -4,6 +4,9 @@ Assessed 2026-09-03 against `7d62e3ec`. “Initial” means the first adoption a
 not that every row must ship in one commit. Commands are admitted by context completeness and user
 value, not by whether an underlying function exists.
 
+Rows marked **amended** were changed while phase 4 was implemented, each with the evidence that
+changed them. An amendment is a decision recorded, not a row quietly dropped.
+
 ## Core
 
 | Command/group | Kind and scope | Result |
@@ -27,12 +30,12 @@ as initial commands. Their Settings surfaces carry required explanation and conf
 
 | Owner / tier | Initial adoption | Defer or refuse |
 | --- | --- | --- |
-| Agents / compiled | Open Agent Center; find managed session using the existing search route; create Claude Code or Codex terminal; carry-last-session and tool-card-fold settings. | Stop, archive, unarchive, import/export, fork, compact, and handoff need a selected session and often confirmation. Pricing and concurrency are forms, not choices. |
+| Agents / compiled | Open Agent Center; find a managed session of the open task using the existing search route; create Claude Code or Codex terminal; carry-last-session and tool-card-fold settings. | Stop, archive, unarchive, import/export, fork, compact, and handoff need a selected session and often confirmation. Pricing and concurrency are forms, not choices. |
 | Browser / node-only | None. | Captures and automation tools are agent capabilities with no user-facing pane or durable navigation target. |
 | Changes / compiled | Open the Changes pane. | Stage/unstage, commit, push, and review-note mutations remain in the pane where the diff and selected files are visible. |
 | Context / compiled | Open the Context pane. | Sending context needs a selected target agent and the current context set; a root command would hide both. |
 | Database / loaded | Open Database; find a project saved query; execute the current editor command when its surface is active; Generate SQL as task-scoped input. | Row insert/update/delete and arbitrary destructive SQL remain in the pane. The palette fast generator does not expose provider/model/example selection. |
-| Docker / compiled | Open Docker; find and reveal a container, image, volume, or network. | Start/stop/restart can follow after result actions are designed. Remove, prune, and compose-down remain confirmed pane operations. |
+| Docker / compiled | Open Docker; find and reveal a container, image, volume, or network in the rail source (**amended 2026-09-03**: the Docker *pane* draws one task's containers and appears only on a task that has some, so an image, a volume or a network has nowhere in it to be revealed). | Start/stop/restart can follow after result actions are designed. Remove, prune, and compose-down remain confirmed pane operations. |
 | Editor / compiled | Go to file via the existing Command-P shortcut; Find in files; reveal the active file. | File edits and terminal-editor handoff remain in the document surface. |
 | GitHub / compiled | Open GitHub; find a pull request; create a PR by navigating to the existing flow; find a changed file in the current PR. | Merge, draft conversion, review, comment, label/reviewer changes, and check reruns require PR context and stay in its surfaces. |
 | HTTP / loaded | Open HTTP; find a project saved request; create a request; import cURL through one submitted text input and open the created request. | Secret variables never appear as values. Sending an unsaved edit requires the mounted editor state and stays in the pane. |
@@ -44,8 +47,8 @@ as initial commands. Their Settings surfaces carry required explanation and conf
 | Onboarding / compiled | None. | Do not invent “restart onboarding” without an owned reset contract and product reason. |
 | Preview / compiled | Open Preview for the current task. | URL-rule editing remains repository configuration; reload can remain surface-local until command context can prove a mounted preview. |
 | Rollbar / loaded | Find an active mapped-project issue and navigate to its project surface; open linked items. | Create-task promotion is a future secondary action, not the primary search result. |
-| Terminal / compiled | Run or stop a configured target; apply a layout recipe; create a shell or agent profile; find and focus a session. | Kill and bulk session management remain in the drawer. |
-| Workflows / compiled | Run a workflow definition; find an active/recent run and open it. | Gate approval, cancel, and kill remain in the run surface with status and consequences visible. |
+| Terminal / compiled | Run or stop a configured target; apply a layout recipe; find and focus a session. | Kill and bulk session management remain in the drawer. **Amended 2026-09-03:** creating a shell or an agent profile was already a command before this programme — the shell owns `task.terminal.new-shell` under its own Terminal group and plugins/agents owns the two harness profiles — so registering them again here would have put two rows with the same words in the root. |
+| Workflows / compiled | Run a workflow definition. | Gate approval, cancel, and kill remain in the run surface with status and consequences visible. **Amended 2026-09-03:** "find an active or recent run and open it" is deferred, because there is nowhere to open one. This plugin ships no pane and no run surface on either host; the only client reader of its `runs` route is plugins/agents' task sidebar, which draws a run's *steps* into its roster and keys selection on a managed-session id a workflow step does not have. Reopen it with a run surface, not before. |
 
 ## Search implementation notes
 
