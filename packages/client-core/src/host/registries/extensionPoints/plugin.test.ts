@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { commandRegistry } from '../commands/commands'
 import { paneRegistry, type PaneContribution } from '../panes/panes'
 import { initClientPlugins, type ClientPlugin } from './plugin'
 import { Registry } from '../../../kit/lib/registry'
@@ -84,6 +85,21 @@ describe('the client plugin host', () => {
     ])
     expect(paneRegistry.get('host.own')).toBeDefined()
     clear('linear')
+  })
+
+  it('stamps the owner on a command, and a plugin cannot state its own', () => {
+    // The one field on a command the host writes and the plugin may not. A contribution point takes
+    // `ContributedCommand`, which has no `ownerId` to declare, and the register wrapper stamps the
+    // registering plugin's name over anything that arrived anyway. Ownership is what the graph checks
+    // before it lets one command name another as its parent (../commands/graph.ts).
+    initClientPlugins([
+      { name: 'board', init: (ctx) => ctx.commands.register({
+        id: 'host.board.new', title: 'New card', category: 'action', palette: true, run: () => {},
+      }) },
+    ])
+    expect(commandRegistry.get('host.board.new')?.ownerId).toBe('board')
+    initClientPlugins([{ name: 'board', init: () => {} }])
+    expect(commandRegistry.get('host.board.new')).toBeUndefined()
   })
 
   it('skips a disabled plugin but never a required one', () => {

@@ -891,6 +891,28 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
+  it('the command registry and its graph draw nothing', () => {
+    // docs/future/command-palette/architecture.md § Boundaries. Registration, availability, the
+    // execution context and the graph projection are what the desktop and the terminal share; the
+    // rectangle each of them draws is not. One import of a component from this folder and the other
+    // host can no longer use it, so the session stops being host-neutral and each renderer goes back
+    // to owning its own transitions, which is the duplication this programme exists to remove.
+    //
+    // Two destinations, and a component is either. A component in this repo is a `.tsx` file
+    // (docs/conventions.md § Files); `host/palette/` is a renderer's own controller even where a file
+    // in it happens to be `.ts`. The same line keybindings.ts's header already draws for a different
+    // reason: this folder has to stay importable from a bare-Node test run.
+    const dir = /\/packages\/client-core\/src\/host\/registries\/commands\//
+    const reaching = EDGES
+      .filter((e) => dir.test(e.fromFile) && !isTestCode(e.fromFile))
+      .filter((e) => !!e.target.file)
+      .filter((e) => e.target.file!.endsWith('.tsx') || /\/client-core\/src\/host\/palette\//.test(e.target.file!))
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    expect([...new Set(reaching)].sort()).toEqual([])
+    // Anti-vacuity: the scan must still be seeing the folder's imports at all.
+    expect(EDGES.filter((e) => dir.test(e.fromFile)).length).toBeGreaterThan(5)
+  })
+
   it('the package graph is acyclic (turbo topological tasks require it)', () => {
     const adj = new Map<string, Set<string>>(PACKAGES.map((p) => [p.name, new Set<string>()]))
     for (const e of crossPackage) adj.get(e.fromPkg.name)!.add(e.target.pkg!.name)
