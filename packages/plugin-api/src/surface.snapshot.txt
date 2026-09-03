@@ -114,6 +114,7 @@ client: openRefPanel
 client: openRepoConfigTrust
 client: openTarget
 client: paneContribution
+client: paneModel
 client: parseInAppTarget
 client: parseJson
 client: patchProject

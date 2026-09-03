@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js'
+import { createStore, reconcile } from 'solid-js/store'
 import type { DiffFile } from './diffModel'
 import type { ParsedFile } from './diffModel'
 
@@ -44,8 +44,18 @@ const waitForIdle = () =>
   })
 
 export function createDiffHydrator(options: HydratorOptions) {
-  const [version, setVersion] = createSignal(0)
+  // Two views of the same fact, and both are load-bearing.
+  //
+  // The `Map` is the hydrator's own bookkeeping. Its queue loop reads it synchronously from whatever
+  // reactive scope called `reset()`, and reading a store there would subscribe that scope to every
+  // path in the diff — one publish would then re-run the effect that resets the hydrator.
+  //
+  // The store is what consumers read, one key per file. It replaced a single version counter, which
+  // made every publish look like a change to every file: a viewer reading `status(path)` for 200
+  // files in one memo rebuilt all 200 rows two or three times per file as they hydrated
+  // (docs/diff-rendering.md § Parsing and highlighting).
   const statuses = new Map<string, DiffHydrationStatus>()
+  const [published, setPublished] = createStore<Record<string, DiffHydrationStatus>>({})
   let fileByPath = new Map<string, DiffFile>()
   let queue: string[] = []
   let generation = 0
@@ -53,9 +63,9 @@ export function createDiffHydrator(options: HydratorOptions) {
   let disposed = false
   let controller: AbortController | null = null
 
-  const publish = () => setVersion((v) => v + 1)
   const setStatus = (path: string, status: DiffHydrationStatus) => {
     statuses.set(path, status)
+    setPublished(path, status)
   }
 
   const cachedFile = (path: string) => {
@@ -86,7 +96,6 @@ export function createDiffHydrator(options: HydratorOptions) {
   const hydrateBatch = async (paths: string[], run: number) => {
     if (run !== generation || disposed) return
     for (const path of paths) setStatus(path, 'loading')
-    publish()
 
     const signal = controller?.signal
     const cached: DiffFile[] = []
@@ -108,14 +117,12 @@ export function createDiffHydrator(options: HydratorOptions) {
       const file = byPath.get(path)
       if (!file) {
         setStatus(path, 'error')
-        publish()
         continue
       }
       const parsed = await options.parseFile(file)
       if (run !== generation || disposed) return
       options.onParsed(parsed)
       setStatus(path, 'loaded')
-      publish()
       await yieldToBrowser()
     }
   }
@@ -139,7 +146,6 @@ export function createDiffHydrator(options: HydratorOptions) {
           for (const path of batch) {
             if (statuses.get(path) !== 'loaded') setStatus(path, 'error')
           }
-          publish()
           console.error('diff hydration failed', error)
         }
         batchCount++
@@ -161,10 +167,12 @@ export function createDiffHydrator(options: HydratorOptions) {
     fileByPath = new Map(files.map((file) => [file.path, file]))
     statuses.clear()
     queue = files.map((file) => file.path)
-    for (const file of files) setStatus(file.path, 'queued')
+    for (const file of files) statuses.set(file.path, 'queued')
+    // One write for the new file set, rather than one per file: `reconcile` drops the paths that are
+    // gone, adds the ones that are new, and leaves a file whose status has not changed alone.
+    setPublished(reconcile(Object.fromEntries(statuses)))
     const first = priorityPath && fileByPath.has(priorityPath) ? priorityPath : files[0]?.path
     if (first) enqueueFront([first])
-    publish()
     schedule()
   }
 
@@ -179,14 +187,11 @@ export function createDiffHydrator(options: HydratorOptions) {
     if (!fileByPath.has(path)) return
     setStatus(path, 'queued')
     enqueueFront([path])
-    publish()
     schedule()
   }
 
-  const status = (path: string): DiffHydrationStatus => {
-    version()
-    return statuses.get(path) ?? 'idle'
-  }
+  /** One file's status, tracked per path: a row reading this re-renders for its own file only. */
+  const status = (path: string): DiffHydrationStatus => published[path] ?? 'idle'
 
   const dispose = () => {
     disposed = true

@@ -1,7 +1,7 @@
 import { onCleanup } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { paneAvailable, paneRegistry, type PaneLayoutContribution } from './panes'
+import { paneAvailable, paneRegistry, type PaneContribution, type PaneLayoutContribution } from './panes'
 import type { Task } from '../../../infra/queries'
 import { _resetPaneModels } from './paneModels'
 import { evictScope } from '../shell/scopeEviction'
@@ -121,6 +121,22 @@ describe('the model a pane’s regions share', () => {
     expect(disposed).toEqual(['t1'])
     evictScope({ scope: 'task', taskId: 't2' })
     expect(disposed).toEqual(['t1', 't2'])
+  })
+})
+
+// `keepAlive` was a field on this contract that promised the host would hold a pane's DOM across a
+// task switch. One pane set it, nothing read it, and it is gone (docs/panes.md § Contributions). This
+// is a compile-time test: `@ts-expect-error` fails `tsc --noEmit`, and therefore `pnpm lint`, on the
+// day somebody puts the field back without wiring it up.
+describe('the pane contract', () => {
+  it('has no keepAlive for a contribution to declare', () => {
+    const refused = {
+      id: 'ghost', label: 'Ghost', glyph: 'ghost', order: 99,
+      component: () => <span />,
+      // @ts-expect-error -- the field is deleted; ./paneModels.ts and the query cache are the keep-alive.
+      keepAlive: 'dom',
+    } satisfies PaneContribution
+    expect(refused.id).toBe('ghost')
   })
 })
 

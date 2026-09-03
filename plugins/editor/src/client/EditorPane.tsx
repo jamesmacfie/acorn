@@ -1,12 +1,12 @@
 import { createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { basicSetup } from 'codemirror'
-import { EditorState, Prec, type Extension, type Text } from '@codemirror/state'
+import { EditorState, Prec, StateEffect, type Extension, type Text } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, prefsOptions, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
+import { activeTaskId, clientEvents, consumePaneIntent, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, type Task } from '@acorn/plugin-api/client'
 import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Rectangle, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
-import { editorApi } from './editorClient'
+import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
 import { readEditorMode, saveEditorMode } from './editorPrefs'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import { editorViewState, rememberEditorViewState } from './editorViewState'
@@ -16,6 +16,32 @@ import SearchPanel from './search/SearchPanel'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
+
+/** One open file, as this pane keeps it while the task is open. */
+type PooledFile = {
+  /** Text, undo history and the file's own grammar — what a Monaco model used to be. */
+  state: EditorState
+  /** Kept beside the state so a later mount can rebuild the extensions without a second download. */
+  language: Extension
+  /** Which mount built the extensions in `state`. See `adopt` below for why that matters. */
+  mount: object
+}
+
+/**
+ * Everything the pane's own mounts share, held by the host per task
+ * (client-core registries/paneModels.ts, docs/panes.md § Layout model).
+ *
+ * It used to be three maps in the component, cleared in its cleanup, so toggling the pane off and on
+ * threw away every open file's text, undo history and cursor and read them all back. The model
+ * outlives a mount and is disposed with the task, which is the same lifetime the reader assumes.
+ */
+type EditorPool = {
+  files: Map<string, PooledFile>
+  /** The document as last loaded or written, for the dirty derivation. */
+  saved: Map<string, Text>
+  /** Reads in flight, so the mount's warm-up and the first `show()` share one request. */
+  reading: Map<string, Promise<EditorState | null>>
+}
 
 // The extension-to-language map and the editor theme live in the host (docs/editor.md § Status).
 
@@ -29,6 +55,7 @@ const EditorTerminal = lazy(() => import('./EditorTerminal'))
 // default, and everything to the left of the box is untouched either way.
 export default function EditorPane(props: { task: Task }) {
   const api = editorApi()
+  const queryClient = useQueryClient()
   const taskId = props.task.id
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
@@ -41,15 +68,39 @@ export default function EditorPane(props: { task: Task }) {
   let stopTheme: (() => void) | undefined
   // One CodeMirror instance reused across tab switches, with the current path tracked explicitly
   // rather than read off props or signals mid-swap. Without that, a stale write lands in the wrong
-  // file. A state per path is what a Monaco model used to be — text, undo history and the file's own
-  // language — and unlike a model it needs no disposing, so closing a tab is a delete.
+  // file.
   let currentPath: string | null = null
-  const states = new Map<string, EditorState>()
-  const saved = new Map<string, Text>() // the document as last loaded or written
+  // The per-file documents, held by the host for as long as the task is (see EditorPool above). They
+  // need no disposing, so closing a tab is a delete.
+  const pool = paneModel<EditorPool>('editor', taskId, () => ({ files: new Map(), saved: new Map(), reading: new Map() }))
+  const saved = pool.saved
+  // This mount's identity. A pooled state carries extensions — the update listener, the save chord —
+  // that close over the mount that built them, and after a remount those closures point at a
+  // destroyed view: typing would derive "not dirty" and never autosave. So a state built by an
+  // earlier mount is reconfigured before it goes on screen, which keeps the document and the undo
+  // history (both live in state fields that survive a reconfigure) and replaces the closures.
+  const mountToken = {}
 
   const files = () => openFiles(taskId)
   const active = () => activeFile(taskId)
   let disposed = false
+
+  /** Put a file's live state back in the pool. Only for a file still open: `close()` deletes its
+   *  entry after flushing it, and re-adding it there would keep a closed file's text forever. */
+  const remember = (path: string, state: EditorState) => {
+    const entry = pool.files.get(path)
+    if (!entry) return
+    entry.state = state
+    entry.mount = mountToken
+  }
+
+  /** A pooled state, made this mount's own. Cheap and synchronous when it already is. */
+  const adopt = (path: string, entry: PooledFile): EditorState => {
+    if (entry.mount === mountToken) return entry.state
+    entry.state = entry.state.update({ effects: StateEffect.reconfigure.of(perFile(path, entry.language)) }).state
+    entry.mount = mountToken
+    return entry.state
+  }
 
   // Cmd/Ctrl+W closes the active file tab when this pane is the focused one. The pane draws no
   // element of its own to test containment against, so it asks the host which pane has focus.
@@ -137,7 +188,7 @@ export default function EditorPane(props: { task: Task }) {
     onCleanup(() => {
       scheduleSave.flush()
       saveViewState()
-      if (view && currentPath) states.set(currentPath, view.state)
+      if (view && currentPath) remember(currentPath, view.state)
       currentPath = null
       stopTheme?.()
       stopTheme = undefined
@@ -159,15 +210,31 @@ export default function EditorPane(props: { task: Task }) {
 
   onMount(() => {
     onCleanup(() => {
-      disposed = true
+      // Flush first, then mark this mount gone: the flush is a save, and `save` below finishes its
+      // bookkeeping either way now that the bookkeeping outlives the mount.
       scheduleSave.flush()
-      states.clear()
-      saved.clear()
+      disposed = true
+      // The pool stays: it belongs to the task, not to this mount (see EditorPool above).
       watchFocus(false)
     })
     void (async () => {
       if (!api) return setRoot(null)
-      const r = await api.root(taskId)
+      // Opening this pane used to be three steps in a row — read the root, mount the rectangle the
+      // root gated, read the file — of which two are requests. The file the reader left open does not
+      // depend on the root, so it is read now, beside it, and `show()` finds it already in the pool
+      // (docs/editor.md § One round trip to text).
+      const remembered = active()
+      if (remembered) void stateFor(remembered).catch(() => {})
+      // A checkout path already in the cache paints the rectangle in this tick, and the fetch below
+      // returns it without a request while it is fresh. An absent root is never painted from the
+      // cache: "no checkout yet" is the one thing that changes, so it is always awaited.
+      const cached = queryClient.getQueryData<string | null>(editorRootKey(taskId))
+      if (cached) setRoot(cached)
+      const r = await queryClient.fetchQuery({
+        queryKey: editorRootKey(taskId),
+        queryFn: () => api.root(taskId),
+        staleTime: EDITOR_ROOT_STALE_MS,
+      }).catch(() => null)
       if (disposed) return
       setRoot(r) // renders the rectangle synchronously when truthy, and `mountEditor` builds the view
       if (!r) return
@@ -177,7 +244,6 @@ export default function EditorPane(props: { task: Task }) {
 
   // Which editor draws an open file, and the one it is drawing right now. `on` re-fires on identity
   // rather than value, so its source is a memo and not an inline getter.
-  const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   const mode = createMemo(() => readEditorMode(prefs.data))
   const wantsTerminal = createMemo(() => (mode() === 'terminal' ? active() : null))
@@ -187,7 +253,7 @@ export default function EditorPane(props: { task: Task }) {
   // and the graphical view reads the file back off disk when it next shows it. That is the whole
   // refresh contract: the editor in the PTY owned the buffer, and the pane never guessed at it.
   const forget = (path: string) => {
-    states.delete(path)
+    pool.files.delete(path)
     saved.delete(path)
     editorSetDirty(taskId, path, false)
   }
@@ -203,20 +269,31 @@ export default function EditorPane(props: { task: Task }) {
     setSaveErr(code ? `Your editor exited with status ${code}.` : '')
   }
 
-  async function stateFor(relPath: string): Promise<EditorState | null> {
-    if (disposed) return null
-    const cached = states.get(relPath)
-    if (cached) return cached
+  // The pane's own read, deduplicated: the warm-up at mount and the first `show()` ask for the same
+  // file in the same tick, and one of them has to be the request. Not guarded on `disposed`, because
+  // a read that lands after this mount is gone still belongs in the pool for the next one.
+  function stateFor(relPath: string): Promise<EditorState | null> {
+    const cached = pool.files.get(relPath)
+    if (cached) return Promise.resolve(adopt(relPath, cached))
+    const inFlight = pool.reading.get(relPath)
+    if (inFlight) return inFlight
+    const run = readFile(relPath).finally(() => pool.reading.delete(relPath))
+    pool.reading.set(relPath, run)
+    return run
+  }
+
+  async function readFile(relPath: string): Promise<EditorState | null> {
     const [content, language] = await Promise.all([
       api?.read(taskId, relPath).catch(() => '').then((text) => text ?? '') ?? Promise.resolve(''),
       // No highlighting beats no file, so a grammar that will not download is an empty extension
       // rather than a throw that takes `show()` down with it.
       languageForPath(relPath).catch(() => [] as Extension),
     ])
-    if (disposed) return null
+    const pooled = pool.files.get(relPath)
+    if (pooled) return adopt(relPath, pooled) // a concurrent read got there first
     const state = EditorState.create({ doc: content, extensions: perFile(relPath, language) })
     saved.set(relPath, state.doc)
-    states.set(relPath, state)
+    pool.files.set(relPath, { state, language, mount: mountToken })
     return state
   }
 
@@ -228,7 +305,7 @@ export default function EditorPane(props: { task: Task }) {
     setSaveErr('')
     // The outgoing file's state, with whatever the reader typed in it. `setState` hands the view a
     // new one, so the old instance is what has to go back in the cache.
-    if (currentPath) states.set(currentPath, view.state)
+    if (currentPath) remember(currentPath, view.state)
     const state = await stateFor(relPath)
     if (disposed || !view || !state) return
     currentPath = relPath
@@ -286,13 +363,15 @@ export default function EditorPane(props: { task: Task }) {
   // cached state's otherwise. A debounced save can land after a tab swap, so this is not always the
   // file the reader is looking at.
   const docFor = (path: string): Text | undefined =>
-    (view && path === currentPath ? view.state.doc : states.get(path)?.doc)
+    (view && path === currentPath ? view.state.doc : pool.files.get(path)?.state.doc)
 
   async function save(p: string | null = currentPath) {
     const doc = p ? docFor(p) : undefined
     if (!api || !p || !doc) return
     const res = await api.write(taskId, p, doc.toString())
-    if (disposed) return
+    // Not guarded on `disposed`. What follows is the pool's and the open-files store's, both of which
+    // outlive this mount, and a write that lands after the pane closed still happened: bailing here
+    // left the file marked dirty on disk-clean content until something else re-read it.
     if (!res.ok) return setSaveErr(res.reason ?? 'Save failed')
     saved.set(p, doc)
     // Still-dirty if the user typed more during the async write.
@@ -304,7 +383,7 @@ export default function EditorPane(props: { task: Task }) {
     await save(relPath) // autosave: persist before we discard the state
     if (disposed) return
     editorClose(taskId, relPath) // active() moves to the neighbour; the effect swaps the surface
-    states.delete(relPath)
+    pool.files.delete(relPath)
     saved.delete(relPath)
   }
 
@@ -335,7 +414,7 @@ export default function EditorPane(props: { task: Task }) {
       if (!view) return
       if (next && next !== currentPath) void show(next)
       else if (!next) {
-        if (currentPath) states.set(currentPath, view.state)
+        if (currentPath) remember(currentPath, view.state)
         currentPath = null
         view.setState(emptyState())
       }

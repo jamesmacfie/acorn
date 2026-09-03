@@ -1,7 +1,22 @@
 # Phase 8: switching and hydration
 
-Status: not started. Waits on phase 0 for the request log, and reads better after phase 7 because
-the two share the agents pane.
+Status: **shipped 2026-09-03.** All four pieces landed. `keepAlive` is deleted, not implemented, and a
+compile-time test in `panes.test.tsx` stops it coming back. The editor issues its checkout-path and
+file reads together and holds its open documents in the pane model, so text lands after one round trip
+and a pane toggled inside a task issues nothing. The task rail warms a task's panes on a 150 ms hover
+through a new `prefetch` on the pane contract, taken up by the editor and the agent pane. The diff's
+per-file statuses are a store keyed by path, and a 200-file hydration rebuilds the row model 102 times
+instead of 226. Owned from here by [docs/panes.md](../../panes.md) § Layout model and § Contributions,
+[docs/editor.md](../../editor.md) § One round trip to text, and
+[docs/diff-rendering.md](../../diff-rendering.md) § Parsing and highlighting. Numbers in
+[measurements.md](./measurements.md) § 2026-09-03 — phase 8.
+
+Three things this phase did not do as written, each with its reason in the sections below and in
+measurements.md: the 200-file hydration re-renders the list 102 times rather than once, which is the
+floor for a row model built over all files and cannot go lower without the restructure this phase's
+own scope refuses; the third full-map copy in `DiffPane.tsx` stays, because it is written once per gap
+a reader opens and it feeds a published function that takes a `Map`; and there is no terminal *pane*
+to give a `prefetch` to — the terminal is a drawer slot, not a pane contribution.
 
 ## Goal
 

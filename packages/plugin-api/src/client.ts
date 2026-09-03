@@ -36,6 +36,11 @@ export { registerWsChannel } from '@acorn/client-core/infra/node/wsChannels.ts'
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
 export { paneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
 export type { PaneContribution, PaneLayoutContribution, PaneRegistration } from '@acorn/client-core/host/registries/panes/panes.ts'
+// The host's per-(pane, task) reactive root. A pane that declares `model` on a layout contribution
+// gets this for free; a pane drawing itself with one `component` reaches for it directly, which is
+// what the editor does to keep its per-file document pool across its own mounts
+// (docs/panes.md § Layout model).
+export { paneModel } from '@acorn/client-core/host/registries/panes/paneModels.ts'
 export { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
 export type { SourceContribution, SourceRouteContribution } from '@acorn/client-core/host/registries/sources/sources.ts'
 // Brand-mark registration. See docs/ui-design.md § Icons for the two feeders and the `brand:<id>`

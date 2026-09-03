@@ -512,6 +512,39 @@ widgets, decorations and inline UI cannot, and the answer to those requests stay
 any proposed addition is "is this an LSP method". As long as every addition passes it, the contract
 grows without becoming an editor library's API in a trench coat.
 
+## One round trip to text
+
+Shipped 2026-09-03. Opening the editor pane on a task used to be three steps in a row: read the
+task's checkout path, mount the CodeMirror rectangle that path gated, then read the file. Only two of
+those are requests, and the second never depended on the first — the file the reader left open is
+remembered in the pane's own state — so the pane now issues both in the same tick and the text lands
+after one round trip. At 50 ms of latency a request, on a remembered file, first text moved from 222 ms
+to 174 ms, and the slope across two latencies says two serial requests became one
+(`docs/future/performance/measurements.md` § 2026-09-03 — phase 8).
+
+**The checkout path is a query, not a call.** It is read through the query cache under
+`['editor', 'root', taskId]` with a one-minute freshness window, so reopening the pane on a task the
+reader was just in issues no request for it at all, and the task rail warms the same key when the
+pointer settles on a row (`docs/panes.md` § Contributions). A path already in the cache paints the
+rectangle in the same tick. An *absent* one never does: "this task has no checkout yet" is the one
+answer that changes underneath the window, so it is always awaited.
+
+**The open documents belong to the task, not to the mount.** Each open file's `EditorState` — its
+text, its undo history, its grammar — is held in the pane's model
+(`client-core/host/registries/panes/paneModels.ts`, `docs/panes.md` § Layout model), which the host
+builds once per (pane, task) and disposes when another task asks for that pane or the task is evicted.
+The pane used to clear the pool in its own cleanup, so closing the pane and opening it again threw away
+every unsaved edit's undo history and re-read every file. It now costs no requests at all.
+
+Closing the pane still flushes a pending autosave, and that write finishes its own bookkeeping even
+though the mount that started it is gone — otherwise the file came back marked dirty against content
+already on disk.
+
+A pooled state carries extensions that close over the mount that built them — the update listener that
+derives dirty, the save chord — so a state built by an earlier mount is reconfigured before it goes on
+screen. CodeMirror keeps the value of a state field that is present in both configurations, which is
+what makes the document and its undo history survive; the closures pointing at a destroyed view do not.
+
 ## Editing in your own editor
 
 Shipped 2026-08-31. Some people have spent fifteen years
