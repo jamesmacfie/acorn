@@ -126,6 +126,7 @@ export const NOT_YOGA: Readonly<Record<string, string>> = {
   titleAlignment: 'where paint draws that caption',
   borderStyle: 'which characters paint draws the border with',
   borderColor: 'what colour paint draws it in',
+  backgroundColor: 'the cells behind a box\'s content, filled by paint (../paint/paint.ts)',
   wrapMode: 'an input to the measure function (./measure.ts)',
   style: 'a run\'s colour and attributes, read by paint',
   fg: 'a run\'s foreground, read by paint',
