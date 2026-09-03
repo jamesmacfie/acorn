@@ -399,7 +399,11 @@ it shares the pane with. Today's code says exactly which operations, because eac
 | `bridge.document.flush()` | "make sure my write route has the latest before I act on it" |
 
 Three methods, each with a proven consumer. That is the entire new bridge surface for database's
-move. One fourth method is already known to be coming, found while porting the ⌘P palette's
+move. All three reach a `remote` region as well as a `frame` one: the grant is structural — a pane's
+region either stands beside a host editor or it does not — and which of the two runtimes the plugin's
+bytes happen to be in is not part of that question. The host passes the same document accessor to both
+(`client-core/src/host/frames/register.ts`), and its absence is the permission check the broker
+applies. Database's panel is a tree in a worker and is the only consumer of any of this. One fourth method is already known to be coming, found while porting the ⌘P palette's
 surroundings: a **multi-document** surface needs "show this uri" — a picker or tab strip selects a
 file, and nothing in read/write/flush can point the host's editor at a different document
 (`openPane` carries no payload). Whether that lands as `bridge.document.open(uri)` or as host-drawn

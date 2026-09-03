@@ -145,13 +145,85 @@ export default {
       options: '/v2/p/http/context-options',
       capture: '/v2/p/http/context-capture',
     }],
-    commands: [{
-      id: 'open',
-      title: 'API: open request panel',
-      category: 'pane',
-      palette: false,
-      action: { verb: 'openPane', pane: 'http' },
-    }],
+    commands: [
+      {
+        id: 'open',
+        title: 'API: open request panel',
+        category: 'pane',
+        // Not in the group below, and not renamed: it is invisible in the palette, so the only place
+        // this title is read is the shortcut editor, where it stands on its own next to a chord.
+        palette: false,
+        action: { verb: 'openPane', pane: 'http' },
+      },
+      {
+        // The group the three visible rows hang under, so the palette root holds one "API" rather than
+        // three. The root search still finds a child by its own words: a node is indexed under its
+        // breadcrumb as well as its title (client-core/host/registries/commands/graph.ts).
+        //
+        // `api` rather than `http`, which is the pane's id: contribution ids are unique across the whole
+        // manifest, so a group cannot be named after the surface it is about.
+        id: 'api',
+        title: 'API',
+        kind: 'group',
+        category: 'action',
+      },
+      {
+        // This project's saved requests, searched from the palette
+        // (docs/future/command-palette/command-catalog.md § HTTP).
+        //
+        // `scope: 'project'` is the whole boundary: the host sends the project the palette session
+        // captured, the route filters on owner and project in SQL, and the command is not offered at
+        // all where there is no routed project.
+        //
+        // `navigate`, matching the rail source above: a saved request's detail belongs to the project,
+        // so picking a row changes the URL and `http-project` draws beside the list. What comes back is
+        // a name, a folder and a method — the route never reads the encrypted columns, so there is no
+        // secret in a row to redact (src/server/paletteSearch.ts).
+        id: 'find-request',
+        title: 'Find a saved request',
+        parentId: 'api',
+        hint: 'saved requests in this repository',
+        keywords: ['http', 'api', 'request', 'endpoint'],
+        category: 'navigation',
+        kind: 'search',
+        scope: 'project',
+        route: '/v2/p/http/palette/requests',
+        placeholder: 'Find a saved request…',
+        onSelect: { verb: 'navigate', surface: 'http-project' },
+      },
+      {
+        // Start a request from the palette. `surfaceAction`, not a node route, because a new request is
+        // a draft in the pane and not a row on the node — the pane's own "+ Request" button does the
+        // same thing, and this is that button reachable by name (src/tree/panelModel.ts).
+        id: 'new-request',
+        title: 'New request',
+        parentId: 'api',
+        keywords: ['http', 'api', 'request', 'new'],
+        category: 'action',
+        palette: true,
+        action: { verb: 'surfaceAction', surface: 'http' },
+      },
+      {
+        // Paste a curl command, get a saved request (docs/future/command-palette/command-catalog.md
+        // § HTTP). Nothing is sent: the parser reads flags out of a token list and never runs a shell,
+        // and sending stays an act the reader takes in the pane with the request in front of them.
+        //
+        // Task-scoped although saved requests are project-owned, because an input's success verb is the
+        // context-free set and `openPane` is its only way to show the reader what was created — so the
+        // import lands where a new request in a task lands anyway, on the task, until it is filed.
+        id: 'import-curl',
+        title: 'Import a curl command',
+        parentId: 'api',
+        hint: 'paste a curl command line and save it as a request',
+        keywords: ['curl', 'import', 'paste', 'http'],
+        category: 'action',
+        kind: 'input',
+        scope: 'task',
+        route: '/v2/p/http/palette/import-curl',
+        placeholder: 'curl -X POST https://…',
+        onSuccess: { verb: 'openPane', pane: 'http' },
+      },
+    ],
     // Was `defaultChord` on the compiled pane contribution. Same chord, declared where a loaded plugin
     // declares one.
     keybindings: [{ command: 'open', defaultChord: 'meta+shift+h', when: 'task' }],

@@ -273,9 +273,10 @@ describe('pane layouts', () => {
 })
 
 describe('surface actions', () => {
-  // A command delivered into the frame region of a composed pane, because its chord is pressed in the
-  // host's editor where the frame has no keyboard. The rule worth pinning is the one every other verb has:
-  // it may only name a surface this same manifest declares, and only one that can receive it.
+  // A command delivered into a region the plugin draws: from the palette, or from a chord pressed in
+  // the host's editor beside it, where that frame has no keyboard of its own. The rule worth pinning is
+  // the one every other verb has: it may only name a surface this same manifest declares, and only one
+  // that can receive it.
   const composedPane = {
     target: 'pane',
     id: 'query',
@@ -292,20 +293,31 @@ describe('surface actions', () => {
     expect(manifest({ frames: [composedPane], commands: [execute('query')] }).success).toBe(true)
   })
 
-  it('refuses a surface with no frame region to receive it', () => {
-    // A plain frame pane has no document to flush and no host chord to have resolved the command,
-    expect(messages(manifest({ frames: [PANE], commands: [execute('board')] })))
-      .toContain("surfaceAction names 'board', which this manifest does not declare as a pane with both a document region and a frame region")
-    // and a pane whose only region is host-drawn has no frame at all, so there is nothing on the
-    // other side.
+  // A document beside the region is NOT required, although the verb was born in a pane that has one.
+  // The palette is the other way in, and from there "do this in the thing I am looking at" is a sentence
+  // about any pane the plugin draws — http's `list-detail` request panel as much as database's
+  // editor-over-panel (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § HTTP).
+  it('accepts a plain frame pane and a pane whose regions are trees, neither of which has a document', () => {
+    expect(manifest({ frames: [PANE], commands: [execute('board')] }).success).toBe(true)
+    const trees = {
+      ...PANE,
+      layout: 'list-detail',
+      regions: { list: { kind: 'remote', entry: 'list' }, detail: { kind: 'remote', entry: 'detail' } },
+    }
+    expect(manifest({ frames: [trees], commands: [execute('board')] }).success).toBe(true)
+  })
+
+  it('refuses a pane with nothing of the plugin\'s own to receive it', () => {
+    // Every region host-drawn: the pane runs none of this plugin's code, so a command aimed at it would
+    // parse and then post into nothing.
     const wholePane = { ...PANE, layout: 'single', regions: { body: { kind: 'document', read: '/v2/p/board/doc' } } }
     expect(messages(manifest({ frames: [wholePane], commands: [execute('board')] })))
-      .toContain("surfaceAction names 'board', which this manifest does not declare as a pane with both a document region and a frame region")
+      .toContain("surfaceAction names 'board', which this manifest does not declare as a pane drawing a region of its own")
   })
 
   it('refuses another plugin\'s surface, which is to say any it did not declare', () => {
     expect(messages(manifest({ frames: [composedPane], commands: [execute('someone-elses')] })))
-      .toContain("surfaceAction names 'someone-elses', which this manifest does not declare as a pane with both a document region and a frame region")
+      .toContain("surfaceAction names 'someone-elses', which this manifest does not declare as a pane drawing a region of its own")
   })
 })
 
@@ -859,6 +871,30 @@ describe('project-scoped surfaces and their routes', () => {
       sources: [PROJECT_SOURCE],
       commands: [{ id: 'board.open', title: 'Board: open card', action: { verb: 'navigate', surface: 'board-card' } }],
     }).success).toBe(false)
+  })
+
+  // The one click site inside a command that can carry `navigate`: a search result. It has a picked
+  // row and, at project scope, the project the palette session captured, which is exactly the pair the
+  // verb was missing everywhere else (docs/future/command-palette/phase-5-loaded-plugin-adoption.md).
+  it('lets a search result navigate, and counts it as a mount site for the surface', () => {
+    const find = {
+      id: 'find', title: 'Board: find a card', kind: 'search', scope: 'project',
+      route: '/v2/p/board/search', onSelect: { verb: 'navigate', surface: 'board-card' },
+    }
+    // `nodeManifest`, because a search calls a node route and only a node half serves one.
+    expect(nodeManifest({
+      frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], sources: [PROJECT_SOURCE], commands: [find],
+    }).success).toBe(true)
+    // And on its own: a project-scoped surface reached only from the palette is addressed and
+    // mountable, so the "nowhere to mount" refusal must not fire on it.
+    expect(nodeManifest({
+      frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], commands: [find],
+    }).success).toBe(true)
+    // The surface still has to be one this manifest declared as project-scoped.
+    expect(messages(nodeManifest({
+      frames: [PROJECT_PANE], routes: [PROJECT_ROUTE], sources: [PROJECT_SOURCE],
+      commands: [{ ...find, onSelect: { verb: 'navigate', surface: 'nope' } }],
+    }))).toContain(`navigate names 'nope', which this manifest does not declare as a project-scoped pane`)
   })
 
   it('refuses navigate and createTask from a slot badge, whose click carries no row and no project', () => {

@@ -165,6 +165,27 @@ export default {
       category: 'pane',
       palette: false,
       action: { verb: 'openPane', pane: 'linear' },
+    }, {
+      // The routed project's mapped Linear issues, searched from the palette
+      // (docs/future/command-palette/command-catalog.md § Linear).
+      //
+      // `scope: 'project'` is the whole boundary: the host sends the project the palette session
+      // captured, the route turns it into the workspace's Linear links, and a connection the routed
+      // project maps nothing of is never asked. The command is not offered at all where there is no
+      // routed project. A manifest names the scope; it never names the value.
+      //
+      // `navigate`, matching the source above: an issue's detail belongs to the project, so picking a
+      // row changes the URL and `linear-issue` draws beside the list.
+      id: 'find-issue',
+      title: 'Linear: find an issue',
+      hint: 'active issues in the Linear projects this repository follows',
+      keywords: ['issue', 'ticket', 'linear'],
+      category: 'navigation',
+      kind: 'search',
+      scope: 'project',
+      route: '/v2/p/linear/palette/issues',
+      placeholder: 'Find a Linear issue…',
+      onSelect: { verb: 'navigate', surface: 'linear-issue' },
     }],
     keybindings: [{ command: 'open', defaultChord: 'meta+shift+l', when: 'task' }],
   },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { linearUploadTarget } from './routes/linear'
-import { issuesFilter, linearData, linearError, parseIdentifier, projectIssuesFilter } from './index'
+import { issuesFilter, linearData, linearError, parseIdentifier, projectIssueSearchFilter, projectIssuesFilter } from './index'
 
 describe('linear server helpers', () => {
   it('parses issue identifiers and ignores malformed identifiers in filters', () => {
@@ -22,6 +22,30 @@ describe('linear server helpers', () => {
       project: { id: { in: ['p-1', 'p-2'] } },
       state: { type: { nin: ['completed', 'canceled'] } },
     })
+  })
+
+  // The palette's filter is the rail's filter with the typed word ANDed onto it: top-level fields are
+  // ANDed by Linear and `or` ORs its own list, so this reads "in these projects, still active, and
+  // matching one of these" (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Linear).
+  it('narrows the mapped-project filter by what somebody typed', () => {
+    expect(projectIssueSearchFilter(['p-1'], 'login')).toEqual({
+      project: { id: { in: ['p-1'] } },
+      state: { type: { nin: ['completed', 'canceled'] } },
+      or: [{ title: { containsIgnoreCase: 'login' } }],
+    })
+    // An identifier is also a team and a number, which is how a pasted key finds its ticket even when
+    // the key appears nowhere in the title.
+    expect(projectIssueSearchFilter(['p-1'], ' eng-42 ').or).toEqual([
+      { title: { containsIgnoreCase: 'eng-42' } },
+      { team: { key: { eq: 'ENG' } }, number: { eq: 42 } },
+    ])
+    // A bare number, with or without the hash it was copied with.
+    expect(projectIssueSearchFilter(['p-1'], '#42').or).toEqual([
+      { title: { containsIgnoreCase: '#42' } },
+      { number: { eq: 42 } },
+    ])
+    // Nothing typed is the mapped-project filter unchanged, so opening the frame lists the project.
+    expect(projectIssueSearchFilter(['p-1'], '   ')).toEqual(projectIssuesFilter(['p-1']))
   })
 
   it('maps provider status failures to the stable route errors', () => {

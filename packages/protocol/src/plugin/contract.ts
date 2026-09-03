@@ -259,6 +259,18 @@ const contextFreeAction = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('surfaceAction'), surface: z.string().min(1).max(64) }),
 ])
 
+// The same set plus `navigate`, for the one click site that has what `navigate` wants.
+//
+// A search row is a selected row, and a project-scoped search ran because the session had a routed
+// project, so both halves of the address exist here where they do not on a plain command
+// (docs/future/command-palette/phase-5-loaded-plugin-adoption.md). `createTask` is still absent: a
+// search result is a thing to go and look at, and promoting one is a second verb on the row rather
+// than what picking it means (docs/future/command-palette/command-catalog.md § Rollbar).
+const selectedRowAction = z.discriminatedUnion('verb', [
+  ...contextFreeAction.options,
+  z.object({ verb: z.literal('navigate'), surface: z.string().min(1).max(64) }),
+])
+
 // What an empty rail says, and where it can send someone. One action, no markup, bounded message: this
 // is the field that invites a source to grow an onboarding flow. See docs/plugins.md.
 const emptyStateDescriptor = z.object({
@@ -543,10 +555,10 @@ const groupCommandDescriptor = z.object({
  *
  * The host GETs `route` with `q` and the identifiers the declared scope owns, and it renders what
  * comes back as display facts (@acorn/protocol/commands.ts § CommandSearchItem). A result cannot
- * choose what picking it does: `onSelect` is one static verb from the same closed set a command's
- * action comes from, declared here and reviewed with the rest of the manifest
- * (docs/future/command-palette/refused.md § Returning executable commands from a loaded search
- * response).
+ * choose what picking it does: `onSelect` is one static verb from a closed set, declared here and
+ * reviewed with the rest of the manifest (docs/future/command-palette/refused.md § Returning
+ * executable commands from a loaded search response). The set is a command's own plus `navigate`,
+ * because a picked row is a selected row and a project-scoped search already has its project.
  */
 const searchCommandDescriptor = z.object({
   ...commandCommon,
@@ -558,7 +570,7 @@ const searchCommandDescriptor = z.object({
   minQueryLength: z.number().int().min(0).max(MAX_COMMAND_SEARCH_MIN_QUERY).optional(),
   // Floored as well as capped: a declared 5 ms is a plugin spending a request on every keystroke.
   debounceMs: z.number().int().min(MIN_COMMAND_SEARCH_DEBOUNCE_MS).max(MAX_COMMAND_SEARCH_DEBOUNCE_MS).optional(),
-  onSelect: contextFreeAction,
+  onSelect: selectedRowAction,
 })
 
 /**
@@ -1077,6 +1089,9 @@ export type PluginChromeAction = z.infer<typeof chromeAction>
 // The verbs that need nothing from their click site. `createTask` depends on a selected rail row and
 // `navigate` on a routed project, and a command registry row has neither in scope.
 export type PluginCommandAction = z.infer<typeof contextFreeAction>
+// The same verbs plus `navigate`, which a search's `onSelect` may name because a picked row is a
+// selected row and its project came from the scope the search declared.
+export type PluginCommandSelectAction = z.infer<typeof selectedRowAction>
 export type PluginSourceEmptyState = z.infer<typeof emptyStateDescriptor>
 // `views` and `fieldRole` are wider than the parse. Both are filters: a newer node naming a view kind or
 // field role this build can't render must narrow what's offered, never fail to register.

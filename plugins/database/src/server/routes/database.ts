@@ -22,14 +22,17 @@ import {
   ProviderOperationError,
   respondError,
 } from '@acorn/plugin-api/node'
+import type { CommandInputResult } from '@acorn/protocol/commands.ts'
 import { MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
 import type { PluginCompletionResponse, PluginDocumentBody } from '@acorn/protocol/documentSurface.ts'
-import { GENERATE_MAX_PROMPT_CHARS } from '../../shared/database'
+import { defaultModelIdFor } from '@acorn/protocol/modelProviders.ts'
+import { GENERATE_MAX_PROMPT_CHARS, SCRATCH_SELECT_ID } from '../../shared/database'
 import type { DbGenerateResult, DbSavedQuery } from '../../shared/database'
 import { dbSavedQueries, dbScratch } from '../../node/schema'
 import type { DatabaseBridge } from '../database'
 import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, stripSqlFences } from '../generateSql'
 import { completeSql } from '../completions'
+import { savedQuerySearchItems } from '../paletteSearch'
 import { MAX_CONTEXT_QUERIES, savedQueryOption, savedQuerySnapshot } from '../agentContext'
 
 // The carrier is the host's (@acorn/plugin-api/node); a request arriving without the context is a
@@ -72,6 +75,14 @@ const completionsBody = z.object({
   position: z.object({ line: z.number().int().min(1), column: z.number().int().min(1) }),
 })
 const contextCaptureBody = z.object({ taskId: z.string().min(1), optionIds: z.array(z.string()).optional() })
+// The command palette's input body. `input` is the reader's typed prompt and `taskId` is the scope the
+// HOST derived from the session it captured — neither the manifest nor a previous answer writes it
+// (client-core/host/chrome/chromeCommands.ts § commandRouteScope). The prompt is held to the same
+// bound the modal's textarea enforces, so the two ways in cannot drift.
+const paletteGenerateBody = z.object({
+  input: z.string().trim().min(1).max(GENERATE_MAX_PROMPT_CHARS),
+  taskId: z.string().min(1),
+})
 
 const id = (c: { req: { param(k: string): string } }) => c.req.param('taskId')
 
@@ -111,6 +122,18 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       .where(and(projectScope(project.id), inArray(dbSavedQueries.id, [...ids])))
       .orderBy(dbSavedQueries.name)
     return rows.map(rowToQuery)
+  }
+
+  // The task's scratch document, written. One helper because two routes write it and they must agree
+  // on the row: the host's editor autosave below, and the palette's `Generate SQL`, whose whole
+  // contract is that this has committed before the reader is told it worked
+  // (docs/future/command-palette/command-catalog.md § Database SQL fast path, step 5).
+  const writeScratch = async (taskId: string, sql: string): Promise<void> => {
+    const at = Date.now()
+    await db
+      .insert(dbScratch)
+      .values({ taskId, sql, updatedAt: at })
+      .onConflictDoUpdate({ target: dbScratch.taskId, set: { sql, updatedAt: at } })
   }
 
   return new Hono<AppEnv>()
@@ -167,11 +190,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       // The taskId is a plain ID into core's tables, so core validates it. Checked on the write as
       // well as the read: an autosave for an archived task should not create a row nothing reads.
       if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
-      const now = Date.now()
-      await db
-        .insert(dbScratch)
-        .values({ taskId, sql: p.data.text, updatedAt: now })
-        .onConflictDoUpdate({ target: dbScratch.taskId, set: { sql: p.data.text, updatedAt: now } })
+      await writeScratch(taskId, p.data.text)
       return c.json({ ok: true })
     })
 
@@ -230,6 +249,83 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       await db.delete(dbSavedQueries).where(and(eq(dbSavedQueries.id, c.req.param('queryId')), projectScope(project.id)))
       emit({ channel: pluginChannel('database', 'saved-queries-changed'), projectId: project.id })
       return c.json({ ok: true })
+    })
+
+    // --- the command palette's two rows (docs/plugins.md § Command kinds) ---
+    //
+    // Task-scoped, both of them, and that is the boundary rather than a convenience. Saved queries are
+    // project-owned, but every route in this file addresses them through a task, because the task is
+    // what core can resolve a project from and the palette is the only caller that could otherwise have
+    // named a project of its own. `taskId` is the identity the HOST derived from the session it
+    // captured; a manifest names the scope and never the value.
+    //
+    // Everything reachable from here is reachable from the pane already, through the same
+    // `savedFor`/`taskOf` pair: a task that does not resolve is a 404, a task whose project has no rows
+    // gets an empty list, and rows are filtered to that one project in SQL rather than after the fact.
+
+    // The `Find a saved query` command's rows. Display facts and the saved query's own id, in the
+    // order the pane's picker lists them, narrowed by what somebody typed (../paletteSearch.ts).
+    //
+    // No credential is in reach: a saved query is a name, a note and SQL somebody wrote down, and the
+    // connection URL is resolved per connect and never persisted (../database.ts).
+    .get('/palette/queries', async (c) => {
+      const taskId = c.req.query('taskId')
+      // No task means no project to resolve, which is an empty list rather than an error: the command
+      // is task-scoped, so the host only offers it with a task open, and a race is not worth a red line.
+      if (!taskId) return c.json({ items: [] })
+      const saved = await savedFor(taskId)
+      if (!saved) return respondError(c, 404, 'not_found')
+      return c.json({ items: savedQuerySearchItems(saved, c.req.query('q') ?? '') })
+    })
+
+    // The `Generate SQL` fast path: the modal's six steps with every choice already made
+    // (docs/future/command-palette/command-catalog.md § Database SQL fast path).
+    //
+    // The choices it does not offer are the point. One text field cannot carry a connection, a model
+    // and a set of worked examples, so this takes the first available connection and that provider's
+    // own default model — the selection the modal opens on — and generates with no examples. Choosing
+    // any of the three remains the modal's job, unchanged.
+    //
+    // The write comes before the answer, and that ordering is the contract: the success action opens
+    // the Database pane, whose editor GETs the scratch route on mount, so answering first would race
+    // the reader to their own result. Every failure below returns before the write, which is what keeps
+    // the prompt in the palette field with the reason under it.
+    .post('/palette/generate', async (c) => {
+      const p = paletteGenerateBody.safeParse(await c.req.json().catch(() => null))
+      if (!p.success) return respondError(c, 400, 'bad_request', p.error.issues.map((i) => i.message))
+      // Generation spends the owner's provider key, so a task-scoped agent credential must not reach
+      // it — the same gate the modal's route applies.
+      if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
+      const { input, taskId } = p.data
+      if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
+      const connection = (await core.models.available(owner(c)))[0]
+      if (!connection) return respondError(c, 404, 'provider_not_connected')
+      const modelId = defaultModelIdFor(connection)
+      const schemaRes = await bridge.schema(taskId)
+      if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
+      try {
+        const result = await core.models.generateText({
+          userId: owner(c),
+          connectionId: connection.connection.id,
+          input: {
+            system: buildSystemPrompt(schemaRes.schema, { ...(schemaRes.notes ? { notes: schemaRes.notes } : {}), examples: [] }),
+            prompt: input,
+            ...(modelId ? { modelId } : {}),
+            maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
+          },
+        })
+        await writeScratch(taskId, stripSqlFences(result.text))
+        // The row the success action carries. Its id is the sentinel the pane reads as "re-read the
+        // scratch document", not a saved query's id, so a pane that is already open shows the new SQL
+        // instead of quietly keeping what was in the editor (../../shared/database.ts).
+        return c.json({
+          ok: true,
+          item: { id: SCRATCH_SELECT_ID, title: 'Generated SQL' },
+        } satisfies CommandInputResult)
+      } catch (error) {
+        if (error instanceof ProviderOperationError) return respondError(c, error.status, error.code)
+        return respondError(c, 502, 'provider_unavailable')
+      }
     })
 
     // Which model connections this owner could generate with. The frame cannot ask core directly:

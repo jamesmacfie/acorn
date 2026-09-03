@@ -1,6 +1,7 @@
 import type {
   PluginCommandAction,
   PluginCommandDescriptor,
+  PluginCommandSelectAction,
   PluginRailItem,
 } from '@acorn/protocol/api.ts'
 import { MIN_COMMAND_SETTING_OPTIONS, type CommandScope, type CommandSearchItem } from '@acorn/protocol/commands.ts'
@@ -36,6 +37,9 @@ export type PluginCommandBinding = {
   /** Can this device honour that verb at all? The chrome pass's own check, passed in because it needs
    *  the surfaces this manifest declared and those are only in scope there. */
   usableAction: (action: PluginCommandAction) => boolean
+  /** The same question for a search's `onSelect`, which may also name `navigate`: a picked row is a
+   *  selected row, and a project-scoped search already has the project that verb addresses. */
+  usableSelectAction: (action: PluginCommandSelectAction) => boolean
 }
 
 /** The manifest's own kind vocabulary, as this build knows it. A newer node may name a sixth. */
@@ -96,8 +100,8 @@ export function usablePluginCommands(
       case 'action': return binding.usableAction((descriptor as { action: PluginCommandAction }).action)
       case 'group': return true
       case 'search': {
-        const search = descriptor as { route: string; onSelect: PluginCommandAction }
-        return ownsRoute(pluginId, search.route) && binding.usableAction(search.onSelect)
+        const search = descriptor as { route: string; onSelect: PluginCommandSelectAction }
+        return ownsRoute(pluginId, search.route) && binding.usableSelectAction(search.onSelect)
       }
       case 'input': {
         const input = descriptor as { route: string; onSuccess: PluginCommandAction }
@@ -189,6 +193,12 @@ export function pluginCommand(
           // The task the row named, if it named one, so `openTask` and `openPane` have something to
           // aim at. It went through the same sanitiser as the rest of the row.
           ...(item.taskId ? { taskId: item.taskId } : {}),
+          // The other two halves of `navigate`, and both are the host's rather than the row's: the
+          // project is the one the session captured, which is the same one the route was scoped to,
+          // and the navigator is the shell's. A row that named its own project would be a response
+          // choosing where a reader lands (docs/future/command-palette/architecture.md § Security).
+          ...(context.projectId ? { projectId: context.projectId } : {}),
+          ...(context.navigate ? { navigate: context.navigate } : {}),
         })),
       }
     }

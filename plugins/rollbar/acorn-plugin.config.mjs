@@ -81,6 +81,28 @@ export default {
       category: 'pane',
       palette: false,
       action: { verb: 'openPane', pane: 'rollbar' },
+    }, {
+      // The routed project's active Rollbar items, searched from the palette
+      // (docs/future/command-palette/command-catalog.md § Rollbar).
+      //
+      // `scope: 'project'` is what makes this safe and what makes it useful: the host sends the
+      // project the palette session captured and nothing else, the route resolves only the
+      // connections that project's workspace maps, and the command is not offered at all where there
+      // is no routed project. A manifest cannot widen that — it names the scope, never the value.
+      //
+      // `navigate` rather than `openPane`, matching the source above: an item's detail belongs to the
+      // project, so picking a row changes the URL and `rollbar-item` draws beside the list. Promoting
+      // one into a task is deliberately not what picking it means.
+      id: 'find-item',
+      title: 'Rollbar: find an item',
+      hint: 'active items in the projects this repository follows',
+      keywords: ['error', 'exception', 'issue', 'rollbar'],
+      category: 'navigation',
+      kind: 'search',
+      scope: 'project',
+      route: '/v2/p/rollbar/palette/issues',
+      placeholder: 'Find a Rollbar item…',
+      onSelect: { verb: 'navigate', surface: 'rollbar-item' },
     }],
     keybindings: [{ command: 'open', defaultChord: 'meta+shift+o', when: 'task' }],
   },

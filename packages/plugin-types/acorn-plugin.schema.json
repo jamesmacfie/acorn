@@ -1557,6 +1557,24 @@
                           "verb",
                           "surface"
                         ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "verb": {
+                            "type": "string",
+                            "const": "navigate"
+                          },
+                          "surface": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "verb",
+                          "surface"
+                        ]
                       }
                     ]
                   }

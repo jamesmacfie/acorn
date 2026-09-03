@@ -71,7 +71,7 @@ is not a command surface.
 | [2](./phase-2-search-and-input.md) | Debounced search, explicit input submission, cancellation, scope and fleet fan-out, plus loaded-plugin route adapters. | Shipped 2026-09-03. |
 | [3](./phase-3-settings-and-core-commands.md) | Setting commands, core hierarchy, navigation searches, and the first shared preference accessors. | Shipped 2026-09-03. |
 | [4](./phase-4-compiled-plugin-adoption.md) | The compiled plugins adopt the graph; terminal/workflow rows and specialist file finders leave their private paths. | Shipped 2026-09-03. |
-| [5](./phase-5-loaded-plugin-adoption.md) | Database, HTTP, Linear, and Rollbar prove the declarative search/input contract. | Ready. |
+| [5](./phase-5-loaded-plugin-adoption.md) | Database, HTTP, Linear, and Rollbar prove the declarative search/input contract. | Shipped 2026-09-03. |
 | [6](./phase-6-cutover-and-documentation.md) | Compatibility code is removed only after zero-use checks, owning docs take the behaviour, and this folder retires. | Waits on phases 3–5. |
 
 ## Done when

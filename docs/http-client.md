@@ -95,6 +95,36 @@ The rail source lists the project's saved requests and nothing more. The host dr
 `/v2/p/http/rail-items`, and a click navigates to the project pane. Exploration lives in the panel
 beside it, so the descriptor vocabulary does not have to grow into a UI framework.
 
+### From the command palette
+
+Three rows under an **API** group (`docs/command-palette-and-shortcuts.md`), all declared in the
+manifest and all served by this plugin's own node half.
+
+| Row | Kind | What it does |
+| --- | --- | --- |
+| Find a saved request | search, project-scoped | `/v2/p/http/palette/requests` answers the routed project's saved rows; picking one navigates to `http-project`, the same address the rail row has |
+| New request | action | Delivers `new-request` to the `http` pane, where the panel starts a blank draft — the same thing the "+ Request" button does |
+| Import a curl command | input, task-scoped | `/v2/p/http/palette/import-curl` parses the pasted command, saves it encrypted against the task, and opens the pane on it |
+
+Two properties are the point of the pair, and both are structural rather than a filter applied
+afterwards.
+
+**The search cannot return a secret, because it never reads one.** The URL, the headers, the body, the
+auth block and the variables are the five columns the node encrypts. The palette's query selects `id`,
+`name`, `folder` and `method` and nothing else, so no ciphertext is opened anywhere on the path and a
+row has no field a credential could occupy — not even the URL, which the rail beside it also leaves
+out, since `?token=…` typed literally is an ordinary way to have saved a request. Rows are filtered by
+owner *and* project in SQL, so another login's requests and another project's are never selected.
+Contrast the agent-context capture, which does open the ciphertext and therefore carries a redaction
+pass and an allowlist.
+
+**The import never sends and never shells out.** `fromCurl` reads flags out of a token list produced by
+`tokenizeShell`, which is a quote-and-escape reader and not a shell: no `child_process`, no `fetch`. A
+`$(…)` or a backtick in a pasted command is stored as the literal text it is. The parsed request goes
+through the same body schema and the same encryption a save from the pane does, and the route answers
+only once the row is stored. Sending stays a separate act the reader takes in the panel with the
+request in front of them.
+
 All three surfaces are **trees**: the plugin's code runs in a worker and emits a tree of the host's own
 components (`docs/plugins.md` § The tree contract). Three consequences are visible in the UI, and all
 three are the same consequence — the plugin has no document of its own.

@@ -53,6 +53,39 @@ export const projectIssuesFilter = (projectIds: string[]): Record<string, unknow
   state: { type: { nin: ['completed', 'canceled'] } },
 })
 
+/**
+ * The same filter, narrowed by what somebody typed. The palette's search sends this
+ * (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Linear).
+ *
+ * Provider-side rather than a filter over a fetched page, because the mapping half is a filter Linear
+ * supports — `project: { id: { in: … } }` is the one the rail already sends — so the narrowing can ride
+ * along with it. Filtering locally would have meant asking for the first hundred active issues and
+ * searching those, which cannot find the hundred-and-first and moves more bytes to find fewer rows.
+ * The request count is the same either way, and it goes through the same per-connection scheduler and
+ * budget the rail does, so no rate-limit policy changes hands.
+ *
+ * Two clauses, both fields `IssueFilter` has had since the API's beginning: the title, and the number
+ * behind an identifier. Deliberately not `searchableContent`, which would also read every description
+ * — that is a different question from "find the ticket I am thinking of", and it is the field most
+ * likely to differ between plans.
+ */
+export function projectIssueSearchFilter(projectIds: string[], query: string): Record<string, unknown> {
+  const base = projectIssuesFilter(projectIds)
+  const text = query.trim()
+  if (!text) return base
+  const or: Record<string, unknown>[] = [{ title: { containsIgnoreCase: text } }]
+  const identifier = parseIdentifier(text.toUpperCase())
+  if (identifier) or.push({ team: { key: { eq: identifier.key } }, number: { eq: identifier.number } })
+  else {
+    // A bare number, with or without the hash somebody pasted it with.
+    const number = /^#?(\d{1,9})$/.exec(text)
+    if (number) or.push({ number: { eq: Number(number[1]) } })
+  }
+  // Top-level fields are ANDed and `or` ORs its own list, so this reads: in these projects, still
+  // active, and matching one of these.
+  return { ...base, or }
+}
+
 // The same query with a different filter: active issues assigned to whoever owns the credential,
 // across the whole workspace rather than the linked projects. A rail is scoped to the project someone
 // is looking at; a dashboard panel is scoped to the person.
