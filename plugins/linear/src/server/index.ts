@@ -55,7 +55,7 @@ export const projectIssuesFilter = (projectIds: string[]): Record<string, unknow
 
 /**
  * The same filter, narrowed by what somebody typed. The palette's search sends this
- * (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Linear).
+ * (docs/integrations.md § From the command palette).
  *
  * Provider-side rather than a filter over a fetched page, because the mapping half is a filter Linear
  * supports — `project: { id: { in: … } }` is the one the rail already sends — so the narrowing can ride

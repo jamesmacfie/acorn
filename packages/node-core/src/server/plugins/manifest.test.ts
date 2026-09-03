@@ -296,7 +296,7 @@ describe('surface actions', () => {
   // A document beside the region is NOT required, although the verb was born in a pane that has one.
   // The palette is the other way in, and from there "do this in the thing I am looking at" is a sentence
   // about any pane the plugin draws — http's `list-detail` request panel as much as database's
-  // editor-over-panel (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § HTTP).
+  // editor-over-panel (docs/http-client.md § From the command palette).
   it('accepts a plain frame pane and a pane whose regions are trees, neither of which has a document', () => {
     expect(manifest({ frames: [PANE], commands: [execute('board')] }).success).toBe(true)
     const trees = {
@@ -875,7 +875,7 @@ describe('project-scoped surfaces and their routes', () => {
 
   // The one click site inside a command that can carry `navigate`: a search result. It has a picked
   // row and, at project scope, the project the palette session captured, which is exactly the pair the
-  // verb was missing everywhere else (docs/future/command-palette/phase-5-loaded-plugin-adoption.md).
+  // verb was missing everywhere else (docs/plugins.md § Command kinds).
   it('lets a search result navigate, and counts it as a mount site for the surface', () => {
     const find = {
       id: 'find', title: 'Board: find a card', kind: 'search', scope: 'project',

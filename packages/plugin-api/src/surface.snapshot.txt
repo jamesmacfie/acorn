@@ -1,4 +1,4 @@
-# plugin API major: 9
+# plugin API major: 10
 client: CHECK_TONE
 client: COMMAND_CLOSED
 client: ClientPlugin
@@ -14,8 +14,6 @@ client: HostRequirement
 client: InAppTarget
 client: InputCommand
 client: IntegrationFlowContribution
-client: PaletteItem
-client: PaletteRowSource
 client: PaneContribution
 client: PaneIntent
 client: PaneLayoutContribution

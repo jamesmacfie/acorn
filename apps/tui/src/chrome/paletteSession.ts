@@ -4,7 +4,6 @@ import {
 import {
   createCommandSession, type CommandSession,
 } from '@acorn/client-core/host/registries/commands/session.ts'
-import { createPaletteRowsProvider } from '@acorn/client-core/host/registries/palette/provider.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { activeTaskId } from '@acorn/client-core/features/tasks/tasks.ts'
 import { useNavigate } from '../kit/router'
@@ -12,18 +11,16 @@ import { routedProjectId } from './routing'
 import { closeOverlay, openOverlay } from './state'
 import type { ShellModel } from './model'
 
-// The terminal's half of the palette: which identity a session captures here, and the one row provider
-// this host still has.
+// The terminal's half of the palette: which identity a session captures here, and nothing else.
 //
 // The session is client-core's and both hosts run the same one
 // (client-core/host/registries/commands/session.ts). It owns the query, the order, the cursor and the
 // invocation. What the shell owns is what a terminal answers differently: the overlay stack is where
 // "open" and "closed" live, because there is no window to float a dialog over.
 //
-// Go-to-task and switch-workspace used to be two row providers here. They are commands now
-// (./navigationCommands.ts), so the only compatibility provider left is the `paletteRows` one, which
-// goes when its last contributor becomes a command
-// (docs/future/command-palette/phase-6-cutover-and-documentation.md).
+// This host handed the session row providers until 2026-09-03 — go-to-task and switch-workspace, then
+// the `paletteRows` contributions after those two became commands (./navigationCommands.ts). There is
+// no such seam left on either host: every row in the palette comes from the command registry.
 
 /**
  * The shell's one session, built where the shell is and handed to `./Palette.tsx` to draw.
@@ -51,10 +48,8 @@ export function createShellPalette(model: ShellModel): CommandSession {
     // rather than a task's layout (../kit/router.ts).
     navigate,
   })
-  const providers = [createPaletteRowsProvider()]
   return createCommandSession({
     context,
-    providers: () => providers,
     onOpen: () => openOverlay('palette'),
     onClose: () => closeOverlay('palette'),
   })

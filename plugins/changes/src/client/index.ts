@@ -11,7 +11,7 @@ export const changesClientPlugin: ClientPlugin = {
     ctx.panes.register(changesPaneContribution)
     // A row that says what this pane is for, beside core's generic `Show pane: Changes`. Somebody
     // reaching for the palette types "diff" or "staged", not "pane"
-    // (docs/future/command-palette/command-catalog.md § Changes). Staging, committing, pushing and
+    // (docs/command-palette-and-shortcuts.md). Staging, committing, pushing and
     // review notes stay in the pane, where the diff and the selected files are visible.
     ctx.commands.register({
       id: 'changes.open',

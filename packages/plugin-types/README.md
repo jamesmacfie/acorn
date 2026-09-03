@@ -41,9 +41,27 @@ your manifest at it and every contribution array is validated as you type:
   "id": "my-widget",
   "name": "My widget",
   "version": "0.1.0",
-  "apiVersion": "3"
+  "apiVersion": "10"
 }
 ```
+
+## Commands are five shapes, not one
+
+A `commands` entry used to be one thing: a title and a closed verb the host runs. It is a
+discriminated union now, and a descriptor with no `kind` still means exactly what it always did, so
+nothing already written needs editing.
+
+| `kind` | What it is |
+| --- | --- |
+| `action` (the default) | One closed verb. |
+| `group` | Holds children. Any command may name a `parentId`, which must be a group in the same manifest. |
+| `search` | A GET `route` in your own namespace and one static `onSelect` verb. The host debounces the typing, sends the query and the identifier your declared `scope` owns, and draws the rows you answer with. |
+| `input` | A POST `route` and one static `onSuccess` verb. Submitted on Enter, never debounced, and your text survives a failure. |
+| `setting` | A GET read route, a PUT write route, and 2-32 labelled choices. |
+
+A route's answer never chooses behaviour: it carries display facts and identity, and the verb that
+runs is the static one your manifest declared. The schema above has the full shape of each, including
+the bounds the host enforces.
 
 ## What is here, and what is not
 
@@ -56,7 +74,7 @@ behind `ctx.storage.open()`, a Zod schema on an agent-tool contribution. Adding 
 adding a dependency to a package that promises none. Narrow them yourself if you need to; the rest
 of the surface is exact, and a test in the acorn repository fails if it drifts.
 
-`apiVersion` is a range over plugin API majors: write `"3"`, or `"2 || 3"` once you have checked
+`apiVersion` is a range over plugin API majors: write `"10"`, or `"9 || 10"` once you have checked
 your plugin against both.
 
 ## Related

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { agentContextRegistry } from '@acorn/client-core/host/registries/sources/agentContexts.ts'
 import { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
-import { paletteRowRegistry } from '@acorn/client-core/host/registries/palette/paletteRows.ts'
 import { attentionRegistry } from '@acorn/client-core/host/registries/rail/attention.ts'
 import { collectionRegistry } from '@acorn/client-core/host/registries/sources/collections.ts'
 import { commandRegistry } from '@acorn/client-core/host/registries/commands/commands.ts'
@@ -26,7 +25,7 @@ const REGISTRIES = {
   // The command graph, from 2026-09-03. A plugin's commands are the one contribution kind that can
   // hold each other: a group and the searches under it are registered together, and a disable has to
   // take the whole subtree, not the parent and a set of orphans
-  // (docs/future/command-palette/phase-4-compiled-plugin-adoption.md § Lifecycle and ownership).
+  // (docs/plugins.md § Command kinds).
   commands: commandRegistry,
   sources: sourceRegistry,
   settingsPages: settingsRegistry,
@@ -36,7 +35,6 @@ const REGISTRIES = {
   extensionPoints: extensionPointRegistry,
   extensions: extensionRegistry,
   refPanels: refPanelRegistry,
-  paletteRows: paletteRowRegistry,
   agentContexts: agentContextRegistry,
   schedules: clientScheduleRegistry,
   railMarkers: railMarkerRegistry,
@@ -171,7 +169,7 @@ describe('disabling a client plugin', () => {
     // contributing nothing would make its own case below pass vacuously; this fails instead.
     expect(Object.keys(OWNED).sort()).toEqual([...OPTIONAL].sort())
     // Onboarding contributes no command, and it is meant to: "restart onboarding" would need a reset
-    // contract nobody owns (docs/future/command-palette/command-catalog.md § Onboarding). Browser is
+    // contract nobody owns (docs/command-palette-and-shortcuts.md). Browser is
     // absent from this roster entirely — it is node-only — so it cannot appear here at all.
     expect(OWNED.onboarding.commands).toBeUndefined()
     expect(NAMES).not.toContain('browser')

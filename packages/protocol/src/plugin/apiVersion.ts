@@ -5,7 +5,7 @@
 // need more than type stripping to run.
 //
 // See docs/plugins.md § Activation for what bumping this number costs.
-export const PLUGIN_API_MAJOR = '9'
+export const PLUGIN_API_MAJOR = '10'
 
 // What a manifest may write in `apiVersion`: one major ('4'), a list ('3 || 4'), or an inclusive span
 // ('2-4'). Mixed lists of both are fine ('2 || 4-6').

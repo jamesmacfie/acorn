@@ -48,6 +48,64 @@ keeps manual SQL available and hides **Generate**. The frame learns which connec
 route on this plugin's node half over `CoreServices.models.available`, ids and labels only. A frame
 has no way to read core's connection roster, and it should not get one.
 
+## From the command palette
+
+Four commands in the manifest, three of them visible and hanging under a **Database** group. The two
+rows that need a route are served by this plugin's own node half.
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
+search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
+
+| Row | Kind | What it does |
+| --- | --- | --- |
+| Run query | action, no scope | Delivers `execute` to the `database` pane, the same command ⌘Enter delivers |
+| Find a saved query | search, task-scoped | `/v2/p/database/palette/queries` answers the saved rows of the task's project; picking one opens the pane and loads the SQL into the editor, and does not run it |
+| Generate SQL | input, task-scoped | `/v2/p/database/palette/generate` writes the generated SQL to the task's scratch document, then opens the pane on it |
+
+Both routes are task-scoped although a saved query belongs to a project, and that is the boundary
+rather than a convenience: every saved-query route in this plugin is addressed through a task, because
+the task is what core resolves a project from. The host sends the task the palette session captured; a
+manifest names the scope and never the value. Ranking is a pure function in
+`plugins/database/src/server/paletteSearch.ts` — a name beats a note, a note beats the SQL, and equal
+matches keep the order the pane's own picker lists them in. The SQL tier is there because the query
+somebody wants is often the one that touches a table, and the table name is nowhere but in the
+statement. No row can carry a credential: a saved query is a name, a note and SQL somebody wrote down,
+and the connection URL is resolved per connect and never persisted.
+
+**Run query** is a `surfaceAction`, and it keeps the id `execute` and the ⌘Enter chord it had before
+the palette existed — the id is what a stored override is keyed on, the chord is what muscle memory is
+keyed on. What it lost is the `Database: ` prefix, which the group above it now says. It names no
+scope of its own; the device offers it when this plugin draws the `database` pane's own region,
+because that region is what receives the event.
+
+`Database: open pane` stays out of the group and keeps its long title. It declares `palette: false`,
+so the only place that title is ever read is the shortcut editor, where it stands on its own next to
+⌘⇧J with no group above it to say the word "Database".
+
+**Generate SQL** is the modal with all three of its choices already made: the first available model
+connection, that provider's own default model, and no worked examples. The order the route works in is
+deliberate. It validates the prompt against the same bound the modal's textarea enforces, requires an
+interactive owner because generation spends that owner's provider key, resolves the task, and then
+asks for the connection list *before* it introspects the schema — "nothing is connected" is the
+cheaper of the two answers and the more actionable one. The scratch write commits before the route
+answers success, because the success action opens the pane and the pane's editor reads the scratch
+route on mount; answering first would race the reader to their own result. Every failure returns
+before the write, so the prompt survives with the reason under it and the reader can retry. The full
+**Generate** modal is unchanged, and remains the way to choose a connection, a model or examples.
+
+Success answers with the row id `#scratch` rather than a saved query's id, and the panel reads that
+one id as "re-read the scratch document". A pane that was closed loads the new SQL from the read route
+anyway; a pane already open would otherwise keep the text its editor had loaded, and the fast path
+would appear to do nothing for the reader most likely to use it. Loading generated SQL is not running
+it, exactly as picking a saved query is not.
+
+Row insert, update and delete are deliberately not commands, and neither is arbitrary destructive SQL:
+they need the grid, the row in front of you and a visible connection, which a palette row does not
+have. The fast path exposes no provider, model or example selection either. One text field cannot
+carry three choices, and giving it a way to would be a second, worse copy of the modal.
+
+The group's id is `db` and not `database` because contribution ids are unique across a whole manifest
+and `database` is already the pane's id — a group cannot be named after the surface it is about.
+
 ## SQL safety
 
 Every value that reaches Postgres is parameterized. Identifiers (schema, table and column names)

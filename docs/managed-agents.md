@@ -395,6 +395,52 @@ The same page carries one setting that is not a session default and does not tra
 draws its tool cards (section Client surfaces). It is there because that is where somebody looks for
 it, not because it shares a store with anything above it.
 
+## From the command palette
+
+Six rows, all registered by this plugin rather than by the shell.
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
+search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
+
+| Row | Kind | What it does |
+| --- | --- | --- |
+| Open Agent Center | action, no scope | Selects the `agents` rail source, which is this device's view of the node rather than a property of a task |
+| Find an agent session | search, task-scoped | The node's own search over session titles, events, and artifacts, asked about the task the palette session captured |
+| New Claude Code terminal | action, needs an open task | Creates a terminal on this plugin's `claude-code` profile, opens the drawer, and focuses it |
+| New Codex terminal | action, needs an open task | The same for the `codex` profile |
+| Carry the last session's model forward | setting, no scope | On and Off over `followLastSession` (section New-session defaults) |
+| How a tool call starts out | setting, no scope | The three Tool call display choices: start collapsed, start expanded, and carry my last one forward |
+
+**The search is task-scoped although the route is not.** The route behind it takes a workspace as
+happily as a task, and Agent Center asks it that way. But a row from another task can only be opened
+by activating that task first, and that navigation belongs to a router a plugin has no handle on. A
+search whose rows cannot all be opened is worse than a narrower one, so the palette asks about the
+captured task and Agent Center stays the surface that spans them. The node ranks the rows and the
+device does not re-rank them, a request is capped at 50, and each row carries the task it came from,
+so a stale context cannot send a pick to the wrong pane. Selection goes through the same retained
+path Agent Center uses (`plugins/agents/src/client/sessions/managedSelection.ts`) rather than a
+second one of the palette's own.
+
+**The two harness terminals belong to this plugin, not to the shell.** The desktop carried them by
+name until 2026-08-31, which meant a third harness needed a shell edit. The profile ids are this
+plugin's (`plugins/agents/src/server/profiles/index.ts`), so the commands are too. The shell keeps
+the drawer toggle and the plain shell, because neither of those belongs to a harness.
+
+**Each setting shares one accessor with its Settings page, so the two cannot drift.** The first
+writes through `writeAgentSessionDefaults`
+(`plugins/agents/src/client/settings/sessionDefaultsClient.ts`), which owns the optimistic cache
+write and the refetch on failure; the second through `saveAgentToolFoldMode`
+(`plugins/agents/src/client/sessions/toolFoldPrefs.ts`), which also spells the three choices once for
+the page's picker and the command's options. Both accessors take a query client, and there is none at
+plugin init, so these two register from a component mounted in the `overlay` slot
+(`plugins/agents/src/client/AgentCommands.tsx`) instead of at boot. That makes them desktop-only: the
+terminal draws no overlay slot and has nowhere to store a device preference, and a choice that would
+quietly fail to persist is worse than an absent row.
+
+What is missing is deliberate. Stop, archive, unarchive, import and export, fork, compact, and
+handoff each need a selected session, and most need a confirmation, which is a result action panel
+rather than a row. Pricing and concurrency are forms: a number has no list of labelled choices to
+pick from.
+
 ## Context, files, and attachments
 
 Context is assembled by the Node from registered task sections and sent as an immutable snapshot.

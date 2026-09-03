@@ -22,7 +22,7 @@ import type { ShellModel } from './model'
 //
 // These replace the two row providers this shell used to hand the session, which were the last of the
 // palette's special cases: a task and a workspace were their own kind of item, composed into the root
-// by hand (docs/future/command-palette/phase-3-settings-and-core-commands.md § Migration steps).
+// by hand (docs/command-palette-and-shortcuts.md).
 //
 // Each loads once when its frame opens and filters locally after that
 // (client-core/host/registries/commands/localSearch.ts): every row is already in this process.

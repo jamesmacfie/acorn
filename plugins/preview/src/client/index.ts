@@ -10,7 +10,7 @@ export const previewClientPlugin: ClientPlugin = {
     // One row, gated on the same seam the pane is: a terminal installs no preview seam, so this is
     // absent there rather than present and useless (docs/tui.md § What a plugin loses here). URL rules
     // are repository configuration and reloading needs a mounted preview, so neither is a command
-    // (docs/future/command-palette/command-catalog.md § Preview).
+    // (docs/command-palette-and-shortcuts.md).
     ctx.commands.register({
       id: 'preview.open',
       title: 'Open Preview',

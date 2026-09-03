@@ -34,8 +34,12 @@ export const saveDockerPrefs = (qc: QueryClient, next: DockerPrefs): Promise<boo
  * One switch, written as a merge onto the whole record.
  *
  * Both switches share one key, so writing either on its own would drop the other back to its default.
- * Settings → Docker and the palette's setting commands both come through here, which is what keeps one
- * value on one persistence path (docs/future/command-palette/architecture.md § Settings integration).
+ * One value on one persistence path: whatever writes a Docker switch comes through here, so a second
+ * writer cannot drift from Settings → Docker.
+ *
+ * This plugin registers no `setting` command, and the accessor is still worth having on its own —
+ * the merge is the part that is easy to get wrong. Adding one would be a product decision rather
+ * than plumbing (docs/docker.md § From the command palette).
  */
 export const saveDockerPref = (
   qc: QueryClient,
@@ -43,13 +47,6 @@ export const saveDockerPref = (
   key: keyof DockerPrefs,
   value: boolean,
 ): Promise<boolean> => saveDockerPrefs(qc, { ...readDockerPrefs(prefs), [key]: value })
-
-/** The two choices a Boolean switch offers, spelled once. On and Off rather than a blind toggle, so a
- *  command shows what is set and means the same thing twice (docs/future/command-palette/refused.md). */
-export const DOCKER_SWITCH_CHOICES = [
-  { value: 'on', label: 'On' },
-  { value: 'off', label: 'Off' },
-] as const
 
 export const dockerPrefsSlice: PersistedStateSlice<Record<string, unknown>> = {
   id: 'docker.prefs',

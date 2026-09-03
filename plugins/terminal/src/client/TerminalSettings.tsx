@@ -15,8 +15,8 @@ import { Checkbox, Field, Select, Stack } from '@acorn/plugin-api/ui'
 // Settings → Terminal: the rail-default profile, what the terminal button auto-launches when the
 // drawer opens empty (TerminalPanel reads `term_rail_default`).
 //
-// The reads, the writes and the option lists are `./terminalPrefs.ts`, shared with the palette's
-// setting commands so there is one persistence path per value.
+// The reads, the writes and the option lists are `./terminalPrefs.ts`, so there is one persistence
+// path per value whatever else comes to write one.
 export default function TerminalSettings() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))

@@ -891,7 +891,7 @@ describe('architecture boundaries', () => {
   })
 
   it('the command registry and its graph draw nothing', () => {
-    // docs/future/command-palette/architecture.md § Boundaries. Registration, availability, the
+    // docs/command-palette-and-shortcuts.md. Registration, availability, the
     // execution context and the graph projection are what the desktop and the terminal share; the
     // rectangle each of them draws is not. One import of a component from this folder and the other
     // host can no longer use it, so the session stops being host-neutral and each renderer goes back
@@ -910,6 +910,112 @@ describe('architecture boundaries', () => {
     expect([...new Set(reaching)].sort()).toEqual([])
     // Anti-vacuity: the scan must still be seeing the folder's imports at all.
     expect(EDGES.filter((e) => dir.test(e.fromFile)).length).toBeGreaterThan(5)
+  })
+
+  // ── The palette is one session, and every row in it is a command ────────────────────────────────
+  //
+  // Five properties, from the cutover that removed the second row vocabulary on 2026-09-03
+  // (docs/command-palette-and-shortcuts.md). Each one was true of the code before it was written
+  // down; what these stop is the drift back, which is cheap and quiet in every direction.
+
+  const SESSION = 'packages/client-core/src/host/registries/commands/session.ts'
+  // Each host in two files: the one that builds the session and captures the identity, and the one
+  // that draws the rows.
+  const HOST_ADAPTERS = ['packages/client-core/src/host/palette/paletteView.ts', 'apps/tui/src/chrome/paletteSession.ts']
+  const HOST_RENDERERS = ['packages/client-core/src/host/palette/CommandPalette.tsx', 'apps/tui/src/chrome/Palette.tsx']
+
+  it('has exactly one palette session, and both hosts render that one', () => {
+    // The duplication this whole programme existed to remove: two hosts each owning the query, the
+    // order, the cursor and the invocation, so a nested or asynchronous command had to be built twice
+    // or built once and be missing from the other product.
+    // The three source trees a session could plausibly be written in, rather than `apps/` whole: that
+    // one holds the desktop's worktree checkouts, which are other copies of this repository.
+    const defining = ['packages/client-core/src', 'apps/tui/src', 'apps/desktop/src']
+      .flatMap((dir) => walk(join(ROOT, dir)))
+      .filter((file) => !isTestCode(file))
+      .filter((file) => /\bexport function createCommandSession\b/.test(readFileSync(file, 'utf8')))
+      .map(rel)
+    expect(defining).toEqual([SESSION])
+
+    // And both hosts reach it. Named rather than derived, because "no host has its own" is only half
+    // the property: a host that stopped importing it would pass a count check by drawing nothing.
+    for (const host of HOST_ADAPTERS) {
+      const edges = EDGES.filter((e) => rel(e.fromFile) === host && e.target.file && rel(e.target.file) === SESSION)
+      expect(`${host} builds a session: ${edges.length > 0}`).toBe(`${host} builds a session: true`)
+    }
+  })
+
+  it('leaves the hosts nothing to compose, fetch or invoke', () => {
+    // A renderer draws `rows()`, marks `selectedIndex()` and calls `activate()`. The moment one of
+    // them fetches a row or runs a command itself the two products can differ again, and the way that
+    // happened before was never a decision — it was one host needing one more row than the other.
+    const FORBIDDEN: [RegExp, string][] = [
+      [/\bcreateResource\b/, 'fetches rows itself'],
+      [/\bfetch\(/, 'fetches rows itself'],
+      [/\bexecuteCommand\b/, 'invokes a command itself'],
+      [/\bbuildCommandGraph\b/, 'projects the graph itself'],
+      [/\bfuzzyScore\b/, 'ranks the list itself'],
+      [/\bSessionRowProvider\b/, 'hands the session rows of its own'],
+    ]
+    const offences: string[] = []
+    for (const host of [...HOST_ADAPTERS, ...HOST_RENDERERS]) {
+      const text = readFileSync(join(ROOT, host), 'utf8')
+      // Comments say what these files used to do, and saying so is the point of them.
+      const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+      for (const [pattern, why] of FORBIDDEN) if (pattern.test(code)) offences.push(`${host}: ${why}`)
+      // A renderer may not even reach the registry. An adapter may: `paletteView.ts` registers the
+      // chord that opens the palette, which is a command like any other one.
+      if (HOST_RENDERERS.includes(host) && /\bcommandRegistry\b/.test(code)) offences.push(`${host}: reads the registry itself`)
+    }
+    expect(offences.sort()).toEqual([])
+
+    // Anti-vacuity: every file the scan names still exists to be scanned.
+    expect([...HOST_ADAPTERS, ...HOST_RENDERERS].filter((host) => !existsSync(join(ROOT, host)))).toEqual([])
+  })
+
+  it('gives a plugin no way to draw inside the palette', () => {
+    // docs/plugins.md § Command kinds. A plugin returns facts and declares a closed verb; the host
+    // draws them. A frame or a remote tree targeting the palette would put one palette per plugin
+    // inside the one surface that owns global focus, the reserved keys and every loading and error
+    // state — and it would have no terminal half at all.
+    const contract = readFileSync(join(ROOT, 'packages/protocol/src/plugin/contract.ts'), 'utf8')
+    const targets = /target: z\.enum\(\[([^\]]*)\]\)/.exec(contract)
+    expect(targets).not.toBeNull()
+    expect(targets![1]).not.toMatch(/palette/)
+
+    // The same question asked of the slot vocabulary, which is the other place a component is mounted
+    // by name.
+    const slots = readFileSync(join(ROOT, 'packages/client-core/src/host/registries/extensionPoints/slots.ts'), 'utf8')
+    expect(slots).not.toMatch(/'palette'/)
+  })
+
+  it('gives a search response no way to choose what selecting it does', () => {
+    // docs/command-palette-and-shortcuts.md § Palette data. A route answer is untrusted wire input. A
+    // result that could name a verb, a route or a URL would make a changing server response more
+    // powerful than the manifest somebody reviewed, so the row carries display facts and identity and
+    // the manifest's search command owns the one static action.
+    const commands = readFileSync(join(ROOT, 'packages/protocol/src/commands.ts'), 'utf8')
+    const item = /export const commandSearchItemSchema = z\.object\(\{([\s\S]*?)\n\}\)/.exec(commands)
+    expect(item).not.toBeNull()
+    const fields = [...item![1].matchAll(/^\s{2}([a-zA-Z]+):/gm)].map((m) => m[1])
+    expect(fields.length).toBeGreaterThan(5) // anti-vacuity: the regex still finds the schema
+    expect(fields.filter((f) => /^(action|actions|run|route|url|href|command|verb|onSelect)$/.test(f))).toEqual([])
+  })
+
+  it('keeps no palette-row registry beside the command one', () => {
+    // The second contribution vocabulary. It had `rows` and `invoke` and no owner, no capability gate,
+    // no disposal and no shortcut, so each of those was arranged for it separately — and only a
+    // compiled plugin could supply its callbacks, which is why a loaded plugin could never contribute a
+    // live row at all. Its last two contributors became `search` commands on 2026-09-03.
+    const registries = join(ROOT, 'packages/client-core/src/host/registries')
+    const offenders = walk(registries)
+      .filter((file) => /palette/i.test(rel(file)))
+      .map(rel)
+    expect(offenders).toEqual([])
+
+    // And nothing hands the session a row source. `providers` was the option that carried them.
+    const session = readFileSync(join(ROOT, SESSION), 'utf8')
+    expect(session).not.toMatch(/SessionRowProvider/)
   })
 
   it('the package graph is acyclic (turbo topological tasks require it)', () => {

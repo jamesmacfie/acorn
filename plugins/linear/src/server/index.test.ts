@@ -26,7 +26,7 @@ describe('linear server helpers', () => {
 
   // The palette's filter is the rail's filter with the typed word ANDed onto it: top-level fields are
   // ANDed by Linear and `or` ORs its own list, so this reads "in these projects, still active, and
-  // matching one of these" (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Linear).
+  // matching one of these" (docs/integrations.md § From the command palette).
   it('narrows the mapped-project filter by what somebody typed', () => {
     expect(projectIssueSearchFilter(['p-1'], 'login')).toEqual({
       project: { id: { in: ['p-1'] } },

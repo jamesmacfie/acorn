@@ -12,7 +12,7 @@ import { revealDockerResource } from './dockerViewStore'
 import type { DockerScope } from '../shared/model'
 
 // Docker in the palette: open the browse surface, and find one of the four things on the daemon
-// (docs/future/command-palette/command-catalog.md § Docker).
+// (docs/docker.md § From the command palette).
 //
 // **One search over all four scopes, not four searches.** A reader looking for `postgres` does not
 // know or care whether they are about to find a container, an image or a volume, and a badge says
@@ -26,7 +26,7 @@ import type { DockerScope } from '../shared/model'
 //
 // Starting, stopping, removing, pruning and compose-down are all absent. Each is either a result
 // action this programme deliberately stops before, or a confirmed operation that belongs where the
-// consequences are visible (docs/future/command-palette/refused.md).
+// consequences are visible (docs/command-palette-and-shortcuts.md § What the palette refuses).
 
 const badge: Record<DockerScope, string> = {
   containers: 'container',

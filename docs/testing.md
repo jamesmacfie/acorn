@@ -40,6 +40,20 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   checks machinery, not pixels: a contribution under test renders a `<span>` carrying its own id. The
   smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
   any of these;
+- the palette session has one fixture suite and both hosts are held to it.
+  `host/registries/commands/session.test.tsx` drives the session directly and asserts what the reader
+  feels: what the empty root lists, what typing searches, what Enter does to a group, what Escape gives
+  back, what happens when the thing you opened over moves. None of it mentions a dialog or a cell,
+  which is the point — if either host needed a different answer to any of them, they would be two
+  products. The DOM half is `host/palette/paletteView.test.tsx` and the terminal half is
+  `apps/tui/src/chrome/chrome.test.tsx`; both drive the same operations through their own keys. A
+  loaded plugin's descriptors get a real registration pass rather than a parser test:
+  `host/chrome/chromeRegister.test.ts` § "a loaded plugin's setting, end to end" runs a two-choice
+  fixture setting through the real host and the real command registry — read, write, a value the
+  manifest never declared refused on the way out and ignored on the way back, gone when the node stops
+  running the plugin, registered-but-unavailable while it is disabled. Deliberately a fixture: no
+  first-party loaded plugin has a two-choice preference, and inventing one to be covered would be a
+  product decision made by a test;
 - the plugin invariants hold the closed kit closed at the call site. `kit/lib/adoption.test.ts` fails on a
   raw `div` or `span` anywhere under `plugins/`, and two arch rules in `tools/arch/boundaries.test.ts`
   fail on a plugin stylesheet and on a plugin importing Solid's `render` in either spelling. These were
@@ -378,6 +392,46 @@ suite drives one task at a time.
     and then scrolls the panel instead of wrapping. On the first tab of a `Sections` strip, Left goes one
     column left rather than doing nothing. In the editor's file tree, Right on a leaf reaches the
     document beside the tree.
+
+The next twelve are the command palette's, owed since the graph and the shared session shipped on
+2026-09-03 and **not yet run**. The session has a fixture suite both hosts pass and every route has
+its own, and what none of them can see is the surface: the suites drive a store and assert its rows,
+while a palette is a thing a person opens over a task they are in the middle of. Run them on the
+desktop and in `acorn` in a terminal, and expect the two to agree.
+
+31. Open the palette on ⌘K with nothing typed. The top level lists the groups and the loose commands
+    and nothing else. Type a word that only a nested command matches — `archive`, `theme`, a run
+    target's name — and it appears with the trail it came from beside it.
+32. Enter a group, type inside it, enter a second group, then press Escape twice. Each frame comes
+    back with exactly the query and the cursor position it was left with, and the focus you had before
+    the palette opened comes back only on the last Escape.
+33. Press ⌘P with a task open. The palette opens straight at the editor's file search rather than at
+    the root, and picking a file opens it. Press `/` on a pull request; the same, at the changed-file
+    search. Neither chord opens a second dialog.
+34. Type quickly into a Rollbar or Linear issue search on a slow connection. One request goes out for
+    the text you stopped on, an earlier answer arriving late never replaces it, and Escape while it is
+    in flight leaves nothing behind.
+35. Submit `Generate SQL` with a prompt that fails — no model connection, or a database that is not
+    reachable. The frame stays open, your prompt is still in the field, the message says what to do,
+    and Enter tries again. A second Enter while the first is in flight does nothing.
+36. Change the theme from the Appearance setting command. The list marks the value that is set,
+    picking one restyles the app immediately, the frame stays open, and the marker moves to what was
+    actually stored. Open Settings → Appearance: it agrees.
+37. With the palette open over a task, switch node or task from another window or another pane. The
+    palette closes rather than acting on rows fetched for somewhere else.
+38. Open a plugin's search frame, then disable that plugin from Settings → Plugins. The frame closes,
+    nothing is invoked, and the plugin's whole group is gone from the root. Re-enable it: the group and
+    everything under it come back, once.
+39. Find a Rollbar issue from the palette and pick it. The URL changes and the surface beside the rail
+    list shows that item, exactly as clicking the same row in the rail does.
+40. Run `Generate SQL` successfully with the Database pane already open and with it closed. Both end
+    with the generated SQL in the editor — the open pane re-reads the scratch document rather than
+    keeping the text it had loaded.
+41. Run and then stop a configured terminal target from the palette. The run/stop decision and the
+    error copy match what the drawer shows, and a broken `.acorn/config.toml` still explains itself in
+    the list rather than yielding an empty one.
+42. Launch a workflow definition from the palette. It starts exactly as launching it from its own
+    surface does, and no approve, cancel or kill row is offered anywhere in the palette.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

@@ -5,9 +5,7 @@ import { nodes } from '../../infra/node/fleet'
 import { activeTaskId } from '../../features/tasks/tasks'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces'
-import { createPaletteRowsProvider } from '../registries/palette/provider'
 import type { CommandExecutionContext } from '../registries/commands/commands'
-import type { SessionRowProvider } from '../registries/commands/session'
 import { registerNavigationCommands } from './navigationCommands'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
@@ -19,15 +17,13 @@ import { PaletteSurface } from './PaletteSurface'
 // the registry's actions and the task and workspace lists, filtered them, kept a row-to-source map
 // and invoked the pick. All of that is `host/registries/commands/session.ts` now, and the terminal
 // runs on the same object (apps/tui/src/chrome/Palette.tsx). What is left here is what only this host
-// can answer: which identity a session captures, which compatibility rows this host can produce, and
-// the dialog it draws them in.
+// can answer: which identity a session captures, which nodes a fleet search may ask, and the dialog
+// it draws the rows in.
 
 export default function CommandPalette() {
   const params = useParams()
   const navigate = useNavigate()
   const fleetWorkspaces = createFleetWorkspaces()
-
-  const providers: readonly SessionRowProvider[] = [createPaletteRowsProvider()]
 
   const context = (): CommandExecutionContext => ({
     host: 'desktop',
@@ -51,7 +47,6 @@ export default function CommandPalette() {
     title: 'Command palette',
     toggleChord: 'meta+k',
     context,
-    providers: () => providers,
     // Supplied here because this is the host that has a fleet at all: the terminal draws one node and
     // answers with the one it captured (apps/tui/src/chrome/paletteSession.ts).
     //

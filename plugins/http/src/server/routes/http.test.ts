@@ -228,7 +228,7 @@ describe('HTTP credential isolation', () => {
   })
 })
 
-// The command palette's two routes (docs/future/command-palette/phase-5-loaded-plugin-adoption.md
+// The command palette's two routes (docs/plugins.md § Command kinds
 // § HTTP). One reads and one writes, and each has one property that is the point: the search cannot
 // carry a secret because it never reads one, and the import never sends.
 describe('the palette routes', () => {

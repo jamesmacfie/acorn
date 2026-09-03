@@ -10,7 +10,7 @@ import { DatabasePaneApp } from './app'
 // What the palette's two rows do once they reach this pane, driven the way the sandbox drives it.
 //
 // One property carries both, and it is the one phase 5 asks for by name: picking a row LOADS SQL and
-// never runs it (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Database). Running is
+// never runs it (docs/database.md § From the command palette). Running is
 // the reader's next keystroke, and the pane already has a chord and a button for it.
 //
 // Two ids arrive on the same selection channel, because they are two different questions. A saved

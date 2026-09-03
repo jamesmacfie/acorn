@@ -584,6 +584,60 @@ disk now is the truth and the pane never guessed at it.
 between hosts; and attaching to a still-running editor process instead of spawning a second one. The
 ephemeral channel dying with the panel is what makes the simple thing correct first.
 
+## From the command palette
+
+Shipped 2026-09-03. Two rows, both registered by the editor plugin's client half
+(`plugins/editor/src/client/commands.ts`) and both reachable by chord or by name. How the palette
+itself works is [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md); what belongs
+here is this plugin's share of it.
+
+| Command | Kind | Chord | What it does |
+| --- | --- | --- | --- |
+| Go to file (`editor.files.open`) | `search`, task-scoped | `⌘P` | Lists the task's worktree and opens the pick |
+| Find in files… (`editor.search.open`) | action | `⌘⇧F` | Opens the editor pane on its search panel, so searching does not begin with "open the editor first" |
+
+Both declare `requires: { plugin: 'editor' }`, so neither is offered on a node without this plugin.
+`⌘P` is bound `global` with an `active` gate on there being an open task — the scope and the gate the
+overlay's own binding carried — and `⌘⇧F` is bound `task`
+(`plugins/editor/src/client/index.ts`). That is why the global table in
+[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) lists `⌘P`.
+
+**Quick-open was an overlay of its own until 2026-09-03**: a component in the shell's `overlay` slot
+running `createOverlayPalette`, with its own query, its own cursor, its own keybinding and its own
+list. It is a `search` command now, so `⌘P` opens the one palette at that command's frame rather than
+a second dialog beside it, and the session owns the typing, the ordering, the cursor and the abort.
+`createOverlayPalette` itself stays, because the workspace picker is still an overlay; nothing in this
+plugin reaches it any more.
+
+Three things the overlay guaranteed the command still guarantees, and
+`plugins/editor/src/client/commands.test.ts` pins each one.
+
+- **The ranking is over the whole path.** A row draws as a filename with its directory dimmed after
+  it, but the score is taken over `src/client/App.tsx` entire. That is why the command ranks its own
+  rows instead of handing them to the host's `localSearch` adapter, which scores a title and a
+  subtitle separately: a query like `client/App` spans the join, and neither half of the row contains
+  it, so the adapter would lose a match the overlay found. The scorer is the shared one — every query
+  character in order, contiguous runs and word starts scoring higher, ties keeping the position the
+  file had in the listing.
+- **An empty query is the listing**, in `git ls-files` order, rather than an instruction to start
+  typing. `minQueryLength` and `debounceMs` are both `0`, because the list is one read of the
+  worktree held for as long as the palette is open and a debounce would be waiting for nothing. The
+  command stops at 100 rows and the session draws at most 50. A failed listing is not cached, so
+  Enter on the error asks again rather than replaying it.
+- **The open intent is unchanged.** Picking a row shows the editor pane and opens the file as an
+  ephemeral preview tab — the two steps a single click in the file tree already took.
+
+**The terminal client gets quick-open for nothing.** It draws the same session, and it never drew the
+overlay: `overlay` is a host UI slot the terminal does not fill, so a finder mounted there was
+desktop-only by construction (`docs/tui.md` § What a plugin loses here). A command registered in the
+plugin's `init` has no such problem, which is the whole difference between this and github's file
+finder ([github-integration.md](./github-integration.md) § From the command palette).
+
+What stays in the document surface is what is about the buffer already on screen. File edits are the
+surface's — dirty state, autosave, `⌘S` and the flush on unmount are host-owned and mean nothing in a
+list of rows — and so is the terminal-editor handoff, which is a device preference that changes what
+draws the file the pane is already on (§ Editing in your own editor).
+
 ## What this does not fix
 
 - **The editor plugin still cannot move, but this is now its ONLY blocker.** Its other two are

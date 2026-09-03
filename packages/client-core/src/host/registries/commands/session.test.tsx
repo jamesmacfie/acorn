@@ -16,7 +16,6 @@ import {
   createCommandSession,
   type CommandFleetNode,
   type CommandSession,
-  type SessionRowProvider,
 } from './session'
 
 // The session's transitions, as one suite both hosts are held to.
@@ -25,7 +24,7 @@ import {
 // what Enter does to a group, what Escape gives back, what happens when the thing you opened over
 // moves. None of it mentions a dialog or a cell, which is the point — the desktop and the terminal
 // bind keys and draw rows, and if one of them needed a different answer to any of these it would be
-// two products (docs/future/command-palette/phase-1-command-graph-and-session.md § Tests).
+// two products (docs/command-palette-and-shortcuts.md).
 //
 // The DOM half is `../../palette/paletteView.test.tsx` and the terminal half is
 // `apps/tui/src/chrome/chrome.test.tsx`; both drive the same operations through their own keys.
@@ -52,16 +51,7 @@ const CONTEXT: CommandExecutionContext = {
   paneId: null, surfaceId: null,
 }
 
-const provider = (id: string, order: number, rows: readonly { id: string; label: string }[], errors?: readonly { source: string; message: string }[]): SessionRowProvider => ({
-  id,
-  order,
-  rows: () => ({
-    rows: rows.map((row) => ({ ...row, action: { effect: 'run', run: () => {} } as const })),
-    errors,
-  }),
-})
-
-/** Everything queued has run: the providers answered and an activation's promise settled. */
+/** Everything queued has run: a search answered and an activation's promise settled. */
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
 /**
@@ -78,7 +68,6 @@ async function withSession(
     opens: () => number
   }) => void | Promise<void>,
   options: {
-    providers?: readonly SessionRowProvider[]
     fleet?: readonly CommandFleetNode[]
     context?: CommandExecutionContext
   } = {},
@@ -90,7 +79,6 @@ async function withSession(
   const dispose = createRoot((disposeRoot) => {
     session = createCommandSession({
       context,
-      providers: () => options.providers ?? [],
       ...(options.fleet ? { fleet: () => options.fleet! } : {}),
       onOpen: () => { opens += 1 },
       onClose: () => { closes += 1 },
@@ -107,20 +95,18 @@ async function withSession(
 const ids = (session: CommandSession): string[] => session.rows().map((row) => row.id)
 
 describe('the empty root', () => {
-  it('keeps the flat list’s order: errors, contributed rows, commands, workspaces, tasks', async () => {
-    register(leaf('cmd.archive', { title: 'Archive task' }))
+  it('lists the top level in the order its owners declared, and nothing else', async () => {
+    // Every row here comes from the command registry, and that is the assertion. There was a second
+    // way into this list until 2026-09-03 — a row provider the host handed the session — and its
+    // rows sorted ahead of the commands by a number nobody could see
+    // (docs/command-palette-and-shortcuts.md).
+    register(leaf('cmd.archive', { title: 'Archive task', order: 20 }))
+    register(leaf('cmd.new', { title: 'New task', order: 10 }))
+    register(group('panes', { title: 'Panes', order: 30 }))
     await withSession(async (session) => {
       session.openRoot()
       await settle()
-      expect(ids(session)).toEqual([
-        'error:rows:0', 'run:dev', 'cmd.archive', 'workspace:w-2', 'task:t-2',
-      ])
-    }, {
-      providers: [
-        provider('rows', 100, [{ id: 'run:dev', label: 'Run: dev' }], [{ source: 'repo', message: 'run.bad is missing command' }]),
-        provider('workspaces', 900, [{ id: 'workspace:w-2', label: 'Switch workspace: Core' }]),
-        provider('tasks', 950, [{ id: 'task:t-2', label: 'Go to task: fix login' }]),
-      ],
+      expect(ids(session)).toEqual(['cmd.new', 'cmd.archive', 'panes'])
     })
   })
 
@@ -148,28 +134,18 @@ describe('the typed root', () => {
     })
   })
 
-  it('interleaves commands with the compatibility rows by relevance, as one list', async () => {
-    register(leaf('cmd.archive', { title: 'Archive task' }))
+  it('ranks the whole tree as one list, not each owner’s block on its own', async () => {
+    register(leaf('cmd.archive', { title: 'Archive task', order: 90 }))
+    register(group('run', { title: 'Run', order: 10 }))
+    register(leaf('run.rearchive', { title: 'rearchive-old-logs', parentId: 'run' }))
     await withSession(async (session) => {
       session.openRoot()
       await settle()
       session.setQuery('archive')
-      // The contributed row sorts first when the query is empty and last when the query says so. A
-      // reader who types a command's name should not have to scroll past every run target.
-      // The row that came first is still in the list, just below: a query re-ranks the whole thing
-      // rather than sorting each source's block on its own.
-      expect(ids(session)).toEqual(['cmd.archive', 'run:rearchive'])
-    }, { providers: [provider('rows', 100, [{ id: 'run:rearchive', label: 'Run: rearchive-old-logs' }])] })
-  })
-
-  it('keeps an error line visible whatever is typed, because it explains a missing row', async () => {
-    await withSession(async (session) => {
-      session.openRoot()
-      await settle()
-      session.setQuery('zzzz')
-      expect(ids(session)).toEqual(['error:rows:0'])
-      expect(session.selectedRow()).toBeNull() // visible, never the selection
-    }, { providers: [provider('rows', 100, [{ id: 'run:dev', label: 'Run: dev' }], [{ source: 'repo', message: 'bad' }])] })
+      // `Archive task` is a worse sibling — it was registered last — and a better match, so it comes
+      // first. Declared order is the tiebreak for an empty query and nothing more.
+      expect(ids(session)).toEqual(['cmd.archive', 'run.rearchive'])
+    })
   })
 })
 
@@ -252,13 +228,18 @@ describe('availability', () => {
 
 describe('the cursor', () => {
   it('keeps the row it was on by id when the list is rebuilt under it', async () => {
+    const [extra, setExtra] = createSignal(false)
     register(leaf('cmd.one', { title: 'One' }))
     register(leaf('cmd.two', { title: 'Two' }))
+    register(leaf('cmd.zero', { title: 'Zero', order: -1, when: () => extra() }))
     await withSession((session) => {
       session.openRoot()
       session.select('cmd.two')
       expect(session.selectedIndex()).toBe(1)
-      session.refresh()
+      // A row appearing above the cursor rebuilds the list and moves every index in it. The selection
+      // is kept by id, so it stays on the row the reader was looking at.
+      setExtra(true)
+      expect(session.selectedIndex()).toBe(2)
       expect(session.selectedRow()?.id).toBe('cmd.two')
     })
   })
@@ -275,18 +256,23 @@ describe('the cursor', () => {
     })
   })
 
-  it('steps over the rows that are not selectable and stops at both ends', async () => {
-    register(leaf('cmd.one', { title: 'One' }))
+  it('never lands on a row that is not selectable, and stops at both ends', async () => {
+    register(search('find', {
+      minQueryLength: 0, debounceMs: 0,
+      query: async () => { throw new Error('the node said no') },
+    }))
     await withSession(async (session) => {
-      session.openRoot()
+      session.openAt('find')
       await settle()
-      expect(ids(session)).toEqual(['error:rows:0', 'cmd.one'])
-      expect(session.selectedRow()?.id).toBe('cmd.one') // never the error line
+      // The one row is the error line: visible, because it explains why the list is empty, and never
+      // the selection.
+      expect(ids(session)).toEqual(['error:search:0'])
+      expect(session.selectedRow()).toBeNull()
       session.move(-1)
-      expect(session.selectedRow()?.id).toBe('cmd.one')
+      expect(session.selectedRow()).toBeNull()
       session.move(1)
-      expect(session.selectedRow()?.id).toBe('cmd.one')
-    }, { providers: [provider('rows', 100, [], [{ source: 'repo', message: 'bad' }])] })
+      expect(session.selectedRow()).toBeNull()
+    })
   })
 })
 
@@ -450,7 +436,7 @@ describe('opening at a command', () => {
   })
 })
 
-// ── Search and input (docs/future/command-palette/phase-2-search-and-input.md § Tests) ────────────
+// ── Search and input (docs/command-palette-and-shortcuts.md) ────────────
 //
 // Two rules run through all of it. A query is asked once the typing stops and only for the last thing
 // typed, and an answer is applied only if the frame still wants it — which is the generation, not the
@@ -820,16 +806,15 @@ describe('scope', () => {
     }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
   })
 
-  it('does not let a search opened at directly cost the root its provider rows', async () => {
-    // Opening straight at a search frame starts the providers' fetch and the frame's own in the same
-    // tick. They have separate generations for exactly this: Escape comes back to a root with rows.
+  it('comes back to a whole root when a search opened at directly is escaped', async () => {
+    register(leaf('cmd.archive', { title: 'Archive task' }))
     register(search('find', { minQueryLength: 0, debounceMs: 0, query: async () => [] }))
     await withSession(async (session) => {
       session.openAt('find')
       await settle()
       session.back()
-      expect(ids(session)).toEqual(['run:dev', 'find'])
-    }, { providers: [provider('rows', 100, [{ id: 'run:dev', label: 'Run: dev' }])] })
+      expect(ids(session)).toEqual(['cmd.archive', 'find'])
+    })
   })
 
   it('namespaces a fleet row so two nodes answering with the same id are both reachable', async () => {
@@ -1039,7 +1024,7 @@ describe('a contributor going away underneath', () => {
   // contributed may be on screen (registries/extensionPoints/plugin.ts). A group and the searches
   // under it are the first contribution kind that can hold each other, so the question is not only
   // "does the row go" but "does anything of it survive"
-  // (docs/future/command-palette/phase-4-compiled-plugin-adoption.md § Lifecycle and ownership).
+  // (docs/plugins.md § Command kinds).
 
   const plugin = (): Disposable[] => {
     const registrations = [

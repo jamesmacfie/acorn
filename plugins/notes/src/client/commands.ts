@@ -10,7 +10,7 @@ import {
 import { notesApi, requestNoteOpen } from './notesClient'
 
 // Notes in the palette: find one across all three scopes, and start a new one on this task
-// (docs/future/command-palette/command-catalog.md § Notes).
+// (docs/notes-and-memory.md § From the command palette).
 //
 // **One search over three lists.** A reader looking for "the deploy runbook" does not know whether
 // they filed it against this task, this workspace or globally, and the pane draws all three in one
@@ -23,7 +23,7 @@ import { notesApi, requestNoteOpen } from './notesClient'
 // selection to the wrong file.
 //
 // Deleting a note and changing whether an agent sees it stay in the pane, where the scope and the
-// current value are both on screen (docs/future/command-palette/command-catalog.md).
+// current value are both on screen (docs/command-palette-and-shortcuts.md).
 
 const SCOPES: readonly NoteScope[] = ['task', 'workspace', 'global']
 

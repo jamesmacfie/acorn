@@ -8,7 +8,7 @@ import { DEFAULT_STYLE, STYLES } from './uiStyles'
 // The five appearance choices, as one reader and one writer each.
 //
 // The rule this file exists for: a setting a person can change from two places has one accessor, and
-// both places call it (docs/future/command-palette/architecture.md § Settings integration). Settings →
+// both places call it (docs/command-palette-and-shortcuts.md). Settings →
 // Appearance had all five inline, so a palette command would have been a second copy of the defaulting
 // (`terminal` when nothing is stored, follow-the-OS until a theme is picked), a second copy of
 // `resolveTheme`, and a second `savePref` call to keep in step. Two persistence paths for one value is

@@ -9,7 +9,7 @@ export const contextClientPlugin: ClientPlugin = {
   init: (ctx) => {
     ctx.panes.register(contextPaneContribution)
     // A row that says what this pane is for, beside core's generic `Show pane: Context`
-    // (docs/future/command-palette/command-catalog.md § Context). Sending context is not here: it
+    // (docs/command-palette-and-shortcuts.md). Sending context is not here: it
     // needs a chosen agent and the current selection, and a root command would hide both.
     ctx.commands.register({
       id: 'context.open',

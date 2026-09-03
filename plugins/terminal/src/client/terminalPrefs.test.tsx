@@ -10,10 +10,9 @@ import {
 
 // The three terminal preferences, read the way both Settings → Terminal and the palette read them.
 //
-// One accessor per value is the rule (docs/future/command-palette/architecture.md § Settings
-// integration), so what is worth pinning is the defaulting: a fresh install, a corrupt value and an
-// opt-out that means on when it is absent are the three cases a second copy of this logic would get
-// subtly wrong.
+// One accessor per value is the rule (docs/command-palette-and-shortcuts.md), so what is worth
+// pinning is the defaulting: a fresh install, a corrupt value, and an opt-out that means on when it
+// is absent are the three cases a second copy of this logic would get subtly wrong.
 
 describe('the terminal preferences', () => {
   it('opens the drawer empty until somebody picks a profile, and offers exactly the four it can open', () => {

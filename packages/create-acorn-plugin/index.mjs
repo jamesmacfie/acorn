@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url'
  * published standalone and can't import the constant; see docs/plugin-authoring.md § Start from the
  * scaffold for how index.test.ts keeps the copy honest.
  */
-export const API_VERSION = '9'
+export const API_VERSION = '10'
 
 /**
  * Where the manifest JSON Schema is published. Same reason as the constant above: this package is

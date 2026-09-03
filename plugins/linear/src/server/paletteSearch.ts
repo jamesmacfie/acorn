@@ -9,7 +9,7 @@ import { priorityMeta, sortLinearIssues } from '../shared/triage'
 // itself — the route sends the reader's word to the API as part of the same filter that names the
 // mapped projects — so re-scoring what came back would be this side second-guessing a provider that
 // already ordered its own results
-// (docs/future/command-palette/command-catalog.md § Search implementation notes). What is left is
+// (docs/command-palette-and-shortcuts.md § Palette data). What is left is
 // merging the answers of several connections, and they merge in the order the rail beside them uses:
 // priority first, then most recently updated (../shared/triage.ts).
 

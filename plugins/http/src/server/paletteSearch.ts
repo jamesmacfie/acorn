@@ -12,7 +12,7 @@ import type { httpRequests } from '../node/schema'
 //
 // That is stronger than filtering a secret out afterwards, which is the property phase 5 asks for:
 // "never headers, bodies, auth material, resolved variables, or secret values"
-// (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § HTTP). Not even the URL, which the
+// (docs/http-client.md § From the command palette). Not even the URL, which the
 // rail beside this also leaves out: a saved URL is regularly `?token=…` typed literally, and there is
 // no way to recognise which literal is a secret.
 //

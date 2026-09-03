@@ -143,7 +143,7 @@ export default {
       },
       {
         // This project's saved queries, searched from the palette
-        // (docs/future/command-palette/command-catalog.md § Database).
+        // (docs/database.md § From the command palette).
         //
         // `scope: 'task'` although a saved query belongs to a project, and that is deliberate rather
         // than a compromise: every saved-query route in this plugin is addressed through a task,
@@ -167,7 +167,7 @@ export default {
       },
       {
         // Describe a query in words and get SQL in the editor, without opening the modal
-        // (docs/future/command-palette/command-catalog.md § Database SQL fast path).
+        // (docs/database.md § From the command palette).
         //
         // One text field, so the three choices the modal offers are all made for the reader: the first
         // connected model provider, that provider's own default model, and no worked examples. Choosing

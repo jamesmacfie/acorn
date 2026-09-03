@@ -7,7 +7,7 @@ import {
   type CommandSearchItem,
   type CommandSettingOption,
 } from '@acorn/protocol/commands.ts'
-import { fuzzyScore } from '../../../kit/lib/paletteModel'
+import { fuzzyScore } from '../../../kit/lib/fuzzy'
 import {
   commandRegistry,
   commandScope,
@@ -24,8 +24,7 @@ import { buildCommandGraph, type CommandGraph, type CommandNode } from './graph'
 import { setCommandPresenter } from './presenter'
 
 // The palette session: what is open, where in the tree it is, what is under the cursor, and what
-// happens when somebody presses Enter (docs/future/command-palette/architecture.md § Palette
-// session).
+// happens when somebody presses Enter (docs/command-palette-and-shortcuts.md).
 //
 // One of these per client, and the same one for both. Before this, the desktop
 // (../../palette/CommandPalette.tsx) and the terminal (apps/tui/src/chrome/Palette.tsx) each fetched
@@ -34,6 +33,12 @@ import { setCommandPresenter } from './presenter'
 // twice, in two languages of component. Now they render this and bind keys to it. A renderer draws
 // `rows()`, marks `selectedIndex()`, prints `breadcrumb()` and `status()`, and calls `activate()`,
 // `move()` and `back()`. It fetches nothing and invokes nothing.
+//
+// **Every row in this list comes from the command registry.** There was a second way in until
+// 2026-09-03 — a row provider the host handed the session, holding the `paletteRows` contributions —
+// and it is gone with its last contributor. That matters beyond the deletion: a row source that is not
+// a command has no owner, no capability gate, no disposal and no shortcut, so each of those had to be
+// arranged for it separately.
 //
 // Solid, but not DOM: signals and memos only, no JSX, so a bare-Node test and a cell renderer can
 // both hold one. `tools/arch/boundaries.test.ts` keeps that line for the whole folder.
@@ -49,7 +54,7 @@ import { setCommandPresenter } from './presenter'
 export type SessionRowAction =
   /** Push this command's own frame. A group, a search, an input or a setting. */
   | { effect: 'enter'; commandId: string }
-  /** Run something. A leaf action and every compatibility row are both this. */
+  /** Run something. A leaf action, a search result and a setting choice are all this. */
   | { effect: 'run'; run: (context: CommandExecutionContext) => Promise<CommandOutcome | void> | CommandOutcome | void }
   /** Nothing. An error line: visible, because it explains why a row somebody expected is missing,
    *  and never the selection. */
@@ -70,36 +75,6 @@ export type SessionRow = {
 }
 
 export const rowSelectable = (row: SessionRow): boolean => row.action.effect !== 'none'
-
-export type SessionRowBatch = {
-  readonly rows: readonly SessionRow[]
-  /** Reported apart from the rows, and floated to the top of the list, for the reason
-   *  `../palette/paletteRows.ts` gives: an error explains why a row a reader expected is missing, and
-   *  that is a property of the whole list rather than of one source. */
-  readonly errors?: readonly { source: string; message: string }[]
-}
-
-/**
- * A row source that is not a command yet.
- *
- * One is left and it is compatibility: the `paletteRows` contributions (../palette/provider.ts).
- * Go-to-task and switch-workspace were two more until 2026-09-03 and are commands now
- * (../../palette/navigationCommands.ts). This type goes when the last source does
- * (docs/future/command-palette/phase-6-cutover-and-documentation.md).
- *
- * Asked once when the session opens, with the context it captured. A provider that throws contributes
- * an error line rather than taking the list down.
- */
-export type SessionRowProvider = {
-  readonly id: string
-  /** Where its rows sit relative to the commands, which are `COMMAND_ROW_ORDER`. */
-  readonly order: number
-  rows(context: CommandExecutionContext, signal: AbortSignal): Promise<SessionRowBatch> | SessionRowBatch
-}
-
-/** Where the command rows sit in the root list. The flat list put the actions after the contributed
- *  rows, and this is that position as a number. */
-export const COMMAND_ROW_ORDER = 500
 
 /** What the top frame is for. The root, a group and a setting list rows; the other two own the field
  *  above the list rather than filtering it. */
@@ -151,8 +126,7 @@ export type SessionSettingPhase = 'loading' | 'ready' | 'error'
  *
  * Read from the owner when the frame opens and re-read from what a write answered, never guessed: the
  * marker beside a choice is the whole point of the frame, and a value the palette assumed rather than
- * asked for is a marker that can be wrong (docs/future/command-palette/architecture.md § Settings
- * integration).
+ * asked for is a marker that can be wrong (docs/command-palette-and-shortcuts.md).
  *
  * `value` is `null` while it is unknown — still loading, the read failed, or the owner answered with a
  * value none of the declared choices names. The choices are still drawn in that last case; nothing is
@@ -234,15 +208,13 @@ export type CommandSession = {
   /** Escape: pop a frame, or close at the root. `true` when it popped. */
   back: () => boolean
   close: () => void
-  /** Ask the providers again. The desktop calls it when the palette opens over a config edit. */
-  refresh: () => void
   /**
    * A composition is in progress, or has just ended.
    *
    * An IME builds one character out of several keystrokes, and each of them reaches the field as an
    * input event. Searching on those spends a request per keystroke on text the reader has not typed
    * yet, so nothing is scheduled while this is true and the end of the composition schedules once
-   * (docs/future/command-palette/architecture.md § Palette session).
+   * (docs/command-palette-and-shortcuts.md).
    */
   setComposing: (composing: boolean) => void
   /** Run a failed search again, now. The error row is not selectable, so Enter on a failed frame comes
@@ -257,13 +229,12 @@ export type CommandSessionOptions = {
   /** The identity to capture, read once per open. An external change to the node, workspace, project
    *  or task in it closes the session. */
   context: () => CommandExecutionContext
-  providers?: () => readonly SessionRowProvider[]
   /**
    * The nodes a `fleet`-scoped search asks, from the host's own fan-out.
    *
    * A host that supplies none is not refused: its answer is the one node it captured, which is what a
    * single-node client's whole fleet is (apps/tui). Nothing fans out without a command asking for it
-   * (docs/future/command-palette/refused.md § Fleet search by default).
+   * (docs/command-palette-and-shortcuts.md § What the palette refuses).
    */
   fleet?: () => readonly CommandFleetNode[]
   /** The host's half of opening: claim focus, raise the overlay. Runs only on a closed-to-open
@@ -335,24 +306,18 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   const [open, setOpen] = createSignal(false)
   const [captured, setCaptured] = createSignal<CommandExecutionContext | null>(null)
   const [frames, setFrames] = createSignal<readonly SessionFrame[]>([])
-  const [batches, setBatches] = createSignal<readonly { provider: SessionRowProvider; batch: SessionRowBatch }[]>([])
-  const [loading, setLoading] = createSignal(false)
   const [pending, setPending] = createSignal(false)
 
-  // One controller per open, and a generation per fetch. Abort is the optimisation and the generation
-  // is the correctness: a provider that ignores its signal still cannot write into a session that has
-  // moved on (docs/future/command-palette/architecture.md § Security and resource limits).
-  let controller: AbortController | null = null
-  // Two counters, because there are two kinds of work and they must not invalidate each other. `loads`
-  // guards the providers' fetch, which belongs to the whole open session; `generation` guards whatever
-  // the top frame has in flight. One counter meant that opening straight at a search frame bumped it
-  // before the providers answered, and the root underneath came back with its rows missing.
-  let loads = 0
+  // A generation per request. Abort is the optimisation and the generation is the correctness: a
+  // provider that ignores its signal still cannot write into a session that has moved on
+  // (docs/command-palette-and-shortcuts.md).
   let generation = 0
 
-  // The top frame's own in-flight work: one search, or one submission, never both. It is separate from
-  // the controller above because the providers' fetch belongs to the whole open session, and a
-  // keystroke that cancels a search must not cancel that.
+  // Two lifetimes, because there are two kinds of work. `whileOpen` lasts as long as the palette is
+  // open and is what a setting write runs under: typing does not cancel a write, and closing does.
+  // `work` is whatever the top frame has in flight — one search, or one submission, never both — and
+  // a keystroke that cancels a search must not reach the other one.
+  let whileOpen: AbortController | null = null
   let work: AbortController | null = null
   let timer: ReturnType<typeof setTimeout> | null = null
   // Not a signal: nothing renders from it, and it is read only when a keystroke asks whether to
@@ -393,38 +358,13 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
       : { effect: 'enter', commandId: node.id },
   })
 
-  const errorRows = (): SessionRow[] =>
-    batches().flatMap(({ provider, batch }) =>
-      (batch.errors ?? []).map((error, at) => ({
-        id: `error:${provider.id}:${at}`,
-        label: `config error (${error.source}): ${error.message}`,
-        action: { effect: 'none' } as const,
-      })))
-
-  const providerRows = (): { row: SessionRow; order: number }[] =>
-    batches().flatMap(({ provider, batch }) => batch.rows.map((row) => ({ row, order: provider.order })))
-
   const rootRows = (query: string): SessionRow[] => {
     const trimmed = query.trim()
-    if (!trimmed) {
-      // The empty root, in the order the flat list had: contributed rows, then the commands. `sort` is
-      // stable, so each provider's own row order survives.
-      const ordered = [
-        ...providerRows(),
-        ...graph().top().map((node) => ({ row: commandRow(node, false), order: COMMAND_ROW_ORDER })),
-      ].sort((a, b) => a.order - b.order)
-      return [...errorRows(), ...ordered.map((entry) => entry.row)]
-    }
-    // A typed root searches descendants too, so a nested command stays findable by its breadcrumb.
-    // Scored against the compatibility rows and interleaved with them, because a flat list is what the
-    // reader still sees: showing every command above every contributed row would be a new ranking
-    // nobody asked for.
-    const scored = [
-      ...providerRows().map((entry) => ({ ...entry, score: fuzzyScore(trimmed, entry.row.label) })),
-      ...graph().ranked(trimmed).map((hit) => ({ row: commandRow(hit.node, true), order: COMMAND_ROW_ORDER, score: hit.score })),
-    ].filter((entry): entry is { row: SessionRow; order: number; score: number } => entry.score !== null)
-    scored.sort((a, b) => b.score - a.score || a.order - b.order)
-    return [...errorRows(), ...scored.map((entry) => entry.row)]
+    // Empty: the top level, in the graph's own sibling order. Typed: every available command at any
+    // depth, ranked, each hit showing the trail it came from — so hierarchy reduces noise without
+    // making a command undiscoverable (./graph.ts).
+    if (!trimmed) return graph().top().map((node) => commandRow(node, false))
+    return graph().ranked(trimmed).map((hit) => commandRow(hit.node, true))
   }
 
   const groupRows = (commandId: string, query: string): SessionRow[] => {
@@ -497,7 +437,7 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
    * a `stay` outcome keeps the frame open, and a rejection leaves the message under the field. What is
    * particular to a setting is the answer — the owner says which value it actually stored, and that is
    * what moves the marker. Nothing is marked optimistically, so a write that failed leaves the list
-   * saying what is really set (docs/future/command-palette/architecture.md § Settings integration).
+   * saying what is really set (docs/command-palette-and-shortcuts.md).
    */
   const settingRow = (command: SettingCommand, option: CommandSettingOption, current: string | null): SessionRow => ({
     id: `setting:${option.value}`,
@@ -508,7 +448,7 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
       run: async (context): Promise<CommandOutcome> => {
         // The session's own controller, not a keystroke's: a write is not cancelled by typing, and it
         // is abandoned when the session closes, which is the only reason left to stop caring.
-        const signal = controller?.signal ?? new AbortController().signal
+        const signal = whileOpen?.signal ?? new AbortController().signal
         const canonical = await command.write(option.value, context, signal)
         // Refused rather than shown, and refused here so a compiled provider and a manifest route are
         // held to the same rule: a value naming no declared choice would leave a list where nothing is
@@ -783,32 +723,6 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
 
   // ── Opening, fetching, closing ──────────────────────────────────────────────────────────────────
 
-  const load = (): void => {
-    const context = untrack(captured)
-    const signal = controller?.signal
-    if (!context || !signal) return
-    const providers = [...(options.providers?.() ?? [])].sort((a, b) => a.order - b.order)
-    if (!providers.length) {
-      setBatches([])
-      return
-    }
-    const mine = ++loads
-    setLoading(true)
-    void Promise.all(providers.map(async (provider) => {
-      try {
-        return { provider, batch: await provider.rows(context, signal) }
-      } catch (error) {
-        return { provider, batch: { rows: [], errors: [{ source: provider.id, message: messageOf(error) }] } }
-      }
-    })).then((next) => {
-      // The generation check is what makes a slow provider harmless, and it is mandatory: a signal an
-      // implementation ignores still cannot land here.
-      if (mine !== loads) return
-      setBatches(next)
-      setLoading(false)
-    })
-  }
-
   /** Landing on a frame. A search asks straight away, which is what a provider with no minimum and no
    *  debounce means by "loads once on entry" (./localSearch.ts); everything else has nothing to ask. */
   const entered = (): void => {
@@ -821,16 +735,14 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     const wasOpen = untrack(open)
     abortWork()
     if (!wasOpen) {
-      controller?.abort()
-      controller = new AbortController()
+      whileOpen?.abort()
+      whileOpen = new AbortController()
       setCaptured(untrack(options.context))
-      setBatches([])
     }
     setFrames(stack)
     if (!wasOpen) {
       setOpen(true)
       options.onOpen?.()
-      load()
     }
     entered()
   }
@@ -861,14 +773,11 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   const close = (): void => {
     if (!untrack(open)) return
     abortWork()
-    controller?.abort()
-    controller = null
-    loads++
+    whileOpen?.abort()
+    whileOpen = null
     setOpen(false)
     setPending(false)
-    setLoading(false)
     setFrames([])
-    setBatches([])
     setCaptured(null)
     options.onClose?.()
   }
@@ -966,7 +875,7 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     placeholder: () => frame()?.placeholder ?? '',
     status: () => frame()?.status ?? '',
     // A search waiting on its provider is busy too, and the loading row says so where a spinner cannot.
-    busy: () => pending() || loading() || frame()?.search?.phase === 'loading' || frame()?.setting?.phase === 'loading',
+    busy: () => pending() || frame()?.search?.phase === 'loading' || frame()?.setting?.phase === 'loading',
     rows,
     selectedIndex,
     selectedRow,
@@ -985,7 +894,6 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     activateRow,
     back,
     close,
-    refresh: load,
     setComposing: (value) => {
       const was = composing
       composing = value
@@ -1004,8 +912,8 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
       // provider still holding the signal is the one thing that could keep talking to a node about a
       // window nobody is looking at.
       abortWork()
-      controller?.abort()
-      controller = null
+      whileOpen?.abort()
+      whileOpen = null
     })
   }
 

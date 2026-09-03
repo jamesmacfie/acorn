@@ -101,7 +101,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `id` | yes | Matches `/^[a-z][a-z0-9-]{1,31}$/` — 2 to 32 characters, lowercase, no dots. The dot ban is what keeps `<dataRoot>/plugins/<id>/` and `<dataRoot>/plugins/<id>.sqlite` in one directory without colliding. |
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
-| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'7'` today (`packages/protocol/src/plugin/apiVersion.ts`). Write `"7"` unless you have checked your plugin against another major too, in which case `"6 || 7"` or `"5-7"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
+| `apiVersion` | yes | A **range over plugin API majors** that has to cover this node's — `'10'` today (`packages/protocol/src/plugin/apiVersion.ts`). Write `"10"` unless you have checked your plugin against another major too, in which case `"9 || 10"` or `"8-10"`. Anything the range does not cover, and anything that is not a range at all, is a `failed` roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -181,8 +181,8 @@ host cannot draw.
 | `frames` | 32 | A surface your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, a `refPanel` and a `settings` surface **must** name a `layout` and its `regions`; a region is a tree (`{ "kind": "remote", "entry": "…" }`), a rectangle (`"frame"`), or a host-drawn document. Also where a pane declares its `claimsKeys`, and where a `coreSlot` surface names which core surface it offers to replace. |
 | `sources` | 8 | A rail source. Rows come from a route on your node half; the host draws them and executes the `onSelect` verb. |
 | `slots` | 8 | A badge in an enumerated host slot: `footer` (the **task** footer, so it is invisible until a task is open) or `topbar` (the topbar's right end — the app's status bar). Nothing else is open, and `docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels` records why each refused slot is refused. |
-| `palette` | 32 | The pre-`commands` spelling of a palette row, still parsed as an alias for a command with `palette: true`. Prefer `commands`: this key takes the *full* verb union rather than the narrow one, which is a legacy inconsistency and not a capability worth reaching for. |
-| `commands` | 32 | A command, id-qualified by the host to `plugin.<id>.<command>`. Takes the narrow verb set only. |
+| `palette` | 32 | The pre-`commands` spelling, still parsed as an alias for a command with `palette: true` and rewritten into one before anything else sees it. Prefer `commands`: this key takes the *full* verb union rather than the narrow one, which is a legacy inconsistency and not a capability worth reaching for, and it has only the `action` shape. |
+| `commands` | 32 | A command, id-qualified by the host to `plugin.<id>.<command>`. Five shapes, on an optional `kind`: an `action` (the default, and one narrow verb), a `group` that holds children, a `search` naming a GET route and one static `onSelect`, an `input` naming a POST route and one static `onSuccess`, and a `setting` naming a read route, a write route and 2-32 labelled choices. A descriptor with no `kind` means exactly what it always did. `docs/plugins.md § Command kinds` has the fields and the bounds of each. |
 | `keybindings` | 32 | A chord for a command from the same manifest. Canonical `meta+ctrl+alt+shift+key` order, must include `meta`, `ctrl` or `alt`, `when` is `global`/`task`/`surface`, and one binding per command. In the terminal client a terminal emulator keeps the command key for itself, so the host reads your `meta` as Ctrl: `meta+shift+p` is pressed there as Ctrl+Shift+P, and `meta+ctrl+alt+shift+d` as Ctrl+Option+Shift+D. You declare the chord once (`docs/tui.md` § What a plugin loses here). |
 | `attention` | 4 | An attention-inbox feed, fetched per node from your route. |
 | `nodeStats` | 4 | A node statistic, with a singular/plural label pair so a card reads "1 card stuck". |
@@ -302,7 +302,7 @@ This is the whole plugin that adds OpenCode:
   "id": "opencode",
   "name": "OpenCode",
   "version": "0.1.0",
-  "apiVersion": "4",
+  "apiVersion": "10",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [
@@ -395,8 +395,9 @@ it. Closed is the point: every plugin composes the same few verbs, and adding on
 where removing one would not be.
 
 The full set. It is meant for a rail source's `onSelect` — the one click site that has a selected row,
-a routed project and the host's promotion callback in scope. (The legacy `palette` descriptor also
-accepts it, which predates the split and should not be relied on.)
+a routed project and the host's promotion callback in scope. A `search` command's `onSelect` gets the
+narrow set plus `navigate`, because it has both halves of a project-surface address too. (The legacy
+`palette` descriptor also accepts the full set, which predates the split and should not be relied on.)
 
 | Verb | Effect |
 | --- | --- |
@@ -783,7 +784,7 @@ it is checked against the contracts above.
   "id": "hello-acorn",
   "name": "Hello Acorn",
   "version": "0.1.0",
-  "apiVersion": "7",
+  "apiVersion": "10",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {

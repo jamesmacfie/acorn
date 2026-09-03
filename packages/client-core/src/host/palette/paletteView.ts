@@ -88,7 +88,7 @@ export function createCommandPaletteView(options: CommandSessionOptions & {
       if (!session.open()) return
       // The input owns typing; only the four navigation keys are intercepted. Backspace is not one of
       // them: an empty query plus Backspace edits text, and Escape is the single way back
-      // (docs/future/command-palette/architecture.md § Palette session).
+      // (docs/command-palette-and-shortcuts.md).
       if (event.key === 'Escape') {
         event.preventDefault()
         session.back()

@@ -23,7 +23,7 @@ import { projectPath } from '../registries/commands/corePaths'
 // hand and invoked through a switch on what kind of thing a row was about. They are ordinary commands
 // now, so the root shows four named rows instead of every task the fleet has, and finding one is a
 // frame rather than a filter over everything at once
-// (docs/future/command-palette/phase-3-settings-and-core-commands.md § Migration steps).
+// (docs/command-palette-and-shortcuts.md).
 //
 // Desktop-only, which is why they are here rather than in the registry folder. All four know the
 // router and the fleet fan-out; the terminal draws one node and has neither, so its four are its own

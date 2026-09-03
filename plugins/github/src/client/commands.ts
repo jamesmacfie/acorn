@@ -29,11 +29,11 @@ import { githubBrowsePath, githubCreateRoute } from './clientRoutes'
 // project is routed, which pull request is open, and where to navigate. A plugin's `init` runs at boot
 // with no router in scope. They are consequently core-owned per-mount registrations at the root rather
 // than a github-owned group, because a group would have to be registered from the same place to be
-// parentable at all (docs/future/command-palette/refused.md § Cross-owner command parenting). The one
+// parentable at all (docs/command-palette-and-shortcuts.md § What the palette refuses). The one
 // command here that needs no router — the rail source — is in ./index.ts through `ctx`.
 
 /** At most this many pull requests reach the palette. The host caps a search at 50 anyway; saying it
- *  here is the provider keeping its own promise (docs/future/command-palette/command-catalog.md
+ *  here is the provider keeping its own promise (docs/command-palette-and-shortcuts.md
  *  § Search implementation notes). */
 export const MAX_PULL_ROWS = 50
 

@@ -263,9 +263,9 @@ const contextFreeAction = z.discriminatedUnion('verb', [
 //
 // A search row is a selected row, and a project-scoped search ran because the session had a routed
 // project, so both halves of the address exist here where they do not on a plain command
-// (docs/future/command-palette/phase-5-loaded-plugin-adoption.md). `createTask` is still absent: a
+// (docs/plugins.md § Command kinds). `createTask` is still absent: a
 // search result is a thing to go and look at, and promoting one is a second verb on the row rather
-// than what picking it means (docs/future/command-palette/command-catalog.md § Rollbar).
+// than what picking it means (docs/integrations.md § From the command palette).
 const selectedRowAction = z.discriminatedUnion('verb', [
   ...contextFreeAction.options,
   z.object({ verb: z.literal('navigate'), surface: z.string().min(1).max(64) }),
@@ -510,7 +510,7 @@ const commandCategory = z.enum(['action', 'navigation', 'pane', 'task', 'termina
 // What every kind of command declares. Ids are local: `chromeRegister.ts` qualifies both this one and
 // `parentId` as `plugin.<pluginId>.<id>` and stamps the owner, so a manifest cannot name another
 // plugin's group as its parent or claim another plugin's id
-// (docs/future/command-palette/architecture.md § Command graph).
+// (docs/command-palette-and-shortcuts.md).
 const commandCommon = {
   id: z.string().min(1).max(64),
   title: z.string().min(1).max(120),
@@ -556,9 +556,9 @@ const groupCommandDescriptor = z.object({
  * The host GETs `route` with `q` and the identifiers the declared scope owns, and it renders what
  * comes back as display facts (@acorn/protocol/commands.ts § CommandSearchItem). A result cannot
  * choose what picking it does: `onSelect` is one static verb from a closed set, declared here and
- * reviewed with the rest of the manifest (docs/future/command-palette/refused.md § Returning
- * executable commands from a loaded search response). The set is a command's own plus `navigate`,
- * because a picked row is a selected row and a project-scoped search already has its project.
+ * reviewed with the rest of the manifest (docs/command-palette-and-shortcuts.md § What the palette
+ * refuses). The set is a command's own plus `navigate`, because a picked row is a selected row and a
+ * project-scoped search already has its project.
  */
 const searchCommandDescriptor = z.object({
   ...commandCommon,
@@ -599,7 +599,7 @@ const inputCommandDescriptor = z.object({
  *
  * Deliberately not free text. A secret, a URL or a number needs validation, a reveal policy and a
  * recovery story that a list of labelled choices does not
- * (docs/future/command-palette/refused.md § Free-form secret settings).
+ * (docs/command-palette-and-shortcuts.md § What the palette refuses).
  */
 const settingCommandDescriptor = z.object({
   ...commandCommon,

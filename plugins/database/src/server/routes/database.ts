@@ -127,7 +127,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
   // The task's scratch document, written. One helper because two routes write it and they must agree
   // on the row: the host's editor autosave below, and the palette's `Generate SQL`, whose whole
   // contract is that this has committed before the reader is told it worked
-  // (docs/future/command-palette/command-catalog.md § Database SQL fast path, step 5).
+  // (docs/database.md § From the command palette, step 5).
   const writeScratch = async (taskId: string, sql: string): Promise<void> => {
     const at = Date.now()
     await db
@@ -279,7 +279,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     })
 
     // The `Generate SQL` fast path: the modal's six steps with every choice already made
-    // (docs/future/command-palette/command-catalog.md § Database SQL fast path).
+    // (docs/database.md § From the command palette).
     //
     // The choices it does not offer are the point. One text field cannot carry a connection, a model
     // and a set of worked examples, so this takes the first available connection and that provider's
