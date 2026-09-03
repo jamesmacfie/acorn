@@ -22,6 +22,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door shipped; rung-2 containment, signing, and discovery remain. |
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
+| [command-palette/](./command-palette/README.md) | One command graph and host-neutral palette session for core, compiled plugins, and loaded plugins: nested commands, cancellable search, submitted input, opt-in settings, a first-party command catalogue, seven phases, and the refusals. | Proposal, 2026-09-03. Not started; nothing blocks phase 0. |
 | [terminal-rewrite/](./terminal-rewrite/README.md) | The terminal client leaves OpenTUI for a painter of its own: a plain node tree Solid mutates, a Yoga pass through the WebAssembly build, a cell buffer with a diff and a flush, an input parser, and the region store as the one owner of focus; the pty rectangle moves to `@xterm/headless`. Kit, layouts, plugins, and the keyboard rules are unchanged. A review, an architecture, six phases, and the refusals (a Rust or Go painter behind a wire chief among them). | Proposal, 2026-09-03. Not started; nothing blocks phase 0. |
 
 ## The single files
