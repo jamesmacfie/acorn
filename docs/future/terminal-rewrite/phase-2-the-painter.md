@@ -1,8 +1,8 @@
 # Phase 2: the painter
 
-Status: part built, 2026-09-03, against `c0903659`. The node tree, the width measure and the layout
-pass are in the tree with their own unit tests; the paint pass, the input parser, the build switch and
-the golden comparison are not, and nothing in the running app has changed. What building the first
+Status: part built, 2026-09-03, against `9ee5546d`. The node tree, the width measure, the layout
+pass, the colour type and the paint pass are in the tree with their own unit tests; the input parser,
+the build switch and the golden comparison are not, and nothing in the running app has changed. What building the first
 part found is at the bottom. Independent of phase 1. Not shippable to readers on its own; it runs
 behind a build switch until phase 3.
 
@@ -60,10 +60,11 @@ In:
   `default`) and a bitmask of ours. `spanStyle` merges into `textStyle` because a span takes the same
   props as a text.
 - **Width**: `ellipsise` and `pad` in `apps/tui/src/kit/cells.tsx` measure with `Intl.Segmenter` and
-  the East Asian Width table spike 3 chose. `☰`, `🗀`, `🗎`, `🗒`, `🗃` and `🖵` in
-  `apps/tui/src/kit/glyphs.ts` become one-cell characters, because they measure two today and the
-  file's own comment says they do not; the goldens for the trust prompt and the notes tab are
-  recaptured after the swap. The emoji ban in that file stays, and its `\p{Emoji_Presentation}` test
+  the East Asian Width table spike 3 chose. `☰` in `apps/tui/src/kit/glyphs.ts` becomes a one-cell
+  character, because it measures two today and the file's own comment says it does not. The other
+  five spike 3 named need nothing: they are already one cell to our own measure, and what was wide
+  was OpenTUI's. No golden is recaptured for any of it, because none holds one of the six. The emoji
+  ban in that file stays, and its `\p{Emoji_Presentation}` test
   becomes an assertion that the painter's measure returns 1 for every value in `GLYPHS`, which is the
   check that would have caught those six.
 - **The switch**: `ACORN_TUI_PAINTER` read in `apps/tui/vite.config.ts` and `apps/tui/vitest.config.ts`
@@ -325,12 +326,108 @@ number after a closing bracket, which is how a keymap priority spelled outside t
 and a `reduce` with a `0` seed reads as one. So does a comment quoting the shape. Worth knowing before
 the paint pass, which will want a seeded reduce more than once.
 
+### The paint pass (2026-09-03)
+
+The second part is built: `apps/tui/src/colour.ts` (the `Color` type) and `apps/tui/src/paint/`
+(the cells, the tree walk, the diff, the flush and the frame scheduler), with
+`apps/tui/src/paint/paint.test.ts` beside them, 19 cases, all of which pass on Node 24.11.0 with no
+FFI and no flag. Nothing in the running app changed: the alias still points at OpenTUI's reconciler
+and nothing yet calls `openScreen`. Two edits outside the folder, both of them one line of substance:
+`apps/tui/src/tree/jsx.ts` narrows its `Color` placeholder to the real type, and
+`apps/tui/src/layout/props.ts` gains `backgroundColor` in `NOT_YOGA`.
+
+The shape held again. The walk is one function per kind, the diff is one loop, and the SGR vocabulary
+is the three colour forms and the four attributes [architecture.md](./architecture.md) § 3 names, with
+no terminfo layer behind them. Twelve more things the file or that one said turned out otherwise.
+
+**`borderCell` is in `apps/tui/src/kit/roles.ts`, not in client-core.** § Scope sends the reader to
+`packages/client-core/src/kit/tokens/roles.ts` for it. What is there is the `border` role table, and
+the table is smaller than the sentence implies: of its five values only `surface` is a box at all,
+`control` is an underline attribute rather than a border, `divider` and `stripe` are single
+characters, and `none` is nothing. `borderCell` is the terminal-side reader of that table, and
+`boxBorder` beside it answers `borderStyle: 'single'` for every box in the app, unconditionally.
+
+**So there is one border style, and the sides are the whole of the variation.** The test § Tests asks
+for, "a box with each border style", is a box with each set of sides: four edges with corners, one
+top edge, one left edge, and none. Paint holds one glyph set rather than a table keyed by style,
+because a table with one row is flexibility nobody asked for; a second set is a second const and a
+lookup on `borderStyle` on the day a style pack wants one.
+
+**A corner belongs to two edges, not to a side.** A corner is drawn only where both edges that meet
+it are drawn, which is what keeps a `Rule` a line: `border={['top']}` draws `──────` and not
+`┌─────┐`. Neither file says this, and getting it wrong would have put a corner glyph on every
+divider in the app.
+
+**Bold and dim share the SGR reset `22`.** § Paint lists "`1`, `2`, `4`, `7` set and their `22`,
+`24`, `27` resets", which reads as four symmetrical pairs. It is three: clearing bold clears dim and
+clearing dim clears bold, so whichever of the two is still wanted has to be said again after the
+reset. It is the only asymmetry in the vocabulary and `paint.test.ts` pins it.
+
+**`39` and `49` are written less often than the design implies.** Each flush ends with `0m`, so the
+next one begins from a known state, and a run in the terminal's own colour then needs no sequence at
+all. The two codes are for a cell that follows a coloured one inside the same flush. The reset is at
+the end rather than the beginning for exactly that reason, and it is also what stops a crash trace
+after the frame coming out bold red.
+
+**A run must not carry a background.** § 3 says a cell is a grapheme, a foreground, a background and
+a mask, and that a text draws its runs — which reads as every run writing all four. If it does, a
+word drawn over a box's background punches a hole in it. So a write's `bg` is optional and absent
+means "keep the background that is already there", which makes `default` a colour rather than an
+absence in the one place the difference is visible.
+
+**Nothing in the kit passes a `backgroundColor`.** Paint fills one where it is given and the prop is
+now in `NOT_YOGA`, but no box in `apps/tui` or client-core sets one: a terminal has no surface to
+paint and a role that wants emphasis says `inverse`. So the "box backgrounds" half of § Scope has no
+caller, and phase 3's selected row is the first thing that would.
+
+**A `span`'s colour still arrives in one object rather than as props.** § Scope has `spanStyle`
+merging into `textStyle` in this phase, and that has not happened yet, so `../kit/roles.ts` still
+answers `{ fg, bold, dim, underline, inverse }` for a span. Paint reads both shapes. Reading only
+`fg` and `attributes` would have been the tidier module and would have reproduced the exact fault
+this phase exists to end, which is a span drawing in its parent's colour.
+
+**Wrapping consumes the space it broke at, so paint has to find each line again.** The measure hands
+back lines and paint needs a style per stretch of each line, and the offset that joins the two is
+not carried anywhere: the space or the newline the wrap ate is in the run and on neither line. Each
+line is a contiguous slice of the run, so its offset is found by looking for it from where the last
+line ended. Reconstructing it is what keeps `measuredRun` the only answer about where the breaks
+are; a second opinion here would be a colour out on every wrapped paragraph with a styled word in it.
+
+**Clipping is unconditional, which is a deliberate departure.** A child is clipped to its parent's
+content box whatever `overflow` says, where CSS and OpenTUI clip only when it says `hidden` or
+`scroll`. There is no `position` setter in the prop table at all, so the only way for a child to be
+outside its parent is to overflow it, and a run drawn over a sibling is never what we want. The
+early-out on an empty clip is also what makes an off-screen subtree free rather than merely
+invisible.
+
+**"Layout if any node is dirty" is every frame.** § Scheduling has the frame testing a dirty flag
+before laying out. There is nothing to test: a frame only exists because an operation on the tree
+asked for one, and every one of those operations is a change Yoga has to be told about. Yoga keeps
+the finer flag itself and re-measures only the nodes it marked, so the check would be ours to
+maintain and Yoga's to make anyway.
+
+**A resize needs an explicit erase.** "A resize clears both and forces a full frame" is not enough on
+its own: with the previous frame blanked, the diff emits the cells the new frame draws and says
+nothing about the ones it does not, so the old frame's corner stays on screen. The flush writes
+`CSI 2 J` on the frame after a resize, and on the first frame of all, where what is on the alternate
+screen is not ours either.
+
+One thing that is not a correction but is worth writing down. The `Color` type went to
+`apps/tui/src/colour.ts`, beside `apps/tui/src/width.ts` rather than inside `apps/tui/src/paint/`,
+because `apps/tui/src/tree/jsx.ts` types the props that carry one and `apps/tui/src/appearance.ts`
+will produce them, and neither of those should import from paint. And the attribute bits are
+OpenTUI's values on purpose — bold 1, dim 2, underline 8, inverse 32, with its italic and blink left
+as gaps — so the mask needs no translating while both painters run and no golden changes when the kit
+stops importing `TextAttributes`.
+
 ### Test results (2026-09-03)
 
-`pnpm --filter @acorn/tui test` on Node 26.8.1: 359 passing, 2 failing. The two are
+`pnpm --filter @acorn/tui test` on Node 26.8.1: 378 passing, 2 failing. The two are
 `walks into a command group on return and back out of it on escape` and `draws a search and an input
 in the same rectangle as the list`, both in `apps/tui/src/chrome/chrome.test.tsx`, both another
-session's in-flight palette work, and both failing on their own commits. The baseline was 323 passing
-and those same 2; the 36 new cases are `apps/tui/src/width.test.ts` (9),
-`apps/tui/src/tree/tree.test.ts` (14) and `apps/tui/src/layout/layout.test.ts` (13). On the repo's own
-Node 24.11.0 all 36 pass with no flag. `pnpm --filter @acorn/tui lint` is clean.
+session's in-flight palette work, and both failing on their own commits. The baseline for the tree
+and layout slice was 323 passing and those same 2; the 55 new cases are
+`apps/tui/src/width.test.ts` (9), `apps/tui/src/tree/tree.test.ts` (14),
+`apps/tui/src/layout/layout.test.ts` (13) and `apps/tui/src/paint/paint.test.ts` (19). On the repo's
+own Node 24.11.0 all 55 pass with no flag, which is the whole of the new work drawing on the Node the
+repo pins. `pnpm --filter @acorn/tui lint` is clean.

@@ -1,4 +1,5 @@
 import type { JSX as SolidJSX } from 'solid-js'
+import type { Color } from '../colour'
 import type { Node } from './node'
 
 // What the intrinsics take, for tsc's benefit.
@@ -10,13 +11,11 @@ import type { Node } from './node'
 // `NOT_YOGA` list is a prop that silently does nothing, and being refused here is how the author
 // finds out.
 //
-// The colour props are deliberately wide. This module must not decide what a colour is, and while
-// the old painter still runs they carry OpenTUI's `RGBA` (../appearance.ts). The slice that replaces
-// that type narrows them.
-
-/** A colour, until the slice that replaces `RGBA` names the real type. Spelled the way
- *  `../appearance.ts` spells `slotColor`, so that swap is one line rather than a rename. */
-export type Color = unknown
+// The colour props take `../colour.ts`'s three answers and nothing else: the terminal's own colour,
+// one of its sixteen slots, or a 24-bit triple. This module does not decide what a colour is, it just
+// says which type carries one — and while the old painter still runs, `../kit/roles.ts` is still
+// handing these props OpenTUI's `RGBA`, which paint reads as `default`. The slice that rewrites
+// `../appearance.ts` is what starts filling them in.
 
 /** Cells, a percentage of the parent, or whatever the content asks for. */
 type Extent = number | `${number}%` | 'auto'
@@ -67,6 +66,10 @@ export type BoxProps = FlexProps & {
   border?: boolean | readonly ('top' | 'right' | 'bottom' | 'left')[]
   borderStyle?: 'single'
   borderColor?: Color
+  /** Cells behind the content. Nothing in the kit asks for one — a terminal has no surface to paint
+   *  and a role that wanted one would say `inverse` instead — but paint fills it where it is given,
+   *  because a run drawn over it keeps it and that is what a highlighted row would need. */
+  backgroundColor?: Color
   /** A caption paint draws into the top border. */
   title?: string
   titleAlignment?: 'left' | 'center' | 'right'

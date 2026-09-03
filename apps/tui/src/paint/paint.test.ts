@@ -1,0 +1,350 @@
+import { describe, expect, it } from 'vitest'
+import { layoutTree } from '../layout/pass'
+import { createElement, createTextNode, insertNode, replaceText, setProperty } from '../tree/renderer'
+import type { Node } from '../tree/node'
+import { ATTRS, bufferLines, cellAt, createBuffer } from './buffer'
+import { openScreen, type Screen } from './screen'
+import { paint } from './paint'
+
+// The paint pass, on its own. No OpenTUI anywhere in this file, so it runs on the Node the repo pins
+// with no FFI and no flag — which is also why every case here builds its tree by hand rather than
+// rendering a component: what is under test is the walk, the clip and the diff, and a component would
+// only be a slower way to make a box.
+
+/** A node with its props set and its children attached, in one expression. */
+function el(kind: string, props: Record<string, unknown> = {}, children: Node[] = []): Node {
+  const node = createElement(kind)
+  for (const [name, value] of Object.entries(props)) setProperty(node, name, value)
+  for (const child of children) insertNode(node, child)
+  return node
+}
+
+/** A box of a known size, which is what a case hangs off: the root has to have a size for the tree
+ *  under it to be a proportion of anything. */
+const boxOf = (width: number, height: number, props: Record<string, unknown> = {}, children: Node[] = []): Node =>
+  el('box', { width, height, ...props }, children)
+
+/** Lay a tree out and paint it, and read the cells back as lines. */
+function drawn(root: Node, cols: number, rows: number): string[] {
+  const buffer = createBuffer(cols, rows)
+  layoutTree(root, cols, rows)
+  paint(root, buffer)
+  return bufferLines(buffer)
+}
+
+/** A screen with its writes collected instead of sent, which is the whole of what a test terminal is
+ *  (docs/future/terminal-rewrite/architecture.md § 7). */
+function screenOf(cols: number, rows: number): { screen: Screen; writes: string[] } {
+  const writes: string[] = []
+  const screen = openScreen({ cols, rows, write: (text) => writes.push(text) })
+  return { screen, writes }
+}
+
+const cursorMoves = (text: string): string[] => text.match(/\x1b\[\d+;\d+H/g) ?? []
+
+describe('a box', () => {
+  it('draws four edges with corners, and its caption in the top one', () => {
+    const box = boxOf(12, 3, { border: true, title: 'Keys' })
+    expect(drawn(box, 12, 3)).toEqual([
+      '┌─Keys─────┐',
+      '│          │',
+      '└──────────┘',
+    ])
+  })
+
+  it('draws one edge and no corners for a rule', () => {
+    // A `Rule` is one side of a box rather than a run of repeated characters, so the renderer draws it
+    // to whatever length the layout gave it (../kit/cells.tsx § Rule). A corner is drawn only where
+    // the two edges that meet it are both drawn, which is what keeps a divider a line.
+    expect(drawn(boxOf(6, 1, { border: ['top'] }), 6, 1)).toEqual(['──────'])
+    expect(drawn(boxOf(1, 3, { border: ['left'] }), 1, 3)).toEqual(['│', '│', '│'])
+  })
+
+  it('draws nothing where the role draws no box', () => {
+    // `boxBorder` answers `false` for every border role but `surface`, and the box has to give the
+    // cell back rather than keep drawing in it (../kit/roles.ts § boxBorder).
+    expect(drawn(boxOf(4, 2, { border: false, title: 'gone' }), 4, 2)).toEqual(['    ', '    '])
+  })
+
+  it('keeps its background under a run of text', () => {
+    // A run has no background of its own: it is drawn onto whatever the box beneath it laid down. If
+    // it wrote one, a word on a highlighted row would punch a hole in the highlight.
+    const buffer = createBuffer(6, 1)
+    const box = boxOf(6, 1, { backgroundColor: 3 }, [el('text', {}, [createTextNode('ab')])])
+    layoutTree(box, 6, 1)
+    paint(box, buffer)
+    expect(cellAt(buffer, 0, 0)).toMatchObject({ char: 'a', bg: 3 })
+    expect(cellAt(buffer, 5, 0)).toMatchObject({ char: ' ', bg: 3 })
+  })
+
+  it('paints a loose run of text at its content origin', () => {
+    // A `#text` directly under a `box` is legal here and draws as one default-styled line inside the
+    // border. It used to throw from inside whatever signal had just moved, and four crashes in one
+    // week were a bare `{count()}` under a `<Stack>` (../tree/renderer.ts).
+    const box = boxOf(9, 3, { border: true }, [createTextNode('loose')])
+    expect(drawn(box, 9, 3)).toEqual([
+      '┌───────┐',
+      '│loose  │',
+      '└───────┘',
+    ])
+  })
+
+  it('skips a hidden subtree whole', () => {
+    // `visible === false` is skipped by paint and `DISPLAY_NONE` by Yoga, so the two agree without a
+    // rule between them (../layout/props.ts § visible).
+    const box = boxOf(5, 2, {}, [
+      el('box', { visible: false }, [el('text', {}, [createTextNode('hidden')])]),
+      el('text', {}, [createTextNode('shown')]),
+    ])
+    expect(drawn(box, 5, 2)).toEqual(['shown', '     '])
+  })
+})
+
+describe('a run of text', () => {
+  it('draws the lines its measure produced', () => {
+    const text = el('text', { wrapMode: 'word' }, [createTextNode('one two three four')])
+    const box = boxOf(9, 4, {}, [text])
+    expect(drawn(box, 9, 4)).toEqual([
+      'one two  ',
+      'three    ',
+      'four     ',
+      '         ',
+    ])
+    // The rectangle and the run are two different widths, and paint needs both: the box is nine cells
+    // because a column container stretches its children across, and the run is seven.
+    expect(text.rect.w).toBe(9)
+  })
+
+  it('truncates rather than wrapping where the run says not to wrap', () => {
+    const box = boxOf(6, 1, {}, [el('text', {}, [createTextNode('far too long for this')])])
+    expect(drawn(box, 6, 1)).toEqual(['far to'])
+  })
+
+  it('clips a run that starts left of the screen rather than moving it', () => {
+    // A computed left may be negative and the read-back leaves it alone, because clamping it to zero
+    // would slide the run sideways where paint's job is to clip it (../layout/pass.ts). So the clip
+    // has to be asked per cell: the clusters before column zero are dropped and the ones after it
+    // land where they belong, which is what makes an overflowing row unreadable-but-aligned rather
+    // than aligned-but-wrong.
+    const inner = el('box', { width: 20, flexShrink: 0 }, [el('text', {}, [createTextNode('abcdefghijklmnopqrst')])])
+    const box = boxOf(10, 1, { alignItems: 'center' }, [inner])
+    const lines = drawn(box, 10, 1)
+
+    expect(inner.rect.x).toBe(-5)
+    expect(lines).toEqual(['fghijklmno'])
+  })
+
+  it('keeps a span its own colour inside a sentence', () => {
+    // The `span` fault, from the other side: a colour handed to one was dropped in silence, so the
+    // run inherited its parent's — and a parent given none drew opaque white, which on a light
+    // terminal was every line of every diff (docs/future/terminal-rewrite/review.md § 2c). A span is
+    // a stretch inside one `text` rather than a box of its own, so the line still wraps as one thing.
+    const buffer = createBuffer(21, 1)
+    const span = el('span', { style: { fg: 6, bold: true } }, [createTextNode('signIn')])
+    const text = el('text', { fg: 8 }, [createTextNode('hash but '), span, createTextNode(' still')])
+    const box = boxOf(21, 1, {}, [text])
+    layoutTree(box, 21, 1)
+    paint(box, buffer)
+
+    expect(bufferLines(buffer)).toEqual(['hash but signIn still'])
+    expect(cellAt(buffer, 0, 0)).toMatchObject({ char: 'h', fg: 8, attrs: 0 })
+    expect(cellAt(buffer, 9, 0)).toMatchObject({ char: 's', fg: 6, attrs: ATTRS.bold })
+    expect(cellAt(buffer, 16, 0)).toMatchObject({ char: 's', fg: 8, attrs: 0 })
+  })
+
+  it('styles each wrapped line from the span it came from', () => {
+    // The line breaks come out of the measure cache and the styles out of the tree, so the two have
+    // to be lined up again here — across the space the wrap consumed, which is in the run but on
+    // neither line. If they ever disagreed, every wrapped paragraph with a styled word in it would
+    // be a colour out from the line the word is on.
+    const buffer = createBuffer(9, 3)
+    const span = el('span', { fg: 2 }, [createTextNode('three')])
+    const text = el('text', { wrapMode: 'word', fg: 1 }, [createTextNode('one two '), span, createTextNode(' four')])
+    const box = boxOf(9, 3, {}, [text])
+    layoutTree(box, 9, 3)
+    paint(box, buffer)
+
+    expect(bufferLines(buffer)).toEqual(['one two  ', 'three    ', 'four     '])
+    expect(cellAt(buffer, 0, 0)).toMatchObject({ char: 'o', fg: 1 })
+    expect(cellAt(buffer, 0, 1)).toMatchObject({ char: 't', fg: 2 })
+    expect(cellAt(buffer, 0, 2)).toMatchObject({ char: 'f', fg: 1 })
+  })
+})
+
+describe('a wide glyph', () => {
+  it('takes two cells and flushes as one run', () => {
+    // A wide glyph writes itself into its first cell and a continuation marker into its second, so
+    // the diff and the flush treat the pair as one thing: the marker carries no character, and a run
+    // that begins on one is widened left onto the glyph it belongs to.
+    const { screen, writes } = screenOf(4, 1)
+    try {
+      insertNode(screen.root, el('text', {}, [createTextNode('漢a')]))
+      screen.frame()
+
+      expect(cellAt(screen.screen(), 0, 0)?.char).toBe('漢')
+      expect(cellAt(screen.screen(), 1, 0)?.char).toBe('')
+      expect(cellAt(screen.screen(), 2, 0)?.char).toBe('a')
+      expect(screen.lines()).toEqual(['漢a '])
+      expect(cursorMoves(writes.join(''))).toHaveLength(1)
+    } finally {
+      screen.close()
+    }
+  })
+})
+
+describe('the flush', () => {
+  it('writes one cursor move and one run for a one-cell change', () => {
+    const { screen, writes } = screenOf(6, 1)
+    try {
+      const word = createTextNode('abc')
+      insertNode(screen.root, el('text', {}, [word]))
+      screen.frame()
+      writes.length = 0
+
+      replaceText(word, 'abd')
+      const second = screen.frame()
+
+      expect(second.runs).toBe(1)
+      expect(cursorMoves(second.text)).toEqual(['\x1b[1;3H'])
+      // Wrapped in synchronized output, so the emulator applies the frame in one go rather than
+      // showing it being drawn.
+      expect(second.text.startsWith('\x1b[?2026h')).toBe(true)
+      expect(second.text.endsWith('\x1b[?2026l')).toBe(true)
+      expect(writes).toEqual([second.text])
+    } finally {
+      screen.close()
+    }
+  })
+
+  it('writes nothing at all when nothing moved', () => {
+    const { screen, writes } = screenOf(6, 1)
+    try {
+      insertNode(screen.root, el('text', {}, [createTextNode('abc')]))
+      screen.frame()
+      writes.length = 0
+
+      expect(screen.frame()).toEqual({ text: '', runs: 0 })
+      expect(writes).toEqual([])
+    } finally {
+      screen.close()
+    }
+  })
+
+  it('groups a row of changed cells into one run and leaves an unchanged gap alone', () => {
+    // A gap costs a cursor move to skip and a couple of characters to draw through, and which is
+    // cheaper depends on the gap. This one does not guess: a run is a stretch of cells that all
+    // changed, and two stretches with anything unchanged between them are two runs.
+    const { screen } = screenOf(9, 1)
+    try {
+      const left = createTextNode('ab')
+      const right = createTextNode('yz')
+      insertNode(screen.root, el('box', { flexDirection: 'row', gap: 3 }, [
+        el('text', { flexShrink: 0 }, [left]),
+        el('text', { flexShrink: 0 }, [right]),
+      ]))
+      screen.frame()
+
+      replaceText(left, 'AB')
+      replaceText(right, 'YZ')
+      const second = screen.frame()
+
+      expect(second.runs).toBe(2)
+      expect(cursorMoves(second.text)).toEqual(['\x1b[1;1H', '\x1b[1;6H'])
+    } finally {
+      screen.close()
+    }
+  })
+
+  it('names the terminal\'s own colours rather than a white of its own', () => {
+    // The white-on-white class, fixed where the colour is emitted: `39` and `49` are the foreground
+    // and the background the person's terminal already has, and there is no way to say that to
+    // OpenTUI at all (../colour.ts).
+    const { screen } = screenOf(3, 1)
+    try {
+      const text = el('text', { fg: 4 }, [createTextNode('abc')])
+      insertNode(screen.root, text)
+      expect(screen.frame().text).toContain('\x1b[34m')
+
+      setProperty(text, 'fg', 12)
+      expect(screen.frame().text).toContain('\x1b[94m')
+
+      setProperty(text, 'fg', [10, 20, 30])
+      const truecolor = screen.frame()
+      expect(truecolor.text).toContain('\x1b[38;2;10;20;30m')
+
+      // And a run that goes back to the terminal's own colour needs no sequence at all, because every
+      // flush ends with `0m` and so begins from a known state. That is the point of the reset being
+      // at the end rather than the start: an unchanged style can be left unsaid across frames as well
+      // as within one.
+      expect(truecolor.text).toContain('\x1b[0m')
+      setProperty(text, 'fg', 'default')
+      const plain = screen.frame()
+      expect(plain.text).toContain('abc')
+      expect(plain.text).not.toMatch(/\x1b\[\d+(?:;\d+)*m/)
+    } finally {
+      screen.close()
+    }
+  })
+
+  it('sets and clears the four attributes the kit asks for', () => {
+    // Three runs in one frame, because a reset is only ever needed inside a flush: the flush that
+    // came before ended at the terminal's default.
+    const { screen } = screenOf(3, 1)
+    try {
+      insertNode(screen.root, el('box', { flexDirection: 'row', gap: 0 }, [
+        el('text', { attributes: ATTRS.bold | ATTRS.underline, flexShrink: 0 }, [createTextNode('a')]),
+        el('text', { attributes: ATTRS.dim, flexShrink: 0 }, [createTextNode('b')]),
+        el('text', { flexShrink: 0 }, [createTextNode('c')]),
+      ]))
+      const written = screen.frame().text
+
+      expect(written).toContain('\x1b[1;4m')
+      // Bold and dim share the reset `22`, so clearing one clears the other and the survivor has to
+      // be said again. It is the one place this vocabulary is not symmetrical.
+      expect(written).toContain('\x1b[22;2;24m')
+      expect(written).toContain('\x1b[22m')
+    } finally {
+      screen.close()
+    }
+  })
+
+  it('clears the display and redraws everything after a resize', () => {
+    const { screen } = screenOf(6, 2)
+    try {
+      insertNode(screen.root, el('text', {}, [createTextNode('abcdef')]))
+      screen.frame()
+      expect(screen.lines()).toEqual(['abcdef', '      '])
+
+      screen.resize(4, 1)
+      // Both buffers are cleared, because every index in them meant something else a moment ago.
+      expect(screen.lines()).toEqual(['    '])
+
+      const after = screen.frame()
+      expect(after.text).toContain('\x1b[2J')
+      expect(screen.lines()).toEqual(['abcd'])
+    } finally {
+      screen.close()
+    }
+  })
+})
+
+describe('the frame scheduler', () => {
+  it('coalesces a burst of writes into one frame', async () => {
+    // One frame per turn of the event loop at most, which is what makes a signal write that touches
+    // twenty nodes cost one paint rather than twenty (../tree/frames.ts).
+    const { screen, writes } = screenOf(8, 1)
+    try {
+      const word = createTextNode('a')
+      insertNode(screen.root, el('text', {}, [word]))
+      replaceText(word, 'ab')
+      replaceText(word, 'abc')
+      expect(writes).toEqual([])
+
+      await new Promise((resolve) => setImmediate(resolve))
+      expect(writes).toHaveLength(1)
+      expect(screen.lines()).toEqual(['abc     '])
+    } finally {
+      screen.close()
+    }
+  })
+})
