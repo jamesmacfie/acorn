@@ -90,6 +90,48 @@ type Group = RegionRef & Memory & {
 }
 
 const groups: Group[] = []
+// And the same regions by their box and by their ref, because every question this module asks about a
+// region is one of those two lookups inside a walk of the retained tree: `stopsIn` asks "is this child
+// a region" of every node it visits, `regionOf` asks it of every ancestor, and `groupAt` resolves the
+// claim on every move. A linear scan inside a walk is O(nodes × regions) where O(depth) would do,
+// which is what phase 9 of the performance programme is about
+// (docs/future/performance/phase-9-the-terminal-clients-keystroke.md).
+//
+// The array stays, because ordering is the one thing it is good at and `ordered()` is the only reader
+// that needs it (§ ordered). The maps are written where a region registers and deleted where it goes,
+// so there is one place either can drift and it is the same place.
+const groupByBox = new Map<Renderable, Group>()
+const groupByRef = new Map<string, Group>()
+
+const refKey = (ref: RegionRef): string => `${ref.paneId}\u0000${ref.regionId}`
+
+// ── The step counter ──────────────────────────────────────────────────────────────────────────
+//
+// How many renderables the walks in this module visited, so "a key press costs the depth of the focus
+// tree and not the size of the region" is a number rather than a claim. Behind the same flag the key
+// trace is, because a counter nobody reads is a branch on every node of every walk
+// (./install.ts § The trace, docs/tui.md § Seeing what the keys did).
+
+let counting = !!process.env.ACORN_TUI_KEYS_TRACE
+let visited = 0
+
+/** The walk counter. `take()` reads it and resets, which is what "per key press" means when the
+ *  reader is a `key:after` intercept; `read()` leaves it alone, which is what a test wants.
+ *
+ *  `count` is the test seam. The flag is read at import and a suite cannot set an environment
+ *  variable before its own imports run, so a case that is about the number turns it on for itself
+ *  (../keys/regions.test.ts). */
+export const walkSteps = {
+  take: (): number => { const at = visited; visited = 0; return at },
+  read: (): number => visited,
+  reset: (): void => { visited = 0 },
+  counting: (): boolean => counting,
+  count: (on: boolean): void => { counting = on; visited = 0 },
+}
+
+/** One node visited. Inlined by shape rather than by a helper at every call site: the walks below
+ *  call this once per node and nothing else does. */
+const step = (): void => { if (counting) visited += 1 }
 // How many times a region has come or gone, as a signal, because the footer's answers depend on the
 // list and not only on where the keys are: the rail hides on Ctrl+B, the pane strip draws only while
 // a task is open, and neither has to move focus to change what Tab can reach. A counter rather than a
@@ -121,7 +163,7 @@ export const focusedRenderable = focusedNode
  */
 export const onScreen = (node: Renderable | null | undefined): boolean => {
   if (!node || node.isDestroyed || !node.visible) return false
-  for (let at: Renderable | null = node.parent; at; at = at.parent) if (!at.visible) return false
+  for (let at: Renderable | null = node.parent; at; at = at.parent) { step(); if (!at.visible) return false }
   return true
 }
 
@@ -148,9 +190,7 @@ export const focusedRegion = (): RegionRef | null => focused
  *  claim, because the claim is how closing the dialog knows where to give the keys back. Every walk
  *  that reads the claim would otherwise move them behind the dialog (§ Scopes). */
 const groupAt = (ref: RegionRef | null | undefined): Group | undefined => {
-  const group = ref
-    ? groups.find((candidate) => candidate.paneId === ref.paneId && candidate.regionId === ref.regionId)
-    : undefined
+  const group = ref ? groupByRef.get(refKey(ref)) : undefined
   return group && inScope(group.box) ? group : undefined
 }
 
@@ -182,11 +222,18 @@ const screenScope = (): Scope => ({ box: null })
 // cannot answer this one (../chrome/bindings.ts).
 const [scopes, setScopes] = createSignal<readonly Scope[]>([screenScope()])
 
+// What `ordered()` last answered, and what it answered it for. Two things move the answer and both
+// are writes rather than reads: a region registering or unregistering, and a scope being pushed or
+// popped, since a scope is the filter (§ ordered, § Scopes).
+let registryVersion = 0
+let orderedCache: { at: number; scopes: readonly Scope[]; groups: Group[] } | null = null
+const registryChanged = (): void => { registryVersion += 1; orderedCache = null }
+
 const top = (): Scope => scopes()[scopes().length - 1] ?? screenScope()
 
 /** Whether a renderable is inside a box, by walking the retained tree up. */
 const within = (box: Renderable, node: Renderable): boolean => {
-  for (let at: Renderable | null = node; at; at = at.parent) if (at === box) return true
+  for (let at: Renderable | null = node; at; at = at.parent) { step(); if (at === box) return true }
   return false
 }
 
@@ -249,11 +296,13 @@ export function pushScope(box: Renderable): () => void {
   box.focusable = true
   const scope: Scope = { box }
   setScopes((all) => [...all, scope])
+  orderedCache = null
   scheduleSettle()
   return () => {
     // By identity rather than by position: a `Menu` inside a `Modal` can be disposed after the modal
     // that drew it, and popping the top of the stack would then pop the wrong scope.
     setScopes((all) => all.filter((entry) => entry !== scope))
+    orderedCache = null
     // The keys leave the box that is going, said here rather than read off the tree. The tree is
     // still telling the truth of the last render: the reconciler defers destruction to
     // `process.nextTick` for Suspense's sake, so the pass below would find a dying dialog attached,
@@ -284,21 +333,55 @@ export const setPaneCycler = (next: ((delta: 1 | -1) => boolean) | null): void =
 //
 // The panels are a getter rather than a list, because a strip's panels mount after its own ref runs
 // and change with its tabs. A strip with none — a list's Open/Closed filter — is an ordinary stop.
-let parents: { node: Renderable; panels: () => Renderable[] }[] = []
+type ParentEntry = { node: Renderable; panels: () => readonly Renderable[] }
 
-const parentEntry = (node: Renderable) => parents.find((parent) => parent.node === node)
+let parents: ParentEntry[] = []
+// The same entries by their node, because `stopsIn` asks "is this child a parent stop" of every node
+// it visits and `entryStop` asks it again (§ The step counter).
+let parentByNode = new Map<Renderable, ParentEntry>()
+
+// Every box that is somebody's panel, as one set.
+//
+// `isPanel` is asked of every child of every walk and of every ancestor of a stop, and the honest
+// answer was "ask each parent stop whether it owns this one", which walked the parents and allocated
+// a fresh panel list per parent per question (../kit/grouping.tsx § panels). The set answers the
+// common case — no — in one lookup.
+//
+// Derived rather than written, so there is still one fact and it is still the strip's: the set is
+// built from the same getters `parentOf` reads, and rebuilt when the panels move. A second registry
+// beside them would be a second answer to "is this a panel", which is the drift this module exists to
+// remove. `panelsChanged` is what says they moved; `markParent` says so for itself.
+let panelBoxes: Set<Renderable> | null = null
+
+/** The panels have moved: a `TabPanel` mounted or unmounted under some strip. Called by the kit,
+ *  which owns the `idPrefix` relation the strips read (../kit/grouping.tsx § registerPanel). */
+export const panelsChanged = (): void => { panelBoxes = null }
+
+const panelSet = (): Set<Renderable> => {
+  if (panelBoxes) return panelBoxes
+  const found = new Set<Renderable>()
+  for (const parent of parents) for (const panel of parent.panels()) if (panel !== parent.node) found.add(panel)
+  panelBoxes = found
+  return found
+}
+
+const parentEntry = (node: Renderable): ParentEntry | undefined => parentByNode.get(node)
 
 /** Mark a renderable as one stop that owns the panels `panels()` returns.
  *
  *  Marking does not make it focusable. Which nodes are reachable is declared where a node is built,
  *  and for a strip that is the `Tabs` ref that calls this (../kit/grouping.tsx,
  *  ../invariants.test.ts § the renderer is the only truth about focus). */
-export function markParent(node: Renderable, panels: () => Renderable[]): void {
-  const entry = { node, panels }
+export function markParent(node: Renderable, panels: () => readonly Renderable[]): void {
+  const entry: ParentEntry = { node, panels }
   parents.push(entry)
+  parentByNode.set(node, entry)
+  panelsChanged()
   onCleanup(() => {
     const at = parents.indexOf(entry)
     if (at >= 0) parents.splice(at, 1)
+    if (parentByNode.get(node) === entry) parentByNode.delete(node)
+    panelsChanged()
   })
 }
 
@@ -311,6 +394,10 @@ export function markParent(node: Renderable, panels: () => Renderable[]): void {
  */
 export function parentOf(node: Renderable): Renderable | undefined {
   for (let at: Renderable | null = node; at; at = at.parent) {
+    step()
+    // The set first, so the ancestors that are not panels — which is nearly all of them — cost one
+    // lookup rather than one scan of the parent stops (§ panelBoxes).
+    if (!panelSet().has(at)) continue
     const owner = parents.find((parent) => parent.node !== at && parent.panels().includes(at as Renderable))
     if (owner) return owner.node
   }
@@ -331,7 +418,16 @@ export function enterParent(parent: Renderable): boolean {
  *  Scoped, and one filter is the whole of what a trap does to the region tier: with a `Modal` up no
  *  region is in scope, so `moveRegion` has nothing to move to and Tab does nothing rather than
  *  walking the keys onto a rail row behind the dialog. Nothing here names Tab (§ Scopes). */
-const ordered = (): Group[] => groups.filter((group) => inScope(group.box)).sort((a, b) => a.order - b.order)
+const ordered = (): Group[] => {
+  // Cached until the registry or the scope stack moves, which is what makes it safe to ask this on
+  // every key: `moveColumn` asks twice, `movePane` twice more, the landing rule once and the footer
+  // once per render, and each ask used to copy and sort the whole list (§ registryChanged).
+  const at = scopes()
+  if (orderedCache && orderedCache.at === registryVersion && orderedCache.scopes === at) return orderedCache.groups
+  const found = groups.filter((group) => inScope(group.box)).sort((a, b) => a.order - b.order)
+  orderedCache = { at: registryVersion, scopes: at, groups: found }
+  return found
+}
 
 export function registerRegion(box: Renderable, ref: RegionRef, order: number, options: RegionOptions = {}): () => void {
   // Focusable from here, and never flipped again. A region with nothing focusable in it still has to
@@ -349,10 +445,16 @@ export function registerRegion(box: Renderable, ref: RegionRef, order: number, o
     pickOnEnter: options.pickOnEnter ?? false,
   }
   groups.push(group)
+  groupByBox.set(box, group)
+  groupByRef.set(refKey(ref), group)
+  registryChanged()
   setMounted((count) => count + 1)
   return () => {
     const at = groups.indexOf(group)
     if (at >= 0) groups.splice(at, 1)
+    if (groupByBox.get(box) === group) groupByBox.delete(box)
+    if (groupByRef.get(refKey(ref)) === group) groupByRef.delete(refKey(ref))
+    registryChanged()
     if (lastByColumn.get(group.x) === group) lastByColumn.delete(group.x)
     setMounted((count) => count + 1)
     // A conditional region can go while it holds the keys: the rail hides on Ctrl+B, the pane strip
@@ -375,7 +477,8 @@ export const regionFocus = (ref: RegionRef, order: number, options: RegionOption
  *  question with `focusin` bubbling; here the tree is the bubble. */
 const regionOf = (node: Renderable): Group | undefined => {
   for (let at: Renderable | null = node; at; at = at.parent) {
-    const group = groups.find((candidate) => candidate.box === at)
+    step()
+    const group = groupByBox.get(at)
     if (group) return group
   }
   return undefined
@@ -568,11 +671,16 @@ export const markItem = (box: Renderable, pick?: () => void, identity?: string):
 // one stop from outside — a reader walking a panel passes it once, and its own collection layer takes
 // the arrows from there — so the reading-order walk has to be able to say "this box is a list"
 // without asking the kit what node drew it, the same way `items` says "this box is a row".
-let containers: {
+type ContainerEntry = {
   box: Renderable
   active: () => Renderable | undefined
   expands: () => boolean
-}[] = []
+}
+
+let containers: ContainerEntry[] = []
+// And by their box, for the same reason the regions are: `stopsIn` asks "is this child a collection"
+// of every node it visits (§ The step counter).
+let containerByBox = new Map<Renderable, ContainerEntry>()
 
 /** Called by a collection for its container (./collection.ts).
  *
@@ -585,11 +693,13 @@ export function markCollection(
   active: () => Renderable | undefined,
   expands: () => boolean = () => false,
 ): void {
-  const entry = { box, active, expands }
+  const entry: ContainerEntry = { box, active, expands }
   containers.push(entry)
+  containerByBox.set(box, entry)
   onCleanup(() => {
     const at = containers.indexOf(entry)
     if (at >= 0) containers.splice(at, 1)
+    if (containerByBox.get(box) === entry) containerByBox.delete(box)
   })
 }
 
@@ -602,7 +712,8 @@ export const focusedExpands = (): boolean => {
   const node = focusedNode()
   if (!node) return false
   for (let at: Renderable | null = node; at; at = at.parent) {
-    const container = containers.find((entry) => entry.box === at)
+    step()
+    const container = containerByBox.get(at)
     if (container) return container.expands()
   }
   return false
@@ -612,6 +723,7 @@ export const focusedExpands = (): boolean => {
 
 const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable | undefined => {
   for (const child of box.getChildren()) {
+    step()
     if (child.visible && take(child)) return child
     const nested = child.visible ? walk(child, take) : undefined
     if (nested) return nested
@@ -640,13 +752,18 @@ const entryStop = (box: Renderable): Renderable | undefined =>
 /** Reveal a newly focused stop in every native document viewport that contains it. */
 const revealInViewports = (node: Renderable): void => {
   for (let at: Renderable | null = node.parent; at; at = at.parent) {
+    step()
     if (at instanceof ScrollBoxRenderable) at.scrollChildIntoView(node.id)
   }
 }
 
-/** Whether a box is some parent stop's panel, and so belongs to the level below this walk. */
-const isPanel = (node: Renderable): boolean =>
-  parents.some((parent) => parent.node !== node && parent.panels().includes(node))
+/** Whether a box is some parent stop's panel, and so belongs to the level below this walk.
+ *
+ *  One lookup. It was a scan of every parent stop, each of which allocated its panel list to answer,
+ *  and it is asked of every child of every walk (§ panelBoxes). A strip is never its own panel, which
+ *  the scan said out loud and the set says by construction: `registerPanel` marks panels and
+ *  `markParent` marks strips. */
+const isPanel = (node: Renderable): boolean => panelSet().has(node)
 
 /**
  * Reading-order stops inside a box, in reading order.
@@ -673,16 +790,17 @@ export const stopsIn = (box: Renderable): Renderable[] => {
   const found: Renderable[] = []
   const visit = (parent: Renderable): void => {
     for (const child of parent.getChildren()) {
+      step()
       if (!child.visible || child.isDestroyed || isPanel(child)) continue
-      if (groups.some((group) => group.box === child)) {
+      if (groupByBox.has(child)) {
         visit(child)
         continue
       }
-      if (parentEntry(child)) {
+      if (parentByNode.has(child)) {
         found.push(child)
         continue
       }
-      const container = containers.find((entry) => entry.box === child)
+      const container = containerByBox.get(child)
       if (container) {
         // A virtual list whose active row is off its drawn window has no renderable for it, and the
         // container itself holds the keys until one arrives (../kit/showing.tsx § Rows).
@@ -718,7 +836,7 @@ export const stopsIn = (box: Renderable): Renderable[] => {
 const boxAround = (node: Renderable): Renderable | undefined => {
   // Either answer only counts while the keys can reach it. A dialog drawn inside a region has that
   // region as an ancestor, and the stops behind the dialog are not its neighbours (§ Scopes).
-  for (let at: Renderable | null = node; at; at = at.parent) if (isPanel(at)) return inScope(at) ? at : undefined
+  for (let at: Renderable | null = node; at; at = at.parent) { step(); if (isPanel(at)) return inScope(at) ? at : undefined }
   const group = regionOf(node)
   return group && inScope(group.box) ? group.box : undefined
 }
@@ -743,16 +861,20 @@ const boxAround = (node: Renderable): Renderable | undefined => {
  * `wrap` has no caller yet: every stop walk on this screen walls or bubbles, and only a collection
  * wraps, by its own rules. It is here because the key contract decides which walks wrap
  * (docs/tui.md § The five key groups).
+ *
+ * `stops` is the same walk already made. A caller that had to ask `stopsIn` a question before it
+ * could decide to move — which is `moveStop`, and it is the reader's arrows — passes the answer in
+ * rather than paying for the subtree twice per key press.
  */
 export function walkStops(
   from: Renderable | null | undefined,
   delta: 1 | -1,
-  options: { within?: Renderable; wrap?: boolean } = {},
+  options: { within?: Renderable; wrap?: boolean; stops?: readonly Renderable[] } = {},
 ): boolean {
   if (!from) return false
   const box = options.within ?? boxAround(from)
   if (!box) return false
-  const stops = stopsIn(box)
+  const stops = options.stops ?? stopsIn(box)
   const at = stops.indexOf(from)
   if (at < 0) return false
   const next = options.wrap ? stops[(at + delta + stops.length) % stops.length] : stops[at + delta]
@@ -778,8 +900,12 @@ export function moveStop(delta: 1 | -1): boolean {
   // is still not this function's to move. The list owns its own arrows and wraps by its own rules.
   if (!node || items.has(node)) return false
   const box = boxAround(node)
-  if (!box || !stopsIn(box).includes(node)) return false
-  return walkStops(node, delta, { within: box }) || true
+  if (!box) return false
+  // One walk. The membership question and the move are the same list, and asking twice was a subtree
+  // walk per key press for nothing (§ walkStops).
+  const stops = stopsIn(box)
+  if (!stops.includes(node)) return false
+  return walkStops(node, delta, { within: box, stops }) || true
 }
 
 /**
@@ -959,9 +1085,9 @@ export function scheduleSettle(): void {
  * the tree kept beside the tree is a fact that can disagree with it.
  */
 const onPlaceholder = (node: Renderable): boolean => {
-  const group = groups.find((candidate) => candidate.box === node)
+  const group = groupByBox.get(node)
   if (group) return !!entryStop(group.box)
-  const container = containers.find((entry) => entry.box === node)
+  const container = containerByBox.get(node)
   return !!container && reachable(container.active())
 }
 
@@ -1056,14 +1182,22 @@ export function _resetRegions(): void {
   // swallowed as a duplicate and the screen opens with the keys nowhere.
   settleQueued = false
   groups.length = 0
+  groupByBox.clear()
+  groupByRef.clear()
+  registryChanged()
   setMounted((count) => count + 1)
   lastByColumn.clear()
   focused = null
   cycler = null
   topology = null
   parents = []
+  parentByNode = new Map<Renderable, ParentEntry>()
+  panelBoxes = null
   setScopes([screenScope()])
+  orderedCache = null
   containers = []
+  containerByBox = new Map<Renderable, ContainerEntry>()
+  visited = 0
   items = new WeakSet<Renderable>()
   itemIdentities = new WeakMap<Renderable, string>()
   itemsByIdentity.clear()

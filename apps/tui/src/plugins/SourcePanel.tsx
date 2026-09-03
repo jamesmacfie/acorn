@@ -104,9 +104,10 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
   const openFilter = (panel: Renderable): boolean => focusRenderable(stopsIn(panel)[0])
 
   // Down and Escape both leave the field for the list below it: the field and the rows are two stops
-  // in one region, so the stop after the field is the row the caret was on. Bound `whileTyping`,
-  // because a field is a typing target and a bare `down` is inactive in one — which is exactly why a
-  // reader would otherwise be stuck in it.
+  // in one region, so the stop after the field is the row the caret was on. At the stop tier, which
+  // is above the typing shadow, because a field is a typing target and a bare `down` would otherwise
+  // be claimed by the shadow and typed into the box — which is exactly why a reader would be stuck in
+  // it (../keys/tiers.ts § TYPING).
   //
   // Two walks, and the difference is the one the model draws. Down walls, so a filter that matched
   // nothing leaves the caret where it is rather than throwing it into the next region. Escape does
@@ -120,7 +121,7 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
         const focused = focusedRenderable()
         return walkStops(focused, 1)
       } },
-    ], STOP, { whileTyping: true })
+    ], STOP)
   }
 
   return (

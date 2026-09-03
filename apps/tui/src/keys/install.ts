@@ -14,22 +14,22 @@
 // nothing does. Which is also why a handler that changed nothing must say so
 // (docs/tui.md § The five key groups).
 
-import { appendFileSync, mkdirSync } from 'node:fs'
+import { createWriteStream, mkdirSync, type WriteStream } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { onCleanup } from 'solid-js'
 import { createDefaultOpenTuiKeymap } from '@opentui/keymap/opentui'
 import { InputRenderable, TextareaRenderable, type CliRenderer, type KeyEvent, type Renderable } from '@opentui/core'
 import type { Keymap, TargetMode } from '@opentui/keymap'
-import { isTyping, keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { keymap, keysFor, setKeymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications/toast.ts'
 import {
   focusedRegion, focusedRenderable, installRegions, moveBack, moveColumn, moveRegion, movePane,
-  scopeDepth,
+  scopeDepth, walkSteps,
 } from './regions'
-import { REGION } from './tiers'
+import { REGION, TYPING } from './tiers'
 
 export type TuiKeymap = Keymap<Renderable, KeyEvent>
 
@@ -69,6 +69,12 @@ export function hostKeysFor(): Record<Intent, readonly string[]> {
 // it can say what answered and why without claiming the key. The hyphenated `key-after` is not a
 // hook name and registers nothing, silently. Registered without `release`, which is how the engine
 // spells "presses only" — with it, every keystroke would log twice.
+//
+// Through an appending stream rather than `appendFileSync`, because the second thing this flag is for
+// is measuring, and a synchronous `open`, `write` and `close` on the loop that draws is a trace that
+// measures itself: on this machine it is about a fifth of a millisecond per key, on the same loop
+// that has to answer the key. A stream opened once and written to buffers the line and flushes it
+// when the loop is idle, which is what a log wants and what a measurement needs.
 
 /**
  * Clear whatever transient feedback is on screen, and say whether there was any.
@@ -103,14 +109,30 @@ const stamp = (at: Date): string =>
   `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
   + `:${String(at.getSeconds()).padStart(2, '0')}.${String(at.getMilliseconds()).padStart(3, '0')}`
 
-function installTrace(engine: TuiKeymap, renderer: CliRenderer): void {
+/** The open log, or null where the state directory could not be made. One per process: the flag is
+ *  read once at install and a suite installs the keyboard per test, so the stream is reused rather
+ *  than reopened. */
+let log: WriteStream | null = null
+
+const openLog = (): WriteStream | null => {
+  if (log) return log
   const file = logPath()
   try {
     mkdirSync(join(file, '..'), { recursive: true })
+    log = createWriteStream(file, { flags: 'a' })
+    // A full disk is not a keyboard bug, and an unhandled `error` on a stream is an uncaught
+    // exception rather than a returned code.
+    log.on('error', () => {})
   } catch {
     // A log nobody can write is not worth taking the app down for.
-    return
+    return null
   }
+  return log
+}
+
+function installTrace(engine: TuiKeymap, renderer: CliRenderer): void {
+  const file = openLog()
+  if (!file) return
   onCleanup(engine.intercept('key:after', (ctx) => {
     const node = renderer.currentFocusedRenderable
     const region = focusedRegion()
@@ -126,13 +148,63 @@ function installTrace(engine: TuiKeymap, renderer: CliRenderer): void {
       `region=${region ? `${region.paneId}/${region.regionId}` : 'none'}`,
       `scope=${depth === 1 ? 'screen' : `overlay:${depth}`}`,
       `agree=${agree}`,
+      // How many renderables the walks behind this key visited. The number the phase 9 work is
+      // about: a key press should cost the depth of the focus tree and not the size of the region
+      // (./regions.ts § The step counter).
+      `steps=${walkSteps.take()}`,
     ]
-    try {
-      appendFileSync(file, `${stamp(new Date())} ${fields.join(' ')}\n`)
-    } catch {
-      // Same reason as above. A full disk is not a keyboard bug.
-    }
+    file.write(`${stamp(new Date())} ${fields.join(' ')}\n`)
   }))
+}
+
+// ── The typing shadow ─────────────────────────────────────────────────────────────────────────
+//
+// While an `Input` or a `Textarea` has the keys, the bare keys type. That used to be said once per
+// binding, as `active: () => !typing()` on every bare key of every control on screen, and the engine
+// counts a binding with a runtime matcher as a reason to switch its active-key cache off — for the
+// whole process, not for that layer. The footer asks the engine what is live on every render, so the
+// cost of saying it that way was a full collect over every active layer per render, forever
+// (./tiers.ts § TYPING).
+//
+// Said once instead, as a layer that is registered when a field takes the keys and unregistered when
+// it loses them. `preventDefault: false` is the whole trick: the binding claims the key *inside* the
+// keymap, so nothing below the shadow's tier ever sees it, and the key still reaches the focused
+// renderable, so the field types it. That is the same shape as a `Modal`'s key claim — a scope, not
+// a swallow — with one difference worth stating: a scope is pushed by the box that is drawn, and
+// this is derived from the one focus event instead, because "is the focused thing a field" is a fact
+// about focus and the renderer is the only truth about that
+// (./regions.ts § The one writer, docs/tui.md § Focus regions).
+
+/** The keys a field types. The shared table, so the shadow cannot name a key the bindings below it
+ *  do not, which is the drift that made the old swallow layer leak Tab (./trap.ts). */
+const SHADOWED = [...BARE_KEYS]
+
+/** The live shadow's disposer, or null while nobody is typing. Module state for the same reason
+ *  `installRegions`'s subscription is: a suite builds a renderer per test. */
+let stopShadow: (() => void) | null = null
+
+const isTypingTarget = (node: Renderable | null): boolean =>
+  !!node && (node instanceof InputRenderable || node instanceof TextareaRenderable)
+
+const syncTypingShadow = (engine: TuiKeymap, renderer: CliRenderer): void => {
+  const wanted = isTypingTarget(renderer.currentFocusedRenderable)
+  if (wanted === !!stopShadow) return
+  if (!wanted) {
+    stopShadow?.()
+    stopShadow = null
+    return
+  }
+  stopShadow = engine.registerLayer({
+    priority: TYPING,
+    bindings: SHADOWED.map((key) => ({
+      key,
+      // Claimed here and nowhere below.
+      cmd: () => true,
+      // And still delivered to the field. Without this the engine calls `preventDefault` on the
+      // event and the edit buffer never sees the character.
+      preventDefault: false,
+    })),
+  })
 }
 
 /**
@@ -164,11 +236,19 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
     // would be a chord nobody can press. Every chord in the intent table is spelled with Ctrl here,
     // and so is every chord the shell registers.
     primary: 'ctrl',
-    typing: () => {
-      const focused = renderer.currentFocusedRenderable
-      return !!focused && (focused instanceof InputRenderable || focused instanceof TextareaRenderable)
-    },
+    typing: () => isTypingTarget(renderer.currentFocusedRenderable),
+    // And this host says the gate once, as a layer, rather than once per bare-key binding
+    // (§ The typing shadow).
+    shadowsTyping: true,
   })
+
+  // The shadow follows the renderer's own focus event, which is the same event the region store
+  // reads, so there is one answer to "is somebody typing" and it is the renderer's.
+  stopShadow?.()
+  stopShadow = null
+  const shadow = (): void => syncTypingShadow(engine, renderer)
+  renderer.off('focused_renderable', shadow)
+  renderer.on('focused_renderable', shadow)
 
   // Per-binding gating, the same field the DOM installer registers: `registerEnabledFields` only
   // reaches layers and commands, and a bare key's "not while somebody is typing" is a property of one
@@ -199,13 +279,11 @@ export function installKeymap(renderer: CliRenderer): TuiKeymap {
     priority: REGION,
     bindings: [
       ...moves.flatMap(([intent, run]) => map[intent].map((key) => ({ key, cmd: run }))),
-      ...columnMoves.flatMap(([intent, run]) => map[intent].map((key) => ({
-        key,
-        cmd: run,
-        // Left and right inside a field move its cursor. Unlike the region and pane chords, spatial
-        // movement is therefore inactive for every typing target, including arrow-key spellings.
-        active: () => !isTyping(),
-      }))),
+      // Left and right inside a field move its cursor, so spatial movement is inactive for every
+      // typing target, arrow-key spellings included. Said by the typing shadow above this tier
+      // rather than by a matcher on each of these, which is what the region and pane chords above
+      // do not want and these four do (§ The typing shadow).
+      ...columnMoves.flatMap(([intent, run]) => map[intent].map((key) => ({ key, cmd: run }))),
     ],
   })
 
@@ -225,10 +303,10 @@ export function bindKeys(
   target: Renderable,
   bindings: readonly { key: string; cmd: () => boolean }[],
   priority: number,
-  /** `whileTyping` lifts the bare-key gate for these bindings. One caller: a suggestions list under an
-   *  edit buffer, where the field itself is the typing target and `↓` has nothing else it could mean
-   *  (../kit/asking.tsx § MentionTextarea). */
-  options: { mode?: TargetMode; whileTyping?: boolean } = {},
+  /** A binding that has to fire while somebody is typing says so with its tier rather than with an
+   *  option: the typing shadow sits at `TYPING`, so anything at `STOP` or above is bound to the
+   *  focused renderable itself and is never shadowed (./tiers.ts § TYPING, ../kit/asking.tsx). */
+  options: { mode?: TargetMode } = {},
 ): void {
   // Read through the singleton rather than threaded, so a layout or a modal deep in a tree can bind
   // without every component above it carrying the engine.
@@ -238,10 +316,6 @@ export function bindKeys(
     target,
     targetMode: options.mode ?? 'focus-within',
     priority,
-    bindings: bindings.map(({ key, cmd }) => ({
-      key,
-      cmd,
-      ...(BARE_KEYS.has(key) && !options.whileTyping ? { active: () => !isTyping() } : {}),
-    })),
+    bindings: bindings.map(({ key, cmd }) => ({ key, cmd })),
   }))
 }

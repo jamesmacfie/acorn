@@ -29,11 +29,39 @@ export const TRAP = 60
  *  sitting above a list change the tab rather than moving the list's rows (../kit/grouping.tsx). */
 export const PARENT = 45
 
-/** A `pressable`, 41. One above the collection tier rather than level with it: a `Button` inside a
+/** A `pressable`, 42. Above the collection tier rather than level with it: a `Button` inside a
  *  `Row` is inside the row's focus-within layer as well as its own focus layer, so both match the
  *  same Enter, and at equal priority the engine falls back to whichever of a container's ref and its
- *  children's refs the reconciler ran first (`@opentui/keymap` § compareLayers, ./stops.ts). */
-export const STOP = 41
+ *  children's refs the reconciler ran first (`@opentui/keymap` § compareLayers, ./stops.ts).
+ *
+ *  Two above rather than one, since the typing shadow took the number between them (§ TYPING). What
+ *  it needed was a tier that every layer reaching a field from outside sits below and every layer
+ *  bound to the field itself sits above, and a stop's layers are the second kind. */
+export const STOP = 42
+
+/**
+ * The typing shadow, 41. Registered while an edit buffer has the keys and unregistered when it loses
+ * them, and it binds the bare keys to a handler that claims them inside the keymap and lets the key
+ * through to the field (`preventDefault: false`).
+ *
+ * A layer rather than a matcher, and that is a performance fact with a shape. `@opentui/keymap` 0.5.9
+ * caches its active keys only while no registered layer, command or binding carries a runtime
+ * matcher, and the counter is global — so one `active: () => !typing()` on one binding turned the
+ * cache off for the whole process, and the footer, which asks per render, paid a full collect over
+ * every active layer each time. Hundreds of bindings carried that matcher, one per bare key per
+ * control on screen. One layer that comes and goes says the same thing and bumps the engine's cache
+ * version twice per field rather than never letting it settle
+ * (../../docs/future/performance/phase-9-the-terminal-clients-keystroke.md).
+ *
+ * The number is the whole of the design. Everything below it is a layer that reaches a focused field
+ * from somewhere else — a collection around it, a viewport's page keys, the screen's own column
+ * moves, the command layer's bare keys — and each of those has to go quiet while somebody types. The
+ * two tiers above it, `STOP` and `PARENT`, are bound to an exact renderable by focus, and a field is
+ * never the renderable they are bound to, with one deliberate exception: the suggestions list under a
+ * `MentionTextarea`, whose `↓` is bound to the field itself and has to keep firing
+ * (../kit/asking.tsx).
+ */
+export const TYPING = 41
 
 /** A collection's own intents, 40, and the one row this file states without owning.
  *

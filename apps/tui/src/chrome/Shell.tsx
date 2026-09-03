@@ -16,7 +16,7 @@ import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/featu
 import { initSessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
 import { Dynamic } from '@opentui/solid'
 import { Line } from '../kit/cells'
-import { EmptyState, Row, Rows } from '../kit/showing'
+import { EmptyState, keyedRows, Row, Rows } from '../kit/showing'
 import { Modal, ModalBody } from '../kit/grouping'
 import { PanelBody } from '../panel'
 import { installCommandLayer } from '../keys/commandLayer'
@@ -327,6 +327,8 @@ function QuitConfirm(props: { onQuit: () => void }) {
 function ProjectPicker(props: { model: ShellModel }) {
   const close = () => closeOverlay('project')
   const projects = () => props.model.workspace()?.projects ?? []
+  // Kept rather than rebuilt, for the reason the rail's are (../kit/showing.tsx § keyedRows).
+  const rows = keyedRows(projects, (project) => ({ key: project.id, ...project }))
   return (
     <Modal onDismiss={close} title="Project" size="sm">
       <ModalBody>
@@ -335,7 +337,7 @@ function ProjectPicker(props: { model: ShellModel }) {
             <Rows
               id="chrome.projects"
               ariaLabel="Projects"
-              items={projects().map((project) => ({ key: project.id, ...project }))}
+              items={rows()}
               onActivate={(id) => { chooseProject(id); close() }}
             >
               {(project, item) => (
@@ -355,6 +357,7 @@ function ProjectPicker(props: { model: ShellModel }) {
  *  overlay is the shape that takes the keys and gives them back (./state.ts, ../keys/regions.ts). */
 function WorkspacePicker(props: { model: ShellModel }) {
   const close = () => closeOverlay('workspace')
+  const rows = keyedRows(() => props.model.workspaces(), (workspace) => ({ key: workspace.id, ...workspace }))
   return (
     <Modal onDismiss={close} title="Workspace" size="sm">
       <ModalBody>
@@ -362,7 +365,7 @@ function WorkspacePicker(props: { model: ShellModel }) {
           <Rows
             id="chrome.workspaces"
             ariaLabel="Workspaces"
-            items={props.model.workspaces().map((workspace) => ({ key: workspace.id, ...workspace }))}
+            items={rows()}
             onActivate={(id) => { props.model.chooseWorkspace(id); close() }}
           >
             {(workspace, item) => (

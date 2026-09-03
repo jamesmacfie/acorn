@@ -39,6 +39,11 @@ export function ScrollViewport(props: {
   children: JSX.Element
   visible?: boolean
   onBox?: (box: ScrollBoxRenderable) => void
+  /** Called after this viewport moves its own offset, for a caller that windows its content and so
+   *  has to know where the offset now is. The wheel is the renderable's own and raises nothing, so a
+   *  caller that needs that half listens for the mouse event on a box around this one, where it
+   *  arrives after the scroll rather than before it (./showing.tsx § DiffPane). */
+  onScroll?: () => void
 }) {
   // A hidden viewport is one of the two ways the keys can go off screen without anybody being told,
   // and it is the one a reader meets every day: `TabPanel` is this node, and switching a tab hides the
@@ -69,7 +74,7 @@ export function ScrollViewport(props: {
         // shared dispatcher with `onKeyDown`.
         bindKeys(element, KEY_SCROLLS.map(({ key, move }) => ({
           key,
-          cmd: () => { move(element); return true },
+          cmd: () => { move(element); props.onScroll?.(); return true },
         // Both layers on the pane's own tier, below the collection: a list inside a viewport
         // answers Home and the arrows first, which is what a reader in a list means by them
         // (../keys/tiers.ts).
@@ -78,6 +83,7 @@ export function ScrollViewport(props: {
           const move = PAGE_KEYS[intent]
           if (!move) return false
           move(element)
+          props.onScroll?.()
           return true
         }, { priority: PANE, mode: 'focus-within' }))
         props.onBox?.(element)

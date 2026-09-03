@@ -1,17 +1,20 @@
 /** @jsxImportSource @opentui/solid */
-import { createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
 import type { BoxRenderable, Renderable } from '@opentui/core'
 import { COLLECTION_INTENTS, createCollectionIntents } from '@acorn/client-core/kit/keys/collectionIntents.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { isCompact } from '../appearance'
 import { flatten, Line, slot } from './cells'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from './roles'
 import { trapKeys } from '../keys/trap'
 import { bindKeys } from '../keys/install'
-import { enterParent, focusedRenderable, markParent, moveRegion, pushScope, walkStops } from '../keys/regions'
+import {
+  enterParent, focusedRenderable, markParent, moveRegion, panelsChanged, pushScope, walkStops,
+} from '../keys/regions'
 import { stop } from '../keys/stops'
-import { LIST, PARENT } from '../keys/tiers'
+import { LIST, OVERLAY_OWN, PARENT } from '../keys/tiers'
 import { ScrollViewport } from './scrolling'
 import type { KitSection } from '@acorn/client-core/kit/components/layout/Sections.tsx'
 
@@ -171,19 +174,35 @@ Timeline.Turn = (props: { children: JSX.Element }) => (
 // One map for the whole host, keyed by a string, and the ceiling that comes with that: two strips
 // sharing a prefix would share a panel set. Nothing on this host can do it — one pane is mounted at a
 // time (../chrome/PaneRow.tsx) — and `Sections` keys its prefix by the surface id anyway.
-const panelsByPrefix = new Map<string, Set<Renderable>>()
+//
+// An array rather than a set, and the same array every time. `markParent` hands the region store a
+// getter, the store asks it while it walks the tree, and a getter that built `[...set]` per call
+// allocated one array per parent stop per node visited (../keys/regions.ts § isPanel). The list only
+// changes when a panel mounts or unmounts, so it is rebuilt there and handed back by reference.
+const panelsByPrefix = new Map<string, Renderable[]>()
+
+/** No prefix has any panels yet, without minting an array to say so. */
+const NO_PANELS: readonly Renderable[] = []
+
+/** The panels a strip owns, as the stored list. Never mutated by a caller. */
+export const panelsFor = (idPrefix: string): readonly Renderable[] => panelsByPrefix.get(idPrefix) ?? NO_PANELS
 
 /** Give a strip a panel to own, for as long as the caller is drawn.
  *
  *  `TabPanel` calls this for itself. The `tabs` layout frames its panel with `Panel` instead of a
  *  `TabPanel` and calls this directly, which is the only other way a panel gets drawn. */
 export function registerPanel(idPrefix: string, box: Renderable): void {
-  const panels = panelsByPrefix.get(idPrefix) ?? new Set<Renderable>()
-  panels.add(box)
-  panelsByPrefix.set(idPrefix, panels)
+  panelsByPrefix.set(idPrefix, [...panelsFor(idPrefix), box])
+  // And the store, which keeps a set of every panel on screen so that "is this box somebody's panel"
+  // is one lookup rather than a scan of the strips. It is derived from these same lists, so this says
+  // they moved rather than saying anything the strips do not already know
+  // (../keys/regions.ts § panelBoxes).
+  panelsChanged()
   onCleanup(() => {
-    panels.delete(box)
-    if (!panels.size) panelsByPrefix.delete(idPrefix)
+    const rest = panelsFor(idPrefix).filter((panel) => panel !== box)
+    if (rest.length) panelsByPrefix.set(idPrefix, rest)
+    else panelsByPrefix.delete(idPrefix)
+    panelsChanged()
   })
 }
 
@@ -237,7 +256,7 @@ export function Tabs(props: {
         // anything inside that panel comes back here. A strip with none — GitHub's Open/Closed
         // filter — owns an empty set and stays an ordinary control, which is what `markParent`'s
         // getter is for.
-        markParent(element, () => [...(panelsByPrefix.get(props.idPrefix) ?? [])])
+        markParent(element, () => panelsFor(props.idPrefix))
         bindKeys(element, [
           ...['left', 'h'].map((key) => ({ key, cmd: () => step(-1) })),
           ...['right', 'l'].map((key) => ({ key, cmd: () => step(1) })),
@@ -426,12 +445,6 @@ function MenuList(props: { close: () => void; children: JSX.Element }) {
         // nodes — and there is no item list to key one by. The design asked for a `Rows` here; a
         // `Rows` needs the items, and `MenuList` is handed a tree.
         //
-        // Twice, because the two answers differ inside a filter field. The bare letters are gated on
-        // "is somebody typing", which is right — `j` in a picker's filter is a `j`. The arrows are
-        // not, because a list under a field is the only thing an arrow there could mean, and that is
-        // the same exception the palette takes above the dismiss layer (../keys/trap.ts
-        // § overlayKeys).
-        //
         // `within` is the list rather than the neighbours of whatever has the keys, because the stops
         // behind an open list are not reachable while its scope holds them
         // (../keys/regions.ts § walkStops).
@@ -439,11 +452,27 @@ function MenuList(props: { close: () => void; children: JSX.Element }) {
         bindKeys(element, [
           { key: 'j', cmd: walk(1) },
           { key: 'k', cmd: walk(-1) },
-        ], LIST)
-        bindKeys(element, [
           { key: 'down', cmd: walk(1) },
           { key: 'up', cmd: walk(-1) },
-        ], LIST, { whileTyping: true })
+        ], LIST)
+        // And the arrows again, above the typing shadow, while a filter field inside this menu has
+        // the keys. Two answers, because the two keys differ there: `j` in a picker's filter is a
+        // `j`, and a list under a field is the only thing an arrow there could mean — the same
+        // exception the palette takes above the dismiss layer (../keys/trap.ts § overlayKeys).
+        //
+        // A layer that comes and goes rather than a matcher on the pair, which is the shape the whole
+        // typing gate has on this host: a matcher would switch the engine's active-key cache off for
+        // the process and the footer asks it per render (../keys/tiers.ts § TYPING). The tier is only
+        // reached while somebody is typing, and while somebody is typing the collection tier the
+        // `LIST` pair above defers to is shadowed anyway, so nothing it was protecting is in reach.
+        createEffect(() => {
+          focusedRenderable()
+          if (!isTyping()) return
+          bindKeys(element, [
+            { key: 'down', cmd: walk(1) },
+            { key: 'up', cmd: walk(-1) },
+          ], OVERLAY_OWN)
+        })
       }}
     >
       {props.children}

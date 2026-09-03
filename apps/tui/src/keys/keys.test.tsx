@@ -11,8 +11,9 @@ import { Rectangle } from '../kit/pixels'
 import { enteredRectangle, type CellTerminal } from '../kit/rectangle'
 import { Row, Rows } from '../kit/showing'
 import { Text } from '../kit/showing'
+import { Button, Input } from '../kit/asking'
 import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
-import { focusedRegion, focusedRenderable, onScreen } from './regions'
+import { focusedRegion, focusedRenderable, onScreen, regionFocus } from './regions'
 
 // The terminal twin of `client-core/host/keys/keys.test.tsx`: the same intent scenarios against the
 // terminal adapter, so the two adapters cannot drift.
@@ -455,6 +456,73 @@ describe.skipIf(!hasFfi)('keys and focus in cells', () => {
       expect(caretLine(moved.lines)).toContain('Alpha')
     } finally {
       frame.done()
+    }
+  }, 30_000)
+})
+
+// ── Typing is a layer ─────────────────────────────────────────────────────────────────────────
+//
+// While a field has the keys the bare keys type, and this host says so once, as a layer registered
+// while a field has them, rather than as a matcher on every bare-key binding on the screen. The
+// behaviour is the same and the engine's own active-key cache is the difference
+// (./tiers.ts § TYPING, ../chrome/bindings.ts).
+
+/** How many layers, commands or bindings are keeping the engine's active-key cache off.
+ *
+ *  Read off the engine's own state through its extension symbol, because 0.5.9 publishes no stats
+ *  API. That is a test of another package's internals and it is worth the ceiling here: the whole
+ *  point of the typing shadow is this number, and a release that renames it should fail loudly rather
+ *  than let the design quietly stop paying (`@opentui/keymap` § createKeymapState). */
+const cacheBlockers = (engine: object): number => {
+  const symbol = Object.getOwnPropertySymbols(Object.getPrototypeOf(engine))
+    .find((candidate) => String(candidate).includes('keymap-extension-context'))
+  expect(symbol, 'the keymap no longer exposes its extension context').toBeDefined()
+  const read = (engine as Record<symbol, () => { state: { activeKeyCacheBlockers: number } }>)[symbol!]
+  return read.call(engine).state.activeKeyCacheBlockers
+}
+
+describe.skipIf(!hasFfi)('the typing shadow', () => {
+  it('lets a bare key reach a field, moves focus with it after the field loses the keys, and blocks no cache', async () => {
+    const [text, setText] = createSignal('')
+    const [pressed, setPressed] = createSignal('')
+    // Two regions, because Tab is how the keys leave a field for something that is not one, and the
+    // cycle needs somewhere to go (./regions.ts § moveRegion).
+    let screen = await renderCells(() => (
+      <box flexDirection="column" flexGrow={1}>
+        <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}>
+          <Input value={text()} onInput={setText} />
+        </box>
+        <box flexDirection="column" ref={regionFocus({ paneId: 'test', regionId: 'buttons' }, 1)}>
+          <Button onPress={() => setPressed('first')}>First</Button>
+          <Button onPress={() => setPressed('second')}>Second</Button>
+        </box>
+      </box>
+    ), { width: 40, height: 8 })
+    try {
+      const { keymap } = await import('@acorn/client-core/kit/keys/keymapHost.ts')
+      const engine = keymap()!
+
+      // The screen opens on the first region, which is the field: a region lands on its first stop
+      // and this one has nothing else (./regions.ts § enter).
+      expect(cacheBlockers(engine)).toBe(0)
+
+      // `j` in a field is a `j`. The shadow claims it so that nothing below answers, and hands it to
+      // the field anyway, which is what `preventDefault: false` buys.
+      screen = await screen.press('j')
+      expect(text()).toBe('j')
+      // And the engine's cache is still on while the shadow is registered, which is the whole reason
+      // it is a layer.
+      expect(cacheBlockers(engine)).toBe(0)
+
+      // Out of the field, and the same key moves the keys instead of typing.
+      screen = await screen.press('TAB')
+      screen = await screen.press('j')
+      expect(text()).toBe('j')
+      screen = await screen.press('RETURN')
+      expect(pressed()).toBe('second')
+      expect(cacheBlockers(engine)).toBe(0)
+    } finally {
+      screen.done()
     }
   }, 30_000)
 })

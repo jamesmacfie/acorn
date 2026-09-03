@@ -9,12 +9,18 @@
 // and a key a rectangle or a trap has taken never shows. `client-core/host/keys/CheatSheet.tsx` reads
 // the same call for the same reason.
 //
+// Asked once per change rather than once per render. The footer draws whenever anything on the screen
+// does, and `getActiveKeys` walks every active layer, so the list is cached against the five things
+// that move it (§ When the answer moves, § activeHints).
+//
 // What this file adds is the words. The engine knows a key is live; it does not know that `j` and `k`
 // together are "move", because the intent layers bind anonymous handlers rather than named commands.
 // The keys come from the host's own intent table, so a hint can never name a key nothing is bound to.
 
+import { createSignal } from 'solid-js'
 import { InputRenderable, ScrollBoxRenderable, TextareaRenderable, type KeyEvent, type Renderable } from '@opentui/core'
-import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { isTyping, keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { BARE_KEYS } from '@acorn/client-core/kit/keys/keymap.ts'
 import { hostKeysFor } from '../keys/install'
 import { focusedExpands, focusedItem, focusedRenderable, isParentStop, regionsInScope } from '../keys/regions'
 import { focusedCrosses, focusedOpens } from '../keys/stops'
@@ -136,6 +142,44 @@ const specs = (): Spec[] => {
   ]
 }
 
+// ── When the answer moves ─────────────────────────────────────────────────────────────────────
+//
+// This file's header used to say the engine has no signal for "the active layers changed". It has
+// one: `state`, which the engine emits when focus moves and when a layer is registered or
+// unregistered, and both of those are exactly when a hint appears or goes. Reading it as a signal is
+// what makes the cache below safe — a control mounting adds a key without focus, an overlay or a
+// region moving anything, and the footer has to say so.
+//
+// One subscription per engine. A suite builds a renderer and an engine per test, so the previous
+// one's listener is dropped when a new engine appears.
+const [layerRevision, bumpLayers] = createSignal(0)
+let watched: object | null = null
+let stopWatching = (): void => {}
+
+const watchLayers = (engine: { on: (name: 'state', fn: () => void) => () => void }): void => {
+  if (watched === engine) return
+  stopWatching()
+  watched = engine
+  stopWatching = engine.on('state', () => bumpLayers((at) => at + 1))
+}
+
+/** What the last answer was and what it was an answer to.
+ *
+ *  The footer draws once per render and a render happens for reasons that have nothing to do with the
+ *  keyboard — a task list arriving, a terminal frame, a toast. `getActiveKeys` walks every active
+ *  layer, so asking it per render was the cost this cache removes: the answer only moves when one of
+ *  the four things below moves, and each of them is a signal or an identity
+ *  (docs/future/performance/phase-9-the-terminal-clients-keystroke.md). */
+let last: {
+  node: Renderable | null
+  overlays: readonly unknown[]
+  regions: number
+  typing: boolean
+  revision: number
+  engine: object
+  hints: Hint[]
+} | null = null
+
 /**
  * The hints the keyboard offers right now, in reading order.
  *
@@ -146,29 +190,59 @@ export function activeHints(): Hint[] {
   // both signals here: where the keys are, and whether an overlay has taken them. Read so that a
   // caller drawing this list re-draws when the answer moves — without them the footer is whatever was
   // true at the render that happened to build it.
-  focusedRenderable()
-  openOverlays()
+  const node = focusedRenderable()
+  const overlays = openOverlays()
   // And how many regions the keys can reach, which changes without focus moving: the rail hides on
   // Ctrl+B and the pane strip draws only while a task is open. Read here rather than only inside the
   // Tab hint's own probe, because that probe short-circuits — so on a render where the key is not
   // live the footer would take no dependency at all and keep whatever it last said
   // (../keys/regions.ts § regionsInScope).
-  regionsInScope()
+  const regions = regionsInScope()
   const engine = keymap<Renderable, KeyEvent>()
   if (!engine) return []
-  const live = new Set(engine.getActiveKeys().map((key) => engine.formatKey(key.display)))
+  watchLayers(engine)
+  // Whether somebody is typing, which is where the words move without focus moving: a field takes
+  // the keys and the typing shadow goes on above every bare key on the screen
+  // (../keys/tiers.ts § TYPING).
+  const typing = isTyping()
+  // And which layers are registered, which is the rest of the answer (§ When the answer moves).
+  const revision = layerRevision()
+  if (last
+    && last.node === node && last.overlays === overlays && last.regions === regions
+    && last.typing === typing && last.revision === revision && last.engine === engine) return last.hints
+
+  // One ask, with the metadata. It was two — the plain list and then the same collect again for the
+  // descriptions — and the second answers the first as well, because `includeMetadata` enriches the
+  // same keys rather than choosing different ones (`@opentui/keymap` § ActiveKeysCaches).
+  const active = engine.getActiveKeys({ includeMetadata: true })
+  const live = new Set(active.map((key) => engine.formatKey(key.display)))
   const shown = specs()
+    // A field's bare keys type. The typing shadow claims them so that nothing below it answers, which
+    // means the engine now reports them live while a field has the keys — true of the shadow and a
+    // lie to the reader, so the footer says what it always said and draws the chord alone
+    // (§ WORDS.field, ../keys/tiers.ts § TYPING).
+    .filter((spec) => !(typing && BARE_KEYS.has(spec.probe)))
     .filter((spec) => spec.probe && live.has(engine.formatKey(spec.probe)) && (spec.when?.() ?? true))
   const hint = ({ probe: _probe, when: _when, ...rest }: Spec): Hint => rest
   // Every command with a chord and a description of its own — the palette, the cheat sheet, quitting,
   // and whatever a plugin registered. These the engine does know the words for, because a command
   // layer binding carries them (../keys/commandLayer.ts).
-  const commands = engine.getActiveKeys({ includeMetadata: true })
+  const commands = active
     .flatMap((key): Hint[] => {
       const desc = String(key.bindingAttrs?.desc ?? key.commandAttrs?.desc ?? '')
       return desc ? [{ keys: engine.formatKey(key.display), label: desc.toLowerCase() }] : []
     })
   // Move and open first because they are what a reader reaches for; the chords next because they are
   // the ones nobody can guess; the rest after, where the footer's own truncation reaches them first.
-  return [...shown.slice(0, 2).map(hint), ...commands, ...shown.slice(2).map(hint)]
+  const hints = [...shown.slice(0, 2).map(hint), ...commands, ...shown.slice(2).map(hint)]
+  last = { node, overlays, regions, typing, revision, engine, hints }
+  return hints
+}
+
+/** Test seam: the cache is module state and a suite renders many screens into one process. */
+export function _resetHints(): void {
+  last = null
+  stopWatching()
+  stopWatching = () => {}
+  watched = null
 }

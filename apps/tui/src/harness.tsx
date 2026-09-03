@@ -109,6 +109,7 @@ export async function renderFixture(size: {
   const { _resetRegions } = await import('./keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
   const { _resetChrome } = await import('./chrome/state')
+  const { _resetHints } = await import('./chrome/bindings')
   const { _resetRouter } = await import('./kit/router')
   const { clearAnnotations } = await import('@acorn/client-core/host/annotations/annotations.ts')
   const { setActiveTaskId, setSelectedSource } = await import('@acorn/client-core/features/tasks/tasks.ts')
@@ -126,6 +127,9 @@ export async function renderFixture(size: {
   _resetRegions()
   _resetLayoutState()
   _resetChrome()
+  // …and the footer's cached answer, which is keyed on the engine among other things and would
+  // otherwise be the previous render's hints until something moved (./chrome/bindings.ts).
+  _resetHints()
   _resetRouter()
   // …and the marks another plugin put on this one's rows. The store remembers which key set it has
   // already asked about, so a render whose fixture contributes marks would be told the previous
