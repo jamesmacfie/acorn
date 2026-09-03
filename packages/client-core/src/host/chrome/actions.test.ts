@@ -1,10 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
+type RawResult = { ok: boolean; status: number; error?: { code: string; message: string } }
+const sendRaw = vi.fn(async (..._args: unknown[]): Promise<RawResult> => ({ ok: true, status: 200 }))
 vi.mock('../../infra/node/apiClient', () => ({
   readJson: vi.fn(),
   sendRaw: (...args: unknown[]) => sendRaw(...args),
   writeJson: vi.fn(),
+}))
+
+// The toast is the part a clicker sees, and the one thing that must keep working now that the palette
+// reads the answer instead: `activeToasts` is a signal a test would have to render to read, so the
+// function is captured here.
+const toasted: string[] = []
+vi.mock('../../features/notifications/toast', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  toast: (message: string) => void toasted.push(message),
 }))
 
 const { runChromeAction } = await import('./actions')
@@ -24,6 +34,8 @@ const item = { id: 'conn-1:ENG-42', title: 'Fix the thing' }
 const disposables: { dispose(): void }[] = []
 
 afterEach(() => {
+  toasted.length = 0
+  sendRaw.mockClear()
   for (const entry of disposables.splice(0).reverse()) entry.dispose()
   evictPendingIntents('task-1')
   setActiveTaskId(null)
@@ -146,5 +158,57 @@ describe('navigate', () => {
       pluginId: 'board', nodeId: 'node-a', item, projectId: 'project-web', navigate,
     })
     expect(navigate).not.toHaveBeenCalled()
+  })
+})
+
+// The answer, added on 2026-09-03 so a command can be awaited: every click site still discards the
+// promise and still gets its toast, and the palette gets a result it can keep its frame open with
+// (docs/future/command-palette/phase-2-search-and-input.md § Migration steps).
+describe('the answer a verb gives back', () => {
+  it('waits for the node before saying an action worked', async () => {
+    const answered = runChromeAction({ verb: 'runNodeAction', path: '/v2/p/database/run' }, {
+      pluginId: 'database', nodeId: 'node-a', item,
+    })
+    expect(sendRaw).toHaveBeenCalledWith('/v2/p/database/run', expect.objectContaining({
+      method: 'POST', nodeId: 'node-a', body: JSON.stringify({ item: 'conn-1:ENG-42' }),
+    }))
+    expect(await answered).toEqual({ ok: true })
+    expect(toasted).toEqual([])
+  })
+
+  it('carries the node’s own failure back, and still toasts it where the click was', async () => {
+    sendRaw.mockResolvedValueOnce({ ok: false, status: 409, error: { code: 'busy', message: 'a query is already running' } })
+    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v2/p/database/run' }, {
+      pluginId: 'database', nodeId: 'node-a',
+    })
+    expect(result).toEqual({ ok: false, message: 'action failed: a query is already running' })
+    // The old click sites read nothing and are unchanged: this is still how they report it.
+    expect(toasted).toEqual(['database: action failed'])
+  })
+
+  it('carries a thrown transport failure back too', async () => {
+    sendRaw.mockRejectedValueOnce(new Error('This node is offline, so nothing was sent.'))
+    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v2/p/database/run' }, {
+      pluginId: 'database', nodeId: 'node-a',
+    })
+    expect(result).toEqual({ ok: false, message: 'action failed: This node is offline, so nothing was sent.' })
+  })
+
+  it('refuses a path outside the plugin’s namespace without asking the node', async () => {
+    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v2/tasks' }, {
+      pluginId: 'database', nodeId: 'node-a',
+    })
+    expect(sendRaw).not.toHaveBeenCalled()
+    expect(result).toEqual({ ok: false, message: 'refused an action outside its own namespace' })
+  })
+
+  it('says which refusal it was, for the frame that has to show one', async () => {
+    setActiveTaskId(null)
+    disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
+    const result = await runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'open a task first: This opens a pane, and a pane belongs to a task.',
+    })
   })
 })

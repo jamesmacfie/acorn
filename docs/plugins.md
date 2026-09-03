@@ -2429,6 +2429,56 @@ binding ids must remain stable across versions because the qualified binding id 
 user's persisted override map. The old `contributions.palette` descriptor remains an alias for a
 command with `palette: true` for plugin API v1 and is scheduled for removal in plugin API v2.
 
+### Command kinds
+
+A command descriptor carries an optional `kind`. Omitted, or `action`, it is one closed verb the host
+runs, which is what every command was before 2026-09-03 and what every already-installed manifest
+still parses as. The other three are additive:
+
+- **`group`** holds children and has no action of its own. Any command may name a `parentId`, which
+  must be a group in the same manifest; cross-plugin parenting is refused, and a missing parent, a
+  parent that is not a group, and a cycle are each an install-time error and a dropped command on the
+  device.
+- **`search`** names a GET `route` in the plugin's own namespace and one static `onSelect` verb. The
+  host debounces the typing, sends `q` plus the identifier the declared `scope` owns
+  (`taskId`, `projectId` or `workspaceId`), and renders
+  `{ items: [{ id, title, subtitle?, icon?, badge?, ref?, taskId?, projectId?, workspaceId? }] }`.
+  `placeholder`, `minQueryLength` (0–20) and `debounceMs` (150–1,000) are optional; the host caps the
+  rendered set at 50 rows.
+- **`input`** names a POST `route` and one static `onSuccess` verb. The host sends
+  `{ input, taskId? }` when the reader presses Enter and expects `{ ok: true, item?, message? }`; a
+  failure is the ordinary error envelope, keeps the reader's text on screen, and runs no action.
+
+`scope` is `none`, `task`, `project`, `workspace` or `node` (the default). A command whose scope names
+an identity the palette session does not have is not offered. `fleet` is not a scope a manifest may
+name: fanning a plugin's route out over every paired node is not a decision a declaration makes for
+somebody else's network.
+
+A route's answer never chooses behaviour. Every field but the ones listed above is dropped before the
+row is rendered, malformed rows are dropped individually, and the verb that runs when a row is picked
+or a submission succeeds is the static one the manifest declared. A search or an input needs a `node`
+entrypoint, because only a node half serves `/v2/p/<id>/`.
+
+```json
+{
+  "contributions": {
+    "commands": [
+      { "id": "issues", "title": "Linear", "category": "navigation", "kind": "group" },
+      {
+        "id": "find",
+        "title": "Linear: find an issue",
+        "kind": "search",
+        "parentId": "issues",
+        "scope": "project",
+        "route": "/v2/p/linear/issues/search",
+        "placeholder": "Search issues…",
+        "onSelect": { "verb": "runNodeAction", "path": "/v2/p/linear/issues/open" }
+      }
+    ]
+  }
+}
+```
+
 The webview manifest shape is:
 
 ```json

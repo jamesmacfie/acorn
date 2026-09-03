@@ -24,6 +24,9 @@
 .palette-row.selected { background: var(--bg-selected); }
 .palette-row.palette-error { color: var(--del-marker); cursor: default; }
 .palette-label { flex: none; }
+/* A search result's own marker: a count, a state, a severity. Beside the label, because it is about
+   the row rather than about where the row came from. */
+.palette-badge { flex: none; font-family: var(--font-ui); }
 /* Where a root-search hit lives, when the hit is not at the top level. Between the label and the
    hint, because it belongs to the label. */
 .palette-crumb { flex: none; font-family: var(--font-ui); }

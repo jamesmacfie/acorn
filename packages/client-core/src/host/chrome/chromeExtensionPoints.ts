@@ -126,7 +126,7 @@ export function pluginExtension(
         ? {
           // Verb already checked against this manifest's surfaces by the chrome pass. The item passed
           // here is minted from the row the host drew, not from the point owner or another plugin.
-          run: (item: { id: string; title: string }) => runChromeAction(descriptor.onSelect!, {
+          run: (item: { id: string; title: string }) => void runChromeAction(descriptor.onSelect!, {
             pluginId,
             nodeId: binding.nodeId(),
             item: { id: item.id, title: item.title },

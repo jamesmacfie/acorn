@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
 import { Input } from '../../kit/components/primitives'
 import type { PaletteView } from './overlay'
 // The component owns its stylesheet, so a consumer can't depend on some other palette having been
@@ -43,6 +43,9 @@ export function PaletteSurface<T>(props: {
   busy?: boolean
   /** One line for a screen reader, announced when it changes: how many results, or what failed. */
   announce?: string
+  /** An IME is building a character, or has just finished one. The command palette forwards it to the
+   *  session, which does not schedule a search until the composition ends. */
+  onComposing?: (composing: boolean) => void
   class?: string
   ariaLabel?: string
 }) {
@@ -68,9 +71,28 @@ export function PaletteSurface<T>(props: {
     field.setAttribute('aria-expanded', 'true')
     field.setAttribute('aria-controls', listId)
     field.setAttribute('aria-autocomplete', 'list')
-    const active = props.items.length ? rowId(props.palette.sel()) : ''
+    // `sel()` is -1 when nothing in the list is selectable, which is what a search frame showing only
+    // its loading line or its error is. Naming `row--1` would point a screen reader at an element that
+    // does not exist.
+    const active = props.palette.sel() >= 0 && props.palette.sel() < props.items.length ? rowId(props.palette.sel()) : ''
     if (active) field.setAttribute('aria-activedescendant', active)
     else field.removeAttribute('aria-activedescendant')
+  })
+
+  // Two listeners the kit's Input does not take, on the same element and for the same reason as the
+  // attributes above: composition is a property of this one field, and every pane in the app should not
+  // grow a prop for it. Attached once per field, so the effect depends on the element alone.
+  createEffect(() => {
+    const field = input()
+    if (!field) return
+    const start = (): void => props.onComposing?.(true)
+    const end = (): void => props.onComposing?.(false)
+    field.addEventListener('compositionstart', start)
+    field.addEventListener('compositionend', end)
+    onCleanup(() => {
+      field.removeEventListener('compositionstart', start)
+      field.removeEventListener('compositionend', end)
+    })
   })
 
   return (

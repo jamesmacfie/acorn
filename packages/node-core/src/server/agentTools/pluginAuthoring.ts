@@ -41,6 +41,17 @@ const manifestJsonSchema = (): JsonSchema =>
 const at = (schema: JsonSchema | undefined, ...path: string[]): JsonSchema | undefined =>
   path.reduce<JsonSchema | undefined>((node, key) => node?.properties?.[key], schema)
 
+/**
+ * One field off a descriptor's items, where the items may be a union of kinds.
+ *
+ * A command is four shapes now — action, group, search, input — so `items.properties` is only there
+ * for the descriptors that are one shape. The first member carrying the field is the answer, because a
+ * field two members both declare has the same shape in both (@acorn/protocol/plugin/contract.ts).
+ */
+const field = (items: JsonSchema | undefined, name: string): JsonSchema | undefined =>
+  items?.properties?.[name]
+  ?? (items?.anyOf ?? items?.oneOf ?? []).map((member) => member.properties?.[name]).find(Boolean)
+
 // A discriminated union of `{ verb: '<literal>' }` objects, read back as the literal set. zod emits
 // `oneOf` for a discriminated union under draft-7, and `anyOf` is the fallback if that changes. The
 // test asserts the result is non-empty, so a silent [] cannot ship.
@@ -130,7 +141,7 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       contextMenuLocations: at(contributions, 'contextMenus')?.items?.properties?.location?.enum ?? [],
       extensionPointLocations: at(contributions, 'extensionPoints')?.items?.properties?.location?.enum ?? [],
       coreSlots: at(contributions, 'frames')?.items?.properties?.coreSlot?.enum ?? [],
-      commandCategories: at(contributions, 'commands')?.items?.properties?.category?.enum ?? [],
+      commandCategories: field(at(contributions, 'commands')?.items, 'category')?.enum ?? [],
       // A `themes` entry must carry exactly these token names, and a theme missing one is refused at
       // parse. Read off the strict object the schema builds from the palette
       // (@acorn/protocol/themeTokens.ts), so a new token reaches the agent with no edit here.
@@ -141,7 +152,7 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       // site with the full set in scope, and a command's `action` is the narrow one every context-free
       // surface takes.
       railOnSelect: verbs(at(contributions, 'sources')?.items?.properties?.onSelect),
-      commandsAndBadges: verbs(at(contributions, 'commands')?.items?.properties?.action),
+      commandsAndBadges: verbs(field(at(contributions, 'commands')?.items, 'action')),
     },
     permissions: {
       node: Object.keys(at(schema, 'permissions', 'node')?.properties ?? {}),
@@ -296,6 +307,16 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
       + `Host slots: ${manifest.slots.map((value) => `\`${value}\``).join(', ')}. `
       + `Context-menu locations: ${manifest.contextMenuLocations.map((value) => `\`${value}\``).join(', ')}. `
       + `Command categories: ${manifest.commandCategories.map((value) => `\`${value}\``).join(', ')}.`,
+    '',
+    '**Commands come in four kinds.** Omit `kind`, or say `action`, and your command is one verb the host',
+    'runs — which is what every command has always been. `group` holds children: a command may name a',
+    '`parentId` that is a group in your own manifest, and nothing else. `search` names a GET route in your',
+    'own namespace and one static `onSelect` verb; the host debounces the reader’s typing, sends `q` plus',
+    'the identifier your `scope` owns, and renders `{ items: [{ id, title, subtitle?, icon?, badge?, ref?,',
+    'taskId? }] }`. `input` names a POST route and one static `onSuccess` verb; the host sends',
+    '`{ input, taskId? }` on Enter and expects `{ ok: true, item?, message? }`. A result never chooses what',
+    'happens to it: everything but those fields is dropped, and the verb that runs is the one you declared',
+    'and a reader reviewed.',
     '',
     '**Descriptors for facts, trees for UI, rectangles for pixels.** Ask which of the three a surface is,',
     'in that order, and take the first that fits. A status chip, a badge, a menu row or a palette entry is',

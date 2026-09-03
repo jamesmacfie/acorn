@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   acceptCommandSearchItems,
+  MAX_COMMAND_SEARCH_QUERY,
   commandInputResultSchema,
   commandSearchItemSchema,
   commandSettingOptionSchema,
@@ -22,6 +23,13 @@ describe('the command vocabulary', () => {
     expect([...COMMAND_KINDS]).toEqual(['action', 'group', 'search', 'input', 'setting'])
     expect([...COMMAND_SCOPES]).toEqual(['none', 'task', 'project', 'workspace', 'node', 'fleet'])
     expect(DEFAULT_COMMAND_SCOPE).toBe('node')
+  })
+
+  it('bounds what travels as a query, because a palette field has no length of its own', () => {
+    expect(MAX_COMMAND_SEARCH_QUERY).toBe(200)
+    // Truncated by whoever sends it, not refused: a reader who pasted too much wants the first part
+    // searched (client-core/host/registries/commands/session.ts).
+    expect('x'.repeat(1_000).slice(0, MAX_COMMAND_SEARCH_QUERY)).toHaveLength(200)
   })
 })
 

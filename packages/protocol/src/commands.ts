@@ -42,6 +42,11 @@ export const MAX_COMMAND_SEARCH_DEBOUNCE_MS = 1_000
 export const DEFAULT_COMMAND_SEARCH_MIN_QUERY = 2
 export const MAX_COMMAND_SEARCH_MIN_QUERY = 20
 
+/** How much of a typed query travels to a provider. A palette field has no length limit of its own, so
+ *  without this a pasted file becomes a query string; the host truncates rather than refuses, because a
+ *  reader who pasted too much wants the first part searched, not an error. */
+export const MAX_COMMAND_SEARCH_QUERY = 200
+
 /** Rows the host will render from one response. Excess is truncated, not refused: a provider that
  *  answers 200 rows is verbose rather than hostile, and dropping the whole answer helps nobody. */
 export const MAX_COMMAND_SEARCH_ITEMS = 50

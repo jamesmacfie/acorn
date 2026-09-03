@@ -38,7 +38,7 @@ function SourceEmpty(props: { pluginId: string; nodeId: string; empty?: PluginSo
           action={
             <Show when={empty().action}>
               {(action) => (
-                <Button onPress={() => runChromeAction(action(), { pluginId: props.pluginId, nodeId: props.nodeId })}>
+                <Button onPress={() => void runChromeAction(action(), { pluginId: props.pluginId, nodeId: props.nodeId })}>
                   {empty().actionLabel ?? 'Open'}
                 </Button>
               )}
@@ -123,7 +123,9 @@ export default function ChromeSourcePanel(props: ChromeSourcePanelProps) {
 
 
   const select = (item: PluginRailItem): void => {
-    if (props.descriptor.onSelect) runChromeAction(props.descriptor.onSelect, {
+    // Discarded on purpose: a rail row has already had any refusal as a toast, and only the palette
+    // reads the answer back (./actions.ts).
+    if (props.descriptor.onSelect) void runChromeAction(props.descriptor.onSelect, {
       pluginId: props.pluginId,
       nodeId,
       item,

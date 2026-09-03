@@ -2,9 +2,11 @@ import { fuzzyScore } from '../../../kit/lib/paletteModel'
 import {
   commandAvailable,
   commandHint,
+  commandScopeSatisfied,
   commandTitle,
   DEFAULT_COMMAND_ORDER,
   type CommandContribution,
+  type CommandExecutionContext,
 } from './commands'
 
 // The command graph: a flat registry read as a tree, once, for whoever is drawing
@@ -120,8 +122,16 @@ const score = (query: string, node: CommandNode): number | null => {
  *
  * Ownership is compared as stated: core's commands carry no owner and so are all one owner, which is
  * what lets a core group hold core children while refusing a plugin's.
+ *
+ * `context` is the identity a session captured, and passing it applies the scope gate: a command about
+ * a task is unavailable in a session that opened over no task (./commands.ts § commandScopeSatisfied).
+ * Omitted — a cheat sheet, a test, anything asking what exists rather than what can run now — leaves
+ * every scope satisfied, because there is no world to hold them against.
  */
-export function buildCommandGraph(commands: readonly CommandContribution[]): CommandGraph {
+export function buildCommandGraph(
+  commands: readonly CommandContribution[],
+  context?: CommandExecutionContext,
+): CommandGraph {
   const diagnostics: CommandGraphDiagnostic[] = []
   const drop = (id: string, issue: CommandGraphIssue, message: string): void => {
     diagnostics.push({ id, issue, message })
@@ -222,7 +232,9 @@ export function buildCommandGraph(commands: readonly CommandContribution[]): Com
   const build = (draft: Draft, depth: number, trail: readonly string[], inherited: Inherited): CommandNode => {
     const title = commandTitle(draft.command)
     const breadcrumb = [...trail, title]
-    const available = inherited.available && commandAvailable(draft.command)
+    const available = inherited.available
+      && commandAvailable(draft.command)
+      && (context === undefined || commandScopeSatisfied(draft.command, context))
     const discoverable = available && inherited.discoverable && !!draft.command.palette
     const children = draft.children
       .sort(bySibling)

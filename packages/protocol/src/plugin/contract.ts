@@ -6,6 +6,11 @@
 // the bottom are `z.infer` of these schemas, loosened where an older node's parser had fewer defaults.
 import { z } from 'zod'
 import { collectionParamsSchema, collectionSchema, COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS } from '../collections.ts'
+import {
+  MAX_COMMAND_SEARCH_MIN_QUERY,
+  MAX_COMMAND_SEARCH_DEBOUNCE_MS,
+  MIN_COMMAND_SEARCH_DEBOUNCE_MS,
+} from '../commands.ts'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../contentLinkPattern.ts'
 import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from '../contextMenus.ts'
 import {
@@ -487,13 +492,94 @@ const paletteDescriptor = z.object({
 
 const commandCategory = z.enum(['action', 'navigation', 'pane', 'task', 'terminal', 'workspace'])
 
-const commandDescriptor = z.object({
+// What every kind of command declares. Ids are local: `chromeRegister.ts` qualifies both this one and
+// `parentId` as `plugin.<pluginId>.<id>` and stamps the owner, so a manifest cannot name another
+// plugin's group as its parent or claim another plugin's id
+// (docs/future/command-palette/architecture.md § Command graph).
+const commandCommon = {
   id: z.string().min(1).max(64),
   title: z.string().min(1).max(120),
   category: commandCategory.default('action'),
   palette: z.boolean().default(true),
+  /** Secondary text on the row. */
+  hint: z.string().min(1).max(160).optional(),
+  /** What the root search matches on besides the title, for a command whose name is not what anybody
+   *  types. */
+  keywords: z.array(z.string().min(1).max(40)).max(16).optional(),
+  /** Sibling order, before relevance. */
+  order: z.number().int().min(0).max(100_000).optional(),
+  /** A `group` this same manifest declares. Checked across the whole array by the manifest refinement,
+   *  because a parent is another entry in the list and no field can see its siblings. */
+  parentId: z.string().min(1).max(64).optional(),
+}
+
+// Which identity the host derives and sends, and it is not the whole vocabulary: `fleet` is missing on
+// purpose. Fanning a manifest's route out over every paired node multiplies somebody else's network,
+// rate limits and error noise on a declaration nobody reviewed per node, and the two scopes a loaded
+// plugin actually needs — the open task and the routed project — are here. Core commands may still be
+// fleet-scoped (@acorn/protocol/commands.ts).
+const loadedCommandScope = z.enum(['none', 'task', 'project', 'workspace', 'node']).default('node')
+
+// The compatibility member, and the reason this is a `z.union` rather than a discriminated one: an
+// existing descriptor carries no `kind` at all, and Zod's discriminated union does not apply a
+// discriminator's default before matching, so it would refuse every manifest already installed.
+const actionCommandDescriptor = z.object({
+  ...commandCommon,
+  kind: z.literal('action').default('action'),
   action: contextFreeAction,
 })
+
+/** A parent. No action of its own: what it holds is the commands naming it as their `parentId`. */
+const groupCommandDescriptor = z.object({
+  ...commandCommon,
+  kind: z.literal('group'),
+})
+
+/**
+ * A live query against one of this plugin's own routes.
+ *
+ * The host GETs `route` with `q` and the identifiers the declared scope owns, and it renders what
+ * comes back as display facts (@acorn/protocol/commands.ts § CommandSearchItem). A result cannot
+ * choose what picking it does: `onSelect` is one static verb from the same closed set a command's
+ * action comes from, declared here and reviewed with the rest of the manifest
+ * (docs/future/command-palette/refused.md § Returning executable commands from a loaded search
+ * response).
+ */
+const searchCommandDescriptor = z.object({
+  ...commandCommon,
+  kind: z.literal('search'),
+  scope: loadedCommandScope,
+  // GET → { items: CommandSearchItem[] }, confined to this plugin's namespace by the refinement.
+  route: pluginRoute,
+  placeholder: z.string().min(1).max(120).optional(),
+  minQueryLength: z.number().int().min(0).max(MAX_COMMAND_SEARCH_MIN_QUERY).optional(),
+  // Floored as well as capped: a declared 5 ms is a plugin spending a request on every keystroke.
+  debounceMs: z.number().int().min(MIN_COMMAND_SEARCH_DEBOUNCE_MS).max(MAX_COMMAND_SEARCH_DEBOUNCE_MS).optional(),
+  onSelect: contextFreeAction,
+})
+
+/**
+ * One line of text, submitted on Enter.
+ *
+ * The host POSTs `{ input, … }` to `route` and runs `onSuccess` only if the route answered. A failure
+ * is the ordinary error envelope and keeps the reader's text where they typed it.
+ */
+const inputCommandDescriptor = z.object({
+  ...commandCommon,
+  kind: z.literal('input'),
+  scope: loadedCommandScope,
+  // POST { input, taskId?, projectId?, workspaceId? } → { ok: true, item?, message? }
+  route: pluginRoute,
+  placeholder: z.string().min(1).max(120).optional(),
+  onSuccess: contextFreeAction,
+})
+
+const commandDescriptor = z.union([
+  actionCommandDescriptor,
+  groupCommandDescriptor,
+  searchCommandDescriptor,
+  inputCommandDescriptor,
+])
 
 const keybindingDescriptor = z.object({
   command: z.string().min(1).max(64),
@@ -975,7 +1061,21 @@ export type PluginSourceDescriptor = Omit<z.infer<typeof sourceDescriptor>, 'pan
 export type PluginSlotDescriptor = z.infer<typeof slotDescriptor>
 export type PluginPaletteDescriptor = z.infer<typeof paletteDescriptor>
 export type PluginCommandCategory = z.infer<typeof commandCategory>
-export type PluginCommandDescriptor = z.infer<typeof commandDescriptor>
+// `kind` is optional on the action member and required nowhere else, which is the rule this file's
+// header states: the field was added to a shape that had already shipped, so a roster row from a node
+// running the previous parser carries no `kind` at all and means the action it always meant. The other
+// three members can only have come from a node that has this schema.
+export type PluginActionCommandDescriptor = Omit<z.infer<typeof actionCommandDescriptor>, 'kind'> & { kind?: 'action' }
+export type PluginGroupCommandDescriptor = z.infer<typeof groupCommandDescriptor>
+export type PluginSearchCommandDescriptor = z.infer<typeof searchCommandDescriptor>
+export type PluginInputCommandDescriptor = z.infer<typeof inputCommandDescriptor>
+/** A newer node may send a kind this build has no frame for, so every reader switches on `kind` and
+ *  skips what it does not know rather than coercing it into an action. */
+export type PluginCommandDescriptor =
+  | PluginActionCommandDescriptor
+  | PluginGroupCommandDescriptor
+  | PluginSearchCommandDescriptor
+  | PluginInputCommandDescriptor
 export type PluginKeybindingDescriptor = z.infer<typeof keybindingDescriptor>
 export type PluginAttentionDescriptor = z.infer<typeof attentionDescriptor>
 export type PluginNodeStatDescriptor = z.infer<typeof nodeStatDescriptor>

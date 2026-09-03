@@ -61,7 +61,7 @@ export function pluginContextMenuItem(
     // The action was already checked against this manifest's declared surfaces by the chrome pass, the
     // same check a command's gets. What is added here is the item, minted from the target the host
     // handed the menu, never from anything the descriptor said.
-    run: (target) => runChromeAction(descriptor.action, {
+    run: (target) => void runChromeAction(descriptor.action, {
       pluginId,
       nodeId: binding.nodeId(),
       item: { id: target.id, title: target.title },

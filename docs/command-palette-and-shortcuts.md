@@ -31,9 +31,30 @@ command with no executor is passed to the registered palette presenter, which op
 command's frame (`registries/commands/presenter.ts`). A leaf named that way opens at its parent with
 the cursor on it.
 
+**A command may also be a search or an input.** A `search` command owns the field: the host debounces
+the typing (250 ms and two characters by default), asks its provider with an `AbortSignal`, and draws
+the instruction, loading, empty, error or result state that came back. An `input` command is never
+debounced — the reader presses Enter once, sees a pending row, and cannot submit twice — and a failure
+keeps the frame, the text and the message. Nothing is scheduled while an IME is composing a character;
+the end of the composition schedules once.
+
+**A stale answer cannot land.** Every request carries a generation taken when it was scheduled, and an
+answer is applied only if that generation is still current. The abort is the optimisation and the
+generation is the correctness, because a provider is free to ignore its signal and some do. A new
+query, a pop, a close, or the world moving under the session all abort what is outstanding.
+
+**A command says which identity it is about.** `scope` is `none`, `task`, `project`, `workspace`,
+`node` (the default) or `fleet`. A command whose scope names an identity the session did not capture
+is not offered and cannot be opened at by shortcut. `node` is where a request goes rather than a gate,
+because a client serving its own origin has no node id. Only `fleet` fans out: it asks the host's
+fan-out adapter for its nodes, runs one request each, namespaces every row as `<nodeId>:<itemId>`,
+carries the node's label into the row, and keeps one node's rows when another's request fails.
+
 **A command says what happened.** An action returns nothing, which means close; `{ effect: 'stay' }`
 keeps the frame open and may carry a line to show; a throw or a rejected promise keeps the frame open
-with the message on it. A second Enter while one is in flight is ignored.
+with the message on it. A second Enter while one is in flight is ignored. A loaded plugin's action is
+awaited now, so a `runNodeAction` the node refused keeps the palette open with the node's own message
+instead of closing over it; every other click site discards the same promise and still gets its toast.
 
 **The session closes when the world moves under it.** It captures one immutable execution context —
 host, node, workspace, project, task, pane, surface — when it opens, and passes that to every provider
@@ -72,6 +93,17 @@ commands are registered by their owning plugin. A loaded plugin's manifest `comm
 promoted into the same command registry: one command supplies both its optional palette row and any
 keybinding target. The legacy manifest `palette` array is a compatibility alias for a command with
 `palette: true`; it never produces a second row.
+
+A manifest may declare an action, a group, a search or an input (`docs/plugins.md § Command kinds`).
+A declarative search names a route in the plugin's own namespace and one static verb for the row that
+is picked; the host sends the query and the identifiers the declared scope owns, drops every field of
+the answer it does not name, caps the rendered set, and runs the manifest's verb. A response cannot
+name a route, a URL, a command or a verb, which is the whole of why a plugin's live rows are safe to
+draw in a host surface.
+
+A compiled plugin whose rows are already on the machine uses the load-once adapter
+(`registries/commands/localSearch.ts`): no debounce, no minimum query, one fetch when the frame opens
+and local filtering after that.
 
 Context-menu rows share the commands' ceiling without sharing their registry. A menu row is a label, an
 order, a predicate over what is under the cursor, and one verb from the same closed context-free set a

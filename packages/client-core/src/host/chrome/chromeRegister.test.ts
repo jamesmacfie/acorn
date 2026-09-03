@@ -438,6 +438,38 @@ describe('syncChromeContributions', () => {
     expect(binding.plugin?.state()).toBe('disabled')
   })
 
+  it('registers the four kinds a manifest may declare, and skips a fifth it does not know', () => {
+    const declared: Partial<PluginContributions> = {
+      commands: [
+        { id: 'issues', title: 'Board: issues', category: 'navigation', palette: true, kind: 'group' },
+        {
+          id: 'find', title: 'Board: find a card', category: 'action', palette: true, kind: 'search',
+          scope: 'task', route: '/v2/p/board/search', parentId: 'issues',
+          onSelect: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+        },
+        {
+          id: 'ask', title: 'Board: new card', category: 'action', palette: true, kind: 'input',
+          scope: 'project', route: '/v2/p/board/new-card',
+          onSuccess: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+        },
+        // A kind a newer node knows about. Skipped rather than coerced into an action.
+        { id: 'theme', title: 'Board: theme', category: 'action', palette: true, kind: 'setting' },
+        // A route outside the plugin's own namespace, refused here as well as at parse time.
+        {
+          id: 'core', title: 'Board: core search', category: 'action', palette: true, kind: 'search',
+          scope: 'none', route: '/v2/tasks', onSelect: { verb: 'openTask' },
+        },
+      ] as PluginContributions['commands'],
+    }
+    _seedPluginDistribution([['node-a', [row('board', {}, declared)]]])
+    syncChromeContributions()
+    expect(ids().commands).toEqual(['plugin.board.issues', 'plugin.board.find', 'plugin.board.ask'])
+    expect(commandRegistry.get('plugin.board.find')).toMatchObject({
+      kind: 'search', ownerId: 'board', parentId: 'plugin.board.issues', scope: 'task',
+    })
+    expect(commandRegistry.get('plugin.board.ask')).toMatchObject({ kind: 'input', scope: 'project' })
+  })
+
   it('keeps one plugin’s bad descriptor from costing it the rest of its chrome', () => {
     const clash = sourceRegistry.register({ id: 'board', order: 1, glyph: 'x', label: 'Core board' })
     _seedPluginDistribution([['node-a', [row('board', {}, CHROME)]]])

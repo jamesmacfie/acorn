@@ -58,7 +58,8 @@ export function Palette(props: { session: CommandSession }) {
         <box flexDirection="column">
           <Input
             kind="filter"
-            placeholder="Run a command, switch a pane, task or workspace…"
+            // A search or an input frame asks for its own thing; the root and a group are still the list.
+            placeholder={props.session.placeholder() || 'Run a command, switch a pane, task or workspace…'}
             value={props.session.query()}
             onInput={(value) => props.session.setQuery(value)}
           />
@@ -72,7 +73,7 @@ export function Palette(props: { session: CommandSession }) {
             <Row
               selected={window().from + index() === props.session.selectedIndex()}
               leading={window().from + index() === props.session.selectedIndex() ? '›' : ' '}
-              meta={[row.breadcrumb?.join(' › '), row.hint].filter(Boolean).join(' · ')}
+              meta={[row.badge, row.breadcrumb?.join(' › '), row.hint].filter(Boolean).join(' · ')}
             >
               {row.label}
             </Row>

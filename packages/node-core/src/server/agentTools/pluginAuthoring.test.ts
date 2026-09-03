@@ -102,13 +102,18 @@ describe('the derived vocabulary tracks the manifest schema', () => {
   })
 
   it('reads the two action-verb unions off the descriptors that carry them', () => {
+    type Member = { properties?: Record<string, { oneOf?: { properties: { verb: { const: string } } }[] }> }
+    type Items = Member & { anyOf?: Member[] }
     const json = z.toJSONSchema(pluginManifestShape, { target: 'draft-7', io: 'input', unrepresentable: 'any' }) as {
-      properties: Record<string, { properties: Record<string, { items: { properties: Record<string, { oneOf?: { properties: { verb: { const: string } } }[] }> } }> }>
+      properties: Record<string, { properties: Record<string, { items: Items }> }>
     }
-    const union = (descriptor: string, field: string) =>
-      (json.properties.contributions.properties[descriptor].items.properties[field].oneOf ?? [])
-        .map((option) => option.properties.verb.const)
-        .sort()
+    // A command is four shapes, so the field is looked for across the union's members the way the
+    // vocabulary itself looks for it.
+    const union = (descriptor: string, field: string) => {
+      const items = json.properties.contributions.properties[descriptor].items
+      const carrier = items.properties?.[field] ?? items.anyOf?.map((member) => member.properties?.[field]).find(Boolean)
+      return (carrier?.oneOf ?? []).map((option) => option.properties.verb.const).sort()
+    }
     const v = pluginAuthoringVocabulary()
     expect(v.actions.railOnSelect).toEqual(union('sources', 'onSelect'))
     expect(v.actions.commandsAndBadges).toEqual(union('commands', 'action'))

@@ -907,6 +907,72 @@ describe('plugin commands and keybindings', () => {
     expect(manifest({ commands: [{ ...command, action: { verb: 'createTask' } }] }).success).toBe(false)
   })
 
+  // The four kinds a manifest may declare (@acorn/protocol/plugin/contract.ts). What is worth pinning
+  // is that the addition is additive — the descriptor above, with no `kind` at all, is still the action
+  // it always was — and that the two new kinds are held to the same confinement every other route is.
+  const group = { id: 'cards', title: 'Cards', category: 'navigation', kind: 'group' }
+  const find = {
+    id: 'find', title: 'Find a card', kind: 'search', route: '/v2/p/board/search',
+    onSelect: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+  }
+  const ask = {
+    id: 'ask', title: 'New card', kind: 'input', route: '/v2/p/board/new-card',
+    onSuccess: { verb: 'runNodeAction', path: '/v2/p/board/open' },
+  }
+
+  it('reads a command with no kind as the action it has always meant', () => {
+    const result = manifest({ commands: [command] })
+    expect(result.success && result.data.contributions.commands[0]).toMatchObject({ kind: 'action', palette: true })
+  })
+
+  it('accepts a group, a search and an input, with the search bounds defaulted', () => {
+    const result = nodeManifest({
+      commands: [
+        group,
+        { ...find, parentId: 'cards', minQueryLength: 3, debounceMs: 400, placeholder: 'Card title…' },
+        ask,
+      ],
+    })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.contributions.commands[1]).toMatchObject({
+      kind: 'search', scope: 'node', minQueryLength: 3, debounceMs: 400,
+    })
+  })
+
+  it('refuses a search that would spend a request on every keystroke, or ask for a novel', () => {
+    expect(nodeManifest({ commands: [{ ...find, debounceMs: 5 }] }).success).toBe(false)
+    expect(nodeManifest({ commands: [{ ...find, minQueryLength: 40 }] }).success).toBe(false)
+    // `fleet` is not a scope a manifest may name: fanning a plugin's route out over every paired node
+    // is not a decision a declaration gets to make for somebody's network.
+    expect(nodeManifest({ commands: [{ ...find, scope: 'fleet' }] }).success).toBe(false)
+  })
+
+  it('confines both new routes and both new verbs to the plugin’s own namespace', () => {
+    expect(messages(nodeManifest({ commands: [{ ...find, route: '/v2/p/other/search' }] })))
+      .toContain('route must be inside /v2/p/board/')
+    expect(messages(nodeManifest({ commands: [{ ...ask, route: '/v2/tasks' }] })))
+      .toContain('route must be inside /v2/p/board/')
+    expect(messages(nodeManifest({ commands: [{ ...find, onSelect: { verb: 'runNodeAction', path: '/v2/core/tasks' } }] })))
+      .toContain('route must be inside /v2/p/board/')
+  })
+
+  it('refuses a search or an input from a package with no node half to answer it', () => {
+    expect(messages(manifest({ commands: [find] })))
+      .toContain('a search command calls a node route; declare `node` in the manifest')
+    expect(messages(manifest({ commands: [ask] })))
+      .toContain('an input command calls a node route; declare `node` in the manifest')
+  })
+
+  it('holds the parent graph together across the whole array', () => {
+    expect(messages(nodeManifest({ commands: [{ ...find, parentId: 'gone' }] })))
+      .toContain("command 'find' names an undeclared parent 'gone'")
+    expect(messages(nodeManifest({ commands: [command, { ...find, parentId: 'search' }] })))
+      .toContain("command 'find' names 'search', which is not a group")
+    expect(messages(nodeManifest({
+      commands: [{ ...group, parentId: 'other' }, { id: 'other', title: 'Other', kind: 'group', parentId: 'cards' }],
+    }))).toContain("command 'cards' is inside a parent cycle")
+  })
+
   it.each(['meta+shift+f', 'ctrl+alt+enter'])('accepts canonical modified chord %s', (defaultChord) => {
     expect(manifest({ commands: [command], keybindings: [{ command: 'search', defaultChord, when: 'task' }] }).success).toBe(true)
   })

@@ -164,6 +164,45 @@ describe.skipIf(!hasFfi)('the shell', () => {
     expect(found).toContain('Stay open and say so')
   }, 30_000)
 
+  it('draws a search and an input in the same rectangle as the list', async () => {
+    // The interactive kinds, over the same session the desktop's palette runs on; the transitions
+    // themselves are client-core/host/registries/commands/session.test.tsx. What is asked here is only
+    // what a terminal can answer: the frame's own placeholder is in the field, the rows are the
+    // provider's, and Enter reaches the outcome.
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.press('k', { ctrl: true })
+    for (const letter of 'groups') await screen.press(letter)
+    await screen.press('RETURN')
+
+    // The group's four children, in the order they declared: stay, close, search, input.
+    await screen.press('ARROW_DOWN')
+    await screen.press('ARROW_DOWN')
+    await screen.press('RETURN')
+    const searching = await screen.until('amber')
+    expect(searching).toContain('narrow the colours')
+    expect(searching).toContain('magenta')
+
+    for (const letter of 'mag') await screen.press(letter)
+    const narrowed = await screen.frame()
+    expect(narrowed).toContain('magenta')
+    expect(narrowed).not.toContain('amber')
+
+    await screen.press('RETURN')
+    expect(await screen.until('You picked magenta')).toContain('You picked magenta')
+
+    // Escape pops back to the group with the cursor where it was, and the input is the row below.
+    await screen.press('ESCAPE')
+    await screen.press('ARROW_DOWN')
+    await screen.press('RETURN')
+    expect(await screen.until('Press Enter to submit')).toContain('Type a line')
+
+    for (const letter of 'hello') await screen.press(letter)
+    await screen.press('RETURN')
+    const answered = await screen.until('You said')
+    screen.done()
+    expect(answered).toContain('hello')
+  }, 30_000)
+
   it('draws the cheat sheet on ? with the keys that are live', async () => {
     const screen = await renderFixture({ width: 100, height: 28 })
     await screen.press('?')

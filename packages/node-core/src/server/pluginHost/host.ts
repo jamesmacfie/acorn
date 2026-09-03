@@ -348,6 +348,9 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // confirmation. If the descriptor grows a `risk` field, this is the line that reads it.
   const registerManifestNodeActions = (ctx: HostPluginContext, binding?: LoadedPluginBinding): void => {
     for (const command of binding?.commands ?? []) {
+      // Only a leaf action has a verb at all. A group holds children, and a search or an input needs a
+      // reader typing into it, so none of the three is a thing a schedule could run unattended.
+      if (command.kind !== undefined && command.kind !== 'action') continue
       if (command.action.verb !== 'runNodeAction') continue
       ctx.nodeActions.register({ actionId: command.id, name: command.title, path: command.action.path })
     }

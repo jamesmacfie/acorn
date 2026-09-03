@@ -51,7 +51,8 @@ const mount = (): void => {
         palette={view.view}
         items={view.session.rows()}
         ariaLabel="Command palette"
-        placeholder="Run a command…"
+        placeholder={view.session.placeholder() || 'Run a command…'}
+        onComposing={view.session.setComposing}
         emptyText="No matches."
         breadcrumb={view.session.breadcrumb()}
         busy={view.session.busy()}
@@ -186,5 +187,97 @@ describe('focus', () => {
     expect(dialog()).toBeNull()
     expect(document.activeElement).toBe(before)
     before.remove()
+  })
+})
+
+describe('the interactive frames', () => {
+  const type = (text: string): void => {
+    const element = field()
+    element.value = text
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it('draws a search through loading, results and its own placeholder, and picks with the keyboard', async () => {
+    let release: (items: { id: string; title: string }[]) => void = () => {}
+    const picked: string[] = []
+    register({
+      id: 'find', title: 'Find', category: 'action', palette: true, kind: 'search',
+      placeholder: 'Search issues…', minQueryLength: 0, debounceMs: 0,
+      query: () => new Promise((resolve) => { release = resolve }),
+      select: (item: { id: string }) => { picked.push(item.id) },
+    } as unknown as CommandContribution)
+    mount()
+    session.openAt('find')
+    await settle()
+
+    expect(field().placeholder).toBe('Search issues…')
+    expect(options().map((row) => row.textContent)).toEqual(['Searching…'])
+    expect(dialog()?.getAttribute('aria-busy')).toBe('true')
+    // An explanatory row is not a tab stop and not the cursor: there is nothing to press Enter on.
+    expect(field().getAttribute('aria-activedescendant')).toBeNull()
+
+    release([{ id: 'i-1', title: 'One' }, { id: 'i-2', title: 'Two' }])
+    await settle()
+    expect(options().map((row) => row.textContent)).toEqual(['One', 'Two'])
+    expect(dialog()?.getAttribute('aria-busy')).toBeNull()
+
+    press('ArrowDown')
+    expect(activeRowText()).toBe('Two')
+    press('Enter')
+    await settle()
+    expect(picked).toEqual(['i-2'])
+    expect(dialog()).toBeNull()
+  })
+
+  it('holds a query back while an IME is composing a character', async () => {
+    const asked: string[] = []
+    register({
+      id: 'find', title: 'Find', category: 'action', palette: true, kind: 'search',
+      minQueryLength: 0, debounceMs: 0,
+      query: async (text: string) => { asked.push(text); return [] },
+      select: () => {},
+    } as unknown as CommandContribution)
+    mount()
+    session.openAt('find')
+    await settle()
+    expect(asked).toEqual([''])
+
+    field().dispatchEvent(new Event('compositionstart', { bubbles: true }))
+    type('にほ')
+    type('にほん')
+    await settle()
+    expect(asked).toEqual([''])
+
+    field().dispatchEvent(new Event('compositionend', { bubbles: true }))
+    await settle()
+    expect(asked).toEqual(['', 'にほん'])
+  })
+
+  it('submits an input on Enter, shows it pending, and keeps the text when it fails', async () => {
+    let answer: () => Promise<void> = () => Promise.reject(new Error('the node said no'))
+    register({
+      id: 'ask', title: 'Ask', category: 'action', palette: true, kind: 'input',
+      placeholder: 'Describe the query…',
+      submit: () => answer(),
+    } as unknown as CommandContribution)
+    mount()
+    session.openAt('ask')
+
+    expect(field().placeholder).toBe('Describe the query…')
+    expect(options().map((row) => row.textContent)).toEqual(['Press Enter to submit.'])
+
+    type('rows per project')
+    press('Enter')
+    expect(options().map((row) => row.textContent)).toEqual(['Submitting…'])
+    await settle()
+    expect(dialog()).not.toBeNull()
+    expect(field().value).toBe('rows per project')
+    expect(document.querySelector('.ui-alert')?.textContent).toContain('the node said no')
+
+    answer = () => Promise.resolve()
+    press('Enter')
+    await settle()
+    expect(dialog()).toBeNull()
   })
 })
