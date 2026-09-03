@@ -11,13 +11,13 @@ import { managedAgentApi } from '../sessions/managedClient'
 import ProviderGlyph from '../sessions/ProviderGlyph'
 import {
   agentSessionDefaultsOptions,
-  agentSessionDefaultsQueryKey,
-  saveAgentSessionDefaults,
+  writeAgentSessionDefaults,
 } from './sessionDefaultsClient'
 import {
+  AGENT_TOOL_FOLD_CHOICES,
   type AgentToolFoldMode,
   readAgentToolFoldPrefs,
-  saveAgentToolFoldPrefs,
+  saveAgentToolFoldMode,
 } from '../sessions/toolFoldPrefs'
 
 // Settings -> Agent defaults: what a new session of each provider starts on
@@ -51,25 +51,21 @@ export default function AgentSessionDefaultsSettings() {
     return byProvider
   })
 
-  // Each change is the save. The query cache carries it so every reader moves at once, and a write
-  // that fails refetches rather than restoring a snapshot: two quick changes would otherwise let the
-  // first one's rollback undo the second.
+  // Each change is the save, through the shared writer the palette's setting command also uses
+  // (./sessionDefaultsClient.ts holds the cache rule). What this page adds is where the failure goes.
   const save = async (patch: Partial<AgentSessionDefaults>) => {
-    queryClient.setQueryData(agentSessionDefaultsQueryKey, { ...record(), ...patch })
     setError('')
     try {
-      queryClient.setQueryData(agentSessionDefaultsQueryKey, await saveAgentSessionDefaults(patch))
+      await writeAgentSessionDefaults(queryClient, record(), patch)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Agent defaults could not be saved.')
-      void queryClient.invalidateQueries({ queryKey: agentSessionDefaultsQueryKey })
     }
   }
 
   // A different store from everything above: the fold setting is this device's preference about how a
   // transcript is drawn, not part of the record the node keeps of what a session launches with.
   const fold = () => readAgentToolFoldPrefs(prefs.data)
-  const chooseFold = (mode: AgentToolFoldMode) =>
-    void saveAgentToolFoldPrefs(queryClient, { ...fold(), mode })
+  const chooseFold = (mode: AgentToolFoldMode) => void saveAgentToolFoldMode(queryClient, prefs.data, mode)
 
   const choose = (providerId: string, optionId: string, value: string) => {
     const forProvider = { ...record().pinned[providerId] }
@@ -149,11 +145,7 @@ export default function AgentSessionDefaultsSettings() {
             size="sm"
             value={fold().mode}
             onChange={(value) => chooseFold(value as AgentToolFoldMode)}
-            options={[
-              { value: 'collapsed', label: 'Start collapsed' },
-              { value: 'expanded', label: 'Start expanded' },
-              { value: 'sticky', label: 'Carry my last one forward' },
-            ]}
+            options={[...AGENT_TOOL_FOLD_CHOICES]}
           />
         </Field>
       </Section>

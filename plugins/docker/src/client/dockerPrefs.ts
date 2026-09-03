@@ -30,6 +30,27 @@ export function readDockerPrefs(prefs: Record<string, string> | undefined): Dock
 export const saveDockerPrefs = (qc: QueryClient, next: DockerPrefs): Promise<boolean> =>
   saveJsonPref(qc, PrefKeys.dockerPrefs, next)
 
+/**
+ * One switch, written as a merge onto the whole record.
+ *
+ * Both switches share one key, so writing either on its own would drop the other back to its default.
+ * Settings → Docker and the palette's setting commands both come through here, which is what keeps one
+ * value on one persistence path (docs/future/command-palette/architecture.md § Settings integration).
+ */
+export const saveDockerPref = (
+  qc: QueryClient,
+  prefs: Record<string, string> | undefined,
+  key: keyof DockerPrefs,
+  value: boolean,
+): Promise<boolean> => saveDockerPrefs(qc, { ...readDockerPrefs(prefs), [key]: value })
+
+/** The two choices a Boolean switch offers, spelled once. On and Off rather than a blind toggle, so a
+ *  command shows what is set and means the same thing twice (docs/future/command-palette/refused.md). */
+export const DOCKER_SWITCH_CHOICES = [
+  { value: 'on', label: 'On' },
+  { value: 'off', label: 'Off' },
+] as const
+
 export const dockerPrefsSlice: PersistedStateSlice<Record<string, unknown>> = {
   id: 'docker.prefs',
   key: PrefKeys.dockerPrefs,

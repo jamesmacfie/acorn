@@ -7,9 +7,12 @@
 import { z } from 'zod'
 import { collectionParamsSchema, collectionSchema, COLLECTION_FIELD_ROLES, PANEL_VIEW_KINDS } from '../collections.ts'
 import {
+  commandSettingOptionSchema,
   MAX_COMMAND_SEARCH_MIN_QUERY,
   MAX_COMMAND_SEARCH_DEBOUNCE_MS,
+  MAX_COMMAND_SETTING_OPTIONS,
   MIN_COMMAND_SEARCH_DEBOUNCE_MS,
+  MIN_COMMAND_SETTING_OPTIONS,
 } from '../commands.ts'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../contentLinkPattern.ts'
 import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from '../contextMenus.ts'
@@ -574,11 +577,37 @@ const inputCommandDescriptor = z.object({
   onSuccess: contextFreeAction,
 })
 
+/**
+ * A bounded choice with its current value shown.
+ *
+ * Two of this plugin's own routes and a static list of choices. The host GETs `readRoute` when the
+ * frame opens and PUTs `writeRoute` when a choice is picked, and both answer `{ value }`; the value
+ * that comes back has to name one of the choices declared here, which the host checks against its own
+ * copy rather than trusting the answer.
+ *
+ * Deliberately not free text. A secret, a URL or a number needs validation, a reveal policy and a
+ * recovery story that a list of labelled choices does not
+ * (docs/future/command-palette/refused.md § Free-form secret settings).
+ */
+const settingCommandDescriptor = z.object({
+  ...commandCommon,
+  kind: z.literal('setting'),
+  scope: loadedCommandScope,
+  // GET → { value }
+  readRoute: pluginRoute,
+  // PUT { value, taskId?, projectId?, workspaceId? } → { value }
+  writeRoute: pluginRoute,
+  // Two is the fewest that is a choice; a list long enough to need scrolling is a settings page
+  // (@acorn/protocol/commands.ts).
+  options: z.array(commandSettingOptionSchema).min(MIN_COMMAND_SETTING_OPTIONS).max(MAX_COMMAND_SETTING_OPTIONS),
+})
+
 const commandDescriptor = z.union([
   actionCommandDescriptor,
   groupCommandDescriptor,
   searchCommandDescriptor,
   inputCommandDescriptor,
+  settingCommandDescriptor,
 ])
 
 const keybindingDescriptor = z.object({
@@ -1064,11 +1093,12 @@ export type PluginCommandCategory = z.infer<typeof commandCategory>
 // `kind` is optional on the action member and required nowhere else, which is the rule this file's
 // header states: the field was added to a shape that had already shipped, so a roster row from a node
 // running the previous parser carries no `kind` at all and means the action it always meant. The other
-// three members can only have come from a node that has this schema.
+// four members can only have come from a node that has this schema.
 export type PluginActionCommandDescriptor = Omit<z.infer<typeof actionCommandDescriptor>, 'kind'> & { kind?: 'action' }
 export type PluginGroupCommandDescriptor = z.infer<typeof groupCommandDescriptor>
 export type PluginSearchCommandDescriptor = z.infer<typeof searchCommandDescriptor>
 export type PluginInputCommandDescriptor = z.infer<typeof inputCommandDescriptor>
+export type PluginSettingCommandDescriptor = z.infer<typeof settingCommandDescriptor>
 /** A newer node may send a kind this build has no frame for, so every reader switches on `kind` and
  *  skips what it does not know rather than coercing it into an action. */
 export type PluginCommandDescriptor =
@@ -1076,6 +1106,7 @@ export type PluginCommandDescriptor =
   | PluginGroupCommandDescriptor
   | PluginSearchCommandDescriptor
   | PluginInputCommandDescriptor
+  | PluginSettingCommandDescriptor
 export type PluginKeybindingDescriptor = z.infer<typeof keybindingDescriptor>
 export type PluginAttentionDescriptor = z.infer<typeof attentionDescriptor>
 export type PluginNodeStatDescriptor = z.infer<typeof nodeStatDescriptor>

@@ -546,7 +546,6 @@ describe('architecture boundaries', () => {
     // Ten roster ids are also core's own words. Where that is the whole reason, the entry says so.
     const NAMES_A_PLUGIN_OK = new Map([
       // `terminal` the UI style pack, which is a shape-and-density choice with no plugin behind it.
-      ['packages/client-core/src/features/settings/AppearanceSettings.tsx', "the 'terminal' UI style"],
       ['packages/client-core/src/features/settings/StyleGallery.tsx', "the 'terminal' UI style"],
       ['packages/client-core/src/features/settings/uiStyles.ts', "the 'terminal' UI style"],
       ['packages/client-core/src/infra/persistence/appStartup.ts', "the 'terminal' UI style"],

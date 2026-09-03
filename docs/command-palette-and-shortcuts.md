@@ -9,8 +9,8 @@ neither fetches a row or invokes one. Until 2026-09-03 each host did all of that
 is why a nested or asynchronous command could not be added to one without being reproduced in the
 other.
 
-**A command may be a group.** `CommandContribution` is a discriminated union — an action, a group, and
-later a search, an input and a setting — and a static command may name a group registered by the same
+**A command may be a group.** `CommandContribution` is a discriminated union — an action, a group, a
+search, an input and a setting — and a static command may name a group registered by the same
 contributor as its `parentId`. Cross-contributor parenting is refused, and so are duplicate ids, a
 parent that is not a group, and a cycle: each becomes a dropped node and one diagnostic rather than a
 palette that will not draw (`registries/commands/graph.ts`).
@@ -31,12 +31,24 @@ command with no executor is passed to the registered palette presenter, which op
 command's frame (`registries/commands/presenter.ts`). A leaf named that way opens at its parent with
 the cursor on it.
 
-**A command may also be a search or an input.** A `search` command owns the field: the host debounces
-the typing (250 ms and two characters by default), asks its provider with an `AbortSignal`, and draws
-the instruction, loading, empty, error or result state that came back. An `input` command is never
-debounced — the reader presses Enter once, sees a pending row, and cannot submit twice — and a failure
-keeps the frame, the text and the message. Nothing is scheduled while an IME is composing a character;
-the end of the composition schedules once.
+**A command may also be a search, an input or a setting.** A `search` command owns the field: the host
+debounces the typing (250 ms and two characters by default), asks its provider with an `AbortSignal`,
+and draws the instruction, loading, empty, error or result state that came back. An `input` command is
+never debounced — the reader presses Enter once, sees a pending row, and cannot submit twice — and a
+failure keeps the frame, the text and the message. Nothing is scheduled while an IME is composing a
+character; the end of the composition schedules once.
+
+**A setting shows what is set before it changes it.** Entering a `setting` frame asks its owner what
+the value currently is, draws the two-to-thirty-two declared choices, and marks the one that is set.
+Picking a choice writes it, keeps the frame open, and marks whatever the owner says it *stored* — never
+what was asked for, so a failed write leaves the list telling the truth. A value naming none of the
+declared choices is refused rather than shown, a stored value the choices do not name leaves the list
+unmarked, and a failed read is one line that Enter reads again. Typing narrows the choices and asks
+nobody anything.
+
+Every Boolean setting is an explicit On and Off rather than a blind toggle, so the command shows the
+current value and means the same thing pressed twice. Free text, secrets, dependent fields and
+anything that saves several values at once stay Settings pages.
 
 **A stale answer cannot land.** Every request carries a generation taken when it was scheduled, and an
 answer is applied only if that generation is still current. The abort is the optimisation and the
@@ -62,8 +74,26 @@ and executor. An external change to the node, workspace, project or task closes 
 outstanding; a command that navigates closes through its own outcome first, so its error still has
 somewhere to be reported.
 
-Task rows, workspace rows and `paletteRows` contributions are compatibility providers over that
-session and keep the order the flat list had. They go as their owners become commands.
+**A setting has one accessor, and the page and the command both call it.** There is no reflection of
+Settings pages into commands: a page is an arbitrary component, and scraping one would couple the
+palette to rendering and create a second persistence path. An owner opts a value in by registering a
+setting command whose reader and writer are the ones its page already uses — Appearance's five choices
+and the six notification switches are core's own, in
+`client-core/host/registries/commands/coreCommands.ts` over
+`features/settings/appearancePrefs.ts` and `features/notifications/settings.ts`. The host that
+contributes those Settings pages is the host that registers their commands, so a client with no
+Appearance page has no Appearance command to disagree with it.
+
+**Core's own catalogue is a small tree.** `Go to` holds the task, workspace, project and node
+searches, `Panes` and `Terminal` hold the task-scoped operations that were loose at the root,
+`Settings` holds one row per registered settings page, and `Appearance` and `Notifications` hold the
+settings core owns. Going to a task or a workspace was a special kind of palette item until
+2026-09-03, composed into the root by hand and invoked through a switch on what a row was about; it is
+a `fleet`-scoped search now, so the root shows one named row instead of every task the fleet has, and
+switching node still happens before a remote task is activated.
+
+`paletteRows` contributions are the one compatibility provider left over that session, and they keep
+the order the flat list had. They go as their owners become commands.
 
 ## Global commands
 
@@ -94,12 +124,19 @@ promoted into the same command registry: one command supplies both its optional 
 keybinding target. The legacy manifest `palette` array is a compatibility alias for a command with
 `palette: true`; it never produces a second row.
 
-A manifest may declare an action, a group, a search or an input (`docs/plugins.md § Command kinds`).
+A manifest may declare an action, a group, a search, an input or a setting
+(`docs/plugins.md § Command kinds`).
 A declarative search names a route in the plugin's own namespace and one static verb for the row that
 is picked; the host sends the query and the identifiers the declared scope owns, drops every field of
 the answer it does not name, caps the rendered set, and runs the manifest's verb. A response cannot
 name a route, a URL, a command or a verb, which is the whole of why a plugin's live rows are safe to
 draw in a host surface.
+
+A declarative setting names two routes in the plugin's own namespace and a static list of choices.
+The host GETs the read route when the frame opens and PUTs the write route with the chosen value plus
+the identifiers the declared scope owns; both answer `{ value }`, and a value naming none of the
+declared choices is refused on the way out and on the way back. Secrets and free-form values are not
+this variant.
 
 A compiled plugin whose rows are already on the machine uses the load-once adapter
 (`registries/commands/localSearch.ts`): no debounce, no minimum query, one fetch when the frame opens

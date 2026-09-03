@@ -7,11 +7,8 @@ import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
-import { registerCommandGroupExample } from '@acorn/client-core/host/registries/commands/example.ts'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources/sources.ts'
-import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
-import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { pendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { initSessions } from '@acorn/client-core/features/tasks/agentSessions.ts'
@@ -37,6 +34,7 @@ import { Inbox, initInbox } from './Inbox'
 import { TrustPrompt } from '../plugins/TrustPrompt'
 import { Palette } from './Palette'
 import { createShellPalette } from './paletteSession'
+import { registerNavigationCommands } from './navigationCommands'
 import { CheatSheet } from './CheatSheet'
 
 // The arrangement: topbar, rail beside the pane, notifications, footer, and whatever overlay is on
@@ -160,8 +158,11 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     const commands = registerCommands([
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => palette.openRoot() },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
-      { id: 'core.workspace.switch', title: 'Switch workspace', category: 'workspace', palette: true, run: () => openOverlay('workspace') },
-      { id: 'core.project.switch', title: 'Switch project', category: 'workspace', palette: true, run: () => openOverlay('project') },
+      // Chord-only. The overlay pickers stay — `w` and `p` are how a reader switches without opening
+      // the palette at all — but the palette's own row for each is the search under Go to, and two rows
+      // saying "Switch workspace" is one too many (./navigationCommands.ts).
+      { id: 'core.workspace.switch', title: 'Switch workspace', category: 'workspace', palette: false, run: () => openOverlay('workspace') },
+      { id: 'core.project.switch', title: 'Switch project', category: 'workspace', palette: false, run: () => openOverlay('project') },
       { id: 'core.rail.toggle', title: 'Rail', category: 'navigation', palette: true, run: () => { setHidden((value) => !value) } },
       { id: 'core.notifications.open', title: 'Notifications', hint: 'what needs you, and what happened', category: 'navigation', palette: true, run: () => openOverlay('notifications') },
       { id: 'core.quit', title: 'Quit', category: 'action', palette: true, run: quit },
@@ -178,26 +179,10 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
       { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
     ])
-    // Temporary, and phase 3 takes it: one group with two children, so hierarchy is something a
-    // person can press Enter on before the catalogue moves
-    // (client-core/host/registries/commands/example.ts).
-    const example = registerCommandGroupExample()
-    onCleanup(() => { example.dispose(); bindings.dispose(); commands.dispose() })
-  })
-
-  // One command per node this device has paired with, so switching node is a palette row rather than
-  // a control nothing else needs. Re-registered when the fleet changes, which is what pairing does.
-  createEffect(() => {
-    const others = nodes().filter((node) => node.nodeId !== activeNodeId())
-    if (!others.length) return
-    const commands = registerCommands(others.map((node) => ({
-      id: `core.node.select.${node.nodeId}`,
-      title: `Switch to node: ${node.label}`,
-      category: 'navigation' as const,
-      palette: true,
-      run: () => setActiveNode(node.nodeId),
-    })))
-    onCleanup(() => commands.dispose())
+    // Go to task, switch workspace, go to project and switch node, as one group of searches. Switching
+    // node was one command per paired node until 2026-09-03, which put the whole roster in the root.
+    const navigation = registerNavigationCommands(model)
+    onCleanup(() => { navigation.dispose(); bindings.dispose(); commands.dispose() })
   })
 
   return (

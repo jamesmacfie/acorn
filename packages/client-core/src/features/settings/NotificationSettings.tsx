@@ -1,10 +1,14 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '../../infra/queries'
-import { saveJsonPref } from './savePref'
 import { Button, Checkbox, Field } from '../../kit/components/primitives'
 import { canSetBadge } from '../../infra/platform'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
-import { parseNotificationSettings, type NotificationSettings as Settings } from '../notifications/settings'
+import {
+  parseNotificationSettings,
+  saveNotificationEvent,
+  saveNotificationSettings,
+  type NotificationSettings as Settings,
+} from '../notifications/settings'
 import { defaultDeliveryContext, deliverNotice } from '../notifications/deliver'
 import { activeTaskId } from '../tasks/tasks'
 import { Show } from 'solid-js'
@@ -24,9 +28,10 @@ export default function NotificationSettings() {
   const prefs = createQuery(() => prefsOptions(true))
   const settings = () => parseNotificationSettings(prefs.data?.[PrefKeys.notifications])
 
-  const save = (patch: Partial<Settings>) =>
-    void saveJsonPref(qc, PrefKeys.notifications, { ...settings(), ...patch })
-  const saveEvent = (patch: Partial<Settings['events']>) => save({ events: { ...settings().events, ...patch } })
+  // Both through the shared merge (../notifications/settings.ts), which is the same one the palette's
+  // setting commands write with: six booleans in one key means an unmerged write turns five of them off.
+  const save = (patch: Partial<Settings>) => void saveNotificationSettings(qc, settings(), patch)
+  const saveEvent = (patch: Partial<Settings['events']>) => void saveNotificationEvent(qc, settings(), patch)
 
   // Unseen on purpose: the point of the button is to fire every channel the switches above allow,
   // and an edge on the task you are looking at is meant to be quiet.
