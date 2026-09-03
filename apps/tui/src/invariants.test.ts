@@ -72,11 +72,11 @@ describe('a scroll is a scrollbox and not a clip', () => {
   })
 })
 
-describe('the renderer is the only truth about focus', () => {
+describe('the store is the only owner of focus', () => {
   // Invariant 9, as a fact about the source. Every "the border is lit and the keys do nothing" bug in
-  // this app was a second writer: one place moved the renderer's focus, another wrote the signal the
-  // highlights are drawn from, and the two drifted. One writer cannot drift, and the only way to keep
-  // it to one is to count them (docs/tui.md § Focus regions).
+  // this app was a second owner: the renderer moved focus on its own, the store wrote the signal the
+  // highlights are drawn from, and the two drifted. One owner cannot drift, and the only way to keep
+  // it to one is to count the places that could be a second (docs/tui.md § Focus regions).
 
   /** Every non-test source file of this package, by its path from `src/`. */
   const sources = (): { path: string; text: string }[] => filesIn(ROOT)
@@ -92,32 +92,36 @@ describe('the renderer is the only truth about focus', () => {
       .sort(([a], [b]) => a.localeCompare(b)),
   )
 
-  it('writes the focus signal in the renderer event listener and nowhere else', () => {
-    // The signal is what a row draws its caret from. Written anywhere but the listener, it is a claim
-    // about focus that the renderer never made, which is a caret on a node that answers no keys.
+  it('writes the focus signal in one function and nowhere else', () => {
+    // The signal is the answer, not a view of one: it is what a row draws its caret from and what the
+    // keymap engine's host adapter reports as the focused target. Written anywhere but the one writer
+    // it is a claim nothing else agrees with.
     expect(said(/setFocusedNode\(/g)).toEqual({ 'keys/regions.ts': 1 })
     const store = readFileSync(join(ROOT, 'keys/regions.ts'), 'utf8')
-    const writer = store.slice(store.indexOf('const writeFocus ='), store.indexOf('export function installRegions'))
+    const writer = store.slice(store.indexOf('const setFocus ='), store.indexOf('// \u2500\u2500 Clicks are hit tests'))
     expect(writer).toContain('setFocusedNode(')
   })
 
-  it('asks the renderer to move focus in one function', () => {
-    // `focusRenderable` is that function, and it reports what the renderer did rather than what it
-    // was asked for. A `focus` call anywhere else is a move the store never hears about, because the
-    // store hears about moves through the renderer's event.
+  it('tells the renderer where the keys are in the caret mirror and nowhere else', () => {
+    // The renderer's focus is paint state now: an edit buffer draws no caret unless the renderer has
+    // focused it, so the store mirrors its own answer there once and never reads it back. A `focus`
+    // or `blur` anywhere else is a second owner, and reading `currentFocusedRenderable` anywhere is
+    // asking the renderer a question the store answers (./keys/regions.ts § paintCaret).
     expect(said(/\.focus\(\)/g)).toEqual({ 'keys/regions.ts': 1 })
+    expect(said(/\.blur\(\)/g)).toEqual({ 'keys/regions.ts': 1 })
+    expect(said(/currentFocusedRenderable/g)).toEqual({})
     const store = readFileSync(join(ROOT, 'keys/regions.ts'), 'utf8')
-    const door = store.slice(store.indexOf('export function focusRenderable'))
-    expect(door.slice(0, door.indexOf('\n}'))).toContain('.focus()')
+    const mirror = store.slice(store.indexOf('const paintCaret ='))
+    expect(mirror.slice(0, mirror.indexOf('\n}'))).toContain('.focus()')
   })
 
   it('declares which nodes are focusable at mount, and in these places only', () => {
-    // `blur()` refuses a node that is not focusable, so flipping the flag off a node that holds the
-    // keys wedges them there for the rest of the run, which is what a disabled control used to do.
-    // The flag is therefore a declaration made where a node is built: a `ref`, `pressable`, which a
-    // `ref` calls, or, in the region store, a region's frame at registration and a scope's box at the
-    // push, each of which is the last resort of a walk into it. Another write is a new answer to
-    // "who decides what is reachable", and it belongs in the region store or nowhere.
+    // The flag is the store's own declaration of what can hold the keys: `reachable` reads it, the
+    // reading-order walk reads it, and the caret mirror needs it still set on the node it paints. So
+    // it is a declaration made where a node is built — a `ref`, `pressable`, which a `ref` calls, or,
+    // in the region store, a region's frame at registration and a scope's box at the push, each of
+    // which is the last resort of a walk into it. Another write is a new answer to "who decides what
+    // is reachable", and it belongs in the region store or nowhere.
     expect(said(/focusable = /g)).toEqual({
       'keys/regions.ts': 2,
       'keys/stops.ts': 2,

@@ -154,8 +154,9 @@ is why Settings can show it as a conflict while the keyboard behaves as if it we
 The keyboard is one engine, `@opentui/keymap`, installed on the shell root by
 `client-core/host/keys/install.ts`. Its HTML adapter turns DOM keydowns into keymap events and tracks
 targets with a `MutationObserver`. The same package carries a terminal adapter, and the terminal
-client uses it: `apps/tui/src/keys/install.ts` builds `createDefaultOpenTuiKeymap(renderer)` and gets
-the same layer model, the same `intentKeys` table and the same bubbling. It needs more priorities
+client builds its `KeymapHost` from it — eleven members delegated unchanged and two, where focus is
+and when it moves, answered by its own region store — so it gets the same layer model, the same
+`intentKeys` table and the same bubbling ([tui.md](./tui.md) § The adapter). It needs more priorities
 than this host does, because it draws the whole workspace in one window and an entered terminal has
 to sit above every one of them, and all ten of them are written in one file with a sentence each
 (`apps/tui/src/keys/tiers.ts`). What differs is the pair of
@@ -205,8 +206,8 @@ with the task, pane and region.
 The terminal keeps the contract and replaces the mechanism, and
 [tui.md](./tui.md) § Keys and focus owns the whole of how: five levels, five key groups, a
 shell-installed topology, a dialog as a scope, one landing rule, and eleven invariants with the file
-that checks each. Where the keys are is the renderer's answer there and nothing else writes it, which
-is what a host with no pointer has instead of `document.activeElement`. Two things there belong to
+that checks each. Where the keys are is a value that host's region store holds and nothing else
+writes, which is what a host with no pointer has instead of `document.activeElement`. Two things there belong to
 this table rather than to that one. Tab is `nextRegion` on that host, beside F6, because the browser
 owns Tab and a terminal does not, and a reader in one presses it first; the intent is the shared one
 and `intentKeys` is still the table, and a host adding a key to an intent it already has is what a

@@ -34,8 +34,9 @@ the tree and each spike has a written answer.
 **[Phase 1: one owner of the keys.](./phase-1-one-owner-of-the-keys.md)** Keep the `@opentui/keymap`
 engine the desktop shares and build it from a host adapter of ours that reads focus from the region
 store, so the store is the only owner of focus and OpenTUI's own focus is used for nothing but drawing
-an input's cursor. Delete the second reveal and the `focusable` flag dance. Done when the store's focus
-value is the only one anything reads, invariant 9 is rewritten, and the reachability suite is green.
+an input's cursor. Delete the `focusable` flag dance. Done when the store's focus value is the only one
+anything reads, invariant 9 is rewritten, and the reachability suite is green. Built 2026-09-03; the
+second reveal was to go with it and could not, and the phase file's own section says why.
 
 **[Phase 2: the painter.](./phase-2-the-painter.md)** The node tree with Solid's universal renderer
 operations, the Yoga pass over it, the cell buffer, the diff, and the flush, behind

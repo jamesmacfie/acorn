@@ -80,9 +80,9 @@ export type Screen = {
   reach: (text: string, steps?: number) => Promise<boolean>
   resize: (width: number, height: number) => void
   quits: () => number
-  /** The renderer, so a test can ask the one question the store cannot answer about itself: what
-   *  OpenTUI thinks has the keys. Every agreement assertion reads `currentFocusedRenderable`
-   *  (./reachability.test.tsx, docs/tui.md § The invariants). */
+  /** The renderer, for the questions the store does not answer: the retained tree a case wants to
+   *  count renderables in, and the caret OpenTUI is drawing (./diffLong.test.tsx,
+   *  ./keys/keys.test.tsx). */
   renderer: CliRenderer
   done: () => void
 }
@@ -204,6 +204,10 @@ export async function renderFixture(size: {
     // for Return with Ctrl and Return without it, so `commit` is a chord nobody can press — and a
     // suite driving a different protocol from production is testing a different keyboard.
     kittyKeyboard: true,
+    // And the same answer about focus, for the same reason: a suite whose renderer focuses on a click
+    // by itself is a suite in which the store is not the only owner of the keys
+    // (./keys/regions.ts § Clicks are hit tests).
+    autoFocus: false,
   })
   previous = renderer
   renderer.setMaxListeners(RENDERER_LISTENER_CAP)

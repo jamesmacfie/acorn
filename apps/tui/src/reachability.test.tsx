@@ -18,10 +18,10 @@ import { topology } from './chrome/topology'
 // questions after every press, so a new pane or a new control joins the property the day it lands.
 //
 // The invariants this file owns are 1 (every stop is reachable), 3 (one caret), 4 (Escape is
-// bounded), 6 (focus never sits on a corpse), 8 (the footer tells the truth), 9 (the renderer and
-// the store agree), 10 (focus stays inside the top scope) and 11 (a claimed key changed something,
-// for the cross keys). Invariant 2 is the coverage test in ./kit/kit.test.tsx, and 5 and 7 are greps
-// in ./invariants.test.ts.
+// bounded), 6 (focus never sits on a corpse), 8 (the footer tells the truth), 9 (there is one focus
+// value and it names a live node), 10 (focus stays inside the top scope) and 11 (a claimed key
+// changed something, for the cross keys). Invariant 2 is the coverage test in ./kit/kit.test.tsx,
+// and 5 and 7 are greps in ./invariants.test.ts.
 
 /**
  * The panes the sweep opens, and the same six ./panes.test.tsx draws. A pane that joins the roster
@@ -80,6 +80,15 @@ const BUDGET = 80
 /** A renderable, as a failure message names it. */
 const name = (node: Renderable | null): string => (node ? `${node.constructor.name}#${node.id}` : 'nothing')
 
+/** Whether a renderable is in the tree under the root, which is invariant 9's half that `onScreen`
+ *  does not answer: a detached subtree is visible all the way up its own parents and is nowhere at
+ *  all. Nothing means the keys are nowhere, which is honest between a corpse and the landing pass. */
+const attached = (node: Renderable | null, root: Renderable): boolean => {
+  if (!node) return true
+  for (let at: Renderable | null = node; at; at = at.parent) if (at === root) return true
+  return false
+}
+
 /** Why a renderable is not on screen, for the message when invariant 6 fails. */
 const offScreen = (node: Renderable | null): string => {
   if (!node) return 'nothing has the keys'
@@ -97,18 +106,17 @@ const labelOf = (node: Renderable, frame: string): string =>
 
 /** The questions, asked after every press. Each throws where it fails, naming the surface. */
 const invariants = (where: string, caret: Caret, frame: string, renderer: CliRenderer): void => {
-  // 9. The renderer and the store agree about what has the keys.
+  // 9. There is one focus value, and it names a node that is really there.
   //
-  //    The renderer routes every key and the store draws every highlight, so a disagreement is a lit
-  //    thing that does not answer — which is what symptoms B and D looked like from the reader's
-  //    seat. One line, and it would have caught most of both (docs/tui.md § The invariants).
-  const routed = renderer.currentFocusedRenderable
+  //    This used to be "the renderer and the store agree about what has the keys", because focus was
+  //    the renderer's and the store was a view of it: a disagreement was a lit thing that did not
+  //    answer, which is what symptoms B and D looked like from the reader's seat. The store owns focus
+  //    now and the renderer holds no opinion to disagree with, so what is left to ask is whether the
+  //    one value is honest — the node is in the tree under the root, and it is still something that
+  //    can hold the keys (./keys/regions.ts § The one owner, docs/tui.md § The invariants).
   const drawn = focusedRenderable()
-  expect(routed === drawn, `${where}: the renderer has ${name(routed)} and the store has ${name(drawn)}`).toBe(true)
-  // And what has the keys can give them up. `blur()` refuses on a node that is not `focusable`, so
-  // one that got focus and then lost the flag keeps the keys and every ancestor's focused-descendant
-  // flag for the rest of the run (@opentui/core Renderable § blur).
-  if (routed) expect(routed.focusable, `${where}: the keys are on a node that cannot be blurred`).toBe(true)
+  expect(attached(drawn, renderer.root), `${where}: the keys are on ${name(drawn)}, which is not in the tree`).toBe(true)
+  if (drawn) expect(drawn.focusable, `${where}: the keys are on a node that cannot hold them`).toBe(true)
 
   // 10. Focus is inside the top scope. With a dialog open, no key moves the keys out of it: the
   //     store answers every question inside the scope, so there is nothing behind the dialog for a

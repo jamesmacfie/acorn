@@ -12,11 +12,10 @@ import {
 // keys after a mount, an unmount, a dialog or a walk. The real thing is exercised end to end in
 // ../browse.test.tsx and swept as a property in ../reachability.test.tsx.
 //
-// The fakes model focus rather than accept it, and that is the one thing they have to get right. The
-// store is a view of the renderer's `focused_renderable` event, so a fake that focuses everything and
-// emits nothing would leave the whole mechanism out of the test: a refused focus, a blur, and the
-// order the renderer moves the keys in are exactly what the bookkeeping is built on
-// (./regions.ts § The one writer).
+// The fakes model what is left of the renderer, which is two things: the caret it draws when the
+// store tells it to, and the root a mouse event bubbles up to. Focus itself is the store's, so a fake
+// does not decide anything about it — what it has to get right is that a `focus` call moves the caret
+// off whatever had it, because one caret is invariant 3 (./regions.ts § The one owner).
 
 /** The mutable side of a fake, since `Renderable` declares `focused` read-only. */
 type Fake = {
@@ -32,20 +31,41 @@ type Fake = {
 
 const asFake = (box: Renderable): Fake => box as unknown as Fake
 
-/** The renderer, as far as focus is concerned: one field the store reads and one event it listens to.
+/** The renderer, as far as focus is concerned: the caret it is told to draw, and the root a click
+ *  bubbles up to. `CliRenderer.focusRenderable` records the new node and blurs the one it displaces,
+ *  which is why one call is one caret; `blurRenderable` clears it.
  *
- *  `CliRenderer.focusRenderable` records the new node, blurs the previous one silently, and emits
- *  once with the current node first. `blurRenderable` emits with a null current. Both halves are
- *  here, because a transfer emitting twice or in the other order would be a different store. */
+ *  `currentFocusedRenderable` is a getter that counts, because the store must never ask it anything:
+ *  asking the renderer where the keys are is what a second owner does, and the count is how a case
+ *  says so. `held` is the same value without counting, for the fakes' own bookkeeping. */
 const fakeRenderer = () => {
-  const listeners = new Set<(node: Renderable | null) => void>()
+  let held: Renderable | null = null
+  let reads = 0
+  let blurs = 0
   return {
-    currentFocusedRenderable: null as Renderable | null,
-    on: (_event: string, listener: (node: Renderable | null) => void): void => { listeners.add(listener) },
-    off: (_event: string, listener: (node: Renderable | null) => void): void => { listeners.delete(listener) },
-    emit: (node: Renderable | null): void => { for (const listener of listeners) listener(node) },
+    // A slot rather than a renderable, because `installRegions` writes one handler to it and the
+    // store reads nothing else off the root (./regions.ts § installRegions).
+    root: { onMouseDown: undefined as ((event: FakeClick) => void) | undefined },
+    // The `frame` event the second reveal waits for. Taken and never fired: a reveal is about
+    // geometry and there is none here, so `../kit/scrolling.test.tsx` owns that case
+    // (./regions.ts § The second reveal).
+    on: (): void => {},
+    off: (): void => {},
+    get currentFocusedRenderable(): Renderable | null { reads += 1; return held },
+    held: () => held,
+    draw: (node: Renderable | null): void => { held = node },
+    /** How many times anything has asked the renderer what has the keys. */
+    reads: () => reads,
+    /** How many times the store has told the renderer to let a caret go. */
+    blurs: () => blurs,
+    blurred: (): void => { blurs += 1 },
   }
 }
+
+/** A left mouse-down as the store sees it: the renderable the renderer resolved, and the button.
+ *  `dispatchMouseEvent` bubbles the real thing up to the root carrying exactly this much
+ *  (@opentui/core § CliRenderer.dispatchMouseEvent). */
+type FakeClick = { type: 'down'; button: number; target: Renderable | null }
 
 let renderer = fakeRenderer()
 
@@ -58,21 +78,20 @@ const node = (children: Renderable[] = []): Renderable => {
     isDestroyed: false,
     getChildren: () => children,
     // `Renderable.focus` refuses a destroyed, already focused or unfocusable node and does not look
-    // at `visible` at all. `blur` refuses a node that is not focusable, which is the whole reason a
-    // control is blurred before it goes disabled (./stops.ts § pressable).
+    // at `visible` at all, and `blur` refuses a node that is not focusable. Both are the caret mirror
+    // now and neither decides anything (./regions.ts § paintCaret).
     focus: () => {
       if (box.isDestroyed || box.focused || !box.focusable) return
-      const previous = renderer.currentFocusedRenderable
+      const previous = renderer.held()
       box.focused = true
-      renderer.currentFocusedRenderable = box as unknown as Renderable
+      renderer.draw(box as unknown as Renderable)
       if (previous) asFake(previous).focused = false
-      renderer.emit(box as unknown as Renderable)
     },
     blur: () => {
+      renderer.blurred()
       if (!box.focused || !box.focusable) return
       box.focused = false
-      renderer.currentFocusedRenderable = null
-      renderer.emit(null)
+      renderer.draw(null)
     },
   }
   for (const child of children) asFake(child).parent = box as unknown as Renderable
@@ -360,6 +379,111 @@ describe('focus regions', () => {
     expect(picked).toBe(2)
   })
 
+  // ── The pointer ─────────────────────────────────────────────────────────────────────────────
+  //
+  // A click is a hit test into the store and nothing else. It used to be the renderer's: `autoFocus`
+  // walks up from the renderable a left click hit and focuses the first focusable ancestor itself,
+  // which is a focus move nothing asked for and the second opinion this store exists to be the only
+  // one of. The flag is off everywhere a renderer is built (./regions.ts § Clicks are hit tests).
+
+  /** A left click on a renderable, as the renderer delivers one: bubbled to the root, carrying what
+   *  it hit. */
+  const click = (target: Renderable | null, button = 0): void => {
+    renderer.root.onMouseDown?.({ type: 'down', button, target })
+  }
+
+  it('focuses the nearest stop above a click, and never asks the renderer what has the keys', () => {
+    const rows: Renderable[] = []
+    const region = node(rows)
+    registerRegion(region, { paneId: 'pr', regionId: 'list' }, 0)
+    row(region, rows, 'r0')
+    row(region, rows, 'r1')
+    // A cell inside the second row: what a reader actually clicks is a line of text, and a line is
+    // not a stop, so the walk up is the whole mechanism.
+    const label = node()
+    asFake(label).parent = rows[1]
+    focusRenderable(rows[0])
+
+    const asked = renderer.reads()
+    click(label)
+    expect(focusedRenderable()).toBe(rows[1])
+    // And the store answered without asking the renderer anything, which is the half a grep cannot
+    // see (../invariants.test.ts § the store is the only owner of focus).
+    expect(renderer.reads()).toBe(asked)
+
+    // A click on nothing that can hold the keys moves nothing, rather than walking up to something
+    // the reader did not point at.
+    const loose = node()
+    click(loose)
+    expect(focusedRenderable()).toBe(rows[1])
+
+    // Nor does a middle or right button, which this host has no meaning for at all.
+    click(rows[0], 2)
+    expect(focusedRenderable()).toBe(rows[1])
+  })
+
+  it('does not let a click reach behind an open dialog', () => {
+    const rows: Renderable[] = []
+    const region = node(rows)
+    registerRegion(region, { paneId: 'pr', regionId: 'list' }, 0)
+    row(region, rows, 'r0')
+    const inside = control()
+    opened(node([inside]))
+    focusRenderable(inside)
+
+    // The row is on screen, focusable and registered, and it is behind the scope — which is the one
+    // reason the hit test refuses. A click that reached it would put the keys behind a dialog the
+    // reader still has open, which is what Tab used to do (§ Scopes).
+    click(rows[0])
+    expect(focusedRenderable()).toBe(inside)
+    expect(focusedInScope()).toBe(true)
+  })
+
+  it('lands the keys somewhere on screen when an ancestor of the focused node is hidden', async () => {
+    const rows: Renderable[] = []
+    const list = node(rows)
+    const region = node([list])
+    asFake(list).parent = region
+    registerRegion(region, { paneId: 'pr', regionId: 'list' }, 0)
+    const beside = control()
+    asFake(beside).parent = region
+    ;(region.getChildren() as Renderable[]).push(beside)
+    row(list, rows, 'r0')
+    focusRenderable(rows[0])
+
+    // The shell's main row and a `TabPanel` hide a subtree rather than unmounting it, and `visible`
+    // is per node in OpenTUI: the row inside goes on reporting itself visible, so the pass is what
+    // notices (./regions.ts § onScreen, ../kit/grouping.tsx).
+    const blurs = renderer.blurs()
+    asFake(list).visible = false
+    await settle()
+    expect(focusedRenderable()).toBe(beside)
+    expect(onScreen(focusedRenderable())).toBe(true)
+    // And nothing was blurred on the way. A blur used to be how the keys left a node, and a blur on
+    // a node that had lost its `focusable` flag was refused — which is how the keys got stuck on a
+    // hidden subtree in the first place (./regions.ts § The one owner).
+    expect(renderer.blurs()).toBe(blurs)
+  })
+
+  it('leaves a node that loses its focusable flag while it holds the keys', async () => {
+    const region = node()
+    const risky = control()
+    const safe = control()
+    const children = region.getChildren() as Renderable[]
+    children.push(risky, safe)
+    asFake(risky).parent = region
+    asFake(safe).parent = region
+    registerRegion(region, { paneId: 'pr', regionId: 'body' }, 0)
+    focusRenderable(risky)
+
+    // What a control going disabled does: the flag is the store's declaration of what can hold the
+    // keys, so clearing it is a landing pass's business and `pressable` asks for one
+    // (./stops.ts § pressable).
+    risky.focusable = false
+    await settle()
+    expect(focusedRenderable()).toBe(safe)
+  })
+
   // ── Scopes ──────────────────────────────────────────────────────────────────────────────────
 
   it('holds the keys inside an open overlay while the screen behind it changes', async () => {
@@ -436,7 +560,7 @@ describe('focus regions', () => {
     // and fall through to its entry stop, which is the filter above the trigger and never the
     // trigger itself. The
     // region remembers its own stops only, and the list remembers the list's
-    // (./regions.ts § The one writer).
+    // (./regions.ts § The one owner).
     const filter = control()
     const trigger = control()
     const region = node([filter, trigger])

@@ -9,13 +9,15 @@
 //
 //   order       the layout registers its regions in the order it draws them, from its own knowledge
 //               (LAYOUT_REGIONS in @acorn/protocol/paneLayouts.ts). Nothing is derived from position.
-//   first stop  the first renderable in the region's subtree that OpenTUI will focus. The kit marks
+//   first stop  the first renderable in the region's subtree this store will focus. The kit marks
 //               those as it draws them — `focusRoles.ts` says which nodes are a stop, an item, a
-//               collection or a trap — and the renderer's own `focusable` flag is what that becomes.
-//   focus       the renderer's. There is one focused renderable at a time and it owns which, and the
-//               store's own signal is a view of the renderer's `focused_renderable` event.
-//   pointer     the renderer's too. It focuses the nearest focusable ancestor of a left click and
-//               emits the same event, so a click needs no bridge of its own (§ The one writer).
+//               collection or a trap — and the `focusable` flag is what that mark becomes.
+//   focus       this module's. One signal holds the renderable that has the keys, this file is the
+//               only thing that writes it, and the renderer is told rather than asked
+//               (§ The one owner).
+//   pointer     a hit test rather than a focus event. The renderer resolves what a click landed on
+//               and the store decides what that means, which is why the renderer's own `autoFocus`
+//               is off (§ Clicks are hit tests, ../main.tsx).
 //
 // Five levels and nothing else: screen, column, region, parent stop, stop. A parent stop is a
 // renderable that owns panels — a `Sections` strip owns the panel under it — so Down enters and
@@ -29,7 +31,7 @@
 // The pane and region chords live on the same layer 5 the desktop uses, so priority decides here too.
 
 import { createSignal, onCleanup } from 'solid-js'
-import { ScrollBoxRenderable, type CliRenderer, type Renderable } from '@opentui/core'
+import { MouseButton, ScrollBoxRenderable, type CliRenderer, type MouseEvent, type Renderable } from '@opentui/core'
 
 export type RegionRef = { paneId: string; regionId: string }
 
@@ -73,7 +75,7 @@ type RegionOptions = {
 
 /** Where something that holds the keys left them, so coming back restores rather than resets. A
  *  region has one and so does a scope, and one focus move writes exactly one of them: whichever of
- *  the two the keys are in (§ The one writer). */
+ *  the two the keys are in (§ The one owner). */
 type Memory = {
   last?: Renderable
   /** The collection's own key for `last`, because a query refresh replaces its renderable. */
@@ -142,8 +144,8 @@ const [mounted, setMounted] = createSignal(0)
 const lastByColumn = new Map<number, Group>()
 let focused: RegionRef | null = null
 // What has the keys, as a signal, because it is what a row draws its caret from: in a terminal the
-// caret is not decoration, it is where focus is. The renderer owns focus and has no signal for it, so
-// this is written here, at the one place that moves it.
+// caret is not decoration, it is where focus is. This signal is the answer rather than a view of one:
+// nothing else holds an opinion about where the keys are (§ The one owner).
 const [focusedNode, setFocusedNode] = createSignal<Renderable | null>(null)
 
 /** The renderable that has the keys. */
@@ -162,8 +164,11 @@ export const focusedRenderable = focusedNode
  * question is the drift this module exists to remove (../reachability.test.tsx).
  */
 export const onScreen = (node: Renderable | null | undefined): boolean => {
-  if (!node || node.isDestroyed || !node.visible) return false
-  for (let at: Renderable | null = node.parent; at; at = at.parent) { step(); if (!at.visible) return false }
+  if (!node || node.isDestroyed) return false
+  // The walk starts at the node rather than at its parent, because a node's own `visible` is not a
+  // special case worth a line of its own: the two boxes that hide a subtree can each be the node that
+  // has the keys, which a `pty` rectangle on a switched-away tab is (../kit/rectangle.tsx).
+  for (let at: Renderable | null = node; at; at = at.parent) { step(); if (!at.visible) return false }
   return true
 }
 
@@ -283,16 +288,16 @@ export const focusedInScope = (): boolean => {
  * Handing them back needs nothing recorded here. The scope holds the keys and so holds the memory of
  * where they were inside it, and the region behind it still claims them and still remembers its own
  * last stop, so closing a `Menu` is the region re-entered on the trigger that opened it and closing
- * one drawn inside a `Modal` is the modal re-entered on its own last stop (§ The one writer). The DOM
+ * one drawn inside a `Modal` is the modal re-entered on its own last stop (§ The one owner). The DOM
  * palette keeps a `prevFocus` element instead (client-core/host/palette/overlay.ts).
  *
  * The caller owns the pop, which is `onCleanup(pushScope(box))` in the box's own `ref`
  * (../kit/grouping.tsx).
  */
 export function pushScope(box: Renderable): () => void {
-  // Focusable from the push, for the reason a region's frame is focusable from registration: a scope
-  // with nothing focusable in it, such as the cheat sheet, which is lines of text, still has to hold
-  // the keys, or the dialog is on screen with the keys behind it (§ registerRegion).
+  // Focusable from the push, for the reason a region's frame is: a scope with nothing focusable in
+  // it, such as the cheat sheet, which is lines of text, still has to hold the keys, or the dialog is
+  // on screen with the keys behind it (§ registerRegion).
   box.focusable = true
   const scope: Scope = { box }
   setScopes((all) => [...all, scope])
@@ -309,7 +314,7 @@ export function pushScope(box: Renderable): () => void {
     // visible, and, its own scope gone, inside the screen's, and would leave the keys on it
     // (../kit/reconciler.ts, docs/tui.md § Destroy on disposal).
     const at = focusedNode()
-    if (at && within(box, at)) at.blur()
+    if (at && within(box, at)) setFocus(null)
     scheduleSettle()
   }
 }
@@ -432,9 +437,7 @@ const ordered = (): Group[] => {
 export function registerRegion(box: Renderable, ref: RegionRef, order: number, options: RegionOptions = {}): () => void {
   // Focusable from here, and never flipped again. A region with nothing focusable in it still has to
   // be reachable or the Tab cycle has a hole, and a pane's regions are `lazy()`, so most start that
-  // way. The flag used to be set by whichever walk first needed it, and since `blur()` refuses a node
-  // that is not focusable, a node that held the keys and then lost the flag kept them for the rest of
-  // the run (@opentui/core § Renderable.blur).
+  // way. The flag is this store's own declaration of what can hold the keys (§ reachable).
   box.focusable = true
   const group: Group = {
     ...ref,
@@ -484,13 +487,17 @@ const regionOf = (node: Renderable): Group | undefined => {
   return undefined
 }
 
-// ── The one writer ────────────────────────────────────────────────────────────────────────────
+// ── The one owner ─────────────────────────────────────────────────────────────────────────────
 //
-// `focused_renderable` is this host's `focusin`. The DOM half listens for that event and writes the
-// same bookkeeping from it; the renderer emits this one for every focus change it makes, whichever
-// of a binding, a landing or a left click caused it. So there is one writer of the signal and
-// nothing for a second one to disagree with, and the mouse arrives through the same door as a key
-// (docs/tui.md § Focus regions).
+// The store decides where the keys are and everything else is told. Every arrow used to point the
+// other way: focus was the renderer's and this module a view of its `focused_renderable` event, so
+// in the gap between the renderer moving focus itself and the view catching up the two disagreed —
+// and a lit border with dead arrows was that gap, every time.
+//
+// There is no focus listener here now, because there is nothing left to hear: the renderer moves
+// focus on nothing of its own with `autoFocus` off, and a click arrives as a hit test instead
+// (§ Clicks are hit tests, ../main.tsx). One thing still goes out to the renderer and it is paint,
+// the caret; nothing reads it back and ../invariants.test.ts counts the calls to keep it that way.
 
 /** Remember a stop, unless it is the frame that was holding the keys for want of anything better.
  *
@@ -504,16 +511,52 @@ const remember = (of: Memory, node: Renderable, frame: Renderable | null): void 
   of.lastIdentity = itemIdentities.get(node)
 }
 
-/** The store's view of the renderer's focus. Called from the listener below and nowhere else. */
-const writeFocus = (node: Renderable | null): void => {
+// Who to tell when the keys move, for a reader that is not a component. The keymap engine asks its
+// host where they are once per key and wants telling when they move — that is what clears a
+// half-pressed sequence and re-draws the footer — so this is the subscription its host adapter is
+// built from, and the typing shadow follows the same one (./keymapHost.ts, ./install.ts).
+const watchers = new Set<(node: Renderable | null) => void>()
+
+/** Hear about every focus move, until the returned function is called. */
+export const onFocusMove = (listener: (node: Renderable | null) => void): (() => void) => {
+  watchers.add(listener)
+  return () => { watchers.delete(listener) }
+}
+
+/**
+ * Draw the caret, which is the one thing about focus the renderer still owns.
+ *
+ * `EditBufferRenderable.renderCursor` returns without drawing unless the renderer has focused the
+ * node, so an `Input` this store has handed the keys to would draw its text and no caret. This is
+ * the one mirror, it is paint state, and nothing reads it back.
+ *
+ * `CliRenderer.focusRenderable` blurs whatever it displaces, so one caret costs one call; the blur
+ * is the other direction, the keys going nowhere. Both refuse a node whose `focusable` flag has
+ * gone, which costs nothing, since the landing rule is about to take the keys off it anyway
+ * (@opentui/core § Renderable.focus, ./stops.ts § pressable).
+ */
+const paintCaret = (previous: Renderable | null, node: Renderable | null): void => {
+  if (node) node.focus()
+  else previous?.blur()
+}
+
+/**
+ * Move the keys, and tell everything that is drawn from where they are.
+ *
+ * The one writer. Deduplicated, because a move to where the keys already are is not a move: it
+ * would reveal the stop again and rewrite the memory, and `enter` reads whether anything changed to
+ * decide whether the landing rule owes the screen another look (§ enter).
+ */
+const setFocus = (node: Renderable | null): void => {
+  const previous = focusedNode()
+  if (node === previous) return
   setFocusedNode(node)
+  paintCaret(previous, node)
+  for (const watcher of watchers) watcher(node)
   if (!node) {
-    // The keys are nowhere, which is the pass's own invitation. What took them is not always
-    // something that commits: the reconciler destroys a removed renderable on `process.nextTick`,
-    // after every microtask the render that removed it scheduled, and the blur it ends with is the
-    // last anyone hears. Asking here is why nothing in focus has to know when that lands. The region
-    // claim is left alone, because a node going away is not the reader choosing to leave and the
-    // claim is how the landing knows which region to re-enter (../kit/reconciler.ts).
+    // The keys are nowhere, which is the pass's own invitation. Two places say it and neither is the
+    // reader choosing to leave — a scope popping, and the pass letting go of a corpse in no region —
+    // so the region claim stays: it is how the landing knows which region to re-enter.
     scheduleSettle()
     return
   }
@@ -540,79 +583,104 @@ const writeFocus = (node: Renderable | null): void => {
 
 // ── The second reveal ─────────────────────────────────────────────────────────────────────────
 //
-// `scrollChildIntoView` compares a child's laid-out `y` and `height` against its viewport's, and
-// `Renderable.y` is whatever the last completed layout pass left there. So for a row that did not
-// exist in the previous frame the reveal above reads stale or zero geometry, computes the wrong
-// delta, and nothing corrects it: the caret ends up below the fold on a viewport that never moved.
-// A reader meets that three ways: a region entered on a freshly mounted list, a refetch replacing a
-// row by identity, and a virtual window shift. The fix for all three is to ask again once the layout
-// has run (docs/tui.md § Scrolling viewports).
+// `scrollChildIntoView` compares a child's laid-out `y` against its viewport's, and `Renderable.y` is
+// whatever the last completed layout pass left there — so for a row that did not exist in the
+// previous frame the reveal above reads stale or zero geometry, scrolls by the wrong delta, and
+// nothing corrects it. Asking again on the renderer's next `frame` is the answer, and it decides
+// nothing about where the keys go: it only makes the viewport show where they already are
+// (docs/tui.md § Scrolling viewports).
 //
-// This is not a second landing rule and must not become one. It decides nothing about where the keys
-// go and it never moves them; it only makes the viewport show where they already are. The landing
-// rule is still one microtask in `ensureFocus` and nothing else (§ The landing rule).
+// Phase 1 of the terminal rewrite meant to delete this and let the settle pass reveal instead. It
+// cannot: the pass is a microtask, so it runs before the next layout and reads the same stale numbers
+// this one did. `../kit/scrolling.test.tsx § reveals the caret in a list that has only just mounted`
+// is the case, and it fails with this taken out. Phase 2 owns it, where layout and reveal are in one
+// frame by construction (docs/future/terminal-rewrite/phase-2-the-painter.md).
 //
 // One renderer listener for the whole store rather than one per viewport, which is what the design
 // first asked for. Every live `scrollbox` already carries a `selection` listener and a pull request
 // draws enough of them that `RENDERER_LISTENER_CAP` is 200; one more each would double that count to
 // do the same work this does once (../renderGuard.ts).
 
-/** The node the post-layout reveal still owes a scroll to, or null.
- *
- *  One slot and not a queue. The reveal is about where the keys are now, and where they were two
- *  frames ago is not a question anyone is asking. */
+/** The node the post-layout reveal still owes a scroll to. One slot and not a queue: the reveal is
+ *  about where the keys are now, and where they were two frames ago is nobody's question. */
 let pendingReveal: Renderable | null = null
 
-// The live subscription, so installing twice in one process does not leave the first listener
-// running: a suite is one worker with a renderer per test (../harness.tsx).
-let stopListening = (): void => {}
+// ── Clicks are hit tests ──────────────────────────────────────────────────────────────────────
+//
+// The renderer resolves which renderable the pointer was over; what that means is the store's. It
+// used to be the renderer's too — `dispatchMouseEvent` walks up from the hit renderable and focuses
+// the first focusable ancestor, and `autoFocus` defaults to true — which is a second opinion about
+// focus for exactly the case this module exists to have one answer to. So the flag is off wherever a
+// renderer is built, in ../main.tsx and in both harnesses, and this replaces it.
+//
+// A click focuses a clicked stop and scrolls, and does nothing else, which is the pointer rule this
+// host already states (docs/tui.md § What the TUI never does). Pressing what was clicked stays the
+// stop's own, from its `onMouseDown` (./stops.ts § pressable).
 
-/**
- * Subscribe the store to the renderer's focus event.
+/** Focus the nearest thing above a left click that could hold the keys, or nothing at all.
  *
- * Called by `installKeymap`, because "install the keyboard on this renderer" is one thing and which
- * renderable the keys are on is half of it (./install.ts).
- */
+ *  `reachable` is the whole of "is this a stop": a stop, a collection row, a region's frame and a
+ *  scope's box are the focusable things in the tree and nothing else is. It answers for the top scope
+ *  too, so a click behind an open dialog reaches nothing rather than past it (§ Scopes). */
+const focusClicked = (event: MouseEvent): void => {
+  if (event.button !== MouseButton.LEFT) return
+  for (let at: Renderable | null = event.target; at; at = at.parent) {
+    step()
+    // Through a name of its own, because `reachable` is a type guard and narrowing the cursor of the
+    // walk with it leaves the walk with nothing to read `parent` off.
+    const hit: Renderable = at
+    if (reachable(hit)) { focusRenderable(hit); return }
+  }
+}
+
+// The live handler, so installing twice in one process does not leave the first one running: a suite
+// is one worker with a renderer per test (../harness.tsx).
+let detach = (): void => {}
+
+/** Point the store at a renderer: where a click landed, and the frame the second reveal waits for.
+ *  Called by `installKeymap`, because "install the keyboard on this renderer" is one thing and where
+ *  the keys are is half of it (./install.ts). */
 export function installRegions(renderer: CliRenderer): void {
-  stopListening()
-  // `CliRenderer` extends an untyped `EventEmitter`, so the payload is annotated here rather than
-  // read off a signature. The current renderable comes first and both it and the previous one may be
-  // null (@opentui/core § CliRenderer.focusRenderable).
-  const listener = (node: Renderable | null): void => writeFocus(node)
-  renderer.on('focused_renderable', listener)
+  detach()
+  // And whatever the last renderer's keymap and typing shadow left listening here: an engine is
+  // built per renderer and tears nothing down itself (§ onFocusMove).
+  watchers.clear()
+  // On the root, because a mouse event bubbles up to it carrying the renderable it hit — and because
+  // `onMouseDown` is one slot per renderable rather than a listener list, so one handler for the
+  // screen is also all there is room for.
+  renderer.root.onMouseDown = focusClicked
   // `frame` fires once per render-loop iteration and after the render, which is the side of layout
-  // where a child's geometry is real. `onLifecyclePass` and `setFrameCallback` both run before it and
-  // would read the same stale numbers the synchronous reveal already read
-  // (@opentui/core § CliRenderer.FRAME).
+  // where a child's geometry is real: `onLifecyclePass` and `setFrameCallback` both run before it and
+  // would read the same stale numbers the synchronous reveal already read (§ The second reveal).
   const afterFrame = (): void => {
     const node = pendingReveal
     pendingReveal = null
     // Still there and still holding the keys. A frame later either can be false: the reconciler
     // destroys a removed renderable on `process.nextTick`, and a landing may have moved on.
-    if (!node || node.isDestroyed || !node.focused) return
+    if (!node || node.isDestroyed || focusedNode() !== node) return
     revealInViewports(node)
   }
   renderer.on('frame', afterFrame)
-  stopListening = () => {
-    renderer.off('focused_renderable', listener)
+  detach = () => {
+    renderer.root.onMouseDown = undefined
     renderer.off('frame', afterFrame)
     pendingReveal = null
-    stopListening = () => {}
+    detach = () => {}
   }
 }
 
 /**
  * Put the keys on a renderable and say whether they went.
  *
- * The only place in this package that asks the renderer to move focus, so every caller learns what
- * the renderer did rather than what it was asked for: a refused move is a `false` to walk on from,
- * instead of a highlight nobody can answer. `Renderable.focus` refuses a destroyed or unfocusable
- * node itself and does not look at `visible` at all, which is why `onScreen` is asked here.
+ * The one door. Every move comes through here, so every caller learns whether the keys went rather
+ * than assuming: a refused move is a `false` to walk on from instead of a highlight nobody can
+ * answer. It is refused for the two reasons the store has, not on screen and not something that can
+ * hold the keys, and for nothing else — there is no renderer left to say no.
  */
 export function focusRenderable(node: Renderable | undefined): boolean {
   if (!node || !onScreen(node) || !node.focusable) return false
-  node.focus()
-  return node.focused
+  setFocus(node)
+  return true
 }
 
 /** Whether a renderable could hold the keys right now: on screen, focusable, and inside the top
@@ -1060,8 +1128,8 @@ let settleQueued = false
  *
  * A tree to read is the whole of what it buys. It orders nothing against the reconciler's
  * `process.nextTick` destruction, which is Suspense's and stays Suspense's: nothing here depends on a
- * corpse still reporting itself live, `pushScope`'s pop blurs the keys out of a box that is going,
- * and a blur to nothing asks for a pass of its own (§ The one writer, ../kit/reconciler.ts).
+ * corpse still reporting itself live, `pushScope`'s pop takes the keys out of a box that is going,
+ * and the keys going nowhere asks for a pass of its own (§ The one owner, ../kit/reconciler.ts).
  */
 export function scheduleSettle(): void {
   if (settleQueued) return
@@ -1129,12 +1197,9 @@ function ensureFocus(): void {
     enter(home)
     return
   }
-  // A corpse in no region at all, which was not focusable when it went and so was never blurred.
-  // Holding it would leave the screen with the keys on a dead node. Through the renderer, because the
-  // signal is a view of it: `blur` emits the event with nothing current and the listener writes the
-  // null. It refuses a node that is not focusable, which is why a control that goes disabled is
-  // blurred before it loses the flag (./stops.ts § pressable).
-  node?.blur()
+  // A corpse in no region at all, and nowhere better to put the keys: no region is registered, so
+  // there is nothing to enter. Holding it would leave the screen with the keys on a dead node.
+  setFocus(null)
 }
 
 /**
@@ -1173,9 +1238,10 @@ export function _columns(): { at: number | null; all: readonly number[] } {
 
 /** Test seam. The list is module-level, so a suite must not inherit the previous one's regions. */
 export function _resetRegions(): void {
-  // The previous render's renderer among them: a suite builds one per test and a listener left on a
-  // torn-down renderer is a second writer of the signal.
-  stopListening()
+  // The previous render's renderer among them: a suite builds one per test, and its click handler and
+  // everything its keymap left subscribed go with it (§ installRegions).
+  detach()
+  watchers.clear()
   // And the guard that says a pass is already queued. The reset is synchronous and a microtask is
   // not, so the previous test can leave this set with its pass still pending: the pass then runs
   // against an empty store, which is harmless, but the next render's first `scheduleSettle` is
@@ -1201,5 +1267,5 @@ export function _resetRegions(): void {
   items = new WeakSet<Renderable>()
   itemIdentities = new WeakMap<Renderable, string>()
   itemsByIdentity.clear()
-  writeFocus(null)
+  setFocus(null)
 }

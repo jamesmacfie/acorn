@@ -1,6 +1,7 @@
 # Phase 1: one owner of the keys
 
-Status: not started. Waits on phase 0's spike 1. Independent of phase 2 and worth shipping alone.
+Status: built 2026-09-03, against `3065f947`. What building it found, including four premises below
+that turned out false, is at the bottom of this file.
 
 ## Goal
 
@@ -197,3 +198,75 @@ typing if its wording names the renderer.
   (`focused_renderable` and `frame`), so deleting them is deleting all of them.
 - Read [tui.md](../../tui.md) § Keys and focus in full first. Every change here must name the rule it
   serves.
+
+## What building it found (2026-09-03)
+
+Built as written, with the answers below. The shape of the phase held: the store owns focus, the
+engine is built from our own `KeymapHost`, a click is a hit test, and typing is a hand-off. Four of
+the file's premises did not, and two things it does not name had to be done.
+
+**`regions.ts` was 1,071 lines at `9e5d90ca` and 1,205 at this phase's own baseline.** Performance
+phases 9 and 10 landed in the same file after this folder was written and added 134 lines of indexing
+(the maps beside the arrays, the step counter, the ordering cache). So the "shorter than 1,071" line
+in § Done when is about a file that no longer exists. Measured against what this phase starts from,
+the file goes 1,205 to 1,271. Everything the phase named for deletion is deleted — the
+`focused_renderable` listener, the blur in `pushScope`'s pop, the blur at the end of `ensureFocus`,
+the flag dance in `stops.ts` — and what replaced them is work the renderer used to do for us and now
+does not: a mouse hit test (the renderer's `autoFocus` walk), a focus subscription (the renderer's
+event), and the caret mirror spike 1 requires. The reconciliation is gone; the mechanism the
+reconciliation was reconciling *to* had to move in.
+
+**The second reveal cannot go.** § Scope says the `frame`-event reveal is replaced by one reveal
+after the settle pass, "because the settle pass runs after Solid has committed and the renderer's
+layout has run for the current frame under the test harness's `flush`". The second half of that is
+not true: the pass is a microtask, so it runs before the next layout and reads exactly the stale
+geometry the synchronous reveal read. Deleting it turns
+`apps/tui/src/kit/scrolling.test.tsx § reveals the caret in a list that has only just mounted` red —
+the caret lands on row 30 and the viewport still shows rows 1 to 10, which is the fault that test was
+written for. It is back, with a comment naming phase 2, which is the alternative § Done when allows.
+
+**`pressable` still clears `focusable`, and the file list in `invariants.test.ts` does not shrink.**
+§ Scope says the flag is "set once and never cleared, since nothing refuses a blur any more". The
+blur is not why the flag is cleared: the flag is the store's own declaration of what can hold the
+keys, read by `reachable` and by the reading-order walk, so clearing it is how a control that goes
+disabled stops being a stop. What goes is the *blur before the clear*, and the landing pass is what
+takes the keys off the node afterwards — which is what § Tests asks for in its third new case, so the
+phase file already disagreed with itself here.
+
+**`onScreen` keeps the node's own `visible`.** § Design says alive means `!isDestroyed` and on screen
+means every ancestor is visible. Read literally that drops the focused node's own flag, and two boxes
+need it: a `pty` rectangle sets `visible={!props.hidden}` on the box that holds the keys, and a
+`TabPanel` is a viewport that can itself be the stop. The walk now starts at the node instead of at
+its parent, which is the same rule in one loop with no fast path.
+
+**Tier 41 stays.** `compareLayers` in `@opentui/keymap` 0.5.9 is `priority` then registration order,
+which this phase does not change, so the tie-break the `TYPING` tier sits between still matters.
+
+**The trace's `agree` field is gone.** It compared the renderer's focus with the store's, which is the
+disagreement this phase removes, so the field could only ever say `yes`. `docs/tui.md`
+§ Seeing what the keys did lost it and lost the "three lines are a bug" line about it.
+
+**Two things the phase does not name.** `autoFocus: false` is needed wherever a renderer is built,
+which spike 1 found and § Scope does not say: `apps/tui/src/main.tsx`, `apps/tui/src/harness.tsx` and
+`apps/tui/src/kit/render.tsx`, the last two because a suite whose renderer focuses on a click is a
+suite in which the store is not the only owner. And the typing hand-off has to run for *every*
+unclaimed key rather than for the bare keys alone: an ordinary character is bound by nothing, so
+nothing claims it and nothing would type it. `install.ts` § typeInto is one ordinary listener after
+the engine's own, and it claims the key after handing it over so the renderer's route cannot type it
+twice.
+
+**Invariant 9 needed a new question rather than a shorter one.** "The focused node is attached and on
+screen" is half invariant 6, which already asks `onScreen` after every press. What is left that only
+invariant 9 can ask is whether the one value names a node in the tree *under the renderer's root* — a
+detached subtree is visible all the way up its own parents and is nowhere at all — and whether that
+node can still hold the keys. `reachability.test.tsx` grew a four-line `attached` walk for the first
+half.
+
+**The test count.** `pnpm --filter @acorn/tui test` on node 26.8.1: 323 passing, 2 failing, both in
+`apps/tui/src/chrome/chrome.test.tsx` and both another session's in-flight palette work, which fail
+on their own commits too. With `ACORN_TUI_WIDE` it is 331 passing and the same 2, so the reachability
+property holds at 80 by 24 and at 120 by 40. Five cases are new: four in `apps/tui/src/keys/regions.test.ts` (the click
+hit test, a click behind a dialog, a hidden ancestor landing with no blur, a node that loses its
+flag) and one in `apps/tui/src/kit/kit.test.tsx` (typing into a field with the renderer's caret on
+another renderable, which is spike 1 as a regression test). `apps/tui/src/kit/render.tsx` exposes the
+renderer for that last one, the way `harness.tsx` already did.

@@ -64,8 +64,8 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
     land: (key) => {
       const box = boxes.get(key)
       if (!box) return
-      // Through the store's one door, so the region the row is in learns it has the keys from the
-      // renderer's own event rather than from this call (./regions.ts § The one writer).
+      // Through the store's one door, so the region the row is in has the keys, its memory is
+      // written and the caret is drawn, all from the one writer (./regions.ts § The one owner).
       focusRenderable(box)
     },
     onItem: () => true,

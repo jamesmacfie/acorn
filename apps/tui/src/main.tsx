@@ -154,10 +154,17 @@ installRenderGuard()
 // overlay over the frame on an uncaught error, and the shell now draws in front of a node that may
 // not answer for a second — so one fire-and-forget request rejecting reads as the whole app being
 // replaced by a debug panel. The error is not lost: it is captured below and printed on the way out.
+//
+// `autoFocus` is off because focus is the region store's and the renderer may not have a second
+// opinion about it. Left on, `dispatchMouseEvent` walks up from the renderable a left click hit and
+// focuses the first focusable ancestor it finds — which is a focus move nothing in the store asked
+// for, for exactly the case the store exists to have one answer to. A click is a hit test into the
+// store instead (./keys/regions.ts § Clicks are hit tests).
 const renderer = await createCliRenderer({
   exitOnCtrlC: false,
   useKittyKeyboard: { disambiguate: true },
   openConsoleOnError: false,
+  autoFocus: false,
 })
 bootMark('renderer created')
 // Time to first draw. `@opentui/solid` exports a `TimeToFirstDraw` renderable that holds the same
