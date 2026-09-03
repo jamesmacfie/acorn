@@ -1,7 +1,10 @@
 # Phase 2: the painter
 
-Status: not started. Waits on phase 0's spikes 2 and 3. Independent of phase 1. Not shippable to
-readers on its own; it runs behind a build switch until phase 3.
+Status: part built, 2026-09-03, against `c0903659`. The node tree, the width measure and the layout
+pass are in the tree with their own unit tests; the paint pass, the input parser, the build switch and
+the golden comparison are not, and nothing in the running app has changed. What building the first
+part found is at the bottom. Independent of phase 1. Not shippable to readers on its own; it runs
+behind a build switch until phase 3.
 
 ## Goal
 
@@ -229,3 +232,105 @@ numbers that decided the Yoga entry and the width measure.
 - Read [ui-design.md](../../ui-design.md) § Every node at 80 by 24 and [panes.md](../../panes.md)
   § Layout model first; a golden mismatch is judged against those sentences, and where a golden
   disagrees with the sentence, the sentence wins and the golden is corrected with a note.
+
+## What building it found (2026-09-03)
+
+The first part is built: `apps/tui/src/tree/` (the `Node` type, the renderer operations, `render`,
+`Dynamic`, `extend`, the JSX types), `apps/tui/src/width.ts` (the measure), and
+`apps/tui/src/layout/` (Yoga's lifetime, the prop table, the text measure, the read-back). Three test
+files beside them, 36 cases, all of which pass on Node 24.11.0 with no FFI and no flag, which is the
+first time anything in this package's suite has drawn without one. `yoga-layout` is at 3.2.1 in
+`apps/tui/package.json` and nothing was removed.
+
+The shape held. The node is a plain object, the operations are about ninety lines of code, the clamp
+is one function, and the six workarounds § What each workaround becomes lists against those three
+folders are absences rather than replacements. Twelve things the file or
+[architecture.md](./architecture.md) said turned out otherwise.
+
+**The nine operations are ten.** `RendererOptions` in solid-js 1.9.13 wants `createElement`,
+`createTextNode`, `replaceText`, `isTextNode`, `setProperty`, `insertNode`, `removeNode`,
+`getParentNode`, `getFirstChild` and `getNextSibling`. Both [architecture.md](./architecture.md) § 1
+and § The operations above say nine while listing all ten of them.
+
+**Six importing files is seven, and only three of them want `Dynamic`.** `apps/tui/src/main.tsx`,
+`apps/tui/src/harness.tsx` and `apps/tui/src/kit/render.tsx` import `render`;
+`apps/tui/src/plugins/TreeHost.tsx`, `apps/tui/src/plugins/SourcePanel.tsx` and
+`apps/tui/src/kit/host.tsx` import `Dynamic`; `apps/tui/src/kit/rectangle.tsx` imports `extend`. An
+eighth file, `apps/tui/src/kit/reconciler.ts`, re-exports the whole package, so the slice that moves
+the alias has that to delete as well as to point.
+
+**A rectangle is four finite integers, of which two are non-negative.** The invariant in
+[architecture.md](./architecture.md) § 2 says all four are non-negative, and a computed left cannot
+be: an overflowing child under `alignItems: center` reports -15, and clamping that to 0 slides the
+run sideways instead of letting paint clip it. So the read-back clamps the size half only and leaves
+a position alone once it is finite. `apps/tui/src/layout/layout.test.ts` pins both halves.
+
+**An unmeasured size clamps to zero, not to the one cell `renderGuard.ts` chose.** That 1 was for the
+Zig side, which took a `u32` and threw on `NaN` from inside the render loop, so a one-cell box was
+the cheapest thing that would not crash. Our paint has no such door, and a zero rectangle paints
+nothing, which is the honest answer for a node Yoga has never measured. The clamp asks
+`Number.isFinite` and never `=== 0`, because an empty auto-sized box and a `DISPLAY_NONE` subtree
+both read zero legitimately.
+
+**`removeNode` cannot be the move.** § The operations says `insertNode` links the node and
+`removeNode` unlinks it, which is right, but Solid inserts a still-parented node when it moves one,
+and routing that through `removeNode` frees the Yoga node of anything created outside an owner. The
+unlink is now its own function and only `removeNode` decides whether to free.
+
+**`extend` had to keep the tag as well as become a no-op.** § Scope says `extend` registers nothing
+and that `apps/tui/src/kit/rectangle.tsx` calls it once. It does not say what happens to the tag it
+registered: the transform still emits `<embedded_terminal>`, and an unmapped tag now throws. So
+`apps/tui/src/tree/node.ts` maps that tag to the `pty` kind until phase 3 removes the call.
+
+**The prop tally holds at 24 and 21, but `maxWidth` is set after all.** Re-scanned at `c0903659`:
+159 `<box>` tags, of which 153 are outside the tests, and 6 `<text>`, carrying 24 distinct props once
+`ref`, `title`, `titleAlignment` and the handlers are set aside. 21 map to a Yoga setter and the other
+three are `borderStyle`, `borderColor` and `wrapMode`, exactly as spike 2 measured. The one
+correction is `maxWidth`: spike 2 says nothing in `apps/tui` sets it, and
+`apps/tui/src/kit/scrolling.tsx` sets `minWidth` and `maxWidth` to `'100%'` inside the scrollbox's
+`contentOptions`. Percentages are therefore live in the table, and so is `maxWidth`.
+
+**A per-edge border width outlives an `Edge.All` reset.** Setting `border` to `['left']` and then to
+`false` left the box still charging a cell on its left, because `setBorder(Edge.All, 0)` does not
+clear a width written to a named edge. The setter writes all four edges by name. `Rule` is the only
+caller that passes an array today, and its box is the divider between two regions, so the cell it
+kept would have been visible.
+
+**Two things about Yoga's JavaScript API, for whoever writes the next test.** `getChild(index)`
+returns a fresh wrapper around the same pointer on every call, so a node's Yoga child cannot be
+recognised by identity and the tree test tags each box with a distinct `flexGrow` instead. And
+`getBorder(edge)` answers `NaN` for an edge whose width arrived through `Edge.All`, so a border
+assertion has to read `getComputedBorder` after a pass.
+
+**A `text` node's rectangle is not its run's width.** A column container stretches its children
+across, so a seven-cell run inside a nine-cell box has `rect.w` of 9 and a measured width of 7. Paint
+needs both: the box to clip to, the run to place. They come from the rectangle and from the measure
+cache respectively, which is why `measuredRun` is exported.
+
+**Only one of the six wide glyphs is wide to our measure.** § Scope says `☰`, `🗀`, `🗎`, `🗒`, `🗃`
+and `🖵` become one-cell characters. Five of them already are, to `Intl.Segmenter` and the East Asian
+Width table, without a line changing in `apps/tui/src/kit/glyphs.ts`: what was wide was OpenTUI's
+measure, not the characters. So the work in that file is `☰` alone, which Unicode 16 moved to `W`.
+No golden needs recapturing for any of it. Phase 0 grepped all 28 for the six characters and none
+holds one: the trust prompt interpolates the Lucide *name* as words and the fixture's bundle asks for
+no permissions anyway, and the pane strip lost its marks when the rail lost its icons. Re-checked
+against the committed set while reviewing this slice, and still none.
+`apps/tui/src/width.test.ts` holds spike 3's whole column, and its
+`GLYPHS` case asserts that `list` is the only name left over, so it turns green on the day the
+character changes. Spike 3's numbers reproduced exactly on Node 24.11.0, including the Devanagari
+cluster count of 3 and the flag at 1.
+
+**`apps/tui/src/keys/tiers.test.ts` greps every non-test file in the package.** It looks for a bare
+number after a closing bracket, which is how a keymap priority spelled outside the tier table looks,
+and a `reduce` with a `0` seed reads as one. So does a comment quoting the shape. Worth knowing before
+the paint pass, which will want a seeded reduce more than once.
+
+### Test results (2026-09-03)
+
+`pnpm --filter @acorn/tui test` on Node 26.8.1: 359 passing, 2 failing. The two are
+`walks into a command group on return and back out of it on escape` and `draws a search and an input
+in the same rectangle as the list`, both in `apps/tui/src/chrome/chrome.test.tsx`, both another
+session's in-flight palette work, and both failing on their own commits. The baseline was 323 passing
+and those same 2; the 36 new cases are `apps/tui/src/width.test.ts` (9),
+`apps/tui/src/tree/tree.test.ts` (14) and `apps/tui/src/layout/layout.test.ts` (13). On the repo's own
+Node 24.11.0 all 36 pass with no flag. `pnpm --filter @acorn/tui lint` is clean.

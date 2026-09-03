@@ -91,9 +91,11 @@ ours and the pain of flex, if any remains, can be measured rather than argued. I
 `apps/tui/src/renderGuard.ts`: the clamp that guards against `NaN` sizes moves into the one function
 that reads computed sizes back, where it belongs, and there is no Zig side to throw.
 
-**Invariant.** A node's rectangle is always four finite non-negative integers. The read-back clamps
-and the test that pins the guard today (`apps/tui/src/renderGuard.test.ts`) becomes a test of that
-function.
+**Invariant.** A node's rectangle is always four finite integers, of which the width and the height
+are non-negative. The position half is not, and phase 2 measured why: an overflowing child under
+`alignItems: center` reports a left of -15, and clamping that to zero would move the run where
+paint's job is to clip it. The read-back clamps and the test that pins the guard today
+(`apps/tui/src/renderGuard.test.ts`) becomes a test of that function.
 
 **Spike 2 answered** the entry and the speed, and its numbers are in
 [phase-0-baseline-and-spikes.md](./phase-0-baseline-and-spikes.md) § Spike 2. Take the synchronous
