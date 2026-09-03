@@ -1,4 +1,5 @@
-import { colorOr, toColor } from '../colour'
+import type { Terminal as HeadlessTerminal } from '@xterm/headless'
+import { colorOr, toColor, type Color } from '../colour'
 import { measuredRun } from '../layout/measure'
 import { isFieldKind, laysOut, type Node } from '../tree/node'
 import { sliceToWidth } from '../width'
@@ -29,10 +30,10 @@ import {
 // to be outside one is to overflow it, and a run drawn over a sibling is never the answer we want.
 // The early-out on an empty clip is also what makes a subtree scrolled off screen free.
 //
-// **What is not here.** The emulator's cells are a later slice of phase 3, so a `pty` draws as the
-// box it is until then — which is all it is to layout as well. A `scrollbox` is a box plus one column
-// of bar: the offset is the read-back's, so there is nothing to translate here (§ drawBar). An
-// `input` and a `textarea` are a box plus their own content and the caret (§ drawField).
+// **Every kind but `box` and `text` is a box plus one thing.** A `scrollbox` is a box plus one column
+// of bar, because the offset is the read-back's and there is nothing to translate here (§ drawBar).
+// An `input` and a `textarea` are a box plus their own content and the caret (§ drawField). A `pty`
+// is a box plus a copy of an emulator's cells (§ drawPty).
 
 /** The six characters a border draws with, and there is one set because there is one style.
  *
@@ -338,6 +339,97 @@ function drawField(node: Node, buffer: Buffer, clip: Clip): void {
   if (inside(own, x, y)) buffer.cursor = { x, y }
 }
 
+/** One of the 256 indexed colours as something a terminal can be asked for.
+ *
+ *  The first sixteen are the reader's own slots and stay indexes, which is the whole point of the
+ *  `Color` type (../colour.ts). Above that xterm's palette is arithmetic rather than a table — a
+ *  6×6×6 cube and then a 24-step grey ramp — and there is nothing in `Color` between a slot and a
+ *  triple, so the arithmetic is done here and the answer is a triple. A program that asked for cube
+ *  colour 141 gets the colour, on a terminal that takes 24-bit; on one that does not, `../flush.ts`
+ *  has nowhere to put it either way. */
+function paletteColor(index: number): Color {
+  if (index < 16) return index
+  if (index < 232) {
+    const at = index - 16
+    const level = (part: number): number => (part === 0 ? 0 : 55 + part * 40)
+    return [level(Math.floor(at / 36)), level(Math.floor(at / 6) % 6), level(at % 6)]
+  }
+  const grey = 8 + (index - 232) * 10
+  return [grey, grey, grey]
+}
+
+/** A cell's foreground or background as the emulator reports it: a 24-bit triple packed into one
+ *  number, one of the 256 indexed colours, or the terminal's own. The three are exclusive and
+ *  "neither of the first two" is what `isFgDefault` means, so the third needs no question. */
+function cellColor(value: number, indexed: boolean, rgb: boolean): Color {
+  if (rgb) return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff]
+  return indexed ? paletteColor(value) : 'default'
+}
+
+/**
+ * A `pty`: the emulator's own cells, copied into the rectangle.
+ *
+ * The emulator is a component's, held on the node as a prop, and this is the only place its buffer is
+ * read (../kit/rectangle.tsx § handedOwn). Copied rather than drawn from: the emulator has already
+ * done the hard half — parsing, wrapping, scrolling its own region, tracking every attribute a
+ * program set — and what is left is one cell per cell.
+ *
+ * **The viewport rather than the buffer.** `buffer.active` is the whole of the scrollback and
+ * `viewportY` is the row the emulator is showing at the top, so a program that scrolled its own
+ * region has moved that number and the rectangle follows it. There is no offset of ours: a
+ * rectangle's viewport is the rectangle, which is why a `pty` wants none of the `scroll` prop the
+ * fields and the viewport carry.
+ *
+ * **A wide glyph is a pair here too**, and the emulator says so the same way our buffer does: the
+ * glyph reports a width of two and the cell after it reports nought characters. So the pair is
+ * written as the pair `./buffer.ts` expects, and the continuation marker keeps the diff and
+ * the flush treating the two as one thing.
+ */
+function drawPty(node: Node, buffer: Buffer, clip: Clip): void {
+  const term = node.props.terminal as HeadlessTerminal | undefined
+  if (!term) return
+  const own = intersect(clip, clipOf(node.rect))
+  if (isEmptyClip(own)) return
+
+  const screen = term.buffer.active
+  const rows = Math.min(node.rect.h, term.rows)
+  const cols = Math.min(node.rect.w, term.cols)
+  // One cell object for the whole copy, which is what `getNullCell` is for: `getCell(x, cell)` fills
+  // it in place, and a fresh object per cell would be 4,800 allocations a frame at 120 by 40.
+  const cell = screen.getNullCell()
+
+  for (let row = 0; row < rows; row += 1) {
+    const line = screen.getLine(screen.viewportY + row)
+    if (!line) continue
+    const y = node.rect.y + row
+    let at = 0
+    while (at < cols) {
+      line.getCell(at, cell)
+      const width = cell.getWidth()
+      const style: Style = {
+        fg: cellColor(cell.getFgColor(), cell.isFgPalette(), cell.isFgRGB()),
+        bg: cellColor(cell.getBgColor(), cell.isBgPalette(), cell.isBgRGB()),
+        attrs: (cell.isBold() ? ATTRS.bold : 0)
+          | (cell.isDim() ? ATTRS.dim : 0)
+          | (cell.isUnderline() ? ATTRS.underline : 0)
+          | (cell.isInverse() ? ATTRS.inverse : 0),
+      }
+      const chars = cell.getChars()
+      put(buffer, own, node.rect.x + at, y, chars === '' ? ' ' : chars, style)
+      if (width === 2) put(buffer, own, node.rect.x + at + 1, y, '', style)
+      at += width === 2 ? 2 : 1
+    }
+  }
+
+  // The emulator's own caret, where the rectangle is entered. The other writer of this is a focused
+  // field, and at most one of the two can be true at a time because at most one thing has the keys —
+  // but nothing enforces that, so the last writer in this walk wins (§ drawField, ./flush.ts § SHOW).
+  if (node.props.focused !== true) return
+  const x = node.rect.x + screen.cursorX
+  const y = node.rect.y + screen.cursorY
+  if (inside(own, x, y)) buffer.cursor = { x, y }
+}
+
 function drawNode(node: Node, buffer: Buffer, clip: Clip): void {
   // `visible === false` is skipped whole, which is also what Yoga does with `DISPLAY_NONE`, so the
   // two agree without a rule between them (../layout/props.ts § visible).
@@ -347,6 +439,7 @@ function drawNode(node: Node, buffer: Buffer, clip: Clip): void {
   // A field's own content and caret go inside the box it also is, so a bordered or coloured field
   // draws both. Nothing in the kit gives one a border, and the box half costs one branch.
   if (isFieldKind(node.kind)) drawField(node, buffer, clip)
+  if (node.kind === 'pty') drawPty(node, buffer, clip)
   // After the children, because the bar is drawn over the last column of whatever they put there.
   if (node.kind === 'scrollbox') drawBar(node, buffer, intersect(clip, clipOf(node.rect)))
 }

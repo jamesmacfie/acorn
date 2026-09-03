@@ -1,8 +1,10 @@
 import { EventEmitter } from 'node:events'
 import { openScreen, type Screen, type Sink } from './paint/screen'
 import { onFrame } from './tree/frames'
-import { wheelAt } from './tree/hit'
+import { pressAt, wheelAt } from './tree/hit'
 import { openTerminal } from './input/terminal'
+import type { InputListener } from './input/events'
+import { keyPressed } from './ownKeys'
 import type { Node } from './tree/node'
 
 // A `CliRenderer`-shaped handle on our screen, so the keyboard can be installed on it.
@@ -20,9 +22,10 @@ import type { Node } from './tree/node'
 // still ours (./input/terminal.ts § The two halves compose).
 //
 // **The key stream is a queue, not a parser.** `keyInput` is an emitter a caller pushes a `KeyEvent`
-// onto, which is what the harness's `press` does. Wiring the parser's events into it is phase 3, and
-// the reason to wait is that the translation — `alt` becomes the keymap's `meta`, and nothing else —
-// belongs beside the widgets that need the rest of the parser's vocabulary.
+// onto: the harness pushes one it constructed, and a caller that handed us a terminal gets the ones
+// `./input/parser.ts` read off stdin (§ listen). Which of the two the engine is reading is a question
+// nothing downstream can ask, and that is the point — a suite driving a different keyboard from the
+// app would be testing a different keyboard.
 
 export type OwnRenderer = {
   /** Our screen, for the callers that want cells rather than a renderer. */
@@ -50,9 +53,13 @@ export type OwnRenderer = {
    *  cached (docs/future/terminal-rewrite/architecture.md § 3). */
   console: { hide: () => void; deactivate: () => void; activate: () => void; getCachedLogs: () => string }
   /** One wheel step at a cell: the innermost viewport under the pointer moves its offset and the keys
-   *  stay where they are. The only thing done with the pointer so far, because a viewport is the only
-   *  node that needs one (./tree/hit.ts § wheelAt). */
+   *  stay where they are (./tree/hit.ts § wheelAt). */
   mouseScroll: (x: number, y: number, direction: 'up' | 'down') => void
+  /** One left press at a cell: the stop it landed on is pressed and the nearest thing above it that
+   *  can hold the keys takes them. The other and last thing done with the pointer, because focusing
+   *  and pressing is the whole of this host's pointer model
+   *  (./keys/regions.ts § Clicks are hit tests, docs/tui.md § What the TUI never does). */
+  mousePress: (x: number, y: number) => void
   /** Draw now rather than on the next turn of the event loop, which is what a test wants. */
   frame: () => void
   destroy: () => void
@@ -64,6 +71,9 @@ export function openOwnRenderer(options: {
   write?: Sink
   /** Given the terminal, this closes it after the screen (see the header). */
   closeTerminal?: () => void
+  /** Given the terminal, this is how to hear it: everything the parser read, in the order it
+   *  happened. Absent in both harnesses, which construct their events instead (§ route). */
+  listen?: (listener: InputListener) => () => void
 }): OwnRenderer {
   const events = new EventEmitter()
   const keyInput = new EventEmitter()
@@ -88,6 +98,43 @@ export function openOwnRenderer(options: {
   }
   onFrame(frame)
 
+  // ── route ──
+  //
+  // Everything the terminal says, delivered where this app already listens for it. Five kinds of
+  // event and five destinations, and not one of them is new machinery: the parser turns bytes into
+  // events and this is the only function that holds both it and the screen.
+  //
+  // **A key is routed by its action, and getting that wrong fires every binding twice.** Our enter
+  // sequence asks the kitty protocol for event reporting, flag 2, which `./main.tsx` has never asked
+  // for — OpenTUI's `useKittyKeyboard: { disambiguate: true }` builds flags 1 and 4 and never 2 — so
+  // on a terminal that speaks the protocol every key now arrives twice, once as a press and once as
+  // a release. So `keypress` carries presses and repeats and `keyrelease` carries releases, which is
+  // the split the keymap host's two subscriptions already expect and the split the typing hand-off
+  // needs: it listens on `keypress` alone, and a release delivered there would type every character
+  // twice (./keys/keymapHost.ts § ownKeymapHost, ./input/terminal.ts § KITTY_FLAGS).
+  const route = (event: Parameters<InputListener>[0]): void => {
+    if (event.type === 'resize') { screen.resize(event.cols, event.rows); return }
+    if (event.type === 'key') {
+      keyInput.emit(event.action === 'release' ? 'keyrelease' : 'keypress', keyPressed(event))
+      return
+    }
+    // A paste is one event rather than a run of Returns, and the dispatcher hands it to whatever has
+    // the keys (./keys/install.ts § pasteInto).
+    if (event.type === 'paste') { keyInput.emit('paste', event); return }
+    // Whether this terminal is the window the reader is looking at, under the two names OpenTUI's
+    // renderer raised it by, because `./main.tsx` subscribes to those and it is the same fact
+    // (./main.tsx § setHostFocused).
+    if (event.type === 'focus') { events.emit(event.state === 'in' ? 'focus' : 'blur'); return }
+    // And the pointer, which is two gestures and no more: a wheel moves the viewport under it, and a
+    // left press moves the keys.
+    if (event.action === 'wheel' && (event.wheel === 'up' || event.wheel === 'down')) {
+      wheelAt(screen.root, event.x, event.y, event.wheel)
+      return
+    }
+    if (event.action === 'press' && event.button === 'left') pressAt(screen.root, event.x, event.y)
+  }
+  const deafen = options.listen?.(route)
+
   return {
     screen,
     root: screen.root,
@@ -103,10 +150,12 @@ export function openOwnRenderer(options: {
     removeInputHandler: () => {},
     console: { hide: () => {}, deactivate: () => {}, activate: () => {}, getCachedLogs: () => '' },
     mouseScroll: (x, y, direction) => { wheelAt(screen.root, x, y, direction) },
+    mousePress: (x, y) => { pressAt(screen.root, x, y) },
     frame,
     destroy: () => {
       if (destroyed) return
       destroyed = true
+      deafen?.()
       screen.close()
       options.closeTerminal?.()
       events.emit('destroy')
@@ -125,15 +174,10 @@ export function openOwnRenderer(options: {
  */
 export function openOwnSurface(): OwnRenderer {
   const terminal = openTerminal()
-  const renderer = openOwnRenderer({
+  return openOwnRenderer({
     ...terminal.size(),
     write: terminal.write,
     closeTerminal: terminal.close,
+    listen: terminal.on,
   })
-  // A resize is the only notice a terminal gives, and `SIGWINCH` is where it arrives: the parser
-  // turns it into an event carrying the new pair (./input/terminal.ts).
-  terminal.on((event) => {
-    if (event.type === 'resize') renderer.screen.resize(event.cols, event.rows)
-  })
-  return renderer
 }

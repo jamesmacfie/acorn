@@ -818,14 +818,10 @@ const CASES: Case[] = [
 /**
  * What the new painter cannot draw yet, case by case, and what each is waiting for.
  *
- * Under `ACORN_TUI_PAINTER=own` this suite runs on a painter with no scroll viewport, no `Input`, no
- * `Textarea`, no pty rectangle and no mouse hit testing — those five are phase 3, and a case that
- * needs one of them has nothing to assert on until it exists. Every other case runs under both, which
- * is the point of the switch: the kit is the same kit and the cells are the same cells
- * (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md).
- *
- * One entry is not phase 3's and says so, because a skip with the wrong reason on it is worse than no
- * skip at all (§ TableRow below).
+ * Two entries are left and neither is a widget, because phase 3 built all five of them. Both are the
+ * same measured Yoga-build difference, recorded with everything that was tried, and neither is above
+ * the layout pass — so the name is now the only phase 3 thing about them
+ * (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § What building it found).
  *
  * Keyed by the title the case is reported under, so a rename shows up as a case that stopped being
  * skipped rather than as a silent skip of the wrong one — the anti-vacuity check below reads it.
@@ -843,10 +839,6 @@ const PHASE_3: Readonly<Record<string, string>> = {
     'a viewport in a parent with no height of its own',
   'is a parent stop: Down enters the panel it is showing, Escape comes back':
     'a viewport in a parent with no height of its own',
-  // A click is a hit test into the store, and the walk from a cell to a node does not exist yet
-  // (../keys/regions.ts § Clicks are hit tests).
-  'puts the keys on the control a click lands on, and Enter presses that one': 'mouse hit testing',
-  'lets go of the keys when the control holding them goes disabled': 'mouse hit testing',
 }
 
 /** The reason this case is held, or nothing at all under the painter that can draw it. */

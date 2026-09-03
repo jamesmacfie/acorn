@@ -36,6 +36,7 @@ import {
   type CliRenderer, type MouseEvent, type Renderable,
 } from '@opentui/core'
 import { drawsOwn } from '../painter'
+import { isRemoved } from '../tree/compat'
 
 export type RegionRef = { paneId: string; regionId: string }
 
@@ -184,13 +185,21 @@ const [focusedNode, setFocusedNode] = createSignal<Renderable | null>(null)
 export const focusedRenderable = focusedNode
 
 /**
- * Whether a renderable is still on screen: alive, visible, and visible all the way up.
+ * Whether a renderable is still on screen: alive, visible, visible all the way up, and still in the
+ * tree.
  *
  * The parent walk is the whole point. OpenTUI's `visible` is per node, so a focused descendant of a
  * hidden box goes on reporting `visible: true` about itself, and two things here hide a whole subtree
  * rather than unmounting it: the shell's main row behind an overlay, and the `TabPanel` that is not
  * showing. Asking the node alone said the keys were fine while they sat behind a dialog
  * (../chrome/Shell.tsx, ../kit/grouping.tsx, @opentui/core § Renderable.visible).
+ *
+ * The end of the walk is the fourth question and it is our painter's. Nothing is destroyed there —
+ * that is the fault class it exists to end — so `isDestroyed` cannot answer "Solid took this away",
+ * and a re-rendered pane left whole subtrees answering yes to the other three from nowhere at all.
+ * Only the top of a removed subtree is unlinked, so the question belongs at the end of the chain and
+ * nowhere else, and it costs the walk nothing (../tree/compat.ts § removed). Under the old painter it
+ * is always false, because nothing there ever marks a node.
  *
  * Exported because the reachability property asks it after every press, and two answers to one
  * question is the drift this module exists to remove (../reachability.test.tsx).
@@ -200,8 +209,9 @@ export const onScreen = (node: Renderable | null | undefined): boolean => {
   // The walk starts at the node rather than at its parent, because a node's own `visible` is not a
   // special case worth a line of its own: the two boxes that hide a subtree can each be the node that
   // has the keys, which a `pty` rectangle on a switched-away tab is (../kit/rectangle.tsx).
-  for (let at: Renderable | null = node; at; at = at.parent) { step(); if (!at.visible) return false }
-  return true
+  let top: Renderable = node
+  for (let at: Renderable | null = node; at; at = at.parent) { step(); if (!at.visible) return false; top = at }
+  return !isRemoved(top)
 }
 
 /**

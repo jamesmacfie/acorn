@@ -57,24 +57,29 @@ import { drawsOwn } from './painter'
 process.env.ACORN_FIXTURE_DELAY_MS ??= '50'
 
 /**
- * Goldens still held, by name and size, with what each is waiting for.
+ * Goldens still held, by name and size, with what each is waiting for and how far off it is.
  *
  * By the full name rather than by surface, because the reasons stopped agreeing across the two sizes:
  * at 80 the harness settles deeper than the capture did, and at 120 the two Yoga builds round a
  * squeezed row differently. Neither is a widget and neither is above the layout pass, so nothing here
- * is a to-do list any more — each of these is a difference to accept or a Yoga question for somebody
- * with a spare afternoon (§ Five of the twenty-eight are still held).
+ * is a to-do list — each of these is a difference to accept, a Yoga question for somebody with a
+ * spare afternoon, or a re-capture (§ Five of the twenty-eight are still held).
+ *
+ * The counts were measured with this table emptied, on 2026-09-04, and every other golden in the set
+ * matched in the same run. They are counts of *differences* rather than of rows: one row that has
+ * shifted a cell is several, because the characters and the runs are compared separately.
  */
 const PHASE_3: Readonly<Record<string, string>> = {
-  'changes-80x24': 'the pane\'s own header row, which this harness settles far enough to draw and the '
-    + 'capture did not',
-  'changes-120x40': 'one cell of squeeze per overflowing row, on 16 rows',
-  'agents-80x24': 'six rows of a section this harness settles far enough to show; the old painter '
-    + 'driven through the same harness draws the same cells on every row, so the painters agree and '
-    + 'the capture is the shallower screen',
-  'agents-120x40': 'one cell of squeeze on the header row, and the composer\'s hint wrapping a row '
-    + 'differently because of it',
-  'notes-120x40': 'one cell of squeeze on two overflowing rows',
+  'changes-80x24': '23 differences, and the pane\'s own header row is what they are: this harness '
+    + 'settles far enough to draw it and the capture did not',
+  'changes-120x40': '15 differences: one cell of squeeze per overflowing row, plus the blue border '
+    + 'runs phase 2 could not correct because the rows they sit on do not line up',
+  'agents-80x24': '12 differences, over six rows of a section this harness settles far enough to '
+    + 'show; the old painter driven through the same harness draws the same cells on every row, so '
+    + 'the painters agree and the capture is the shallower screen',
+  'agents-120x40': '10 differences: one cell of squeeze on the header row, and the composer\'s hint '
+    + 'wrapping a row differently because of it',
+  'notes-120x40': '4 differences: one cell of squeeze on two overflowing rows',
 }
 
 /**

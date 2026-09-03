@@ -3,7 +3,7 @@ import type { JSX } from 'solid-js'
 import type { CliRenderer } from '@opentui/core'
 import { rgbOf } from '../colourCompat'
 import { openOwnRenderer } from '../ownRenderer'
-import { frameRequested } from '../tree/frames'
+import { frameRequested, framesSettled } from '../tree/frames'
 import { pressedKey } from '../ownKeys'
 import { drawsOwn } from '../painter'
 
@@ -106,6 +106,10 @@ const openSurface = async (size: { width: number; height: number }): Promise<Sur
         for (let turn = 0; turn < 20 && frameRequested(); turn += 1) {
           await new Promise((done) => setImmediate(done))
         }
+        // …and then anything that has *held* a frame rather than asked for one, which the loop above
+        // cannot outwait: a `pty` rectangle's emulator parses on a timer and twenty turns of
+        // `setImmediate` go by in two milliseconds (../tree/frames.ts § framesSettled).
+        await framesSettled()
         renderer.frame()
       },
       captureCharFrame: () => `${renderer.screen.lines().join('\n')}\n`,
@@ -123,12 +127,12 @@ const openSurface = async (size: { width: number; height: number }): Promise<Sur
       // listens. Wiring the parser's own paste events into it is the next slice
       // (../keys/install.ts § pasteInto).
       pasteText: (text) => { renderer.keyInput.emit('paste', { text }) },
-      // A wheel hit-tests to the innermost viewport under the cell and moves its offset. A click is
-      // the other half of the pointer and is a later slice: focusing what was clicked is the store's
-      // question, and a case that clicks skips until it is answered
-      // (../tree/hit.ts, ./kit.test.tsx § PHASE_3).
+      // The two gestures this host has. A wheel hit-tests to the innermost viewport under the cell
+      // and moves its offset; a press hit-tests to the deepest node and walks up, pressing the stop
+      // it landed on and giving it the keys (../tree/hit.ts, ../keys/regions.ts § Clicks are hit
+      // tests).
       scroll: async (x, y, direction) => { renderer.mouseScroll(x, y, direction) },
-      click: async () => {},
+      click: async (x, y) => { renderer.mousePress(x, y) },
       destroy: () => renderer.destroy(),
     }
   }

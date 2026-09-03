@@ -218,16 +218,23 @@ const typeInto = (event: KeyEvent): void => {
 }
 
 /**
- * Hand a bracketed paste to the field that has the keys.
+ * Hand a bracketed paste to whatever has the keys and can take one.
  *
  * The same hand-off as `typeInto` one event over, and it is registered only under our painter because
  * OpenTUI already has a route: its renderer delivers a paste to the renderable *it* has focused, and
  * the caret mirror has focused the same field, so a second listener would paste twice. Phase 4 leaves
  * this one (./regions.ts § paintCaret).
+ *
+ * `isTypingTarget` is deliberately not the gate here, where it is the gate for a key. Two things
+ * install a `handlePaste`: a field, and the box of a `pty` rectangle, which brackets the text for the
+ * program inside it if that program asked. The second is not a typing target — an entered rectangle
+ * takes its keys by intercepting above every layer rather than through this predicate — so asking the
+ * question would refuse a paste into the one place a reader most expects one to work
+ * (../kit/rectangle.tsx § pasted, ../kit/asking.tsx § api).
  */
 const pasteInto = (event: { text?: string; bytes?: Uint8Array }): void => {
   const node = focusedRenderable()
-  if (!node || !isTypingTarget(node)) return
+  if (!node) return
   const text = event.text ?? (event.bytes ? new TextDecoder().decode(event.bytes) : '')
   if (text !== '') (node as unknown as { handlePaste?: (event: { text: string }) => void })
     .handlePaste?.({ text })

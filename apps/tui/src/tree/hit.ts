@@ -1,6 +1,6 @@
 import { laysOut, type Node } from './node'
 
-// What the pointer is over, and where a wheel goes from there.
+// What the pointer is over, and where a wheel and a press go from there.
 //
 // Every node carries the rectangle the layout pass wrote, so "which node is under this cell" is a
 // depth-first search and nothing more. Two rules make it the answer a reader would give:
@@ -16,7 +16,9 @@ import { laysOut, type Node } from './node'
 //
 // The wheel is here rather than in the region store because it is not a focus question: a scroll
 // moves a viewport's offset and leaves the keys where they are (docs/tui.md § What the TUI never
-// does). Focusing what a click landed on is the store's and is a later slice.
+// does). A press is the other half and it is delivered the same way, from the node under the pointer
+// upwards — what it *means* is the store's, which reads it off the root
+// (../keys/regions.ts § Clicks are hit tests).
 
 const holds = (node: Node, x: number, y: number): boolean =>
   x >= node.rect.x && x < node.rect.x + node.rect.w && y >= node.rect.y && y < node.rect.y + node.rect.h
@@ -89,5 +91,52 @@ export function wheelAt(root: Node, x: number, y: number, direction: 'up' | 'dow
     if (stopped || scrolled || at.kind !== 'scrollbox') continue
     ;(at as Wheeled).scrollBy?.(direction === 'down' ? WHEEL_ROWS : -WHEEL_ROWS)
     scrolled = true
+  }
+}
+
+/** A mouse press as the two handlers in this package read one, which is OpenTUI's `MouseEvent` cut
+ *  down to the members they touch: the store wants the button and what was hit, and a stop's own
+ *  handler wants nothing at all (`../keys/regions.ts § focusClicked`, `../keys/stops.ts § pressable`). */
+export type Press = {
+  x: number
+  y: number
+  button: number
+  target: Node
+  preventDefault: () => void
+  stopPropagation: () => void
+}
+
+/** The left button, as `MouseButton.LEFT` numbers it. Spelled here rather than imported because this
+ *  module deliberately reaches no OpenTUI, and it is the store that compares the two. */
+const LEFT = 0
+
+/** What answers a mouse press, which is a slot on the node rather than a prop: the store assigns one
+ *  to the root and `../keys/stops.ts` assigns one to every pressable box, both imperatively, both on
+ *  the object (`../tree/compat.ts`). */
+type Pressed = { onMouseDown?: (event: Press) => void }
+
+/**
+ * Deliver one left press at a cell: from the node under the pointer upwards, each node's own handler.
+ *
+ * The order is the old painter's, where a mouse event runs each renderable's handler before it hands
+ * the event to its parent, and both ends of the walk are load-bearing. A stop's own handler presses
+ * what was clicked; the root's is the store's, which walks back up from `target` to the nearest thing
+ * that can hold the keys and focuses it. So a click focuses and presses, in that order, which is the
+ * whole of this host's pointer model (docs/tui.md § What the TUI never does).
+ */
+export function pressAt(root: Node, x: number, y: number): void {
+  const target = hit(root, x, y)
+  if (!target) return
+  let stopped = false
+  const event: Press = {
+    x,
+    y,
+    button: LEFT,
+    target,
+    preventDefault: () => {},
+    stopPropagation: () => { stopped = true },
+  }
+  for (let at: Node | null = target; at && !stopped; at = at.parent) {
+    (at as Pressed).onMouseDown?.(event)
   }
 }

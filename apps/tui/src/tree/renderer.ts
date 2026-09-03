@@ -1,10 +1,11 @@
 import { createMemo, getOwner, onCleanup, splitProps, untrack } from 'solid-js'
 import { createRenderer } from 'solid-js/universal'
+import { focusedRenderable, onScreen, scheduleSettle } from '../keys/regions'
 import { invalidateRun } from '../layout/measure'
 import { applyProp, flexShrinkFor, SHRINK_DEPENDS } from '../layout/props'
 import { createYogaNode, freeYogaNode } from '../layout/yoga'
 import { INTRINSIC, KINDS, measuresText, textOwner, type Node } from './node'
-import { makeNode } from './compat'
+import { markInserted, markRemoved, makeNode } from './compat'
 import { requestFrame } from './frames'
 
 // The reconciler this host draws through: ours, over plain objects.
@@ -115,6 +116,7 @@ export function insertNode(parent: Node, node: Node, anchor?: Node): void {
   const index = found < 0 ? parent.children.length : found
   parent.children.splice(index, 0, node)
   node.parent = parent
+  markInserted(node)
   if (parent.yoga && node.yoga) parent.yoga.insertChild(node.yoga, yogaIndex(parent, index))
   runChanged(parent)
   requestFrame()
@@ -132,9 +134,24 @@ function unlink(parent: Node, node: Node): void {
 
 export function removeNode(parent: Node, node: Node): void {
   unlink(parent, node)
+  // And marked, which is the one thing the store cannot work out for itself. A removed node is not
+  // destroyed here — that is the whole point, since `Suspense` hands the same object back — so
+  // "gone" has to be a fact somebody records rather than a lifecycle anybody can read
+  // (./compat.ts § removed).
+  markRemoved(node)
   // Nothing is freed here unless nothing else will. The Yoga node outlives the removal because Solid
   // may hand this exact object back, and the owner that made it is what decides otherwise.
   if (freeOnRemove.has(node)) freeYogaNode(node)
+  // A node leaving the tree is one of the two ways the keys end up nowhere, and it is the one the old
+  // painter noticed by destroying the renderable a tick later. Here nothing is destroyed, so the
+  // store is told: the landing pass walks the parents before it decides, and a node whose chain no
+  // longer reaches the root cannot hold them. Only where they have actually gone, because a pass that
+  // ran on every removal would reveal the focused node in its viewports on every re-render
+  // (../keys/regions.ts § The landing rule, § ensureFocus).
+  //
+  // Untracked, because this runs inside whatever computation was updating the tree and a tracked read
+  // of the focus signal would make every one of them re-run when the keys move.
+  if (!untrack(() => onScreen(focusedRenderable()))) scheduleSettle()
   requestFrame()
 }
 

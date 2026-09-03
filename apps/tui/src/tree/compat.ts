@@ -38,6 +38,33 @@ const CLASS: Readonly<Record<Kind, string>> = {
  *  rather than anything meaningful: the ids are minted per render and no golden holds one. */
 let minted = 0
 
+/**
+ * The tops of the subtrees Solid has removed and not put back.
+ *
+ * The one thing the store still needs that "a node is data" does not answer by itself. Nothing here
+ * is destroyed, which is the fault class this painter exists to end — `Suspense` hands the same
+ * object back on resolve and it has to still work — but a node whose subtree was removed and never
+ * re-inserted is not on the screen either, and the store's whole question about a node is whether it
+ * can still hold the keys.
+ *
+ * Only the top of a removed subtree is unlinked, so this holds only tops and the question is asked of
+ * the end of a parent walk (`../keys/regions.ts § onScreen`). A `WeakSet` rather than a field for the
+ * reason `./renderer.ts § freeOnRemove` is one: `Node` is deliberately the whole type, and this
+ * is bookkeeping rather than state anything draws from.
+ */
+const removed = new WeakSet<Node>()
+
+/** Solid took this subtree out. Called by `removeNode`. */
+export const markRemoved = (node: Node): void => { removed.add(node) }
+
+/** …and put it back, which is what `Suspense` resolving looks like. Called by `insertNode`, which is
+ *  also where a *move* lands, so a node that was only relocated is never left marked. */
+export const markInserted = (node: Node): void => { removed.delete(node) }
+
+/** Is this node the top of a subtree that is no longer in the tree? Asked of the end of a parent
+ *  walk, and false for anything the old painter drew, because nothing ever marks one of those. */
+export const isRemoved = (node: unknown): boolean => removed.has(node as Node)
+
 const accessors = {
   // The last layout, under the four names the store reads it by.
   x: { get(this: Node) { return this.rect.x } },
