@@ -32,6 +32,10 @@ export type { PaneIntent } from '@acorn/client-core/host/registries/commands/cli
 export { wsAttach, wsConnect, wsOnNotice, wsOnStatus, wsOnWorkflowStepEvent, wsSend, wsWrite } from '@acorn/client-core/infra/node/wsClient.ts'
 export type { WorkflowNotice } from '@acorn/client-core/infra/node/wsClient.ts'
 export { registerWsChannel } from '@acorn/client-core/infra/node/wsChannels.ts'
+// A compiled plugin hearing the same `plugin:<id>:<verb>` broadcasts its loaded frames can declare.
+// The subscriber returns its disposal because a model root, rather than the plugin host's registration
+// pass, owns this listener's lifetime.
+export { onPluginFrame } from '@acorn/client-core/host/plugins/pluginChannel.ts'
 
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
 export { paneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'

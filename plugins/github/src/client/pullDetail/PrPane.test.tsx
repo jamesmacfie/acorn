@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/plugin-api/client'
 import { PrPane } from './PrPane'
 import { prPaneContribution } from './paneContribution'
+import { _resetPrModels } from './prModel'
 import { _resetPrTabs } from './prTabs'
 
 // The PR pane is the navigator beside the diff, the same pair the browse surface draws
@@ -22,11 +23,21 @@ vi.mock('@solidjs/router', () => ({
   useSearchParams: () => [{}, () => {}],
 }))
 
+const seams = vi.hoisted(() => ({
+  invalidateQueries: vi.fn(async () => {}),
+  offPrSynced: vi.fn(),
+  prSynced: undefined as ((payload: unknown) => void) | undefined,
+  subscribe: vi.fn((_pluginId: string, channel: string, listener: (payload: unknown) => void) => {
+    if (channel === 'plugin:github:pr-synced') seams.prSynced = listener
+    return seams.offPrSynced
+  }),
+}))
+
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ data: undefined, isLoading: true, isError: false }),
   createMutation: () => ({ mutate: () => {}, mutateAsync: async () => {}, isPending: false }),
   useQueryClient: () => ({
-    invalidateQueries: async () => {},
+    invalidateQueries: seams.invalidateQueries,
     getQueryData: () => undefined,
     setQueryData: () => {},
     cancelQueries: async () => {},
@@ -41,6 +52,7 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => {
   return {
     ...actual,
     clientEvents: { on: () => () => {}, emit: () => {} },
+    onPluginFrame: seams.subscribe,
     wsOnStatus: () => () => {},
     consumePaneIntent: () => undefined,
     activateTaskSignals: () => {},
@@ -59,6 +71,10 @@ let host: HTMLElement
 const disposers: (() => void)[] = []
 
 beforeEach(() => {
+  seams.invalidateQueries.mockClear()
+  seams.offPrSynced.mockClear()
+  seams.subscribe.mockClear()
+  seams.prSynced = undefined
   host = document.createElement('div')
   document.body.append(host)
 })
@@ -66,6 +82,7 @@ beforeEach(() => {
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose()
   host.remove()
+  _resetPrModels()
   _resetPrTabs()
 })
 
@@ -102,5 +119,28 @@ describe('the PR pane', () => {
     expect(text).toContain('Reviewers')
     expect(text).toContain('Files')
     expect(text).toContain('Comments/Commits')
+  })
+
+  it('re-reads this pull when its background mirror refresh lands', () => {
+    draw()
+    expect(seams.subscribe).toHaveBeenCalledWith(
+      'github',
+      'plugin:github:pr-synced',
+      expect.any(Function),
+    )
+
+    seams.prSynced?.({ repoOwner: 'other', repoName: 'acorn', pullNumber: 7 })
+    seams.prSynced?.({ repoOwner: 'runn-fast', repoName: 'acorn', pullNumber: 8 })
+    expect(seams.invalidateQueries).not.toHaveBeenCalled()
+
+    // Provider names are case-insensitive even when the cache key preserves the project's spelling.
+    seams.prSynced?.({ repoOwner: 'Runn-Fast', repoName: 'ACORN', pullNumber: 7 })
+    expect(seams.invalidateQueries).toHaveBeenCalledOnce()
+    expect(seams.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['pull', 'runn-fast', 'acorn', '7'],
+    })
+
+    _resetPrModels()
+    expect(seams.offPrSynced).toHaveBeenCalledOnce()
   })
 })

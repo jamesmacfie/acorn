@@ -1652,6 +1652,11 @@ ctx.events.send({ channel: `plugin:${ID}:sample`, cpu: 0.34, memory: 0.81 })
 bridge.events.on(`plugin:${ID}:sample`, (sample) => paint(sample))
 ```
 
+A compiled client half hears the same channel through `onPluginFrame(pluginId, channel, listener)`
+from `@acorn/plugin-api/client`. The returned disposable belongs to the model or component root that
+subscribed; GitHub's pull model uses it to replace a stale detail response after the node announces
+`plugin:github:pr-synced`.
+
 What a plugin puts on the frame beside `channel` is the payload, delivered to its frames unchanged.
 Core reads the channel and nothing else, which is the same promise the WS envelope makes everywhere
 (`@acorn/protocol/ws.ts`).

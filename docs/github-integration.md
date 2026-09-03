@@ -44,6 +44,12 @@ mentions, labels, reviewers, comments, review threads, and create-PR. Mutations 
 then update or invalidate the affected mirror so a subsequent read does not serve a known pre-write
 value.
 
+PR detail keeps the mirror's serve-then-revalidate behavior, including provider-rendered `bodyHTML`.
+That HTML can contain GitHub `private-user-images` URLs signed for only a few minutes, so a stale read
+may briefly carry an expired URL. When the background refresh commits, `plugin:github:pr-synced`
+invalidates the matching active detail query and replaces that HTML with the freshly signed version;
+the event is part of the read contract rather than only a notification for other plugins.
+
 The task-scoped `github_pull_create` agent tool shares the same create service as the interactive
 route. It infers the head from the task branch, uses the requested base, and atomically attaches the
 created PR through `CoreServices.tasks.attachPull`: the first attachment claims

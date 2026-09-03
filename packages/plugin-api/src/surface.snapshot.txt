@@ -113,6 +113,7 @@ client: nodes
 client: observeAttention
 client: onClosePaneWhen
 client: onClosePaneWithin
+client: onPluginFrame
 client: onScopeEvicted
 client: openInAppUrl
 client: openPane
