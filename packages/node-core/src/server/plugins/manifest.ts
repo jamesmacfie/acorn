@@ -297,7 +297,64 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
   // refinement can see.
   contextMenus.forEach((entry, i) => action(entry.action, ['contributions', 'contextMenus', i, 'action']))
   palette.forEach((entry, i) => action(entry.action, ['contributions', 'palette', i, 'action']))
-  commands.forEach((entry, i) => action(entry.action, ['contributions', 'commands', i, 'action']))
+  // Four kinds, and each one is checked for what it alone can name: a leaf action's verb, a search or
+  // an input's route and its one static verb, a group's nothing at all
+  // (@acorn/protocol/plugin/contract.ts).
+  const commandKind = new Map<string, string>()
+  commands.forEach((entry, i) => {
+    const at = ['contributions', 'commands', i] as (string | number)[]
+    if (!commandKind.has(entry.id)) commandKind.set(entry.id, entry.kind)
+    switch (entry.kind) {
+      case 'action':
+        action(entry.action, [...at, 'action'])
+        break
+      case 'group':
+        break
+      case 'search':
+        route(entry.route, [...at, 'route'])
+        action(entry.onSelect, [...at, 'onSelect'])
+        break
+      case 'input':
+        route(entry.route, [...at, 'route'])
+        action(entry.onSuccess, [...at, 'onSuccess'])
+        break
+    }
+    // Verbatim the schedule and task-check rule above, and for the identical reason: only a node half
+    // serves `/v2/p/<id>/`, so a search declared by a client-only package would 404 on every keystroke
+    // and an input on every Enter.
+    if ((entry.kind === 'search' || entry.kind === 'input') && !manifest.node) {
+      const article = entry.kind === 'input' ? 'an' : 'a'
+      ctx.addIssue({ code: 'custom', path: at, message: `${article} ${entry.kind} command calls a node route; declare \`node\` in the manifest` })
+    }
+  })
+  // The parent graph, across the whole array, because a parent is another entry in the list and no
+  // field can see its siblings. The client repeats all three refusals over a roster row and drops the
+  // offending command rather than the palette (client-core/host/registries/commands/graph.ts); here
+  // they are an install-time error, which is where an author can still do something about them.
+  commands.forEach((entry, i) => {
+    if (entry.parentId === undefined) return
+    const at = ['contributions', 'commands', i, 'parentId'] as (string | number)[]
+    const parent = commandKind.get(entry.parentId)
+    if (parent === undefined) {
+      ctx.addIssue({ code: 'custom', path: at, message: `command '${entry.id}' names an undeclared parent '${entry.parentId}'` })
+      return
+    }
+    if (parent !== 'group') {
+      ctx.addIssue({ code: 'custom', path: at, message: `command '${entry.id}' names '${entry.parentId}', which is not a group` })
+      return
+    }
+    // Walking up beats colouring the graph: the chains are short, and the walk stops on the command
+    // that closed the loop, which is one an author can go and look at.
+    const parents = new Map(commands.map((command) => [command.id, command.parentId]))
+    const seen = new Set<string>([entry.id])
+    for (let above: string | undefined = entry.parentId; above !== undefined; above = parents.get(above)) {
+      if (seen.has(above)) {
+        ctx.addIssue({ code: 'custom', path: at, message: `command '${entry.id}' is inside a parent cycle` })
+        break
+      }
+      seen.add(above)
+    }
+  })
   const commandIds = new Set([...commands, ...palette].map((entry) => entry.id))
   const surfaceIds = new Set(frames.map((frame) => frame.id))
   const boundCommands = new Set<string>()

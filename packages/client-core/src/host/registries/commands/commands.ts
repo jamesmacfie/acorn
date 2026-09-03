@@ -1,4 +1,4 @@
-import type { CommandScope, CommandSearchItem, CommandSettingOption } from '@acorn/protocol/commands.ts'
+import { DEFAULT_COMMAND_SCOPE, type CommandScope, type CommandSearchItem, type CommandSettingOption } from '@acorn/protocol/commands.ts'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { hasHostCapability } from '../../../infra/node/hostCapabilities'
 import { Registry, type Disposable } from '../../../kit/lib/registry'
@@ -162,6 +162,31 @@ export const commandHint = (command: CommandContribution): string | undefined =>
  *  (./graph.ts). */
 export const commandAvailable = (command: CommandContribution): boolean =>
   hasHostCapability(command.requires) && (command.when?.() ?? true)
+
+/** Which identity this command is about. `node` when it did not say (@acorn/protocol/commands.ts). */
+export const commandScope = (command: CommandContribution): CommandScope => command.scope ?? DEFAULT_COMMAND_SCOPE
+
+/**
+ * Does the captured context carry the identity this command needs?
+ *
+ * Three of the six scopes are a gate: a command about the open task, the routed project or the current
+ * workspace has nothing to address when there is none, so the palette hides it rather than offering a
+ * row that can only fail (docs/future/command-palette/architecture.md § Execution context).
+ *
+ * The other three are not. `none` needs nothing. `node` is the default every command written before
+ * scopes existed already carries, and it says where a request goes rather than whether the command
+ * exists — a client serving its own origin has no node id at all (infra/node/activeNode.ts), and
+ * hiding the whole catalogue there would be this gate emptying the palette. `fleet` degrades to the
+ * captured node when the host supplies no fan-out, which is what a single-node client is.
+ */
+export const commandScopeSatisfied = (command: CommandContribution, context: CommandExecutionContext): boolean => {
+  switch (commandScope(command)) {
+    case 'task': return context.taskId !== null
+    case 'project': return context.projectId !== null
+    case 'workspace': return context.workspaceId !== null
+    default: return true
+  }
+}
 
 /** A leaf that `executeCommand` can run. Everything else is entered rather than run. */
 export const isActionCommand = (command: CommandContribution): command is ActionCommand =>

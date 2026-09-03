@@ -30,7 +30,8 @@ export default function ChromeBadge(props: ChromeBadgeProps) {
   // QueryClient rather than dropping the row, so the badge stops updating instead of vanishing.
   const badge = () => result().rows[0]?.data ?? null
   const click = (): void => {
-    if (props.descriptor.onClick) runChromeAction(props.descriptor.onClick, { pluginId: props.pluginId, nodeId })
+    // Discarded on purpose: a badge has nothing to do with the answer, and the refusal is a toast.
+    if (props.descriptor.onClick) void runChromeAction(props.descriptor.onClick, { pluginId: props.pluginId, nodeId })
   }
 
   return (

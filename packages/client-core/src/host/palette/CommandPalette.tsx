@@ -1,6 +1,7 @@
 import { Show } from 'solid-js'
 import { useParams } from '@solidjs/router'
 import { activeNodeId } from '../../infra/node/activeNode'
+import { nodes } from '../../infra/node/fleet'
 import { activeTaskId } from '../../features/tasks/tasks'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces'
@@ -50,6 +51,10 @@ export default function CommandPalette() {
     toggleChord: 'meta+k',
     context,
     providers: () => providers,
+    // Read only by a `fleet`-scoped search, which nothing declares yet. Supplied here because this is
+    // the host that has a fleet at all: the terminal draws one node and answers with the one it
+    // captured (apps/tui/src/chrome/paletteSession.ts).
+    fleet: () => nodes().map((node) => ({ nodeId: node.nodeId, label: node.label })),
   })
 
   providers = [createPaletteRowsProvider(), createWorkspaceRowsProvider(fleetWorkspaces), createTaskRowsProvider(session.open)]
@@ -66,17 +71,22 @@ export default function CommandPalette() {
       palette={view}
       items={session.rows()}
       ariaLabel="Command palette"
-      placeholder="Run a target, switch a pane, task or workspace, archive…"
+      // A search or an input frame asks for its own thing; the root and a group are still this list.
+      placeholder={session.placeholder() || 'Run a target, switch a pane, task or workspace, archive…'}
       emptyText="No matches."
       breadcrumb={session.breadcrumb()}
       busy={session.busy()}
       announce={announce()}
+      onComposing={session.setComposing}
       status={<Show when={session.status()}><Alert>{session.status()}</Alert></Show>}
       onPick={(row) => session.activateRow(row.id)}
       rowClassList={(row) => ({ 'palette-error': row.action.effect === 'none' })}
       row={(row) => (
         <>
           <span class="palette-label">{row.label}</span>
+          <Show when={row.badge}>
+            <span class="palette-badge muted">{row.badge}</span>
+          </Show>
           <Show when={row.breadcrumb?.length}>
             <span class="palette-crumb muted">{row.breadcrumb?.join(' › ')}</span>
           </Show>

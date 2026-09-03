@@ -20,6 +20,13 @@ import {
   type PluginCollectionPage,
 } from '@acorn/protocol/collections.ts'
 import {
+  acceptCommandSearchItems,
+  commandInputResultSchema,
+  MAX_COMMAND_SEARCH_QUERY,
+  type CommandInputResult,
+  type CommandSearchItem,
+} from '@acorn/protocol/commands.ts'
+import {
   MAX_REF_RESOLVE_IDENTIFIERS,
   pluginRefResolutionsSchema,
   type PluginRefResolution,
@@ -213,6 +220,75 @@ export async function readRailItems(pluginId: string, path: string, nodeId: stri
     drop(pluginId, 'rail item', row)
     return []
   })
+}
+
+// ── Command search and input (docs/future/command-palette/architecture.md § Loaded-plugin descriptor) ──
+
+/** The identifiers a scoped command may send. Derived by the host from the session it captured, never
+ *  read off the descriptor or off a previous answer. */
+export type CommandRouteScope = { taskId?: string; projectId?: string; workspaceId?: string }
+
+const withQuery = (path: string, params: Record<string, string | undefined>): string => {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) if (value) search.set(key, value)
+  const query = search.toString()
+  if (!query) return path
+  return `${path}${path.includes('?') ? '&' : '?'}${query}`
+}
+
+/**
+ * One search command's rows, from the plugin's own route.
+ *
+ * Everything the host sends is the host's: `q` is the reader's text, truncated to the protocol bound,
+ * and the scope identifiers are the ones the session captured. Everything the route answers is
+ * untrusted: `acceptCommandSearchItems` drops each malformed row, caps the accepted set, and strips
+ * every key it does not name — so a response carrying an `action`, a `url` or a `route` loses it here,
+ * before anything downstream could read one (@acorn/protocol/commands.ts).
+ */
+export async function readCommandSearch(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  query: string,
+  scope: CommandRouteScope,
+  signal: AbortSignal,
+): Promise<CommandSearchItem[]> {
+  const body = await read<unknown>(pluginId, withQuery(path, { q: query.slice(0, MAX_COMMAND_SEARCH_QUERY), ...scope }), nodeId, signal)
+  const items = acceptCommandSearchItems(body)
+  const sent = Array.isArray((body as { items?: unknown[] } | null)?.items) ? (body as { items: unknown[] }).items.length : 0
+  if (sent > items.length) drop(pluginId, `search response (${sent - items.length} of ${sent} rows)`, body)
+  return items
+}
+
+/**
+ * One input command's submission.
+ *
+ * A POST, never debounced, and the only write in this file. A failure arrives as the ordinary error
+ * envelope and becomes a thrown `ApiError`, which is what keeps the reader's text on screen with the
+ * node's own message under it; an answer this build cannot read is the same kind of failure.
+ */
+export async function submitCommandInput(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  input: string,
+  scope: CommandRouteScope,
+  signal: AbortSignal,
+): Promise<CommandInputResult> {
+  if (!ownsRoute(pluginId, path)) throw new Error(`${pluginId} may not post to ${path}`)
+  const body = await writeJson<unknown>(path, {
+    method: 'POST',
+    nodeId,
+    signal,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ input, ...scope }),
+  })
+  const result = commandInputResultSchema.safeParse(body)
+  if (!result.success) {
+    drop(pluginId, 'input result', body)
+    throw new Error('the plugin answered with something this build cannot read')
+  }
+  return result.data
 }
 
 const TONES = new Set(['neutral', 'accent', 'warn'])

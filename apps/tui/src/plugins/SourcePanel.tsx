@@ -86,7 +86,7 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
   const select = (id: string): void => {
     const item = items().find((entry) => entry.id === id)
     if (!item || !props.descriptor.onSelect) return
-    runChromeAction(props.descriptor.onSelect, {
+    void runChromeAction(props.descriptor.onSelect, {
       pluginId: props.pluginId,
       nodeId,
       item,

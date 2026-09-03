@@ -19,7 +19,7 @@ import {
   pluginInstalledAtOnNode,
 } from '../plugins/distribution'
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, type DeclaredSurfaces } from '../plugins/contributions'
-import { runChromeAction } from './actions'
+import { pluginCommand, usablePluginCommands } from './chromeCommands'
 import { suppliedSourcePanel } from './sourcePanel'
 import {
   captureAgentContext,
@@ -131,7 +131,16 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
 
   // `palette` is the one-release compatibility alias. Both forms become commands, and the palette's
   // existing command-registry pass renders only those whose `palette` flag is true.
-  const commands: PluginCommandDescriptor[] = [
+  //
+  // Which of the four kinds each one is, whether this device can honour it, and whether its parent is a
+  // group of the same plugin's are all ./chromeCommands.ts: the same file builds the contribution, so
+  // the check and the thing it lets through cannot drift apart.
+  const commandBinding = {
+    nodeId: chromeNode,
+    enabled: () => pluginEnabledOnNode(chromeNode(), pluginId),
+    usableAction: (candidate: PluginChromeAction) => contextFreeActionUsable(pluginId, surfaces, candidate),
+  }
+  const commands = usablePluginCommands(pluginId, [
     ...(contributions.commands ?? []),
     ...(contributions.palette ?? []).flatMap((descriptor): PluginCommandDescriptor[] =>
       // The two verbs a command can't carry, dropped rather than promoted. `createTask` needs a selected
@@ -139,21 +148,10 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       descriptor.action.verb === 'createTask' || descriptor.action.verb === 'navigate'
         ? []
         : [{ ...descriptor, category: 'action', palette: true, action: descriptor.action }]),
-  ].filter((descriptor) => contextFreeActionUsable(pluginId, surfaces, descriptor.action))
+  ], commandBinding)
   const commandById = new Map(commands.map((descriptor) => [descriptor.id, descriptor]))
   for (const descriptor of commands) {
-    add('command', descriptor.id, () => commandRegistry.register({
-      id: qualifiedPluginCommandId(pluginId, descriptor.id),
-      // The same stamp the compiled feeder applies (registries/extensionPoints/plugin.ts), and for the
-      // same reason: a manifest has no `ownerId` field to state, and the graph compares owners before
-      // it lets one command name another as its parent.
-      ownerId: pluginId,
-      title: descriptor.title,
-      category: descriptor.category,
-      palette: descriptor.palette,
-      when: () => pluginEnabledOnNode(chromeNode(), pluginId),
-      run: () => runChromeAction(descriptor.action, { pluginId, nodeId: chromeNode(), commandId: descriptor.id }),
-    }))
+    add('command', descriptor.id, () => commandRegistry.register(pluginCommand(pluginId, descriptor, commandBinding)))
   }
 
   for (const descriptor of contributions.keybindings ?? []) {

@@ -1,14 +1,19 @@
 import { createRoot, createSignal } from 'solid-js'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import type { Disposable } from '../../../kit/lib/registry'
 import {
   commandRegistry,
   executeCommand,
   type CommandContribution,
   type CommandExecutionContext,
+  type CommandOutcome,
+  type InputCommand,
+  type SearchCommand,
 } from './commands'
 import {
   createCommandSession,
+  type CommandFleetNode,
   type CommandSession,
   type SessionRowProvider,
 } from './session'
@@ -71,9 +76,13 @@ async function withSession(
     closes: () => number
     opens: () => number
   }) => void | Promise<void>,
-  options: { providers?: readonly SessionRowProvider[] } = {},
+  options: {
+    providers?: readonly SessionRowProvider[]
+    fleet?: readonly CommandFleetNode[]
+    context?: CommandExecutionContext
+  } = {},
 ): Promise<void> {
-  const [context, setContext] = createSignal(CONTEXT)
+  const [context, setContext] = createSignal(options.context ?? CONTEXT)
   let closes = 0
   let opens = 0
   let session!: CommandSession
@@ -81,6 +90,7 @@ async function withSession(
     session = createCommandSession({
       context,
       providers: () => options.providers ?? [],
+      ...(options.fleet ? { fleet: () => options.fleet! } : {}),
       onOpen: () => { opens += 1 },
       onClose: () => { closes += 1 },
     })
@@ -436,5 +446,400 @@ describe('opening at a command', () => {
       expect(session.open()).toBe(true)
       expect(session.frame()?.commandId).toBe('a')
     })
+  })
+})
+
+// ── Search and input (docs/future/command-palette/phase-2-search-and-input.md § Tests) ────────────
+//
+// Two rules run through all of it. A query is asked once the typing stops and only for the last thing
+// typed, and an answer is applied only if the frame still wants it — which is the generation, not the
+// abort, because a provider is free to ignore a signal and some of them do.
+
+const item = (id: string, over: Record<string, unknown> = {}): CommandSearchItem =>
+  ({ id, title: id, ...over }) as CommandSearchItem
+
+const search = (id: string, over: Partial<SearchCommand>): CommandContribution => ({
+  id, title: id, category: 'action', palette: true, kind: 'search',
+  query: async () => [], select: () => {}, ...over,
+} as CommandContribution)
+
+const input = (id: string, over: Partial<InputCommand>): CommandContribution => ({
+  id, title: id, category: 'action', palette: true, kind: 'input',
+  submit: () => {}, ...over,
+} as CommandContribution)
+
+const labels = (session: CommandSession): string[] => session.rows().map((row) => row.label)
+
+/** Fake timers plus the microtasks a settled promise needs. `advanceTimersByTimeAsync` awaits between
+ *  timers, so one call covers both a debounce and the fetch it started. */
+const tick = async (ms = 0): Promise<void> => { await vi.advanceTimersByTimeAsync(ms) }
+
+describe('a search frame', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('asks once when the typing stops, and only for the last thing typed', async () => {
+    const asked: string[] = []
+    register(search('find', { query: async (text) => { asked.push(text); return [item('issue-1')] } }))
+    await withSession(async (session) => {
+      session.openAt('find')
+      session.setQuery('r')
+      session.setQuery('ro')
+      session.setQuery('rol')
+      await tick(1_000)
+      expect(asked).toEqual(['rol'])
+      expect(labels(session)).toEqual(['issue-1'])
+    })
+  })
+
+  it('says what it wants until the query is long enough, and asks for it trimmed', async () => {
+    const asked: string[] = []
+    register(search('find', { query: async (text) => { asked.push(text); return [] } }))
+    await withSession(async (session) => {
+      session.openAt('find')
+      expect(labels(session)).toEqual(['Type at least 2 characters to search.'])
+      session.setQuery('  r  ')
+      await tick(1_000)
+      expect(asked).toEqual([])
+      expect(labels(session)).toEqual(['Type at least 2 characters to search.'])
+
+      session.setQuery('  ro  ')
+      await tick(1_000)
+      expect(asked).toEqual(['ro'])
+    })
+  })
+
+  it('waits for the composition to end before asking, so an IME costs one request', async () => {
+    const asked: string[] = []
+    register(search('find', { query: async (text) => { asked.push(text); return [] } }))
+    await withSession(async (session) => {
+      session.openAt('find')
+      session.setComposing(true)
+      session.setQuery('にほ')
+      session.setQuery('にほん')
+      await tick(1_000)
+      expect(asked).toEqual([])
+
+      session.setComposing(false)
+      await tick(1_000)
+      expect(asked).toEqual(['にほん'])
+    })
+  })
+
+  it('gives up on what it asked when the query, the frame or the world moves', async () => {
+    const signals: AbortSignal[] = []
+    register(search('find', {
+      query: (_text, _context, signal) => {
+        signals.push(signal)
+        return new Promise<CommandSearchItem[]>(() => {})
+      },
+    }))
+    const held = signals
+
+    await withSession(async (session) => {
+      session.openAt('find')
+      session.setQuery('rol')
+      await tick(300)
+      expect(held).toHaveLength(1)
+      expect(held[0].aborted).toBe(false)
+
+      // A new query.
+      session.setQuery('roll')
+      expect(held[0].aborted).toBe(true)
+      await tick(300)
+      expect(held).toHaveLength(2)
+
+      // Escape out of the frame.
+      session.back()
+      expect(held[1].aborted).toBe(true)
+    })
+
+    held.length = 0
+    await withSession(async (session) => {
+      session.openAt('find')
+      session.setQuery('rol')
+      await tick(300)
+      session.close()
+      expect(held[0].aborted).toBe(true)
+    })
+
+    held.length = 0
+    await withSession(async (session, world) => {
+      session.openAt('find')
+      session.setQuery('rol')
+      await tick(300)
+      // The task this session opened over moved, so the session closes and takes its request with it.
+      world.setContext({ ...CONTEXT, taskId: 't-2' })
+      await tick(0)
+      expect(session.open()).toBe(false)
+      expect(held[0].aborted).toBe(true)
+    })
+  })
+
+  it('cannot be given an old answer by a provider that ignored its signal', async () => {
+    let releaseFirst: (items: CommandSearchItem[]) => void = () => {}
+    register(search('find', {
+      query: (text) => text === 'ro'
+        ? new Promise<CommandSearchItem[]>((resolve) => { releaseFirst = resolve })
+        : Promise.resolve([item('new')]),
+    }))
+    await withSession(async (session) => {
+      session.openAt('find')
+      session.setQuery('ro')
+      await tick(300)
+      session.setQuery('rol')
+      await tick(300)
+      expect(labels(session)).toEqual(['new'])
+
+      // The first request answers anyway, long after its query stopped being the question.
+      releaseFirst([item('stale')])
+      await tick(0)
+      expect(labels(session)).toEqual(['new'])
+    })
+  })
+
+  it('walks instruction, loading, empty, error, retry and pick', async () => {
+    let answer: () => Promise<CommandSearchItem[]> = async () => []
+    const picked: CommandSearchItem[] = []
+    register(search('find', {
+      query: () => answer(),
+      select: (chosen) => { picked.push(chosen) },
+    }))
+    await withSession(async (session) => {
+      session.openAt('find')
+      expect(session.kind()).toBe('search')
+      expect(labels(session)).toEqual(['Type at least 2 characters to search.'])
+
+      // Loading: the debounce has fired and nobody has answered yet.
+      let release: (items: CommandSearchItem[]) => void = () => {}
+      answer = () => new Promise((resolve) => { release = resolve })
+      session.setQuery('rol')
+      await tick(300)
+      expect(labels(session)).toEqual(['Searching…'])
+      expect(session.busy()).toBe(true)
+
+      // Empty.
+      release([])
+      await tick(0)
+      expect(labels(session)).toEqual(['No results.'])
+      expect(session.busy()).toBe(false)
+
+      // Error, and it is not selectable: Enter on it is the retry.
+      answer = () => Promise.reject(new Error('the node said no'))
+      session.setQuery('roll')
+      await tick(300)
+      expect(labels(session)).toEqual(['search: the node said no'])
+      expect(session.selectedRow()).toBeNull()
+
+      answer = async () => [item('issue-1', { subtitle: 'runn/runn', badge: '12' })]
+      session.activate()
+      await tick(0)
+      expect(labels(session)).toEqual(['issue-1'])
+      expect(session.rows()[0]?.hint).toBe('runn/runn')
+      expect(session.rows()[0]?.badge).toBe('12')
+
+      session.activate()
+      await tick(0)
+      expect(picked.map((row) => row.id)).toEqual(['issue-1'])
+      // A pick closes, which is what an action means.
+      expect(session.open()).toBe(false)
+    })
+  })
+})
+
+describe('an input frame', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('submits once, on Enter, and never twice', async () => {
+    const sent: string[] = []
+    let release: () => void = () => {}
+    register(input('ask', {
+      submit: (text) => {
+        sent.push(text)
+        return new Promise<void>((resolve) => { release = () => resolve() })
+      },
+    }))
+    await withSession(async (session) => {
+      session.openAt('ask')
+      expect(session.kind()).toBe('input')
+      expect(labels(session)).toEqual(['Press Enter to submit.'])
+
+      // Typing is not submitting: an input is never debounced into a request.
+      session.setQuery('select 1')
+      await tick(1_000)
+      expect(sent).toEqual([])
+
+      session.activate()
+      expect(sent).toEqual(['select 1'])
+      expect(labels(session)).toEqual(['Submitting…'])
+      session.activate()
+      expect(sent).toEqual(['select 1'])
+
+      release()
+      await tick(0)
+      expect(session.open()).toBe(false)
+    })
+  })
+
+  it('refuses what its own validation refuses, without asking anybody', async () => {
+    const sent: string[] = []
+    register(input('ask', {
+      validate: (text) => (text.length < 4 ? 'say a little more' : undefined),
+      submit: (text) => { sent.push(text) },
+    }))
+    await withSession(async (session) => {
+      session.openAt('ask')
+      session.setQuery('ab')
+      session.activate()
+      expect(sent).toEqual([])
+      expect(session.status()).toBe('say a little more')
+
+      session.setQuery('abcd')
+      session.activate()
+      await tick(0)
+      expect(sent).toEqual(['abcd'])
+    })
+  })
+
+  it('keeps the text and the frame when the submission fails, and the line when it stays', async () => {
+    let answer: () => Promise<CommandOutcome> = async () => ({ effect: 'stay', status: 'wrote it' })
+    register(input('ask', { submit: () => answer() }))
+    await withSession(async (session) => {
+      session.openAt('ask')
+      session.setQuery('select 1')
+      session.activate()
+      await tick(0)
+      expect(session.open()).toBe(true)
+      expect(session.status()).toBe('wrote it')
+
+      answer = () => Promise.reject(new Error('syntax error at or near "slect"'))
+      session.activate()
+      await tick(0)
+      expect(session.open()).toBe(true)
+      expect(session.query()).toBe('select 1')
+      expect(session.status()).toBe('syntax error at or near "slect"')
+    })
+  })
+
+  it('gives up on a submission the reader escaped out of', async () => {
+    let signal!: AbortSignal
+    let release: () => void = () => {}
+    register(input('ask', {
+      submit: (_text, _context, sent) => {
+        signal = sent
+        return new Promise<void>((resolve) => { release = () => resolve() })
+      },
+    }))
+    await withSession(async (session) => {
+      session.openAt('ask')
+      session.setQuery('select 1')
+      session.activate()
+      session.back()
+      expect(signal.aborted).toBe(true)
+      // The answer arrives anyway and lands nowhere: the frame that asked is gone.
+      release()
+      await tick(0)
+      expect(session.open()).toBe(true)
+      expect(session.kind()).toBe('root')
+    })
+  })
+})
+
+describe('scope', () => {
+  it('hides a command whose identity this session does not have', async () => {
+    register(leaf('needs.task', { scope: 'task' }))
+    register(leaf('needs.project', { scope: 'project' }))
+    register(leaf('needs.workspace', { scope: 'workspace' }))
+    register(leaf('needs.nothing', { scope: 'none' }))
+    await withSession((session) => {
+      session.openRoot()
+      expect(ids(session)).toEqual(['needs.nothing'])
+    }, { context: { ...CONTEXT, taskId: null, projectId: null, workspaceId: null } })
+
+    await withSession((session) => {
+      session.openRoot()
+      expect(ids(session)).toEqual(['needs.task', 'needs.project', 'needs.workspace', 'needs.nothing'])
+    })
+  })
+
+  it('will not open at a command the captured identity hides', async () => {
+    register(leaf('needs.task', { scope: 'task' }))
+    await withSession((session) => {
+      session.openAt('needs.task')
+      // The root, not the command: a shortcut aimed at something this session cannot run opens the
+      // list rather than a frame that could only fail.
+      expect(session.kind()).toBe('root')
+      expect(ids(session)).toEqual([])
+    }, { context: { ...CONTEXT, taskId: null } })
+  })
+
+  it('asks the captured node, and only fans out when a command says fleet', async () => {
+    const asked: (string | null)[] = []
+    register(search('here', { minQueryLength: 0, debounceMs: 0, query: async (_t, context) => { asked.push(context.nodeId); return [] } }))
+    register(search('everywhere', {
+      scope: 'fleet', minQueryLength: 0, debounceMs: 0,
+      query: async (_t, context) => { asked.push(context.nodeId); return [] },
+    }))
+    await withSession(async (session) => {
+      session.openAt('here')
+      await settle()
+      expect(asked).toEqual(['node-1'])
+
+      asked.length = 0
+      session.close()
+      session.openAt('everywhere')
+      await settle()
+      expect(asked).toEqual(['node-1', 'node-2'])
+    }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
+  })
+
+  it('keeps two nodes’ rows apart, and one node’s failure off the other’s rows', async () => {
+    const chosen: { id: string; nodeId: string | null }[] = []
+    register(search('everywhere', {
+      scope: 'fleet', minQueryLength: 0, debounceMs: 0,
+      query: async (_text, context) => {
+        if (context.nodeId === 'node-2') throw new Error('no answer within 5s')
+        return [item('dup')]
+      },
+      select: (picked, context) => { chosen.push({ id: picked.id, nodeId: context.nodeId }) },
+    }))
+    await withSession(async (session) => {
+      session.openAt('everywhere')
+      await settle()
+      // The error first, then the rows the other node did answer with.
+      expect(labels(session)).toEqual(['desktop: no answer within 5s', 'dup'])
+      expect(ids(session)).toEqual(['error:desktop:0', 'node-1:dup'])
+      expect(session.rows()[1]?.hint).toBe('laptop')
+
+      session.activate()
+      await settle()
+      // Picked against the node that answered with it, not against whichever node is active.
+      expect(chosen).toEqual([{ id: 'dup', nodeId: 'node-1' }])
+    }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
+  })
+
+  it('does not let a search opened at directly cost the root its provider rows', async () => {
+    // Opening straight at a search frame starts the providers' fetch and the frame's own in the same
+    // tick. They have separate generations for exactly this: Escape comes back to a root with rows.
+    register(search('find', { minQueryLength: 0, debounceMs: 0, query: async () => [] }))
+    await withSession(async (session) => {
+      session.openAt('find')
+      await settle()
+      session.back()
+      expect(ids(session)).toEqual(['run:dev', 'find'])
+    }, { providers: [provider('rows', 100, [{ id: 'run:dev', label: 'Run: dev' }])] })
+  })
+
+  it('namespaces a fleet row so two nodes answering with the same id are both reachable', async () => {
+    register(search('everywhere', {
+      scope: 'fleet', minQueryLength: 0, debounceMs: 0,
+      query: async () => [item('dup')],
+    }))
+    await withSession(async (session) => {
+      session.openAt('everywhere')
+      await settle()
+      expect(ids(session)).toEqual(['node-1:dup', 'node-2:dup'])
+    }, { fleet: [{ nodeId: 'node-1', label: 'laptop' }, { nodeId: 'node-2', label: 'desktop' }] })
   })
 })

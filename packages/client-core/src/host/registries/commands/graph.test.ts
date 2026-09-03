@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildCommandGraph, type CommandGraphIssue } from './graph'
-import type { CommandContribution } from './commands'
+import type { CommandContribution, CommandExecutionContext } from './commands'
 
 // The projection, as the failures a registry can actually contain.
 //
@@ -212,5 +212,44 @@ describe('an empty graph', () => {
     expect(graph.search('anything')).toEqual([])
     expect(graph.children('nothing')).toEqual([])
     expect(graph.diagnostics).toEqual([])
+  })
+})
+
+describe('scope', () => {
+  const WORLD: CommandExecutionContext = {
+    host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId: 't-1',
+    paneId: null, surfaceId: null,
+  }
+
+  it('is not asked at all without a world to ask it against', () => {
+    const graph = buildCommandGraph([leaf('archive', { scope: 'task' })])
+    expect(graph.nodes.get('archive')?.available).toBe(true)
+  })
+
+  it('holds a command to the identity the session captured', () => {
+    const commands = [
+      leaf('needs-task', { scope: 'task' }),
+      leaf('needs-project', { scope: 'project' }),
+      leaf('needs-workspace', { scope: 'workspace' }),
+      leaf('needs-node', { scope: 'node' }),
+      leaf('needs-nothing', { scope: 'none' }),
+      leaf('says-nothing'),
+    ]
+    const whole = buildCommandGraph(commands, WORLD)
+    expect(whole.top().map((node) => node.id)).toHaveLength(6)
+
+    const bare = buildCommandGraph(commands, { ...WORLD, taskId: null, projectId: null, workspaceId: null, nodeId: null })
+    // The three identity scopes are gone. `node` and the default are not a gate: a client serving its
+    // own origin has no node id and would otherwise lose its whole catalogue.
+    expect(bare.top().map((node) => node.id)).toEqual(['needs-node', 'needs-nothing', 'says-nothing'])
+  })
+
+  it('takes a group’s children with it, because a group you cannot reach holds nothing you can', () => {
+    const graph = buildCommandGraph([
+      group('task-things', { scope: 'task' }),
+      leaf('task-things.archive', { parentId: 'task-things' }),
+    ], { ...WORLD, taskId: null })
+    expect(graph.nodes.get('task-things.archive')?.available).toBe(false)
+    expect(graph.search('archive')).toEqual([])
   })
 })

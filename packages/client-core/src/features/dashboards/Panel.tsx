@@ -76,7 +76,7 @@ export default function Panel(props: PanelProps) {
     // `prefer: 'route'` is the dashboard saying what it is. A panel row is a jumping-off point, since you
     // are looking at a list precisely in order to leave it. Surfaces you are working inside ask for the
     // opposite and get it (plugins/github, `makeContentLinkHandler`).
-    runChromeAction(row.action, {
+    void runChromeAction(row.action, {
       pluginId: row.pluginId,
       nodeId,
       navigate,
