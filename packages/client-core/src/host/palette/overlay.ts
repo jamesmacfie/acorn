@@ -7,7 +7,15 @@ import { keybindingRegistry } from '../registries/commands/keybindings'
 // handling, and input focus ownership. The overlay markup stays in each component. This is a hook
 // returning the shared signals/handlers, not a framework.
 
-export type OverlayPalette = {
+/**
+ * What `PaletteSurface.tsx` draws, and the least it needs to draw it.
+ *
+ * Two things satisfy it. `createOverlayPalette` below, which owns its own query and cursor, is what
+ * the file finders and the workspace picker still use. The command palette's is a view over the
+ * shared session instead (./paletteView.ts), because the query and the cursor there belong to a frame
+ * and a pop has to restore them — which is not something a hook holding two signals can do.
+ */
+export type PaletteView = {
   open: Accessor<boolean>
   query: Accessor<string>
   sel: Accessor<number>
@@ -15,8 +23,6 @@ export type OverlayPalette = {
   setSel: (index: number) => void
   /** Input handler. Updates the query and resets the selection to the top. */
   setQuery: (query: string) => void
-  /** Open the overlay and focus its input (registered via setInputRef). */
-  show: () => void
   /** Close the overlay and clear query + selection. Also the backdrop-click handler. */
   close: () => void
   setInputRef: (el: HTMLInputElement) => void
@@ -26,9 +32,67 @@ export type OverlayPalette = {
   onDialogMouseDown: (event: MouseEvent) => void
 }
 
+export type OverlayPalette = PaletteView & {
+  /** Open the overlay and focus its input (registered via setInputRef). */
+  show: () => void
+}
+
 // Only one overlay open at a time: opening one dismisses whichever other is open. Module-scoped
-// (single-window app) so the four independent instances coordinate without a shared store.
+// (single-window app) so the independent instances coordinate without a shared store.
 let activeClose: (() => void) | null = null
+
+/**
+ * The host half of an overlay: which element had focus before it opened, who gets it back, and which
+ * overlay is the open one.
+ *
+ * Split out of `createOverlayPalette` so the command palette's view can have it without also taking
+ * the query and cursor signals it does not want. There is one implementation of "give the keyboard
+ * back" in the app and this is it; a second would be a second set of the rules below, which are all
+ * about a case somebody hit.
+ */
+export type OverlayFocus = {
+  /** Becoming the open overlay: dismiss any other, remember where focus was, take the input. */
+  claim: () => void
+  /** Giving it up: stop being the open one and hand focus back where it came from. */
+  release: () => void
+  setInputRef: (el: HTMLInputElement) => void
+  onDialogMouseDown: (event: MouseEvent) => void
+}
+
+export function createOverlayFocus(close: () => void): OverlayFocus {
+  let inputRef: HTMLInputElement | undefined
+  let prevFocus: HTMLElement | null = null // element focused when we opened (e.g. the code editor)
+
+  return {
+    claim: () => {
+      // Close any other open overlay first (it restores its own prevFocus), then capture ours, so the
+      // element we return to on dismissal is the real pre-overlay one, not the other palette's input.
+      if (activeClose && activeClose !== close) activeClose()
+      activeClose = close
+      prevFocus = document.activeElement as HTMLElement | null
+      queueMicrotask(() => inputRef?.focus())
+    },
+    release: () => {
+      if (activeClose === close) activeClose = null
+      // Return focus to wherever it was before we grabbed it, so Esc / backdrop / re-toggle dismissal
+      // doesn't strand keyboard focus on <body>. Skip if that element is gone: a pick that navigated
+      // or opened a file unmounted it, and that action's own focus target wins.
+      const prev = prevFocus
+      prevFocus = null
+      if (prev?.isConnected && prev !== document.activeElement) prev.focus()
+    },
+    setInputRef: (el) => {
+      inputRef = el
+    },
+    onDialogMouseDown: (event) => {
+      // Preserve native caret placement and text selection in the input itself. Palette chrome,
+      // empty-state rows, and result buttons should leave typing/navigation owned by the input.
+      if (event.target === inputRef) return
+      event.preventDefault()
+      inputRef?.focus()
+    },
+  }
+}
 
 export function createOverlayPalette(opts: {
   /** Stable command/keybinding id for the overlay toggle. Omit for programmatic-only overlays. */
@@ -46,30 +110,18 @@ export function createOverlayPalette(opts: {
   const [open, setOpen] = createSignal(false)
   const [query, setQuerySignal] = createSignal('')
   const [sel, setSel] = createSignal(0)
-  let inputRef: HTMLInputElement | undefined
-  let prevFocus: HTMLElement | null = null // element focused when we opened (e.g. the code editor)
 
   const close = () => {
-    if (activeClose === close) activeClose = null
     setOpen(false)
     setQuerySignal('')
     setSel(0)
-    // Return focus to wherever it was before we grabbed it, so Esc / backdrop / re-toggle dismissal
-    // doesn't strand keyboard focus on <body>. Skip if that element is gone: a pick that navigated
-    // or opened a file unmounted it, and that action's own focus target wins.
-    const prev = prevFocus
-    prevFocus = null
-    if (prev?.isConnected && prev !== document.activeElement) prev.focus()
+    focus.release()
   }
+  const focus = createOverlayFocus(close)
   const show = () => {
-    // Close any other open overlay first (it restores its own prevFocus), then capture ours, so the
-    // element we return to on dismissal is the real pre-overlay one, not the other palette's input.
-    if (activeClose && activeClose !== close) activeClose()
-    activeClose = close
-    prevFocus = document.activeElement as HTMLElement | null
+    focus.claim()
     setOpen(true)
     opts.onOpen?.()
-    queueMicrotask(() => inputRef?.focus())
   }
   const setQuery = (q: string) => {
     setQuerySignal(q)
@@ -92,14 +144,6 @@ export function createOverlayPalette(opts: {
       e.preventDefault()
       opts.onPick(sel())
     }
-  }
-
-  const onDialogMouseDown = (event: MouseEvent) => {
-    // Preserve native caret placement and text selection in the input itself. Palette chrome,
-    // empty-state rows, and result buttons should leave typing/navigation owned by the input.
-    if (event.target === inputRef) return
-    event.preventDefault()
-    inputRef?.focus()
   }
 
   onMount(() => {
@@ -137,10 +181,8 @@ export function createOverlayPalette(opts: {
     setQuery,
     show,
     close,
-    setInputRef: (el) => {
-      inputRef = el
-    },
+    setInputRef: focus.setInputRef,
     onKeyDown,
-    onDialogMouseDown,
+    onDialogMouseDown: focus.onDialogMouseDown,
   }
 }

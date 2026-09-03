@@ -1,6 +1,6 @@
-import { For, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, Show, type JSX } from 'solid-js'
 import { Input } from '../../kit/components/primitives'
-import type { OverlayPalette } from './overlay'
+import type { PaletteView } from './overlay'
 // The component owns its stylesheet, so a consumer can't depend on some other palette having been
 // mounted first to get the chrome styled.
 import './palette.css'
@@ -9,16 +9,21 @@ import './palette.css'
 // structure, wiring the same seven handlers from createOverlayPalette by hand, and github's file finder
 // had its own `.finder-*` class vocabulary for the same thing.
 //
-// Beside the hook rather than in ui/, because it imports OverlayPalette's type and the ui/ purity rule
-// carves out `palette/model.ts` only. Behaviour stays in the hook; this is the chrome.
+// Beside the hook rather than in ui/, because it imports the view's type and the ui/ purity rule
+// carves out `palette/model.ts` only. Behaviour stays behind the view; this is the chrome.
 //
 // Each caller keeps its own row body: the palettes render label and hint, while the file finders render
 // dir and name. A shared row shape would grow a slot per caller, which is the markup it's replacing.
 //
 // Deliberately not absorbing Picker (anchored, filtered, non-modal) or Modal. The three-way distinction
 // is argued in Modal.tsx and dismissable.ts.
+
+/** One instance's id prefix, so `aria-activedescendant` on the input can name a row in the list. Two
+ *  palettes mounted at once must not both call their third row `palette-row-2`. */
+let surfaceSeq = 0
+
 export function PaletteSurface<T>(props: {
-  palette: OverlayPalette
+  palette: PaletteView
   items: readonly T[]
   placeholder: string
   emptyText: string
@@ -31,9 +36,43 @@ export function PaletteSurface<T>(props: {
   footer?: JSX.Element
   /** Extra content between the input and the list, an error banner. */
   status?: JSX.Element
+  /** Where in the command tree this frame is, drawn above the field. The command palette's; a file
+   *  finder has no hierarchy and passes nothing (./paletteView.ts). */
+  breadcrumb?: readonly string[]
+  /** Something is being fetched or invoked. Becomes `aria-busy` on the dialog. */
+  busy?: boolean
+  /** One line for a screen reader, announced when it changes: how many results, or what failed. */
+  announce?: string
   class?: string
   ariaLabel?: string
 }) {
+  const base = `palette-${++surfaceSeq}`
+  const listId = `${base}-list`
+  const rowId = (index: number) => `${base}-row-${index}`
+
+  // The three combobox attributes, written onto the element rather than passed to `Input`.
+  //
+  // `aria-activedescendant` has to sit on the element that holds focus, which is the field, and the
+  // kit's Input takes a fixed set of props on purpose (docs/ui-design.md § The closed kit). Adding
+  // three ARIA props to a node every pane in the app draws, for one surface, is the wrong trade; the
+  // surface owns its own dialog and list markup already, so it owns these too.
+  //
+  // A signal and not a `let`, because the effect and the `Show` below both wake on `open()` and
+  // nothing says which goes first: with a plain variable the effect can run before the field it is
+  // meant to describe exists, and the attributes never land.
+  const [input, setInput] = createSignal<HTMLInputElement>()
+  createEffect(() => {
+    const field = input()
+    if (!field || !props.palette.open()) return
+    field.setAttribute('role', 'combobox')
+    field.setAttribute('aria-expanded', 'true')
+    field.setAttribute('aria-controls', listId)
+    field.setAttribute('aria-autocomplete', 'list')
+    const active = props.items.length ? rowId(props.palette.sel()) : ''
+    if (active) field.setAttribute('aria-activedescendant', active)
+    else field.removeAttribute('aria-activedescendant')
+  })
+
   return (
     <Show when={props.palette.open()}>
       <div class="overlay-backdrop" onClick={props.palette.close}>
@@ -42,24 +81,40 @@ export function PaletteSurface<T>(props: {
           role="dialog"
           aria-modal="true"
           aria-label={props.ariaLabel}
+          aria-busy={props.busy ? 'true' : undefined}
           onKeyDown={props.palette.onKeyDown}
           onMouseDown={props.palette.onDialogMouseDown}
           onClick={(event) => event.stopPropagation()}
         >
+          <Show when={props.breadcrumb?.length}>
+            <div class="palette-crumbs muted">{props.breadcrumb?.join(' › ')}</div>
+          </Show>
           <Input
-            ref={props.palette.setInputRef}
+            ref={(el) => {
+              setInput(el)
+              props.palette.setInputRef(el)
+            }}
             kind="bare"
             placeholder={props.placeholder}
             value={props.palette.query()}
             onInput={(value) => props.palette.setQuery(value)}
           />
           <Show when={props.status}>{props.status}</Show>
-          <ul class="palette-list">
+          {/* Announced rather than drawn: the row count and the error already have a visible form,
+              and a live region is how somebody not looking at the list hears them change. */}
+          <div class="sr-only" role="status" aria-live="polite">{props.announce ?? ''}</div>
+          <ul class="palette-list" id={listId} role="listbox" aria-label={props.ariaLabel}>
             <For each={props.items} fallback={<li class="palette-empty muted">{props.emptyText}</li>}>
               {(item, index) => (
-                <li>
+                <li role="presentation">
                   <button
                     type="button"
+                    id={rowId(index())}
+                    role="option"
+                    aria-selected={index() === props.palette.sel()}
+                    // Not a tab stop: the field keeps focus and names the active row, which is what
+                    // `aria-activedescendant` is for.
+                    tabIndex={-1}
                     class="palette-row"
                     classList={{ selected: index() === props.palette.sel(), ...props.rowClassList?.(item) }}
                     // Hover moves the cursor without touching the query, so mouse and keyboard share one

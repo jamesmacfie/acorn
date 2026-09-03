@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { composeItems, type PaletteItem } from '../../../kit/lib/paletteModel'
 import type { Disposable } from '../../../kit/lib/registry'
 import {
   COMMAND_CLOSED,
@@ -16,19 +15,14 @@ import {
   type CommandExecutionContext,
 } from './commands'
 
-// The command contract, as the two things a later phase will build on: what the palette will show,
-// and what running one does.
+// The command contract, as the two things everything else builds on: what the palette shows, and what
+// running one does.
 //
-// The first half is characterization. Every assertion below about discovery and composition is what
-// the desktop (../../palette/CommandPalette.tsx) and the terminal (apps/tui/src/chrome/Palette.tsx)
-// do today, written down so the shared session that replaces them can be held to it. If one of these
-// changes, that is a product decision somebody made, not a refactor.
-//
-// One suite for both hosts, because the order is not either host's. Both build the action rows with
-// the same registry filter and hand `composeItems` the same five sources, and that function owns what
-// comes out (../../../kit/lib/paletteModel.ts). What the two hosts really do differ on — the desktop
-// keys a task row by `${nodeId}:${taskId}` for its fleet fan-out and the terminal by the bare id — is
-// below the composition and belongs to whichever renderer is still building rows.
+// The first half is characterization, written before the shared session existed so that the session
+// could be held to it. It is: `./session.test.tsx` asserts the same order over real rows, and neither
+// host composes a list of its own any more. What stays here is the registry's own half — which
+// commands are discoverable, when a dynamic title is read, and that a palette row and a shortcut
+// reach one registration by the same id.
 
 const held: Disposable[] = []
 const register = (command: CommandContribution): CommandContribution => {
@@ -83,36 +77,18 @@ describe('what the palette discovers', () => {
   })
 })
 
-describe('the rows both hosts compose', () => {
-  it('orders errors, contributed rows, actions, workspaces and tasks', () => {
-    register(leaf('cmd.archive', { title: 'Archive task' }))
-    const rows: PaletteItem[] = [{ kind: 'run', id: 'run:dev', label: 'Run: dev', hint: 'pnpm dev', running: false }]
-    const items = composeItems({
-      rows,
-      errors: [{ source: 'repo', message: 'run.bad is missing command' }],
-      actions: paletteActions(),
-      workspaces: [{ id: 'w-1', label: 'Switch workspace: Core' }],
-      tasks: [{ id: 't-1', label: 'Go to task: fix login' }],
-    })
-    expect(items.map((item) => item.kind)).toEqual(['error', 'run', 'action', 'workspace', 'task'])
-  })
-
-  it('leaves an action row addressed by the command’s own id, unlike a task or a workspace', async () => {
+describe('the row a command becomes', () => {
+  it('is addressed by the command’s own id, from the palette and from a shortcut', async () => {
     // Why a shortcut and a palette row reach one registration. A task row is `task:<id>` and a
-    // workspace row is `workspace:<id>`, because those ids are only unique within their own kind; an
-    // action row is the command id itself, which is also what a keybinding's `command` names
+    // workspace row is `workspace:<id>`, because those ids are only unique within their own kind; a
+    // command's row is the command id itself, which is also what a keybinding's `command` names
     // (./keybindings.ts) and what both key layers hand to `executeCommand`.
     const run = vi.fn()
     register(leaf('cmd.same', { run }))
-    const items = composeItems({
-      errors: [],
-      actions: paletteActions(),
-      workspaces: [{ id: 'w-1', label: 'Switch workspace: Core' }],
-      tasks: [{ id: 't-1', label: 'Go to task: fix login' }],
-    })
-    expect(items.map((item) => item.id)).toEqual(['cmd.same', 'workspace:w-1', 'task:t-1'])
-    // The palette's path and a shortcut's path, in that order, reaching the one registered leaf.
-    await executeCommand(items[0].id)
+    expect(paletteActions().map((row) => row.id)).toEqual(['cmd.same'])
+    // The palette's path and a shortcut's path reaching the one registered leaf. The row the session
+    // builds around that id is ./session.test.tsx.
+    await executeCommand('cmd.same')
     await executeCommand('cmd.same')
     expect(run).toHaveBeenCalledTimes(2)
   })

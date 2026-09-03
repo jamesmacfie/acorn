@@ -71,7 +71,19 @@ export type CommandGraph = {
    * than a shortcut.
    */
   search(query: string): readonly CommandNode[]
+  /**
+   * The same search, with the scores it ranked on.
+   *
+   * The palette's root holds more than commands while the compatibility rows are still around, and
+   * those rows are scored by the same `fuzzyScore`. A caller merging the two lists needs one number
+   * per row or it cannot interleave them, and would have to fall back to showing commands as a block
+   * — which is not what the flat list does today (./session.ts § the root projection).
+   */
+  ranked(query: string): readonly CommandNodeHit[]
 }
+
+/** One search hit: the node, and what it scored. */
+export type CommandNodeHit = { readonly node: CommandNode; readonly score: number }
 
 type Draft = {
   command: CommandContribution
@@ -236,23 +248,25 @@ export function buildCommandGraph(commands: readonly CommandContribution[]): Com
     (nodes.get(id)?.children ?? []).filter((child) => child.discoverable)
   const top = (): readonly CommandNode[] => roots.filter((node) => node.discoverable)
 
+  const ranked = (query: string): readonly CommandNodeHit[] => {
+    const trimmed = query.trim()
+    if (!trimmed) return top().map((node) => ({ node, score: 0 }))
+    return [...nodes.values()]
+      .filter((node) => node.discoverable)
+      .map((node) => ({ node, score: score(trimmed, node) }))
+      .filter((row): row is CommandNodeHit => row.score !== null)
+      // Relevance first, then the sibling order the author stated, so two equal hits do not swap
+      // places between renders.
+      .sort((a, b) => b.score - a.score || orderOf(a.node.command) - orderOf(b.node.command))
+  }
+
   return {
     roots,
     nodes,
     diagnostics,
     top,
     children: discoverableChildren,
-    search: (query) => {
-      const trimmed = query.trim()
-      if (!trimmed) return top()
-      return [...nodes.values()]
-        .filter((node) => node.discoverable)
-        .map((node) => ({ node, hit: score(trimmed, node) }))
-        .filter((row): row is { node: CommandNode; hit: number } => row.hit !== null)
-        // Relevance first, then the sibling order the author stated, so two equal hits do not swap
-        // places between renders.
-        .sort((a, b) => b.hit - a.hit || orderOf(a.node.command) - orderOf(b.node.command))
-        .map((row) => row.node)
-    },
+    search: (query) => ranked(query).map((hit) => hit.node),
+    ranked,
   }
 }

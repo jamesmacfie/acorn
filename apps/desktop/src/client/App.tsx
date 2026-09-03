@@ -36,6 +36,7 @@ import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/kit/components/content/Acorn.tsx'
 import { clientEvents } from '@acorn/client-core/host/registries/commands/clientEvents.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands/commands.ts'
+import { registerCommandGroupExample } from '@acorn/client-core/host/registries/commands/example.ts'
 import { KeybindingDispatcher, registerKeybindings } from '@acorn/client-core/host/registries/commands/keybindings.ts'
 import { CheatSheet } from '@acorn/client-core/host/keys/CheatSheet.tsx'
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
@@ -132,7 +133,11 @@ export default function App() {
       { id: 'core.settings.open', command: 'core.settings.open', description: 'Open settings', category: 'Global', defaultChord: 'meta+,', when: 'global' },
       { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Toggle focused pane or terminal maximize', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
     ])
-    onCleanup(() => { bindings.dispose(); commands.dispose() })
+    // Temporary, and phase 3 takes it: one group with two children, so hierarchy is something a
+    // person can press Enter on before the catalogue moves
+    // (client-core/host/registries/commands/example.ts).
+    const example = registerCommandGroupExample()
+    onCleanup(() => { example.dispose(); bindings.dispose(); commands.dispose() })
   })
 
   onMount(() => {

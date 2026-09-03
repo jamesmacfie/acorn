@@ -5,7 +5,7 @@ draws, in cells. It is the second host of the closed kit and the only test that 
 rather than layout.
 
 `apps/tui/` is the whole of it, about 9,000 lines, and nearly all of that is one component per kit
-node and one per layout. The panes, the query layer, the keymap, the palette model, the focus intents
+node and one per layout. The panes, the query layer, the keymap, the palette session, the focus intents
 and the tree protocol are `packages/client-core`'s, unchanged. No plugin writes terminal UI, declares
 a `tui` surface, or learns which host it is on.
 
@@ -1113,10 +1113,17 @@ in would put a second Solid renderer in the graph to render one child. The arbit
 `exclusiveSlots.ts` is shared unchanged. The topbar and the pane strip are bespoke until the
 client-plugins programme gives each a contract.
 
-The palette is a `Modal` over the same `kit/lib/paletteModel.ts` the desktop's runs on, and it does not
-use the kit's collection: a collection's keys are bare keys, a bare key does not fire while something
-is being typed into, and in a palette something always is. So it keeps one cursor signal and binds the
-arrows above the trap.
+The palette is a `Modal` over the same session the desktop's runs on
+(`client-core/host/registries/commands/session.ts`). The query, the order, the cursor, the frame stack
+and what Enter does are that object's; this host binds keys to it, draws its rows and prints its
+breadcrumb, and fetches and invokes nothing itself. The session is built in `chrome/Shell.tsx` rather
+than in `chrome/Palette.tsx`, because the component is mounted only while the overlay is up and a
+shortcut aimed at a group has to be able to open it.
+
+It does not use the kit's collection: a collection's keys are bare keys, a bare key does not fire while
+something is being typed into, and in a palette something always is. So the arrows are bound above the
+trap and the session owns the cursor they move. Escape is the single way back — it pops a frame, and
+at the root it closes, which is the `Modal`'s `onDismiss`.
 
 An overlay takes the whole screen under the topbar, and hides what is there rather than replacing it.
 It is a sibling of the rail-and-pane row in `chrome/Shell.tsx`, not a child of the pane column: an
