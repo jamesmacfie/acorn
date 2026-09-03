@@ -16,6 +16,10 @@ export type RemoteTreeComponent = Component<{
   contribution: RemoteContribution
   props: () => unknown
   scope?: () => { taskId?: string; projectId?: string; item?: string }
+  /** The sibling host editor's document, for a tree that is one region of a composed pane. An accessor
+   *  because the two regions mount independently; its absence is the whole permission check, exactly as
+   *  it is for an iframe region (../frames/broker.ts). */
+  document?: () => { read(): string; write(text: string): void; flush(): Promise<void> } | null
 }>
 
 let supplied: RemoteTreeComponent | null = null

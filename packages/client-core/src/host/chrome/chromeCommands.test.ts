@@ -12,6 +12,7 @@ vi.mock('../../infra/node/apiClient', () => ({
 }))
 
 const { pluginCommand, usablePluginCommands } = await import('./chromeCommands')
+const { projectSurfaceRegistry } = await import('../registries/panes/projectSurfaces')
 type CommandExecutionContext = import('../registries/commands/commands').CommandExecutionContext
 type SearchCommand = import('../registries/commands/commands').SearchCommand
 type InputCommand = import('../registries/commands/commands').InputCommand
@@ -30,7 +31,7 @@ const CONTEXT: CommandExecutionContext = {
   paneId: null, surfaceId: null,
 }
 
-const binding = { nodeId: () => 'node-a', enabled: () => true, usableAction: () => true }
+const binding = { nodeId: () => 'node-a', enabled: () => true, usableAction: () => true, usableSelectAction: () => true }
 
 const searchDescriptor = (over: Record<string, unknown> = {}): PluginCommandDescriptor => ({
   id: 'find', title: 'Find an issue', category: 'action', palette: true, kind: 'search',
@@ -152,6 +153,36 @@ describe('a search command', () => {
     const command = pluginCommand('linear', searchDescriptor(), binding) as SearchCommand
     await expect(command.select({ id: 'i-1', title: 'One' }, CONTEXT)).rejects.toThrow('the node fell over')
   })
+
+  // `navigate` is the verb Rollbar and Linear pick a row with: their detail belongs to the project, so
+  // a pick changes the URL and the surface beside the list follows
+  // (docs/future/command-palette/phase-5-loaded-plugin-adoption.md).
+  describe('picking a row that navigates', () => {
+    const navigating = searchDescriptor({ onSelect: { verb: 'navigate', surface: 'rollbar-item' } })
+
+    it('mints the path from the registered pattern, the captured project and the sanitized row id', async () => {
+      const surface = projectSurfaceRegistry.register({
+        id: 'rollbar-item',
+        path: '/p/:projectId/x/rollbar/items/:item',
+        item: 'item',
+        order: 60,
+        component: (() => null) as never,
+      })
+      const navigate = vi.fn()
+      const command = pluginCommand('rollbar', navigating, binding) as SearchCommand
+      const outcome = await command.select({ id: 'conn-1:142', title: 'TypeError' }, { ...CONTEXT, navigate })
+      expect(navigate).toHaveBeenCalledWith('/p/p-1/x/rollbar/items/conn-1%3A142')
+      expect(outcome).toEqual({ effect: 'close' })
+      surface.dispose()
+    })
+
+    it('refuses rather than guessing when this host has nowhere to take the reader', async () => {
+      const command = pluginCommand('rollbar', navigating, binding) as SearchCommand
+      // No navigator on the context, which is a shortcut rather than a palette session, and no
+      // registered surface either. Both are the same answer: nothing happens and the frame says so.
+      await expect(command.select({ id: 'conn-1:142', title: 'TypeError' }, CONTEXT)).rejects.toThrow('project')
+    })
+  })
 })
 
 describe('an input command', () => {
@@ -207,7 +238,8 @@ describe('which descriptors this device will honour', () => {
   })
 
   it('refuses a verb this device cannot honour, on a search as on an action', () => {
-    const refusing = { ...binding, usableAction: (action: { verb: string }) => action.verb !== 'openPane' }
+    const refuse = (action: { verb: string }): boolean => action.verb !== 'openPane'
+    const refusing = { ...binding, usableAction: refuse, usableSelectAction: refuse }
     expect(usablePluginCommands('linear', [
       searchDescriptor({ id: 'fine' }),
       searchDescriptor({ id: 'undrawable', onSelect: { verb: 'openPane', pane: 'nope' } }),

@@ -324,6 +324,7 @@ export type {
   PluginCommandAction,
   PluginCommandCategory,
   PluginCommandDescriptor,
+  PluginCommandSelectAction,
   PluginContentLinkDescriptor,
   PluginContributions,
   PluginDocumentCompletions,

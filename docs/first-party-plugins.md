@@ -213,8 +213,9 @@ Its **project-scoped issue view** was the other loss, and that one is closed. Ev
 manifest had was task-scoped or modal, so the issue detail Linear used to render at `/p/:projectId`
 through a `SourceRouteContribution` had no manifest form, and every rail row click outside a task was
 refused with "open a task first". Panes now declare a `scope`, a manifest may declare `routes` under a
-host-minted `/p/:projectId/x/<plugin-id>/` prefix, and a source's `onSelect` may `navigate` to a
-project-scoped surface — so the capability is carried by the tier rather than by a compiled exception.
+host-minted `/p/:projectId/x/<plugin-id>/` prefix, and a source's `onSelect` — or a search command's,
+which has the same selected row and the project its scope was resolved against — may `navigate` to a
+project-scoped surface, so the capability is carried by the tier rather than by a compiled exception.
 The picker remains open.
 
 Rollbar was the sharpest case and is now the best evidence the tier boundary is real. Its loaded

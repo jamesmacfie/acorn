@@ -31,6 +31,10 @@ export type RemoteTreeProps = {
   /** The task or project this tree is inside. An accessor, read on every bridge call, because one
    *  worker serves every tree its bundle draws and therefore holds one bridge. */
   scope?: () => { taskId?: string; projectId?: string; item?: string }
+  /** The sibling host editor's document, for a tree that is one region of a composed pane. An accessor
+   *  because the two regions mount independently; its absence is the whole permission check for the
+   *  `document` verb, exactly as it is on the desktop. */
+  document?: () => { read(): string; write(text: string): void; flush(): Promise<void> } | null
 }
 
 let slotSeq = 0
@@ -84,12 +88,21 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     onRefused: refuse,
     connect: (port) => {
       const bound = binding()
+      // The row that opened this pane, when a row did. Retained by `openPane` until the pane consumes
+      // it, so a tree mounting for the first time gets its selection in `context` rather than racing
+      // its own mount against an event that has already fired — the same split a frame region makes
+      // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
+      // current selection rather than a one-shot.
+      const opened = scope().item
+        ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id) : undefined)
+      const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
       const context: PluginFrameContext = {
         surface: bound.surface,
         target: 'remote',
         nodeId: bound.nodeId,
         ...(bound.taskId ? { taskId: bound.taskId } : {}),
         ...(bound.projectId ? { projectId: bound.projectId } : {}),
+        ...(item ? { item } : {}),
         // This host has one appearance and it is the reader's own terminal: no stylesheet, no tokens,
         // and no theme id to resolve until the appearance layer publishes its colours as data
         // (../appearance.ts, docs/tui.md).
@@ -101,7 +114,12 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
         port,
         binding: bound,
         services: createFrameServices(
-          { binding: bound, hash: contribution.hash },
+          {
+            binding: bound,
+            hash: contribution.hash,
+            // Present only where the host handed one down, which is a composed pane's other region.
+            ...(componentProps.document ? { document: componentProps.document } : {}),
+          },
           {
             qc,
             frameHasFocus: holdsFocus,

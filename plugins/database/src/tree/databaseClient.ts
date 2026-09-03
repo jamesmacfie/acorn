@@ -16,6 +16,7 @@ import {
   databaseQueriesRoute,
   databaseQueryRoute,
   databaseRowsRoute,
+  databaseScratchRoute,
   databaseTablesRoute,
 } from '../shared/database'
 import type {
@@ -64,6 +65,12 @@ export const generateSql = async (
   taskId: string,
   body: { connectionId: string; modelId?: string; prompt: string; queryIds?: string[] },
 ): Promise<DbGenerateResult> => (await api()).post(databaseActionRoute(taskId, 'generate'), body)
+
+// The stored scratch document, as the node holds it. Not `bridge.document.read()`, which answers with
+// what is in the editor right now: this is asked after the palette's `Generate SQL` wrote the row, so
+// the row is the question.
+export const readScratch = async (taskId: string): Promise<string> =>
+  (await (await api()).get<{ text?: string }>(databaseScratchRoute(taskId))).text ?? ''
 
 export const listSavedQueries = async (taskId: string): Promise<DbSavedQuery[]> =>
   (await api()).get(databaseQueriesRoute(taskId))

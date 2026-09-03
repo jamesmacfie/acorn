@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import { useParams } from '@solidjs/router'
+import { useNavigate, useParams } from '@solidjs/router'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { activeTaskId } from '../../features/tasks/tasks'
@@ -24,6 +24,7 @@ import { PaletteSurface } from './PaletteSurface'
 
 export default function CommandPalette() {
   const params = useParams()
+  const navigate = useNavigate()
   const fleetWorkspaces = createFleetWorkspaces()
 
   const providers: readonly SessionRowProvider[] = [createPaletteRowsProvider()]
@@ -39,6 +40,10 @@ export default function CommandPalette() {
     taskId: activeTaskId() ?? null,
     paneId: null,
     surfaceId: null,
+    // The shell's own navigator, for the closed chrome verbs that address a URL rather than a task
+    // layout. Taken here because `useNavigate` needs a router context and the command registry has
+    // none (../registries/commands/commands.ts).
+    navigate,
   })
 
   const { session, view } = createCommandPaletteView({

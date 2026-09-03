@@ -1171,11 +1171,15 @@ for the same reason: its click carries no selected row and no routed project, so
 either would parse and then only ever fail. Only a source's `onSelect` gets the full set, because a
 rail row is the one click site with a row, a project, and the promotion callback in scope.
 `surfaceAction` is the one verb whose effect lands *inside* a plugin rather than on the shell: it
-delivers the command's own id to the frame region of one of that plugin's `document-over-frame` panes
-(§ Document surfaces above), and it may only name a pane the same manifest declares with such a
-layout — a plain frame pane has no document to flush and no host chord to have resolved it. It is
-useful only on a command, because what it delivers *is* the command id, and a footer badge has no
-command in scope. An `agentContexts`
+delivers the command's own id to a region of one of that plugin's own panes, and it may only name a
+pane the same manifest declares that draws such a region — an iframe or a worker tree qualifies alike,
+and a pane whose regions are all host-drawn does not, because there would be nothing on the far end of
+the bridge to receive it. A document beside the region is not required. The verb was born in a
+`document-over-frame` pane, where `⌘Enter` is pressed in the host's editor and the frame has no
+keyboard (§ Document surfaces above), but the palette is the other way in, and from there "do this in
+the thing I am looking at" is a sentence about any pane the plugin draws — http's `list-detail`
+request panel as much as database's editor-over-panel. It is useful only on a
+command, because what it delivers *is* the command id, and a footer badge has no command in scope. An `agentContexts`
 entry names two routes — `options`
 (GET) and `capture` (POST) — and puts a row in the agent composer's context picker. Its `capture`
 answer is the one descriptor response that ends up inside a model's prompt, so it is parsed against
@@ -2444,7 +2448,10 @@ still parses as. The other four are additive:
   (`taskId`, `projectId` or `workspaceId`), and renders
   `{ items: [{ id, title, subtitle?, icon?, badge?, ref?, taskId?, projectId?, workspaceId? }] }`.
   `placeholder`, `minQueryLength` (0–20) and `debounceMs` (150–1,000) are optional; the host caps the
-  rendered set at 50 rows.
+  rendered set at 50 rows. `onSelect` takes a command's verbs plus `navigate`, which no other command
+  may name: picking a row supplies the selected row, and a project-scoped search already ran against a
+  routed project, so both halves of a project-surface address exist here. The path is minted from the
+  pattern the host registered, with the row's own id as the item — a response still chooses nothing.
 - **`input`** names a POST `route` and one static `onSuccess` verb. The host sends
   `{ input, taskId? }` when the reader presses Enter and expects `{ ok: true, item?, message? }`; a
   failure is the ordinary error envelope, keeps the reader's text on screen, and runs no action.
@@ -2480,7 +2487,7 @@ needs a `node` entrypoint, because only a node half serves `/v2/p/<id>/`.
         "scope": "project",
         "route": "/v2/p/linear/issues/search",
         "placeholder": "Search issues…",
-        "onSelect": { "verb": "runNodeAction", "path": "/v2/p/linear/issues/open" }
+        "onSelect": { "verb": "navigate", "surface": "linear-issue" }
       },
       {
         "id": "grouping",

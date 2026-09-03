@@ -137,7 +137,12 @@ describe('syncChromeContributions', () => {
     const message = 'No boards linked yet.'
     const authored = (action: PluginSourceEmptyState['action']): PluginSourceEmptyState =>
       ({ message, action, actionLabel: 'Link one' })
-    const panes = { panes: new Set(['board']), projectPanes: new Set<string>(), overlays: new Set(['board-picker']) }
+    const panes = {
+      panes: new Set(['board']),
+      projectPanes: new Set<string>(),
+      overlays: new Set(['board-picker']),
+      actionPanes: new Set(['board']),
+    }
 
     // Another plugin's route, a pane this manifest never declared, and a verb that needs a row.
     expect(usableEmptyState('board', panes, authored({ verb: 'runNodeAction', path: '/v2/p/other/go' }))).toEqual({ message })
@@ -475,6 +480,147 @@ describe('syncChromeContributions', () => {
     expect(commandRegistry.get('plugin.board.ask')).toMatchObject({ kind: 'input', scope: 'project' })
     expect(commandRegistry.get('plugin.board.theme')).toMatchObject({
       kind: 'setting', scope: 'project', options: [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }],
+    })
+  })
+
+  // `navigate` is the one verb a search's `onSelect` may name that a plain command may not: a picked
+  // row is a selected row, and a project-scoped search already ran against a routed project. The
+  // surface still has to be one this manifest declared as project-scoped, which the node checked when
+  // it parsed the manifest and this checks again because a roster row is bytes a node sent.
+  it('honours a search that navigates to its own project surface, and refuses one that does not', () => {
+    const declared: Partial<PluginContributions> = {
+      frames: [{
+        target: 'pane', id: 'board-card', label: 'Card', glyph: 'puzzle', order: 500,
+        formFactor: ['desktop'], scope: 'project',
+      }],
+      commands: [
+        {
+          id: 'find', title: 'Board: find a card', category: 'navigation', palette: true, kind: 'search',
+          scope: 'project', route: '/v2/p/board/search',
+          onSelect: { verb: 'navigate', surface: 'board-card' },
+        },
+        {
+          id: 'stray', title: 'Board: find a stray', category: 'navigation', palette: true, kind: 'search',
+          scope: 'project', route: '/v2/p/board/search',
+          onSelect: { verb: 'navigate', surface: 'not-declared' },
+        },
+      ] as PluginContributions['commands'],
+    }
+    _seedPluginDistribution([['node-a', [row('board', {}, declared)]]])
+    syncChromeContributions()
+    expect(ids().commands).toEqual(['plugin.board.find'])
+  })
+
+  // A surface action is the one verb whose effect lands inside the plugin, and the device has to know
+  // which of the plugin's panes can receive one: a pane drawing a region of its own, either as an
+  // iframe or as a tree in a worker. A pane whose regions are all host-drawn cannot, because there
+  // would be nothing on the far end of the bridge.
+  it('honours a surface action naming a pane the plugin draws, and refuses one that draws nothing', () => {
+    const region = { kind: 'remote', entry: 'panel' } as const
+    const declared: Partial<PluginContributions> = {
+      frames: [
+        {
+          target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'],
+          scope: 'task', layout: 'list-detail', regions: { list: region, detail: region },
+        },
+        {
+          target: 'pane', id: 'notes', label: 'Notes', glyph: 'puzzle', order: 500, formFactor: ['desktop'],
+          scope: 'task', layout: 'single',
+          regions: { body: { kind: 'document', languageId: 'plaintext', read: '/v2/p/board/doc' } },
+        },
+      ] as PluginContributions['frames'],
+      commands: [
+        { id: 'run', title: 'Board: run', category: 'action', palette: true, action: { verb: 'surfaceAction', surface: 'board' } },
+        { id: 'stray', title: 'Board: stray', category: 'action', palette: true, action: { verb: 'surfaceAction', surface: 'notes' } },
+        { id: 'ghost', title: 'Board: ghost', category: 'action', palette: true, action: { verb: 'surfaceAction', surface: 'nope' } },
+      ],
+    }
+    _seedPluginDistribution([['node-a', [row('board', {}, declared)]]])
+    syncChromeContributions()
+    expect(ids().commands).toEqual(['plugin.board.run'])
+  })
+
+  // The fixture the phase asks for: a loaded plugin's setting, driven through the real registration
+  // pass rather than through a hand-built contribution
+  // (docs/future/command-palette/phase-5-loaded-plugin-adoption.md § Manifest and lifecycle cleanup).
+  //
+  // Two non-secret choices, because that is what a setting command may be: a bounded, visible choice
+  // with its current value shown. Deliberately a fixture and not a real plugin's setting — none of the
+  // four adopting plugins has a two-choice preference, and inventing one to be covered would be a
+  // product decision made by a test.
+  describe('a loaded plugin’s setting, end to end', () => {
+    const declared: Partial<PluginContributions> = {
+      commands: [{
+        id: 'grouping', title: 'Board: group cards by', category: 'action', palette: true, kind: 'setting',
+        scope: 'project', readRoute: '/v2/p/board/prefs/grouping', writeRoute: '/v2/p/board/prefs/grouping',
+        options: [{ value: 'status', label: 'Status' }, { value: 'assignee', label: 'Assignee' }],
+      }] as PluginContributions['commands'],
+    }
+    const context = { host: 'desktop' as const, nodeId: 'node-a', workspaceId: null, projectId: 'p-1', taskId: 't-1', paneId: null, surfaceId: null }
+    const setting = () => commandRegistry.get('plugin.board.grouping') as unknown as {
+      options: readonly { value: string; label: string }[]
+      read: (context: unknown, signal: AbortSignal) => Promise<string>
+      write: (value: string, context: unknown, signal: AbortSignal) => Promise<string>
+    }
+
+    beforeEach(() => {
+      _seedPluginDistribution([['node-a', [row('board', {}, declared)]]])
+      syncChromeContributions()
+    })
+
+    it('reads the current value from the plugin’s own route, scoped to what the session captured', async () => {
+      readJson.mockResolvedValueOnce({ value: 'assignee' })
+      expect(await setting().read(context, new AbortController().signal)).toBe('assignee')
+      // The project the session captured rides along, and the task it also captured does not: the
+      // descriptor declared project scope, and the host sends that scope's identifier and no other.
+      expect(readJson).toHaveBeenCalledWith('/v2/p/board/prefs/grouping?projectId=p-1', expect.objectContaining({ nodeId: 'node-a' }))
+    })
+
+    it('writes the chosen value and takes the canonical one the route answers with', async () => {
+      writeJson.mockResolvedValueOnce({ value: 'status' })
+      expect(await setting().write('status', context, new AbortController().signal)).toBe('status')
+      expect(writeJson).toHaveBeenCalledWith('/v2/p/board/prefs/grouping', expect.objectContaining({
+        method: 'PUT',
+        nodeId: 'node-a',
+        body: JSON.stringify({ value: 'status', projectId: 'p-1' }),
+      }))
+    })
+
+    it('refuses a value that is not one of the manifest’s own choices, on the way out and back', async () => {
+      // On the way out, before any request is made.
+      await expect(setting().write('colour', context, new AbortController().signal)).rejects.toThrow('not one of the choices')
+      expect(writeJson).not.toHaveBeenCalled()
+      // And on the way back: a route that starts answering with something new cannot quietly add a
+      // choice nobody reviewed. The manifest's copy is the only copy.
+      expect(setting().options.map((option) => option.value)).toEqual(['status', 'assignee'])
+      readJson.mockResolvedValueOnce({ value: 'colour' })
+      expect(await setting().read(context, new AbortController().signal)).toBe('colour')
+      expect(setting().options.some((option) => option.value === 'colour')).toBe(false)
+    })
+
+    it('is gone when the node stops running the plugin, so nothing can be read or written through it', async () => {
+      // A search that was already in flight when the plugin went away. The promise is still pending.
+      readJson.mockReturnValueOnce(new Promise(() => {}))
+      const pending = setting().read(context, new AbortController().signal)
+      // Node switch, disconnect and uninstall all arrive here the same way: the plugin is not on the
+      // roster for the node this window is looking at.
+      _seedPluginDistribution([['node-a', []]])
+      syncChromeContributions()
+      expect(ids().commands).toEqual([])
+      expect(commandRegistry.get('plugin.board.grouping')).toBeUndefined()
+      // Invoking it by id is the closed answer a missing command gets, not a frame that opens on a
+      // route nobody serves any more.
+      expect(await executeCommand('plugin.board.grouping', context)).toEqual({ effect: 'close' })
+      // The pending read has nothing left to apply to, which is the point: the row it would have
+      // marked is no longer in the registry.
+      expect(pending).toBeInstanceOf(Promise)
+    })
+
+    it('stays registered but unavailable while the plugin is disabled', () => {
+      _seedPluginDistribution([['node-a', [row('board', { running: false, disabled: true, state: 'disabled' }, declared)]]])
+      syncChromeContributions()
+      expect(ids().commands).toEqual(['plugin.board.grouping'])
+      expect(commandAvailable(commandRegistry.get('plugin.board.grouping')!)).toBe(false)
     })
   })
 

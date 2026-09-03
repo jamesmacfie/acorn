@@ -7,6 +7,8 @@ import {
 import { createPaletteRowsProvider } from '@acorn/client-core/host/registries/palette/provider.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { activeTaskId } from '@acorn/client-core/features/tasks/tasks.ts'
+import { useNavigate } from '../kit/router'
+import { routedProjectId } from './routing'
 import { closeOverlay, openOverlay } from './state'
 import type { ShellModel } from './model'
 
@@ -32,14 +34,22 @@ import type { ShellModel } from './model'
  * to be open already.
  */
 export function createShellPalette(model: ShellModel): CommandSession {
+  const navigate = useNavigate()
   const context = (): CommandExecutionContext => ({
     host: 'tui',
     nodeId: activeNodeId() ?? null,
     workspaceId: model.workspace()?.id ?? null,
-    projectId: model.task()?.projectId ?? null,
+    // The routed project, not the open task's, which is what the desktop captures
+    // (client-core/host/palette/CommandPalette.tsx reads `params.projectId`). A project-scoped command
+    // asks "which project is on screen", and answering it from a task would offer a project search on
+    // a route that shows no project list to navigate within.
+    projectId: routedProjectId(),
     taskId: activeTaskId() ?? null,
     paneId: null,
     surfaceId: null,
+    // Same as the desktop's: the shell's navigator, for a closed chrome verb that addresses a URL
+    // rather than a task's layout (../kit/router.ts).
+    navigate,
   })
   const providers = [createPaletteRowsProvider()]
   return createCommandSession({

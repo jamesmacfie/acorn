@@ -34,8 +34,12 @@ export type CommandHostKind = 'desktop' | 'tui'
  * knows which world it was picked in (docs/future/command-palette/architecture.md § Execution
  * context).
  *
- * Data only. The navigation, pane and fleet adapters the closed chrome actions need arrive with the
- * session that carries them; there is no session yet, so there is nothing here to hand one.
+ * Identity, and one adapter. The seven identity fields are data and are what `sameIdentity` compares;
+ * `navigate` is the shell's own navigator, handed over by the host that built the context because
+ * `useNavigate` is only callable while a component is being set up and a command registry is not one
+ * (docs/future/command-palette/architecture.md § Execution context). It is absent on
+ * `DETACHED_COMMAND_CONTEXT`, which is the honest answer for a shortcut: nothing captured a world, so
+ * there is nowhere for it to take anybody.
  */
 export type CommandExecutionContext = {
   readonly host?: CommandHostKind
@@ -45,6 +49,7 @@ export type CommandExecutionContext = {
   readonly taskId: string | null
   readonly paneId: string | null
   readonly surfaceId: string | null
+  readonly navigate?: (path: string) => void
 }
 
 /**

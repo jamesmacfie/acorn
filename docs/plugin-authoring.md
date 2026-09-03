@@ -275,7 +275,8 @@ The cross-field rules are worth knowing before you write a manifest that parses 
 an `openPane` must name a task-scoped pane this manifest declares; a `navigate` must name a
 project-scoped one; a project-scoped pane needs both a `routes` entry (its only address) and a source
 whose `onSelect` navigates to it (its only mount site); an `overlay` needs an action that opens it; a
-`surfaceAction` may name only a pane that has both a document region and a `frame` region; a webview needs a client bundle; an
+`surfaceAction` may name only a pane that draws a region of its own, as an iframe or as a worker
+tree; a webview needs a client bundle; an
 extension point must hang off a `pane` this manifest declares and only one may sit at each location on
 it; an `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference and its `items` route
 must be your own; a `taskChecks` entry needs a `node` half, since only that serves the namespace its two
@@ -406,7 +407,7 @@ accepts it, which predates the split and should not be relied on.)
 | `createTask` | Host-owned promotion: the row supplies the task seed, the host owns the modal, the ownership check and the ordering. |
 | `openUrl` | `https` only, in the real browser. |
 | `openOverlay` | Open a full-screen picker this manifest declares. |
-| `surfaceAction` | Deliver this command's own id to the `frame` region of a pane that also has a document region. The only verb whose effect lands inside a plugin. |
+| `surfaceAction` | Deliver this command's own id to a region of one of your own panes — an iframe or a worker tree. The only verb whose effect lands inside a plugin. |
 
 Commands, slot badges and a source's `emptyState` take a **six-verb subset**: `openPane`, `openTask`,
 `runNodeAction`, `openUrl`, `openOverlay`, `surfaceAction`. `createTask` and `navigate` are absent

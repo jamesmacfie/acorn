@@ -1,5 +1,5 @@
 import { createComponent, lazy } from 'solid-js'
-import type { NodePluginRow, PluginChromeAction, PluginCommandDescriptor, PluginSourceEmptyState } from '@acorn/protocol/api.ts'
+import type { NodePluginRow, PluginChromeAction, PluginCommandDescriptor, PluginCommandSelectAction, PluginSourceEmptyState } from '@acorn/protocol/api.ts'
 import { isPluginShortcutChord, qualifiedPluginCommandId } from '@acorn/protocol/keybindings.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { activeNodeId } from '../../infra/node/activeNode'
@@ -75,10 +75,24 @@ const contextFreeActionUsable = (pluginId: string, surfaces: DeclaredSurfaces, a
   if (action.verb === 'openOverlay') return surfaces.overlays.has(action.overlay)
   if (action.verb === 'runNodeAction') return ownsRoute(pluginId, action.path)
   if (action.verb === 'openUrl') return isPluginOpenableUrl(action.url)
+  // The one verb whose effect lands inside the plugin. It needs a pane of this plugin's own that is
+  // running its bytes, because that is what receives the event; it needs no task, since a pane nobody
+  // has open simply has nothing listening, which is the honest outcome for "do this in the thing I am
+  // looking at" (./actions.ts § surfaceAction).
+  if (action.verb === 'surfaceAction') return surfaces.actionPanes.has(action.surface)
   // `createTask` needs a selected rail row, and `navigate` needs a routed project and a navigator.
   // Refused rather than read, because the verb doesn't carry the field the site would need.
   return false
 }
+
+/** The same question for a search command's `onSelect`, which has a picked row and the project its
+ *  scope was resolved against, so `navigate` is answerable there and nowhere else a command runs. The
+ *  surface still has to be one this manifest declared as project-scoped, checked here as well as at
+ *  parse time because a roster row is bytes a node sent. */
+const selectActionUsable = (pluginId: string, surfaces: DeclaredSurfaces, action: PluginCommandSelectAction): boolean =>
+  action.verb === 'navigate'
+    ? surfaces.projectPanes.has(action.surface)
+    : contextFreeActionUsable(pluginId, surfaces, action)
 
 /** An authored empty state with an unusable action reduced to its message. Exported because the
  * descriptor it sanitises is captured inside a component closure, where a test can't reach it, and a
@@ -139,6 +153,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     nodeId: chromeNode,
     enabled: () => pluginEnabledOnNode(chromeNode(), pluginId),
     usableAction: (candidate: PluginChromeAction) => contextFreeActionUsable(pluginId, surfaces, candidate),
+    usableSelectAction: (candidate: PluginCommandSelectAction) => selectActionUsable(pluginId, surfaces, candidate),
   }
   const commands = usablePluginCommands(pluginId, [
     ...(contributions.commands ?? []),

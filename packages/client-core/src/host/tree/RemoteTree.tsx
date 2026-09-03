@@ -42,6 +42,15 @@ export type RemoteTreeProps = {
    * with from.
    */
   scope?: () => TreeScope
+  /**
+   * The sibling host editor's document, for a tree that is one region of a composed pane.
+   *
+   * An accessor rather than a value, because the two regions mount independently and either may be
+   * first. Its absence is the whole permission check for the `document` verb: a tree either stands
+   * beside a host editor or it does not, and there is no scope to declare either way
+   * (../frames/broker.ts). The `frame` region of the same pane is handed the identical accessor.
+   */
+  document?: () => { read(): string; write(text: string): void; flush(): Promise<void> } | null
 }
 
 let slotSeq = 0
@@ -92,12 +101,21 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     onRefused: refuse,
     connect: (port) => {
       const bound = binding()
+      // The row that opened this pane, when a row did. Retained by `openPane` until the pane consumes
+      // it, so a tree mounting for the first time gets its selection in `context` rather than racing
+      // its own mount against an event that has already fired — the same split a frame region makes
+      // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
+      // current selection rather than a one-shot.
+      const opened = scope().item
+        ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id) : undefined)
+      const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
       const context: PluginFrameContext = {
         surface: bound.surface,
         target: 'remote',
         nodeId: bound.nodeId,
         ...(bound.taskId ? { taskId: bound.taskId } : {}),
         ...(bound.projectId ? { projectId: bound.projectId } : {}),
+        ...(item ? { item } : {}),
         theme: document.documentElement.dataset.theme ?? 'light',
         style: document.documentElement.dataset.style ?? 'terminal',
         claimsKeys: [],
@@ -109,7 +127,12 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
         // against, so the gate is whether the shell's focus is inside the element this tree drew into,
         // which is the same question one rung down.
         services: createFrameServices(
-          { binding: bound, hash: contribution.hash },
+          {
+            binding: bound,
+            hash: contribution.hash,
+            // Present only where the host handed one down, which is a composed pane's other region.
+            ...(componentProps.document ? { document: componentProps.document } : {}),
+          },
           {
             qc,
             frameHasFocus: () => container !== undefined && container.contains(document.activeElement),

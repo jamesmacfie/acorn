@@ -147,6 +147,20 @@ the answer it does not name, caps the rendered set, and runs the manifest's verb
 name a route, a URL, a command or a verb, which is the whole of why a plugin's live rows are safe to
 draw in a host surface.
 
+The verb a search picks a row with may be `navigate`, which no other command may name. Rollbar and
+Linear both use it: their item detail belongs to the project rather than to a task, so picking a row
+changes the URL and the surface beside the rail list follows, exactly as clicking the same row in that
+list does. It is available there and nowhere else because it needs a selected row and a routed
+project, and a search at project scope is the one command site that has both. The address is still
+minted from the pattern the host registered, with the row's sanitized id as the item.
+
+`surfaceAction` is the other verb worth naming here, because a command is the only click site it is
+useful from: it delivers the command's own id into a region of one of that plugin's own panes, and the
+plugin handles it as it would its own button click. Database's `Run query` and HTTP's `New request`
+are the two: running the editor's SQL and starting a blank draft are both things that happen inside a
+pane, not routes on a node. A pane nobody has open has nothing listening, which is the honest outcome
+for "do this in the thing I am looking at".
+
 A declarative setting names two routes in the plugin's own namespace and a static list of choices.
 The host GETs the read route when the frame opens and PUTs the write route with the chosen value plus
 the identifiers the declared scope owns; both answer `{ value }`, and a value naming none of the
