@@ -73,6 +73,15 @@ In:
 - **Wiring the parser.** `apps/tui/src/keys/install.ts`'s host adapter (phase 1) subscribes to the
   parser's key events instead of `renderer.keyInput`. Focus in and out feed `setHostFocused` as the
   DEC 1004 events do today. Paste reaches the focused input or textarea as text.
+
+  One thing to get right on the first attempt, because it fires everywhere at once. The parser asks
+  for kitty flag 2, event reporting, which `../main.tsx` has never asked for: OpenTUI's
+  `useKittyKeyboard: { disambiguate: true }` builds flags 1 and 4 and never 2, so no terminal has
+  ever sent this app a key release. On a terminal that speaks the protocol, every key now arrives
+  twice, once as `press` and once as `release`, and a subscription that does not filter fires every
+  binding twice. `onKeyPress` takes `press` and `repeat`; `onKeyRelease` takes `release`; the typing
+  hand-off in `install.ts § typeInto` takes `press` and `repeat` only, or a character is typed twice.
+  A test at 80 by 24 that presses one key and counts one intent is the cheapest guard.
 - **The golden comparison** now covers every golden, and `apps/tui/src/kit/kit.test.tsx`,
   `apps/tui/src/layouts/layouts.test.tsx`, `apps/tui/src/keys/keys.test.tsx`, `apps/tui/src/panes.test.tsx`,
   `apps/tui/src/chrome/chrome.test.tsx`, and `apps/tui/src/reachability.test.tsx` run under `own` with
