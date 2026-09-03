@@ -428,6 +428,10 @@ describe('syncChromeContributions', () => {
     syncChromeContributions()
     expect(ids().commands).toEqual(['plugin.board.search', 'plugin.board.quiet'])
     expect(commandRegistry.get('plugin.board.quiet')?.palette).toBe(false)
+    // The owner is stamped from the plugin id, never read off the descriptor. A manifest has no field
+    // to state one, and the graph compares owners before it lets a command name another as its parent
+    // (../registries/commands/graph.ts).
+    expect(commandRegistry.get('plugin.board.search')?.ownerId).toBe('board')
     const binding = keybindingRegistry.get('plugin.board.search')!
     expect(binding).toMatchObject({ command: 'plugin.board.search', category: 'board', defaultChord: 'meta+shift+f' })
     expect(binding.active?.()).toBe(false)

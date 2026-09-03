@@ -12,7 +12,7 @@ vi.mock('../../infra/node/apiClient', () => ({
 }))
 
 const { setActiveNode } = await import('../../infra/node/activeNode')
-const { commandRegistry } = await import('../registries/commands/commands')
+const { commandRegistry, executeCommand } = await import('../registries/commands/commands')
 const { keybindingRegistry } = await import('../registries/commands/keybindings')
 const { paneRegistry } = await import('../registries/panes/panes')
 const { projectImporterRegistry } = await import('../registries/sources/projectImporters')
@@ -372,9 +372,9 @@ describe('syncFrameContributions', () => {
       expect(command.when!()).toBe(false)
     })
 
-    it('closes the overlay when its command runs', () => {
+    it('closes the overlay when its command runs', async () => {
       openPluginOverlay('board', 'board-picker')
-      commandRegistry.get(closeId)!.run!()
+      await executeCommand(closeId)
       expect(commandRegistry.get(closeId)!.when!()).toBe(false)
     })
   })

@@ -12,6 +12,7 @@
     "./broker.ts": "./src/broker.ts",
     "./browserRules.ts": "./src/browserRules.ts",
     "./collections.ts": "./src/collections.ts",
+    "./commands.ts": "./src/commands.ts",
     "./contentLinkPattern.ts": "./src/contentLinkPattern.ts",
     "./contextMenus.ts": "./src/contextMenus.ts",
     "./documentSurface.ts": "./src/documentSurface.ts",

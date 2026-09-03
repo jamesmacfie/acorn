@@ -17,7 +17,7 @@ import { clientCapability, clientCapabilityIds, provideClientCapability, require
 import type { Disposable, Registry } from '../../../kit/lib/registry'
 import { settingsRegistry, type SettingsContribution } from '../shell/settings'
 import { sourceRegistry, type SourceContribution } from '../sources/sources'
-import { commandRegistry, type CommandContribution } from '../commands/commands'
+import { commandRegistry, stampCommandOwner, type ContributedCommand } from '../commands/commands'
 import { keybindingRegistry, type KeybindingContribution } from '../commands/keybindings'
 import { integrationFlowRegistry, type IntegrationFlowContribution } from '../sources/integrationFlows'
 import { projectImporterRegistry, type ProjectImporterContribution } from '../sources/projectImporters'
@@ -53,7 +53,7 @@ export type ClientPluginContext = {
   // Generic per call. A source's promotion is typed on the item it promotes, and the registry holds a
   // heterogeneous list, so a plugin declares its own item type here.
   sources: { register<Item>(entry: SourceContribution<Item>): void }
-  commands: ClientContributionPoint<CommandContribution>
+  commands: ClientContributionPoint<ContributedCommand>
   keybindings: ClientContributionPoint<KeybindingContribution>
   projectImporters: ClientContributionPoint<ProjectImporterContribution>
   settingsPages: ClientContributionPoint<SettingsContribution>
@@ -173,8 +173,13 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     },
   })
   const sources = own(sourceRegistry)
-  const commands = own(commandRegistry)
   const keybindings = own(keybindingRegistry)
+  // Not `own`. The owner is the one field on a command the host states and the plugin may not, for
+  // the reason a content link's `providerId` is stamped rather than read: a command that could name
+  // its owner could name another contributor's group as its parent (../commands/graph.ts).
+  const ownCommand: ClientContributionPoint<ContributedCommand> = {
+    register: (entry) => record(commandRegistry.register(stampCommandOwner(entry, name))),
+  }
   const ownIntegrationFlow: ClientContributionPoint<IntegrationFlowContribution> = {
     register: (entry) => {
       if (entry.id !== name) throw new Error(`Plugin '${name}' registered integration flow '${entry.id}'`)
@@ -212,7 +217,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     // The registry is heterogeneous by construction, so widening the item type here is the erasure
     // rather than a hole. Nothing downstream reads a promotion without selecting the source by id.
     sources: { register: <Item>(entry: SourceContribution<Item>) => sources.register(entry) },
-    commands,
+    commands: ownCommand,
     keybindings,
     integrationFlows: ownIntegrationFlow,
     projectImporters: own(projectImporterRegistry),

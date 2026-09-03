@@ -144,6 +144,10 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   for (const descriptor of commands) {
     add('command', descriptor.id, () => commandRegistry.register({
       id: qualifiedPluginCommandId(pluginId, descriptor.id),
+      // The same stamp the compiled feeder applies (registries/extensionPoints/plugin.ts), and for the
+      // same reason: a manifest has no `ownerId` field to state, and the graph compares owners before
+      // it lets one command name another as its parent.
+      ownerId: pluginId,
       title: descriptor.title,
       category: descriptor.category,
       palette: descriptor.palette,
