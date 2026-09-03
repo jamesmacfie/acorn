@@ -1,0 +1,109 @@
+import { laysOut, type Kind, type Node } from './node'
+
+// The `Renderable`-shaped view of a node, and the whole reason it exists is that the region store is
+// still typed on OpenTUI's tree.
+//
+// `../keys/regions.ts` is 1,071 lines that walk `parent`, read `visible`, `isDestroyed` and
+// `focusable` and a rectangle off a node, and index a node among `getChildren()`. None of that is OpenTUI's Zig
+// half — it is a tree walk over whatever the components handed it through a `ref` — so the cheapest
+// way to run the store over our nodes is to answer those names. Phase 4 rewrites the store against
+// `Node` directly and deletes this file; a rewrite now would be the same work done twice, against a
+// painter nothing yet draws with.
+//
+// **A prototype per kind, not fields per node.** Two reasons, and the second is the surprising one.
+// An accessor per node would be ten `defineProperty` calls on every one of the 1,708 nodes a pane
+// builds; and `../golden.ts § focusPath` holds a focused node's path as `constructor.name` per step,
+// which is `BoxRenderable` in every golden phase 0 captured. A named constructor function per kind
+// answers that for free, so a frame's focus path compares without the golden being touched.
+//
+// **What is deliberately not answered.** `instanceof` — a shim cannot be an instance of somebody
+// else's class, so the two `instanceof ScrollBoxRenderable` tests in the store ask
+// `../keys/regions.ts § isViewport` instead. And none of this holds state of its own: every accessor
+// reads a field the tree or the layout pass already wrote, and `focusable` and `onMouseDown`, which
+// the components and the store assign, are plain properties on an ordinary object.
+
+/** The class name OpenTUI's renderer gave each kind, which is what a golden's focus path holds. */
+const CLASS: Readonly<Record<Kind, string>> = {
+  box: 'BoxRenderable',
+  text: 'TextRenderable',
+  span: 'TextNodeRenderable',
+  scrollbox: 'ScrollBoxRenderable',
+  input: 'InputRenderable',
+  textarea: 'TextareaRenderable',
+  pty: 'EmbeddedTerminalRenderable',
+  '#text': 'TextNodeRenderable',
+}
+
+/** Every node gets an id, because `scrollChildIntoView` and the key trace both name one. A counter
+ *  rather than anything meaningful: the ids are minted per render and no golden holds one. */
+let minted = 0
+
+const accessors = {
+  // The last layout, under the four names the store reads it by.
+  x: { get(this: Node) { return this.rect.x } },
+  y: { get(this: Node) { return this.rect.y } },
+  width: { get(this: Node) { return this.rect.w } },
+  height: { get(this: Node) { return this.rect.h } },
+  // A prop the layout pass turns into `DISPLAY_NONE` and paint skips, read here as the flag the store
+  // walks with (`onScreen`). Absent means visible, which is what every box that says nothing means.
+  visible: {
+    get(this: Node) { return this.props.visible !== false },
+    // Nothing in the app writes it — the shell and the tab panels hide a subtree through the prop —
+    // and the setter is here so that if something ever does, the write lands where the prop is
+    // instead of throwing or shadowing it.
+    set(this: Node, value: boolean) { this.props.visible = value },
+  },
+  // Nothing is ever destroyed here, which is the fault class this painter exists to end: a plain
+  // object has no lifecycle to be on the wrong side of (./node.ts).
+  isDestroyed: { get() { return false } },
+  // What can hold the keys. An ordinary property everywhere else — `../keys/stops.ts` and five
+  // components write it on the node they built, and `../invariants.test.ts` counts those places — and
+  // an accessor here for the one kind that used to arrive with a default: OpenTUI's
+  // `ScrollBoxRenderable` is focusable unless told otherwise, which is what makes a viewport the stop
+  // of last resort for a document with no controls in it (`../keys/regions.ts § stopsIn`). Without it
+  // a `list-detail` narrow enough to show one half at a time had nothing to put the keys on, so `l`
+  // never reached the layer that switches the halves. Backed by `props`, so a write lands where the
+  // getter reads it rather than shadowing the accessor.
+  focusable: {
+    get(this: Node) { return (this.props.focusable as boolean | undefined) ?? this.kind === 'scrollbox' },
+    set(this: Node, value: boolean) { this.props.focusable = value },
+  },
+  // The caret, which is the one thing about focus the store still asks a renderable for
+  // (`../keys/regions.ts § paintCaret`). There is no caret to draw until phase 3 puts a cursor in a
+  // field, so both are no-ops rather than absences: the store calls them unconditionally.
+  focus: { value() {} },
+  blur: { value() {} },
+  getChildren: {
+    value(this: Node) {
+      // The children that lay out. A `span` and a `#text` are part of their parent's one run, so they
+      // are not nodes to a walk that is looking for stops.
+      return this.children.filter((child) => laysOut(child.kind))
+    },
+  },
+} as const
+
+/** One prototype per kind, made once. */
+const PROTOTYPES: Partial<Record<Kind, object>> = {}
+
+const prototypeFor = (kind: Kind): object => {
+  const made = PROTOTYPES[kind]
+  if (made) return made
+  // A named function purely so `constructor.name` answers what the goldens hold (see the header).
+  const shim = { [CLASS[kind]]: function () {} }[CLASS[kind]] as unknown as { prototype: object }
+  Object.defineProperties(shim.prototype, accessors as unknown as PropertyDescriptorMap)
+  PROTOTYPES[kind] = shim.prototype
+  return shim.prototype
+}
+
+/** A fresh node of this kind, with the store's view of it on its prototype. */
+export function makeNode(kind: Kind): Node {
+  const node = Object.create(prototypeFor(kind)) as Node & { id: number }
+  node.kind = kind
+  node.props = {}
+  node.parent = null
+  node.children = []
+  node.yoga = null
+  node.rect = { x: 0, y: 0, w: 0, h: 0 }
+  node.id = (minted += 1)
+  return node
+}

@@ -2,7 +2,7 @@ import { layoutTree } from '../layout/pass'
 import { onFrame } from '../tree/frames'
 import { createElement, setProperty } from '../tree/renderer'
 import type { Node } from '../tree/node'
-import { bufferLines, clearBuffer, createBuffer, resizeBuffer, type Buffer } from './buffer'
+import { bufferLines, bufferRuns, clearBuffer, createBuffer, resizeBuffer, type Buffer, type Run } from './buffer'
 import { flush, type Flush } from './flush'
 import { paint } from './paint'
 
@@ -46,6 +46,9 @@ export type Screen = {
   screen: () => Buffer
   /** What is on screen, as one string per row. */
   lines: () => string[]
+  /** …and as coloured runs, which is the half of a frame that says how it was drawn rather than what
+   *  it says (./buffer.ts § bufferRuns). */
+  runs: () => Run[][]
   /** Stop answering frame requests. The tree survives; nothing draws it. */
   close: () => void
 }
@@ -110,6 +113,7 @@ export function openScreen(options: {
     frame,
     screen: () => front,
     lines: () => bufferLines(front),
+    runs: () => bufferRuns(front),
     close: () => onFrame(null),
   }
 }

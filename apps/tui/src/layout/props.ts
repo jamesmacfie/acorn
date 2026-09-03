@@ -131,6 +131,14 @@ export const NOT_YOGA: Readonly<Record<string, string>> = {
   style: 'a run\'s colour and attributes, read by paint',
   fg: 'a run\'s foreground, read by paint',
   attributes: 'a run\'s bold, dim, underline and inverse bits, read by paint',
+  // The same four bits again, one prop each. `../kit/roles.ts § textStyle` answers both ways because
+  // a `span` under the old painter reads its weight out of a `style` object and ignores a mask, and a
+  // spread of that answer onto a `text` therefore carries these too. Paint reads the mask; phase 4
+  // drops the four (../kit/cells.tsx § Run).
+  bold: 'a run\'s weight, said as a boolean for a span',
+  dim: 'a run\'s dimness, said as a boolean for a span',
+  underline: 'a run\'s underline, said as a boolean for a span',
+  inverse: 'a run\'s inversion, said as a boolean for a span',
   transform: 'the role\'s own change to the characters, already applied by `styled`',
   textColor: 'a widget\'s foreground, read by paint',
   placeholder: 'a widget\'s empty-state text, phase 3',

@@ -2,7 +2,7 @@
 import { createSignal, Show } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import type { PluginTrustRequest } from '@acorn/client-core/host/plugins/distribution.ts'
-import { hasFfi } from '../ffi'
+import { canDraw } from '../ffi'
 import { renderFixture } from '../harness'
 import { activeHints } from '../chrome/bindings'
 import { renderCells } from '../kit/render'
@@ -64,7 +64,7 @@ const TRUST: PluginTrustRequest = {
   },
 }
 
-describe.skipIf(!hasFfi)('keys and focus in cells', () => {
+describe.skipIf(!canDraw)('keys and focus in cells', () => {
   it('lands the keys on the list when a pane opens, and moves them with next and prev', async () => {
     const frame = await renderCells(() => (
       <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />
@@ -481,7 +481,7 @@ const cacheBlockers = (engine: object): number => {
   return read.call(engine).state.activeKeyCacheBlockers
 }
 
-describe.skipIf(!hasFfi)('the typing shadow', () => {
+describe.skipIf(!canDraw)('the typing shadow', () => {
   it('lets a bare key reach a field, moves focus with it after the field loses the keys, and blocks no cache', async () => {
     const [text, setText] = createSignal('')
     const [pressed, setPressed] = createSignal('')

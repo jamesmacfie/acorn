@@ -5,7 +5,8 @@ import { TextAttributes, type Renderable } from '@opentui/core'
 import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import { NODE_SUPPORT } from '@acorn/client-core/kit/tokens/support.ts'
 import { NODE_FOCUS } from '@acorn/client-core/kit/tokens/focusRoles.ts'
-import { hasFfi } from '../ffi'
+import { canDraw } from '../ffi'
+import { drawsOwn } from '../painter'
 import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
 import { renderCells, type Cells, type Frame } from './render'
 import {
@@ -806,14 +807,75 @@ const CASES: Case[] = [
   },
 ]
 
-describe.skipIf(!hasFfi)('the kit in cells', () => {
+/**
+ * What the new painter cannot draw yet, case by case, and what each is waiting for.
+ *
+ * Under `ACORN_TUI_PAINTER=own` this suite runs on a painter with no scroll viewport, no `Input`, no
+ * `Textarea`, no pty rectangle and no mouse hit testing — those five are phase 3, and a case that
+ * needs one of them has nothing to assert on until it exists. Every other case runs under both, which
+ * is the point of the switch: the kit is the same kit and the cells are the same cells
+ * (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md).
+ *
+ * One entry is not phase 3's and says so, because a skip with the wrong reason on it is worse than no
+ * skip at all (§ TableRow below).
+ *
+ * Keyed by the title the case is reported under, so a rename shows up as a case that stopped being
+ * skipped rather than as a silent skip of the wrong one — the anti-vacuity check below reads it.
+ */
+const PHASE_3: Readonly<Record<string, string>> = {
+  // A field's own content: the value or the placeholder, and the caret in it.
+  'Input: a field that takes the room its row has left': 'Input',
+  'Textarea: a multi-line field holding its value': 'Textarea',
+  'Composer: a boxed field with a > prompt': 'Textarea',
+  'MentionTextarea: reduced: a Textarea with the mention menu below it, no inline highlight': 'Textarea',
+  'KeyValueEditor: a two-column table with editable cells': 'Input',
+  'FindBar: / query  3/12 on one line': 'Input',
+  'Input: takes what is typed at it': 'Input',
+  'Textarea: takes what is typed at it': 'Textarea',
+  'FindBar: takes a query typed at it': 'Input',
+  'Composer: submits what is in the box on commit': 'Textarea',
+  'MentionTextarea: completes the word being typed from the list under the field': 'Textarea',
+  // A viewport is three nodes to the old painter — a wrapper, the viewport and a content box — and one
+  // box to ours, so its height comes from somewhere else and it has no `viewport` to read
+  // (../kit/scrolling.tsx, ../kit/showing.tsx).
+  'TabPanel: the rows under the tab strip, and nothing for a panel that is not current': 'the scroll viewport',
+  'DiffPane: reduced: unified only': 'the scroll viewport',
+  'is a parent stop: Down enters the panel it is showing, Escape comes back': 'the scroll viewport',
+  // A click is a hit test into the store, and the walk from a cell to a node does not exist yet
+  // (../keys/regions.ts § Clicks are hit tests).
+  'puts the keys on the control a click lands on, and Enter presses that one': 'mouse hit testing',
+  'lets go of the keys when the control holding them goes disabled': 'mouse hit testing',
+  // And the hand-off that types a key into the field holding them.
+  'types into the field that has the keys, wherever the renderer is drawing its caret': 'typing',
+  // Not phase 3's. Yoga starts a node at `flexShrink: 0` and every renderable in the old painter
+  // started at 1, so a row one cell wider than its box keeps every child at full width here and the
+  // last of them — this row's caret marker — is clipped instead of squeezed. Setting the default to 1
+  // draws it and sends `ConfirmButton` into a layout that never settles, so it wants a proper look
+  // rather than a one-line default (docs/future/terminal-rewrite/phase-2-the-painter.md
+  // § What building it found).
+  'TableRow: presses on Enter, marking the focused row at its end':
+    'Yoga\'s flexShrink default, which is not a widget at all',
+}
+
+/** The reason this case is held, or nothing at all under the painter that can draw it. */
+const owed = (title: string): string | undefined => (drawsOwn() ? PHASE_3[title] : undefined)
+
+/** A case's title, with what it is waiting for, for the skipped half's report. */
+const held = <T,>(rows: readonly (readonly [string, T])[]): (readonly [string, T])[] =>
+  rows.filter(([title]) => owed(title)).map(([title, entry]) => [`${title} — phase 3: ${owed(title)!}`, entry] as const)
+
+const drawable = <T,>(rows: readonly (readonly [string, T])[]): (readonly [string, T])[] =>
+  rows.filter(([title]) => !owed(title))
+
+describe.skipIf(!canDraw)('the kit in cells', () => {
   it('has a case for every node in the kit, and no case for a node that is gone', () => {
     expect(CASES.map((entry) => entry.node).sort()).toEqual([...KIT_NODES].sort())
     // Anti-vacuity: two empty lists compare equal, and the kit is not empty.
     expect(CASES.length).toBeGreaterThan(70)
   })
 
-  it.each(CASES.map((entry) => [`${entry.node}: ${entry.draws}`, entry] as const))('%s', async (_name, entry) => {
+  const cases = CASES.map((entry) => [`${entry.node}: ${entry.draws}`, entry] as const)
+  const drawCase = async (_name: string, entry: Case): Promise<void> => {
     // The collection store is module state, so two renders in one process share a caret.
     _resetCollections()
     const frame = await renderCells(entry.render, entry.size)
@@ -822,7 +884,26 @@ describe.skipIf(!hasFfi)('the kit in cells', () => {
     } finally {
       frame.done()
     }
-  }, 20_000)
+  }
+  it('holds back nothing it cannot name', () => {
+    // Every key in the table has to be a title some case is actually reported under, or the skip is
+    // silent and the case it meant to hold runs and fails. Checked here rather than trusted, because
+    // the two halves are a rename apart (§ PHASE_3).
+    const titles = new Set([
+      ...CASES.map((entry) => `${entry.node}: ${entry.draws}`),
+      ...BEHAVIOURS.map((entry) => `${entry.node}: ${entry.does}`),
+      'puts the keys on the control a click lands on, and Enter presses that one',
+      'lets go of the keys when the control holding them goes disabled',
+      'types into the field that has the keys, wherever the renderer is drawing its caret',
+      'is a parent stop: Down enters the panel it is showing, Escape comes back',
+    ])
+    expect(Object.keys(PHASE_3).filter((title) => !titles.has(title))).toEqual([])
+  })
+
+  it.each(drawable(cases))('%s', drawCase, 20_000)
+  // The held half, as skips rather than as absences, so the report says which node is waiting and why
+  // (§ PHASE_3). Empty under the old painter, which registers nothing.
+  if (held(cases).length) it.skip.each(held(cases))('%s', drawCase)
 
   it('draws loose text wherever it lands, in every shape that has thrown', async () => {
     // The class, not an instance. A run of text needs a `text` parent here and on the DOM a bare
@@ -1309,8 +1390,9 @@ const NOT_DRIVEN_HERE: Partial<Record<KitNodeName, string>> = {
 const every = (from: Renderable): Renderable[] =>
   from.getChildren().flatMap((child) => [child, ...every(child)])
 
-describe.skipIf(!hasFfi)('every control is a stop', () => {
-  it.each(BEHAVIOURS.map((entry) => [`${entry.node}: ${entry.does}`, entry] as const))('%s', async (_name, entry) => {
+describe.skipIf(!canDraw)('every control is a stop', () => {
+  const behaviours = BEHAVIOURS.map((entry) => [`${entry.node}: ${entry.does}`, entry] as const)
+  const driveCase = async (_name: string, entry: Behaviour): Promise<void> => {
     _resetCollections()
     const pressed: string[] = []
     const screen = await renderCells(
@@ -1328,9 +1410,11 @@ describe.skipIf(!hasFfi)('every control is a stop', () => {
     } finally {
       screen.done()
     }
-  }, 30_000)
+  }
+  it.each(drawable(behaviours))('%s', driveCase, 30_000)
+  if (held(behaviours).length) it.skip.each(held(behaviours))('%s', driveCase)
 
-  it('puts the keys on the control a click lands on, and Enter presses that one', async () => {
+  it.skipIf(owed('puts the keys on the control a click lands on, and Enter presses that one'))('puts the keys on the control a click lands on, and Enter presses that one', async () => {
     // The proof that a click is a hit test. The renderer's own `autoFocus` is off, so nothing but the
     // store moves the keys: it takes the renderable the click landed on and walks up to the nearest
     // thing that can hold them, which is this button (../keys/regions.ts § Clicks are hit tests).
@@ -1369,7 +1453,7 @@ describe.skipIf(!hasFfi)('every control is a stop', () => {
     }
   }, 30_000)
 
-  it('types into the field that has the keys, wherever the renderer is drawing its caret', async () => {
+  it.skipIf(owed('types into the field that has the keys, wherever the renderer is drawing its caret'))('types into the field that has the keys, wherever the renderer is drawing its caret', async () => {
     // Spike 1's answer as a regression test, and the sentence the whole phase rests on: an OpenTUI
     // edit buffer's `handleKeyPress` reads the key and its own suspend trait and nothing else, so the
     // dispatcher can hand it a key without the renderer having focused it. If that stopped being
@@ -1422,7 +1506,7 @@ describe.skipIf(!hasFfi)('every control is a stop', () => {
     }
   }, 30_000)
 
-  it('lets go of the keys when the control holding them goes disabled', async () => {
+  it.skipIf(owed('lets go of the keys when the control holding them goes disabled'))('lets go of the keys when the control holding them goes disabled', async () => {
     // The flag is the store's declaration of what can hold the keys, so a control that loses it while
     // it has them is a node the landing pass has to leave. It used to be worse than a stuck caret:
     // `blur()` refuses a node that is not focusable, so the keys stayed for the rest of the run and
@@ -1567,8 +1651,8 @@ const inPane = (body: () => JSX.Element, height: number) => renderCells(
   { width: 60, height },
 )
 
-describe.skipIf(!hasFfi)('a tab strip with panels', () => {
-  it('is a parent stop: Down enters the panel it is showing, Escape comes back', async () => {
+describe.skipIf(!canDraw)('a tab strip with panels', () => {
+  it.skipIf(owed('is a parent stop: Down enters the panel it is showing, Escape comes back'))('is a parent stop: Down enters the panel it is showing, Escape comes back', async () => {
     const screen = await inPane(() => <TwoPanels />, 12)
     try {
       // Entry lands on the strip rather than in the panel, because a parent stop is what `entryStop`

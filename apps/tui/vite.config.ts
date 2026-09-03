@@ -15,6 +15,26 @@ import solid from 'vite-plugin-solid'
 //   - `@acorn/plugin-api/ui` resolves to this package's kit. A compiled pane imports the kit through
 //     that facade and nothing else, so aliasing the facade is the whole host switch for it. Mirrored
 //     in tsconfig.json's `paths`.
+
+// Which painter draws, and the whole of the switch between them.
+//
+// `generate: 'universal'` below sends every JSX call in the process — client-core's components and a
+// sandboxed plugin's included — to the module named in `moduleName`, so the one thing that decides
+// which painter receives them is what that name resolves to. `opentui` is the default, deliberately:
+// the shipped bundle and the whole existing suite are untouched until phase 4 flips it, and
+// `ACORN_TUI_PAINTER=own` is how the golden comparison and a reader who wants to try it ask for ours
+// (docs/future/terminal-rewrite/phase-2-the-painter.md § Scope).
+//
+// An alias and a define rather than a plugin. There are two painters and there will be one, so
+// anything more general than this is flexibility with a deletion date on it.
+const painter = process.env.ACORN_TUI_PAINTER === 'own' ? 'own' : 'opentui'
+const RECONCILER = {
+  // OpenTUI's, with loose text wrapped and the destroy race tied to the owner (src/kit/reconciler.ts).
+  opentui: 'src/kit/reconciler.ts',
+  // Ours: plain objects, Yoga through wasm, a cell buffer (src/tree/renderer.ts).
+  own: 'src/tree/renderer.ts',
+}[painter]
+
 const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 // Anything that touches Solid's reactive graph is bundled rather than left to Node, so there is
 // exactly one copy of it. Two reasons, and they bite differently:
@@ -80,14 +100,15 @@ export default defineConfig({
       // reach for the reconciler from a package that does not depend on it. They are not drawn here —
       // the TUI has its own kit and its own layouts — but they are in the graph, so they have to
       // resolve, and they have to resolve to the same instance.
-      { find: /^@opentui\/solid$/, replacement: resolve(import.meta.dirname, 'src/kit/reconciler.ts') },
+      // …and under `ACORN_TUI_PAINTER=own` it is ours instead, which is the switch (§ painter above).
+      { find: /^@opentui\/solid$/, replacement: resolve(import.meta.dirname, RECONCILER) },
       // …and the real one behind it, which only `src/kit/reconciler.ts` names.
       { find: /^@opentui\/solid\/index\.js$/, replacement: fileURLToPath(import.meta.resolve('@opentui/solid')) },
     ],
   },
   plugins: [solid({ solid: { generate: 'universal', moduleName: '@opentui/solid' } })],
   ssr: { noExternal: true },
-  define: { __ACORN_HOST__: '"tui"' },
+  define: { __ACORN_HOST__: '"tui"', __ACORN_PAINTER__: JSON.stringify(painter) },
   build: {
     target: 'node22',
     outDir: 'dist',

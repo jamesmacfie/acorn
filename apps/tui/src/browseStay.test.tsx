@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { hasFfi } from './ffi'
+import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 
 // The shell has to stay on the project the reader chose, whatever the path says next.
@@ -14,7 +14,7 @@ import { renderFixture } from './harness'
 // you back to a repository you were not looking at, which empties whatever list you were in
 // (./kit/router.ts, ./chrome/routing.ts § routedProjectId).
 describe('browsing while the path says something the router does not know', () => {
-  it.skipIf(!hasFfi)('stays on the chosen project rather than bouncing to the first', async () => {
+  it.skipIf(!canDraw)('stays on the chosen project rather than bouncing to the first', async () => {
     const screen = await renderFixture({ width: 120, height: 32 })
     await screen.until('Reviews', 30)
 

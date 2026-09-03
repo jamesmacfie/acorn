@@ -1,5 +1,5 @@
-import { RGBA } from '@opentui/core'
 import type { Slot } from '@acorn/client-core/kit/tokens/roles.ts'
+import type { Color } from './colour'
 
 // Appearance in a terminal: which colour a slot is, and which of the style axes survive.
 //
@@ -21,27 +21,28 @@ import type { Slot } from '@acorn/client-core/kit/tokens/roles.ts'
 // they are published this is a call site rather than a design.
 
 /** The six colours a role can ask for. `default` is the terminal's own foreground. */
-export type Palette = Record<Slot, RGBA>
+export type Palette = Record<Slot, Color>
 
-/** The terminal's own slots, as the two colours OpenTUI has that mean "ask the terminal": the default
- *  foreground, which it writes as `ESC[39m`, and a palette index, which it writes as `ESC[38;5;n`.
- *  Either way the answer comes from the theme the person chose rather than from us.
+/** The terminal's own slots, as `./colour.ts`'s three answers: the terminal's own foreground, or one
+ *  of its sixteen numbered slots. Either way the colour comes from the theme the person chose rather
+ *  than from us.
  *
- *  Both have to be said out loud, and that is the whole of the light-terminal bug. A run with no
- *  colour is not the terminal's foreground to OpenTUI — it is opaque white, `ESC[38;2;255;255;255m`,
- *  which on a light background is white on white. And a colour *named* is worse than useless: OpenTUI
- *  reads `cyan` as the CSS colour and sends `#00FFFF`, so the accent was a fixed hex on every
- *  terminal rather than the palette's own sixth slot. */
+ *  Both have to be said out loud, and that is the whole of the light-terminal bug — under the painter
+ *  we are leaving. A run with no colour was not the terminal's foreground to OpenTUI, it was opaque
+ *  white, which on a light background is white on white; and a colour *named* was worse, because it
+ *  read `cyan` as the CSS colour and sent `#00FFFF`. Our painter writes `39` for `default` and
+ *  `30 + n` for a slot, so the class is answered where the colour is emitted
+ *  (./paint/flush.ts). */
 export const TERMINAL_PALETTE: Palette = {
-  default: RGBA.defaultForeground(),
+  default: 'default',
   // Slot 8, the palette's own grey, is what `muted` is instead of the `dim` attribute: dim blends a
   // run toward the background, so on a light terminal it drew white on white
   // (client-core/kit/tokens/roles.ts § tone).
-  muted: RGBA.fromIndex(8),
-  accent: RGBA.fromIndex(6),
-  ok: RGBA.fromIndex(2),
-  warn: RGBA.fromIndex(3),
-  danger: RGBA.fromIndex(1),
+  muted: 8,
+  accent: 6,
+  ok: 2,
+  warn: 3,
+  danger: 1,
 }
 
 /** Which theme token feeds which slot. Six of the forty; the rest are backgrounds, borders and diff
@@ -62,6 +63,14 @@ export const reportsTruecolor = (env: NodeJS.ProcessEnv = process.env): boolean 
 
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
 
+/** A `#rgb` or `#rrggbb` as the triple a terminal takes. Three-digit form doubles each nibble, which
+ *  is what CSS means by it. */
+const fromHex = (hex: string): Color => {
+  const body = hex.slice(1)
+  const full = body.length === 3 ? body.split('').map((part) => part + part).join('') : body
+  return [0, 2, 4].map((at) => Number.parseInt(full.slice(at, at + 2), 16)) as unknown as Color
+}
+
 /** A theme's palette as the five slots. Truecolor passes the theme's own value through; anything else
  *  falls back to the terminal's slot, including a colour written as `oklch(...)`, which a terminal
  *  cannot take at all. */
@@ -70,16 +79,17 @@ export function paletteFor(theme: Readonly<Record<string, string | undefined>>, 
   if (!truecolor) return palette
   for (const slot of Object.keys(FROM_TOKEN) as Slot[]) {
     const value = theme[FROM_TOKEN[slot]]?.trim()
-    if (value && HEX.test(value)) palette[slot] = RGBA.fromHex(value)
+    if (value && HEX.test(value)) palette[slot] = fromHex(value)
   }
   return palette
 }
 
 let palette: Palette = TERMINAL_PALETTE
 
-/** The colour a slot resolves to right now. A role that names no slot still gets one: `undefined`
- *  leaves OpenTUI to draw its own white, so "no colour of its own" has to mean the default slot. */
-export const slotColor = (slot: Slot | undefined): RGBA => palette[slot ?? 'default']
+/** The colour a slot resolves to right now. A role that names no slot still gets one: an absent
+ *  colour is a colour somebody downstream has to guess at, so "no colour of its own" is said as the
+ *  default slot instead. */
+export const slotColor = (slot: Slot | undefined): Color => palette[slot ?? 'default']
 
 /** Swap the palette. Phase 4's job, when the TUI can read the chosen theme off the node. */
 export const setPalette = (next: Palette): void => { palette = next }

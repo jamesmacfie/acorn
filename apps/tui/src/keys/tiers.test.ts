@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { toast } from '@acorn/client-core/features/notifications/toast.ts'
-import { hasFfi } from '../ffi'
+import { canDraw } from '../ffi'
 import { renderFixture } from '../harness'
 import { focusedRegion } from './regions'
 import {
@@ -89,7 +89,7 @@ describe('the tiers are named in one place', () => {
   })
 })
 
-describe.skipIf(!hasFfi)('one Escape at the region tier', () => {
+describe.skipIf(!canDraw)('one Escape at the region tier', () => {
   it('clears what is on screen first, then climbs', async () => {
     // The collision the table found. There were two layers at the region tier binding Escape — the
     // shell's notification dismiss and the region chain's `moveBack` — and which one answered came

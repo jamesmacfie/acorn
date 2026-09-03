@@ -1,8 +1,9 @@
 /** @jsxImportSource @opentui/solid */
 import { parseArgs } from 'node:util'
-import { CliRenderEvents, createCliRenderer } from '@opentui/core'
+import { CliRenderEvents, createCliRenderer, type CliRenderer } from '@opentui/core'
 import { render } from '@opentui/solid'
 import { installPlatform } from './platform'
+import { drawsOwn } from './painter'
 import { openNode } from './node/open'
 import { installKeymap } from './keys/install'
 import { COMMAND } from './keys/tiers'
@@ -53,8 +54,12 @@ const { values } = parseArgs({
 // inside a chunk. Not declared as an `engines` floor on this package: the rest of the repo builds and
 // tests this one happily on the Node it already has, and only running it needs 26.4 (findings.md,
 // "The runtime floor").
+//
+// And not checked at all under our own painter, which is the whole point of the programme: it is
+// TypeScript, Yoga through wasm and cells on stdout, so it runs on the Node the repo pins with no
+// flag (./painter.ts, docs/future/terminal-rewrite/README.md § Why).
 const [nodeMajor = 0, nodeMinor = 0] = process.versions.node.split('.').map(Number)
-if (nodeMajor < 26 || (nodeMajor === 26 && nodeMinor < 4)) {
+if (!drawsOwn() && (nodeMajor < 26 || (nodeMajor === 26 && nodeMinor < 4))) {
   console.error(`acorn draws with OpenTUI, which needs Node 26.4 or later started with --experimental-ffi. This is Node ${process.versions.node}.`)
   process.exit(2)
 }
@@ -160,12 +165,24 @@ installRenderGuard()
 // focuses the first focusable ancestor it finds — which is a focus move nothing in the store asked
 // for, for exactly the case the store exists to have one answer to. A click is a hit test into the
 // store instead (./keys/regions.ts § Clicks are hit tests).
-const renderer = await createCliRenderer({
-  exitOnCtrlC: false,
-  useKittyKeyboard: { disambiguate: true },
-  openConsoleOnError: false,
-  autoFocus: false,
-})
+//
+// Under `ACORN_TUI_PAINTER=own` none of that applies and the two halves are composed instead: the
+// terminal owns the modes and the bytes, the screen owns the cells, and the screen closes first on
+// the way out so the last frame lands while the alternate screen is still ours
+// (./input/terminal.ts § The two halves compose, ./ownRenderer.ts).
+//
+// Reached through an `import()` rather than a static import, so the painter this build did not pick
+// stays out of the bundle: `./ownRenderer.ts` reaches the tree, the layout pass, the cell buffer and
+// the input parser, and a static import here would put all four into the `main.js` of the build that
+// draws with the other one (./ownRenderer.ts § openOwnSurface).
+const renderer: CliRenderer = drawsOwn()
+  ? (await import('./ownRenderer')).openOwnSurface() as unknown as CliRenderer
+  : await createCliRenderer({
+    exitOnCtrlC: false,
+    useKittyKeyboard: { disambiguate: true },
+    openConsoleOnError: false,
+    autoFocus: false,
+  })
 bootMark('renderer created')
 // Time to first draw. `@opentui/solid` exports a `TimeToFirstDraw` renderable that holds the same
 // number, but it is an on-screen label: it would have to be mounted in the tree and would paint a debug
@@ -294,6 +311,10 @@ if (opened.starting) {
   )
 }
 
+// The root node under our painter and the renderer under OpenTUI's, which is the one line of the
+// mount that differs between them (./harness.tsx § Surface).
+const target = drawsOwn() ? (renderer as unknown as { root: unknown }).root : renderer
+
 await render(
   () => (
     <App
@@ -311,5 +332,5 @@ await render(
       onQuit={() => void quit()}
     />
   ),
-  renderer,
+  target as never,
 )

@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { hasFfi } from './ffi'
+import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 
 // The pane sweep: every first-party pane the roster registers, opened at exactly 80 by 24 with the
@@ -56,7 +56,7 @@ const screenFor = async (
   return frame
 }
 
-describe.skipIf(!hasFfi)('every pane at 80 by 24', () => {
+describe.skipIf(!canDraw)('every pane at 80 by 24', () => {
   it('agents: the session list, with its state and model under the title', async () => {
     const frame = await screenFor('agents', { until: 'MANAGED SESSIONS' })
     expect(frame).toContain('MANAGED SESSIONS')

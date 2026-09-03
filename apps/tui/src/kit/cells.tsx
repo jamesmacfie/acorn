@@ -1,8 +1,10 @@
 /** @jsxImportSource @opentui/solid */
 import { Show, type JSX } from 'solid-js'
 import type { TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
-import { borderCell, spanStyle, styled, textStyle } from './roles'
+import { borderCell, styled, textStyle } from './roles'
 import { slotColor } from '../appearance'
+import { paintColor } from '../colourCompat'
+import { sliceToWidth, stringWidth } from '../width'
 
 // The three things every component in this package needs, and the reason each exists.
 //
@@ -84,11 +86,15 @@ export function Line(props: { role?: TextRole; tone?: Tone; wrap?: boolean; chil
  *
  *  Only for a caller that owns the `text` around it. Everything else uses `Line`.
  *
- *  `style`, not the spread props `Line` uses. A span takes its colour in one object and drops
- *  anything else in silence (./roles.ts § spanStyle). */
+ *  Both shapes of one answer, because the two painters read a span's colour in different places. Ours
+ *  reads the props, the same ones a `text` takes. The old one ignores every prop on a text node but
+ *  `href` and `style` and reads the colour and the attributes out of that one object as booleans, so a
+ *  span given only props drew in its parent's colour — which was white, on a white terminal, on every
+ *  line of every diff. Saying it twice is what keeps one component source drawing the same cells under
+ *  both, and phase 4 drops the `style` half (./roles.ts § textStyle). */
 export function Run(props: { role?: TextRole; tone?: Tone; children: JSX.Element }) {
   const run = () => styled(flatten(props.children), props.role, props.tone)
-  return <span style={spanStyle(props.role, props.tone)}>{run().text}</span>
+  return <span {...run().style} style={run().style}>{run().text}</span>
 }
 
 /** A divider between two regions, along the axis it separates: a line across for `x`, a column of
@@ -102,7 +108,7 @@ export function Rule(props: { axis?: 'x' | 'y' }) {
   const vertical = () => props.axis === 'y'
   return (
     <Show when={borderCell('divider').glyph}>
-      <box border={vertical() ? ['left'] : ['top']} borderStyle="single" borderColor={slotColor('default')} flexShrink={0} />
+      <box border={vertical() ? ['left'] : ['top']} borderStyle="single" borderColor={paintColor(slotColor('default'))} flexShrink={0} />
     </Show>
   )
 }
@@ -114,9 +120,23 @@ export const runStyle = (role?: TextRole, tone?: Tone) => {
 }
 
 /** Cut to a width, with a `…` where something was cut. Every truncating node — `Table`, `Grid`, a
- *  `Row`'s meta — cuts the same way, so a reader learns the mark once. */
-export const ellipsise = (value: string, width: number): string =>
-  width <= 0 ? '' : value.length <= width ? value : `${value.slice(0, Math.max(0, width - 1))}…`
+ *  `Row`'s meta — cuts the same way, so a reader learns the mark once.
+ *
+ *  Cells, not characters. `String.length` is wrong three ways — two code units for one astral
+ *  character, one cell for a wide one, a cell for a combining mark that takes none — so a column
+ *  holding any of the three did not line up with the one above it. The fixture is entirely ASCII,
+ *  where the two answers agree, which is why nobody has seen it (../width.ts). */
+export function ellipsise(value: string, width: number): string {
+  if (width <= 0) return ''
+  if (stringWidth(value) <= width) return value
+  // A cell for the mark itself, and `sliceToWidth` gives back a whole cluster: cutting one code point
+  // short of a wide character would otherwise leave the run a cell narrower than the column.
+  return `${sliceToWidth(value, width - 1).text}…`
+}
 
-/** Pad to a width, for a column that has to line up with the one above it. */
-export const pad = (value: string, width: number): string => ellipsise(value, width).padEnd(width, ' ')
+/** Pad to a width, for a column that has to line up with the one above it. Padded by cells for the
+ *  same reason, because `padEnd` counts code units. */
+export function pad(value: string, width: number): string {
+  const cut = ellipsise(value, width)
+  return cut + ' '.repeat(Math.max(0, width - stringWidth(cut)))
+}

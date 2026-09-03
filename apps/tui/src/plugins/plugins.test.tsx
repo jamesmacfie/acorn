@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto'
 import { createComponent } from 'solid-js'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
-import { hasFfi } from '../ffi'
+import { canDraw } from '../ffi'
 import { renderCells } from '../kit/render'
 import { Text } from '../kit/showing'
 
@@ -157,7 +157,7 @@ test('a descriptor source keeps its region identity across chrome refreshes', as
   expect(refreshed.regions!.detail).toBe(first.regions!.detail)
 })
 
-test.skipIf(!hasFfi)('a descriptor source draws its list and its detail in cells', async () => {
+test.skipIf(!canDraw)('a descriptor source draws its list and its detail in cells', async () => {
   // What `client-core/host/chrome/sourcePanel.ts` exists for. The chrome registry used to name
   // `ChromeSourcePanel` directly, which is `<main class="panes">` and DOM kit primitives all the way
   // down, so selecting a descriptor source here threw "[Reconciler] Unknown component type: main"
@@ -260,7 +260,7 @@ test('a worker that dies at module scope fails its slot rather than hanging', as
 
 // ── Reserved regions ──────────────────────────────────────────────────────────────────────────────
 
-test.skipIf(!hasFfi)('a pane that reserved a footer draws the rows delivered into it', async () => {
+test.skipIf(!canDraw)('a pane that reserved a footer draws the rows delivered into it', async () => {
   // What `client-core/host/chrome/extendedPane.ts` exists for. The frame registry wrapped a loaded
   // plugin's pane in the DOM's `ExtendedPane` — a `div` around an `aside` holding a `PanelGrid` — so a
   // pane that declared a `pane.footer` or a `pane.aside` was refused by the reconciler rather than
@@ -320,7 +320,7 @@ test.skipIf(!hasFfi)('a pane that reserved a footer draws the rows delivered int
 
 // ── Two paths, one kit ────────────────────────────────────────────────────────────────────────────
 
-test.skipIf(!hasFfi)('a tree drawn from a batch and the same tree written as JSX draw the same cells', async () => {
+test.skipIf(!canDraw)('a tree drawn from a batch and the same tree written as JSX draw the same cells', async () => {
   const { TreeHost } = await import('./TreeHost')
   const ops: TreeMutation[] = [{
     op: 'insert',

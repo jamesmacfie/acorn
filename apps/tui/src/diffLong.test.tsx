@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
 import type { Renderable } from '@opentui/core'
-import { hasFfi } from './ffi'
+import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 
 // A diff longer and wider than the column it draws in.
@@ -15,7 +15,7 @@ import { renderFixture } from './harness'
 // the gutter's last digit ran into the change marker. What came out was a smear of characters from
 // lines that are nowhere near each other (./kit/showing.tsx § Diff, ./kit/cells.tsx § Run).
 describe('a diff longer than its column', () => {
-  it.skipIf(!hasFfi)('draws one line per row, in order, with the gutter clear of the code', async () => {
+  it.skipIf(!canDraw)('draws one line per row, in order, with the gutter clear of the code', async () => {
     process.env.ACORN_FIXTURE_PATCH_LINES = '2500'
     try {
       const screen = await renderFixture({ width: 160, height: 40, pane: 'pr' })
@@ -72,7 +72,7 @@ const renderables = (root: Renderable): number => {
   return count
 }
 
-describe.skipIf(!hasFfi)('a five-thousand-line diff', () => {
+describe.skipIf(!canDraw)('a five-thousand-line diff', () => {
   it('builds a window rather than the whole patch', async () => {
     process.env.ACORN_FIXTURE_PATCH_LINES = '5000'
     try {

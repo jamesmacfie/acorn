@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CliRenderer, Renderable } from '@opentui/core'
 import { focusedKind, words, activeHints, type FocusedKind } from './chrome/bindings'
-import { hasFfi } from './ffi'
+import { canDraw } from './ffi'
 import { renderFixture, type Caret, type Screen } from './harness'
 import {
   _allStops, _columns, focusedInScope, focusedRegion, focusedRenderable, focusRenderable, onScreen,
@@ -241,7 +241,7 @@ const sweep = async (surface: Surface, size: typeof SIZES[number]): Promise<void
   }
 }
 
-describe.skipIf(!hasFfi)('every stop is reachable, and the invariants hold on the way', () => {
+describe.skipIf(!canDraw)('every stop is reachable, and the invariants hold on the way', () => {
   const cases = SIZES.flatMap((size) => SURFACES.map((surface) => [`${surface.name} at ${size.width} by ${size.height}`, surface, size] as const))
   it.each(cases)('%s', async (_name, surface, size) => {
     await sweep(surface, size)
@@ -269,7 +269,7 @@ const escapesFrom = (node: Renderable | null): number => {
   return depth
 }
 
-describe.skipIf(!hasFfi)('escape is bounded', () => {
+describe.skipIf(!canDraw)('escape is bounded', () => {
   // The screen surfaces only. Escape inside a scope closes the scope, which is the trap's own
   // contract and ../keys/keys.test.tsx's case; it is not the climb this property is about, and a
   // surface that opens a dialog would spend its first Escape closing it (./keys/trap.ts).

@@ -122,12 +122,34 @@ describe('the store is the only owner of focus', () => {
     // in the region store, a region's frame at registration and a scope's box at the push, each of
     // which is the last resort of a walk into it. Another write is a new answer to "who decides what
     // is reachable", and it belongs in the region store or nowhere.
+    //
+    // `tree/compat.ts` is the sixth and it is a node being built rather than a sixth opinion: the
+    // accessor there gives a `scrollbox` the default OpenTUI's own renderable had, and phase 4 deletes
+    // the file (docs/future/terminal-rewrite/phase-2-the-painter.md).
     expect(said(/focusable = /g)).toEqual({
       'keys/regions.ts': 2,
       'keys/stops.ts': 2,
       'kit/grouping.tsx': 1,
       'kit/rectangle.tsx': 2,
       'kit/showing.tsx': 2,
+      'tree/compat.ts': 1,
     })
+  })
+})
+
+// The new painter's own invariant: it is ours, all of it.
+//
+// The four folders are the tree Solid mutates, the Yoga pass over it, the cell buffer and the input
+// parser, and the whole point of the programme is that none of them is a wrapper around somebody
+// else's renderer. An import that crept back in would be a dependency phase 4 could not delete and a
+// runtime floor it could not lower, and it would not fail anything else: the package still has
+// `@opentui/core` in it, so the import would resolve and the tests would pass
+// (docs/future/terminal-rewrite/phase-2-the-painter.md § Done when).
+describe('the new painter is ours', () => {
+  it('reaches for nothing from @opentui anywhere under tree, layout, paint or input', () => {
+    const borrowed = ['tree', 'layout', 'paint', 'input'].flatMap((folder) => filesIn(join(ROOT, folder))
+      .filter((file) => /from '@opentui\//.test(readFileSync(file, 'utf8')))
+      .map((file) => file.slice(ROOT.length)))
+    expect(borrowed.sort()).toEqual([])
   })
 })

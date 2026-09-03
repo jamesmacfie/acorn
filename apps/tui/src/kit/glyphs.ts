@@ -8,11 +8,15 @@
 // tree, plus the handful a person reaches for first. A name that is missing is a one-line addition,
 // and a name nobody uses is a character somebody had to choose for no reader.
 //
-// **Every glyph here is one cell wide, and that is a rule rather than a coincidence.** A character
-// with `Emoji_Presentation` takes two cells in most terminals and one in the rest, so a row holding
-// one is a row whose width the layout cannot predict: eight of these used to be emoji, and they drew
-// the rail's names a cell to the right of every other row's. Before adding a name, check the mark
-// against `\p{Emoji_Presentation}` — if it matches, pick a different mark.
+// **Every glyph here is one cell wide, and that is a rule rather than a coincidence.** A row holding
+// a wide character is a row whose width the layout cannot predict: eight of these used to be emoji,
+// and they drew the rail's names a cell to the right of every other row's.
+//
+// The rule is checked rather than remembered. `../width.test.ts` § GLYPHS runs the painter's own
+// measure over every value here and insists on 1, which is what a new name is judged by. It replaced
+// a `\p{Emoji_Presentation}` test that passed all 73 names and missed six wide ones — the property a
+// character has is not the width a terminal gives it, and only the measure that lays the row out can
+// answer that.
 export const GLYPHS: Readonly<Record<string, string>> = {
   // Actions
   x: '✕',
@@ -83,7 +87,9 @@ export const GLYPHS: Readonly<Record<string, string>> = {
   'user-round': '☺',
   radio: '◉',
   label: '🏷',
-  list: '☰',
+  // `≡`, not `☰`, which Unicode 16 moved to East Asian Width `W`: two cells by the standard, one in
+  // any terminal with an older table, and therefore a width no layout can predict (../width.ts § WIDE).
+  list: '≡',
   'list-checks': '☑',
   'layout-grid': '▦',
   kanban: '▤',

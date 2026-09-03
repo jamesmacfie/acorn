@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { rgbToHex } from '@opentui/core'
 import { paletteFor, reportsTruecolor, slotColor, TERMINAL_PALETTE } from './appearance'
 import { osc52, supportsClipboard } from './kit/copy'
 
@@ -7,14 +6,14 @@ import { osc52, supportsClipboard } from './kit/copy'
 // needs a renderer, so neither is skipped on an older Node.
 
 describe('the palette', () => {
-  // The light-terminal bug, as an assertion. OpenTUI draws a colour it was not given as opaque white
-  // and reads a colour it was given by name as a CSS colour, so "leave it to the terminal" has to be
-  // said in the two colours it has for that: the default foreground, and a palette index.
+  // The light-terminal bug, as an assertion. Every slot is a question for the terminal rather than a
+  // colour of ours: the reader's own foreground, or one of their sixteen numbered slots. A hex here
+  // would be acorn's theme drawn over the one they chose (./colour.ts).
   it('asks the terminal for every slot, including the one no role names', () => {
-    expect(slotColor('default').intent).toBe('default')
-    expect(slotColor(undefined).intent).toBe('default')
+    expect(slotColor('default')).toBe('default')
+    expect(slotColor(undefined)).toBe('default')
     for (const slot of ['muted', 'accent', 'ok', 'warn', 'danger'] as const) {
-      expect(slotColor(slot).intent).toBe('indexed')
+      expect(typeof slotColor(slot)).toBe('number')
     }
   })
 
@@ -24,8 +23,8 @@ describe('the palette', () => {
 
   it('passes a theme’s hexes through where the terminal says it can take them', () => {
     const palette = paletteFor({ '--accent': '#8be9fd', '--state-ok': '#50fa7b' }, true)
-    expect(rgbToHex(palette.accent)).toBe('#8be9fd')
-    expect(rgbToHex(palette.ok)).toBe('#50fa7b')
+    expect(palette.accent).toEqual([0x8b, 0xe9, 0xfd])
+    expect(palette.ok).toEqual([0x50, 0xfa, 0x7b])
     // Untouched tokens keep the terminal's slot rather than becoming undefined.
     expect(palette.warn).toBe(TERMINAL_PALETTE.warn)
   })
