@@ -5,7 +5,7 @@ import { installPlatform } from './platform'
 import { openNode } from './node/open'
 import { installKeymap } from './keys/install'
 import { COMMAND } from './keys/tiers'
-import { openOwnSurface, type OwnRenderer } from './ownRenderer'
+import { openTerminalRenderer, type Renderer } from './renderer'
 
 // `acorn`.
 //
@@ -130,7 +130,7 @@ bootMark('App imported')
 // The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
 // The surface: the two halves composed. The terminal owns the modes and the bytes, the screen owns
 // the cells, and the screen closes first on the way out so the last frame lands while the alternate
-// screen is still ours (./input/terminal.ts § The two halves compose, ./ownRenderer.ts).
+// screen is still ours (./input/terminal.ts § The two halves compose, ./renderer.ts).
 //
 // The kitty keyboard protocol is asked for there and not assumed: a terminal that does not know the
 // request ignores it, and the mode is popped on exit either way. Not a nicety — Ctrl+Return is the
@@ -142,7 +142,7 @@ bootMark('App imported')
 //
 // Nothing here focuses anything. Focus is the region store's and the surface has no second opinion
 // about it: a click is a hit test into the store (./keys/regions.ts § Clicks are hit tests).
-const renderer: OwnRenderer = openOwnSurface()
+const renderer: Renderer = openTerminalRenderer()
 bootMark('renderer created')
 // Time to first draw: the renderer's own first `frame` event, which is the moment the first cells
 // reached the terminal with nothing drawn over them.

@@ -5,7 +5,7 @@ import { _resetNotices, pushNotice } from '@acorn/client-core/features/notificat
 import { tasksKey, type Task } from '@acorn/protocol/api.ts'
 import { createRoot, createSignal } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
+import type { KeyEvent } from '../keyEvent'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { keyedRows } from '../kit/showing'
 import { recordedRequests } from '../fixture'

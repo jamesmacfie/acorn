@@ -184,8 +184,8 @@ what a notification is. OSC 9 for iTerm2, Ghostty, WezTerm, and Warp; OSC 99 for
 rxvt; wrapped in a tmux DCS passthrough with every ESC doubled when `TMUX` is set. Title and body are
 stripped of anything that could end the sequence early. A terminal on none of those lists gets the
 BEL from `apps/tui/src/kit/bell.ts` and nothing else. Whether the terminal is the window the reader
-is looking at comes from DEC 1004, which OpenTUI reports as `FOCUS` and `BLUR` events; `apps/tui/src/main.tsx`
-feeds them to `setHostFocused`.
+is looking at comes from DEC 1004, which the input parser reports as `focus` and `blur` events;
+`apps/tui/src/main.tsx` feeds them to `setHostFocused`.
 
 ## Settings
 

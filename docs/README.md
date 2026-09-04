@@ -85,7 +85,7 @@ Five docs, and they do not overlap. Start at the map.
 | [testing.md](./testing.md) | Where tests live, the tiers, the testkit, and the manual smoke checklist. |
 | [performance.md](./performance.md) | The record of the performance programme: what was decided about the shape of the system, what was refused and on what exit condition, and every number it measured. |
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
-| [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, and its chrome. |
+| [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 

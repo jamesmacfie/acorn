@@ -330,9 +330,13 @@ over a byte ceiling, and on a **chunk name**.
 - **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
   That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
   analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything
-  in it is evaluated before the first cell is drawn. The ceiling is 1,060,000 B. The walk is a regex
-  over import edges rather than a real module graph, so it is approximate on purpose — it exists to
-  catch a 300 KB regression, not to be exact.
+  in it is evaluated before the first cell is drawn. The ceiling is 995,000 B, which is the measured
+  closure rounded up by about 3%, and it went up rather than down when the client took over its own
+  painting: what used to be a 6 MB native library outside the bundle is about 98 KB inside it
+  ([tui.md](./tui.md) § How a frame is drawn). Dropping a dependency moves this number by nothing —
+  every bare import is left to the runtime, so a package that is only ever imported weighs nothing
+  here. The walk is a regex over import edges rather than a real module graph, so it is approximate
+  on purpose — it exists to catch a 300 KB regression, not to be exact.
 
 **Why a name test as well as a byte total.** Between 2026-08-31 and 2026-09-02 the renderer's total
 drifted from 1,317,605 B to 1,329,679 B across 31 unrelated commits while staying red, so nobody read

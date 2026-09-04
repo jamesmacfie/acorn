@@ -14,8 +14,11 @@ Three docs have "terminal" in the name. This one is acorn running in a terminal.
 between you and it. [managed-agents.md](./managed-agents.md) is the other way to run the same
 providers, driven over a protocol with a ledger.
 
-The design record is in git: `docs/future/terminal/`, nine phases between 2026-08-30 and 2026-08-31,
-deleted once it shipped. Find it with `git log --follow -- docs/future/terminal/README.md`.
+Two design records are in git rather than in the tree, and comments in `apps/tui` cite both:
+`docs/future/terminal/`, nine phases between 2026-08-30 and 2026-08-31, which is how this client came
+to exist; and `docs/future/terminal-rewrite/`, five phases on 2026-09-03 and 2026-09-04, which is how
+it came to draw its own cells. Each was deleted the day it shipped. Find one with
+`git log --follow -- docs/future/terminal/README.md`, and the same for the other.
 
 ## What it is, in one screen
 
@@ -33,18 +36,13 @@ and `capture -- notes` picks a pane by name.
 
 ## The runtime floor
 
-OpenTUI reaches its Zig render core over `node:ffi`, which is a Node 26.4 builtin behind
-`--experimental-ffi`. So `acorn` needs **Node 26.4 or later, started with `--experimental-ffi`**, and
-`apps/tui/src/main.tsx` checks the version itself rather than letting the loader fail with a stack
-trace from inside a chunk. It is not an `engines` floor on the package: the repo builds and lints this
-one on whatever Node it already has, and only running it needs 26.4.
+The floor is the repo's. `node-runtime.json` holds the pin and the range every package here builds,
+lints and runs on, `apps/tui/package.json` declares that same range in its `engines`, and `acorn`
+needs no flag: the painter is this package's own TypeScript and Yoga arrives as WebAssembly, so
+drawing reaches no native library at all.
 
-Two consequences. The `tui` test suite skips every case that draws where there is no FFI, which is
-what keeps an older Node reporting a skip rather than failing a suite for a reason unrelated to the
-change under test ([testing.md](./testing.md) § Test layers). And bundling a Node runtime stops being
-the last step of shipping a tarball and becomes a precondition of one carrying `acorn` at all, because
-26.4 with an experimental flag is not something to expect on a server
-([future/bundle.md](./future/bundle.md)).
+So the whole suite draws on the Node the repo already has, with no skips and no second runtime to
+bundle ([testing.md](./testing.md) § Test layers, [future/bundle.md](./future/bundle.md)).
 
 ## The process model
 
@@ -185,9 +183,9 @@ all, which a pane needs before it can draw at all.
 
 ## The host switch
 
-Seven aliases in `apps/tui/vite.config.ts`, mirrored in the package's `tsconfig.json` paths. Both, or
-tsc and the bundle disagree and nothing says so. That is the whole of what makes a compiled pane draw
-in cells:
+An alias list in `apps/tui/vite.config.ts`, and the entries tsc also has to know about mirrored in
+the package's `tsconfig.json` paths. Both, or tsc and the bundle disagree and nothing says so. That
+is the whole of what makes a compiled pane draw in cells:
 
 - `@acorn/plugin-api/ui` resolves to `apps/tui/src/kit/ui.ts`, this package's kit. A pane imports the
   kit through that facade and nothing else.
@@ -209,10 +207,18 @@ in cells:
   See The router below for what stands in its place.
 - `solid-js` points at the client build, because Solid's `node` export condition is its server
   renderer and has no reactivity.
-- `@opentui/solid` resolves to `src/kit/reconciler.ts`, which is the package re-exported with two
-  things replaced: `insert`, and `createElement`. The transform emits its calls by module name, so
-  this is the only place that sits in front of every one of them. See Loose text under a box for the
-  first and Destroy on disposal for the second, and why both are here rather than in each component.
+- **Three stubs answer packages this host does not install.** CodeMirror's grammars and
+  highlight-style half, browser xterm and its two addons, and shiki are each reached only from a DOM
+  surface that cannot draw in cells, so `apps/tui/src/kit/codemirrorGrammars.ts`,
+  `apps/tui/src/kit/xterm.ts` and `apps/tui/src/kit/shiki.ts` stand in front of their specifiers.
+  Every export throws and names the host, because a stub that answers plausibly is how this bundle
+  once carried seventeen CodeMirror grammars it could never highlight. Each is a pattern rather than
+  a line per package, so a language added to client-core does not become a package this host has to
+  install again — and the names still have to exist, because the build links a named import against
+  the stub and would rather say so than wait for a reader. Two specifiers are deliberately left
+  alone: `@xterm/headless`, which is the `pty` rectangle's own emulator, and `@codemirror/language`,
+  which `codemirror` itself depends on and the `editor` pane really does import. A stub may only
+  stand in front of a specifier no working surface reaches.
 - `lucide-static/icon-nodes.json` resolves to an empty table. It is 706 KB of SVG path data and there
   is no SVG here: `Icon` on this host is a lookup from a Lucide name to one character, and the DOM
   component that reads the table is in the graph because client-core's components have to resolve,
@@ -227,14 +233,81 @@ in cells:
   went off when somebody opened Linear. If another arrives, alias it or inline it; there is no third
   answer, and `apps/tui/dist` can be grepped for `from "….json"` to find one.
 
-Beside the aliases, two build facts. `vite-plugin-solid`'s `generate: 'universal'` sends JSX to
-OpenTUI's reconciler instead of to the DOM. And `__ACORN_HOST__` is `'tui'`, which is what `Only` and
-`Fallback` read and the only thing in the kit that asks which host it is on
-([ui-design.md](./ui-design.md) § The closed kit).
+Beside the aliases, two build facts. `vite-plugin-solid`'s `generate: 'universal'` sends JSX to the
+module named in `moduleName` instead of to the DOM, and that name is `apps/tui/src/tree/renderer.ts`
+spelled as its own path rather than as a bare specifier with an alias behind it — one place to look
+rather than two. And `__ACORN_HOST__` is `'tui'`, which is what `Only` and `Fallback` read and the
+only thing in the kit that asks which host it is on ([ui-design.md](./ui-design.md) § The closed kit).
+
+`apps/tui/src/tree/renderer.ts` is the whole of what Solid drives: the ten node operations
+`solid-js/universal` asks for — `createElement`, `createTextNode`, `replaceText`, `setProperty`,
+`insertNode`, `removeNode`, `isTextNode`, `getParentNode`, `getFirstChild`, `getNextSibling` — over
+the plain objects in `apps/tui/src/tree/node.ts`, plus the `render` and `Dynamic` a Solid host has to
+export. Every JSX call in the process lands there, client-core's and a sandboxed plugin's included,
+which is why the two rules this host used to need are absences rather than code (§ Rendering).
 
 Anything touching Solid's reactive graph is bundled rather than left to Node, so there is exactly one
 copy of it. A second copy is a second graph and a second set of contexts, and it fails as "No renderer
 found" from inside a component that is plainly under the provider.
+
+## How a frame is drawn
+
+Four folders under `apps/tui/src/` draw a frame and a fifth answers the keyboard. Nothing above them
+knows they exist: client-core, the kit, the layouts and the chrome write JSX and are told nothing.
+
+```text
+Solid components                                        unchanged
+        │  JSX compiled with generate: 'universal', moduleName → tree/renderer.ts
+        ▼
+Node tree: plain objects        tree/       what Solid creates, patches and moves
+        │  a frame, when the tree changed
+        ▼
+Layout: yoga-layout (wasm)      layout/     one Yoga node per tree node, rectangles clamped here
+        ▼
+Paint: a cell buffer            paint/      tree → cells, diff against the last frame, flush
+        ▼
+Terminal (stdout)               synchronized output, 16 slots or truecolor
+
+Terminal (stdin)
+        ▼
+Input parser                    input/      bytes → key, mouse, focus, paste, resize
+        ▼
+One dispatcher                  keys/       tiers → layers → the focused stop, or the typing target
+        ▼
+Region store owns focus         keys/regions.ts     a value, not a property on a node
+```
+
+**The tree.** A node is a `kind`, a props bag, a parent, an ordered children array, a Yoga handle and
+the rectangle the last layout gave it. Nothing else: no methods that do anything, no events, no
+`destroy`, no focus. The invariant is that the tree is the only retained UI state and only Solid
+writes it. Paint reads it, and the only other readers of a rectangle are the two that legitimately
+want last frame's size — a layout's own breakpoint, and a `pty` rectangle's `size()`.
+
+**Layout.** `yoga-layout`'s WebAssembly build, loaded once at boot; one Yoga node made in
+`createElement` and freed when the owner that created it is disposed, which is what keeps a
+`Suspense` from freeing a handle it is about to hand back. `visible={false}` is `DISPLAY_NONE`, so a
+hidden subtree costs no layout and no paint. Each frame lays the root out at the terminal's size and
+reads the four computed numbers back into every node. The invariant is four finite integers, of
+which the width and the height are never negative (§ Rendering).
+
+**Paint.** A buffer of `cols × rows` cells, each a grapheme, a foreground, a background and an
+attribute bitmask. Paint walks the tree depth first inside each node's clip rectangle, the previous
+frame's buffer is kept, and the flush emits a cursor move and the changed run for every run that
+differs, wrapped in `CSI ? 2026 h` and `CSI ? 2026 l` so the emulator applies the frame in one go. A
+frame is asked for by an operation on the tree and coalesced to one per turn of the event loop, so a
+screen nobody is touching costs nothing. Width is `Intl.Segmenter` for the cluster boundaries and a
+table of the East Asian Width `W` and `F` ranges for how wide each cluster is, with an ASCII branch
+in front of it (`apps/tui/src/width.ts`); every colour is a slot or, where `COLORTERM` says the
+terminal takes it, a 24-bit value. The invariant is that the buffer after a frame is a pure function
+of the tree, the rectangles, the focus value and the emulators' own buffers — which is what lets the
+harness render the same buffer with no terminal behind it (§ Tests).
+
+**Input.** A parser over stdin bytes: a key with a name, modifiers, text and press or release; a
+mouse event; a focus in or out; a paste; a resize from `SIGWINCH`. It asks for the kitty keyboard
+protocol on the way in and pops it on the way out, and a terminal that ignores the request gets the
+legacy parse — CSI sequences, SS3, the escape timeout for a lone Escape. The invariant is one
+`KeyEvent` shape, ours, read by the keymap host, the footer, the `pty` rectangle's encoder and both
+harnesses (`apps/tui/src/keyEvent.ts`). The engine is generic over it and never constructs one.
 
 ## Rendering
 
@@ -251,8 +324,9 @@ in the eager graph at all, because `src/plugins/RemoteTree.tsx` is lazy, and the
 `src/kit/showing.tsx` with the cheap ones, so a loader would cost a frame of blank and save no bytes.
 The DOM host's table does hold loaders, because its copy is fetched on every cold window
 ([plugins.md](./plugins.md) § The tree contract). `TreeHost` draws each root under a `Suspense` with a
-`null` fallback either way, which is safe here only because § Destroy on disposal ties a node's
-destruction to its creating owner rather than to being detached. A node cannot be added with a sentence and no component, or a component
+`null` fallback either way, which is safe here because a node that leaves the tree is unlinked and
+kept rather than destroyed, so a boundary that suspends twice gets the same objects back
+(§ How a frame is drawn). A node cannot be added with a sentence and no component, or a component
 and no sentence. Five prop types are the DOM kit's, imported as types rather than rewritten:
 `ButtonProps`, `InputProps`, `SelectProps`, `PickerProps` and `MentionTextareaProps`. Four of the
 hand-written copies had quietly lost a prop by the time anything compiled both sets together.
@@ -265,7 +339,7 @@ DOM is focusable, draws a ring, and raises a click on Enter; a cell renderable d
 of the click the pointer model allows, the store's hit test being the focus half. Its companion `stop(options)` returns the `ref` a component hands its
 box and a `focused()` accessor, because a `ref` callback cannot return a signal. The layer sits at
 priority 42, above a collection's 40: both layers match when focus is on a control inside a row, and
-at equal priority `@opentui/keymap` falls back to registration order, which is the reconciler's
+at equal priority `@opentui/keymap` falls back to registration order, which is the engine's own
 business and not something to depend on. The number between them is the typing shadow
 (§ The five key groups).
 
@@ -277,49 +351,58 @@ reads characters cannot see focus at all.
 
 Colour comes from `apps/tui/src/appearance.ts`, which collapses a theme's forty-odd tokens to the
 terminal's 16 slots plus `dim` and `bold`. `roleCell()` is `roleVar()`'s sibling and returns the
-OpenTUI style fragment for a role value, with `ignored` returning nothing. A theme picked in the app
-does not reach this host: a theme in acorn is an id whose tokens live in a `:root[data-theme=…]` block
-in a stylesheet, and publishing those as data is the appearance layer's change rather than the
-terminal's. The default was always the terminal's own palette.
+cell style for a role value — a colour and an attribute bitmask — with `ignored` returning nothing.
+A theme picked in the app does not reach this host: a theme in acorn is an id whose tokens live in a
+`:root[data-theme=…]` block in a stylesheet, and publishing those as data is the appearance layer's
+change rather than the terminal's. The default was always the terminal's own palette.
 
 The seven layout components are `apps/tui/src/layouts/`, reaching the pane registry through
 `client-core/src/host/layouts/table.ts`, which is host-supplied for the same reason the component
 table is.
 
-One guard sat over the renderer, in `apps/tui/src/renderGuard.ts` — deleted by the terminal rewrite,
-and in the git history — installed beside it in `main.tsx` and in the test harness. OpenTUI reads a node's size straight from yoga, and a node that joins the tree
-after a frame's layout pass has no measured size: the width comes back `NaN` and the frame hands it to
-the Zig side, which takes a `u32` and throws "Argument 3 must be a uint32" from inside the render loop.
-That ends the process. It lasts one frame and hits any node with a border or a hit box, so no single
-node can own the fix — `list-detail` mounts its divider when the list region arrives, and a `Card`
-mounts on every turn of the agents transcript, which is how switching to a workspace whose task opens
-that pane killed `acorn`. The guard clamps an unmeasured size to one cell, and goes the day OpenTUI
-clamps its own.
+A node's size is clamped where it is read back, in `apps/tui/src/layout/pass.ts`, and one function
+reads it. Yoga answers `getComputedWidth` on a node it has never measured with `NaN`, and a node that
+joins the tree after a frame's layout pass is exactly that for one frame — `list-detail` mounts its
+divider when the list region arrives, and a `Card` mounts on every turn of the agents transcript. So
+the read-back takes `NaN` to nought rather than to a cell: a zero rectangle paints nothing, which is
+the honest answer for a box nobody has measured, and the next frame has the real size. `NaN` is the
+marker and zero is not, because an empty auto-sized box and a hidden subtree both lay out at zero
+legitimately, so only `Number.isFinite` can ask the question.
 
-The clamp lands before a resize handler runs, not after, because `updateFromLayout` calls that handler
-while the raw yoga numbers are still stored on the node. `ScrollBox` reads its own height there to size
-its bar, and one `NaN` reading is permanent: its scroll position clamps itself through `Math.max(0, x)`,
-which keeps returning `NaN`, so the content node's translate never recovers and the whole subtree draws
-at the wrong screen position. A scrollbox beside a region that measures its own box, which is what
-`Sections` does at 120 cells, drew its column's content off screen for good.
+A left or a top may be negative and stays that way. An overflowing child under `alignItems: center`
+reports a left of -15, and moving that run to column nought would put it where it does not belong —
+clipping it is paint's job. So the rule is four finite integers, of which the width and the height
+are the two that cannot be below zero.
 
-Nothing may write to stderr while the renderer owns the terminal, because stderr is the file it draws
-on and a stray line leaves the shell reading as garbage until the next full repaint. OpenTUI's own
-console is deactivated for the overlay it pops, and `main.tsx` holds Node's process warnings in a set
-and prints them after `renderer.destroy()` hands the terminal back. One warning this host provokes is
-worth naming rather than holding: every live `scrollbox` subscribes to the renderer's `selection`
-event, and a pull request draws well past Node's default ten listeners, so `RENDERER_LISTENER_CAP`
-raises that ceiling. `ScrollBox.destroySelf` unsubscribes, so the count is a count and not a leak, and
-the cap is raised rather than removed so a real runaway still trips it.
+Nothing may write to stderr while the renderer owns the terminal, because it is the same terminal:
+paint writes cells to stdout and nothing else, and a stray line on stderr leaves the shell reading as
+garbage until the next full repaint. `main.tsx` holds Node's process warnings in a set and prints
+them after the screen is closed and the terminal handed back, beside the boot account and a started
+node's own held stderr. Nothing captures `console`, so a stray log from a library still lands in the
+middle of a frame and stays there until the cells under it change. Node's warnings are the ones this
+host actually provokes, which is why they are the ones held.
+
+Two rules this host used to have are gone, and both are worth knowing because they were crashes
+rather than style. `<Stack>{count()}</Stack>` needed a wrapping `text` node — a bare string under a
+box was refused from inside a signal write, which aborted the whole update pass and left the screen
+not following anything — and paint now draws a text node under a box as a one-line run, so the shape
+is only a shape. And a node used to be destroyed a tick after it left the tree, which blanked every
+`Suspense` boundary that suspended twice; `removeNode` unlinks the object and keeps it, so there is
+nothing to be already destroyed.
 
 ### Rectangles
 
 `Rectangle` is the kit's one admission that a pane needs pixels, and it has four kinds. On this host:
 
 - **`pty` is native.** `attachPty(handle, io)` on `@acorn/plugin-api/ui` takes the channel — open at a
-  size, bytes in, bytes out — and the host draws the emulator: an xterm on the DOM, OpenTUI's in
-  cells. The caller's source is the same file either way, which is what let Docker's exec panel and
-  the editor's `$EDITOR` window cross at about fifteen lines each. The terminal plugin's own drawer
+  size, bytes in, bytes out — and the host draws the emulator: an xterm on the DOM, `@xterm/headless`
+  in cells. Three other packages here already depend on it and the desktop parses the same PTY with
+  the same parser, so a program's output reads the same on both hosts. The one thing headless xterm
+  has no notion of is a keyboard, so `apps/tui/src/kit/ptyKeys.ts` is the encoder: our `KeyEvent` to
+  the bytes a terminal sends, reading application cursor mode and bracketed paste off the emulator's
+  own `modes` at the moment a key arrives rather than remembering them. The caller's source is the
+  same file either way, which is what let Docker's exec panel and the editor's `$EDITOR` window cross
+  at about fifteen lines each. The terminal plugin's own drawer
   surface keeps its xterm, because its options are a theme, a font size, a WebGL renderer and a
   Shift+Enter rule, none of which means anything in cells ([terminal.md](./terminal.md) § Client).
   The bytes reach the rectangle as bytes: `term:out` is the one channel on the node's socket that is a
@@ -338,79 +421,6 @@ the cap is raised rather than removed so a real runaway still trips it.
 `Rectangle` itself is `absent` in the support matrix, because this host recognises the kind and draws
 natively rather than handing an element back. The `rectangle` extension kind — a sibling region an
 iframe fills — is absent entirely.
-
-### Loose text under a box
-
-A run of text must have a `text` parent here, and on the DOM a bare string anywhere is a text node
-nobody thinks about. It is the one structural difference between the hosts, and it belongs to the host
-rather than to the caller: `<Stack>{count()}</Stack>` is correct kit, and a plugin has no way to know
-which of its two readers will refuse it.
-
-**`apps/tui/src/kit/reconciler.ts` answered it once**, for everything — deleted by the terminal
-rewrite, and in the git history. It was `@opentui/solid` re-exported with `insert` replaced, aliased into the Solid transform's `moduleName` so every JSX call
-in the process passes through it, and it wraps a bare string or number in a `text` when the parent is
-a box. An empty string becomes nothing, which is what the DOM draws for one.
-
-It was not always one place. `cells.tsx` answers the same question three times — `flatten` for a node
-that draws a line, `hasNode` to ask which it is, `slot` for a child that lands in a box — and each of
-the seventy-six kit nodes had to reach for the right one. That is a convention, not a guarantee, and
-four crashes in one week came through the gaps in it, wearing four different values: a count beside an
-icon, a pending `lazy()` resolving to `""`, a remote tree's text node, a plugin's own row. None of the
-three helpers covered the chrome, the layouts, the tree host, or a plugin's tree, none of which are
-kit.
-
-The failure mode is what made it worth fixing at the boundary rather than per node. The refusal comes
-out of `insertNode` deep inside a signal write, and an exception there aborts the whole update pass —
-so every other reader of that signal is left un-notified, the screen stops following, and nothing says
-why. One bad child read as "the router does not work" for an afternoon.
-
-Two notes on the seam. `insert` and not `insertNode`, because OpenTUI builds its renderer from a
-node-ops object and exports neither it nor `createRenderer`, so the function that throws cannot be
-replaced — but everything reaches it through `insert`, which is exported. And the wrap follows nested
-accessors, because a value can arrive from deeper than the first read: a `lazy()` is a memo inside the
-memo `insert` was handed.
-
-The three helpers stay. They are how a node says what a run of text *means* — its role and its tone —
-and the reconciler only says where it may live. A `Suspense` round a `lazy()` stays too, for the same
-reason: it decides what shows while a chunk loads, which is a question the reconciler does not answer.
-
-**What this does not forgive.** A component type this host has no renderable for. `<main>` from a DOM
-component is still "Unknown component type", and it should be: that is a surface on the wrong host,
-not a shape the DOM absorbs.
-
-### Destroy on disposal
-
-The reconciler's second replacement, and the worse of the two bugs it ends. OpenTUI destroys a
-renderable one `process.nextTick` after it leaves the tree, and that tick always runs before any
-promise settles. Solid's `Suspense` removes its children when it suspends and hands the *same
-instances* back when it resolves — its children memo is created once, which is the whole reason
-suspending is cheap on the DOM. Put the two together and any boundary that has shown content and then
-suspends again is gone for good: children removed, destroyed a tick later, refused on the way back in
-("was already destroyed, skipping add"), and the panel is blank until the process exits. Reading an
-uncached query's `data` is a suspension — even a disabled query suspends for one microtask, and one
-microtask loses to the tick — so the shapes that hit it were the ordinary ones: the caret landing on a
-pull whose detail had not loaded, a browse window sliding onto rows whose queries had not run.
-
-**The fix is that removal no longer decides destruction; disposal does.** `createElement` ties every
-node it makes to the reactive owner that made it. Detached with a live owner means a `Suspense` may
-hand the node back, so it is kept. Owner disposed — a `For` row dropped, a `Show` flipped, a route
-change — destroys on the next tick if the node is still detached. Attached teardown (the renderer
-destroying its tree child-first) still destroys promptly. This is what the DOM gives Solid for free —
-removal detaches, garbage collection destroys — restated in a runtime with explicit destruction. A
-node created outside any owner keeps OpenTUI's prompt destroy.
-
-The test that pins it is `apps/tui/src/browseSlow.test.tsx`, and its fixture knob matters as much as
-the assertion: a transport that answers in a microtask can never hold a `Suspense` open across the
-destroying tick, so the zero-latency fixture passed every browse test while the app drew blank
-panels. `ACORN_FIXTURE_DELAY_MS` is how a test reaches the shape the app lives in. The same change
-retired the liveness guards that grew around the symptom — a destroyed edit buffer read from a live
-effect cannot happen any more, because an owner's effects are disposed before its nodes are
-destroyed. The override matches `@opentui/solid`'s 0.5.9 lifecycle, so an OpenTUI upgrade must run
-`browseSlow.test.tsx` before removing or changing it.
-
-One residue on purpose: `main.tsx` deactivates OpenTUI's console overlay the way the harness always
-has, because a single stray library warning drawing over the frame reads as the whole app failing,
-and the terminal's scrollback after quit is where a log line belongs.
 
 ### Unknown nodes and failed trees
 
@@ -479,13 +489,17 @@ mechanism.
 
 `apps/tui/src/keys/install.ts` builds the engine from `apps/tui/src/keys/keymapHost.ts`, this
 package's own `KeymapHost`, where the DOM host builds `createDefaultHtmlKeymap(root)` from the
-package's own adapter. Eleven of the host's thirteen members are `@opentui/keymap`'s OpenTUI adapter,
-delegated to unchanged, and two are ours: `getFocusedTarget` returns the region store's focused node,
-and `onFocusChange` subscribes to the store. That is the whole of the difference and it is the
-difference that matters — the package's adapter answers `getFocusedTarget` with whichever renderable
-the renderer has focused, so a layer bound to the node the *store* said had the keys did not fire
-while the renderer disagreed, and that disagreement is what the navigation fixes in this client's
-history were about (§ Focus regions).
+package's own adapter. All thirteen of its members are ours, answered over the node tree and the
+region store: the tree walk is a node's `parent`, the key stream is an emitter the input parser
+pushes onto, and `getFocusedTarget` and `onFocusChange` are the store's one focus value and the
+signal behind it. Three are absences rather than stubs — a node is never destroyed, so
+`isTargetDestroyed` is false and `onTargetDestroy` never fires, and there is no raw-input pipe to
+prepend to because bytes become events before they arrive.
+
+The engine is what stays, and that is the point of the split: it is pure TypeScript, the desktop
+drives the same one through `client-core/kit/keys/keymapHost.ts`, and both hosts on one engine is
+how the two adapters cannot drift. What a host owns is the thirteen answers, and the one that
+matters is where focus comes from (§ Focus regions).
 
 `client-core/kit/keys/keymapHost.ts` holds the engine at the widest type pair the engine allows and
 hands each host's pair back at the one call that reads it, rather than being generic over a pair
@@ -497,8 +511,9 @@ Chords are spelled with `ctrl` here. The engine reports the platform's primary m
 macOS is `super`, and a terminal emulator keeps Cmd for itself and never delivers it, so `commit` was
 a chord nobody could press. `setKeymap` takes a `primary` and this host passes `ctrl`.
 
-Spelling it `ctrl+return` is half the answer, and `main.tsx` asks the terminal for the other half:
-`createCliRenderer({ useKittyKeyboard: { disambiguate: true } })`. A legacy terminal sends one byte,
+Spelling it `ctrl+return` is half the answer, and `apps/tui/src/input/terminal.ts` asks the terminal
+for the other half in its enter sequence, along with the alternate screen, raw mode, SGR mouse
+reporting, DEC 1004 focus reporting and bracketed paste. A legacy terminal sends one byte,
 `\r`, for Return with Ctrl held and Return without it, so `commit` does not reach the engine as a chord
 at all. The `disambiguate` flag of the kitty keyboard protocol is what makes the two distinguishable,
 and it settles a lone Escape the same way, which the parser otherwise has to wait out. A terminal that
@@ -552,16 +567,13 @@ scope, not a swallow (§ Traps) — with one difference: a scope is pushed by th
 the shadow follows the region store's focus signal, because "is the focused thing a field" is a fact
 about focus and the store is the only truth about that (§ Focus regions).
 
-The key still has to reach the field, and the dispatcher hands it over rather than leaving that to the
-renderer. `Renderable.focus` installs a handler that calls the renderable's own `handleKeyPress`, and
-the renderer runs those after every ordinary listener and only while nothing has called
-`preventDefault` — so typing used to work because the renderer happened to have focused the same
-field. `apps/tui/src/keys/install.ts` § typeInto is one ordinary listener after the engine's: where no
-binding claimed the key and the store's focused node is a field, it calls `handleKeyPress` itself and
-then claims the key, so the renderer's own route cannot type it a second time. An OpenTUI edit
-buffer's `handleKeyPress` reads the key and its own suspend trait and nothing else, which is what
-makes the hand-off possible, and `apps/tui/src/kit/kit.test.tsx` types into a field with the
-renderer's caret on another renderable to keep it that way.
+The key still has to reach the field, and the dispatcher hands it over rather than leaving it to
+anything under the dispatcher. `apps/tui/src/keys/install.ts` § typeInto is one ordinary listener
+after the engine's: where no binding claimed the key and the store's focused node is a field, it
+calls that node's own `handleKeyPress` and then claims the key. A field installs `handleKeyPress` on
+its node from its own `ref` (`apps/tui/src/kit/asking.tsx`), and the edit model behind it reads the
+key and nothing else — no focus of its own to check, which is what makes the hand-off possible at
+all.
 
 The reason it is a layer is a number. `@opentui/keymap` 0.5.9 caches the answer to "what is live right
 now" only while no registered layer, command or binding carries a runtime matcher, and the counter is
@@ -600,16 +612,16 @@ its regions rather than from `compareDocumentPosition`. **Focus is a value the s
 nothing else has an opinion about it.** One signal says which renderable has the keys, one function
 writes it — which region that puts them in and what the region should remember are written in the
 same place — and everything that moves the keys goes through `focusRenderable`, which decides and
-reports whether they went. It used to be the other way round: focus was OpenTUI's and the store a
-view of the renderer's `focused_renderable` event, so in the gap between the renderer moving focus on
-its own and the view catching up the two disagreed. A lit border with dead arrows was that gap, and
-about 40% of this client's commits were repairs of it.
+reports whether they went. Nothing under the store holds focus of its own: a node's `focus` and
+`blur` are no-ops kept as a one-way mirror in `paintCaret`, and `apps/tui/src/invariants.test.ts`
+counts the calls — one `focus`, one `blur`, both in that mirror, and no source file outside a test
+asks anything but the store where the keys are. That is worth a rule rather than a habit. A second
+owner of focus is a lit border with dead arrows every time the two disagree, and the disagreement is
+invisible: the renderable is drawn as focused and the layer bound to it never fires.
 
-One thing still goes out to the renderer and it is paint rather than focus. `EditBufferRenderable`
-draws no caret unless the renderer has focused it, so the store mirrors its own answer with one
-`renderable.focus()` in `paintCaret` and never reads it back. `apps/tui/src/invariants.test.ts` counts
-the calls: one `focus`, one `blur`, both in that mirror, and no source file outside a test asks the
-renderer which renderable has the keys.
+The caret is drawn from the same value. A field asks the store whether it has the keys and writes the
+answer into its own props, where paint reads it, so there is no focus state anywhere for the store to
+be out of step with.
 
 The mouse is a hit test rather than a focus event. The renderer resolves which renderable a left click
 landed on and bubbles it up to the root; the store walks up from there to the nearest thing that could
@@ -620,7 +632,7 @@ focusable ancestor itself, which is a second opinion about focus for exactly the
 for.
 
 Entering a region lands on its first parent stop, else its first collection row, else its first stop,
-else the region's own frame, walking OpenTUI's retained tree depth first. The middle step is this
+else the region's own frame, walking the node tree depth first. The middle step is this
 host's own: on the desktop a reader arrives with a pointer and clicks what they meant, and here the
 first thing focused is the thing the bare keys drive, so landing in a filter box would mean `j` types
 a `j`. A landing on the frame is never remembered — the list that arrives a moment later is what the
@@ -679,16 +691,16 @@ frame, while Solid commits synchronously and every renderable of the current ren
 of the current task. `apps/tui/src/invariants.test.ts` holds the folder to one `queueMicrotask` and
 the kit to none.
 
-A tree to read is the whole of what the microtask buys. It orders nothing against the reconciler's
-`process.nextTick` destruction, which exists for `Suspense` (§ Destroy on disposal) and is no longer
-load-bearing for focus: a scope popping takes the keys out of the box that is going rather than
-waiting to be told, and nothing in the pass depends on a node that has been disposed still reporting
-itself live.
+A tree to read is the whole of what the microtask buys, and there is nothing left for it to be
+ordered against. A node is never destroyed, so the pass's only question about the node it holds is
+whether that node is still in the tree and still on screen, which is a walk up the parents at the
+moment it asks. A scope popping takes the keys out of the box that is going rather than waiting to be
+told.
 
 **One question.** Can the renderable that has the keys still hold them, and is it the real thing
 rather than a stand-in? Holding them means alive, visible, visible all the way up to the root, still
 `focusable`, and inside the top scope. The walk up the parents is the half that matters, because
-OpenTUI's `visible` is per node: the shell hides the main row behind an overlay and a `TabPanel`
+`visible` is per node: the shell hides the main row behind an overlay and a `TabPanel`
 hides the tab that is not showing, and a focused descendant of either goes on saying it is visible. A
 stand-in is a region's own frame while that region has an entry stop, or a collection's container
 while that collection has a live active row. Both are `focusable` so that they can hold the keys when
@@ -796,9 +808,12 @@ what eight of the nine plugin lists used to do. A region body that can grow past
 `apps/tui/src` allowed to spell the clip. `apps/tui/src/invariants.test.ts` greps for that, because a
 clip reviews well.
 
-`apps/tui/src/kit/scrolling.tsx` is the non-virtual viewport seam. It draws a constrained OpenTUI
-`scrollbox`, which owns the vertical offset, visible scrollbar, wheel/trackpad acceleration and
-clamping. Panels opt into it for document/detail bodies; hidden tab panels keep their own offsets.
+`apps/tui/src/kit/scrolling.tsx` is the non-virtual viewport seam, and the component owns the
+scrolling: the vertical offset, the visible scrollbar, wheel and trackpad acceleration, and the
+clamp are all in that file, and the node carries the offset as a prop that paint translates its
+children by. The `Viewport` type it exports is what the rest of the app asks of a viewport — the key
+tables, the store's reveal and `DiffPane` reach one through that shape rather than through whatever
+drew it. Panels opt into it for document/detail bodies; hidden tab panels keep their own offsets.
 The viewport itself is the fallback focus stop for a document with no controls. When it contains a
 row, textarea, rectangle or other real stop, it is transparent to focus and a focused child is
 revealed through every scrollbox ancestor with `scrollChildIntoView`.
@@ -812,24 +827,21 @@ scrolls instead. This is in the shared `collectionIntents.ts`, so the desktop ke
 PageDown on the last row of a list stops. The arrows still wrap, because a list you cannot fall off
 the end of is a list you never have to look at.
 
-The reveal runs twice. Once synchronously on every focus move, and once more on the renderer's next
-`frame` event, from the one renderer listener `apps/tui/src/keys/regions.ts` installs beside its click
-hit test. The second one exists because `scrollChildIntoView` compares a child's laid-out `y` against
-its viewport's, and `Renderable.y` is whatever the last completed layout pass left there: for a row
-that did not exist in the previous frame the first reveal reads stale or zero geometry, scrolls by
-the wrong delta, and nothing corrects it. A reader meets that three ways, and all three are common:
-a region entered on a freshly mounted list, a refetch replacing a row by identity, and a virtual
-window shift. It is not a landing rule and decides nothing about where the keys go; it only makes the
-viewport show where they already are.
+The reveal runs once, on the renderer's `frame` event, from the one renderer listener
+`apps/tui/src/keys/regions.ts` installs beside its click hit test. It waits because
+`scrollChildIntoView` compares a child's laid-out `y` against its viewport's, and a node's rectangle
+is whatever the last layout pass left there: for a row that did not exist in the previous frame a
+reveal taken at the moment focus moved reads stale or zero geometry, scrolls by the wrong delta, and
+nothing corrects it. A reader meets that three ways and all three are common — a region entered on a
+freshly mounted list, a refetch replacing a row by identity, and a virtual window shift. A frame here
+is layout and then paint in one function, so the geometry the reveal reads is the geometry the reader
+is about to see. It is not a landing rule and decides nothing about where the keys go; it only makes
+the viewport show where they already are, and
+`apps/tui/src/kit/scrolling.test.tsx § reveals the caret in a list that has only just mounted` is
+what pins it.
 
-Phase 1 of the terminal rewrite meant to delete the second half and let the landing pass do the
-revealing, on the grounds that the pass runs after Solid has committed. It cannot: the pass is a
-microtask, so it runs before the next layout and reads the same stale geometry the first reveal did,
-and `apps/tui/src/kit/scrolling.test.tsx § reveals the caret in a list that has only just mounted`
-fails without it. It stays for as long as this renderer draws. Under the painter phase 3 of that
-programme built there is one reveal, on the frame event, because a frame there is layout and then
-paint in one function and the geometry the reveal reads is the geometry the reader is about to see
-(docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md).
+One listener for the whole store rather than one per viewport. A pull request draws enough viewports
+that one listener each is a crowd, and they would all be doing the work this does once.
 
 Arrows move and page keys scroll, which is the one sentence the footer has to be able to say
 everywhere. Arrow keys and `j`/`k` scroll a viewport only while the viewport itself has the keys, and
@@ -842,19 +854,21 @@ two stops is not a place the keys can be.
 
 The diff pane is the third shape, and it is a viewport with a window inside it. `DiffPane` in
 `apps/tui/src/kit/showing.tsx` used to build one `<text>` per line of every file, which for a
-five-thousand-line patch is five thousand renderables in a pane that shows twenty. It keeps its rows as
-one flat list — a file's header is a row in it, so an anchor is an index — and draws the slice around
-the viewport's offset with a box above and below standing in for the rest. The spacers are what keep
-it a `ScrollViewport`: the scrollbox still owns the offset, the bar, the wheel and the page keys, and
-it is still the focus stop a document with no controls needs. The offset reaches the window two ways,
-because the viewport raises an event for one of them and not the other: its own key handlers call an
-`onScroll` the pane passes in, and the wheel is caught on a box *around* the viewport, where OpenTUI's
-mouse walk delivers it after the scrollbox has already moved. The known ceiling is that a spacer is one
-line per row and an annotated row draws two, so the content is as many lines taller than the model as
-there are marked rows inside the window.
+five-thousand-line patch is five thousand renderables in a pane that shows twenty. It keeps its rows
+as one flat list — a file's header is a row in it, so an anchor is an index — and draws the slice
+around the viewport's offset with a box above and below standing in for the rest. The spacers are
+what keep it a `ScrollViewport`: the scrollbox still owns the offset, the bar, the wheel and the
+page keys, and it is still the focus stop a document with no controls needs. The offset reaches the
+window two ways, because the viewport raises an event for one of them and not the other: its own key
+handlers call an `onScroll` the pane passes in, and the wheel is caught on a box *around* the
+viewport, because a wheel step runs each node's own handler from the node under the pointer upwards
+— so a listener above the viewport sees the scroll after the viewport has already moved its offset,
+and one on the viewport itself would see it before (`apps/tui/src/tree/hit.ts`). The known ceiling
+is that a spacer is one line per row and an annotated row draws two, so the content is as many lines
+taller than the model as there are marked rows inside the window.
 
 Virtual `Rows` deliberately do not sit inside that mechanism: they render only their visible slice,
-so there is no offscreen child for a native scrollbox to move. Their own `top` offset handles wheel
+so there is no offscreen child for a scroll viewport to move. Their own `top` offset handles wheel
 input and draws the custom thumb. A wheel can move the active row offscreen without changing
 selection; the collection container temporarily keeps the keys, and the next keyboard move reveals
 and restores the active row. This division keeps document scrolling native without replacing the
@@ -904,9 +918,9 @@ receives it is worse than one that does not open.
 A rectangle is one tab stop from outside. Enter hands the keys to what is inside, Escape takes them
 back. A `pty` rectangle owns its keys by intercepting rather than by holding a layer, because a layer
 answers keys it can name and a rectangle answers all of them: `PtyRectangle` registers an intercept
-above every layer and consumes what it takes. Keys reach the emulator through `encodeKey`, not through
-the emulator's own handler, because the emulator only takes keys when the renderer has focused it and
-here the box holds the focus so Enter and Escape belong to the rectangle.
+above every layer and consumes what it takes. Keys reach the emulator through `encodeKey`
+(`apps/tui/src/kit/ptyKeys.ts`), which is the whole of its keyboard: headless xterm parses bytes and
+draws cells and has none of its own.
 
 **Being entered is a fact about the screen, not a flag anybody keeps.** A rectangle is entered while
 the reader has pressed Enter since the box last lost the keys, the box has the keys now, and the box
@@ -915,13 +929,11 @@ arrives, so there is nothing to go stale. The one thing stored is the Enter, and
 signal clears it: something else taking the keys and the box going off screen are two different ways
 to lose them, they used to raise a renderer event and nothing respectively, and one signal is both.
 
-It used to be a flag set by Enter and cleared by Escape or by unmounting, and neither of those
-happens when a subtree is hidden without being unmounted. `visible` is per node in OpenTUI, so hiding
-an ancestor blurs the ancestor and leaves the rectangle's box reporting itself focused and visible.
-Both of this app's ways of hiding a subtree do exactly that, the shell's main row behind an overlay
-and a `TabPanel` that is not showing, so a rectangle nobody could see went on consuming every key in
-the app, `Ctrl+C` included, because the intercept sits above every layer there is. It kept them until
-the reader found the tab it was on and pressed Escape at it.
+It has to be a question rather than a flag because `visible` is per node: hiding an ancestor leaves
+the rectangle's own box reporting itself visible, and both of this app's ways of hiding a subtree do
+exactly that — the shell's main row behind an overlay, and a `TabPanel` that is not showing — so a
+flag left a rectangle nobody could see consuming every key in the app, `Ctrl+C` included, because the
+intercept sits above every layer there is.
 
 The footer asks that same question of every rectangle that is mounted rather than counting the ones
 that are entered. Two can be mounted at once, a task with a terminal pane beside a docker exec, and
@@ -983,8 +995,8 @@ label with nothing to drive, and a stop that does nothing is a hole a reader fal
 (`$XDG_STATE_HOME/acorn/keys.log`, else `~/.local/state/acorn/keys.log`):
 
 ```text
-17:08:29.001 key=f6      reason=binding-handled    focused=BoxRenderable#box-72 region=pane/body scope=overlay:2 steps=11
-17:08:29.492 key=enter   reason=intercept-consumed focused=BoxRenderable#box-91 region=pane/body scope=screen    steps=0
+17:08:29.001 key=f6      reason=binding-handled    focused=BoxRenderable#72 region=pane/body scope=overlay:2 steps=11
+17:08:29.492 key=enter   reason=intercept-consumed focused=BoxRenderable#91 region=pane/body scope=screen    steps=0
 ```
 
 The parsed key, what answered it and why, the renderable that had the keys, its region, how many
@@ -1088,7 +1100,7 @@ for the same arithmetic — a frame round one line of content is three rows of c
 over rather than the room its contents want, so a Browse list of forty pull requests cannot push the
 Tasks panel off the bottom of the screen. What is inside it either clips or scrolls. A `Rows` marked
 `virtual` is handed its height by the panel, draws only the rows that fit, and puts its own scrollbar
-down the right edge. A non-virtual document/detail body uses OpenTUI's native scrollbox and scrollbar.
+down the right edge. A non-virtual document/detail body uses a `ScrollViewport` and its bar.
 The virtual window holds still until the caret walks off an edge, then follows by exactly as much as
 it has to; wheel input can inspect another part of the list without moving the caret.
 
@@ -1102,9 +1114,9 @@ that means a pull request reads as its number and its title, and its timestamp i
 
 The name in the border is the string the DOM host puts in a region's `aria-label`, and the lit border
 is what `:focus-within` does to a region's edge there. Same two facts, one rendering each. The lit
-border is read off the focus signal rather than from OpenTUI's own `focusedBorderColor`, which needs
-the box to be `focusable` — and a focusable frame is a stop in the cycle, so a region holding another
-frame would open on the frame instead of on the list inside it.
+border is read off the store's focus signal, and it has to be: a border a node lit for itself would
+need that node to be `focusable`, and a focusable frame is a stop in the cycle, so a region holding
+another frame would open on the frame instead of on the list inside it.
 
 There is no collapse to a strip of marks below 100 columns any more. It only ever said anything because
 every row carried a glyph, and most of those glyphs drew nothing: a source's glyph is a Lucide name,
@@ -1204,9 +1216,10 @@ stripped of anything that could end the sequence early. A terminal on none of th
 BEL and nothing else. `ACORN_TUI_NOTIFY` is the switch, in the `ACORN_TUI_OSC52` pattern: `off`,
 `bell`, `terminal`, or `both`, which is the default. There is no settings page here to hold it.
 
-Whether the terminal is the window the reader is looking at comes from DEC 1004: the renderer emits
-`CliRenderEvents.FOCUS` and `BLUR`, `apps/tui/src/main.tsx` feeds them to `setHostFocused`, and the
-gate's seen rule reads them. Unknown counts as focused, so a terminal that never reports stays quiet.
+Whether the terminal is the window the reader is looking at comes from DEC 1004: the parser turns
+`ESC [ I` and `ESC [ O` into a `focus` and a `blur` event, `apps/tui/src/main.tsx` feeds them to
+`setHostFocused`, and the gate's seen rule reads them. Unknown counts as focused, so a terminal that
+never reports stays quiet.
 
 ### Navigation
 
@@ -1375,9 +1388,20 @@ buffer, one per layout drawn from its projection, a twin of client-core's `keys.
 terminal adapter, a pane file that opens every first-party pane at exactly 80 by 24 and asks whether
 the thing the pane is for is on the first screen, a chrome file that drives the whole shell, a
 reachability file that walks every stop on seven surfaces and checks four invariants after every
-press, and five files that need no renderer and never skip: the focus invariants that are facts about
+press, and five files that need no renderer at all: the focus invariants that are facts about
 the source, the palette's collapse to 16 slots, the clipboard
-sequence, the plugin sandbox, and the boot test.
+sequence, the plugin sandbox, and the boot test. Nothing in the suite skips and nothing asks for a
+flag: it runs on the Node the repo pins (§ The runtime floor).
+
+**The harness is the real thing with its two ends replaced.** `apps/tui/src/kit/render.tsx` draws one
+fragment and `apps/tui/src/harness.tsx` drives the whole shell, and both open the same renderer the
+app opens, with stdout as a buffer sink and no terminal behind it. So a test reads the frame that was
+actually painted, as characters and as coloured runs, which is what lets a case assert that a focused
+control is lit when its six characters have not changed. `press` puts a `KeyEvent` straight onto the
+key stream rather than bytes onto stdin, so nothing is waiting to see whether a lone Escape starts a
+sequence — but the press still gives real time to what it started, because a Tab that lands the caret
+on a row whose data the fixture answers on a timer needs the timer to fire, and turning the render
+loop does not make it.
 
 The boot test (`apps/tui/src/node/boot.test.ts`) is what `apps/desktop/test/boot.test.ts` is for the
 shell. Against a fresh data root and a fresh config directory it starts a real standalone node, uses
@@ -1389,8 +1413,8 @@ root's lock.
 ## Shipping it
 
 Not shipped. `acorn` runs from a checkout. Putting it in the node tarball and the desktop bundle is
-step 7 of [future/bundle.md](./future/bundle.md) § Ordering, which owns the pipeline, the two native
-modules, the runtime pin and the signing gate. What that step still owes is written there.
+step 7 of [future/bundle.md](./future/bundle.md) § Ordering, which owns the pipeline, the one native
+module and the signing gate. What that step still owes is written there.
 
 ## Doors left open
 

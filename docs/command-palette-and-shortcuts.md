@@ -153,14 +153,15 @@ is why Settings can show it as a conflict while the keyboard behaves as if it we
 
 The keyboard is one engine, `@opentui/keymap`, installed on the shell root by
 `client-core/host/keys/install.ts`. Its HTML adapter turns DOM keydowns into keymap events and tracks
-targets with a `MutationObserver`. The same package carries a terminal adapter, and the terminal
-client builds its `KeymapHost` from it — eleven members delegated unchanged and two, where focus is
-and when it moves, answered by its own region store — so it gets the same layer model, the same
-`intentKeys` table and the same bubbling ([tui.md](./tui.md) § The adapter). It needs more priorities
+targets with a `MutationObserver`. The terminal client writes its own `KeymapHost` — all thirteen
+members, over its node tree and its region store — and drives the same engine, so it gets the same
+layer model, the same `intentKeys` table and the same bubbling
+([tui.md](./tui.md) § The adapter). It needs more priorities
 than this host does, because it draws the whole workspace in one window and an entered terminal has
 to sit above every one of them, and all ten of them are written in one file with a sentence each
 (`apps/tui/src/keys/tiers.ts`). What differs is the pair of
-type parameters — a target is an OpenTUI `Renderable` there and an `HTMLElement` here — so
+type parameters — a target is a node of the terminal client's own tree there and an `HTMLElement`
+here — so
 `client-core/kit/keys/keymapHost.ts` names neither: the host supplies its pair at `setKeymap`, along
 with its own answer to "is somebody typing right now", which is the only question a binding asks
 about the focused thing.
@@ -225,8 +226,8 @@ on an item, and say whether the item itself holds focus rather than a control in
 `collection.ts` beside it is the DOM's half: `focus()`, `scrollIntoView`, the `aria-*` attributes and
 the roving `tabindex`. `apps/tui/src/keys/collection.ts` is the terminal's, where a row hands its
 renderable back as it draws and the caret is drawn wherever focus is. Non-virtual documents use a
-native OpenTUI scrollbox; a virtual `Rows` keeps its own window so wheel input can move the viewport
-without changing the active key and keyboard movement can reveal that key again.
+`ScrollViewport`, which owns the offset; a virtual `Rows` keeps its own window so wheel input can
+move the viewport without changing the active key and keyboard movement can reveal that key again.
 
 `Grid` is the one documented exception, and it is a consequence of virtualisation rather than a
 shortcut. Most of its rows have no element, so roving focus cannot be DOM focus: the arrows move a

@@ -23,7 +23,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [dashboards/](./dashboards/README.md) | What is left of the dashboards redesign. | Redesign shipped; the taskless database connection, dynamic collections, and write-back remain. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [command-palette/](./command-palette/README.md) | One command graph and host-neutral palette session for core, compiled plugins, and loaded plugins: nested commands, cancellable search, submitted input, opt-in settings, a first-party command catalogue, seven phases, and the refusals. | In progress, 2026-09-03. Phases 0–2 shipped; phase 3 is next and phase 5 is ready. |
-| [terminal-rewrite/](./terminal-rewrite/README.md) | The terminal client leaves OpenTUI for a painter of its own: a plain node tree Solid mutates, a Yoga pass through the WebAssembly build, a cell buffer with a diff and a flush, an input parser, and the region store as the one owner of focus; the pty rectangle moves to `@xterm/headless`. Kit, layouts, plugins, and the keyboard rules are unchanged. A review, an architecture, six phases, and the refusals (a Rust or Go painter behind a wire chief among them). | Proposal, 2026-09-03. Not started; nothing blocks phase 0. |
 
 ## The single files
 
@@ -56,7 +55,8 @@ doc owns it and the others point.
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` (replaced by
 the single `events.md` above on 2026-08-28 when all but three items shipped), `layout/`, `structure/`,
-`structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `notifications/`, and
+`structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
+`notifications/`, and
 the single files `live-qa.md` and `dx.md` are in git history. Each ended by saying where its behaviour moved.
 
 `performance/` was deleted on 2026-09-03 when its eleventh phase closed it, and it ended differently
@@ -77,6 +77,35 @@ callback, [tui.md](../tui.md) § What is drawn bespoke has the topbar count, the
 DEC 1004 focus rule, [plugin-map.md](../plugin-map.md) § Notifications still answers which call a
 plugin makes, and [contribution-kinds.md](../contribution-kinds.md) has what an attention
 row's severity decides.
+
+`terminal-rewrite/` took the terminal client off OpenTUI and gave it a painter of its own, in five
+phases on 2026-09-03 and 2026-09-04. Shipped and deleted 2026-09-04. It had a sixth, a list of
+conventions the reference terminal apps have and we lack; it was independent of the rest, it was
+never started, and it is in git with the others. [tui.md](../tui.md) owns all of it. § How a frame is
+drawn is a new section and the architecture file's four layers landed in it: the plain node tree
+Solid mutates, the Yoga pass through the WebAssembly build, the cell buffer with its diff and its
+synchronized flush, the byte parser, and the invariant that holds at each boundary. § The runtime
+floor is two sentences, because the floor is the repo's — the phases took out the Node 26.4
+requirement and the `--experimental-ffi` flag and gave `apps/tui` the `engines` every other package
+here has. § The host switch lost the `@opentui/solid` alias and gained the three throwing stubs that
+now stand in front of the packages the last phase dropped. § Rendering carries the layout read-back's
+clamp where the render guard's paragraph was, plus one sentence each for the two crashes the rewrite
+ended, so a reviewer meeting `<Stack>{count()}</Stack>` knows it used to be one. § Rectangles and
+§ The Rectangle contract name `@xterm/headless` and the key encoder in front of it. § The adapter
+says the `KeymapHost` is ours, all thirteen members of it, and § Focus regions says the store owns
+focus with nothing left to disagree with — which is what took the second reveal out of § Scrolling
+viewports. § Tests has the harness, which is the real renderer with stdout as a buffer.
+
+Three other docs took a share. [testing.md](../testing.md) § Test layers lost the FFI skip, because
+nothing in that suite skips any more. [bundle.md](./bundle.md) § Shipping `acorn` lost the second
+native module and the flag in `bin/acorn`, and its open question about which packages the tarball has
+to carry is answered. And [performance.md](../performance.md) holds the eager closure's honest number
+— the painter is about 98 KB inside the bundle where a 6 MB library sat outside it, so the ceiling
+went up rather than down — and re-reads its own phase 9 against the store the rewrite left behind.
+Two refusals are worth not re-arguing: a Rust or Go painter behind a wire, rejected because
+client-core is TypeScript whatever paints the cells, and a constraint layout instead of flex, parked
+rather than rejected. Both are in the folder's `refused.md`.
+
 `terminal-updates/` was seven phases that finished the terminal's keyboard, shipped and deleted
 2026-09-02. [tui.md](../tui.md) § Keys and focus owns all of it. Phase 0 wired every asking node so it
 focuses, shows focus and acts, which is § The adapter and the pressable contract under it. Phase 1

@@ -64,9 +64,10 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   where a role is meant, and `tsc --noEmit` under `pnpm lint` is the pass that checks it. See
   [ui design](./ui-design.md) § The closed kit;
 - the `tui` suite (`apps/tui`) renders the kit to a cell buffer instead of to a document. It runs the
-  bundle's own transform, so JSX goes to OpenTUI's reconciler, and it inherits the alias that points
-  `@acorn/plugin-api/ui` at the terminal kit, which means a pane under test imports the kit exactly as
-  the shipped bundle does. What it asserts is what a reader would look for on the screen — `Badge`
+  bundle's own transform and opens the same renderer the app opens, with stdout as a buffer sink and
+  no terminal behind it, and it inherits the alias that points `@acorn/plugin-api/ui` at the terminal
+  kit — so a pane under test draws through the code path and imports the kit exactly as the shipped
+  bundle does. What it asserts is what a reader would look for on the screen — `Badge`
   draws `[text]`, a `Fold` draws `▸ label` shut and `▾ label` open with its children indented two
   cells, the caret moves when `j` is pressed — rather than a snapshot of every cell, which would fail
   on every spacing decision anybody makes afterwards and name no broken promise. There is one case per
@@ -108,7 +109,7 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   block presses Escape out of each surface and asks that the climb ends in the rail. It runs at 80 by
   24, and at 120 by 40 as well when `ACORN_TUI_WIDE` is set, which CI sets and a save does not: the
   wide pass doubles a three-minute file to buy the layouts that split at 100 cells. Five files
-  alongside need no renderer and never skip: the focus invariants that are facts about the source
+  alongside need no renderer at all: the focus invariants that are facts about the source
   rather than about a render (`src/invariants.test.ts`, one deferred decision and no `super+` chord),
   the palette's collapse from a theme to the terminal's slots, the clipboard sequence, the plugin
   suite below, and the boot test after it.
@@ -122,12 +123,9 @@ Suites that do that kind of real work carry a 20-second test and hook timeout in
   replaces the row rather than appending one. None of that needs a terminal, so it runs on whatever
   Node the repo is on; the one case that draws — the same tree fed as a batch and written as JSX,
   asserted to produce identical cells, which is this host's twin of client-core's `twoPaths.test.tsx`
-  — skips without FFI like everything else that renders.
-  It needs a renderer to draw to, and OpenTUI's is Zig behind `node:ffi`, a Node 26.4 builtin behind
-  `--experimental-ffi`: the config passes that flag only where it is accepted and the tests skip where
-  there is no FFI, so an older Node reports a skip rather than failing the suite for a reason that has
-  nothing to do with the change under test. See
-  [docs/tui.md](./tui.md) § The runtime floor.
+  — draws like every other case here. Nothing in this suite skips and nothing asks for a flag: the
+  painter is the client's own TypeScript, so it runs on the Node the repo pins
+  ([docs/tui.md](./tui.md) § The runtime floor).
 
   The boot test (`src/node/boot.test.ts`) is the third file that needs no renderer, and it is what
   `apps/desktop/test/boot.test.ts` is for the shell: does `acorn`'s world come up. Against a fresh
@@ -371,8 +369,9 @@ suite drives one task at a time.
     waiting out the parser.
 29. Enter a PTY, then let a notification activate another task while the keys are inside it. Open the
     palette with its chord from inside the PTY, close it, and type again. Run it with
-    `ACORN_TUI_KEYS_TRACE=1` and read `keys.log`: no line may say `agree=no`, and none may say
-    `region=none` while the screen has regions ([tui.md](./tui.md) § Seeing what the keys did).
+    `ACORN_TUI_KEYS_TRACE=1` and read `keys.log`: no line may say `reason=no-match` on a key the
+    footer offers, and none may say `region=none` while the screen has regions
+    ([tui.md](./tui.md) § Seeing what the keys did).
 30. Walk the cross and page keys where five different rules used to live. In a `list-detail` pane,
     Right crosses from the list to the detail, Left comes back, and PageDown lands on the last row
     and then scrolls the panel instead of wrapping. On the first tab of a `Sections` strip, Left goes one

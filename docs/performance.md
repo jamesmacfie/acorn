@@ -545,20 +545,25 @@ exclusions are keeping patch bodies and blobs out, and the largest single entry 
 row at 163 KB. Exit condition: a blob past about ten megabytes, where the serialise reaches 25 ms and
 drops a frame every five seconds.
 
-#### The reconciler's per-element cost in the terminal client
+#### The per-element cost in the terminal client
 
-`apps/tui/src/kit/reconciler.ts` — deleted by the terminal rewrite, and in the git history — tied
-every element's destruction to its creating owner and wrapped every dynamic child in an accessor.
-Both fixed bugs a person could see: a `Suspense` that resolves into a destroyed renderable draws
-nothing, and loose text in a box throws.
+The question was whether the two things this host did to every element it made — tying a
+destruction to the owner that created it, and wrapping every dynamic child in an accessor so a loose
+string could be caught — were worth their cost per element. It is closed twice over, and neither
+answer is a measurement of the old code.
 
-Phase 9 answered the question the deferred argument asked, from the other end. The cost is per element
-and the element count is bounded now: the heaviest screen in the client, a 5,000-line diff, draws
-**376 renderables instead of 5,303** (§ 2026-09-03 — phase 9), and
-`apps/tui/src/diffLong.test.tsx` holds a bound under 1,000 that forbids a count growing with the data.
-A per-element cost over a few hundred elements is not something a frame notices, and removing either
-behaviour brings back a documented bug. Exit condition: a screen that passes that bound, or a measured
-frame time that lands on element creation.
+Phase 9 answered it from one end. The cost is per element and the element count is bounded now: the
+heaviest screen in the client, a 5,000-line diff, draws **376 renderables instead of 5,303**
+(§ 2026-09-03 — phase 9), and `apps/tui/src/diffLong.test.tsx` holds a bound under 1,000 that forbids
+a count growing with the data. A per-element cost over a few hundred elements is not something a
+frame notices.
+
+The terminal rewrite answered it from the other. Both behaviours were workarounds for a retained
+node with a lifecycle, and the tree Solid drives is plain objects: nothing is destroyed, so there is
+nothing to tie, and a loose string under a box is painted as a one-line run rather than refused
+([tui.md](./tui.md) § How a frame is drawn). What is left per element is a Yoga handle, freed when
+the owner that made it is disposed. Exit condition: a screen that passes phase 9's bound, or a
+measured frame time that lands on element creation.
 
 ## The numbers
 
@@ -1194,10 +1199,15 @@ critical path entirely.
 | --- | --- | --- | --- |
 | After phase 1 | 112 | 1,026,357 B | 2,110,161 B |
 | After phase 4 | **91** | **841,142 B** | 2,122,669 B |
-| Ceiling now held | | **870,000 B** | |
+| Ceiling set here | | **870,000 B** | |
 
 **185,215 B, 18%, and 21 fewer chunks.** The whole build grew 12 KB, which is the roster becoming its
 own chunk boundary rather than being folded into `App`.
+
+That ceiling is not the one held today. The terminal rewrite put the painter inside this bundle
+where a 6 MB native library used to sit outside it, so the closure is **963,940 B against a 995,000 B
+ceiling** — raised rather than lowered, and for the reason
+[frontend.md](./frontend.md) § Startup budget gives.
 
 This is phase 1's missed target, and it is still missed: phase 1's `Done when` asked for under 550 KB.
 Phase 1 was right that the roster was what remained and wrong that removing it would halve the number.
@@ -1240,11 +1250,11 @@ node that is not listening.
   reconnect. The fix is to connect to the row last time's handshake wrote — its port is dead, the broker
   reports `offline` and retries, which is a state the footer already draws.
 - **An unhandled rejection drew OpenTUI's debug console over the shell.** `initSessions` in client-core
-  fires its first pull without a `catch`; OpenTUI answers an uncaught error by showing its console
-  overlay. Fixed at the source, and the renderer is now created with `openConsoleOnError: false`. The
-  host also keeps OpenTUI's console *capture* on and hidden rather than deactivating it, so a stray
-  `console.warn` from a plugin lands in the capture and is printed after `renderer.destroy()` instead of
-  being written to the file the renderer draws on.
+  fires its first pull without a `catch`; OpenTUI answered an uncaught error by showing its console
+  overlay. Fixed at the source. There is no console overlay under this client's own painter and
+  nothing captures `console` any more: `main.tsx` holds Node's own warnings and prints them once the
+  terminal is handed back, and an ordinary library log goes to stderr where it always was
+  ([tui.md](./tui.md) § Rendering).
 
 #### Not measured
 
@@ -1812,6 +1822,31 @@ the shape rather than the layout: what it forbids is a number that grows with th
   registry is empty in the fixture, so there is nothing here to count.
 
 
+#### Re-read against the painter that came after
+
+Every number above was taken on the old renderer, and the phase's own changes all survived the move
+to this client's own painter. The registry scans are still four hash lookups: the store's region,
+parent-stop, collection and panel indexes are keyed by node, and `stopsIn` is still asked once per
+move (`apps/tui/src/keys/regions.ts`). The typing shadow and the command layer's build-time
+filtering are untouched, and so is the engine they were built against, so the blocker count is still
+zero. The diff pane still draws a slice with a spacer above and below it. Each of the three is held
+by the test named beside it rather than by this record.
+
+Two premises are gone rather than confirmed. **The suite needs no Node 26.8.1 and no
+`--experimental-ffi`**: it runs and draws on the Node the repo pins, so anyone re-taking these
+numbers takes them there ([tui.md](./tui.md) § The runtime floor). And **the walks are over plain
+objects the store's own tree holds**, not over a retained tree something else owned, which is what
+made "the count is flat in the rows" a property worth stating: there is no second structure the walk
+could fall back to scanning. `apps/tui/src/keys/regions.test.ts § a key press costs the depth of the
+tree` still asks for the flatness and the bound, and it now runs everywhere.
+
+One indexing item is still open, and the rewrite named it rather than taking it. The store reads a
+node through `apps/tui/src/tree/compat.ts`, which puts the renderable vocabulary the store was
+written in — `visible`, `isDestroyed`, `focusable`, `getChildren` — onto a plain object's prototype.
+Reading `Node` directly would take an accessor off every read in every walk. It is a thousand-line
+diff with no behaviour in it, which is why it was not done under the deletion that made it possible.
+
+
 ### 2026-09-03 — phase 10, the re-measurement
 
 Same machine, Node 24.11.0 (Node 26.8.1 for the terminal client). Every phase from 0 (`17b03dbe`) to
@@ -1837,10 +1872,11 @@ is named, because a phase that decided on the old figure decided on the old figu
 
 **Everything is inside its ceiling and everything has drifted the wrong way since the phase that took
 it.** The desktop is 4,366 B and one request over phase 2's figure, the terminal client 16,091 B and
-four chunks over phase 4's with 12,767 B of headroom left under the 870,000 B ceiling, and the service
-chunk 11,572 B over phase 3's. None of it is a regression anyone would notice and all of it is the
-same drift the denylist exists for: five phases of ordinary work each added a few kilobytes to the
-first paint. The check that catches a 300 KB mistake does not catch this, and it is not meant to.
+four chunks over phase 4's with 12,767 B of headroom left under the 870,000 B ceiling that stood on
+the day, and the service chunk 11,572 B over phase 3's. None of it is a regression anyone would
+notice and all of it is the same drift the denylist exists for: five phases of ordinary work each
+added a few kilobytes to the first paint. The check that catches a 300 KB mistake does not catch
+this, and it is not meant to.
 
 The desktop's uncounted tail grew too: 120 chunks and 1,595,686 B are one dynamic import away, against
 109 chunks and 1,509,975 B after phase 1. That number is reported and not gated, for the reason phase 0

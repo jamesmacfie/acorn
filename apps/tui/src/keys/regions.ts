@@ -33,7 +33,7 @@
 import { createSignal, onCleanup } from 'solid-js'
 import { isRemoved, type Renderable } from '../tree/compat'
 import type { Press } from '../tree/hit'
-import type { OwnRenderer } from '../ownRenderer'
+import type { Renderer } from '../renderer'
 
 export type RegionRef = { paneId: string; regionId: string }
 
@@ -340,10 +340,9 @@ export function pushScope(box: Renderable): () => void {
     setScopes((all) => all.filter((entry) => entry !== scope))
     orderedCache = null
     // The keys leave the box that is going, said here rather than read off the tree. The tree is
-    // still telling the truth of the last render: the reconciler defers destruction to
-    // `process.nextTick` for Suspense's sake, so the pass below would find a dying dialog attached,
-    // visible, and, its own scope gone, inside the screen's, and would leave the keys on it
-    // (docs/tui.md § Destroy on disposal).
+    // still telling the truth of the last render: nothing is destroyed, so the pass below would find
+    // the closing dialog attached, visible, and — its own scope gone — inside the screen's, and would
+    // leave the keys on it (docs/tui.md § Traps).
     const at = focusedNode()
     if (at && within(box, at)) setFocus(null)
     scheduleSettle()
@@ -667,7 +666,7 @@ let detach = (): void => {}
 /** Point the store at a renderer: where a click landed, and the frame the reveal waits for.
  *  Called by `installKeymap`, because "install the keyboard on this renderer" is one thing and where
  *  the keys are is half of it (./install.ts). */
-export function installRegions(renderer: OwnRenderer): void {
+export function installRegions(renderer: Renderer): void {
   detach()
   // And whatever the last renderer's keymap and typing shadow left listening here: an engine is
   // built per renderer and tears nothing down itself (§ onFocusMove).
