@@ -2072,6 +2072,10 @@ A contributor names one:
 await mount.host.invoke('replace', { expectedAttachmentId, replacementAttachmentId })
 ```
 
+`solidTree` puts `host` on the component's props beside `bridge`, so a Solid tree reaches it as
+`props.host` without touching the mount. Both are the same object across a props update, which is what
+keeps a handler valid while it is awaiting.
+
 Two lists have to contain the name before the host forwards anything: the point's `actions`, which is
 the owner plugin's published contract, and this particular `Slot`'s handler map, which is the
 instance's consent. A name in one and not the other is refused. Neither the handlers nor their names
@@ -2113,10 +2117,19 @@ overlay passes the "an overlay needs an action that opens it" rule.
 One name, not a list. A tree that could name any of its plugin's overlays would have a dispatcher; one
 name is a grant a person can read in the manifest at trust time.
 
-The host accepts it only while focus is inside that exact tree, and at most once a second. A modal is a
-person's act, and the focus check is what a click or a key press leaves behind, so a background timer
-cannot put an editor in front of the reader. It is the same pair of gates `ui.openUrl` has one rung
-down.
+Name it as your manifest spells it. The device rewrites a frame id that sits outside your plugin's
+namespace to `<pluginId>.<id>`, and rewrites the descriptor's `overlay` reference with it
+(client-core/host/plugins/contributionIds.ts), but the string your tree passes is yours. The host
+qualifies it the same way before comparing, so `editor` and `my-plugin.editor` both reach the same
+frame and neither is refused for naming your own overlay.
+
+The host accepts it only from a person, and at most once a second. Either the shell's focus is inside
+that exact tree, or somebody pressed something in it within the last second. Two answers rather than
+one because focus alone is not enough: WebKit does not move focus to a button when it is clicked, which
+is the behaviour behind macOS's "Keyboard navigation" setting and the platform the desktop shell runs
+on, so a focus-only gate meant a click on a kit `Button` could never open an overlay at all. A
+background timer produces neither, which is the property being kept. The throttle is the same second
+gate `ui.openUrl` has one rung down.
 
 **The result lifecycle.** The overlay store holds an invocation rather than a pair of ids: an id that
 keys the iframe, the opener's input, and the waiter. `openOverlay` resolves with whatever the overlay

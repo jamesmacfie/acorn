@@ -28,7 +28,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | File | What it is | Status, 2026-08-30 |
 | --- | --- | --- |
-| [agent-attachment-image.md](./agent-attachment-image.md) | The implementation brief for the loaded PNG/JPEG attachment editor plugin. Every platform seam it needs shipped on 2026-09-04; docs/plugins.md, docs/managed-agents.md and docs/security.md own those, and the proposal that described them was deleted. | Proposal, 2026-09-04. Plugin not started. |
+| [agent-attachment-image.md](./agent-attachment-image.md) | The implementation brief for a PNG/JPEG attachment editor built as a third-party plugin outside this repository, and the proof that the loaded tier can carry a real feature. Every seam it needs shipped on 2026-09-04; docs/plugins.md, docs/managed-agents.md and docs/security.md own those. | Proposal, 2026-09-04. Not started. |
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX half shipped; distribution half remains. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [findings.md](./findings.md) | One core entity, the finding, that gives agent, workflow, and scheduled claims a human disposition, exposed to every harness over MCP; joins notes, memory, gates, and schedules into the harness-engineering loop. | Proposal, 2026-08-29. Not started. |

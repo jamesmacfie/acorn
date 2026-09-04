@@ -20,7 +20,7 @@ import { createRenderer } from 'solid-js/universal'
 import { createStore, reconcile } from 'solid-js/store'
 import type { JSX } from 'solid-js'
 import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
-import type { AcornBridge, TreeRender } from './sdk'
+import type { AcornBridge, TreeMount, TreeRender } from './sdk'
 import {
   createNode, createText, firstChild, insertNode as attach, isTextNode, nextSibling, parentOf,
   removeNode, setProperty, setText, type RemoteNode,
@@ -109,13 +109,21 @@ export const {
  * port is a `text`, not a fresh tree.
  */
 export function solidTree<P extends Record<string, unknown>>(
-  component: (props: P & { bridge: AcornBridge }) => JSX.Element,
+  component: (props: P & { bridge: AcornBridge; host: TreeMount['host'] }) => JSX.Element,
 ): TreeRender {
   return (bridge, mount) => {
-    const [props, setProps] = createStore({ ...(mount.props() as P), bridge })
-    mount.onProps((next) => setProps(reconcile({ ...(next as P), bridge })))
+    // `host` beside `bridge`, and for the same reason: both are stable for this mount's life and
+    // neither is data the owner sent. Without it the two things a tree may ask its host for — call an
+    // owner action, open its companion overlay — would be unreachable from a Solid component, which is
+    // how every loaded plugin acorn ships is written (./sdk.ts § TreeMount.host).
+    //
+    // Same object on every reconcile, so the store's diff sees no change and a redraw does not
+    // invalidate a handler mid-await.
+    const host = mount.host
+    const [props, setProps] = createStore({ ...(mount.props() as P), bridge, host })
+    mount.onProps((next) => setProps(reconcile({ ...(next as P), bridge, host })))
     // The same cast `kitNode` makes, for the same reason.
-    const draw = component as unknown as (props: P & { bridge: AcornBridge }) => RemoteNode
+    const draw = component as unknown as (props: P & { bridge: AcornBridge; host: TreeMount['host'] }) => RemoteNode
     mount.onUnmount(render(() => createComponent(draw, props), mount.root.node))
   }
 }
