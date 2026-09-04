@@ -635,15 +635,19 @@ for the reason above: one bridge per bundle could not say which of your four mou
 
 ```tsx
 mountTree({
-  attachmentPreview: solidTree((props, { host }) => (
+  // `solidTree` puts `host` on your props beside `bridge`. Both are stable for the mount's life, so a
+  // handler that is mid-await when the owner sends new props is still holding the right one.
+  attachmentPreview: solidTree((props) => (
     <Button onPress={async () => {
-      const result = await host.openOverlay('editor', { taskId: props.taskId, attachmentId: props.attachment.id })
+      const result = await props.host.openOverlay('editor', { taskId: props.taskId, attachmentId: props.attachment.id })
       if (!result) return                       // dismissed; nothing happened
-      await host.invoke('replace', { expectedAttachmentId: props.attachment.id, ...result })
+      await props.host.invoke('replace', { expectedAttachmentId: props.attachment.id, ...result })
     }}>Edit {props.attachment.filename}</Button>
   )),
 })
 ```
+
+Writing the renderer by hand instead of through `solidTree`? It is the second argument, `mount.host`.
 
 `host.invoke(action, payload)` calls an action the owning point declared and the owner bound to that
 exact slot. You learn the names from the owner's published `actions` list; anything else is refused.

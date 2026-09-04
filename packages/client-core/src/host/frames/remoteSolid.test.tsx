@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { KIT_NODES } from '@acorn/protocol/tree/nodes.ts'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { createRemoteRoot, insertNode, type RemoteNode } from './remoteRoot'
-import { KIT_NODE_COMPONENTS } from './remoteSolid'
+import { KIT_NODE_COMPONENTS, solidTree } from './remoteSolid'
+import type { TreeMount } from './sdk'
 import { KIT_COMPONENTS } from '../tree/components'
 import { kitComponent } from '../tree/kitEntry'
 import { TreeHost, type TreeTransport } from '../tree/TreeHost'
@@ -126,5 +127,62 @@ describe('the kit as a plugin writes it', () => {
     expect(host.querySelector('.ui-badge')).not.toBeNull()
     expect(host.innerHTML).not.toContain('sneaky')
     expect(refused.join(' ')).toContain('class')
+  })
+})
+
+// What `solidTree` hands the component, which is the whole of a plugin author's access to the host.
+//
+// `host` is here because it was once not, and nothing caught it: the two things a tree may ask its host
+// for landed on `TreeMount`, and every loaded plugin acorn ships is written through this adapter, so a
+// seam that never reached a component was a seam no plugin could use. This is the test that says so.
+describe('what a Solid tree renderer receives', () => {
+  const mountWith = (props: Record<string, unknown>) => {
+    const seen: Record<string, unknown>[] = []
+    const bridge = { id: 'bridge' } as never
+    // Cast because the real signatures are generic in their result and a fixture cannot be. What is
+    // being pinned is that these exact functions reach the component, not what they return.
+    const treeHost = {
+      invoke: async () => 'invoked',
+      openOverlay: async () => 'opened',
+    } as unknown as TreeMount['host']
+    const onProps: ((next: unknown) => void)[] = []
+    const root = createRemoteRoot(() => {})
+    solidTree((received: Record<string, unknown>) => {
+      seen.push(received)
+      return null as unknown as JSX.Element
+    })(bridge, {
+      entry: 'preview',
+      root,
+      props: () => props,
+      onProps: (listener) => onProps.push(listener),
+      onUnmount: (dispose) => disposers.push(dispose),
+      host: treeHost,
+    })
+    return { seen, treeHost, update: (next: unknown) => onProps.forEach((listener) => listener(next)) }
+  }
+
+  // The store proxies `host`, as it does every object in the props, so identity is not the claim. What
+  // matters is that the component reaches the two methods and they are the ones the mount supplied.
+  const hostOf = (props: Record<string, unknown> | undefined) => props?.host as {
+    invoke: () => Promise<unknown>
+    openOverlay: () => Promise<unknown>
+  } | undefined
+
+  it('hands over the owner’s props, the bridge, and the host', async () => {
+    const { seen, treeHost } = mountWith({ attachment: { id: 'a1' }, taskId: 't1' })
+    expect(seen[0]).toMatchObject({ attachment: { id: 'a1' }, taskId: 't1' })
+    // Both `bridge` and `host` come through the store's proxy, so the object identity is the store's
+    // rather than the mount's. Their members are not proxied, which is what a caller actually uses.
+    expect(seen[0]?.bridge).toMatchObject({ id: 'bridge' })
+    expect(hostOf(seen[0])?.invoke).toBe(treeHost.invoke)
+    await expect(hostOf(seen[0])!.openOverlay()).resolves.toBe('opened')
+  })
+
+  it('keeps the same host methods across a props update, so a handler mid-await stays valid', () => {
+    const { seen, treeHost, update } = mountWith({ taskId: 't1' })
+    const before = hostOf(seen[0])!.invoke
+    update({ taskId: 't2' })
+    expect(before).toBe(treeHost.invoke)
+    expect(hostOf(seen[0])!.invoke).toBe(treeHost.invoke)
   })
 })

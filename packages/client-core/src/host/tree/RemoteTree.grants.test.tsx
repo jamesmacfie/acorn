@@ -38,7 +38,9 @@ vi.mock('../plugins/contributions', () => ({
     pluginId: 'markup',
     installed: {
       permissions: { api: [], events: [] },
-      contributions: { frames: [{ id: 'editor', target: 'overlay', label: 'Image markup' }] },
+      // Namespaced, the way ../plugins/contributionIds.ts rewrites it before any of this is read. The
+      // fixture used to spell it bare, which is why the mismatch below shipped.
+      contributions: { frames: [{ id: 'markup.editor', target: 'overlay', label: 'Image markup' }] },
     },
   }],
   isTaskPane: () => false,
@@ -47,7 +49,7 @@ vi.mock('../plugins/contributions', () => ({
 const { RemoteTree } = await import('./RemoteTree')
 const { pluginOverlayInvocation, closePluginOverlayWith, closePluginOverlay } = await import('../frames/overlays')
 
-const CONTRIBUTION = { id: 'markup:preview', pluginId: 'markup', hash: 'a'.repeat(64), entry: 'attachmentPreview', overlay: 'editor' }
+const CONTRIBUTION = { id: 'markup:preview', pluginId: 'markup', hash: 'a'.repeat(64), entry: 'attachmentPreview', overlay: 'markup.editor' }
 
 let dispose: (() => void) | null = null
 let host: HTMLDivElement
@@ -69,8 +71,15 @@ const mount = (over: Partial<Parameters<typeof RemoteTree>[0]> = {}) => {
   )
 }
 
-/** Focus something inside the tree, which is what a click on a contributor's button would have done. */
+/** Focus something inside the tree, which is what a click leaves behind on a platform that focuses
+ *  buttons when they are clicked. */
 const focusInside = (): void => host.querySelector('button')?.focus()
+
+/** Press something inside the tree without focusing it, which is what WebKit leaves behind: clicking a
+ *  button does not move focus to it, so `document.activeElement` stays on `<body>`. */
+const pressInside = (): void => {
+  host.querySelector('button')?.dispatchEvent(new window.PointerEvent('pointerdown', { bubbles: true }))
+}
 
 const ask = (request: TreeHostRequest) => handler!(request)
 
@@ -128,21 +137,49 @@ describe('opening a companion overlay', () => {
       .resolves.toMatchObject({ ok: false, error: { code: 'unknown_overlay' } })
   })
 
-  // A modal is a person's act, so a bundle cannot put one in front of a reader from a timer.
-  it('refuses when focus is not inside this tree', async () => {
+  // A modal is a person's act, so a bundle cannot put one in front of a reader from a timer. Neither
+  // focus nor a recent press is the only state in which that is true.
+  it('refuses when nobody has focused or pressed anything in this tree', async () => {
     mount()
     document.body.focus()
-    await expect(ask({ op: 'overlay.open', name: 'editor', payload: null }))
+    await expect(ask({ op: 'overlay.open', name: 'markup.editor', payload: null }))
       .resolves.toMatchObject({ ok: false, error: { code: 'needs_focus' } })
+  })
+
+  // The regression this pair exists for. WebKit does not focus a button when it is clicked, which is
+  // the platform the desktop shell runs on, so a focus-only gate meant a tree could never open its
+  // companion overlay from a click at all.
+  it('opens on a press inside the tree even though focus never moved there', async () => {
+    mount()
+    document.body.focus()
+    pressInside()
+    expect(document.activeElement).not.toBe(host.querySelector('button'))
+    const asked = ask({ op: 'overlay.open', name: 'markup.editor', payload: null })
+    await Promise.resolve()
+    expect(pluginOverlayInvocation()).toMatchObject({ pluginId: 'markup', surface: 'markup.editor' })
+    closePluginOverlayWith(null)
+    await asked
+  })
+
+  // The other half of the same bug: the device rewrites a frame id outside the plugin's namespace and
+  // rewrites the manifest's reference with it, but not the name the running tree passes.
+  it('takes the name the plugin\u2019s own manifest spelled, not the one the device rewrote it to', async () => {
+    mount()
+    focusInside()
+    const asked = ask({ op: 'overlay.open', name: 'editor', payload: null })
+    await Promise.resolve()
+    expect(pluginOverlayInvocation()).toMatchObject({ pluginId: 'markup', surface: 'markup.editor' })
+    closePluginOverlayWith(null)
+    await asked
   })
 
   it('presents the overlay with its input and resolves with what it closed with', async () => {
     mount()
     focusInside()
-    const asked = ask({ op: 'overlay.open', name: 'editor', payload: { attachmentId: 'a1' } })
+    const asked = ask({ op: 'overlay.open', name: 'markup.editor', payload: { attachmentId: 'a1' } })
     await Promise.resolve()
 
-    expect(pluginOverlayInvocation()).toMatchObject({ pluginId: 'markup', surface: 'editor', input: { attachmentId: 'a1' } })
+    expect(pluginOverlayInvocation()).toMatchObject({ pluginId: 'markup', surface: 'markup.editor', input: { attachmentId: 'a1' } })
     closePluginOverlayWith({ replacementAttachmentId: 'a2' })
 
     await expect(asked).resolves.toEqual({ ok: true, body: { replacementAttachmentId: 'a2' } })

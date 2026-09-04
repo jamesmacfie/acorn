@@ -1,46 +1,52 @@
-# Agent attachment image editor plugin
+# Agent attachment image editor: a third-party plugin
 
-Status: proposal, 2026-09-04. Plugin not started. Every platform seam it needs is now shipped.
+Status: proposal, 2026-09-04. Not started. Every platform seam it needs is shipped.
 
-The prerequisite this file was written against is done. The three seams and the agents capability
-landed on 2026-09-04, and the proposal that described them has been retired into the docs that own
-the behaviour: `docs/plugins.md` § Asking the owner, § Companion overlays and § Binary bridge calls,
-`docs/managed-agents.md` § Draft attachments, and `docs/security.md` § Rung 0. Read those rather
-than this file's summary of them; the summary below is kept because it names what this plugin uses,
-not because it is the contract.
+This is a brief for a plugin that lives **outside this repository**. It is not a workspace package, it
+is not in `plugins/`, and it is not on the desktop's bundled roster. It is a directory somebody else
+builds, publishes and installs, and the point of writing it that way is that it proves the loaded-plugin
+platform can carry a real feature without acorn shipping it.
 
-The spellings in the dependency contract below are the ones that shipped. Paths in the rest of this
-file are architectural hints, not promises.
+Everything below was checked against the tree on 2026-09-04. Where this file describes a platform
+behaviour it is summarising a document that owns it; read the owner before you rely on the summary.
+
+| What | Owned by |
+| --- | --- |
+| Asking a slot's owner to do something | `docs/plugins.md` § Asking the owner |
+| Opening your own overlay from a tree | `docs/plugins.md` § Companion overlays |
+| Moving bytes over the bridge | `docs/plugins.md` § Binary bridge calls |
+| Draft attachments and how one is replaced | `docs/managed-agents.md` § Draft attachments |
+| Writing a plugin by hand, and what a manifest says | `docs/plugin-authoring.md` |
+| What the sandbox refuses | `docs/security.md` § Rung 0 |
 
 ## Outcome
 
-Add a bundled loaded plugin with package/id `agent-attachment-image` and display name **Image markup**.
-It replaces the compact preview for unsent PNG and JPEG agent attachments. Pressing the preview opens
-a deliberately small, MS Paint-like editor where the user can draw freehand strokes or add text. Apply
-creates a new immutable attachment and replaces the source id in the agent composer. The existing
-managed-agent enqueue and driver path then sends the altered image to the agent.
+A plugin with id `agent-attachment-image` and display name **Image markup**. It replaces the compact
+preview for unsent PNG and JPEG agent attachments. Pressing the preview opens a small, MS Paint-like
+editor where a person draws freehand strokes or adds text. Apply creates a new immutable attachment and
+asks the agent composer to swap the source id for it. The existing enqueue and driver path then sends
+the altered image to the agent.
 
-The plugin should feel native where it is small and own pixels where that is necessary:
+Two runtimes, because the feature genuinely needs both:
 
-- the composer preview is a remote tree made from Acorn kit controls;
-- the editor is a sandboxed overlay iframe containing a DOM canvas; and
-- image bytes cross only through the bounded binary API and the agents-owned draft-attachment
-  capability that the platform prerequisite introduced.
+- the composer preview is a **remote tree** built from acorn's own kit nodes, so it inherits the
+  shell's focus, keyboard handling, ARIA and style pack; and
+- the editor is a **sandboxed overlay iframe** containing a DOM canvas, because a canvas is exactly the
+  case a rectangle exists for.
 
-This file is the implementation brief for the plugin only. It does not redesign the plugin platform.
-If the reported platform implementation materially differs from the prerequisite contract below,
-update this file first instead of adding compatibility code inside the plugin.
+Image bytes cross only through the binary bridge and the agents-owned draft-attachment capability.
 
-## Dependency contract
+## What you are building against
 
-These are the shipped signatures, checked against the tree on 2026-09-04.
+### The four seams
 
 ```ts
-// Remote tree, bound to one mounted contribution slot.
-mount.host.openOverlay<TResult>(overlayId: string, input?: unknown): Promise<TResult | null>
-mount.host.invoke<TResult>(action: string, payload?: unknown): Promise<TResult>
+// On the mount handed to a tree renderer. `solidTree` puts it on your component's props beside
+// `bridge`. Both are stable for the mount's life.
+host.invoke<TResult>(action: string, payload?: unknown): Promise<TResult>
+host.openOverlay<TResult>(overlayId: string, input?: unknown): Promise<TResult | null>
 
-// Sandboxed frame, routed through the pinned node transport.
+// On the bridge, in a frame. Routed through the node this surface is pinned to.
 bridge.api.getBytes(path: string, options?: { signal?: AbortSignal }): Promise<{
   bytes: Uint8Array
   type: string
@@ -52,333 +58,304 @@ bridge.api.postBytes<T>(path: string, body: {
   filename?: string
 }, options?: { signal?: AbortSignal }): Promise<T>
 
-// Node capability provided by agents and requested in the manifest.
-type DraftAttachmentsCapability = {
-  read(input: { taskId: string; attachmentId: string }): Promise<{
-    attachment: AgentAttachment
-    bytes: Uint8Array
-  } | null>
-  createReplacement(input: {
-    taskId: string
-    sourceAttachmentId: string
-    filename: string
-    mediaType: 'image/png' | 'image/jpeg'
-    bytes: Uint8Array
-  }): Promise<AgentAttachment>
+// In an overlay frame: what the tree passed, and how to answer it.
+bridge.context.input          // unknown, under 64 KiB, overlay surfaces only
+bridge.ui.close(result)       // resolves the tree's openOverlay call
+
+// The node capability, typed for you in acorn-plugin-types.
+import type { DraftAttachment, DraftAttachmentsCapability } from 'acorn-plugin-types'
+```
+
+`DraftAttachmentsCapability` is written out in `acorn-plugin-types` rather than left as an opaque
+`HostOwned` brand, precisely so a plugin outside this repository can call it without casting every
+return value.
+
+### The declarative half
+
+- `agents:attachment` is a `remote`, `replace`-mode point declaring one action, `replace`.
+- A `remote` extension descriptor may name `overlay: "<one of your own overlay frames>"`. That
+  association is the grant and it is also a valid opener, so you do not need a command whose only
+  purpose is to make the overlay reachable.
+- Overlay input and result are each capped at 64 KiB and are JSON. Bytes go over a route.
+- Binary bridge calls are capped at 12 MiB either way, above the agents store's 10 MiB per-attachment
+  limit.
+- `/v2/p/agents/*` is not reachable from your sandbox and never will be. The capability is the seam.
+
+Build no fallback for any of these. Not base64 JSON, not a data URL, not direct agents-route access,
+not a filesystem read. If a seam is missing on the node you are running against, the honest answer is
+that the plugin does not work there.
+
+## Package shape
+
+You own the repository, the toolchain and the release. Acorn only ever sees the output directory.
+
+```text
+agent-attachment-image/            your repo
+  package.json
+  tsconfig.json
+  vite.config.ts                   or your bundler of choice
+  src/
+    node/index.ts                  the NodePlugin
+    node/routes.ts                 Request in, Response out
+    node/routes.test.ts
+    shared/routes.ts               route builders both halves import
+    shared/wire.ts                 the overlay input and result shapes
+    client/index.ts                one entry, two runtimes
+    client/preview/AttachmentPreview.tsx
+    client/editor/mountImageEditor.ts
+    client/editor/editor.css
+    client/editor/model.ts         history and tools, no DOM
+    client/editor/coordinates.ts   pointer to image space
+    client/editor/rasterize.ts     replay and encode
+  dist/                            what you ship
+    acorn-plugin.json
+    node/index.js
+    client.js
+```
+
+`dist/` is the package acorn installs. Its layout is a convention; only `acorn-plugin.json` is a fixed
+name, and every other path in the package is wherever that manifest says it is.
+
+Two rules from `docs/plugin-authoring.md` decide your build:
+
+- **The node half may import only relative paths and `node:` builtins**, unless you bundle it. An
+  installed package has no `node_modules` beside it.
+- **The client half is exactly one file.** A plugin origin serves one script.
+
+You will want a bundler. The editor is a canvas with a Solid tree beside it, and hand-inlining the
+handshake — which is the no-build profile's answer — buys you nothing here. With a bundler you get the
+published SDK:
+
+```sh
+npm install acorn-plugin-sdk acorn-plugin-types solid-js
+```
+
+```ts
+// vite.config.ts — the tree half compiles through Solid's universal renderer
+solid({ solid: { generate: 'universal', moduleName: 'acorn-plugin-sdk/remote' } })
+```
+
+`acorn-plugin-sdk` is framework-free and dependency-free; bundling it into your one `client.js`
+satisfies the single-file rule exactly as your own modules do. `acorn-plugin-types` is types only and
+gives you a typed `ctx` with no runtime.
+
+Do not add an image-editing dependency. Canvas 2D covers pen and text.
+
+## The manifest
+
+Hand-written, because you are not using acorn's in-repo builder. Point `$schema` at the published
+schema and your editor validates it as you type.
+
+```json
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "agent-attachment-image",
+  "name": "Image markup",
+  "version": "0.1.0",
+  "apiVersion": "10",
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "requires": { "plugins": [{ "id": "agents" }] },
+  "permissions": {
+    "api": [],
+    "events": [],
+    "node": { "core": [], "capabilities": ["agents.draftAttachments"] }
+  },
+  "contributions": {
+    "frames": [
+      { "target": "overlay", "id": "editor", "label": "Image markup" }
+    ],
+    "extensions": [
+      {
+        "id": "agent-image",
+        "point": "agents:attachment",
+        "label": "Image markup",
+        "remote": "attachmentPreview",
+        "matches": ["image/png", "image/jpeg"],
+        "overlay": "editor"
+      }
+    ]
+  }
 }
 ```
 
-The expected declarative contracts are:
+Notes on the fields that matter here:
 
-- `agents:attachment` declares an owner action equivalent to `replace`;
-- a remote extension may associate one of its own overlay frames;
-- overlay invocation input is available in the frame context;
-- overlay `close(result)` resolves only the initiating tree request;
-- binary request and response bodies are bounded above the 10 MiB attachment limit;
-- another plugin's `/v2/p/agents/*` routes remain inaccessible to the client sandbox; and
-- `agents.draftAttachments` reads and creates replacements only for task-scoped, unreferenced draft
-  attachments and never exposes a filesystem path.
+- `apiVersion` is a string, and `10` is the current major
+  (`packages/protocol/src/plugin/apiVersion.ts`). Read it rather than trusting this file. A range such
+  as `"10 || 11"` is legal if you intend to support both.
+- `id` binds your route namespace, your renderer prefix and your SQLite filename, and it can never
+  change. `name` in your `NodePlugin` must equal it.
+- `requires.plugins` means your package does not load at all when agents is absent, and the roster row
+  says which id was missing. It also means you initialize after agents, so the capability is registered
+  by the time your `init` runs. It installs nothing — the owner installs both.
+- `overlay: "editor"` is what makes that frame reachable. There is deliberately no command.
+- Ask for no `api` scope. Task identity comes from the owner-scoped contribution and the capability
+  does the authoritative ownership check. Ask for no filesystem, secrets, exec or network authority
+  either; you need none of them, and the trust prompt shows the owner every one you request.
 
-No fallback transport should be built. In particular, do not substitute base64 JSON, a data URL,
-direct agents-route access, or filesystem reads if any prerequisite is missing.
+## Architecture and data flow
+
+```text
+AgentComposer draft holds source attachment A
+  -> agents:attachment arbitration picks agent-attachment-image
+  -> your remote AttachmentPreview draws the compact chip
+  -> the reader presses Edit
+  -> host.openOverlay('editor', metadata for A)
+  -> your overlay frame GETs your own content route as bytes
+  -> your node route calls agents.draftAttachments.read(A)
+  -> the frame decodes A and records pen/text operations in memory
+  -> Apply rasterizes base + operations and POSTs bytes to your replacement route
+  -> your node route calls agents.draftAttachments.createReplacement(A, bytes)
+  -> the agents store creates or deduplicates immutable attachment B
+  -> the overlay closes with { kind: 'applied', ... }
+  -> your preview calls host.invoke('replace', { expectedAttachmentId: A, replacementAttachmentId: B })
+  -> AgentComposer compare-and-swaps A -> B, persists the draft, then cleans up A
+  -> ordinary enqueue references B
+  -> the existing driver resolution sends B's local image to the agent
+```
+
+Two ownership facts hold the whole design up. Your plugin never touches the draft array: it is client
+state in the composer, and the composer is the only thing that can prove A still occupies that slot.
+And your node half never claims a replacement has committed: it creates candidate B and stops.
 
 ## User experience
 
 ### Composer preview
 
-For `image/png` and `image/jpeg`, replace the fallback attachment body with a native kit preview that
-shows:
+For `image/png` and `image/jpeg`, replace the fallback attachment body with a kit preview showing the
+image glyph, the filename, the rounded KiB size, an Edit affordance labelled `Edit <filename>`, and a
+busy state while a result is being committed.
 
-- the image glyph;
-- filename;
-- rounded KiB size;
-- an Edit affordance or a pressable body with accessible label `Edit <filename>`; and
-- a busy state while an edit result is being committed.
+The agents plugin keeps the remove control, drawn outside the part you replace. You must not receive or
+recreate attachment removal. That is what keeps the attachment removable when your plugin is disabled,
+fails, or loses arbitration to another contributor.
 
-The agents plugin must continue to own the remove button outside the replaceable portion. The image
-plugin must not receive or recreate attachment removal. This ensures the attachment remains removable
-when the editor plugin is disabled, fails, or loses extension-point arbitration.
-
-The supplied UI reference is a compact metadata chip rather than a thumbnail. Match that density for
-the first version. Do not add an image/thumbnail node to the closed kit as part of this work.
+The reference is a compact metadata chip, not a thumbnail. Match that density. Do not ask for an image
+node in the closed kit as part of this work.
 
 ### Editor overlay
 
-The overlay has host-owned modal chrome and a plugin-owned editor body:
+Host-owned modal chrome, plugin-owned body:
 
 ```text
 ┌ Image markup · screenshot.png ─────────────────────────────── × ┐
-│ [Pen] [Text]   [● ● ● ● ● ●]   Width [S M L]  Undo Redo Reset │
+│ [Pen] [Text]   [● ● ● ● ● ●]   Width [S M L]  Undo Redo Reset  │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
 │                    image canvas, fit to view                   │
 │                                                                │
 ├────────────────────────────────────────────────────────────────┤
-│  PNG · 1920 × 1080                          [Cancel] [Apply]    │
+│  PNG · 1920 × 1080                          [Cancel] [Apply]   │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-The first release includes only:
+First release: Pen and Text; black, white, red, yellow, green and blue; small, medium and large widths;
+undo, redo, reset, cancel and apply; zoom-to-fit, with zoom in/out only if it stays contained; keyboard
+shortcuts for history and dismissal. Initial state is Pen, red, medium.
 
-- Pen and Text tools;
-- black, white, red, yellow, green, and blue;
-- small, medium, and large pen widths;
-- undo, redo, reset, cancel, and apply;
-- zoom-to-fit, with optional zoom in/out only if it remains a contained addition; and
-- keyboard shortcuts for history and dismissal.
-
-The initial tool is Pen, colour is red, and width is medium. Remember the last tool, colour, and width
-through plugin state if the shipped bridge already offers bounded namespaced state; do not persist the
-image or operation history.
+Remember the last tool, colour and width in `bridge.state`, which is namespaced to your plugin and
+capped at 1 MiB per value. Never persist the image or the operation history.
 
 ### Interaction rules
 
-- Pointer down on the canvas begins a stroke only when Pen is active.
-- Pointer capture continues the stroke if the pointer leaves the canvas.
-- Pointer up/cancel commits one stroke operation.
-- A click with Text active places a DOM textarea over the image at that image coordinate.
-- `Cmd/Ctrl+Enter` or an explicit Add control commits text. Escape cancels the text entry before it
+- Pointer down begins a stroke only when Pen is active.
+- Pointer capture continues a stroke that leaves the canvas.
+- Pointer up or cancel commits one stroke.
+- A click with Text active places a textarea over the image at that image coordinate.
+- `Cmd/Ctrl+Enter` or an explicit Add commits text. Escape cancels the text entry **before** it
   dismisses the overlay.
 - `Cmd/Ctrl+Z` undoes; `Cmd/Ctrl+Shift+Z` and `Cmd/Ctrl+Y` redo.
-- Reset removes every committed alteration after confirmation only when there is more than one
-  operation; for a single operation, ordinary Undo is sufficient and less interruptive.
-- Apply with no committed operations behaves like Cancel and creates no attachment.
-- Cancel, backdrop click, the host close control, and navigation discard the in-memory operation list.
-- Apply stays disabled while source loading, decoding, encoding, upload, or replacement commit is in
-  progress.
-- If upload fails, keep the operations and let the user retry.
+- Reset asks for confirmation only when more than one operation exists; for a single one, Undo is
+  enough and less interruptive.
+- Apply with nothing committed behaves like Cancel and creates no attachment.
+- Cancel, backdrop, the host's close control and navigation all discard the in-memory operations.
+- Apply is disabled while loading, decoding, encoding or uploading.
+- A failed upload keeps the operations so the reader can retry.
 
-The overlay must never close merely because encoding or upload began. It closes with a replacement id
-only after the Node has accepted and stored the replacement candidate.
+The overlay never closes because encoding or upload started. It closes only after the node has stored
+the candidate.
 
 ## Scope
 
-### In scope
+**In scope**: the package, its node route adapter, the remote preview, the overlay editor, the pure
+edit model, tests, and a README your users read before installing.
 
-- A new `plugins/agent-attachment-image` workspace package.
-- Its loadable-plugin config, Node route adapter, remote preview, overlay editor, pure edit model, and
-  tests.
-- Adding it to the desktop bundled-loaded-plugin roster.
-- Minimal fixes to the implemented platform seam if integration exposes a clear defect in the shipped
-  contract, with a regression test at the platform owner.
-- Owning documentation for the shipped plugin.
+**Out of scope**: PDF, GIF, WebP, SVG, HEIC, video or arbitrary preview; animated flattening; crop,
+resize, rotate, selection, fill, shapes, layers, eraser, filters, eyedropper or clipboard paste; image
+generation; editing an attachment after enqueue; writing to the worktree or the reader's source file; a
+media library or a plugin database; a terminal canvas editor; anything that would need a change to
+acorn's closed kit.
 
-### Out of scope
+## The node half
 
-- PDF, GIF, WebP, SVG, HEIC, video, or arbitrary file preview.
-- Animated-image flattening.
-- Crop, resize, rotate, selection, fill, shapes, layers, eraser, filters, eyedropper, or clipboard
-  paste.
-- AI image generation or semantic image understanding.
-- Editing an attachment after enqueue or modifying a sent turn.
-- Writing to the project worktree or overwriting the file from which the attachment originated.
-- A generic media library, asset database, or plugin database.
-- A TUI canvas editor. The terminal keeps the default/static attachment rendering.
-- A compiled plugin or a new entry in compiled plugin rosters.
-- A public attachment download endpoint under `/v2/p/agents/`.
-
-## Architecture and data flow
-
-```text
-AgentComposer draft contains source attachment A
-  -> agents:attachment arbitration selects agent-attachment-image
-  -> remote AttachmentPreview renders native compact UI
-  -> user presses Edit
-  -> slot-bound openOverlay(editor, metadata for A)
-  -> overlay frame GETs plugin-owned content route as bytes
-  -> plugin Node route calls agents.draftAttachments.read(A)
-  -> frame decodes A and records pen/text operations in memory
-  -> Apply rasterizes base + operations and POSTs bytes to plugin-owned replacement route
-  -> plugin Node route calls agents.draftAttachments.createReplacement(A, bytes)
-  -> agents store creates/deduplicates immutable attachment B
-  -> overlay closes with { kind: 'applied', replacementAttachmentId: B.id }
-  -> remote preview invokes owner action replace(expected A, replacement B)
-  -> AgentComposer compare-and-swaps A -> B, persists the draft, then cleans up A
-  -> ordinary enqueue references B
-  -> existing driver resolution sends B's local image to the agent
-```
-
-The plugin never owns the draft array. The Node never claims that replacement has committed. It only
-creates candidate B. The agents client makes the final compare-and-swap because only it can prove that
-A still occupies that composer slot.
-
-## Package and file shape
-
-Use this as the intended ownership split, adjusting filenames only to match the live conventions:
-
-```text
-plugins/agent-attachment-image/
-  acorn-plugin.config.mjs
-  package.json
-  src/
-    contract/
-      routes.ts
-      wire.ts
-    node/
-      index.ts
-    server/
-      attachmentImageRoutes.ts
-      attachmentImageRoutes.test.ts
-    client/
-      index.ts
-      preview/
-        AttachmentPreview.tsx
-        AttachmentPreview.test.tsx
-      editor/
-        ImageEditor.ts
-        editor.css
-        model.ts
-        model.test.ts
-        coordinates.ts
-        coordinates.test.ts
-        rasterize.ts
-        rasterize.test.ts
-```
-
-Keep files feature-owned and narrow:
-
-- `wire.ts` owns parsed input/result shapes used on both sides of the iframe boundary.
-- `routes.ts` owns plugin-local route builders used by client and Node code.
-- `attachmentImageRoutes.ts` adapts HTTP bytes to the agents capability; it contains no image editing.
-- `model.ts` owns tools, operation history, undo/redo, and dirty state without DOM types.
-- `coordinates.ts` converts displayed pointer positions to source-image coordinates.
-- `rasterize.ts` draws a base bitmap and operation list into an injected 2D context and encodes it.
-- `ImageEditor.ts` owns DOM/canvas lifecycle and composes those pure modules.
-- `AttachmentPreview.tsx` owns only remote-tree UI and the two slot-bound calls.
-
-Avoid one large editor component containing pointer math, history, HTTP, encoding, and DOM creation.
-
-## Package metadata and manifest
-
-Use package name `@acorn/plugin-agent-attachment-image`, version `0.1.0`, private workspace package,
-ES modules, and the same lint/test scripts as other plugins:
-
-```json
-{
-  "scripts": {
-    "lint": "tsc --noEmit",
-    "test": "vitest run"
-  }
-}
-```
-
-Expected workspace dependencies are `@acorn/plugin-api`, `@acorn/plugin-agents` for the capability
-contract if that is how the implementation exported it, `@acorn/protocol` for `AgentAttachment`,
-`solid-js` for the remote preview, and the existing test/build dependencies used by loaded plugins.
-Do not add an image-editing dependency for pen and text; Canvas 2D is sufficient.
-
-The config should express this effective manifest:
-
-```js
-export default {
-  name: 'Image markup',
-  entry: '@acorn/plugin-agent-attachment-image/node/index.ts',
-  factory: 'agentAttachmentImagePlugin',
-  client: { entry: './src/client/index.ts' },
-  requires: { plugins: [{ id: 'agents' }] },
-  permissions: {
-    api: [],
-    events: [],
-    node: {
-      core: [],
-      capabilities: ['agents.draftAttachments'],
-      secrets: false,
-      exec: false,
-      net: [],
-    },
-  },
-  contributions: {
-    frames: [{
-      target: 'overlay',
-      id: 'editor',
-      label: 'Image markup',
-    }],
-    extensions: [{
-      id: 'agent-image',
-      point: 'agents:attachment',
-      label: 'Image markup',
-      remote: 'attachmentPreview',
-      matches: ['image/png', 'image/jpeg'],
-      overlay: 'editor',
-    }],
-  },
-}
-```
-
-Use the final implemented manifest field names, not the illustrative names above. The generated
-manifest must contain `requires.plugins`; verify the loaded-plugin builder now copies that config
-field. There should be no command just to make the overlay appear reachable. Its association with the
-remote extension is the real opener.
-
-Do not request `core.tasks:read`: task identity comes from the owner-scoped contribution and the Node
-capability performs the authoritative ownership check. Do not request general filesystem, secrets,
-network, or process authority.
-
-## Node half
-
-The Node plugin is a thin route adapter with no state:
+A thin route adapter with no state:
 
 ```ts
-export const agentAttachmentImagePlugin = (): NodePlugin => ({
+import type { CapabilityIdOf, NodePlugin } from 'acorn-plugin-types'
+import { createAttachmentImageFetch } from './routes'
+
+// One line per capability, because acorn-plugin-types has no runtime: an `import { … }` that resolved
+// to nothing would be a worse trap than a cast.
+const AGENTS_DRAFT_ATTACHMENTS = 'agents.draftAttachments' as CapabilityIdOf<'agents.draftAttachments'>
+
+export default {
   name: 'agent-attachment-image',
-  init: (ctx) => {
-    ctx.routes.fetch(createAttachmentImageFetch(() =>
-      ctx.capabilities.require(AGENTS_DRAFT_ATTACHMENTS),
-    ), { prefix: '', note: 'read and create image draft attachment replacements' })
+  init(ctx) {
+    ctx.routes.fetch(
+      createAttachmentImageFetch(() => ctx.capabilities.require(AGENTS_DRAFT_ATTACHMENTS)),
+      { prefix: '', note: 'read and replace draft image attachments' },
+    )
   },
-})
+} satisfies NodePlugin
 ```
 
-Resolve the capability per request, or pass a getter as above. Plugin initialization order is not a
-safe time to capture another plugin's capability. Follow the portable fetch-carrier pattern used by
-the existing loaded plugins; do not export a live Hono instance across the loaded boundary.
+Resolve the capability **per request**, as the getter above does. Plugin init order is undefined in
+general; `requires.plugins` guarantees agents ran first, but a reload or a disable can still happen
+underneath you, and a handle captured at init would then be stale. `require` throws when it is gone,
+which your handler turns into a retryable dependency error.
+
+`ctx.routes.fetch` takes a `(Request, PluginRequestContext) => Response`. Nothing in that signature
+names a framework: bring your own router, bundle it, and hand over its `fetch`.
 
 ### Routes
 
-Use two plugin-owned endpoints, with route builders shared by client code:
+Two endpoints, with builders in `shared/routes.ts` that both halves import so the spelling cannot
+drift:
 
-| Method | Plugin-relative route | Success |
+| Method | Path, relative to your namespace | Answers |
 | --- | --- | --- |
-| GET | `/draft-attachments/:attachmentId/content?taskId=:taskId` | Raw image bytes with source MIME, filename, content length, and `Cache-Control: no-store`. |
-| POST | `/draft-attachments/:attachmentId/replacements?taskId=:taskId` | JSON `{ attachment: AgentAttachment }` after storing/deduplicating the candidate. |
+| GET | `/draft-attachments/:attachmentId/content?taskId=…` | Raw bytes, with the source MIME, `Content-Length`, `Content-Disposition` and `Cache-Control: no-store`. |
+| POST | `/draft-attachments/:attachmentId/replacements?taskId=…` | `{ attachment }` after the store has kept or deduplicated the candidate. |
 
-The POST body is raw image bytes. Send media type and filename using the exact metadata carrier the
-binary bridge implementation chose; do not duplicate them in a JSON wrapper. Validate:
+The POST body is raw bytes; the media type and filename ride the headers `postBytes` sets. Do not wrap
+them in JSON as well.
 
-- method and path;
-- non-empty bounded task and attachment ids;
-- `image/png` or `image/jpeg` only;
-- a bounded non-empty display filename;
-- declared content length before reading where available; and
-- actual bytes through the agents capability/store, which remains authoritative for magic bytes,
-  per-file size, safe basename, and content hash.
+Validate the method, the path, and non-empty bounded task and attachment ids before you dispatch. Check
+that the declared content length is within your ceiling where you have one. Then hand the bytes to the
+capability and let it be authoritative on magic bytes, per-file size, the safe basename and the content
+hash — your checks exist to fail fast, not to become a second source of truth.
 
-Map a missing or referenced source to a stable not-editable/not-found error without revealing whether
-an attachment exists on another task. Map unavailable capability to the host's dependency-unavailable
-error. Pass existing structured errors through rather than converting every failure to 500.
+Map a missing, wrong-task or already-sent source to one stable "not editable" error. Do not distinguish
+them: telling a caller which one it was answers questions about attachments on tasks it cannot see. Map
+an absent capability to a retryable dependency error. Pass structured errors through rather than
+flattening everything to 500.
 
-No route deletes the candidate. If composer commit fails, the agents owner can use its existing
-unreferenced-delete operation; otherwise normal attachment GC handles it.
+No route deletes anything. If the composer refuses the candidate it cleans up; otherwise the agents
+store's own sweep collects it.
 
-### Route tests
+## One bundle, two runtimes
 
-Use an injected fake capability and assert:
-
-- GET returns exact bytes and headers;
-- GET missing/wrong-task/referenced is refused without bytes;
-- POST passes the route source id, task id, filename, MIME, and exact bytes to `createReplacement`;
-- PNG and JPEG succeed;
-- unsupported/spoofed/oversize input is surfaced from the capability as a structured error;
-- dependency absence is explicit and retryable where appropriate;
-- an error response never echoes bytes, filename content, or annotation text; and
-- no filesystem path appears in any response.
-
-## One client bundle, two runtimes
-
-The loaded-plugin builder emits one browser bundle. The entry has to select its runtime before
-mounting:
+Your manifest names one `client` file and acorn loads it two ways: in a Web Worker for the tree, in an
+iframe for the overlay. Branch before you mount.
 
 ```ts
+import { mountFrame, mountTree } from 'acorn-plugin-sdk'
+import { solidTree } from 'acorn-plugin-sdk/remote'
+import styles from './editor/editor.css?inline'
+import { AttachmentPreview } from './preview/AttachmentPreview'
+import { mountImageEditor } from './editor/mountImageEditor'
+
 if (typeof document === 'undefined') {
   mountTree({ attachmentPreview: solidTree(AttachmentPreview) })
 } else {
@@ -386,20 +363,24 @@ if (typeof document === 'undefined') {
 }
 ```
 
-Do not invoke both mount functions. A frame handshake has no tree port; a worker has no DOM. Keep the
-DOM editor free of Solid if that makes canvas lifecycle simpler. The universal Solid transform can
-still compile the remote preview because the branch and imports share one bundle.
+Never call both. A frame's handshake carries no tree port and a worker has no DOM.
 
-If the implementation's CSP or build pipeline cannot bundle CSS as a string for `mountFrame`, use the
-existing frame stylesheet pattern. Do not add a separately fetched asset: the plugin origin serves a
-single content-addressed client bundle.
+Keep the editor free of Solid. It is DOM and canvas lifecycle, and the tree half already pulls Solid's
+universal renderer into the bundle; adding the DOM renderer beside it puts two Solid instances in one
+file for no gain.
+
+`styles` is your stylesheet inlined as a string, because a plugin origin serves one script and nothing
+else. There is no second asset to fetch.
+
+**Verify this branch early.** Nothing in acorn proves that one bundle survives it — the four loaded
+plugins acorn ships are trees only. Build a two-line fixture that mounts a trivial tree and a trivial
+frame from one file, install it, and confirm both draw before you write the real thing against the
+assumption.
 
 ## Shared wire shapes
 
-Define and parse these at the iframe/worker boundary:
-
 ```ts
-type EditorInput = {
+export type EditorInput = {
   taskId: string
   attachmentId: string
   filename: string
@@ -407,94 +388,89 @@ type EditorInput = {
   byteSize: number
 }
 
-type EditorResult =
+export type EditorResult =
   | { kind: 'applied'; expectedAttachmentId: string; replacementAttachmentId: string }
   | { kind: 'unchanged' }
 ```
 
-`null` is host dismissal and is not an `EditorResult`. Parse with small hand-written guards unless the
-plugin already depends on Zod for another reason. Reject unexpected fields only where the implemented
-bridge promises strict JSON; otherwise ignore additive fields and validate what is consumed.
+`null` is the host telling you the reader dismissed the overlay. It is not an `EditorResult`, and every
+dismissal path produces it: Escape, the backdrop, the close button, another overlay opening, your own
+tree unmounting, navigating away.
 
-The frame must verify that `bridge.context.target` is `overlay`, that input parses, and that input MIME
-matches the metadata returned by GET. The worker must require the result's expected id to equal the id
-from the current preview props before invoking the owner action.
+Parse both shapes with small hand-written guards. Ignore fields you do not consume; validate the ones
+you do.
 
-Do not send image bytes, operation history, or text annotation contents through overlay input/result.
+The frame should check that `bridge.context.target` is `overlay`, that its input parses, and that the
+input's MIME matches what the GET actually returned. The tree must require the result's expected id to
+equal the id in its current props before it invokes the owner action.
 
-## Remote preview implementation
+Never put image bytes, operation history or annotation text in the input or the result.
 
-`AttachmentPreview` receives changing owner props and the slot-bound host interface. Its flow is:
+## The remote preview
 
-1. parse `{ attachment, taskId, sessionId }` from the mount props;
-2. render a kit `Chip`/`Button` composition matching the default attachment density;
-3. on press, capture the current attachment id and set local busy state;
-4. open `editor` with `EditorInput`;
-5. if dismissed or unchanged, clear busy state;
-6. if applied, validate both ids and invoke owner action `replace` with
-   `{ expectedAttachmentId, replacementAttachmentId }`;
-7. wait for owner acknowledgement rather than optimistically rewriting props; and
-8. clear busy/error state unless the mount was disposed.
+`solidTree` hands your component the owner's props, plus `bridge` and `host`:
 
-If props change while the overlay is open, treat the captured id as stale. The platform should dismiss
-an overlay when its source slot unmounts, but the preview must still rely on the owner's compare-and-
-swap, not on that UI behavior for correctness.
+```tsx
+type PreviewProps = {
+  attachment: DraftAttachment
+  taskId: string
+  sessionId: string
+  bridge: AcornBridge
+  host: TreeMount['host']
+}
+```
 
-Disable repeated presses while one invocation is live. An error should leave the original preview and
-offer Edit again. Use a concise inline status when the kit supports it; use a toast only for failures
-that occur after the overlay has closed and therefore have no editor surface left to display them.
+Its flow:
 
-The preview has no `onRemove`, does not call the managed-agent API directly, and never sees attachment
-bytes.
+1. read `{ attachment, taskId, sessionId }` from props;
+2. draw a kit `Chip`/`Button` composition at the default attachment density;
+3. on press, capture the current attachment id and set a local busy state;
+4. `await host.openOverlay('editor', input)`;
+5. on `null` or `unchanged`, clear busy and stop;
+6. on `applied`, check both ids and `await host.invoke('replace', { expectedAttachmentId, replacementAttachmentId })`;
+7. wait for the owner's answer rather than optimistically redrawing; and
+8. clear busy and error state unless the mount was disposed.
+
+Call `openOverlay` from the press handler. The host honours it only while focus is inside your tree,
+and at most once a second, so a background timer cannot put a modal in front of the reader. Catch
+`unsupported_host` and leave the static preview up: the terminal draws trees and has no iframe, and a
+control that cannot work is worse than no control.
+
+If props change while the overlay is open, treat your captured id as stale. Acorn dismisses an overlay
+when its source slot unmounts, but correctness rests on the owner's compare-and-swap, not on that.
+
+Disable repeated presses while one invocation is live. On failure, leave the original preview and offer
+Edit again. Use an inline status where the kit allows one; use a toast only for a failure that lands
+after the overlay closed and has no editor left to show it in.
+
+The preview has no remove control, never calls a managed-agent route, and never sees bytes.
 
 ## Editor domain model
 
-Keep the source bitmap immutable and store alterations as operations:
+The source bitmap is immutable; alterations are a list of operations.
 
 ```ts
 type ImagePoint = { x: number; y: number }
 
-type StrokeOperation = {
-  kind: 'stroke'
-  color: EditorColor
-  width: number
-  points: ImagePoint[]
-}
-
-type TextOperation = {
-  kind: 'text'
-  color: EditorColor
-  size: number
-  at: ImagePoint
-  text: string
-}
-
+type StrokeOperation = { kind: 'stroke'; color: EditorColor; width: number; points: ImagePoint[] }
+type TextOperation = { kind: 'text'; color: EditorColor; size: number; at: ImagePoint; text: string }
 type EditOperation = StrokeOperation | TextOperation
 
-type EditorHistory = {
-  committed: EditOperation[]
-  undone: EditOperation[]
-}
+type EditorHistory = { committed: EditOperation[]; undone: EditOperation[] }
 ```
 
-Rules:
+- Committing clears `undone`; undo moves the last committed onto it; redo moves it back; reset empties
+  both.
+- A stroke with fewer than two distinct points is a dot, not an empty operation.
+- Empty or whitespace-only text is never committed.
+- Cap text at 2,000 scalar values, committed operations at 1,000, and points at 20,000 per stroke. When
+  a cap is hit, say so rather than silently truncating what gets exported.
 
-- committing a new operation clears `undone`;
-- undo moves the last committed operation to `undone`;
-- redo restores the last undone operation;
-- reset clears both arrays;
-- a stroke with fewer than two distinct points becomes a dot, not an empty operation;
-- empty/whitespace-only text is not committed;
-- cap text at 2,000 Unicode scalar values per operation;
-- cap committed operations at 1,000 and points at 20,000 per stroke; and
-- when a cap is hit, stop accepting that operation and tell the user instead of silently truncating
-  the exported result.
+Do not implement undo as `ImageData` snapshots. At the 40 MP decoded ceiling one RGBA snapshot is about
+160 MiB before history or browser overhead.
 
-Do not implement undo as `ImageData` snapshots. At the permitted 40 MP decoded ceiling, one RGBA
-snapshot is roughly 160 MiB before history or browser overhead.
-
-The six colours are closed literal values, not arbitrary CSS supplied by state. Width presets resolve
-to image-space pixels. Suggested initial values are based on the shorter image dimension:
+The six colours are closed literals, never CSS from state. Widths resolve to image-space pixels from
+the shorter side:
 
 ```ts
 small  = clamp(round(shortSide * 0.002), 2, 12)
@@ -502,90 +478,66 @@ medium = clamp(round(shortSide * 0.005), 4, 32)
 large  = clamp(round(shortSide * 0.012), 8, 72)
 ```
 
-Store the resolved width on each operation so changing the active preset does not alter history.
+Store the resolved width on each operation, so changing the active preset does not rewrite history.
 
-## Image loading and memory bounds
+## Loading, and the memory ceiling
 
-Load source bytes with an `AbortController`, create a `Blob` using the returned authoritative MIME,
-and decode with `createImageBitmap`. Revoke any object URL and close the bitmap on unmount.
+Fetch with an `AbortController`, build a `Blob` from the authoritative MIME the GET returned, and decode
+with `createImageBitmap`. Revoke object URLs and close the bitmap on unmount.
 
-Before allocating the working canvas, refuse when:
+Refuse, before allocating the working canvas, when a dimension is zero, either dimension exceeds 8,192
+pixels, or `width * height` exceeds 40,000,000. Keep those as named constants beside their tests. The
+10 MiB encoded limit does not stop a heavily compressed image from asking for an unsafe decoded
+allocation.
 
-- width or height is zero;
-- either dimension exceeds 8,192 pixels; or
-- `width * height` exceeds 40,000,000 pixels.
+`createImageBitmap` should bake JPEG orientation into the decoded pixels, so use `bitmap.width` and
+`bitmap.height` as canonical and let the export inherit it. Add a fixture with non-default EXIF
+orientation and prove it. If your runtime does not honour orientation consistently, stop and add an
+explicit decoder rather than shipping an editor that rotates people's images.
 
-Keep these named constants next to tests. The encoded 10 MiB attachment limit does not prevent a
-highly compressed image from creating an unsafe decoded allocation.
+Keep one source-sized render canvas. A second is acceptable during export but must not persist.
 
-`createImageBitmap` should apply JPEG orientation as displayed by the browser. Use the decoded
-`bitmap.width` and `bitmap.height` as the canonical source dimensions; exported pixels bake that
-orientation in. Add a fixture with non-default EXIF orientation to prove the desktop engine behavior.
-If the runtime does not honor orientation consistently, STOP and add an explicit orientation decoder;
-do not ship an editor whose export rotates the user's image.
+## Coordinates and pointer input
 
-Keep one source-sized render canvas. A second source-sized scratch canvas is acceptable during final
-export but must not persist between exports. The visible CSS size is independent of backing pixels.
-
-## Coordinates, zoom, and pointer input
-
-Every operation uses image-space coordinates. Convert from client coordinates with:
+Every operation is in image space:
 
 ```ts
 x = clamp((clientX - rect.left) * imageWidth / rect.width, 0, imageWidth)
 y = clamp((clientY - rect.top) * imageHeight / rect.height, 0, imageHeight)
 ```
 
-This remains correct under zoom as long as `rect` describes the actual displayed canvas. Test all four
-corners, center, non-integer scaling, letterboxed layout, and out-of-bounds clamping.
+Correct under zoom as long as `rect` is the displayed canvas. Test four corners, the centre,
+non-integer scaling, a letterboxed layout, and out-of-bounds clamping.
 
-For Pen:
+For Pen: Pointer Events only, never separate mouse and touch paths; `setPointerCapture` after a valid
+down; one active pointer; round caps and joins; ignore pressure so a stylus and a trackpad export the
+same thing; coalesce moves to one render per animation frame; skip a point closer than
+`max(0.5, width / 8)` image pixels to the last. Render the active stroke without committing it. Pointer
+cancel discards it. Unmount releases capture and cancels scheduled frames.
 
-- listen to Pointer Events, not separate mouse/touch paths;
-- call `setPointerCapture(pointerId)` after a valid pointer down;
-- track one active pointer only;
-- use round line caps and joins;
-- ignore pressure for MVP so device type does not change exported semantics;
-- coalesce move events into at most one render per animation frame; and
-- skip a new point when it is less than `max(0.5, width / 8)` image pixels from the last point.
+For Text, position a normal textarea over the canvas using the inverse mapping. Keep the text in DOM
+state until commit. Rasterize with a documented font stack, explicit size, baseline and line height.
+Wrap only if your wrapping is deterministic and tested; otherwise honour explicit newlines and do not
+wrap at all.
 
-Render the active stroke without committing it. Pointer cancel discards that active stroke. Unmount
-must release capture and scheduled animation frames.
+## Rasterize and export
 
-For Text, position a normal textarea over the displayed canvas using the inverse mapping from image
-coordinates to CSS coordinates. Keep editing text in DOM state until commit. Rasterize committed text
-with a stable documented font stack, explicit size, baseline, and line height. Use wrapping only if it
-is deterministic and covered by tests; otherwise preserve explicit newlines and do not silently wrap.
+`rasterize` is deterministic for a given bitmap, dimensions and operation list: reset the transform,
+clear, draw the base at decoded dimensions, replay operations in order, then encode.
 
-## Rasterization and export
+- PNG in, PNG out, via `canvas.toBlob('image/png')`.
+- JPEG in, JPEG out, via `canvas.toBlob('image/jpeg', 0.92)`.
+- Never `toDataURL`.
+- Never silently resize, change format or drop quality to fit a limit. Refuse and keep the editor open.
+- Name the output `<base>-annotated.png` or `.jpg`, stripping an existing trailing `-annotated` first
+  so repeated edits do not accumulate suffixes.
+- A `null` from `toBlob` is a visible encoding failure, not an empty upload.
 
-`rasterize` must be deterministic for a given decoded bitmap, dimensions, and operation list:
+You do not need to compare your bytes to the source. The store deduplicates by content hash, so an edit
+that changed nothing comes back as the source's own id — close with `unchanged` and do not invoke the
+owner action.
 
-1. reset the context transform and clear the destination;
-2. draw the base bitmap at decoded dimensions;
-3. replay operations in order;
-4. render strokes with their stored colour and image-space width;
-5. render text line by line with its stored colour and size; and
-6. encode only after the final replay completes.
-
-Export policy:
-
-- PNG source becomes PNG via `canvas.toBlob('image/png')`.
-- JPEG source becomes JPEG via `canvas.toBlob('image/jpeg', 0.92)`.
-- Do not use `toDataURL`.
-- Do not silently resize, change format, or lower JPEG quality to fit a byte limit.
-- Refuse an encoded result over the agents attachment limit while keeping the editor open.
-- Name the output `<base>-annotated.png` or `<base>-annotated.jpg`.
-- Strip an existing final `-annotated` before adding it, so repeated edits do not accumulate suffixes.
-- A null `toBlob` result is a visible encoding failure, not an empty upload.
-
-Comparing local encoded bytes to the source is optional. The attachment store already deduplicates by
-content hash. If the returned replacement id equals the source id, close with `unchanged` and do not
-invoke the owner action.
-
-## Apply and replacement lifecycle
-
-Apply is a four-stage state machine:
+## Apply
 
 ```ts
 type ApplyState =
@@ -596,354 +548,269 @@ type ApplyState =
   | { kind: 'failed'; message: string }
 ```
 
-On Apply:
+1. Refuse a second apply.
+2. Finish or cancel the active text edit, according to what the reader actually did.
+3. Render and encode the base plus committed operations.
+4. Reject locally if the bytes exceed the known maximum.
+5. `postBytes` to your replacement route.
+6. Validate the returned attachment: same task, sane metadata.
+7. If its id equals the source id, close `{ kind: 'unchanged' }`.
+8. Otherwise close with both ids.
+9. Your preview invokes `replace` and waits for the composer's answer.
 
-1. prevent a second apply;
-2. finish or cancel any active text edit according to the user's explicit action;
-3. render and encode base plus committed operations;
-4. reject locally if bytes exceed the known maximum;
-5. POST raw bytes to the plugin-owned replacement route;
-6. validate returned attachment metadata and same task;
-7. if replacement id equals source id, close `{ kind: 'unchanged' }`;
-8. otherwise close with both expected and replacement ids; and
-9. let the remote preview invoke the owner `replace` action and await acknowledgement.
+The editor cannot know whether the commit succeeded, because it is gone by then. If the owner rejects,
+the preview reports it and the original stays. The candidate is cleaned up by the composer or collected
+later as unreferenced.
 
-The editor cannot know whether composer commit succeeds after it closes. If the owner action rejects,
-the preview reports the failure and keeps the original. The candidate replacement is best-effort
-deleted by agents or later collected as unreferenced.
+Never delete the source from your route. The composer persists the replacement in the durable draft
+before it cleans up the source, and a cleanup failure is not a failed replacement.
 
-Never delete source A from the plugin Node route. The composer persists B in the local draft before
-cleaning up A. A cleanup failure is not a failed replacement.
+## Concurrency and failure
 
-## Concurrency and failures
-
-| Event | Required behavior |
+| Event | Required behaviour |
 | --- | --- |
-| Source removed while editor is open | Source slot dismissal should close the overlay. A late result still fails owner compare-and-swap and cannot reinsert the image. |
-| Source queued elsewhere | Capability refuses replacement of a now-referenced attachment, or owner refuses stale replacement. Sent evidence is unchanged. |
-| Props change during editing | Result carries the captured expected id; only an exact current slot match can commit. |
-| Node goes offline during GET | Show retryable load failure; no blank editable canvas. |
-| Node goes offline during POST | Keep operations and allow Apply retry. |
-| Upload succeeds, overlay/client crashes | Candidate remains unreferenced and existing GC removes it. Source id remains in persisted draft. |
-| Owner commit fails | Original remains. Preview reports failure and candidate is cleaned up best-effort/GC'd. |
-| Source cleanup fails after commit | Replacement remains committed and sendable; GC removes source later. |
-| Plugin is disabled | Agents fallback preview returns; attachment and draft are untouched. |
-| Two matching preview plugins exist | Existing replace arbitration applies. Do not bypass user choice. |
-| Reopen after Cancel/Apply | A fresh iframe and empty operation history are created. |
-| Unsupported host | No active Edit control is rendered; default/static attachment presentation remains usable. |
+| Source removed while the editor is open | The slot unmounting dismisses the overlay. A late result still fails the owner's compare-and-swap and cannot reinsert the image. |
+| The turn is sent while the editor is open | The capability refuses to replace a now-referenced attachment, and the owner refuses a stale swap. Sent evidence is unchanged. |
+| Props change during editing | The result carries the captured expected id; only an exact match commits. |
+| Node offline during GET | A retryable load failure. Never a blank editable canvas. |
+| Node offline during POST | Keep the operations and allow retry. |
+| Upload succeeds, then the client crashes | The candidate is unreferenced and the existing sweep removes it. The source id survives in the persisted draft. |
+| Owner commit fails | The original remains. The preview reports it; the candidate is cleaned up. |
+| Source cleanup fails after commit | The replacement is committed and sendable. The sweep gets the source later. |
+| Your plugin is disabled | The agents fallback chip returns. The attachment and the draft are untouched. |
+| Another matching preview plugin exists | Existing `replace` arbitration applies, and the reader picks. Do not try to win. |
+| Reopen after Cancel or Apply | A fresh iframe with empty history. Acorn keys the overlay on the invocation, so this is free — but do not rely on module state surviving or not surviving. |
+| Host with no overlays | `unsupported_host`. Render no Edit control; the static preview stays usable. |
 
-## Accessibility and visual rules
+## Accessibility
 
-- The preview control has an accessible name including the filename and exposes busy/disabled state.
-- Host overlay chrome owns dialog semantics, focus trap, close button, and return focus.
-- The editor toolbar uses real buttons with pressed state for active tool/colour/width.
-- Colour controls include text names; colour alone is not the label.
-- Canvas has a concise accessible label and instructions associated by description.
-- The positioned text textarea is a normal labelled form control.
-- Status changes such as loading, encoding, upload failure, and apply success use a polite live region.
-- Controls meet the existing hit-target and focus-ring conventions in every style pack.
-- Exported colours are fixed image values. Theme tokens style editor chrome only.
-- At narrow overlay sizes, toolbar rows wrap but the canvas remains the one scrolling/fitting region.
-- Do not use raw Acorn CSS classes inside the remote tree. Use kit components and props. Frame CSS may
-  use the tokens pushed by the bridge.
+- The preview control's accessible name includes the filename, and it exposes busy and disabled state.
+- Host chrome owns the dialog semantics, focus trap, close button and focus return.
+- The toolbar uses real buttons with pressed state for the active tool, colour and width.
+- Colour controls carry text names. Colour alone is never the label.
+- The canvas has a concise accessible label with instructions associated by description.
+- The positioned textarea is an ordinary labelled form control.
+- Loading, encoding, upload failure and success go through a polite live region.
+- Controls meet acorn's hit-target and focus-ring conventions in every style pack.
+- Exported colours are fixed image values. Theme tokens style your chrome only.
+- At narrow sizes the toolbar wraps and the canvas stays the one fitting region.
+- Use kit components and props in the tree, never raw acorn CSS class names. Your frame's CSS may use
+  the tokens the bridge pushes.
 
 ## Security and privacy
 
-- Request only the agents draft-attachment capability; no API, event, filesystem, secret, process, or
-  network grant.
-- Keep client access inside `/v2/p/agent-attachment-image/*`; the Node capability is the only
-  cross-plugin data seam.
-- Treat task id, attachment id, filename, MIME, dimensions, and overlay result as untrusted at every
-  boundary.
-- Let the agents store perform authoritative magic-byte and task/reference validation.
-- Never return or log local attachment paths.
-- Never log image bytes, operation lists, annotation text, or full filenames.
-- Operational logging, if added, is limited to MIME family, source/output byte counts, decoded
-  dimensions, duration, and stable error code.
-- No audit event is needed for edits to an unsent draft. The queued turn is the durable record of what
-  the agent actually received.
-- Revoke object URLs, abort fetches, cancel animation frames, close `ImageBitmap`, and remove DOM
-  listeners on every exit.
-- Never attempt to recover an unapplied image from local storage; doing so would persist user image
-  content in a second, less-governed store.
+- Request the draft-attachment capability and nothing else.
+- Keep client calls inside `/v2/p/agent-attachment-image/*`. The capability is your only cross-plugin
+  data seam, and the bridge refuses another plugin's namespace before it reads a body.
+- Treat the task id, attachment id, filename, MIME, dimensions and overlay result as untrusted at every
+  boundary, including the one between your own two runtimes.
+- Let the agents store be authoritative on magic bytes and on task and reference checks.
+- Never return or log a local attachment path. You are never given one.
+- Never log image bytes, operation lists, annotation text or full filenames. A text annotation is a
+  person's content and must not reach an error message, a toast detail or a log line.
+- If you log at all, log the MIME family, byte counts, decoded dimensions, a duration and a stable
+  error code.
+- No audit verb. This is a local transformation of an unsent draft, comparable to editing the prompt
+  before sending. The queued turn is the durable record of what the agent received.
+- Revoke object URLs, abort fetches, cancel animation frames, close the `ImageBitmap` and remove
+  listeners on every exit path.
+- Never recover an unapplied image from local storage. That would put image content in a second, less
+  governed store.
 
 ## Implementation steps
 
-### Step 0 — Read the seams you are building on
+### Step 0 — Read the seams, and run their tests
 
-The prerequisite is shipped, so this step is reading rather than syncing. Four places, and the tests
-beside each are the specification:
+If you have this repository checked out, the tests are the specification and they run in seconds:
 
 | What you need | Where it lives | Its tests |
 | --- | --- | --- |
-| `mount.host.invoke` and the point's `actions` | `client-core/host/tree/hostRequests.ts`, `Slot.tsx`, `RemoteTree.tsx` | `RemoteTree.grants.test.tsx`, `hostRequests.test.ts` |
-| `mount.host.openOverlay` and the descriptor's `overlay` | `client-core/host/frames/overlays.ts`, `PluginOverlay.tsx` | `overlays.test.ts`, `RemoteTree.grants.test.tsx` |
-| `bridge.api.getBytes` / `postBytes` | `client-core/host/frames/{broker,frameServices}.ts` | `broker.test.ts` § byte requests |
+| `host.invoke` and a point's `actions` | `client-core/host/tree/hostRequests.ts`, `Slot.tsx`, `RemoteTree.tsx` | `RemoteTree.grants.test.tsx`, `hostRequests.test.ts` |
+| `host.openOverlay` and the descriptor's `overlay` | `client-core/host/frames/overlays.ts`, `PluginOverlay.tsx` | `overlays.test.ts`, `RemoteTree.grants.test.tsx` |
+| What `solidTree` hands your component | `client-core/host/frames/remoteSolid.ts` | `remoteSolid.test.tsx` |
+| `getBytes` / `postBytes` | `client-core/host/frames/{broker,frameServices}.ts` | `broker.test.ts` § byte requests |
 | `agents.draftAttachments` | `plugins/agents/src/contract/draftAttachments.ts` | `server/sessions/draftAttachments.test.ts` |
 
-Run them before you start, so a failure later is yours:
+If you do not, the `plugin_authoring` agent tool answers with this contract plus the connected node's
+*current* manifest vocabulary, action verbs and bridge messages, read off that node's own schemas. That
+is the only way to be sure an answer is not from memory.
 
-```sh
-pnpm --filter @acorn/client-core exec vitest run src/host/tree src/host/frames
-pnpm --filter @acorn/plugin-agents exec vitest run src/server/sessions/draftAttachments.test.ts
+### Step 1 — Scaffold and prove the manifest
+
+Create the package, the manifest above, an empty node factory and a client entry that mounts a trivial
+tree and a trivial frame. Install it as a local folder and restart the node:
+
+```http
+POST /v2/core/plugins/install
+{ "source": { "path": "/absolute/path/to/dist" } }
 ```
 
-Do not recreate any of these inside the plugin. If one of them is genuinely short of what this plugin
-needs, widen the seam and its tests in a separate change, then come back.
+Settings → Plugins → *Local folder* does the same thing with a file picker when the target node is this
+machine, and it symlinks rather than copies, so you edit in place and the next boot runs what you
+edited. An agent writing this package cannot call that route; it asks with the `plugin_request` agent
+tool and the owner approves. Asking with `dev: true` auto-trusts your later bundles, which turns the
+loop into edit-and-reload.
 
-### Step 1 — Scaffold the workspace package and manifest
+Expected: the roster row is green, the trust prompt names only `agents.draftAttachments`, and both the
+tree and the frame draw. If the roster row is red it names the offending manifest field paths and
+whether the failure was at load, init or ready.
 
-Create the package, config, empty Node factory, dual-runtime client entry, and test setup. Add only the
-dependencies actually imported. Ensure the config includes the agents requirement, capability grant,
-overlay frame, and remote extension matching PNG/JPEG.
+### Step 2 — The node route adapter
 
-Build the loadable package without adding it to the desktop roster yet:
+Route builders, request validation, per-request capability lookup, exact bytes out, raw bytes in. Test
+with an injected fake capability. Never touch attachment storage directly — you cannot, and the seam
+exists so you do not try.
 
-```sh
-pnpm --filter @acorn/node build:plugin agent-attachment-image
-```
+Cover: GET returns exact bytes and headers; GET for a missing, wrong-task or referenced attachment is
+refused without bytes; POST forwards the route's source id, task id, filename, MIME and exact bytes;
+PNG and JPEG both succeed; spoofed, unsupported and oversize input surface as structured errors; an
+absent capability is explicit and retryable; no error echoes bytes, a filename or annotation text; and
+no response contains a filesystem path.
 
-Expected: the builder emits `acorn-plugin.json`, `dist/node.js`, and `dist/client.js`; parsing the
-manifest succeeds; its grants contain only `agents.draftAttachments`; it requires agents; and the
-overlay is reachable through the extension association.
+### Step 3 — The pure edit model
 
-### Step 2 — Implement and test the Node route adapter
+Operation types, history transitions, caps, width resolution, coordinate conversion, output naming and
+raster replay. Use a recording fake 2D context rather than pixel snapshots for domain behaviour. None
+of this needs a DOM, and keeping it that way is what makes it testable at all.
 
-Add shared route builders, request validation, capability lookup per request, exact raw-byte response,
-and raw-byte replacement upload. Use an injected capability getter in tests. Do not touch attachment
-storage directly.
+### Step 4 — The overlay editor
 
-```sh
-pnpm --filter @acorn/plugin-agent-attachment-image test -- attachmentImageRoutes
-```
+Mount it only in the frame runtime. Loading, decoding, the memory ceiling, responsive sizing, pointer
+capture, the text overlay, the toolbar, shortcuts, live status, export, POST, and the typed close
+result. Put browser primitives behind small injected functions so tests can make them fail.
 
-Expected: all route cases in “Route tests” pass, including exact-byte equality and no path leakage.
+### Step 5 — The remote preview and the handoff
 
-### Step 3 — Implement the pure edit model
+Mount it only in the worker runtime. Draw the compact preview, open the overlay with current metadata,
+parse the result, invoke `replace` with both ids. Test prop changes and disposal while a promise is
+still pending.
 
-Add operation types, history transitions, caps, width resolution, coordinate conversion, output naming,
-and pure raster replay helpers. Tests should use a recording fake 2D context rather than pixel-level
-browser snapshots for domain behavior.
+Expected: cancel and unchanged invoke nothing; applied invokes exactly once; a stale id is refused;
+ordering and removal stay the composer's; the queued turn carries the replacement id.
 
-```sh
-pnpm --filter @acorn/plugin-agent-attachment-image test -- model coordinates rasterize
-```
+### Step 6 — Prove the pixels reach the agent
 
-Expected: deterministic operation order, undo/redo/reset, point conversion, caps, naming, and replay
-tests pass with no DOM required.
+The acceptance test is not "the editor rendered". Attach a known small PNG, draw a stroke over known
+pixels, Apply, queue the turn, and decode what the driver resolved. The stroke has to be in those
+bytes. Do the same for a JPEG with EXIF rotation and assert the exported orientation matches what the
+editor displayed.
 
-### Step 4 — Implement the overlay editor
+### Step 7 — Ship
 
-Mount the DOM editor only in the frame runtime. Implement source loading/decoding, memory limits,
-responsive canvas sizing, pointer capture, text overlay, toolbar, shortcuts, live status, export, POST,
-and typed close result. Inject browser primitives behind small functions so tests can control failures.
-
-```sh
-pnpm --filter @acorn/plugin-agent-attachment-image test -- ImageEditor
-```
-
-Expected: loading, pen, text, keyboard history, cancel, unchanged, encode failure, oversize export,
-upload retry, result payload, and teardown cases pass.
-
-### Step 5 — Implement the remote preview and owner handoff
-
-Mount the remote tree only in the worker runtime. Render the compact preview, call the associated
-overlay with current metadata, parse its result, and invoke `replace` with compare-and-swap ids. Test
-prop changes and disposal while promises are pending.
-
-```sh
-pnpm --filter @acorn/plugin-agent-attachment-image test -- AttachmentPreview
-pnpm --filter @acorn/plugin-agents test -- AttachmentSlot AgentComposer
-```
-
-Expected: cancel/unchanged do not invoke; applied invokes exactly once; stale ids are refused; original
-ordering and removal remain owned by agents; the queued input contains the replacement id.
-
-### Step 6 — Integrate and bundle
-
-Add `agent-attachment-image` to `apps/desktop/scripts/build-bundled-plugins.mjs`. Add an integration
-fixture with a tiny known image that draws a known stroke, commits it, and verifies the replacement
-bytes—not just the new filename—reach the managed-agent driver resolution path.
-
-```sh
-pnpm --filter @acorn/node build:plugin agent-attachment-image
-pnpm --filter @acorn/desktop test
-```
-
-Expected: desktop staging contains the new loaded package, boot accepts it, and the altered-pixel
-integration passes.
-
-### Step 7 — Document and close
-
-Move shipped facts to the owning documentation:
-
-- add the plugin to `docs/first-party-plugins.md` and `docs/plugin-map.md`;
-- describe the visible attachment behavior and immutable replacement in `docs/managed-agents.md`;
-- add build/test and manual smoke coverage to `docs/testing.md`.
-
-The platform prerequisite is already owned by current documentation and its own future file was
-deleted on 2026-09-04: `docs/plugins.md` § Asking the owner, § Companion overlays and § Binary bridge
-calls, `docs/plugin-authoring.md` § Asking the host for something, `docs/managed-agents.md` § Draft
-attachments, `docs/security.md` § Rung 0, `docs/frontend.md` § Node data access, and `docs/tui.md`
-§ Rectangles for the terminal's answer.
-
-Once this plugin ships, delete this file or reduce it to a pointer.
-
-Run final gates:
-
-```sh
-pnpm lint
-pnpm --filter @acorn/plugin-agent-attachment-image test
-pnpm --filter @acorn/plugin-agents test
-pnpm --filter @acorn/desktop test
-pnpm test
-```
-
-Expected: every command exits 0. Use `pnpm test`, not `turbo run test`, for the full suite.
+Write the README your users read before they approve the trust prompt: what it does, what it asks for,
+and what it never sees. Publish the package. If you later want it in acorn itself, that is a separate
+conversation about the bundled roster, not something this brief covers.
 
 ## Test plan
 
-### Unit tests
+**Unit.** History: commit, undo, redo, redo invalidation, reset, caps, dot stroke. Coordinates: corners,
+centre, scale, zoom, clamping, a zero rectangle. Widths: a tiny image, a normal one, an 8,192-pixel one.
+Naming: extensions, multiple dots, an existing `-annotated`, an empty or unsafe base. Raster replay:
+base first, stable order, line settings, text baseline. Wire guards: missing, malformed, additive,
+wrong-MIME and stale-id payloads. Routes: the cases in step 2.
 
-- history: commit, undo, redo, redo invalidation, reset, caps, dot stroke;
-- coordinates: corners, center, scale, zoom, clamping, zero rectangle refusal;
-- width presets: tiny, normal, and 8,192-pixel images;
-- output naming: extensions, multiple dots, existing `-annotated`, unsafe/empty base fallback;
-- raster replay: base first, stable operation order, line settings, text line baseline;
-- wire guards: missing, malformed, additive, wrong-MIME, and stale-id payloads; and
-- route adapter: exact binary/header/error cases listed above.
+**Lifecycle.** The preview opens the overlay with the exact current attachment; two previews from one
+worker open their own attachments and not each other's; a double press makes one invocation; cancel,
+unchanged, applied, malformed result, owner rejection, prop change and unmount; editor load success,
+failure, retry and abort; pen capture, move, up and cancel; text add, cancel, empty and multiline;
+history shortcuts and editable-target handling; apply states and disabled controls; no-op apply, a null
+encode, an oversize export, a POST error and retry; cleanup of the bitmap, URLs, listeners, frames and
+pending requests.
 
-### Component/lifecycle tests
+**Integration.** The two pixel proofs from step 6, plus: cancel after edits leaves the draft and the
+source hash unchanged; removing the source during editing means a late result cannot reinsert it; a
+successful POST with a failed owner commit leaves the source and an unreferenced candidate; a failed
+source cleanup after commit still queues the replacement; your route refuses a referenced source; the
+bridge refuses `/v2/p/agents/*` before the transport; disabling your plugin leaves the default preview,
+removal and send unchanged; reopening after cancel carries no history.
 
-- preview opens the associated overlay with the exact current attachment;
-- two previews from one worker open their respective attachments;
-- double press creates one invocation;
-- cancel, unchanged, applied, malformed result, owner rejection, prop change, and unmount;
-- editor load success/failure/retry and abort;
-- pen pointer capture/move/up/cancel;
-- text add/cancel/empty/multiline;
-- undo/redo shortcuts and editable-target handling;
-- Apply states and disabled controls;
-- no-op apply, encoding null, oversize output, POST error/retry, and close payload; and
-- cleanup of bitmap, URLs, events, animation frames, and pending requests.
-
-### Integration tests
-
-1. Attach a known 4×4 PNG, edit one known pixel region, commit, queue, and decode the resolved driver
-   image to prove the stroke exists.
-2. Attach a JPEG carrying EXIF rotation, place text, and prove exported orientation/dimensions match
-   the editor view.
-3. Cancel after edits and prove source hash and draft id are unchanged.
-4. Remove source during editing and prove a late result cannot reinsert it.
-5. Make POST succeed and owner commit fail; prove source remains and candidate is unreferenced.
-6. Make old-source cleanup fail after commit; prove replacement still queues.
-7. Call the plugin route with a referenced source and prove it is refused.
-8. Attempt client access to `/v2/p/agents/*` and prove the bridge refuses before transport.
-9. Disable the plugin and prove the default preview/removal/send behavior is unchanged.
-10. Reopen after cancel and prove no operation history survives.
-
-### Manual desktop checks
-
-- Pen follows the pointer at all four corners at zoom-to-fit on a Retina display.
-- Small/medium/large widths are useful on both a phone screenshot and a high-resolution photo.
-- Text appears where placed and stays aligned after resizing the overlay.
-- Focus begins inside the editor, stays trapped, and returns to the initiating preview.
-- Escape cancels active text before dismissing the dialog.
-- Light, dark, and each style pack keep controls readable without changing output colours.
-- A source near 10 MiB and one near the decoded-pixel ceiling fail without freezing the shell.
-- Node disconnect during load/upload yields a recoverable error.
-- Switching tasks or disabling the plugin leaves no orphan overlay or permanently busy preview.
-- A real managed-agent turn visibly contains the annotated image.
+**Manual.** Pen follows the pointer at all four corners at zoom-to-fit on a Retina display. The three
+widths are useful on both a phone screenshot and a high-resolution photo. Text lands where placed and
+stays aligned when the overlay resizes. Focus starts in the editor, stays trapped and returns to the
+preview. Escape cancels active text before dismissing. Light, dark and every style pack keep controls
+readable without changing exported colours. A 10 MiB source and a near-40 MP source both fail or
+succeed with clear feedback and no freeze. Disconnecting the node mid-load and mid-upload is
+recoverable. Switching tasks or disabling the plugin leaves no orphan overlay and no stuck preview. And
+a real agent turn visibly contains the annotated image.
 
 ## Done criteria
 
-- [ ] The package builds as a loaded Node/client plugin and is present in desktop bundled resources.
-- [ ] Its manifest requires agents and requests only `agents.draftAttachments`.
-- [ ] PNG/JPEG previews are editable; other MIME types retain the agents fallback.
-- [ ] Pen, text, history, reset, cancel, and apply meet the interaction rules above.
-- [ ] Image bytes never use JSON, base64, data URLs, remote props, or tree mutations.
-- [ ] Apply creates an immutable candidate and the composer compare-and-swaps its id.
-- [ ] The existing driver receives altered pixels in an automated integration test.
-- [ ] Wrong-task, referenced, stale, oversize, decode-bomb, offline, and cleanup-failure cases are
-  covered.
-- [ ] Removing the plugin restores default attachment behavior without data migration.
-- [ ] `pnpm lint`, focused package tests, desktop tests, and `pnpm test` pass.
-- [ ] Shipped behavior is documented by its owners and this future file is retired.
+- [ ] The package installs as a loaded plugin and its trust prompt names only `agents.draftAttachments`.
+- [ ] It does not load when agents is absent, and the roster row says why.
+- [ ] PNG and JPEG previews are editable; every other type keeps the agents fallback.
+- [ ] Pen, text, history, reset, cancel and apply meet the interaction rules.
+- [ ] Image bytes never travel as JSON, base64, a data URL, a tree prop or a tree mutation.
+- [ ] Apply creates an immutable candidate and the composer compare-and-swaps the id.
+- [ ] An automated test proves the altered pixels reach the driver.
+- [ ] Wrong-task, referenced, stale, oversize, decode-bomb, offline and cleanup-failure paths are all
+      covered.
+- [ ] Uninstalling restores the default attachment behaviour with no migration.
 
-## STOP conditions
+## Stop and ask rather than improvising if
 
-Stop and report rather than improvising if:
-
-- the platform implementation is not present after syncing;
-- the shipped platform lacks slot-bound overlay input/result, owner action invocation, binary bodies,
-  or the agents draft-attachment capability;
-- opening an overlay is still bundle-bound rather than mounted-slot-bound;
-- using the capability would require a filesystem path to cross into the plugin;
+- the node you are targeting lacks slot-bound overlay input and result, owner-action invocation, binary
+  bodies, or the agents draft-attachment capability;
+- `solidTree` does not hand your component a `host`, which would mean the node predates 2026-09-04;
+- opening an overlay turns out to be bundle-bound rather than bound to the mounted slot;
+- using the capability would require a filesystem path to cross into your plugin;
 - the only apparent route is direct client access to `/v2/p/agents/*`;
-- the agents capability permits referenced/sent attachments to be replaced;
-- the loaded-plugin builder cannot emit `requires.plugins` or the companion overlay declaration;
-- Canvas/JPEG decoding does not honor EXIF orientation consistently in the supported desktop runtime;
-- the required editor would exceed current 10 MiB encoded or 40 MP decoded limits without a product
-  decision to add resizing/quality controls; or
-- implementation requires adding canvas/pointer semantics to the host-neutral closed kit.
+- the capability lets you replace a referenced or sent attachment;
+- your bundler cannot produce one client file that serves both runtimes;
+- canvas or JPEG decoding does not honour EXIF orientation consistently in the runtime you support; or
+- the editor would need to exceed the 10 MiB encoded or 40 MP decoded limits without a product decision
+  about resizing or quality controls.
 
 ## Refused alternatives
 
-- **Compiled plugin:** unnecessarily expands trust and hides whether the loaded-plugin platform works.
-- **Base64 JSON:** adds size and copies, and makes image content easier to leak into logs.
-- **Direct agents routes:** violates cross-plugin namespace confinement.
-- **In-place blob edits:** breaks content addressing, deduplication, and the evidence of sent turns.
-- **Node-owned draft replacement:** the unsent draft is client state and cannot be transacted by Node.
-- **Full-canvas undo snapshots:** unsafe memory growth at supported image dimensions.
-- **A canvas kit node:** leaks pixel and pointer semantics into the TUI for a use case already served by
-  an iframe rectangle.
-- **GIF/WebP flattening:** silently destroys animation.
-- **Always-PNG output:** can make annotated photographs exceed attachment limits.
-- **Silent resizing or quality reduction:** changes user content without a visible product decision.
-- **Persisting unfinished edits:** duplicates sensitive image content and adds recovery semantics that
-  a lo-fi editor does not need.
+- **Making it a compiled or bundled first-party plugin.** It expands trust and hides whether the
+  loaded-plugin platform can actually carry a feature this shape. That is the thing being tested.
+- **Base64 over JSON.** Size, allocation, decode work, and image content that is easier to leak into a
+  log, in exchange for nothing.
+- **Calling the agents routes directly.** Cross-plugin namespace confinement is a security boundary.
+- **Editing the stored blob in place.** Content addressing, deduplication, draft recovery and the record
+  of what was sent all depend on stored bytes never changing.
+- **Letting the node replace the draft.** The unsent draft is client state and the node cannot transact
+  with it.
+- **Full-canvas undo snapshots.** Unsafe memory growth at the dimensions this permits.
+- **A canvas node in the closed kit.** It would leak pixel and pointer semantics into the terminal host
+  for a case an iframe already serves.
+- **Flattening GIF or WebP.** A file that may be animated must not silently become one frame.
+- **Always exporting PNG.** An annotated photograph can then exceed the attachment ceiling.
+- **Silent resizing or quality reduction.** That changes a person's content without a visible decision.
+- **Persisting unfinished edits.** It duplicates sensitive image content and adds recovery semantics a
+  small editor does not need.
 
 ## Maintenance notes
 
-- If agents changes attachment byte/count ceilings, import or return those values through a contract;
-  do not let the plugin's local precheck become the authority.
-- If the closed kit later gains a safe bitmap-thumbnail node, the compact preview may adopt it without
-  changing editor, route, or replacement contracts.
-- If animated image editing is added, it is a separate renderer/export model and should not extend the
-  raster operation model by special cases.
-- If crop/resize is added, clarify whether operation coordinates remain in original or transformed
-  space before writing code; that is a data-model decision.
-- Reviewers should pay particular attention to buffer copies, bitmap/canvas lifetime, stale-result
-  compare-and-swap behavior, and capability task/reference checks.
-- The plugin has no migration. Adding a database later requires a concrete durable entity; preferences
-  alone belong in namespaced plugin state.
+- If agents changes its byte or count ceilings, read them through a contract rather than letting your
+  local precheck become the authority.
+- If the closed kit ever gains a safe bitmap-thumbnail node, the preview can adopt it without touching
+  the editor, the routes or the replacement contract.
+- Animated editing, if it ever happens, is a different renderer and export model. Do not extend the
+  raster operation list with special cases for it.
+- Crop and resize are a data-model decision before they are a feature: settle whether operation
+  coordinates stay in original or transformed space before writing any of it.
+- Reviewers should look hardest at buffer copies, bitmap and canvas lifetime, stale-result handling, and
+  the capability's task and reference checks.
+- You own no tables. If you ever need one, it needs a concrete durable entity first; preferences belong
+  in namespaced plugin state.
 
-## Verify before building
+## Recheck before you start
 
-The seams below shipped on 2026-09-04 and their tests are named in Step 0. Everything here is still
-worth re-reading before you start, because this file will outlive at least one of these facts:
+This file will outlive at least one of these facts.
 
-- `agents:attachment` is still a remote, replace-mode point, and still declares `replace` in its
-  `actions`. It sets no `selector` today, so if you want the settings picker and developer view to say
-  what the arbitration is over, adding `selector: 'mediaType'` is part of your work.
-- The agents owner still renders removal outside the replaceable preview and owns compare-and-swap of
-  its local `AgentAttachment[]` draft.
-- Attachment storage is still immutable, task-scoped, content-addressed, limited to 10 MiB per file,
-  and garbage-collects unreferenced candidates.
-- Queue validation still creates turn attachment references, and drivers still resolve ids only at
-  dispatch.
-- Loaded client bundles still run as a worker for remote trees and an iframe for frames, with one built
-  bundle capable of selecting the runtime before mount.
-- The frame CSP still prevents direct network access and the binary bridge uses the pinned node
+- `PLUGIN_API_MAJOR` is `'10'` (`packages/protocol/src/plugin/apiVersion.ts`). Read it; do not copy the
+  number from here. The seams this plugin uses were additive and did not bump it.
+- `agents:attachment` is still `remote`, `replace` mode, and still declares `replace` in its `actions`.
+  It sets no `selector`, so the settings picker and developer view cannot yet say what the arbitration
+  is over. Adding `selector: 'mediaType'` would be a change to the agents plugin, not to yours.
+- The composer still draws removal outside the replaceable preview and still owns the compare-and-swap
+  of its local draft.
+- Attachment storage is still immutable, task-scoped, content-addressed, capped at 10 MiB per file, and
+  still collects unreferenced rows after 24 hours.
+- Enqueue still creates the turn's attachment references, and drivers still resolve ids at dispatch, so
+  swapping the id before enqueue is still sufficient.
+- A loaded client bundle still runs as a worker for a tree and an iframe for a frame.
+- The frame CSP still forbids direct network access, and the binary bridge still rides the pinned node
   transport.
-- Another plugin's route namespace remains denied.
-- The desktop bundled-plugin roster is still `apps/desktop/scripts/build-bundled-plugins.mjs`. As of
-  2026-09-04 `apps/node/scripts/build-plugin.mjs` still writes no `requires` block into a generated
-  manifest, so extending it, with a builder test, is part of this work and not something the
-  prerequisite covered.
-- Read `PLUGIN_API_MAJOR` out of `packages/protocol/src/plugin/apiVersion.ts` rather than copying a
-  number from any proposal. The seams this plugin uses were additive and did not bump it.
-- One thing neither the prerequisite nor this plan has proven: whether the loaded-plugin builder's
-  single client bundle survives a DOM-or-worker branch in one entry. Check it against a hybrid fixture
-  before writing the plugin entry against it.
-- The repository-wide lint baseline is green before attributing failures to this plugin.
+- Another plugin's route namespace is still denied at the broker, before the transport is called.
