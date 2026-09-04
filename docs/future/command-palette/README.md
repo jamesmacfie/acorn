@@ -97,8 +97,9 @@ is not a command surface.
 ## How this relates
 
 [client-plugins](../client-plugins/README.md) can change who contributes a command but must not create
-a second palette. [terminal-rewrite](../terminal-rewrite/README.md) may change how the TUI draws the
-session, but its command state remains in client-core. Loaded-plugin containment and route ownership
+a second palette. The terminal client draws the session with a painter of its own
+([tui.md](../../tui.md) § How a frame is drawn), and that changed nothing here: its command state
+remains in client-core. Loaded-plugin containment and route ownership
 remain governed by [security.md](../../security.md); this programme adds no executable result
 payload and no plugin-rendered rectangle.
 
