@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, For, Show } from 'solid-js'
 import type { CommandSession } from '@acorn/client-core/host/registries/commands/session.ts'
 import { Modal, ModalBody } from '../kit/grouping'

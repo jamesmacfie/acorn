@@ -1,6 +1,7 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createMemo, createSignal, For, Index, Show, untrack, type JSX } from 'solid-js'
-import type { BoxRenderable, MouseEvent, ScrollBoxRenderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
+import type { Wheel } from '../tree/hit'
 import type { Size, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
 import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionItem,
@@ -16,7 +17,7 @@ import { stop } from '../keys/stops'
 import { flatten, hasNode, Line, pad, Run, runStyle, slot } from './cells'
 import { markdownLines, type Line as MarkdownLine } from './markdown'
 import { borderCell, litControl, rule, spaceCells } from './roles'
-import { ScrollViewport } from './scrolling'
+import { ScrollViewport, type Viewport } from './scrolling'
 import { GLYPHS } from './glyphs'
 import { spinnerFrame } from './tick'
 import { focusRenderable, focusedRenderable, scheduleSettle } from '../keys/regions'
@@ -140,7 +141,7 @@ export function Row(props: {
       flexShrink={0}
       overflow="hidden"
       paddingLeft={props.depth ? props.depth * 2 : 0}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         // The row is where focus lands, so the collection can put it there and a region's first stop
         // can find it. `item` is the collection's; a row outside one is not a stop, which is what
         // `focusRoles.ts` says a `Row` is — an item, never a stop of its own.
@@ -309,7 +310,7 @@ export function Rows<T extends CollectionItem>(props: {
   })
   const NO_PLACE = {} as Record<string, never>
 
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   const [rows, setRows] = createSignal(0)
   // Where the window starts. Kept rather than derived, so it moves only when the caret would leave
   // it: centring on the active row scrolled the whole list under the reader on every press, which is
@@ -386,7 +387,7 @@ export function Rows<T extends CollectionItem>(props: {
       // many rows fit — so it always fitted, always drew everything, and overflowed the frame
       // (../panel.tsx). Every other list keeps the kit's rule and takes the room its rows need.
       {...(props.virtual ? { flexGrow: 1, flexBasis: 0, flexShrink: 1 } : { flexShrink: 0 })}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         box = element
         setRows(element.height)
         // Focusable for good, at mount, and the walk still counts the list once. `stopsIn` draws a
@@ -398,7 +399,7 @@ export function Rows<T extends CollectionItem>(props: {
         scheduleSettle()
       }}
       onSizeChange={() => setRows(box?.height ?? 0)}
-      onMouseScroll={(event: MouseEvent) => {
+      onMouseScroll={(event: Wheel) => {
         if (!props.virtual) return
         const direction = event.scroll?.direction
         if (direction !== 'up' && direction !== 'down') return
@@ -475,7 +476,7 @@ export function Chip(props: {
     <box
       flexDirection="row"
       flexShrink={0}
-      ref={(element: BoxRenderable) => { if (acts()) control.ref(element) }}
+      ref={(element: Renderable) => { if (acts()) control.ref(element) }}
     >
       {slot(props.leading)}
       <Line {...litControl({ focused: control.focused(), strong: props.selected, tone: props.tone })}>
@@ -697,7 +698,7 @@ let building: TableState | null = null
 
 /** reduced: box-drawn, truncating columns by the priority its heads declare. */
 export function Table(props: { size?: 'sm' | 'md'; stickyHead?: boolean; minWidth?: number; children: JSX.Element }) {
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   const [width, setWidth] = createSignal(80)
   const [columns, setColumns] = createSignal<Column[]>([])
 
@@ -730,7 +731,7 @@ export function Table(props: { size?: 'sm' | 'md'; stickyHead?: boolean; minWidt
   return (
     <box
       flexDirection="column"
-      ref={(element: BoxRenderable) => { box = element; setWidth(element.width) }}
+      ref={(element: Renderable) => { box = element; setWidth(element.width) }}
       onSizeChange={() => setWidth(box?.width ?? 80)}
     >
       {props.children}
@@ -762,7 +763,7 @@ export function TableRow(props: { head?: boolean; onPress?: () => void; children
     <box
       flexDirection="row"
       gap={1}
-      ref={(element: BoxRenderable) => { if (props.onPress) control.ref(element) }}
+      ref={(element: Renderable) => { if (props.onPress) control.ref(element) }}
     >
       {props.children}
       {/* The caret goes after the cells rather than before them, and it is the one place in the kit
@@ -789,9 +790,9 @@ export function Grid(props: {
   onSelect?: (index: number) => void
   ariaLabel: string
 }) {
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   const [size, setSize] = createSignal({ width: 80, height: 10 })
-  const measure = (element: BoxRenderable | undefined) => {
+  const measure = (element: Renderable | undefined) => {
     if (element) setSize({ width: element.width, height: element.height })
   }
   const fits = () => Math.max(1, Math.floor(size().width / MIN_COLUMN))
@@ -828,7 +829,7 @@ export function Grid(props: {
     <box
       flexDirection="column"
       flexGrow={1}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         box = element
         measure(element)
         control.ref(element)
@@ -986,7 +987,7 @@ export function DiffPane(props: { source: { files: () => DiffFile[] | undefined;
     requestAnnotations(point, keys())
   })
 
-  let viewport: ScrollBoxRenderable | undefined
+  let viewport: (Renderable & Viewport) | undefined
   const [top, setTop] = createSignal(0)
   const [fit, setFit] = createSignal(0)
   /** Read the viewport's own offset and height. Called from the two places the offset moves: the
@@ -1008,10 +1009,10 @@ export function DiffPane(props: { source: { files: () => DiffFile[] | undefined;
   })
 
   return (
-    // The box around the viewport, and it is here for the wheel: OpenTUI walks a mouse event up the
-    // tree and runs each renderable's own handler before it hands the event to its parent, so a
-    // listener here sees the scroll after the scrollbox below has already moved its offset. On the
-    // scrollbox itself it would see it before (@opentui/core § Renderable.processMouseEvent).
+    // The box around the viewport, and it is here for the wheel: a wheel step runs each node's own
+    // handler from the node under the pointer upwards, so a listener here sees the scroll after the
+    // scrollbox below has already moved its offset. On the scrollbox itself it would see it before
+    // (../tree/hit.ts § wheelAt).
     <box
       flexGrow={1}
       flexShrink={1}
@@ -1020,7 +1021,7 @@ export function DiffPane(props: { source: { files: () => DiffFile[] | undefined;
       onMouseScroll={sync}
       onSizeChange={sync}
     >
-      <ScrollViewport onScroll={sync} onBox={(box: ScrollBoxRenderable) => { viewport = box; sync() }}>
+      <ScrollViewport onScroll={sync} onBox={(box) => { viewport = box; sync() }}>
         <Show when={props.source.files()} fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}>
           {/* The rows above the window, as height rather than as renderables, so the scrollbox's own
               offset and bar are about the whole diff and not about the slice. */}

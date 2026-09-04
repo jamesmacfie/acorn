@@ -358,7 +358,7 @@ const json = (value: unknown) => ({
     fetch: async (_nodeId, request) => {
       // A transport that answers in a microtask can never hold a `Suspense` open past the tick that
       // destroys its subtree, so the failure the real app lives with — content removed, destroyed,
-      // then handed back dead (kit/reconciler.ts § Destroy on disposal) — was unreachable from a
+      // then handed back dead — was unreachable from a
       // test. The delay is opt-in per test, like ACORN_FIXTURE_PULLS above.
       const delay = Number(process.env.ACORN_FIXTURE_DELAY_MS ?? 0)
       if (delay) await new Promise((resolve) => setTimeout(resolve, delay))

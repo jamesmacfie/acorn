@@ -14,7 +14,7 @@
 // told whether it has the keys (docs/tui.md § Rendering).
 
 import { createEffect, createSignal, onCleanup, untrack } from 'solid-js'
-import type { Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import { focusedRenderable, moveStop, scheduleSettle } from './regions'

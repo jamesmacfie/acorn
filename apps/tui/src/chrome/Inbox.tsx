@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { For, onCleanup, Show } from 'solid-js'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { createAttentionInbox, type AttentionInbox } from '@acorn/client-core/features/notifications/attentionInbox.ts'

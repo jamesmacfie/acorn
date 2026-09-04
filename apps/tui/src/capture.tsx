@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { renderFixture } from './harness'
 
 // The screenshot, on a machine with no TTY. Same tree as the pane suite; printed instead of asserted.

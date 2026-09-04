@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { afterEach, describe, expect, it } from 'vitest'
 import { renderFixture } from './harness'
 import { fixtureBadgePresses } from './fixtureExtensions'

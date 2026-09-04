@@ -1,6 +1,6 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { Show } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
 import { layoutState } from '@acorn/client-core/host/layouts/state.ts'
 import { registerPanel, Tabs as TabStrip } from '../kit/grouping'
@@ -32,7 +32,7 @@ export function Tabs(props: LayoutProps) {
     <box
       flexDirection="column"
       flexGrow={1}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         // The pane's own tier, focus-within on the pane box. Priority is what decides, not how
         // local the layer is (client-core host/keys/install.ts § the four tiers, ../keys/tiers.ts).
         // Ctrl, not the platform's primary modifier. macOS keeps Cmd for the terminal emulator and

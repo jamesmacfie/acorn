@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { TEXT_NODE, isKitNode } from '@acorn/protocol/tree/nodes.ts'
@@ -67,9 +67,9 @@ export function TreeHost(props: TreeHostProps) {
         {/* One boundary per root, the same shape client-core's TreeHost takes. Every entry in this
             host's table is a component today, so nothing suspends; the boundary is here because the
             table's type allows a loader and because the kit is drawn from one set of names on both
-            hosts. Safe under OpenTUI only because ../kit/reconciler.ts ties a node's destruction to
-            its creating owner rather than to being detached — without that, a boundary that suspends
-            after showing content comes back permanently blank. */}
+            hosts. It was safe under the old painter only because a reconciler patch tied a node's
+            destruction to its creating owner rather than to being detached; a node here is a plain
+            object with no destruction to be on the wrong side of. */}
         <For each={state.roots()}>{(id) => <Suspense fallback={null}><NodeView id={id} /></Suspense>}</For>
       </ErrorBoundary>
     </Show>

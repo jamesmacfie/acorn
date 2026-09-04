@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { Show } from 'solid-js'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
 import { Panel } from '../panel'

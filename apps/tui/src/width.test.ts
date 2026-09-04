@@ -12,7 +12,7 @@ import { clusterWidth, graphemes, sliceToWidth, stringWidth } from './width'
 
 describe('the width measure', () => {
   it('counts one cell per character on the ASCII fast path', () => {
-    // Every one of the fixture's twenty strings is ASCII, which is why the goldens do not depend on
+    // Every one of the fixture's twenty strings is ASCII, which is why the drawing tests do not depend on
     // this choice at all and why nobody has seen the faults below.
     expect(stringWidth('Draft the release notes')).toBe(23)
     expect(stringWidth('')).toBe(0)

@@ -251,7 +251,7 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
  * depends on the width it wraps at, the width depends on whether the bar is showing, and the bar
  * depends on the height. A frame that resolves that cycle by iterating is a frame that can fail to
  * settle. Overlaying it costs the rightmost column of a scrolling document and no oscillation. No
- * golden in the set holds a visible bar, so nothing measures the difference either way.
+ * frame the old painter drew held a visible bar, so nothing measured the difference either way.
  *
  * The two characters and the thumb's size and place are `../kit/showing.tsx § THUMB`'s, which is the
  * bar a virtual `Rows` draws down its own edge. There is one bar in this app and it should look like

@@ -1,6 +1,6 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
-import type { Renderable } from '@opentui/core'
+import type { Renderable } from './tree/compat'
 import { renderFixture } from './harness'
 
 // A diff longer and wider than the column it draws in.

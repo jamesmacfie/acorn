@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
 import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { renderFixture } from './harness'

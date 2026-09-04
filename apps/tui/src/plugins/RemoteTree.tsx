@@ -1,7 +1,7 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createMemo, on, onCleanup } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import type { BoxRenderable, Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import { createFrameBridge, postSelect, postSurfaceAction, type FrameBinding } from '@acorn/client-core/host/frames/broker.ts'
 import { createFrameServices } from '@acorn/client-core/host/frames/frameServices.ts'
@@ -41,7 +41,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   // Where this tree drew, for the bridge's focus gate. The DOM asks whether `document.activeElement`
   // is inside the tree's element; here focus is the renderer's, so the same question is whether the
   // focused renderable has this box among its parents.
-  let container: BoxRenderable | undefined
+  let container: Renderable | undefined
 
   const contribution = componentProps.contribution
   const scope = () => componentProps.scope?.() ?? {}
@@ -155,7 +155,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
 
   const pluginId = createMemo(() => contribution.pluginId)
   return (
-    <box flexDirection="column" flexGrow={1} ref={(element: BoxRenderable) => { container = element }}>
+    <box flexDirection="column" flexGrow={1} ref={(element: Renderable) => { container = element }}>
       <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} />
     </box>
   )

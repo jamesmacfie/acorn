@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
 import { renderFixture } from './harness'
 
@@ -10,8 +10,8 @@ import { renderFixture } from './harness'
 // zero-latency fixture never reached — the caches were warm before the first key press, so nothing
 // ever suspended after first paint, and both browse tests passed while the app drew blank panels.
 // Under that shape, OpenTUI used to destroy the removed subtree and refuse it back ("was already
-// destroyed, skipping add"), leaving the panel empty forever (kit/reconciler.ts § Destroy on
-// disposal). So this walks the caret past the prefetch horizon, where every landing mounts uncached
+// destroyed, skipping add"), leaving the panel empty forever, and the reconciler patch phase 4
+// deleted is what answered it. So this walks the caret past the prefetch horizon, where every landing mounts uncached
 // queries, and asserts the two things a reader actually loses: the detail still draws, and the list
 // is still there to come back to.
 const caretLine = (frame: string): string => frame.split('\n').find((line) => line.includes('›')) ?? ''

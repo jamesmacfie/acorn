@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
 import { LAYOUT_REGIONS, PANE_LAYOUTS, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { LayoutProps, Region } from '@acorn/client-core/host/layouts/regions.ts'

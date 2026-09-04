@@ -1,4 +1,4 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { pendingTrust, resolvePendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'

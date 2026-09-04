@@ -1,5 +1,5 @@
 import type { Accessor } from 'solid-js'
-import type { Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import { layoutState } from '@acorn/client-core/host/layouts/state.ts'
 import { bindKeys } from '../keys/install'
 import { PANE } from '../keys/tiers'

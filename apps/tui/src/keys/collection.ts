@@ -17,7 +17,7 @@
 // been keyed by (client-core/kit/keys/collectionState.ts).
 
 import { onCleanup } from 'solid-js'
-import type { Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import { _resetCollectionState } from '@acorn/client-core/kit/keys/collectionState.ts'
 import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionIntentOptions, type CollectionItem,

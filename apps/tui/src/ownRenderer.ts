@@ -5,16 +5,20 @@ import { pressAt, wheelAt } from './tree/hit'
 import { openTerminal } from './input/terminal'
 import type { InputListener } from './input/events'
 import { keyPressed } from './ownKeys'
-import type { Node } from './tree/node'
+import type { Renderable } from './tree/compat'
 
-// A `CliRenderer`-shaped handle on our screen, so the keyboard can be installed on it.
+// A handle on our screen, so the keyboard can be installed on it.
 //
-// The three files that take a renderer today — `./keys/install.ts`, `./keys/regions.ts` and
-// `./keys/keymapHost.ts` — want eight things from it: a root to hang a mouse handler on, a `frame`
-// event, a key stream, whether it is destroyed, which renderable it has focused, and a console it can
-// quieten. None of that is the Zig half. So this answers those eight names over `./paint/screen.ts`
-// and nothing else, and phase 4 deletes it along with the OpenTUI types those files are written
-// against (docs/future/terminal-rewrite/phase-2-the-painter.md).
+// The three files that take a renderer — `./keys/install.ts`, `./keys/regions.ts` and
+// `./keys/keymapHost.ts` — want five things from it: a root to hang a mouse handler on, a `frame`
+// event, a key stream, whether it is destroyed, and a `destroy` event. This answers those five over
+// `./paint/screen.ts` and nothing else.
+//
+// It was shaped after OpenTUI's `CliRenderer` while both painters ran, and phase 4 took the names
+// nothing asked for back off it: the console it could quieten, the keyboard capabilities the keymap
+// metadata states outright, the listener cap that counted a `selection` subscriber per viewport, and
+// the renderer's own idea of which node had focus — which is now the region store's one value
+// (./keys/regions.ts § The one owner).
 //
 // **It composes the two halves rather than owning either.** `./paint/screen.ts` owns the cells and
 // `./input/terminal.ts` owns the modes and the bytes; this holds a screen and, where a caller gave it
@@ -30,28 +34,12 @@ import type { Node } from './tree/node'
 export type OwnRenderer = {
   /** Our screen, for the callers that want cells rather than a renderer. */
   screen: Screen
-  root: Node
+  root: Renderable
   keyInput: EventEmitter
-  /** The keyboard protocol this build asks for, which decides whether the engine reports `super` and
-   *  `hyper` as supported (@opentui/keymap § createOpenTuiHostMetadata). Always true: the request is
-   *  in `./input/terminal.ts`'s enter sequence. */
-  capabilities: { kitty_keyboard: true }
   isDestroyed: boolean
-  /** The caret mirror, which is the one thing about focus the store still tells a renderer
-   *  (./keys/regions.ts § paintCaret). There is no caret until phase 3 draws a field, so it does
-   *  nothing — and there is deliberately no way to ask this object where the keys are, because the
-   *  store is the only one that knows (./invariants.test.ts § the store is the only owner). */
-  focusRenderable: (node: Node | null) => void
   on: (event: string, listener: (...args: never[]) => void) => void
   off: (event: string, listener: (...args: never[]) => void) => void
   once: (event: string, listener: (...args: never[]) => void) => void
-  setMaxListeners: (count: number) => void
-  prependInputHandler: (handler: (sequence: string) => boolean) => void
-  removeInputHandler: (handler: (sequence: string) => boolean) => void
-  /** The overlay that is not there. OpenTUI replaced `global.console` and popped a debug panel over
-   *  the frame; we write cells to stdout and nothing else, so there is nothing to hide and nothing
-   *  cached (docs/future/terminal-rewrite/architecture.md § 3). */
-  console: { hide: () => void; deactivate: () => void; activate: () => void; getCachedLogs: () => string }
   /** One wheel step at a cell: the innermost viewport under the pointer moves its offset and the keys
    *  stay where they are (./tree/hit.ts § wheelAt). */
   mouseScroll: (x: number, y: number, direction: 'up' | 'down') => void
@@ -139,16 +127,10 @@ export function openOwnRenderer(options: {
     screen,
     root: screen.root,
     keyInput,
-    capabilities: { kitty_keyboard: true },
     get isDestroyed() { return destroyed },
-    focusRenderable: () => {},
     on: (event, listener) => { events.on(event, listener as (...args: unknown[]) => void) },
     off: (event, listener) => { events.off(event, listener as (...args: unknown[]) => void) },
     once: (event, listener) => { events.once(event, listener as (...args: unknown[]) => void) },
-    setMaxListeners: (count) => { events.setMaxListeners(count) },
-    prependInputHandler: () => {},
-    removeInputHandler: () => {},
-    console: { hide: () => {}, deactivate: () => {}, activate: () => {}, getCachedLogs: () => '' },
     mouseScroll: (x, y, direction) => { wheelAt(screen.root, x, y, direction) },
     mousePress: (x, y) => { pressAt(screen.root, x, y) },
     frame,

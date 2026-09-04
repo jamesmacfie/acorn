@@ -13,17 +13,17 @@
 // adapter is ours whole and the question has one answer (./regions.ts § The one owner).
 
 import type { HostMetadata, KeymapHost } from '@opentui/keymap'
-import type { CliRenderer, KeyEvent, Renderable } from '@opentui/core'
-import { ownKeyEvent } from '../ownKeys'
+import type { Renderable } from '../tree/compat'
 import type { OwnRenderer } from '../ownRenderer'
+import { ownKeyEvent, type OwnKeyEvent as KeyEvent } from '../ownKeys'
 import { focusedRenderable, onFocusMove } from './regions'
 
 /** The host the engine is built from, which is the adapter below and nothing else.
  *
  *  Its own exported function so `./install.ts` reads the same as it did while this file held two of
  *  these, and so the cast lives in one place rather than at the call site. */
-export function tuiKeymapHost(renderer: CliRenderer): KeymapHost<Renderable, KeyEvent> {
-  return ownKeymapHost(renderer as unknown as OwnRenderer)
+export function tuiKeymapHost(renderer: OwnRenderer): KeymapHost<Renderable, KeyEvent> {
+  return ownKeymapHost(renderer)
 }
 
 // ── The thirteen questions, over our own tree ─────────────────────────────────────────────────
@@ -43,8 +43,8 @@ const PLATFORM = process.platform === 'darwin' ? 'macos'
     : process.platform === 'linux' ? 'linux' : 'unknown'
 
 /** What the engine is told about the keyboard it is reading. The same answers OpenTUI's adapter gives
- *  for the same host, kitty included, because `../input/terminal.ts` asks for the protocol
- *  (@opentui/keymap § createOpenTuiHostMetadata). */
+ *  for the same host, kitty included, because `../input/terminal.ts` asks for the protocol in its
+ *  enter sequence. */
 const OWN_METADATA: HostMetadata = {
   platform: PLATFORM,
   primaryModifier: PLATFORM === 'macos' ? 'super' : PLATFORM === 'unknown' ? 'unknown' : 'ctrl',
@@ -66,7 +66,7 @@ function ownKeymapHost(renderer: OwnRenderer): KeymapHost<Renderable, KeyEvent> 
   }
   return {
     metadata: OWN_METADATA,
-    rootTarget: renderer.root as unknown as Renderable,
+    rootTarget: renderer.root,
     get isDestroyed() { return renderer.isDestroyed },
     getFocusedTarget: () => focusedRenderable(),
     getParentTarget: (target) => target.parent,

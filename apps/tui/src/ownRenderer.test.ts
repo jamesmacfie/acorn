@@ -1,6 +1,5 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { CliRenderer } from '@opentui/core'
 import { setHostFocused } from '@acorn/client-core/features/notifications/deliver.ts'
 import { installKeymap } from './keys/install'
 import { _resetRegions } from './keys/regions'
@@ -71,7 +70,7 @@ afterEach(() => {
 describe('the terminal, wired to the dispatcher', () => {
   it('presses one key once, whatever the protocol sends about it', async () => {
     const { stdin, renderer, close } = wire()
-    const engine = installKeymap(renderer as unknown as CliRenderer)
+    const engine = installKeymap(renderer as unknown as OwnRenderer)
     let intents = 0
     let presses = 0
     let releases = 0

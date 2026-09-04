@@ -16,8 +16,8 @@ import {
 // A state machine over five states — ground, ESC, CSI, SS3 and a string sequence (OSC and its
 // relatives, which carry replies we do not act on) — plus a sixth for a bracketed paste, which is a
 // state rather than a sequence because the bytes inside it are somebody's file and may contain
-// anything, an ESC included. Nothing here imports from `@opentui/*` and nothing here reads a
-// terminfo database: the only thing we know about this terminal is what it said back to the requests
+// anything, an ESC included. Nothing here reads a terminfo database: the only thing we know about
+// this terminal is what it said back to the requests
 // `./terminal.ts` made, and the one such answer worth keeping is `kittyAnswered`.
 //
 // **A partial sequence stays in the buffer and the buffer is the only state.** A terminal delivers a

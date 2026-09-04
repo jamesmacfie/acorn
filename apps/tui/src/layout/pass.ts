@@ -3,7 +3,8 @@ import type { Node } from '../tree/node'
 
 // One layout pass, and the clamp that reads it back.
 //
-// This function is where `../renderGuard.ts` goes. That file patched two methods on somebody else's
+// This function is where the old render guard went — deleted in phase 4, and in the git history as
+// `apps/tui/src/renderGuard.ts`. That file patched two methods on somebody else's
 // prototype because a node that joins the tree after a frame's layout pass has no computed size, and
 // the fault is Yoga's rather than OpenTUI's: `getComputedWidth` and `getComputedHeight` on an
 // unmeasured node both return `NaN`, and so does `getComputedLayout()` for the same two fields
@@ -16,7 +17,7 @@ import type { Node } from '../tree/node'
 //   NaN is the marker    and zero is not. An empty auto-sized box lays out at height 0 and a
 //                        `DISPLAY_NONE` subtree lays out at 0, 0, 0, 0, both legitimately, so "is it
 //                        zero" cannot be the question anywhere. Only `Number.isFinite` can.
-//   a size becomes zero  rather than the one cell `renderGuard.ts` chose. That 1 was for the Zig
+//   a size becomes zero  rather than the one cell the render guard chose. That 1 was for the Zig
 //                        side, which took a `u32` and threw on `NaN` from inside the render loop.
 //                        Our paint has no such door: a zero rectangle paints nothing, which is the
 //                        honest answer for a node Yoga has never measured, and the next frame has
@@ -41,7 +42,9 @@ const position = (value: number): number => (Number.isFinite(value) ? Math.round
 const size = (value: number): number => (Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0)
 
 /** Yoga's four computed numbers, made safe, and offset into absolute screen cells by the parent's
- *  origin. Exported on its own because it is the whole of what `../renderGuard.test.ts` was pinning. */
+ *  origin. Exported on its own because it is the whole of what the render guard's own test pinned,
+ *  and `./layout.test.ts § clamps the rectangle of a node that joined the tree after the pass` is
+ *  where that assertion now lives. */
 export function clampRect(
   left: number,
   top: number,

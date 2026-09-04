@@ -1,6 +1,6 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createSignal } from 'solid-js'
-import type { BoxRenderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import type { LayoutProps } from '@acorn/client-core/host/layouts/regions.ts'
 import { createKeySplit } from './split'
 import { Panel } from '../panel'
@@ -24,7 +24,7 @@ const MIN_BOTTOM_LINES = 3
 const MAX_BOTTOM_FRACTION = 0.8
 
 export function StackSplit(props: LayoutProps) {
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   const [lines, setLines] = createSignal(0)
   const split = createKeySplit({
     stateKey: props.stateKey,
@@ -41,7 +41,7 @@ export function StackSplit(props: LayoutProps) {
     <box
       flexDirection="column"
       flexGrow={1}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         box = element
         setLines(element.height)
         split.attach(element)

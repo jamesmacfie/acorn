@@ -1,6 +1,6 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
-import type { BoxRenderable, Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
 import { COLLECTION_INTENTS, createCollectionIntents } from '@acorn/client-core/kit/keys/collectionIntents.ts'
 import type { Intent } from '@acorn/client-core/kit/keys/intents.ts'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
@@ -41,7 +41,7 @@ export function Stack(props: { gap?: Space; children: JSX.Element }) {
 
 export function Inline(props: { gap?: Space; wrap?: boolean; children: JSX.Element }) {
   return (
-    <box flexDirection="row" flexWrap={props.wrap ? 'wrap' : 'no-wrap'} gap={spaceCells(props.gap ?? 'inline')}>
+    <box flexDirection="row" flexWrap={props.wrap ? 'wrap' : 'nowrap'} gap={spaceCells(props.gap ?? 'inline')}>
       {props.children}
     </box>
   )
@@ -127,7 +127,7 @@ export function Card(props: {
       flexShrink={0}
       marginTop={isCompact() ? 0 : 1}
       marginBottom={isCompact() ? 0 : 1}
-      ref={(element: BoxRenderable) => { if (props.onPress) control.ref(element) }}
+      ref={(element: Renderable) => { if (props.onPress) control.ref(element) }}
     >
       <Show when={props.stripe || lit()}>
         <Line tone={lit() ? 'accent' : props.stripe}>{borderCell('stripe').glyph}</Line>
@@ -247,7 +247,7 @@ export function Tabs(props: {
       rowGap={0}
       flexShrink={0}
       overflow="hidden"
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         // Which nodes are reachable is declared where the node is built, and this is where a strip is
         // built. `markParent` used to set the flag, which put the one declaration a `Tabs` makes
         // about itself in the region store (../keys/regions.ts § markParent).
@@ -358,7 +358,7 @@ export function Modal(props: {
       // Only the first half used to be here, so unless the caller also reached for a focus helper of
       // this app's the reader got a dialog they could not answer. Every modal a plugin draws was in
       // that state, because a plugin only has the kit (../keys/regions.ts § pushScope).
-      ref={(element: BoxRenderable) => onCleanup(pushScope(element))}
+      ref={(element: Renderable) => onCleanup(pushScope(element))}
     >
       {props.children}
     </box>
@@ -436,7 +436,7 @@ function MenuList(props: { close: () => void; children: JSX.Element }) {
       {...boxBorder('surface')}
       paddingLeft={1}
       paddingRight={1}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         // The keys go into the list and come back to the trigger when it closes, and nothing outside
         // the list answers while it is open (../keys/regions.ts § pushScope).
         onCleanup(pushScope(element))
@@ -569,14 +569,14 @@ export function ListDetail(props: {
   detailAs?: 'div' | 'main'
   children: JSX.Element
 }) {
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   const [width, setWidth] = createSignal(NARROW_AT)
   const narrow = () => width() < NARROW_AT
   return (
     <box
       flexDirection="row"
       flexGrow={1}
-      ref={(element: BoxRenderable) => { box = element; setWidth(element.width) }}
+      ref={(element: Renderable) => { box = element; setWidth(element.width) }}
       onSizeChange={() => setWidth(box?.width ?? NARROW_AT)}
     >
       {/* `split` is the form where both columns are children — a `ListColumn` and a `DetailColumn` —
@@ -737,7 +737,7 @@ export function Sections(props: {
   sections: readonly KitSection[]
   main?: KitSection
 }) {
-  let box: BoxRenderable | undefined
+  let box: Renderable | undefined
   const [cells, setCells] = createSignal(MAIN_COLUMN_AT)
   const wide = () => cells() >= MAIN_COLUMN_AT && !!props.main
   const tabs = (): KitSection[] => [
@@ -753,7 +753,7 @@ export function Sections(props: {
     <box
       flexDirection="row"
       flexGrow={1}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         box = element
         setCells(element.width)
       }}

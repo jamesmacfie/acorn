@@ -1,7 +1,7 @@
 import { layoutTree } from '../layout/pass'
 import { onFrame } from '../tree/frames'
 import { createElement, setProperty } from '../tree/renderer'
-import type { Node } from '../tree/node'
+import type { Renderable } from '../tree/compat'
 import { bufferLines, bufferRuns, clearBuffer, createBuffer, resizeBuffer, type Buffer, type Run } from './buffer'
 import { flush, type Flush } from './flush'
 import { paint } from './paint'
@@ -33,7 +33,7 @@ export type Sink = (text: string) => void
 
 export type Screen = {
   /** The node to mount the app under. Sized to the terminal, so the tree has something to be 100% of. */
-  root: Node
+  root: Renderable
   size: () => { cols: number; rows: number }
   /** A new terminal size. Clears both buffers and forces a full frame, because every index in them
    *  meant something else a moment ago. */
@@ -60,7 +60,7 @@ export function openScreen(options: {
   rows: number
   write?: Sink
   /** A root of the caller's own, for a test that built one by hand. */
-  root?: Node
+  root?: Renderable
 }): Screen {
   let cols = Math.max(0, Math.trunc(options.cols))
   let rows = Math.max(0, Math.trunc(options.rows))

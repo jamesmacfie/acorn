@@ -77,7 +77,7 @@ const OVERFLOWS: Record<string, Overflow> = {
  *
  * Yoga starts a node at 0 and every renderable in the old painter derived it, so we derive it the
  * same way: a box given a width or a height in cells does not shrink, and everything else does. That
- * is `Renderable.setupYogaProperties` in @opentui/core 0.5.9, and the kit is written against it —
+ * is what the old painter's `Renderable.setupYogaProperties` did, and the kit is written against it —
  * which is why 153 of its boxes say `flexShrink={0}` out loud and none says 1. A percentage is not a
  * number here, deliberately: the old painter asked `typeof width === 'number'` too.
  *
@@ -89,7 +89,7 @@ const OVERFLOWS: Record<string, Overflow> = {
  *
  * A blanket 1 also passes every test in this package. The derived rule is here anyway, because it is
  * the answer the kit was written against rather than the answer that happens to be green: the two
- * differ on a fixed-size box inside an overflowing row, which is a shape no golden holds.
+ * differ on a fixed-size box inside an overflowing row, which is a shape nothing here draws.
  */
 export function flexShrinkFor(props: Record<string, unknown>): number {
   const said = props.flexShrink

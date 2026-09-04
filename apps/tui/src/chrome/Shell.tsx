@@ -1,7 +1,8 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch, type JSX } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import type { BoxRenderable, KeyEvent, Renderable } from '@opentui/core'
+import type { Renderable } from '../tree/compat'
+import type { OwnKeyEvent as KeyEvent } from '../ownKeys'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence/prefKeys.ts'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
@@ -59,8 +60,8 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // overlay is up, and a shortcut aimed at a group has to be able to open it (./paletteSession.ts).
   const palette = createShellPalette(model)
   const prefs = createQuery(() => prefsOptions(true))
-  let root: BoxRenderable | undefined
-  const [strip, setStrip] = createSignal<BoxRenderable | undefined>()
+  let root: Renderable | undefined
+  const [strip, setStrip] = createSignal<Renderable | undefined>()
   // The shell's own width, so the left column can take a share of it rather than a fixed number of
   // cells (./Rail.tsx § railCells). The one width anything in the chrome reads, and it is this box's
   // rather than the terminal's — the same rule a layout keeps (docs/tui.md § What the TUI never does).
@@ -204,7 +205,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     <box
       flexDirection="column"
       flexGrow={1}
-      ref={(element: BoxRenderable) => {
+      ref={(element: Renderable) => {
         root = element
         setCells(element.width)
       }}
@@ -228,7 +229,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               <box
                 flexShrink={0}
                 flexDirection="column"
-                ref={(element: BoxRenderable) => {
+                ref={(element: Renderable) => {
                   setStrip(element)
                   regionFocus(PANES, STRIP_ORDER)(element)
                 }}

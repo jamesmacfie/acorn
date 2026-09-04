@@ -1,3 +1,4 @@
+import type { Renderable } from './compat'
 import { laysOut, type Node } from './node'
 
 // What the pointer is over, and where a wheel and a press go from there.
@@ -25,7 +26,7 @@ const holds = (node: Node, x: number, y: number): boolean =>
 
 /** The deepest node whose rectangle contains the cell, or nothing where the point is outside the
  *  tree altogether. */
-export function hit(node: Node, x: number, y: number): Node | null {
+export function hit(node: Renderable, x: number, y: number): Renderable | null {
   if (node.props.visible === false || !holds(node, x, y)) return null
   for (let at = node.children.length - 1; at >= 0; at -= 1) {
     const child = node.children[at]!
@@ -73,7 +74,7 @@ const WHEEL_ROWS = 3
  *   the offset that moved   the wheel on a box *around* the viewport precisely so that it runs after
  *                           the move rather than before it.
  */
-export function wheelAt(root: Node, x: number, y: number, direction: 'up' | 'down'): void {
+export function wheelAt(root: Renderable, x: number, y: number, direction: 'up' | 'down'): void {
   const target = hit(root, x, y)
   if (!target) return
   let stopped = false
@@ -101,7 +102,7 @@ export type Press = {
   x: number
   y: number
   button: number
-  target: Node
+  target: Renderable
   preventDefault: () => void
   stopPropagation: () => void
 }
@@ -124,7 +125,7 @@ type Pressed = { onMouseDown?: (event: Press) => void }
  * that can hold the keys and focuses it. So a click focuses and presses, in that order, which is the
  * whole of this host's pointer model (docs/tui.md § What the TUI never does).
  */
-export function pressAt(root: Node, x: number, y: number): void {
+export function pressAt(root: Renderable, x: number, y: number): void {
   const target = hit(root, x, y)
   if (!target) return
   let stopped = false

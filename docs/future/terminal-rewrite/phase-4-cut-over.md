@@ -1,8 +1,9 @@
 # Phase 4: cut over
 
-Status: first slice built 2026-09-04 — the goldens settled, the switch, the gates and the harness. The
-remaining checklist steps are the workaround files, the packages, the dead dependencies, the goldens
-and the docs. This is the only phase that deletes anything.
+Status: two slices built 2026-09-04. The first settled the goldens and took out the switch, the gates
+and the harness. The second took out the workaround files, the two painter packages, four of the dead
+dependencies, the goldens themselves and the runtime floor. Only the docs are left. This is the only
+phase that deletes anything.
 
 ## Goal
 
@@ -374,3 +375,230 @@ should — they go with the goldens.
   the real fix is a fixture timestamp that is not the epoch.
 - **The startup graph is 964,995 B against an 870,000 B ceiling.** The check has been failing since
   before this programme; the dead dependencies are what is supposed to close it.
+
+## What building it found, second slice (2026-09-04)
+
+Steps 4 to 7 of § Design are done: the workaround files, the packages, the dead dependencies, the
+goldens, the re-measurement and the runtime floor. Only § Docs is left.
+
+`grep -rn "opentui" apps/tui --include='*.ts' --include='*.tsx' --include='*.json' --include='*.mjs'`
+now returns the `@opentui/keymap` dependency line, its `"//dependencies"` note, the `@opentui/keymap`
+imports in `apps/tui/src/keys/`, the citations of that engine's source in comments, and
+`apps/tui/src/invariants.test.ts`, whose rule has to spell `@opentui/` to forbid it. Nothing names
+`@opentui/core` or `@opentui/solid` anywhere.
+
+The suite is **557 passing, 2 failing, 2 skipped** on Node 24.11.0 with no flag, against the first
+slice's 584, 2 and 5. Every number that moved is a deletion: `renderGuard.test.ts` was two cases, the
+golden file was twenty-five plus its three skips. Both failures are the first slice's two, and both
+were checked alone: `walks into a command group on return and back out of it on escape` fails alone
+and is another session's palette work; `draws many frames without re-collecting` passes alone and is
+the load-dependent family. The two remaining skips are the `kit.test.tsx` Yoga cases, which were never
+this programme's. `pnpm --filter @acorn/tui lint`, `npx oxlint apps/tui` and `tools/arch` are clean —
+`docPaths` aside, on which see below.
+
+### What was deleted, and the three things that moved instead
+
+Deleted: `apps/tui/src/kit/reconciler.ts`, `apps/tui/src/renderGuard.ts`,
+`apps/tui/src/renderGuard.test.ts`, `apps/tui/golden/`, `apps/tui/src/golden.test.ts`,
+`apps/tui/src/golden.ts`, `apps/tui/src/goldenSurfaces.ts`, `apps/tui/src/captureGolden.tsx`, its
+Vite entry and its `package.json` script, `main.tsx`'s console suppression and listener cap, the
+`RGBA` adapter and `paintColor` in `apps/tui/src/colourCompat.ts`, and six members of the renderer
+shim nothing asked for any more (`console`, `capabilities`, `focusRenderable`, `setMaxListeners` and
+the two input-handler no-ops).
+
+Before deleting `renderGuard.test.ts`, both halves of what it pinned were checked against
+`apps/tui/src/layout/layout.test.ts`: § clamps the rectangle of a node that joined the tree after the
+pass is the first, and the second — that a resize handler reads an already-clamped size — was
+OpenTUI's `ScrollBox` reading its own `NaN` mid-write and has no counterpart here, because the
+read-back writes a rectangle and calls `onSizeChange` afterwards.
+
+Three of the four files § Your slice asked about turned out to be the only implementation, not a shim,
+and stayed:
+
+- **`apps/tui/src/tree/compat.ts`** is where the node type now lives. It gained an exported
+  `Renderable` interface — the tree's own fields plus `x`, `y`, `width`, `height`, `visible`,
+  `isDestroyed`, `focusable`, `focus`, `blur`, `getChildren`, `id`, and the three hooks a widget or
+  the store installs on a node (`onMouseDown`, `handleKeyPress`, `scrollChildIntoView`). That is the
+  type twenty files used to import from `@opentui/core`, and `BoxRenderable`, `ScrollBoxRenderable`,
+  `InputRenderable` and `TextareaRenderable` all collapsed into it, because the distinctions were
+  class names and there are no classes. Rewriting `keys/regions.ts` to read `Node` directly and
+  deleting this file is still owed and is still not this phase: the names are the store's whole
+  surface, so it is a thousand-line diff with no behaviour in it.
+- **`apps/tui/src/ownRenderer.ts`** is the only renderer, so it stayed and lost the six dead members.
+- **`apps/tui/src/ownKeys.ts`** holds `OwnKeyEvent`, which is the key type the keymap engine reads;
+  the eight files that imported `KeyEvent` from `@opentui/core` now import it under that name.
+
+The `own` prefix on both files no longer distinguishes anything and should go, but renaming them now
+would break `docs/tui.md`'s citations and redden `tools/arch/docPaths.test.ts` before the docs slice
+can fix it. It belongs with the docs.
+
+### The pragma is `@acorn/tui/jsx`, and it had to stay per-file
+
+§ What the next slices must know said the pragma could not go until tsc reads
+`apps/tui/src/tree/jsx.ts`'s namespace. It now does: `apps/tui/src/tree/jsx-runtime.ts` re-exports
+that namespace, `tsconfig.json` maps `@acorn/tui/jsx/jsx-runtime` to it, and all 61 `.tsx` files say
+`/** @jsxImportSource @acorn/tui/jsx */`.
+
+**Setting `jsxImportSource` once in `tsconfig.json` instead would have been wrong.** tsc pulls
+client-core's own `.tsx` sources into this program, and a compiler option applies to every file in it
+— those are DOM components and their JSX namespace has to stay Solid's. A per-file pragma is the only
+form that says "this package's files, not the ones it drags in".
+
+Switching it found five real prop errors the old namespace had been hiding, and each is a deletion the
+phase file asked for:
+
+- `kit/cells.tsx § Run` spelled its style twice, `{...run().style} style={run().style}`, because the
+  old painter ignored every prop on a text node but `href` and `style`. § Scope asked for that half to
+  go and now it has to.
+- `kit/grouping.tsx § Inline` passed `flexWrap="no-wrap"`, which is OpenTUI's spelling; Yoga's is
+  `nowrap`. It was landing on `WRAPS[...] ?? Wrap.NoWrap`, so the answer was right by accident.
+- `kit/roles.ts § Style.fg` was typed `ReturnType<typeof paintColor>`, which is why `paintColor`
+  existed at all. It is a `Color` now and the identity cast is gone from forty call sites.
+- `kit/showing.tsx` typed a wheel handler as OpenTUI's `MouseEvent`; it is `tree/hit.ts § Wheel`.
+- `kit/scrolling.tsx § Viewport` is exported now and carries `scrollTop`, because `DiffPane` reads it
+  off the node and `ScrollBoxRenderable` used to declare it.
+
+### `rgbOf` stays, `paintColor` and `toRgba` go
+
+`paintColor` was the identity and only its return type did anything, so it went with the JSX
+namespace. `toRgba` had one caller. But `rgbOf` is not golden machinery and does not go with the
+goldens: `kit/render.tsx § runs` and `harness.tsx § captureSpans` report a run's foreground as an
+`{ r, g, b }` triple, and five live assertions read it — `diffLong.test.tsx` asks that an inserted
+line is greener than it is red, `controls.test.tsx`, `extensions.test.tsx` and `scrolling.test.tsx`
+each filter for a lit run the same way. So `colourCompat.ts` keeps `rgbOf` over a sixteen-slot table
+of its own, at the values `RGBA` answered, and the assertions did not move.
+
+### The dead dependencies: four of the five groups went, and one premise was false
+
+§ Scope says "the review found none of them does work on this host". That is right for three groups
+and wrong for two packages, and the evidence is the built output: every bare import is left to the
+runtime by `vite.config.ts`, so a chunk that names a package needs it installed the moment that chunk
+loads.
+
+Removed, with the build and a resolvability sweep over `dist/` between each group: the thirteen
+`@codemirror/lang-*` packages, `@codemirror/legacy-modes`, `@codemirror/language`,
+`@codemirror/theme-one-dark`, `shiki`, `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-webgl` and
+`lucide-static` — twenty of them. With `@opentui/core` and `@opentui/solid`, `package.json` goes from
+57 dependencies to 35.
+
+Put back, because the build proves this host needs them:
+
+- **`idb-keyval`.** `client-core/src/infra/node/fleet.ts` imports it at module scope, and `main.tsx`
+  imports `fleet.ts` before the first frame, so it is in the eager closure the startup check walks.
+  Measured rather than argued: with it removed, importing the built `fleet` chunk throws
+  `ERR_MODULE_NOT_FOUND: Cannot find package 'idb-keyval'`, which is `acorn` not booting.
+
+  **And the suite does not catch that**, which is the most useful thing this slice learned.
+  `apps/tui/src/node/boot.test.ts` passed with the dependency gone, because vitest runs the sources
+  and resolves `idb-keyval` from client-core's own `node_modules`, where it is declared. A green suite
+  is not evidence that this package's dependencies are complete, and that is now true of six
+  specifiers rather than one: `@codemirror/theme-one-dark`, the `@codemirror/lang-*` set,
+  `@codemirror/legacy-modes`, `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-webgl` and `shiki`
+  are all answered by a Vite alias that vitest also applies, so nothing in the suite can tell you
+  whether the built output would have resolved them. **The built output is the only check.** The one
+  used here is a sweep of every double-quoted bare specifier in `dist/` against what `apps/tui` can
+  resolve, run after each group of dependencies came out and again after the aliases went in; it
+  belongs in `scripts/` the day somebody wants it enforced.
+- **`codemirror`, `@codemirror/state`, `@codemirror/view`, `@codemirror/language`.** `EditorPane.tsx`
+  imports `basicSetup`, `EditorState` and `EditorView` directly rather than through
+  `@acorn/plugin-api/ui/editor`, and this host draws the editor pane —
+  `apps/tui/src/kit/editor.ts` § The ceiling already said so, and `apps/tui/src/panes.test.tsx`
+  § editor draws it. Two of them are also the type imports in that stub, so tsc needs them either
+  way, and `@codemirror/language` is here because `codemirror` itself depends on it (see the aliases
+  below).
+
+**Dropping them left three chunks importing packages that no longer resolve, and that was a
+regression — it is fixed with three stubs and three aliases.** The first pass of this slice recorded
+those chunks as dead and moved on. They are not dead: `DocumentSurface` and `TerminalPanel` are both
+reached by a real `import()` from a chunk in the graph, so they are lazy chunks a reader can hit. With
+the packages installed the import resolved and the surface merely failed to draw; without them it is
+`ERR_MODULE_NOT_FOUND` the moment the surface opens. Cleanup must not turn a surface that cannot draw
+into a process that crashes.
+
+So each specifier is answered locally, the way `@solidjs/router`, `lucide-static/icon-nodes.json` and
+`@acorn/plugin-api/ui/editor` already are — a stub with a header saying why this host cannot have the
+real thing (`vite.config.ts` § resolve.alias, and `isAliased`, which has to list them too or `external`
+wins before the alias runs):
+
+| Stub | Answers | For |
+| --- | --- | --- |
+| `apps/tui/src/kit/codemirrorGrammars.ts` | `@codemirror/theme-one-dark`, every `@codemirror/lang-*`, every `@codemirror/legacy-modes/mode/*` | `DocumentSurface`, which holds an `HTMLElement` and mounts a CodeMirror `EditorView` into it |
+| `apps/tui/src/kit/xterm.ts` | `@xterm/xterm`, its stylesheet, `@xterm/addon-fit`, `@xterm/addon-webgl` | `TerminalPanel`, a `UiSlotContribution` for a drawer slot this host does not have |
+| `apps/tui/src/kit/shiki.ts` | every `shiki` specifier — core, both engines, every grammar and theme | the DOM `DiffPane`, the DOM `Markdown` and `TerminalPanel` |
+
+**Every export throws, and names the host.** A stub that answers plausibly is how this host got an
+editor pane pulling seventeen grammars it could never highlight, so a surface that does reach one gets
+told where it is rather than drawing an empty box somebody has to bisect. As shipped:
+
+> `createHighlighterCore` is shiki, and the terminal client draws in the sixteen slots the reader's
+> terminal chose rather than in a theme of ours. Ask a role for a colour instead
+> (apps/tui/src/kit/shiki.ts, apps/tui/vite.config.ts).
+
+The patterns are regexes rather than a line per package, because the grammar and theme sets are open:
+a language added to `client-core/src/features/editor/language.ts` must not become a package this host
+has to install again. The names have to exist as exports even so — the build links a named import
+against the stub, so adding a grammar there and not here is a build error rather than a runtime one.
+
+**Two packages are deliberately not aliased, and both are the same mistake.** `@xterm/headless` is the
+`pty` rectangle's own emulator. And `@codemirror/language` was aliased for an afternoon and broke the
+editor pane in three tests: `codemirror` depends on it, the `editor` pane imports `basicSetup` from
+`codemirror`, and under vitest — where `ssr.noExternal` inlines `node_modules` too — the stub was
+handed to a package that works here. It is a declared dependency instead. **The rule the two share: a
+stub may only stand in front of a specifier no working surface reaches.**
+
+Verified three ways. The dist audit — every double-quoted bare specifier in `apps/tui/dist`, minus
+builtins and declared dependencies — reports nothing. Importing `DocumentSurface`, `TerminalPanel`,
+`EditorPane` and both shiki chunks in Node links all five, where three of them threw
+`ERR_MODULE_NOT_FOUND` before. And the eager closure did not move: 963,998 B before the aliases,
+963,962 B after, 98 chunks either way, and none of the three stubs is in the walk. They are bytes in
+the lazy chunks that already existed.
+
+`@xterm/headless` stays — it is the `pty` rectangle's emulator, added in phase 3.
+
+### The startup graph: the premise was false and the ceiling went up, not down
+
+§ Re-measure asked for the ceiling to be lowered, and § What the next slices must know said "the dead
+dependencies are what is supposed to close it". Neither is true, and the reason is one line:
+
+**Dropping a dependency moves this number by nothing.** `vite.config.ts` externalises every bare
+import, so a package that is only ever imported contributes zero built bytes. Removing nineteen
+dependencies moved the eager closure from 964,303 B to 964,303 B. What did move it was deleting the
+golden capture entry, which took 27 KB off the *built* total but nothing off the eager closure, and
+the comment edits in this slice, which took off a few hundred bytes.
+
+The honest numbers, all on Node 24.11.0:
+
+| When | Eager closure | Ceiling |
+| --- | --- | --- |
+| performance programme phase 4, when 870,000 B was set | 841,142 B | 870,000 B |
+| `main` at this programme's start | 875,265 B | 870,000 B — already red |
+| phase 3 under `own` | 970,037 B | still red |
+| phase 4, first slice | 964,995 B | still red |
+| phase 4, second slice | 963,998 B | **995,000 B** |
+
+The ceiling is now the measured number rounded up by about 3%, which is the rule every previous
+ceiling here was set by. It went up rather than down because the painter is ours: `ownRenderer`,
+`renderer` and `ownKeys` together are 97,889 B of the closure, and 875,265 + 97,889 is 973,154, which
+is within a rounding of where we are. What used to be a 6 MB native library outside the bundle is now
+about 98 KB inside it. `apps/tui/src/startupGraph.test.ts` holds the new number and `KNOWN` is still
+empty.
+
+### The runtime floor
+
+`node-runtime.json` pins `24.11.0` and declares `">=22.18 <23 || >=24.4"`, so `apps/tui/package.json`
+now declares exactly that, with a `"//engines"` note saying why the package no longer differs from the
+rest of the repo. `apps/tui/vitest.config.ts` had already lost its version branch in the first slice
+and has no flag and no skip in it.
+
+### Two loose ends the docs slice owns
+
+- **`tools/arch/docPaths.test.ts` is red on thirty paths inside `docs/future/terminal-rewrite/`**,
+  every one of them naming a file this slice deleted. They go when the folder does, which is the last
+  commit of the docs slice. The two citations in docs that survive — `docs/tui.md` § Rendering and
+  § Loose text under a box, and `docs/performance.md`'s reconciler paragraph — were given a
+  same-line "deleted" marker so the check is no redder outside this folder than it was before.
+  Everything else it reports is the pre-existing dotfile-path family (`.env`, `.acorn`).
+- **A stale claim in `apps/tui/src/kit/scrolling.tsx`.** Its offset is written from an effect rather
+  than as a JSX attribute, and the reason it gave was that tsc typed intrinsics against OpenTUI's prop
+  shapes. Our `tree/jsx.ts` declares `offset`, so it could be either now; the comment says so and the
+  effect stays, because changing it is a behaviour change with no reason behind it.

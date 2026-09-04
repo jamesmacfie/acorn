@@ -1,5 +1,5 @@
-/** @jsxImportSource @opentui/solid */
-import type { BoxRenderable, Renderable } from '@opentui/core'
+/** @jsxImportSource @acorn/tui/jsx */
+import type { Renderable } from './tree/compat'
 import { createSignal, ErrorBoundary, Suspense, type JSX } from 'solid-js'
 import { Line } from './kit/cells'
 import { boxBorder } from './kit/roles'
@@ -28,7 +28,7 @@ export function Panel(props: {
   title?: string
   /** Runs with the frame's box, after this component has taken it. Where a caller registers its focus
    *  region, which is why it is a callback rather than `ref`: both want the same element. */
-  onBox?: (box: BoxRenderable) => void
+  onBox?: (box: Renderable) => void
   /** Fixed height in rows, borders included. Left unset the frame takes what its contents need; the
    *  panel that should get the slack passes `grow` instead. */
   rows?: number
@@ -58,11 +58,11 @@ export function Panel(props: {
       {...boxBorder('surface', { tone: lit() ? 'accent' : 'neutral' })}
       title={props.title}
       titleAlignment="left"
-      ref={(element: BoxRenderable) => { setBox(element); props.onBox?.(element) }}
+      ref={(element: Renderable) => { setBox(element); props.onBox?.(element) }}
     >
-      {/* The contents clip inside the border rather than pushing it out: OpenTUI insets a bordered
-          box's scissor rect by its own sides, so this is the frame's own promise and not something
-          each caller has to remember (`BoxRenderable.getScissorRect`). */}
+      {/* The contents clip inside the border rather than pushing it out: paint clips a child to its
+          parent's content box, which a border is outside of, so this is the frame's own promise and
+          not something each caller has to remember (`./paint/paint.ts`). */}
       {props.scroll
         ? <ScrollViewport>{props.children}</ScrollViewport>
         : <box flexDirection="column" flexGrow={1} overflow="hidden">{props.children}</box>}

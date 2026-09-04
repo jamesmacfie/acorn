@@ -5,7 +5,7 @@ import { invalidateRun } from '../layout/measure'
 import { applyProp, flexShrinkFor, SHRINK_DEPENDS } from '../layout/props'
 import { createYogaNode, freeYogaNode } from '../layout/yoga'
 import { INTRINSIC, KINDS, measuresText, textOwner, type Node } from './node'
-import { markInserted, markRemoved, makeNode } from './compat'
+import { markInserted, markRemoved, makeNode, type Renderable } from './compat'
 import { requestFrame } from './frames'
 
 // The reconciler this host draws through: ours, over plain objects.
@@ -13,13 +13,12 @@ import { requestFrame } from './frames'
 // `solid-js/universal` wants ten node operations and this is all ten of them. The module is the
 // target of the `moduleName` alias in `../../vite.config.ts`, so every JSX call in the process lands
 // here — client-core's components and a sandboxed plugin's included — and it exports the same three
-// names `@opentui/solid` does (`render`, `Dynamic`, `extend`) so that pointing the alias at it is the
-// whole switch.
+// exports the three names a Solid host has to export: `render`, `Dynamic` and `extend`.
 //
-// **What it replaces, and why the replacements are absences.** Both overrides in
-// `../kit/reconciler.ts` and both prototype patches in `../renderGuard.ts` exist because a
-// `Renderable` has a lifecycle, has behaviour, and reads its own size. A plain object has none of the
-// three, so:
+// **What it replaces, and why the replacements are absences.** The two reconciler overrides and the
+// two prototype patches this host used to carry — deleted in phase 4, and in the git history under
+// `kit/reconciler.ts` and `renderGuard.ts` — all existed because a `Renderable` has a lifecycle, has
+// behaviour, and reads its own size. A plain object has none of the three, so:
 //
 //   - The orphan-text rule goes. A `#text` under a `box` is legal here; paint draws it as a one-line
 //     run at the box's content origin. Four crashes in one week were a bare `{count()}` under a
@@ -33,7 +32,7 @@ import { requestFrame } from './frames'
 // it back. Solid's ownership graph already knows the difference the old code was guessing at: a real
 // unmount disposes the owner that created the node, while `Suspense` keeps its children's owners
 // alive on purpose. So `createElement` ties the free to the creating owner with `onCleanup`, the same
-// trick `../kit/reconciler.ts` used for `tieDestroyToOwner`, and a node made outside any owner frees
+// trick the old reconciler patch used for `tieDestroyToOwner`, and a node made outside any owner frees
 // when it is removed instead, which is the right answer for something no reactive scope will
 // re-insert.
 
@@ -41,10 +40,9 @@ import { requestFrame } from './frames'
  *  deliberately the whole type and this is bookkeeping, not state anything reads. */
 const freeOnRemove = new WeakSet<Node>()
 
-// Through `./compat.ts`, which puts the region store's view of a node on its prototype while the
-// store is still typed on OpenTUI's tree. The fields it sets are this file's; the accessors are that
-// file's, and phase 4 deletes them.
-const make = (kind: Node['kind']): Node => makeNode(kind)
+// Through `./compat.ts`, which puts the region store's view of a node on its prototype. The fields
+// set here are this file's; the accessors are that file's.
+const make = (kind: Node['kind']): Renderable => makeNode(kind)
 
 /** The nearest `text` ancestor has to re-measure, because what it measures is the concatenation of
  *  everything under it. A no-op anywhere else in the tree, which is most of the time. */
@@ -56,7 +54,7 @@ function runChanged(node: Node): void {
   owner.yoga?.markDirty()
 }
 
-export function createElement(tag: string): Node {
+export function createElement(tag: string): Renderable {
   const kind = KINDS[tag]
   // A tag this host has no kind for is a surface on the wrong host — `<main>` from a DOM component —
   // and saying so is better than drawing an empty box (docs/tui.md § A descriptor source's list).
@@ -73,7 +71,7 @@ export function createElement(tag: string): Node {
   return node
 }
 
-export function createTextNode(text: string): Node {
+export function createTextNode(text: string): Renderable {
   const node = make('#text')
   node.text = text
   return node
@@ -192,9 +190,9 @@ export const { effect, memo, createComponent, insert, spread, setProp, mergeProp
  *
  *  `JSX.Element` rather than `Node` on the way in, because a caller writes JSX and tsc types that
  *  against the ambient JSX namespace. Both namespaces in play — ours in `./jsx.ts` and the one the
- *  `@jsxImportSource` pragma still names — say `Element` is Solid's own, so this is the type a caller
- *  actually holds. What arrives is a `Node`, because `createElement` above is what built it. */
-export function render(code: () => SolidJSX.Element, root: Node = createElement('box')): () => void {
+ *  `@jsxImportSource` pragma names both say `Element` is Solid's own, so this is the type a caller
+ *  actually holds. What arrives is a node, because `createElement` above is what built it. */
+export function render(code: () => SolidJSX.Element, root: Renderable = createElement('box')): () => void {
   return renderer.render(code as unknown as () => Node, root)
 }
 

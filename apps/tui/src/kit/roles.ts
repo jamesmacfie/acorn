@@ -1,7 +1,7 @@
 import { roleCell, type CellStyle } from '@acorn/client-core/kit/tokens/roles.ts'
 import type { Border, Space, TextRole, Tone } from '@acorn/client-core/kit/tokens/tokens.ts'
+import type { Color } from '../colour'
 import { isCompact, slotColor } from '../appearance'
-import { paintColor } from '../colourCompat'
 import { ATTRS } from '../paint/buffer'
 
 // Roles as cells: what a role token means to a terminal, as something a renderable can be handed.
@@ -10,15 +10,13 @@ import { ATTRS } from '../paint/buffer'
 // last inch: turning a `CellStyle` into the props a run of cells takes. Nothing in this package names
 // a colour, a gap or a box character — it asks for a role, and the answer arrives here.
 //
-// The attribute bits are `../paint/buffer.ts`'s, which are deliberately the same numbers
-// `TextAttributes` used: bold 1, dim 2, underline 8, inverse 32, with its italic and blink left as
-// gaps. Keeping the positions means the mask needs no translating while both painters run and no
-// golden frame moves on the day this file stopped importing OpenTUI's copy of them.
+// The attribute bits are `../paint/buffer.ts`'s: bold 1, dim 2, underline 8, inverse 32, with the
+// gaps at 4 and 16 where italic and blink would be. The positions are the ones every terminal
+// library uses, so a mask read off a frame is the number a reader expects.
 
 export type Style = {
-  /** A `../colour.ts` colour, typed as OpenTUI's while both painters compile from one component
-   *  source (../colourCompat.ts). */
-  fg: ReturnType<typeof paintColor>
+  /** A `../colour.ts` colour: the terminal's own foreground, one of its sixteen slots, or a triple. */
+  fg: Color
   attributes: number
   /** The same four bits as booleans. Not a second answer: a `span` under the old painter reads its
    *  colour and its weight out of one object and ignores an `attributes` prop entirely, so a run
@@ -57,7 +55,7 @@ export function textStyle(role: TextRole | undefined, tone?: Tone): Style {
   // `role="muted"` a grey rather than the default foreground with the dim bit set.
   const mask = attributes(text) | (colour ? attributes(colour) : 0)
   return {
-    fg: paintColor(slotColor(colour?.slot ?? text.slot)),
+    fg: slotColor(colour?.slot ?? text.slot),
     attributes: mask,
     ...(mask & ATTRS.bold ? { bold: true } : {}),
     ...(mask & ATTRS.dim ? { dim: true } : {}),
@@ -95,7 +93,7 @@ export const boxBorder = (border: Border, opts: { when?: boolean; tone?: Tone } 
   return {
     border: box,
     borderStyle: 'single',
-    borderColor: box ? paintColor(slotColor(roleCell('tone', opts.tone ?? 'neutral').slot)) : undefined,
+    borderColor: box ? slotColor(roleCell('tone', opts.tone ?? 'neutral').slot) : undefined,
   }
 }
 

@@ -19,8 +19,8 @@ import { runText } from './node'
 // The ten node operations, against a tree built by hand rather than by the transform, because what is
 // under test is the operations and not Solid.
 //
-// Nothing here imports `@opentui/*`, so it runs on the Node the repo pins with no FFI and no flag.
-// That is the point of the whole phase: the drawing tests stop skipping on the repo's own Node.
+// It runs on the Node the repo pins with no FFI and no flag, like every drawing test here does now.
+// That was the point of the whole programme.
 
 /** A box carrying a `flexGrow` that identifies it. `getChild` returns a fresh wrapper around the same
  *  wasm pointer on every call, so a node's Yoga child cannot be recognised by identity; a distinct
@@ -70,7 +70,7 @@ describe('the node operations', () => {
   it('skips the Yoga slots of children that have no Yoga node', () => {
     // A `text` holding a `span` between two `#text` runs: three tree children, no Yoga children. A
     // box holding a `#text` beside a box is the same question the other way round, and it is the
-    // orphan-text shape `kit/reconciler.ts` used to wrap on the way in.
+    // orphan-text shape the old reconciler patch used to wrap on the way in.
     const box = createElement('box')
     const loose = createTextNode('7')
     const after = tagged(7)

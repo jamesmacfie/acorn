@@ -1,6 +1,6 @@
-/** @jsxImportSource @opentui/solid */
+/** @jsxImportSource @acorn/tui/jsx */
 import type { JSX } from 'solid-js'
-import type { CliRenderer } from '@opentui/core'
+import type { OwnRenderer } from '../ownRenderer'
 import { rgbOf } from '../colourCompat'
 import { openOwnRenderer } from '../ownRenderer'
 import { frameRequested, framesSettled } from '../tree/frames'
@@ -48,7 +48,7 @@ export type Cells = Frame & {
   resize: (width: number, height: number) => Promise<Cells>
   /** The renderer, for the questions the store does not answer: the tree a case wants to walk, and
    *  the root a hit test starts from (./kit.test.tsx § every control is a stop). */
-  renderer: CliRenderer
+  renderer: OwnRenderer
   done: () => void
 }
 
@@ -58,7 +58,7 @@ export type Cells = Frame & {
  * and scrolls where a shell case does not.
  */
 type Surface = {
-  renderer: CliRenderer
+  renderer: OwnRenderer
   flush: () => Promise<unknown>
   captureCharFrame: () => string
   runs: () => Run[]
@@ -75,7 +75,7 @@ type Modifiers = { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: bool
 const openSurface = (size: { width: number; height: number }): Surface => {
   const renderer = openOwnRenderer({ cols: size.width, rows: size.height })
   return {
-    renderer: renderer as unknown as CliRenderer,
+    renderer: renderer as unknown as OwnRenderer,
     // Turn the event loop until the tree stops asking for frames, then draw once, for the reason
     // `../harness.tsx § openSurface` gives: one frame produces the next, so a fixed number of turns
     // reads a screen that is still settling (../tree/frames.ts).
@@ -121,19 +121,16 @@ export async function renderCells(
 ): Promise<Cells> {
   const { render } = await import('../tree/renderer')
   const { installKeymap } = await import('../keys/install')
-  const { installRenderGuard, RENDERER_LISTENER_CAP } = await import('../renderGuard')
   const { _resetCollections } = await import('../keys/collection')
   const { _resetRegions } = await import('../keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
   _resetCollections()
   _resetRegions()
   _resetLayoutState()
-  installRenderGuard()
 
   // The renderer first and the tree second, because a collection, a layout and a trap each register
   // their key layer as they draw and a layer registered against no engine is silently dropped.
   const setup = openSurface({ width: size.width ?? 40, height: size.height ?? 8 })
-  setup.renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(setup.renderer)
   // The tree mounts on the screen's root node rather than on the surface around it
   // (../tree/renderer.ts § render).
