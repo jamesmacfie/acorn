@@ -1,7 +1,9 @@
 # Phase 5: what the reference apps do that we do not
 
-Status: not started. Independent of the other phases; reads better after phase 1, because each item
-is a keyboard rule and phase 1 is where the keyboard's mechanism settles.
+Status: built 2026-09-04. Independent of the other phases; reads better after phase 1, because each
+item is a keyboard rule and phase 1 is where the keyboard's mechanism settles. Three of the five items
+rested on a false premise and three of the five are refused; what was found is at the bottom of this
+file (§ What building it found).
 
 ## Goal
 
@@ -124,3 +126,80 @@ if the host-key table is listed there.
   `9e5d90ca`.
 - Confirm the engine still supports key sequences before deciding on `g g`; if it does not, the item
   is refused without the argument.
+
+## What building it found (2026-09-04)
+
+Built on `8ac62b1d`, at the end of phase 4. The verify list found three of the five items resting on a
+false premise, and the two that survived turned out to be the same bug seen from two sides.
+
+### The verify list, item by item
+
+**The command layer does bind `w`, `p`, `n`, `q` and `?` at the screen's depth only, and the digits
+are unbound.** `commandLayer.ts` drops a bare key when `scopeDepth() > 1`, and those five are
+registered from `chrome/Shell.tsx` through the shared keybinding registry. No bare digit is bound
+anywhere under `apps/tui/src`. `ctrl+1` to `ctrl+9` are the `tabs` layout's, and they are chords.
+
+**The cheat sheet was never drawn from its own list.** Read at `9e5d90ca` as the phase says: it calls
+`activeHints()`, which is the footer's own function over `getActiveKeys`, and it has done since before
+this programme. The premise is false and the item's goal — one source — already held. What was
+missing was the test, so that is what this phase added.
+
+**The engine does support sequences.** `@opentui/keymap` 0.5.9's README names branch-aware multi-key
+sequences with `runExact`, `continueSequence`, a public pending-sequence API and a Neovim-style
+timeout resolver, and gives `g` against `gg` as its own example. So `g g` had to be argued rather than
+dismissed, and it is refused in [refused.md](./refused.md) on `g` itself.
+
+### Item by item
+
+**1. Digits that jump to rail panels: refused.** The phase argued for taking it. The argument does not
+survive the region list being built per screen rather than fixed. Reasons in
+[refused.md](./refused.md) § Digits that jump to a rail panel; the sentence a reader gets is in
+[tui.md](../../tui.md) § Navigation.
+
+**2. The cheat sheet from the dispatcher: already true, and now pinned.** `chrome.test.tsx` grew a
+case that reads the drawn rows out of the dialog's frame and asserts they equal `activeHints()` taken
+at the depth the sheet opened from, in order and in both directions. Grouping the sheet by tier was
+not taken: the sheet is the footer's list in full, and a sheet that showed more than the footer would
+need a second source, which is the one thing this item exists to prevent.
+
+**3. `G`: already bound, and shared.** `intentKeys` has `first: ['home', 'g']` and
+`last: ['end', 'shift+g']` at `9e5d90ca` and earlier, `apps/tui/src/input/parser.ts` spells a shifted
+letter `shift+g` naming `intentKeys` as the reason, and pressing `G` on the Menu list moves the caret
+to the last row. Nothing to add. The regression test is in `chrome.test.tsx` and the doc line is
+[tui.md](../../tui.md) § The five key groups. `g g` is refused.
+
+**4. A visible context stack: the hint was there and no reader ever saw it.** `esc back` is in
+`activeHints()` at every depth we could reach — the screen, an open `MenuList`, a `Modal` — and the
+drawn footer carried it at none of them. The footer cuts rather than wraps and `dismiss` sat last in
+reading order, so on the browse screen at 80 cells the line ended at `ctrl+k command…`, and inside the
+cheat sheet, where a reader most needs the way out, it ended at `ct…`. Two changes in
+`chrome/bindings.ts`: `dismiss` moves to third, ahead of the commands, and the `h/l` hint takes the
+`regionsInScope() > 1` guard Tab already had, because inside a scope the pair's `column` word is a
+promise the region tier cannot keep. `reachability.test.tsx` now reads the drawn footer line after
+every press on every surface and asserts it names Escape.
+
+Three scopes deep is not asserted, because a reader cannot get there. Every dialog the shell opens is
+opened by a bare key and the command layer drops its bare keys above the screen's depth, so `?` over
+an open menu does nothing; a third scope needs a pane that draws a `Menu` inside its own `Modal`, and
+no pane in the roster does. `chrome.test.tsx` covers the two that exist.
+
+**5. Per-view help in the footer: refused after the check.** On a `list-detail` pane the footer already
+reads differently in the two halves — `j/k move · enter open` in the list and `j/k scroll · h/l column`
+in the detail — but only because the kinds differ, so two regions of one kind would read the same. The
+answer is that the screen says it in place: both halves draw a titled frame, the caret is in one of
+them, and below 80 cells only the focused half is drawn. Adding a label would take cells from a line
+that had already run out. [refused.md](./refused.md) § The region's name at the footer's left.
+
+### The tests
+
+`pnpm --filter @acorn/tui test` on Node 24.11.0 with no flag: 561 passing, 2 skipped, and one failing,
+which is another session's in-flight palette work and fails on its own commit. Three cases are new in
+`apps/tui/src/chrome/chrome.test.tsx` — the cheat sheet against the engine, the way out at each depth,
+and `G` and `g` beside End and Home — and one assertion is new in `apps/tui/src/reachability.test.tsx`,
+inside `invariants()`, so it runs after every press on all eight surfaces.
+
+**One thing found and not chased.** `chrome.test.tsx` § what the footer costs counts the collects one
+Tab is allowed and its bound is eight. It counts nine when a `pr` fixture has run earlier in the same
+file, so opening that pane leaves something registered that the next screen's Tab pays for once. It is
+deterministic rather than flaky, it is not the footer's cache, and it is not what this phase is about,
+so the new case sits after the count rather than in front of it and says why.

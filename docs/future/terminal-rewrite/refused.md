@@ -135,3 +135,57 @@ Refused because the cost is booting client-core under Node, and
 [performance.md](../../performance.md) § 2026-09-03 — phase 4
 owns it and has already moved the first draw to 67 ms attached. Removing OpenTUI's 1.5 MB entry from
 the eager graph will help and phase 4 measures it, but the programme does not promise a number.
+
+## Digits that jump to a rail panel
+
+Considered in [phase 5](./phase-5-what-the-reference-apps-do.md), which argued for taking it: lazydocker
+binds `1` to `6` to its panels, and a direct jump is what a reader who knows the screen wants after
+the first week.
+
+Refused on the thing the analogy hides. lazydocker's six panels are always drawn and always in that
+order, so a digit names the same panel every time. Our region list is built per screen: Browse
+registers nothing when the source draws no list of its own, the rail goes on `ctrl+b`, the pane strip
+draws only while a task is open, and a pane's regions are whatever its layout declared. The sweep at
+2026-09-04 counts three regions on a browse screen and seven on the changes pane, so `3` would name a
+different region on nearly every screen — the opposite of what a direct jump buys.
+
+The footer settles the rest, and it is the criterion the phase set. Nine digits registered as commands
+are nine more rows in it and nine more in the cheat sheet, on a line that already runs out before
+`esc back` at every width we draw. Nine digits bound outside the registry are nine keys the footer
+cannot name at all, which is what [tui.md](../../tui.md) § The footer exists to stop. And nine bare
+keys is a large spend: a bare key belongs to the screen, goes inert while somebody types, and there
+are not many left.
+
+Reopens if the region list becomes a fixed set the reader can learn — the same argument the `tabs`
+layout already wins with `ctrl+1` to `ctrl+9`, where the strip draws the numbers in order.
+
+## `g g`
+
+Considered: vim's "go to the top", which yazi, rainfrog and lazygit all take.
+
+Refused, and not for want of a mechanism. `@opentui/keymap` 0.5.9 does support sequences — its README
+names branch-aware multi-key sequences with `runExact`, `continueSequence` and a Neovim-style timeout
+resolver, and `g` against `gg` is the example it gives. The reason is `g` itself. `intentKeys` has
+bound `g` to `first` and `G` to `last` since before this programme, both hosts answer them, and the
+terminal's parser already spells the shifted one `shift+g` on purpose. Making `g` a prefix would put
+a timeout in front of a key that answers instantly today, to reach an intent that key already
+reaches. The footer cannot draw "g then g" in a cell either, so the sequence would be a key nothing
+advertises.
+
+Reopens if a second sequence turns up wanting the mechanism and `first` is free of `g` by then.
+
+## The region's name at the footer's left
+
+Considered in [phase 5](./phase-5-what-the-reference-apps-do.md): gh-dash's `ShortHelp()` says which
+view it is describing, and ours does not, so a reader on a `list-detail` pane cannot tell from the
+footer alone whether the keys are in the list or the detail.
+
+Refused on the check the phase asked for. The screen answers it already and answers it in place: both
+halves draw a titled frame, the caret is in one of them, and below 80 cells only the half with the
+keys is drawn at all. The footer is the wrong place to repeat that, because the footer is the one
+line on this host that is short of room — it cuts rather than wraps and, before this phase, ran out
+before `esc back` on every screen we draw. A permanent label at the left would take those cells from
+the hints, which are the part a reader cannot get any other way.
+
+Reopens if two regions of one pane ever have the same kind of focus and the same words, and the caret
+alone stops telling them apart.

@@ -148,6 +148,18 @@ const invariants = (where: string, caret: Caret, frame: string, renderer: Render
     if (label === undefined) continue
     expect(label, `${where}: the footer offers "${keys} ${label}" on a ${focusedKind()}`).toBe(word)
   }
+
+  // 8, again, and this half is about the line rather than the list. Escape climbs one level per press
+  // and the scopes are a stack, but nothing on this host draws the depth — the footer's `esc` is the
+  // whole of what a reader is told about where they are and how to get out, so it has to be on the
+  // line at every depth the walk reaches.
+  //
+  // Read off the drawn frame and not off `activeHints()` on purpose. The hint was in the list all
+  // along; it was last in reading order and the footer cuts rather than wraps, so the line ran out
+  // before it on every screen, the cheat sheet's own footer included. A list a reader never sees is
+  // the same as no list (./chrome/bindings.ts § specs, docs/tui.md § The footer).
+  const footer = frame.split('\n').slice(-2)[0] ?? ''
+  expect(footer, `${where}: the footer never says how to get out: "${footer.trim()}"`).toContain('esc')
 }
 
 /** The frame without the strip at the bottom, which is the footer and any notification above it. What

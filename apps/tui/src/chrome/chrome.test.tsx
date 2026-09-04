@@ -10,6 +10,7 @@ import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { keyedRows } from '../kit/showing'
 import { recordedRequests } from '../fixture'
 import { renderFixture } from '../harness'
+import { activeHints } from './bindings'
 
 // The chrome, drawn against the fixture node: rail, topbar, pane strip, footer, palette, overlays.
 //
@@ -19,6 +20,9 @@ import { renderFixture } from '../harness'
 // caret is a screen nobody can drive (docs/testing.md § Test layers).
 
 const caretRow = (frame: string): number => frame.split('\n').findIndex((line) => line.includes('›'))
+
+/** The hint line, which is the last drawn row of the screen. A notification takes the row above it. */
+const footer = (frame: string): string => frame.split('\n').slice(-2)[0] ?? ''
 
 describe('the shell', () => {
   it('draws the topbar, the rail, the pane strip and the footer at 80 by 24', async () => {
@@ -215,6 +219,56 @@ describe('the shell', () => {
     // Read from the active layers, not from a written list: `tab` is this host's own key for a shared
     // intent and it is here because the region layer bound it (../keys/install.ts).
     expect(frame).toContain('tab')
+  }, 30_000)
+
+  it('draws every cheat sheet row from what the engine reports at the depth the sheet opened from', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.until('Invalidate', 45)
+    // What the keyboard offers on the screen behind the sheet. Asked before the press, because the
+    // sheet is a `Modal` and pushes a scope the moment it draws: inside it the region layers have
+    // nothing to reach and the engine rightly stops reporting them. The sheet answers the question a
+    // reader asked, which is "what can I do here", so it snapshots on open (./CheatSheet.tsx).
+    const offered = activeHints().map((hint) => hint.keys)
+    await screen.press('?')
+    const frame = await screen.frame()
+    screen.done()
+
+    // The rows, as drawn: the key column of every line inside the dialog's frame. `Kbd` pads the key
+    // to the widest one and the row has a gap of two, so two spaces end the column.
+    const drawn = frame.split('\n')
+      .filter((line) => line.startsWith('│ '))
+      .map((line) => line.slice(2).split(/\s{2,}/)[0] ?? '')
+
+    // Both directions, which is the whole point of one source. Neither list may hold a key the other
+    // does not: a row the engine never reported is the sheet lying about a key that does nothing, and
+    // a hint with no row is the footer offering something the sheet cannot explain. Adding a binding
+    // adds a row here and removing one removes it, with nothing to keep in step by hand
+    // (./bindings.ts, docs/tui.md § The footer).
+    expect(drawn).toEqual(offered)
+  }, 30_000)
+
+  it('goes to the ends of a list on G and g, beside End and Home', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.until('Invalidate', 45)
+    const on = async (): Promise<string> => {
+      const frame = await screen.frame()
+      return (frame.split('\n')[caretRow(frame)] ?? '').trim()
+    }
+    // vim's first and last, and they are `first` and `last` in the shared intent table rather than a
+    // mode of this host's own — so the desktop's lists answer them too, and there is one table
+    // (client-core/kit/keys/keymap.ts § intentKeys, docs/tui.md § The five key groups).
+    expect(await on()).toContain('GitHub')
+    await screen.press('g', { shift: true })
+    expect(await on()).toContain('Agents')
+    await screen.press('g')
+    expect(await on()).toContain('GitHub')
+    // The same two intents the page group reaches with the keys a reader without vim in their hands
+    // would try.
+    await screen.press('END')
+    expect(await on()).toContain('Agents')
+    await screen.press('HOME')
+    expect(await on()).toContain('GitHub')
+    screen.done()
   }, 30_000)
 
   it('draws a notification above the footer, and never takes the keys for it', async () => {
@@ -425,4 +479,48 @@ describe('the rail keeps the rows a change did not touch', () => {
       dispose()
     })
   })
+})
+
+// ── The way out, at every depth ───────────────────────────────────────────────────────────────
+//
+// Last in the file, and that is not taste. The measurement above is of one screen's collects after
+// one Tab, and it counts nine rather than eight when a `pr` fixture ran before it: opening that pane
+// leaves something registered that the next screen's Tab pays for once. Worth finding and not worth
+// finding here, so this case sits after the count rather than in front of it.
+
+describe('the footer says how to get out', () => {
+  it('says how to get out at every depth, behind a menu and behind a modal', async () => {
+    const screen = await renderFixture({ width: 100, height: 28, pane: 'pr' })
+    await screen.until('#42', 45)
+    // The scopes are a stack and Escape pops it, and the footer's `esc` is the only thing on this host
+    // that draws the depth at all. It has to survive the cut: the footer ellipsises rather than
+    // wrapping, and this row used to sit last in reading order, so the line ran out before it every
+    // time (./bindings.ts § specs).
+    expect(footer(await screen.frame())).toContain('esc back')
+
+    // Two deep, inside a `MenuList`'s scope. Nothing behind the menu is in scope, so most of what the
+    // footer was saying goes with it — which is the moment a reader most needs the one key that gets
+    // them out.
+    expect(await screen.reach('squash', 40)).toBe(true)
+    await screen.press('RETURN')
+    await screen.until('rebase')
+    expect(footer(await screen.frame())).toContain('esc back')
+
+    // And two deep inside a `Modal`, which is the other kind of scope and lands the keys as well as
+    // containing them (../keys/regions.ts § pushScope).
+    await screen.press('ESCAPE')
+    await screen.press('?')
+    await screen.until('Keys')
+    expect(footer(await screen.frame())).toContain('esc back')
+    // Climbed back out before the screen goes. The overlay stack is module state that outlives one
+    // fixture, and a case that leaves a dialog open leaves the next one measuring a screen it did not
+    // build (§ what the footer costs).
+    await screen.press('ESCAPE')
+    screen.done()
+
+    // Three deep is not asserted because a reader cannot get there. Every dialog the shell opens is
+    // opened by a bare key, and the command layer drops its bare keys above the screen's own depth,
+    // so `?` over an open menu does nothing. A third scope needs a pane that draws a `Menu` inside
+    // its own `Modal`, and no pane in the roster does (../keys/commandLayer.ts, ../keys/tiers.ts).
+  }, 30_000)
 })

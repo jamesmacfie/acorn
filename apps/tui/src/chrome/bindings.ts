@@ -135,7 +135,25 @@ const specs = (): Spec[] => {
   return [
     { probe: bare('next', 1), keys: says.moveKeys, label: says.move, detail: 'and the arrows' },
     { probe: bare('activate'), keys: 'enter', label: says.act, detail: 'or space' },
-    { probe: bare('expand', 1), keys: 'h/l', label: says.cross, detail: 'and the arrows' },
+    // Third, and never further down. Escape is the way out and the one key a reader who is lost has
+    // to be able to find, and the footer cuts rather than wraps — so while this sat last in reading
+    // order the line ran out before it on every screen we draw, the cheat sheet included. Nothing was
+    // wrong with the list; the reader never saw the row (./Footer.tsx, docs/tui.md § The footer).
+    { probe: bare('dismiss'), keys: 'esc', label: 'back' },
+    {
+      probe: bare('expand', 1),
+      keys: 'h/l',
+      label: says.cross,
+      detail: 'and the arrows',
+      // A bubbled `h` or `l` has one meaning and it is the column move, so where the word is `column`
+      // the hint is true only while there is a second region to move to — the question Tab's hint
+      // already asks, for the same reason. A layer knows nothing about scopes, so inside a `Modal` or
+      // an open `Menu` the region layer's pair is still registered and still reported live, and the
+      // footer offered `h/l column` over a dialog with no columns behind it. The other three words —
+      // `fold`, `move`, `tab` — are answered inside the scope, so they are ungated
+      // (../keys/regions.ts § Scopes).
+      when: () => says.cross !== 'column' || regionsInScope() > 1,
+    },
     { probe: bare('search', 1), keys: '/', label: 'filter' },
     { probe: bare('menu'), keys: 'menu', label: 'menu' },
     { probe: bare('delete'), keys: 'del', label: 'delete' },
@@ -148,9 +166,12 @@ const specs = (): Spec[] => {
       when: () => regionsInScope() > 1,
     },
     { probe: bare('nextPane'), keys: keys.nextPane[0] ?? '', label: 'pane', detail: 'the pane to the right' },
-    { probe: bare('dismiss'), keys: 'esc', label: 'back' },
   ]
 }
+
+/** How many hints go ahead of the commands. Three, because `dismiss` is the third spec and the count
+ *  is what keeps it in front of them however few of the first three are live (§ specs). */
+const LEADING = 3
 
 // ── When the answer moves ─────────────────────────────────────────────────────────────────────
 //
@@ -242,9 +263,10 @@ export function activeHints(): Hint[] {
       const desc = String(key.bindingAttrs?.desc ?? key.commandAttrs?.desc ?? '')
       return desc ? [{ keys: engine.formatKey(key.display), label: desc.toLowerCase() }] : []
     })
-  // Move and open first because they are what a reader reaches for; the chords next because they are
-  // the ones nobody can guess; the rest after, where the footer's own truncation reaches them first.
-  const hints = [...shown.slice(0, 2).map(hint), ...commands, ...shown.slice(2).map(hint)]
+  // Move, open and back first, because they are what a reader reaches for and Escape is what a reader
+  // who is lost reaches for hardest; the chords next because they are the ones nobody can guess; the
+  // rest after, where the footer's own truncation reaches them first.
+  const hints = [...shown.slice(0, LEADING).map(hint), ...commands, ...shown.slice(LEADING).map(hint)]
   last = { node, overlays, regions, typing, revision, engine, hints }
   return hints
 }
