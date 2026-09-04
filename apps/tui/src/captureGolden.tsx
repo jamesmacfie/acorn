@@ -20,11 +20,14 @@ import { SIZES, SURFACES } from './goldenSurfaces'
 // Nothing here is a test. The files are data until phase 2 compares against them, and phase 4
 // deletes them along with ./golden.ts once the intent tests run against the new painter.
 //
-// **Sixteen of the files have been corrected by hand and re-running this would undo it.** Phase 2
-// found 188 runs holding OpenTUI's own `focusedBorderColor` rather than the colour the border role
-// chose, and corrected them against ui-design.md § Roles, and what each host makes of them. A
-// recapture under the old painter puts the hex back; a recapture under the new one is the recapture
-// phase 4 does once, when there is one painter left (./golden.test.ts § the goldens).
+// **All 28 files have been corrected by hand and re-running this would undo it.** Phases 2, 3 and 4
+// found 360 runs holding a colour no role in this app ever chose — OpenTUI's own
+// `focusedBorderColor` on a focused box, its `placeholderColor` in a field — and corrected each to
+// the colour the kit's role returned, against ui-design.md § Roles, and what each host makes of them.
+// Re-running this puts every one of those hexes back. Two of the files were also re-captured in
+// phase 4 with five real seconds of settle before the frame, because the originals were taken while
+// a query was still in flight (./golden.test.ts § the goldens,
+// docs/future/terminal-rewrite/phase-4-cut-over.md § What building it found).
 
 // The delay ./browseSlow.test.tsx uses. Without it the fixture answers in a microtask, every cache
 // is warm before the first frame, and the captured state is one no reader ever sees — the goldens

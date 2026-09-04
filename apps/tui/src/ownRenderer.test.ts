@@ -6,7 +6,6 @@ import { installKeymap } from './keys/install'
 import { _resetRegions } from './keys/regions'
 import { openTerminal, type TerminalInput, type TerminalOutput } from './input/terminal'
 import { openOwnRenderer, type OwnRenderer } from './ownRenderer'
-import { drawsOwn } from './painter'
 
 // What the terminal says, arriving where the app listens for it.
 //
@@ -69,7 +68,7 @@ afterEach(() => {
   setHostFocused(null)
 })
 
-describe.skipIf(!drawsOwn())('the terminal, wired to the dispatcher', () => {
+describe('the terminal, wired to the dispatcher', () => {
   it('presses one key once, whatever the protocol sends about it', async () => {
     const { stdin, renderer, close } = wire()
     const engine = installKeymap(renderer as unknown as CliRenderer)

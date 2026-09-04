@@ -1,6 +1,5 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 
 // Its own file, not a second case in ./browse.test.tsx: the query cache is module state and outlives
@@ -25,7 +24,7 @@ const caretOn = async (
 // pushed the Tasks panel off the bottom and drew over the footer, and the rows inside it squeezed
 // every field into an illegible smear — the caret column with them, so a focused list looked exactly
 // like an unfocused one (../panel.tsx, ./kit/showing.tsx § Rows).
-describe.skipIf(!canDraw)('a browse list longer than its panel', () => {
+describe('a browse list longer than its panel', () => {
   it('windows to the panel, shows where it is, and leaves the panels below it alone', async () => {
     process.env.ACORN_FIXTURE_PULLS = '40'
     try {

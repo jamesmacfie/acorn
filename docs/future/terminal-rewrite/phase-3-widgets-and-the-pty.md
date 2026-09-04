@@ -378,8 +378,8 @@ and it is this slice's own prose: the build does not minify, and `apps/tui/src/k
 from 95 lines to 274 in a file that was already in the graph. Nothing new is reachable from `App` —
 `apps/tui/src/tree/hit.ts` is only reached through `apps/tui/src/ownRenderer.ts`, which the composition
 root still reaches through one `import()`, and the two modules the component does import statically,
-`apps/tui/src/painter.ts` and `apps/tui/src/tree/frames.ts`, are seventeen and thirty lines with no
-imports of their own. Both numbers are over the 870,000 B ceiling the check has been failing since
+`apps/tui/src/painter.ts` (deleted in phase 4) and `apps/tui/src/tree/frames.ts`, are seventeen and
+thirty lines with no imports of their own. Both numbers are over the 870,000 B ceiling the check has been failing since
 before this programme.
 
 ### What the next slice must know

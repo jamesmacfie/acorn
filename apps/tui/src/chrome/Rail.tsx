@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { createEffect, For, Show } from 'solid-js'
-import { Dynamic } from '@opentui/solid'
+import { Dynamic } from '../tree/renderer'
 import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { markersFor } from '@acorn/client-core/host/registries/rail/railMarkerFeed.ts'

@@ -1,6 +1,5 @@
 /** @jsxImportSource @opentui/solid */
 import { describe, expect, it } from 'vitest'
-import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 import { focusedRegion, focusedRenderable, isField } from './keys/regions'
 
@@ -31,7 +30,7 @@ const caretOn = async (
   return false
 }
 
-describe.skipIf(!canDraw)('browsing a source', () => {
+describe('browsing a source', () => {
   it('puts a source in the Menu, its list in Browse, and the highlighted item in the main panel', async () => {
     const screen = await renderFixture({ width: 100, height: 32 })
 

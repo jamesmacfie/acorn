@@ -1,13 +1,11 @@
 /** @jsxImportSource @opentui/solid */
 import { createRequire } from 'node:module'
 import { createEffect, createSignal, onCleanup, Show, type JSX } from 'solid-js'
-import { extend } from '@opentui/solid'
-import { EmbeddedTerminalRenderable, type BoxRenderable, type KeyEvent, type Renderable } from '@opentui/core'
+import type { BoxRenderable, KeyEvent, Renderable } from '@opentui/core'
 import type { Terminal as HeadlessTerminal } from '@xterm/headless'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { focusRenderable, focusWithin, focusedRenderable, onScreen } from '../keys/regions'
 import { RECTANGLE } from '../keys/tiers'
-import { drawsOwn } from '../painter'
 import { holdFrame, requestFrame } from '../tree/frames'
 import type { Node } from '../tree/node'
 import { Line } from './cells'
@@ -22,21 +20,12 @@ import { boxBorder } from './roles'
 // the node, reached over the same `term` WebSocket channel
 // (docs/terminal-and-agents.md), and this is a second emulator for it.
 //
-// **Two emulators, one contract.** Under the painter we are leaving it is OpenTUI's
-// `EmbeddedTerminalRenderable`, which is Ghostty's emulator behind an FFI boundary with its own key
-// encoder in Zig. Under ours it is `@xterm/headless`, which three other packages in this repo already
-// depend on and which the desktop draws the same PTY through — so a program's output is parsed by the
-// same parser on both hosts and looks the same. The one thing headless xterm has no notion of is a
+// **The emulator is `@xterm/headless`**, which three other packages in this repo already depend on
+// and which the desktop draws the same PTY through — so a program's output is parsed by the same
+// parser on both hosts and looks the same. The one thing headless xterm has no notion of is a
 // keyboard, hence `./ptyKeys.ts`. Everything above the emulator — the arming, the intercept, the
-// Escape pair, the footer's answer — is one piece of code either way, because the contract is the
-// contract (docs/tui.md § The Rectangle contract). Phase 4 deletes the OpenTUI half
-// (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md).
-//
-// `EmbeddedTerminalRenderable` is not one of OpenTUI's Solid intrinsics, so the catalogue is extended
-// once with it. `extend` is idempotent enough to call at module scope: the catalogue is a plain
-// record and this writes the same entry every time. Under our painter it registers nothing, because
-// our kinds are fixed and `pty` is one of them (../tree/renderer.ts § extend).
-extend({ embedded_terminal: EmbeddedTerminalRenderable })
+// Escape pair, the footer's answer — is the rectangle contract and knows nothing about it
+// (docs/tui.md § The Rectangle contract).
 
 /**
  * What a caller filling a `pty` rectangle is handed.
@@ -59,17 +48,14 @@ export type CellTerminal = {
   size: () => { cols: number; rows: number }
 }
 
-/** What the rectangle asks of whichever emulator is inside it, and the whole of the difference
- *  between the two painters. Installed by the half that mounted one. */
+/** What the rectangle asks of the emulator inside it, installed once the emulator is mounted. Two
+ *  answers, because everything else a rectangle does it does above the emulator. */
 type Inside = {
   /** The bytes this keystroke sends the program, honouring whatever modes it has set. */
   encode: (key: KeyEvent) => Uint8Array
-  /** The bytes this paste sends it, bracketed where the program asked for that, and absent under the
-   *  painter we are leaving. The dispatcher's paste hand-off is ours alone — OpenTUI's renderer
-   *  delivers a paste to the renderable *it* focused, which is the box rather than the emulator — so
-   *  there is nothing there to answer and adding a second route to a shipping painter is a change
-   *  nobody asked for (../keys/install.ts § pasteInto). */
-  paste?: (text: string) => Uint8Array
+  /** The bytes this paste sends it, bracketed where the program asked for that
+   *  (../keys/install.ts § pasteInto). */
+  paste: (text: string) => Uint8Array
 }
 
 // How long after leaving a rectangle a second Escape means "send an Escape to what is inside".
@@ -225,29 +211,13 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     })
   }
 
-  const handedNative = (renderable: EmbeddedTerminalRenderable) => {
-    // Not itself a stop. The rectangle is one stop from outside and the emulator is what is inside
-    // it, so focus lands on the box and the box decides when to hand the keys over. Leaving the
-    // emulator focusable would let a region's first stop land past the door.
-    renderable.focusable = false
-    // The emulator answering a query the program inside sent it — cursor position, device
-    // attributes. It goes to the PTY exactly like a keystroke does, and it is the only thing this
-    // callback carries: the keys are forwarded below, because a rectangle decides which keys are its
-    // before the emulator ever sees one.
-    renderable.onData = (bytes) => emit(bytes)
-    renderable.onTerminalResize = resized
-    inside = { encode: (key) => renderable.encodeKey(key) }
-    hand((data) => renderable.write(data), () => ({ cols: renderable.width, rows: renderable.height }))
-  }
-
   /**
-   * Our painter's half: a headless emulator held by the component and read by paint.
+   * The emulator, held by the component and read by paint.
    *
-   * The `Terminal` goes on the node as a prop, which is the one widget in this phase whose state does
+   * The `Terminal` goes on the node as a prop, which is the one widget in this kit whose state does
    * not reduce to numbers — paint has to read a buffer. It is still the component's: the node holds a
    * reference and knows nothing about it, so there is no emulator state the node can be in that this
-   * component disagrees with (docs/future/terminal-rewrite/phase-3-widgets-and-the-pty.md § Design,
-   * ../paint/paint.ts § drawPty).
+   * component disagrees with (../paint/paint.ts § drawPty).
    */
   const handedOwn = (element: unknown) => {
     const node = element as Node
@@ -342,7 +312,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
    *  (../keys/install.ts § pasteInto, ./asking.tsx § api). */
   const pasted = (event: { text: string }): void => {
     if (!entered()) return
-    const bytes = inside?.paste?.(event.text)
+    const bytes = inside?.paste(event.text)
     if (bytes?.length) emit(bytes)
   }
 
@@ -370,16 +340,10 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
       // entered (../chrome/Footer.tsx).
       title={`${props.label} · ${entered() ? 'esc leave' : 'enter'}`}
     >
-      {/* One tag each, in one component, because the tag is the only thing that differs: everything
-          above this line is the rectangle contract and is shared. A ternary in the JSX rather than
-          two components over a duplicated intercept, which `@opentui/solid`'s open intrinsic types
-          allow — its component catalogue is an interface with a string index signature, so any tag
-          compiles with `any` props (../tree/jsx.ts, § Two emulators, one contract). Neither of these
-          is a stop: the box is, and our `pty` is not focusable by default the way OpenTUI's had to
-          be told (../tree/compat.ts § focusable). */}
-      {drawsOwn()
-        ? <pty ref={handedOwn} flexGrow={1} />
-        : <embedded_terminal ref={handedNative} flexGrow={1} />}
+      {/* Not a stop: the box is, and the emulator is what is inside it, so focus lands on the box
+          and the box decides when to hand the keys over. A `pty` is not focusable by default, so
+          nothing here has to say so (../tree/compat.ts § focusable). */}
+      <pty ref={handedOwn} flexGrow={1} />
     </box>
   )
 }

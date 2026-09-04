@@ -1,6 +1,5 @@
 import { builtinModules } from 'node:module'
 import { isAbsolute, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
 
@@ -9,31 +8,21 @@ import solid from 'vite-plugin-solid'
 //
 // Three things make it the TUI rather than the desktop:
 //
-//   - `generate: 'universal'` sends Solid's JSX to OpenTUI's reconciler instead of to the DOM.
+//   - `generate: 'universal'` sends Solid's JSX to our own tree module instead of to the DOM.
 //   - `__ACORN_HOST__` is `'tui'`, which is what `Only` and `Fallback` read (client-core
 //     kit/tokens/support.ts).
 //   - `@acorn/plugin-api/ui` resolves to this package's kit. A compiled pane imports the kit through
 //     that facade and nothing else, so aliasing the facade is the whole host switch for it. Mirrored
 //     in tsconfig.json's `paths`.
 
-// Which painter draws, and the whole of the switch between them.
+// Where every JSX call in the process goes.
 //
-// `generate: 'universal'` below sends every JSX call in the process — client-core's components and a
-// sandboxed plugin's included — to the module named in `moduleName`, so the one thing that decides
-// which painter receives them is what that name resolves to. `opentui` is the default, deliberately:
-// the shipped bundle and the whole existing suite are untouched until phase 4 flips it, and
-// `ACORN_TUI_PAINTER=own` is how the golden comparison and a reader who wants to try it ask for ours
-// (docs/future/terminal-rewrite/phase-2-the-painter.md § Scope).
-//
-// An alias and a define rather than a plugin. There are two painters and there will be one, so
-// anything more general than this is flexibility with a deletion date on it.
-const painter = process.env.ACORN_TUI_PAINTER === 'own' ? 'own' : 'opentui'
-const RECONCILER = {
-  // OpenTUI's, with loose text wrapped and the destroy race tied to the owner (src/kit/reconciler.ts).
-  opentui: 'src/kit/reconciler.ts',
-  // Ours: plain objects, Yoga through wasm, a cell buffer (src/tree/renderer.ts).
-  own: 'src/tree/renderer.ts',
-}[painter]
+// `generate: 'universal'` below sends them — client-core's components and a sandboxed plugin's
+// included — to the module named in `moduleName`, and that name is this path. Named by its own path
+// rather than by a bare specifier with an alias behind it, because an alias is a second place to
+// look and there is nothing left to switch between: plain objects, Yoga through wasm, a cell buffer
+// (src/tree/renderer.ts, docs/future/terminal-rewrite/architecture.md).
+const RECONCILER = resolve(import.meta.dirname, 'src/tree/renderer.ts')
 
 const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 // Anything that touches Solid's reactive graph is bundled rather than left to Node, so there is
@@ -41,13 +30,11 @@ const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 //
 //   - `solid-js` resolves to its server renderer under the `node` condition, which has no reactivity.
 //   - A second copy is a second graph and a second set of contexts, which fails as
-//     "No renderer found" from inside a component that is plainly under the provider. `@opentui/solid`
-//     holds the renderer in a Solid context, so it has to share the instance too.
+//     "No renderer found" from inside a component that is plainly under the provider.
 //
 // pnpm-workspace.yaml's catalog says the same thing about solid-js for the same reason.
-// `@opentui/core` stays external: it is the native half, and bundling it would not help.
 const isReactiveRuntime = (id: string) =>
-  id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/') || id.startsWith('@opentui/solid')
+  id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/')
 // Aliased to something local, so it must not be externalized first: the `external` callback sees the
 // raw specifier and a `true` there wins before `resolve.alias` runs, which left `@solidjs/router` in the
 // output as a bare import of a package this host deliberately does not have
@@ -91,24 +78,11 @@ export default defineConfig({
       // own Node harness does the same (references/opentui/packages/solid/scripts/solid-transform.ts).
       { find: /^solid-js$/, replacement: 'solid-js/dist/solid.js' },
       { find: /^solid-js\/store$/, replacement: 'solid-js/store/dist/store.js' },
-      // The reconciler, with loose text wrapped on the way in. `src/kit/reconciler.ts` re-exports all of
-      // `@opentui/solid` and replaces one function, and it is aliased rather than imported because the
-      // Solid transform emits its calls by module name (`moduleName` below) — so this is the only way
-      // to sit in front of every one of them, including the ones client-core's own components make.
-      //
-      // Absolute inside it, because client-core's components are compiled with this transform too and
-      // reach for the reconciler from a package that does not depend on it. They are not drawn here —
-      // the TUI has its own kit and its own layouts — but they are in the graph, so they have to
-      // resolve, and they have to resolve to the same instance.
-      // …and under `ACORN_TUI_PAINTER=own` it is ours instead, which is the switch (§ painter above).
-      { find: /^@opentui\/solid$/, replacement: resolve(import.meta.dirname, RECONCILER) },
-      // …and the real one behind it, which only `src/kit/reconciler.ts` names.
-      { find: /^@opentui\/solid\/index\.js$/, replacement: fileURLToPath(import.meta.resolve('@opentui/solid')) },
     ],
   },
-  plugins: [solid({ solid: { generate: 'universal', moduleName: '@opentui/solid' } })],
+  plugins: [solid({ solid: { generate: 'universal', moduleName: RECONCILER } })],
   ssr: { noExternal: true },
-  define: { __ACORN_HOST__: '"tui"', __ACORN_PAINTER__: JSON.stringify(painter) },
+  define: { __ACORN_HOST__: '"tui"' },
   build: {
     target: 'node22',
     outDir: 'dist',

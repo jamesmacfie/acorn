@@ -8,7 +8,6 @@ import type { KeyEvent, Renderable } from '@opentui/core'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { keyedRows } from '../kit/showing'
 import { recordedRequests } from '../fixture'
-import { canDraw } from '../ffi'
 import { renderFixture } from '../harness'
 
 // The chrome, drawn against the fixture node: rail, topbar, pane strip, footer, palette, overlays.
@@ -20,7 +19,7 @@ import { renderFixture } from '../harness'
 
 const caretRow = (frame: string): number => frame.split('\n').findIndex((line) => line.includes('›'))
 
-describe.skipIf(!canDraw)('the shell', () => {
+describe('the shell', () => {
   it('draws the topbar, the rail, the pane strip and the footer at 80 by 24', async () => {
     const screen = await renderFixture({ pane: 'notes' })
     const frame = await screen.until('Scratchpad')
@@ -346,7 +345,7 @@ describe.skipIf(!canDraw)('the shell', () => {
 // mean the four things that actually move the answer
 // (./bindings.ts § When the answer moves).
 
-describe.skipIf(!canDraw)('the footer asks the keymap once per change', () => {
+describe('the footer asks the keymap once per change', () => {
   it('draws many frames without re-collecting, and re-collects when the keys move', async () => {
     const screen = await renderFixture({ width: 100, height: 28 })
     try {

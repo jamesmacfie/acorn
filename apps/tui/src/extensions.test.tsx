@@ -1,6 +1,5 @@
 /** @jsxImportSource @opentui/solid */
 import { afterEach, describe, expect, it } from 'vitest'
-import { canDraw } from './ffi'
 import { renderFixture } from './harness'
 import { fixtureBadgePresses } from './fixtureExtensions'
 
@@ -25,7 +24,7 @@ const litRuns = async (screen: { spans: () => Promise<{ text: string; fg: { r: n
     .filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1)
     .map((run) => run.text)
 
-describe.skipIf(!canDraw)('a contribution inside somebody else’s surface', () => {
+describe('a contribution inside somebody else’s surface', () => {
   // The keyboard contract for extension content, and the whole of requirement 9: content in a remote
   // slot is as reachable as the kit nodes it draws, inside the region its host registered. The slot
   // sits above github's own action toolbar in the Details panel, so a contributed button is that

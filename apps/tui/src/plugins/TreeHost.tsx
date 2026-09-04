@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
-import { Dynamic } from '@opentui/solid'
+import { Dynamic } from '../tree/renderer'
 import { TEXT_NODE, isKitNode } from '@acorn/protocol/tree/nodes.ts'
 import { kitComponent } from '@acorn/client-core/host/tree/kitEntry.ts'
 import { createTreeState } from '@acorn/client-core/host/tree/treeState.ts'

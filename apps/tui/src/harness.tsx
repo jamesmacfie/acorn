@@ -5,8 +5,6 @@ import type { PluginTrustRequest } from '@acorn/client-core/host/plugins/distrib
 import { _resetRequests, stubTransport, TASK } from './fixture'
 import { rgbOf } from './colourCompat'
 import { setTerminalBadge } from './kit/notify'
-import { RAW_KEYS } from './kit/render'
-import { drawsOwn } from './painter'
 import { openOwnRenderer } from './ownRenderer'
 import { frameRequested, framesSettled } from './tree/frames'
 import { pressedKey } from './ownKeys'
@@ -85,8 +83,8 @@ export type Screen = {
   reach: (text: string, steps?: number) => Promise<boolean>
   resize: (width: number, height: number) => void
   quits: () => number
-  /** The renderer, for the questions the store does not answer: the retained tree a case wants to
-   *  count renderables in, and the caret OpenTUI is drawing (./diffLong.test.tsx,
+  /** The renderer, for the questions the store does not answer: the tree a case wants to count nodes
+   *  in, and the console a capture sends away before it takes its frame (./diffLong.test.tsx,
    *  ./keys/keys.test.tsx). */
   renderer: CliRenderer
   done: () => void
@@ -95,12 +93,12 @@ export type Screen = {
 type Modifiers = { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }
 
 /**
- * The renderer, the two frame readers and the key queue, from whichever painter this build picked.
+ * The renderer, the two frame readers and the key queue.
  *
- * Everything below this line is painter-agnostic: the fixture, the resets, the roster and the tree
- * are the same under both, because the components are. What differs is who draws the cells and how a
- * test asks for them, and that is these seven members (./painter.ts,
- * docs/future/terminal-rewrite/architecture.md § 7).
+ * Its own shape rather than seven loose consts because it is what a test is allowed to do to a
+ * screen, said once: everything below it — the fixture, the resets, the roster, the tree — is about
+ * the app rather than about the surface it is drawn on
+ * (docs/future/terminal-rewrite/architecture.md § 7).
  */
 type Surface = {
   renderer: CliRenderer
@@ -113,11 +111,11 @@ type Surface = {
   destroy: () => void
 }
 
-/** Our painter: a screen with no terminal under it, read straight out of the cell buffer.
+/** A screen with no terminal under it, read straight out of the cell buffer.
  *
  *  No FFI and no flag, which is the programme's whole point: this draws on the Node the repo pins
  *  (./paint/screen.ts, docs/future/terminal-rewrite/README.md § Done when). */
-function ownSurface(size: { width: number; height: number }): Surface {
+function openSurface(size: { width: number; height: number }): Surface {
   const renderer = openOwnRenderer({ cols: size.width, rows: size.height })
   return {
     renderer: renderer as unknown as CliRenderer,
@@ -164,45 +162,14 @@ function ownSurface(size: { width: number; height: number }): Surface {
   }
 }
 
-/** OpenTUI's, through its own test renderer. */
-async function opentuiSurface(size: { width: number; height: number }): Promise<Surface> {
-  const { createTestRenderer } = await import('@opentui/core/testing')
-  const { renderer, mockInput, flush, captureCharFrame, captureSpans, resize } = await createTestRenderer({
-    width: size.width,
-    height: size.height,
-    // The keyboard protocol the app asks for (./main.tsx). Without it a legacy terminal sends one byte
-    // for Return with Ctrl and Return without it, so `commit` is a chord nobody can press — and a
-    // suite driving a different protocol from production is testing a different keyboard.
-    kittyKeyboard: true,
-    // And the same answer about focus, for the same reason: a suite whose renderer focuses on a click
-    // by itself is a suite in which the store is not the only owner of the keys
-    // (./keys/regions.ts § Clicks are hit tests).
-    autoFocus: false,
-  })
-  return {
-    renderer,
-    flush,
-    captureCharFrame,
-    captureSpans: () => captureSpans().lines.map((line) => line.spans.map((span) => ({
-      text: span.text,
-      fg: { r: span.fg.r, g: span.fg.g, b: span.fg.b },
-      attributes: span.attributes,
-      width: span.width,
-    }))),
-    resize,
-    pressKey: (key, modifiers) => { mockInput.pressKey(RAW_KEYS[key] ?? key, modifiers) },
-    destroy: () => renderer.destroy(),
-  }
-}
-
 // How to tear the last `renderFixture` down, so the next one can. Module state because a suite is
 // one worker with many renders and the harness is what they have in common.
 //
-// The Solid root is disposed as well as the surface, and under our painter that is not optional:
-// `@opentui/solid` disposes the root from inside `renderer.destroy()`, and ours hands the disposer
-// back and leaves the lifetime to the caller. Without it the previous test's tree stays mounted, its
-// footer effect re-runs against a keymap whose host is gone, and every case after the first fails
-// with "Cannot use a keymap after its host was destroyed" (../tree/renderer.ts § render).
+// The Solid root is disposed as well as the surface, and it is not optional: `render` hands the
+// disposer back and leaves the lifetime to the caller. Without it the previous test's tree stays
+// mounted, its footer effect re-runs against a keymap whose host is gone, and every case after the
+// first fails with "Cannot use a keymap after its host was destroyed"
+// (./tree/renderer.ts § render).
 let previous: (() => void) | null = null
 
 export async function renderFixture(size: {
@@ -222,7 +189,7 @@ export async function renderFixture(size: {
    *  clear anything seeded before the call (client-core/host/plugins/distribution.ts). */
   trust?: readonly PluginTrustRequest[]
 } = {}): Promise<Screen> {
-  const { render } = await import('@opentui/solid')
+  const { render } = await import('./tree/renderer')
   const { installKeymap } = await import('./keys/install')
   const { installRenderGuard, RENDERER_LISTENER_CAP } = await import('./renderGuard')
   const { _resetCollections } = await import('./keys/collection')
@@ -308,11 +275,11 @@ export async function renderFixture(size: {
   // tears its renderer down, so the Solid root stays mounted, its `onCleanup` never runs, and the
   // next render in the same worker throws "command contribution already registered" from the shell's
   // `onMount` — one red test turning into three, none of which names the first. Tearing down here
-  // costs nothing when the previous test was tidy (@opentui/solid disposes the root on `destroy`).
+  // costs nothing when the previous test was tidy.
   previous?.()
   const width = size.width ?? 80
   const height = size.height ?? 24
-  const surface = drawsOwn() ? ownSurface({ width, height }) : await opentuiSurface({ width, height })
+  const surface = openSurface({ width, height })
   const { renderer, flush, captureCharFrame, captureSpans, resize } = surface
   renderer.setMaxListeners(RENDERER_LISTENER_CAP)
   installKeymap(renderer)
@@ -324,12 +291,12 @@ export async function renderFixture(size: {
   const { client } = clientFor('node-1')
   client.clear()
   size.cache?.(client)
-  // Under our painter the tree mounts on the screen's root node rather than on a renderer, which is
-  // the one line of `render` that differs between them (../tree/renderer.ts § render).
-  const target = drawsOwn() ? (renderer as unknown as { root: unknown }).root : renderer
+  // The tree mounts on the screen's root node rather than on the surface around it
+  // (./tree/renderer.ts § render).
+  const target = (renderer as unknown as { root: unknown }).root
   const mounted = await render(() => <App client={client} nodeId="node-1" supervised={size.supervised ?? false} onQuit={() => { quits += 1 }} />, target as never)
   const tearDown = (): void => {
-    if (drawsOwn()) (mounted as unknown as () => void)()
+    ;(mounted as unknown as () => void)()
     surface.destroy()
   }
   previous = tearDown
@@ -338,28 +305,35 @@ export async function renderFixture(size: {
   // capture that hangs says nothing about which node did it.
   const settle = (ms: number) => Promise.race([flush(), new Promise((done) => setTimeout(done, ms))])
   await settle(3000)
-  // OpenTUI patches `console.*` and pops its own overlay over the frame when anything logs. Whatever
-  // logged is worth seeing on stderr; it is not worth drawing over the screen.
-  renderer.console.deactivate()
-  renderer.console.hide()
-  await settle(1000)
-  // Twenty more turns of the loop. A pane's own data is a route and a store, not a prop, and the first
-  // render in a fresh worker also pays for compiling every module the pane pulls in — so the settles
-  // above come back before the pane has anything in it, and the first test in every file was asserting
-  // on an empty pane (docs/tui.md). Each turn is cheap: `flush`
-  // resolves as soon as the render loop is idle, so this is twenty chances for a promise to land rather
-  // than four seconds of waiting.
+  // Twenty more turns of the loop, and it is measured rather than inherited: taking it out reds
+  // `./browseSlow.test.tsx`'s re-suspending case and `browse at 80 by 24` in
+  // `./reachability.test.tsx`, and nothing else in the suite. A pane's own data is a route and a
+  // store rather than a prop, and the first render in a fresh worker also pays for compiling every
+  // module the pane pulls in — so the settle above comes back before the pane has anything in it,
+  // and the first test in every file was asserting on an empty pane. That is a Vite cost rather than
+  // a painter one, which is why one painter did not end it. Each turn is cheap: `flush` resolves as
+  // soon as the tree stops asking for frames, so this is twenty chances for a promise to land rather
+  // than four seconds of waiting (docs/tui.md).
   for (let turn = 0; turn < 20; turn += 1) await settle(200)
   const frame = async (): Promise<string> => {
     await settle(500)
     return captureCharFrame()
   }
 
+  // A real wait between the press and the settle, and not for the reason it used to be. It was here
+  // because a lone Escape is the start of every escape sequence there is and a terminal's parser
+  // holds it until it is sure nothing follows — and a test pushes a `KeyEvent` straight onto the key
+  // stream, so there is no parser in front of the dispatcher and that reason is gone
+  // (./ownKeys.ts § pressedKey).
+  //
+  // What the wait was also doing, which nobody had written down, is giving real time to whatever the
+  // press started. A key lands the caret on a row whose data the fixture answers on a 50 ms timer,
+  // and flushing the render loop does not make a timer fire however many turns it is given. Taking
+  // it out reds `./browseSlow.test.tsx` and `browse at 80 by 24` in `./reachability.test.tsx` and
+  // nothing else, both on the first frame after a Tab. `./kit/render.tsx` needs none, because a
+  // fragment under test has no transport behind it.
   const press = async (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }): Promise<void> => {
     surface.pressKey(key, modifiers)
-    // A real wait before the render loop, not just a flush. A lone Escape is the start of every
-    // escape sequence there is, and the terminal's parser holds it until it is sure nothing
-    // follows; flushing the render loop does not make that timer run.
     await new Promise((done) => setTimeout(done, 80))
     await settle(500)
   }
@@ -450,10 +424,10 @@ export async function renderFixture(size: {
       }
       return drawn
     },
-    // A single character is itself; a named key is OpenTUI's own spelling for one, which is upper
-    // case (`KeyCodes.RETURN`). Anything else is typed one letter at a time, silently, which is a
-    // good hour to save the next person — and a chord is the key plus a modifiers object, never the
-    // string `'ctrl+k'`, which types five letters and a `k`.
+    // A single character is itself; a named key is the parser's own spelling for one, which is upper
+    // case — `RETURN`, `ESCAPE`, `PAGEDOWN`. Anything else is typed one letter at a time, silently,
+    // which is a good hour to save the next person — and a chord is the key plus a modifiers object,
+    // never the string `'ctrl+k'`, which types five letters and a `k` (./ownKeys.ts § pressedKey).
     press,
     /** The frame as coloured runs rather than characters.
      *

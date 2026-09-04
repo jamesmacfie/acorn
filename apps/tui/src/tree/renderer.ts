@@ -1,4 +1,4 @@
-import { createMemo, getOwner, onCleanup, splitProps, untrack } from 'solid-js'
+import { createMemo, getOwner, onCleanup, splitProps, untrack, type JSX as SolidJSX } from 'solid-js'
 import { createRenderer } from 'solid-js/universal'
 import { focusedRenderable, onScreen, scheduleSettle } from '../keys/regions'
 import { invalidateRun } from '../layout/measure'
@@ -187,33 +187,35 @@ export const { effect, memo, createComponent, insert, spread, setProp, mergeProp
 
 /** Mount a tree under a root node and return the dispose.
  *
- *  The root belongs to the painter, so a later slice hands one in. A caller with no painter yet gets
- *  a bare box to mount into, which is what the tree's own tests want. */
-export function render(code: () => Node, root: Node = createElement('box')): () => void {
-  return renderer.render(code, root)
+ *  The root belongs to the screen, so `../main.tsx` and both harnesses hand one in. A caller with no
+ *  screen gets a bare box to mount into, which is what the tree's own tests want.
+ *
+ *  `JSX.Element` rather than `Node` on the way in, because a caller writes JSX and tsc types that
+ *  against the ambient JSX namespace. Both namespaces in play — ours in `./jsx.ts` and the one the
+ *  `@jsxImportSource` pragma still names — say `Element` is Solid's own, so this is the type a caller
+ *  actually holds. What arrives is a `Node`, because `createElement` above is what built it. */
+export function render(code: () => SolidJSX.Element, root: Node = createElement('box')): () => void {
+  return renderer.render(code as unknown as () => Node, root)
 }
 
-/** A component chosen at runtime. `../plugins/TreeHost.tsx`, `../plugins/SourcePanel.tsx` and
- *  `../kit/host.tsx` import this from `@opentui/solid` today, and they want the universal one rather
- *  than `solid-js/web`'s: the DOM version would put a second Solid renderer in the process. */
+/** A component chosen at runtime, and the universal one rather than `solid-js/web`'s: the DOM version
+ *  would put a second Solid renderer in the process. Six chrome and plugin surfaces use it
+ *  (`../chrome/Shell.tsx`, `../chrome/Rail.tsx`, `../chrome/slot.tsx`, `../kit/host.tsx`,
+ *  `../plugins/TreeHost.tsx`, `../plugins/SourcePanel.tsx`).
+ *
+ *  A memo is what comes back and `JSX.Element` is what it is called, for the reason `render` above
+ *  gives: Solid unwraps a function in a child position, so the accessor is the element as far as
+ *  anything reading it is concerned. */
 export function Dynamic<T extends Record<string, unknown>>(
-  props: T & { component: ((props: T) => Node) | undefined },
-) {
+  props: T & { component: ((props: T) => SolidJSX.Element) | undefined },
+): SolidJSX.Element {
   const [own, rest] = splitProps(props, ['component'])
   return createMemo(() => {
     const chosen = own.component
     // Untracked, so the chosen component's own reads belong to its own owner rather than to this memo.
-    return chosen ? untrack(() => createComponent(chosen, rest as unknown as T)) : undefined
-  })
+    return chosen ? untrack(() => createComponent(chosen as unknown as (props: T) => Node, rest as unknown as T)) : undefined
+  }) as unknown as SolidJSX.Element
 }
-
-/** Registers nothing, on purpose.
- *
- *  OpenTUI's `extend` adds a renderable to a component catalogue, and `../kit/rectangle.tsx` calls it
- *  once to put its embedded terminal in there. Our kinds are fixed and `./node.ts` already maps that
- *  tag, so there is nothing to register — and phase 3 removes the call. A no-op rather than nothing,
- *  so the alias satisfies every import it has to satisfy. */
-export const extend = (_components: Record<string, unknown>): void => {}
 
 export { laysOut, measuresText, runText, textOwner } from './node'
 export type { Kind, Node } from './node'

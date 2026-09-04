@@ -1,7 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { createSignal, Show } from 'solid-js'
 import { describe, expect, it } from 'vitest'
-import { canDraw } from '../ffi'
 import { Button } from './asking'
 import { Sections } from './grouping'
 import { Row, Rows, Text } from './showing'
@@ -23,7 +22,7 @@ const caret = (screen: { lines: string[] }): string => screen.lines.find((line) 
 const lit = (screen: { runs: () => { text: string; fg: { r: number; g: number; b: number }; attributes: number }[] }): string[] =>
   screen.runs().filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1).map((run) => run.text)
 
-describe.skipIf(!canDraw)('scrolling detail viewports', () => {
+describe('scrolling detail viewports', () => {
   it('enters a selected tab with Down, reveals keyboard rows, and returns with Escape', async () => {
     const rows = items(18)
     const screen = await renderCells(() => (

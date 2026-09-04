@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { createMemo, createSignal, Show } from 'solid-js'
-import { Dynamic } from '@opentui/solid'
+import { Dynamic } from '../tree/renderer'
 import type { Renderable } from '@opentui/core'
 import { bindIntents } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { useNavigate, useParams } from '@solidjs/router'

@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest'
 import { LAYOUT_REGIONS, PANE_LAYOUTS, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { LayoutProps, Region } from '@acorn/client-core/host/layouts/regions.ts'
-import { canDraw } from '../ffi'
 import { renderCells, type Frame } from '../kit/render'
 import { Line } from '../kit/cells'
 import { LAYOUTS } from './index'
@@ -124,7 +123,7 @@ const draw = (entry: Case, size: { width: number; height: number }) => {
   return renderCells(() => <Layout stateKey={`pane-${entry.layout}`} label="Test" {...entry.props} />, size)
 }
 
-describe.skipIf(!canDraw)('the layouts in cells', () => {
+describe('the layouts in cells', () => {
   it('has a case for every layout name, and no case for one that is gone', () => {
     expect(CASES.map((entry) => entry.layout).sort()).toEqual([...PANE_LAYOUTS].sort())
     // Every case fills only regions the layout actually has, so a case cannot pass by drawing
