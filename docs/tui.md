@@ -533,7 +533,14 @@ does, and a handler returning `false` passes it on.
 | Cross | `→` `l` / `←` `h` | `expand`/`collapse`, which a tree answers and a horizontal collection moves; a plain list and a leaf bubble | the next/previous tab; an edge bubbles | bubbles | bubbles | one column left or right, landing on that column's last-used region, no wrap |
 | Act | `⏎` `space` | activate the row, then enter main where the region says so | nothing | press: `onPress`, a toggle, a `Select`'s list, an `Input`'s submit, an entered rectangle | nothing | nothing |
 | Back | `esc` | the parent stop if a panel holds the collection, else the region's home | the region's home | the parent stop, else the region's home | the region's home | a notification clears, else the climb the shell's topology names |
-| Page | `pgup` `pgdn` `home` `end` | `pagePrev`, `pageNext`, `first`, `last` on the collection | scroll the viewport around it | scroll the viewport around it | scroll | nothing |
+| Page | `pgup` `pgdn` `home` `end` `g` `G` | `pagePrev`, `pageNext`, `first`, `last` on the collection | scroll the viewport around it | scroll the viewport around it | scroll | nothing |
+
+**`g` and `G` are `first` and `last`, and they are not this host's own.** They sit in `intentKeys`
+beside Home and End, so a desktop list answers them too, and the terminal adds no key for either. A
+sequence would be the vim spelling — `g g` for the top — and we refuse it: `g` already means `first`
+on its own, so making it a prefix would put a timeout in front of a key that answers instantly today,
+and the footer has no way to draw "g then g" in a cell. Nothing else on either host wants a sequence,
+and the engine's support for them costs nothing while nothing uses it.
 
 **A cross key has one meaning per level and one at the bottom.** A handler that changed nothing
 returns `false`, so the key carries on down: a tab strip at its last tab, a tree row that is a file,
@@ -989,6 +996,31 @@ While a PTY is entered the footer says `esc leave · esc esc send escape`. `?` o
 a modal with the same hints and a sentence each, and the footer itself is not a focus stop: it is a
 label with nothing to drive, and a stop that does nothing is a hole a reader falls into.
 
+**The cheat sheet is the footer's own list, drawn in full.** It calls `activeHints()` and nothing
+else, so a binding that appears in one appears in the other and a key nothing bound can appear in
+neither. It snapshots on open, because the modal pushes a scope the moment it draws and would
+otherwise answer a question the reader did not ask. What the sheet adds is the `detail` sentence the
+footer has no room for. `chrome.test.tsx` asserts the two lists are equal in both directions: a row
+the engine never reported is the sheet naming a dead key, and a hint with no row is the footer
+offering something the sheet cannot explain.
+
+**Escape sits third, and that is a rule rather than an accident.** The footer cuts rather than wraps,
+and the hints run move, act, back, then the chords, then the rest. `esc back` used to sit last in
+reading order, which meant the line ran out before it on every screen we draw, the cheat sheet's own
+footer included: the hint was in the list and no reader ever saw it. The scopes are a stack and
+Escape pops it, and this row is the whole of what draws that depth, so `reachability.test.tsx` reads
+the drawn line and not the list, at every depth the walk visits.
+
+**A hint the top scope cannot honour is dropped.** A layer knows nothing about scopes, so inside a
+`Modal` or an open `Menu` the region tier's Tab and its column pair are still registered and the
+engine still reports them live. `regionsInScope() > 1` is the rest of the question and both hints ask
+it. The pair asks it only where its word is `column`, because `fold`, `move` and `tab` are answered
+inside the scope by the thing that has the keys.
+
+**A region's name is not in the footer, and we are not adding it.** A `list-detail` pane draws two
+titled frames and the caret sits in one of them, so which half has the keys is on the screen already
+and is on it in place. A label at the left would cost the cells the hints are short of.
+
 ### Seeing what the keys did
 
 `ACORN_TUI_KEYS_TRACE=1` writes one line per key to `keys.log` under the XDG state directory
@@ -1244,6 +1276,15 @@ the shell's own layer and clears a notification instead. The same file says whic
 when the screen first has any — Tasks when the session opened with a task and no source, Menu otherwise
 — and which regions a first crossing into a column passes over, which is the pane strip and nothing
 else.
+
+**No digit jumps to a region.** lazydocker binds `1` to `6` to its six panels and it works there
+because those six are always drawn, always in that order. Ours are not a fixed set: Browse registers
+nothing without a list, the rail goes on `ctrl+b`, the strip draws only while a task is open, and a
+pane's own regions are its layout's. So `3` would name a different region on nearly every screen,
+which is the opposite of what a direct jump is for. The footer settles the rest: it already runs out
+of line before `esc back` on every screen we draw, so nine more rows are nine keys it cannot say, and
+a key the footer cannot say is what § The footer exists to prevent. Tab and the column moves are the
+region keys, and `ctrl+1` to `ctrl+9` are the `tabs` layout's, which is a fixed set drawn in one strip.
 
 `w` switches workspace and `p` switches project, both through an overlay, because that is the shape
 that takes the keys off whatever had them. Neither restores what you were looking at. Both schedule a

@@ -216,7 +216,8 @@ per-host key table is for. And overlays and entered PTYs retain first refusal th
 
 **Collection state is the host's.** A run of `Row`s inside a `Rows`, a tab strip, a menu, a chip row,
 a segmented control, a timeline and a grid are all one collection with roving focus inside, and the
-arrows, Home, End, the page keys and type-ahead come from `client-core/kit/keys/collectionIntents.ts`
+arrows, Home, End, `g` and `G`, the page keys and type-ahead come from
+`client-core/kit/keys/collectionIntents.ts`
 rather than from the pane. `active` and `selected` live in the host's store keyed by the item's own
 key ([state-ownership.md](./state-ownership.md)), so a refetch keeps your place.
 
